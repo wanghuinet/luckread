@@ -18,11 +18,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm run generate:types:cloudflare
       - run: pnpm run build
+        env:
+          PAYLOAD_SECRET: ci-build-placeholder
+      - name: Validate Cloudflare deployment inputs
+        env:
+          D1_ID: ${{ secrets.LUCKREAD_D1_DATABASE_ID }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$D1_ID" || { echo "Missing LUCKREAD_D1_DATABASE_ID"; exit 1; }
+          test -n "$CF_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$CF_ACCOUNT" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          sed -i "s/REPLACE_WITH_LUCKREAD_D1_DATABASE_ID/$D1_ID/" wrangler.jsonc
       - run: pnpm run deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PAYLOAD_SECRET: ci-build-placeholder
