@@ -30,7 +30,12 @@ export default buildConfig({
     binding: cloudflare.env.D1,
     readReplicas: 'first-primary',
   }),
-  storage: [r2Storage({ bucket: cloudflare.env.R2, collections: { media: true } })],
+  plugins: [
+    r2Storage({
+      bucket: cloudflare.env.R2,
+      collections: { media: true },
+    }),
+  ],
 })
 
 function getCloudflareContextFromWrangler(): Promise<CloudflareContext> {
