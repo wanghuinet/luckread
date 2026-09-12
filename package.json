@@ -1,0 +1,47 @@
+{
+  "name": "luckread",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "cross-env NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" payload build",
+    "deploy": "pnpm run deploy:database && pnpm run deploy:app",
+    "deploy:app": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "deploy:database": "cross-env NODE_ENV=production PAYLOAD_SECRET=ignore payload migrate && wrangler d1 execute D1 --command 'PRAGMA optimize' --remote",
+    "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
+    "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
+    "generate:types": "pnpm run generate:types:cloudflare && pnpm run generate:types:payload",
+    "generate:types:cloudflare": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "generate:types:payload": "cross-env NODE_OPTIONS=--no-deprecation payload generate:types",
+    "lint": "cross-env NODE_OPTIONS=--no-deprecation eslint .",
+    "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@opennextjs/cloudflare": "^1.11.0",
+    "@payloadcms/db-d1-sqlite": "3.82.1",
+    "@payloadcms/next": "3.82.1",
+    "@payloadcms/richtext-lexical": "3.82.1",
+    "@payloadcms/storage-r2": "3.82.1",
+    "@payloadcms/ui": "3.82.1",
+    "cross-env": "10.1.0",
+    "graphql": "^16.8.1",
+    "next": "16.3.3",
+    "payload": "3.82.1",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@types/node": "24.12.3",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "eslint": "^9.16.0",
+    "eslint-config-next": "16.3.3",
+    "prettier": "^3.4.2",
+    "tsx": "4.22.4",
+    "typescript": "6.0.3",
+    "wrangler": "~4.116.0"
+  },
+  "engines": {"node": ">=24.15.0", "pnpm": ">=9"},
+  "pnpm": {"onlyBuiltDependencies": ["sharp", "esbuild", "unrs-resolver"]}
+}
