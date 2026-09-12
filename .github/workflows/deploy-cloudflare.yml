@@ -3,6 +3,11 @@ name: Deploy LuckRead Payload
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '*.log'
+      - '**/*.log'
   workflow_dispatch:
 
 jobs:
