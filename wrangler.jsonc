@@ -7,7 +7,7 @@
   "assets": {"directory": ".open-next/assets", "binding": "ASSETS"},
   "d1_databases": [{
     "binding": "D1",
-    "database_id": "REPLACE_WITH_LUCKREAD_D1_DATABASE_ID",
+    "database_id": "2f80471e-3756-49f9-8db1-7707a433ad64",
     "database_name": "luckread",
     "remote": true
   }],
