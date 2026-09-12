@@ -28,13 +28,21 @@ jobs:
           D1_ID: ${{ secrets.LUCKREAD_D1_DATABASE_ID }}
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PAYLOAD_SECRET: ${{ secrets.LUCKREAD_PAYLOAD_SECRET }}
         run: |
           test -n "$D1_ID" || { echo "Missing LUCKREAD_D1_DATABASE_ID"; exit 1; }
           test -n "$CF_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
           test -n "$CF_ACCOUNT" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          test -n "$PAYLOAD_SECRET" || { echo "Missing LUCKREAD_PAYLOAD_SECRET"; exit 1; }
           sed -i "s/REPLACE_WITH_LUCKREAD_D1_DATABASE_ID/$D1_ID/" wrangler.jsonc
+      - name: Set Payload runtime secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PAYLOAD_SECRET: ${{ secrets.LUCKREAD_PAYLOAD_SECRET }}
+        run: printf '%s' "$PAYLOAD_SECRET" | pnpm exec wrangler secret put PAYLOAD_SECRET
       - run: pnpm run deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          PAYLOAD_SECRET: ci-build-placeholder
+          PAYLOAD_SECRET: ${{ secrets.LUCKREAD_PAYLOAD_SECRET }}
