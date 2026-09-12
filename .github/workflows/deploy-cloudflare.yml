@@ -25,7 +25,7 @@ jobs:
           node-version: 24
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm run generate:types:cloudflare
-      - run: pnpm run build
+      - run: pnpm exec opennextjs-cloudflare build
         env:
           PAYLOAD_SECRET: ci-build-placeholder
       - name: Validate Cloudflare deployment inputs
