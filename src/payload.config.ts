@@ -26,7 +26,10 @@ export default buildConfig({
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
-  db: sqliteD1Adapter({ binding: cloudflare.env.D1 }),
+  db: sqliteD1Adapter({
+    binding: cloudflare.env.D1,
+    readReplicas: 'first-primary',
+  }),
   storage: [r2Storage({ bucket: cloudflare.env.R2, collections: { media: true } })],
 })
 
