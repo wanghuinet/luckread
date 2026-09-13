@@ -33,6 +33,7 @@
       }
     }
   },
+  "version": "1.0.0",
   "x-luckread": {
     "single-source-rule": "Every OpenAPI operationId MUST appear exactly once in operations.",
     "public-operations": ["authRegister", "authLogin"],
