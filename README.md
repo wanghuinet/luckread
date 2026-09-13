@@ -15,6 +15,10 @@ The repository retains:
 - `.github/workflows/actions-execution-probe.yml` — hosted-runner execution probe
 - `.agents/skills/payload/` — Payload development reference material, not product implementation
 
+## Latest architecture landing
+
+`docs/10-P0-PLATFORM-ARCHITECTURE-CONTINUATION-P641-P720.md` records the current architecture continuation through P720, including Workflow/Moderation, API Platform, Developer Platform, Webhooks/Partner API, and Recommendation/Ranking/Personalization. It is explicitly marked `DOCUMENTED / ARCHITECTURE-ONLY` and does not claim implementation or release Green without independent CI evidence.
+
 ## Development rule
 
 Payload is restored only after the contract/evidence admission gates are green. At implementation time, the project must pull the approved/pinned upstream Payload version and then implement against the already-frozen contracts.
@@ -45,6 +49,8 @@ Implementation must not redefine the contract. A framework default, generated ty
 
 ## Current status
 
-The repository is in contract-admission hardening. Payload implementation is intentionally absent until the admission gate is closed with current-SHA execution evidence.
+The repository remains in contract-admission hardening. Payload implementation is intentionally absent until the admission gate is closed with current-SHA execution evidence.
+
+The P641–P720 architecture results are now landed on `main` as documented design. They must progress through the existing Contract → Implementation → Integration → E2E → Security → Release gates before being described as implemented or production-ready.
 
 A hosted-runner execution blocker is tracked separately in GitHub Issue #2. Local structural and semantic validation does not override a failed or unexecuted hosted CI gate.
