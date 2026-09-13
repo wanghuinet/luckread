@@ -1,0 +1,44 @@
+name: API Inventory Reconciliation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/api/**'
+      - 'contracts/openapi/**'
+      - 'scripts/api-inventory-reconciliation-check.mjs'
+      - '.github/workflows/api-inventory-reconciliation.yml'
+  pull_request:
+    paths:
+      - 'contracts/api/**'
+      - 'contracts/openapi/**'
+      - 'scripts/api-inventory-reconciliation-check.mjs'
+      - '.github/workflows/api-inventory-reconciliation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    name: Reconcile API inventory and policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Run reconciliation
+        run: node scripts/api-inventory-reconciliation-check.mjs
+
+      - name: Upload reconciliation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-inventory-reconciliation-evidence
+          path: artifacts/api-inventory/reconciliation-report.json
+          if-no-files-found: error
