@@ -10,6 +10,8 @@ info:
 servers:
   - url: /api/v1
     description: API v1
+authorization:
+  - bearerAuth: []
 security:
   - bearerAuth: []
 tags:
@@ -110,6 +112,7 @@ paths:
   /users/me:
     get:
       tags: [Users]
+      summary: Get current user profile
       operationId: getMe
       responses:
         '200':
@@ -119,6 +122,7 @@ paths:
               schema: { $ref: '#/components/schemas/User' }
     patch:
       tags: [Users]
+      summary: Update current user profile
       operationId: updateMe
       parameters:
         - $ref: '#/components/parameters/IfMatch'
@@ -138,6 +142,9 @@ paths:
       tags: [Users, Admin]
       summary: Transition account lifecycle state
       operationId: transitionAccountState
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/IfMatchRequired'
       requestBody:
         required: true
         content:
@@ -161,10 +168,13 @@ paths:
                   auditEventId: { $ref: '#/components/schemas/ResourceId' }
         '403': { $ref: '#/components/responses/PermissionDenied' }
         '409': { $ref: '#/components/responses/InvalidState' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
 
   /contents:
     get:
       tags: [Contents]
+      summary: List content
       operationId: listContents
       parameters:
         - $ref: '#/components/parameters/Cursor'
@@ -177,6 +187,7 @@ paths:
               schema: { $ref: '#/components/schemas/ListResponse' }
     post:
       tags: [Contents]
+      summary: Create content draft
       operationId: createContent
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -198,6 +209,7 @@ paths:
       - $ref: '#/components/parameters/ContentId'
     get:
       tags: [Contents]
+      summary: Get content by ID
       operationId: getContent
       responses:
         '200':
@@ -210,6 +222,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
       tags: [Contents]
+      summary: Update content
       operationId: updateContent
       parameters:
         - $ref: '#/components/parameters/IfMatch'
@@ -228,12 +241,15 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
     delete:
       tags: [Contents]
+      summary: Delete content
       operationId: deleteContent
       parameters:
         - $ref: '#/components/parameters/IfMatch'
       responses:
         '204':
           description: Soft-deleted.
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
 
   /contents/{contentId}/state:
     parameters:
@@ -242,6 +258,9 @@ paths:
       tags: [Contents]
       summary: Transition content lifecycle state
       operationId: transitionContentState
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       requestBody:
         required: true
         content:
@@ -267,6 +286,7 @@ paths:
                   etag: { $ref: '#/components/schemas/ETag' }
         '409': { $ref: '#/components/responses/InvalidState' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
 
   /media:
     post:
@@ -302,6 +322,7 @@ paths:
       - $ref: '#/components/parameters/MediaId'
     get:
       tags: [Media]
+      summary: Get media metadata
       operationId: getMedia
       responses:
         '200':
@@ -316,6 +337,7 @@ paths:
       - $ref: '#/components/parameters/ContentId'
     get:
       tags: [Comments]
+      summary: List content comments
       operationId: listComments
       parameters:
         - $ref: '#/components/parameters/Cursor'
@@ -328,6 +350,7 @@ paths:
               schema: { $ref: '#/components/schemas/ListResponse' }
     post:
       tags: [Comments]
+      summary: Create content comment
       operationId: createComment
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -413,6 +436,7 @@ paths:
   /feed:
     get:
       tags: [Feed]
+      summary: Get personalized feed
       operationId: getFeed
       parameters:
         - name: type
@@ -433,6 +457,7 @@ paths:
   /search:
     get:
       tags: [Search]
+      summary: Search content
       operationId: search
       parameters:
         - name: q
@@ -451,6 +476,7 @@ paths:
   /notifications:
     get:
       tags: [Notifications]
+      summary: List current user notifications
       operationId: listNotifications
       parameters:
         - $ref: '#/components/parameters/Cursor'
@@ -485,6 +511,7 @@ paths:
   /creators/me:
     get:
       tags: [Creators]
+      summary: Get current creator profile
       operationId: getMyCreator
       responses:
         '200':
@@ -497,6 +524,7 @@ paths:
   /ips:
     post:
       tags: [IPs]
+      summary: Create IP principal
       operationId: createIp
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -524,6 +552,7 @@ paths:
       - $ref: '#/components/parameters/IpId'
     post:
       tags: [IPs]
+      summary: Invite an IP member
       operationId: inviteIpMember
       requestBody:
         required: true
@@ -541,6 +570,7 @@ paths:
         '403': { $ref: '#/components/responses/PermissionDenied' }
     delete:
       tags: [IPs]
+      summary: Remove an IP member
       operationId: removeIpMember
       requestBody:
         required: true
@@ -558,6 +588,7 @@ paths:
   /organizations:
     post:
       tags: [Organizations]
+      summary: Create organization
       operationId: createOrganization
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -581,6 +612,7 @@ paths:
   /admin/moderation/cases:
     get:
       tags: [Admin]
+      summary: List moderation cases
       operationId: listModerationCases
       parameters:
         - $ref: '#/components/parameters/Cursor'
@@ -636,11 +668,23 @@ components:
       in: header
       required: false
       schema: { $ref: '#/components/schemas/IdempotencyKey' }
+    IdempotencyKeyRequired:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Required for operations whose policy declares idempotencyRequired=true.
+      schema: { $ref: '#/components/schemas/IdempotencyKey' }
     IfMatch:
       name: If-Match
       in: header
       required: false
-      description: Required for state-changing operations on versioned resources.
+      description: Optional reusable parameter for versioned writes where policy does not require it globally.
+      schema: { $ref: '#/components/schemas/ETag' }
+    IfMatchRequired:
+      name: If-Match
+      in: header
+      required: true
+      description: Required for optimistic-locked versioned writes.
       schema: { $ref: '#/components/schemas/ETag' }
 
   responses:
@@ -808,7 +852,7 @@ components:
         authorId: { $ref: '#/components/schemas/ResourceId' }
         creatorId: { $ref: '#/components/schemas/ResourceId' }
         ipId: { $ref: '#/components/schemas/ResourceId' }
-        publishedAt: { type: string, format: date-time, nullable: true }
+        publishedAt: { type: [string, 'null'], format: date-time }
       required: [id, type, state, visibility, version, revision]
       additionalProperties: false
 
@@ -817,7 +861,7 @@ components:
       properties:
         id: { $ref: '#/components/schemas/ResourceId' }
         contentId: { $ref: '#/components/schemas/ResourceId' }
-        parentId: { $ref: '#/components/schemas/ResourceId', nullable: true }
+        parentId: { anyOf: [{ $ref: '#/components/schemas/ResourceId' }, { type: 'null' }] }
         authorId: { $ref: '#/components/schemas/ResourceId' }
         body: { type: string }
         state: { $ref: '#/components/schemas/CommentState' }
@@ -834,9 +878,9 @@ components:
         size: { type: integer }
         checksum: { type: string }
         r2Key: { type: string }
-        width: { type: integer, nullable: true }
-        height: { type: integer, nullable: true }
-        durationMs: { type: integer, nullable: true }
+        width: { type: [integer, 'null'] }
+        height: { type: [integer, 'null'] }
+        durationMs: { type: [integer, 'null'] }
       required: [id, state, r2Key]
       additionalProperties: false
 
@@ -847,7 +891,7 @@ components:
         name: { type: string }
         state: { $ref: '#/components/schemas/IpState' }
         principalId: { $ref: '#/components/schemas/ResourceId' }
-        ownerOrgId: { $ref: '#/components/schemas/ResourceId', nullable: true }
+        ownerOrgId: { anyOf: [{ $ref: '#/components/schemas/ResourceId' }, { type: 'null' }] }
       required: [id, name, state, principalId]
       additionalProperties: false
 
