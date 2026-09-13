@@ -106,6 +106,7 @@ paths:
       responses:
         '204':
           description: Logged out; token version incremented.
+        '4XX': { $ref: '#/components/responses/ClientError' }
 
   /users/me:
     get:
@@ -118,6 +119,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/User' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
     patch:
       tags: [Users]
       summary: Update current user profile
@@ -182,6 +184,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ListResponse' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
     post:
       tags: [Contents]
       summary: Create content draft
@@ -345,6 +348,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ListResponse' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
     post:
       tags: [Comments]
       summary: Create content comment
@@ -395,6 +399,7 @@ paths:
       responses:
         '204':
           description: Like removed (idempotent).
+        '4XX': { $ref: '#/components/responses/ClientError' }
 
   /social/follows:
     post:
@@ -413,6 +418,7 @@ paths:
       responses:
         '200':
           description: Followed (idempotent).
+        '4XX': { $ref: '#/components/responses/ClientError' }
     delete:
       tags: [Interactions]
       summary: Idempotent unfollow.
@@ -429,6 +435,7 @@ paths:
       responses:
         '204':
           description: Unfollowed (idempotent).
+        '4XX': { $ref: '#/components/responses/ClientError' }
 
   /feed:
     get:
@@ -469,6 +476,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ListResponse' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
 
   /notifications:
     get:
@@ -484,6 +492,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ListResponse' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
     post:
       tags: [Notifications]
       summary: Batch mark read / unread / delete
@@ -504,6 +513,7 @@ paths:
       responses:
         '200':
           description: Applied.
+        '4XX': { $ref: '#/components/responses/ClientError' }
 
   /creators/me:
     get:
@@ -543,6 +553,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Ip' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
 
   /ips/{ipId}/members:
     parameters:
@@ -581,6 +592,7 @@ paths:
       responses:
         '204':
           description: Removed; organization version incremented.
+        '4XX': { $ref: '#/components/responses/ClientError' }
 
   /organizations:
     post:
@@ -605,6 +617,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Organization' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
 
   /admin/moderation/cases:
     get:
@@ -685,6 +698,11 @@ components:
       schema: { $ref: '#/components/schemas/ETag' }
 
   responses:
+    ClientError:
+      description: Client error using the canonical error contract.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
     NotFound:
       description: >-
         Not found. Also returned when the resource exists but the caller may not
