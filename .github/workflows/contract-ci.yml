@@ -28,7 +28,5 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Install contract validator
-        run: npm install --no-save --no-package-lock ajv@8.17.1
       - name: Validate common schemas
         run: node scripts/contract-ci.mjs common
