@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/authz/subject-types.json",
+  "title": "Authorization Subject Types",
+  "type": "object",
+  "required": ["subjectTypes"],
+  "properties": {
+    "subjectTypes": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["type", "requiresIdentity", "mayImpersonateUser"],
+        "properties": {
+          "type": { "enum": ["ANONYMOUS", "USER", "SERVICE", "API_CLIENT", "AUTOMATION"] },
+          "requiresIdentity": { "type": "boolean" },
+          "mayImpersonateUser": { "type": "boolean" },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  },
+  "x-rules": [
+    "ANONYMOUS may access only explicitly public operations.",
+    "USER authorization is constrained by account state, permission, scope and resource policy.",
+    "SERVICE requires explicit service permission and cannot implicitly become SUPER_ADMIN.",
+    "API_CLIENT requires declared application scope plus the underlying subject authorization.",
+    "AUTOMATION requires an explicit registered automation identity and bounded permissions.",
+    "No subject type may bypass account security state without an explicit break-glass contract."
+  ],
+  "x-subjectTypes": [
+    { "type": "ANONYMOUS", "requiresIdentity": false, "mayImpersonateUser": false, "notes": "Public access only." },
+    { "type": "USER", "requiresIdentity": true, "mayImpersonateUser": false, "notes": "Human end-user subject." },
+    { "type": "SERVICE", "requiresIdentity": true, "mayImpersonateUser": false, "notes": "Machine/service principal." },
+    { "type": "API_CLIENT", "requiresIdentity": true, "mayImpersonateUser": false, "notes": "Registered developer application credential." },
+    { "type": "AUTOMATION", "requiresIdentity": true, "mayImpersonateUser": false, "notes": "Scheduled/event-driven platform automation." }
+  ]
+}
