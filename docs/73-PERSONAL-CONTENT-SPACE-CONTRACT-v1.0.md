@@ -71,12 +71,56 @@ My
 ├── Media
 ├── Collections / Series
 ├── Continue Watching / Reading
+├── Live
 └── Creator Center
 ```
 
 The exact UI can evolve without changing ownership boundaries.
 
-## 5. Content Ownership Boundary
+## 5. Live Entry and Return Contract
+
+The Personal Content Space MUST retain a visible **Live / 直播** entry point.
+
+This entry is an experience/navigation capability and MUST NOT be removed merely because the Live infrastructure implementation is deferred.
+
+```text
+My
+  ↓
+Live / 直播
+  ↓
+Live Experience
+  ↓
+Back / Close
+  ↓
+Original Personal Content Space
+```
+
+Requirements:
+
+- The Live button MUST remain present in the navigation contract.
+- Clicking Live MUST open the Live experience without replacing the user's Personal Content Space state permanently.
+- The originating navigation context MUST be preserved.
+- Returning from Live MUST return the user directly to the previous Personal Content Space location whenever technically possible.
+- The previous tab/filter/cursor/scroll position SHOULD be restored where safe and supported.
+- If the Live experience fails to initialize, the user MUST be able to return immediately to Personal Content Space.
+- Live entry MUST support future integration with an external/self-hosted Live implementation without changing the Personal Content Space navigation contract.
+- Personal Content Space MUST NOT own Live room state, RTC state, stream state, participant state, or media transport state.
+
+Recommended navigation state:
+
+```text
+PersonalContentSpaceState
+├── entryPoint
+├── selectedSection
+├── filter
+├── cursor
+├── scrollPosition
+└── returnTarget
+```
+
+The Live flow MUST treat `returnTarget` as navigation state only; it MUST NOT become a business-data authority.
+
+## 6. Content Ownership Boundary
 
 For every item shown in Personal Content Space, the system MUST retain a stable domain reference rather than copying the complete authoritative object.
 
@@ -90,7 +134,7 @@ Content / Creator / Social / Media / Interaction / Other Authority
 
 The aggregation layer MAY maintain derived indexes, counters, ordering keys, snapshots, and cache entries for performance, but these MUST be reconstructible.
 
-## 6. Content State Model
+## 7. Content State Model
 
 User-facing content management MUST distinguish at least:
 
@@ -108,7 +152,7 @@ DRAFT
 
 The authoritative state belongs to the owning domain. Personal Content Space only presents and filters that state.
 
-## 7. Drafts
+## 8. Drafts
 
 Drafts are first-class user work products.
 
@@ -127,7 +171,7 @@ Requirements:
 
 Draft persistence belongs to the Content / Production domain; Personal Content Space provides the management entry.
 
-## 8. Published Content
+## 9. Published Content
 
 The published list MUST support:
 
@@ -144,7 +188,7 @@ The published list MUST support:
 
 Metrics are read models and MUST NOT become authoritative accounting records.
 
-## 9. Scheduled Content
+## 10. Scheduled Content
 
 Scheduled items MUST expose:
 
@@ -158,7 +202,7 @@ Scheduled items MUST expose:
 
 Scheduling execution belongs to the Content / Platform scheduling domain.
 
-## 10. Failed / Rejected Content
+## 11. Failed / Rejected Content
 
 The user MUST be able to understand why an operation failed without exposing internal security-sensitive details.
 
@@ -174,7 +218,7 @@ Supported states include:
 
 Retry MUST be idempotent and MUST NOT create duplicate authoritative content.
 
-## 11. Likes / Favorites / History
+## 12. Likes / Favorites / History
 
 Personal Content Space may aggregate:
 
@@ -189,7 +233,7 @@ These records are owned by Interaction / Activity / Media domains as applicable.
 
 History MAY have configurable retention and privacy controls.
 
-## 12. Comments and Replies
+## 13. Comments and Replies
 
 The user can access:
 
@@ -201,7 +245,7 @@ The user can access:
 
 Deletion, moderation, appeal, and visibility decisions remain owned by the Comment / Moderation domains.
 
-## 13. Following and Followers
+## 14. Following and Followers
 
 Personal Content Space provides navigation into:
 
@@ -213,7 +257,7 @@ Personal Content Space provides navigation into:
 
 The Social Graph remains authoritative.
 
-## 14. Media Space
+## 15. Media Space
 
 My Media MAY include:
 
@@ -228,7 +272,7 @@ My Media MAY include:
 
 Media objects MUST reference the Media domain and MUST NOT duplicate binary objects into the Personal Content Space.
 
-## 15. Collections / Series
+## 16. Collections / Series
 
 Users MAY organize content into:
 
@@ -241,7 +285,7 @@ Users MAY organize content into:
 
 Collection ownership and membership semantics MUST be explicitly defined by the owning domain.
 
-## 16. Creator Center Boundary
+## 17. Creator Center Boundary
 
 Personal Content Space MUST provide a clear transition for users who want to create content:
 
@@ -259,7 +303,7 @@ Registration MUST NOT require creator creation.
 
 Creator Center remains the authoritative experience for creator operations, analytics, monetization, publishing workflows, and creator tools.
 
-## 17. Content Types
+## 18. Content Types
 
 The aggregation contract MUST be extensible to at least:
 
@@ -278,7 +322,7 @@ The aggregation contract MUST be extensible to at least:
 
 Adding a new content type MUST NOT require redesigning the Personal Content Space contract.
 
-## 18. API Contract
+## 19. API Contract
 
 Representative APIs:
 
@@ -296,7 +340,10 @@ GET    /v1/me/followers
 GET    /v1/me/media
 GET    /v1/me/collections
 GET    /v1/me/continue
+GET    /v1/me/live
 ```
+
+The Live API here is only a user-specific navigation/history surface. It MUST NOT imply that Personal Content Space owns Live infrastructure.
 
 Mutation examples:
 
@@ -310,7 +357,7 @@ DELETE /v1/me/activity/history/{id}
 
 Every mutation MUST enforce user ownership, authorization, idempotency where applicable, and domain-level validation.
 
-## 19. Query Contract
+## 20. Query Contract
 
 All list APIs SHOULD support:
 
@@ -324,7 +371,7 @@ All list APIs SHOULD support:
 
 Offset pagination MUST NOT be the only mechanism for large user histories.
 
-## 20. Aggregation Failure Model
+## 21. Aggregation Failure Model
 
 Personal Content Space may depend on multiple services/domains.
 
@@ -339,6 +386,7 @@ Personal Content Aggregator
    ├── Social
    ├── Media
    ├── Creator
+   ├── Live Navigation / History
    └── Other Domains
 ```
 
@@ -352,7 +400,9 @@ Requirements:
 - No fabricated authoritative data
 - No cross-domain transaction requirement for read aggregation
 
-## 21. Event Contract
+Live-specific failure MUST degrade only the Live area where possible and MUST preserve an immediate return path to Personal Content Space.
+
+## 22. Event Contract
 
 Representative events:
 
@@ -381,7 +431,7 @@ Personal Content Space MAY consume these events to maintain derived indexes and 
 
 Event consumption MUST be idempotent.
 
-## 22. Cache Contract
+## 23. Cache Contract
 
 Cacheable data includes:
 
@@ -391,12 +441,13 @@ Cacheable data includes:
 - Media summaries
 - Collection summaries
 - Derived counts
+- Live entry/history summaries
 
 Cache MUST be treated as disposable.
 
 No security or authorization decision may rely solely on stale cache state.
 
-## 23. Privacy
+## 24. Privacy
 
 The system MUST respect:
 
@@ -412,7 +463,7 @@ The system MUST respect:
 
 Private data MUST never leak through aggregated list APIs.
 
-## 24. Security
+## 25. Security
 
 Every Personal Content Space request MUST establish:
 
@@ -425,7 +476,7 @@ Every Personal Content Space request MUST establish:
 
 IDs MUST NOT be treated as authorization.
 
-## 25. Performance Contract
+## 26. Performance Contract
 
 P0 targets:
 
@@ -436,8 +487,9 @@ P0 targets:
 - Batch background refreshes
 - Do not synchronously calculate expensive analytics for ordinary user-center requests
 - Do not synchronously fetch large media objects merely to render a list
+- Live navigation MUST return without requiring Personal Content Space to wait for unrelated downstream systems
 
-## 26. Data Lifecycle
+## 27. Data Lifecycle
 
 Personal indexes follow the source domain lifecycle:
 
@@ -452,7 +504,7 @@ Source Created
 
 Deletion propagation MUST be deterministic and auditable.
 
-## 27. Account Deletion Interaction
+## 28. Account Deletion Interaction
 
 When an account enters deletion workflow:
 
@@ -466,7 +518,7 @@ When an account enters deletion workflow:
 
 Personal Content Space MUST NOT independently resurrect deleted account data.
 
-## 28. UX Requirements
+## 29. UX Requirements
 
 Every major list MUST define:
 
@@ -479,9 +531,19 @@ Every major list MUST define:
 - Moderated item state where relevant
 - Retry action where safe
 
+The Live entry additionally MUST define:
+
+- Live button visible state
+- Live loading state
+- Live unavailable state
+- Live initialization failure state
+- Back / close state
+- Return-to-origin state
+- Preservation of safe navigation context
+
 The experience should remain understandable even when a referenced domain object is no longer available.
 
-## 29. Observability
+## 30. Observability
 
 The system SHOULD record:
 
@@ -494,10 +556,12 @@ The system SHOULD record:
 - Broken reference rate
 - Deletion propagation latency
 - Event processing lag
+- Live entry initialization latency
+- Live return/navigation failure rate
 
 Observability data MUST NOT expose private content unnecessarily.
 
-## 30. Acceptance Criteria
+## 31. Acceptance Criteria
 
 The contract is considered implementation-ready only when all are defined:
 
@@ -513,6 +577,9 @@ The contract is considered implementation-ready only when all are defined:
 - Media
 - Collections
 - Continue reading/watching
+- Persistent Live / 直播 entry
+- Live open and immediate return behavior
+- Preservation of originating navigation context where supported
 - Creator Center transition
 - Content type extensibility
 - Cursor pagination
@@ -524,7 +591,7 @@ The contract is considered implementation-ready only when all are defined:
 - Account deletion propagation
 - Empty/error/degraded UX states
 
-## 31. STOP Conditions
+## 32. STOP Conditions
 
 Implementation MUST STOP if:
 
@@ -538,11 +605,12 @@ Implementation MUST STOP if:
 - Retry can create duplicate authoritative content
 - Cache becomes authoritative
 - A new content type requires breaking the existing aggregation contract
+- Live navigation permanently loses the user's originating Personal Content Space state without an approved UX exception
 
-## 32. Admission Status
+## 33. Admission Status
 
 Status: **READY FOR IMPLEMENTATION**
 
-This document defines the Personal Content Space boundary, ownership model, API surface, event model, privacy/security requirements, failure model, lifecycle, performance requirements, and acceptance criteria.
+This document defines the Personal Content Space boundary, ownership model, API surface, event model, privacy/security requirements, failure model, lifecycle, performance requirements, Live navigation/return contract, and acceptance criteria.
 
 Implementation remains blocked until the project-level contract admission process authorizes code changes.
