@@ -21,7 +21,7 @@
   "x-transitions": [
     { "from": "UNREGISTERED", "to": "PENDING_VERIFICATION", "actor": "user", "permission": null },
     { "from": "PENDING_VERIFICATION", "to": "ACTIVE", "actor": "user", "permission": null, "precondition": "phone_or_email_verified" },
-    { "from": "PENDING_VERIFICATION", "to": "DELETED", "actor": "system", "permission": "job", "precondition": "verification_timeout" },
+    { "from": "PENDING_VERIFICATION", "to": "DELETED", "actor": "system", "permission": "system.job", "precondition": "verification_timeout" },
     { "from": "ACTIVE", "to": "RESTRICTED", "actor": "operator", "permission": "user.restrict" },
     { "from": "ACTIVE", "to": "FROZEN", "actor": "operator", "permission": "user.freeze" },
     { "from": "ACTIVE", "to": "SUSPENDED", "actor": "admin", "permission": "user.suspend" },
@@ -37,14 +37,14 @@
     { "from": "SUSPENDED", "to": "ACTIVE", "actor": "admin", "permission": "user.reinstate" },
     { "from": "SUSPENDED", "to": "BANNED", "actor": "admin", "permission": "user.ban", "requiresApproval": true },
     { "from": "BANNED", "to": "RESTORED", "actor": "admin", "permission": "user.restore", "requiresApproval": "L7" },
-    { "from": "BANNED", "to": "DELETED", "actor": "system", "permission": "job" },
-    { "from": "DELETION_REQUESTED", "to": "DELETION_PENDING", "actor": "system", "permission": "job" },
+    { "from": "BANNED", "to": "DELETED", "actor": "system", "permission": "system.job" },
+    { "from": "DELETION_REQUESTED", "to": "DELETION_PENDING", "actor": "system", "permission": "system.job" },
     { "from": "DELETION_REQUESTED", "to": "ACTIVE", "actor": "user", "permission": null, "precondition": "within_cooling_off" },
-    { "from": "DELETION_PENDING", "to": "DELETED", "actor": "system", "permission": "job", "precondition": "cooling_off_elapsed" },
+    { "from": "DELETION_PENDING", "to": "DELETED", "actor": "system", "permission": "system.job", "precondition": "cooling_off_elapsed" },
     { "from": "DELETION_PENDING", "to": "ACTIVE", "actor": "user", "permission": null, "precondition": "within_cooling_off" },
     { "from": "DELETED", "to": "REACTIVATED", "actor": "user", "permission": "user.reactivate", "precondition": "within_reactivation_window" },
-    { "from": "RESTORED", "to": "ACTIVE", "actor": "system", "permission": "job" },
-    { "from": "REACTIVATED", "to": "ACTIVE", "actor": "system", "permission": "job" }
+    { "from": "RESTORED", "to": "ACTIVE", "actor": "system", "permission": "system.job" },
+    { "from": "REACTIVATED", "to": "ACTIVE", "actor": "system", "permission": "system.job" }
   ],
   "x-forbidden": [
     { "from": "DELETED", "to": "ACTIVE", "reason": "must pass through REACTIVATED within window" },
