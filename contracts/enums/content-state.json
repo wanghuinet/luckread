@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/enums/content-state.json",
   "title": "ContentState",
-  "description": "Unified content lifecycle state across Article/Gallery/Video/Audio/Live/Short. Canonical Source: docs/10, docs/05.",
+  "description": "Unified content lifecycle state across Article/Gallery/Video/Audio/Live/Short. Canonical Source: docs/10, docs/05. DELETED is a recoverable tombstone during the bounded restore window; it is not a terminal state.",
   "type": "string",
   "enum": [
     "DRAFT",
@@ -22,7 +22,8 @@
     "authoritative-writer": "W00",
     "requires-optimistic-lock": true,
     "initial-state": "DRAFT",
-    "terminal-states": ["DELETED"],
+    "terminal-states": [],
+    "recoverable-tombstone-states": ["DELETED"],
     "indexed-states": ["PUBLISHED"]
   }
 }
