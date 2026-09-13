@@ -1,6 +1,6 @@
 # LuckRead Center Layer Unified Preflight Contract v1.0
 
-**状态：PREFLIGHT-CONTRACT-COMPLETE / CROSS-CUTTING-CHECKS-INCLUDED / IMPLEMENTATION BLOCKED UNTIL PREFLIGHT PASS**  
+**状态：PREFLIGHT-CONTRACT-COMPLETE / L1-L6-CHECKS-INCLUDED / IMPLEMENTATION BLOCKED UNTIL PREFLIGHT PASS**  
 **范围：18 Center 全局静态一致性、完整性、横向规则与准入前检查**
 
 ## 1. Purpose
@@ -20,6 +20,7 @@
 无 security scope
 无 superiority evidence
 无 cross-cutting contract closure
+无 L1-L6 traceability
 ```
 
 Preflight 只检查合同与映射，不运行生产代码，不替代 Unified CL、Domain Ready Gate 或 User Acceptance。
@@ -61,6 +62,8 @@ entryPoints
 coreJourneys
 L1 capabilities
 L2/L3/L4 mappings
+L5 execution mappings
+L6 verification mappings
 API surface
 Event surface
 permission model
@@ -97,6 +100,10 @@ status
 174 Canonical ID / Entity Reference
 175 Feature Flag / Configuration / Policy Versioning
 176 Evidence Registry
+178 L3/L4 Traceability Closure
+179 L5 Execution Specification
+180 L6 Verification / Evidence Atomic Unit
+181 L3-L6 Hierarchy Reconciliation
 ```
 
 不适用项也必须给出机器可审计的 `NOT-APPLICABLE` 理由。
@@ -116,6 +123,8 @@ status
 Center L1
 → Domain L1/L2
 → L3/L4
+→ L5 where implementation-candidate
+→ L6 where verification-candidate
 → acceptance
 ```
 
@@ -185,6 +194,7 @@ correlationId
 operationId where applicable
 resourceId
 actorId where safe
+L4/L5/L6 identity where applicable
 ```
 
 ### PF-16 Cost / Performance
@@ -244,19 +254,36 @@ Center P0 path 必须符合 171 SLI/SLO/error budget 与隐私 telemetry 规则�
 ### PF-31 Configuration Closure
 受配置、Feature Flag、Policy Version 控制的能力必须符合 175。
 
+### PF-32 L5 Closure
+实现候选 L4 必须存在符合 179 的 L5 Execution Specification。
+
+### PF-33 L6 Closure
+接受候选 L5 必须存在符合 180 的 L6 Verification Claim 与 evidence plan。
+
+### PF-34 Hierarchy Consistency
+L5/L6 必须遵守 181：
+
+```text
+L5 → exactly one L4
+L6 → exactly one L5
+```
+
+且不得在 L5/L6 新增产品能力。
+
 ## 6. Global Cross-Center Checks
 
 ```text
 C1 18 Center Registry = 154
-C2 L1-L4 = 155
-C3 UX baseline = 40/41/139/158
-C4 Authority map = domain contracts / 74
-C5 Cross-cutting dependency set = 160–176
-C6 High-risk mutation = Permission/Security/Audit
-C7 Async destructive/financial = operationId + idempotency + recovery
-C8 Derived views = rebuildable
-C9 Current state = authoritative source/version
-C10 PASS claims = 176 evidence
+C2 L1-L4 = 155 + 178
+C3 L5/L6 hierarchy = 179/180/181
+C4 UX baseline = 40/41/139/158
+C5 Authority map = domain contracts / 74
+C6 Cross-cutting dependency set = 160–176
+C7 High-risk mutation = Permission/Security/Audit
+C8 Async destructive/financial = operationId + idempotency + recovery
+C9 Derived views = rebuildable
+C10 Current state = authoritative source/version
+C11 PASS claims = 176 evidence
 ```
 
 ## 7. Failure Classification
@@ -277,6 +304,7 @@ P0/P1 必须阻断 Unified CL；P2/P3 若影响关键 capability/security/author
 18 Centers Registered
 AND No Authority Conflict
 AND No Unclassified Capability
+AND L1-L6 Traceability Valid
 AND No Cross-Center State Conflict
 AND All P0 Journeys Complete
 AND All High-Risk Mutations Scoped
@@ -302,7 +330,11 @@ PREFLIGHT FAIL
 139 Global Superiority
 → 154 Center Master Matrix
 → 155 Center Traceability
-→ 160–176 Cross-Cutting Contracts
+→ 178 L3/L4 Closure
+→ 179 L5 Specification
+→ 180 L6 Verification
+→ 176 Evidence Registry
+→ 160–175 Cross-Cutting Contracts
 → 158 Competitor Benchmark
 → 157 Center Preflight
 → 156 Center Admission
@@ -318,7 +350,7 @@ Preflight 不得被用来绕过 156、74 或 75。
 
 ```text
 18_CENTER_SCOPE = COMPLETE
-CENTER_TRACEABILITY = COMPLETE
+CENTER_TRACEABILITY = L1-L6 DEFINED
 CROSS_CUTTING_CONTRACTS = CLOSED
 STATIC_PREFLIGHT_MODEL = COMPLETE
 UNIFIED_CL = REQUIRED
