@@ -5,10 +5,13 @@
   "type": "object",
   "properties": {
     "error": {
-      "$ref": "https://luckread.com/contracts/v1/common/error.json"
+      "$ref": "./error.json"
     },
     "requestId": {
-      "$ref": "https://luckread.com/contracts/v1/common/request-id.json"
+      "$ref": "./request-id.json"
+    },
+    "traceId": {
+      "$ref": "./trace-id.json"
     }
   },
   "required": ["error", "requestId"],
