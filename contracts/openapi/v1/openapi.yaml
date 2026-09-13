@@ -1,0 +1,46 @@
+openapi: 3.1.0
+info:
+  title: LuckRead API
+  version: 1.0.0
+  description: Contract-first public API for the LuckRead self-media platform.
+servers:
+  - url: /api/v1
+    description: API v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Users
+  - name: Contents
+  - name: Media
+  - name: Taxonomy
+  - name: Comments
+  - name: Interactions
+  - name: Feed
+  - name: Search
+  - name: Notifications
+  - name: Creators
+  - name: Governance
+  - name: Translation
+paths: {}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    ResourceId:
+      $ref: ../../schemas/common/resource-id.json
+    RequestId:
+      $ref: ../../schemas/common/request-id.json
+    Cursor:
+      $ref: ../../schemas/common/cursor.json
+    Error:
+      $ref: ../../schemas/common/error.json
+    ErrorResponse:
+      $ref: ../../schemas/common/error-response.json
+    ListResponse:
+      $ref: ../../schemas/common/list-response.json
+    Pagination:
+      $ref: ../../schemas/common/pagination.json
