@@ -5,12 +5,18 @@ on:
     branches: [main, 'contract/**']
     paths:
       - 'contracts/**'
+      - 'docs/**'
       - 'scripts/contract-ci.mjs'
+      - 'scripts/contract-evidence.mjs'
+      - 'scripts/contract-admission.mjs'
       - '.github/workflows/contract-ci.yml'
   pull_request:
     paths:
       - 'contracts/**'
+      - 'docs/**'
       - 'scripts/contract-ci.mjs'
+      - 'scripts/contract-evidence.mjs'
+      - 'scripts/contract-admission.mjs'
       - '.github/workflows/contract-ci.yml'
   workflow_dispatch:
 
@@ -18,11 +24,8 @@ permissions:
   contents: read
 
 jobs:
-  # Contract CI is the CODE DEVELOPMENT ADMISSION gate.
-  # Contract -> Schema -> OpenAPI -> Migration -> DTO -> Authorization ->
-  # State Machine -> Test -> Contract CI -> Code Development Admission.
   contract:
-    name: Contract Admission Gate
+    name: Contract Admission Gate (${{ matrix.domain }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -47,6 +50,20 @@ jobs:
       - name: Validate contract domain (${{ matrix.domain }})
         shell: bash
         run: node scripts/contract-ci.mjs ${{ matrix.domain }}
+      - name: Generate exact-commit evidence
+        shell: bash
+        env:
+          CONTRACT_DOMAIN: ${{ matrix.domain }}
+          CONTRACT_CI_RESULT: PASS
+          CONTRACT_VALIDATOR_VERSION: 1.0.0
+        run: node scripts/contract-evidence.mjs
+      - name: Upload contract evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-evidence-${{ matrix.domain }}
+          path: contract-evidence/${{ matrix.domain }}.json
+          if-no-files-found: error
 
   contract-full:
     name: Contract Admission Gate (full)
@@ -62,6 +79,21 @@ jobs:
       - name: Validate all contract domains
         shell: bash
         run: node scripts/contract-ci.mjs
+      - name: Generate full-validation evidence
+        if: success()
+        shell: bash
+        env:
+          CONTRACT_DOMAIN: full
+          CONTRACT_CI_RESULT: PASS
+          CONTRACT_VALIDATOR_VERSION: 1.0.0
+        run: node scripts/contract-evidence.mjs
+      - name: Upload full-validation evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-evidence-full
+          path: contract-evidence/full.json
+          if-no-files-found: error
 
   openapi-lint:
     name: OpenAPI Lint
@@ -77,3 +109,44 @@ jobs:
       - name: Lint OpenAPI
         shell: bash
         run: npx --yes @redocly/cli@1.34.2 lint contracts/openapi/v1/openapi.yaml
+      - name: Generate OpenAPI lint evidence
+        if: success()
+        shell: bash
+        env:
+          CONTRACT_DOMAIN: openapi-lint
+          CONTRACT_CI_RESULT: PASS
+          CONTRACT_VALIDATOR_VERSION: redocly-cli@1.34.2
+        run: node scripts/contract-evidence.mjs
+      - name: Upload OpenAPI lint evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-evidence-openapi-lint
+          path: contract-evidence/openapi-lint.json
+          if-no-files-found: error
+
+  development-admission:
+    name: Development Admission (fail-closed)
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    needs: [contract, contract-full, openapi-lint]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download matrix evidence
+        if: ${{ needs.contract.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contract-evidence-*
+          path: contract-evidence
+          merge-multiple: true
+      - name: Verify job results
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ needs.contract.result }}" = success
+          test "${{ needs.contract-full.result }}" = success
+          test "${{ needs.openapi-lint.result }}" = success
+      - name: Verify exact-commit evidence
+        shell: bash
+        run: node scripts/contract-admission.mjs contract-evidence
