@@ -1,21 +1,20 @@
 # LuckRead Capability Hierarchy Reconciliation & Traceability Gate v1.0
 
-**Status:** RECONCILIATION-COMPLETE / TRACEABILITY-READY / CONTRACT-ADMISSION-PENDING
+**Status:** RECONCILIATION-COMPLETE / L1-L6-TRACEABILITY-READY / CONTRACT-ADMISSION-PENDING
 
 ## 0. Purpose
 
-This document reconciles the strengthened mainstream-product L1/L2 baseline in `37-ENHANCED-MAINSTREAM-PLATFORM-L1-L2-CAPABILITY-MASTER-MATRIX-v1.0.md` with the existing L2/L3/L4 inventories in documents 34, 35 and 36.
+This document reconciles the strengthened mainstream-product L1/L2 baseline in `37-ENHANCED-MAINSTREAM-PLATFORM-L1-L2-CAPABILITY-MASTER-MATRIX-v1.0.md` with the L2/L3/L4 inventories and the engineering execution/verification layers in documents 178–181.
 
-The objective is to prevent a common failure mode:
+The objective is to prevent:
 
 ```text
 L1/L2 looks complete
-→ L3/L4 still misses the new product boundary
+→ L3/L4 misses the strengthened product boundary
+→ L5/L6 execution and verification are undefined
 → contracts are written against an incomplete implementation inventory
 → code later reintroduces architectural drift
 ```
-
-This gate therefore makes the strengthened matrix the product-level completeness baseline and requires every new L1/L2 capability to be traceable into the existing L3/L4 hierarchy before implementation admission.
 
 ## 1. Authoritative hierarchy
 
@@ -28,439 +27,188 @@ This gate therefore makes the strengthened matrix the product-level completeness
              ↓
 36 Fourth-Level Capability Matrix
              ↓
+178 L3/L4 Traceability Closure Matrix
+             ↓
+179 L5 Execution Specification
+             ↓
+180 L6 Verification / Evidence Atomic Unit
+             ↓
 Data Contract
 API Contract
 Event Contract
 Permission/Security Contract
 Cost/Runtime Contract
 Test/Acceptance Contract
+Evidence Registry
 ```
 
-Document 37 is authoritative for the **strengthened product boundary**.
-
-Documents 34-36 remain authoritative for the already-defined L2/L3/L4 implementation-planning inventory until their next version is explicitly updated.
-
-Therefore a capability appearing in 37 but not yet represented in 34-36 is classified as:
-
-`PRODUCT-COMPLETE / IMPLEMENTATION-TRACEABILITY-PENDING`
-
-It is not silently considered implemented.
+Document 37 is authoritative for the strengthened **product boundary**.
+Documents 34–36 remain authoritative for their existing capability inventories.
+Document 178 closes newly split L3/L4 traceability.
+Documents 179–180 define engineering execution and verification; they do not create new product capability.
+Document 181 resolves the hierarchy interpretation.
 
 ## 2. Reconciliation status
 
-| Capability area | Product boundary | L2/L3/L4 traceability | Admission status |
-|---|---|---|---|
-| Identity | complete | existing | READY for contract refinement |
-| Device / Session / Privacy | complete | existing | READY for contract refinement |
-| Creator | complete | existing | READY for contract refinement |
-| Creator Studio | complete | existing | READY for contract refinement |
-| Creator Growth / Success | added | partial/new | TRACEABILITY REQUIRED |
-| Creator Tools / Production Ecosystem | added | partial/new | TRACEABILITY REQUIRED |
-| Organization / MCN | complete | existing | READY for contract refinement |
-| Content | complete | existing | READY for contract refinement |
-| Content Production | added | partial/new | TRACEABILITY REQUIRED |
-| Content Relations / Remix | strengthened | existing graph coverage + expansion | TRACEABILITY REQUIRED |
-| Show / Series / Program | added | partial/new | TRACEABILITY REQUIRED |
-| IP Graph / IP Economy | strengthened | existing | READY for contract refinement |
-| Entity / Unified Profile | added | partial/new | TRACEABILITY REQUIRED |
-| Media | complete | existing | READY for contract refinement |
-| Media Processing | complete | existing | READY for contract refinement |
-| Social Graph | complete | existing | READY for contract refinement |
-| Fan Relationship / Membership | added | partial/new | TRACEABILITY REQUIRED |
-| Community | complete | existing | READY for contract refinement |
-| Interaction | complete | existing | READY for contract refinement |
-| Event / High-Frequency Interaction | complete | existing | READY for contract refinement |
-| Feed / Distribution | strengthened | existing | READY for contract refinement |
-| Recommendation | complete | existing | READY for contract refinement |
-| Personalization | added | partial/new | TRACEABILITY REQUIRED |
-| Trending / Hot Topics | added | partial/new | TRACEABILITY REQUIRED |
-| Search / Discovery | complete | existing | READY for contract refinement |
-| Live / Realtime / IM | complete | existing | READY for contract refinement |
-| Notification | complete | existing | READY for contract refinement |
-| Safety / Risk / Trust | complete | existing | READY for contract refinement |
-| Content Moderation / Appeals | complete | existing | READY for contract refinement |
-| Copyright / Rights | complete | existing | READY for contract refinement |
-| Creator & IP Marketplace | added | partial/new | TRACEABILITY REQUIRED |
-| Brand Collaboration | added | partial/new | TRACEABILITY REQUIRED |
-| Campaign / Activity | added | partial/new | TRACEABILITY REQUIRED |
-| Monetization / Commerce / Creator Economy | strengthened | existing + expansion | TRACEABILITY REQUIRED for expansion |
-| Advertising Platform | added | partial/new | TRACEABILITY REQUIRED |
-| Wallet / Ledger / Settlement | complete | existing | READY for contract refinement |
-| Personal Content Space | added | partial/new | TRACEABILITY REQUIRED |
-| Podcast / Audio | added | partial/new | TRACEABILITY REQUIRED |
-| Analytics / Experiment / Growth | complete | existing | READY for contract refinement |
-| Platform / Open Ecosystem / Operations | complete | existing | READY for contract refinement |
+The previously identified newly split domains are now closed at L3/L4 by document 178. Their implementation admission remains dependent on L5/L6 completion.
 
-## 3. Required traceability closure for newly split domains
+| Capability area | Product boundary | L3/L4 traceability | L5/L6 | Admission status |
+|---|---|---|---|---|
+| Creator Growth / Success | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
+| Creator Tools / Production Ecosystem | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
+| Content Production | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
+| Show / Series / Program | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
+| Entity / Unified Profile | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
+| Fan Relationship / Membership | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
+| Personalization | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
+| Trending / Hot Topics | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
+| Creator & IP Marketplace | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
+| Brand Collaboration | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
+| Campaign / Activity | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
+| Advertising Platform | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
+| Personal Content Space | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
+| Podcast / Audio | complete | 178 | required | CONTRACT-READY AFTER L5/L6 |
 
-The following domains are explicitly required to be represented in the L3/L4 inventory before their Data/API/Event contracts can enter implementation admission.
+Existing domains remain subject to the same L1→L6 traceability rule.
 
-### 3.1 Creator Growth / Success
+## 3. L3/L4 closure requirement
 
-Minimum L3 responsibilities:
-- creator level
-- growth score
-- goals
-- tasks/missions
-- benefits
-- incentives
-- programs
-- education/support
-- churn/reactivation
+Document 178 is the explicit closure point for newly split product boundaries.
 
-Minimum L4 responsibility examples:
-- calculate creator level
-- evaluate level transition
-- issue creator task
-- record task completion
-- issue benefit entitlement
-- calculate growth trend
-- detect creator inactivity
-- create reactivation task
-- audit incentive decision
-
-### 3.2 Creator Tools / Production Ecosystem
-
-Minimum L3 responsibilities:
-- editing tools
-- media composition
-- subtitle/dubbing
-- templates
-- asset library
-- AI assistance
-- preview
-- batch creation
-- multi-platform publishing
-- remix creation
-
-Minimum L4 responsibility examples:
-- create editing project
-- save editing checkpoint
-- validate asset graph
-- render preview
-- validate subtitle track
-- generate reusable template
-- execute batch publish command
-- validate cross-platform payload
-- create remix provenance record
-
-### 3.3 Content Production
-
-Minimum L3 responsibilities:
-- composition
-- autosave
-- preview
-- packaging
-- collaboration
-- quality checks
-- repurposing
-
-### 3.4 Show / Series / Program
-
-Minimum L3 responsibilities:
-- channel
-- show
-- series
-- season
-- episode
-- playlist
-- program
-- release schedule
-- ordering
-- show analytics
-
-### 3.5 Entity / Unified Profile
-
-Minimum L3 responsibilities:
-- canonical entity identity
-- profile projection
-- works aggregation
-- creator aggregation
-- community aggregation
-- product aggregation
-- rights aggregation
-- related entities
-
-### 3.6 Fan Relationship / Membership
-
-Minimum L3 responsibilities:
-- fan state
-- fan level
-- membership plan
-- membership tier
-- benefits
-- subscriber-only access
-- contribution
-- affinity
-- churn
-- reactivation
-
-### 3.7 Personalization
-
-Minimum L3 responsibilities:
-- interest profile
-- interest strength
-- decay
-- creator preference
-- IP preference
-- topic preference
-- consumption pattern
-- negative preference
-- personalization controls
-
-### 3.8 Trending / Hot Topics
-
-Minimum L3 responsibilities:
-- trend candidate admission
-- hot score
-- acceleration
-- category ranking
-- creator/content/IP ranking
-- anti-brush controls
-- trend history
-- ranking explanation
-- regional/personalized trend surfaces
-
-### 3.9 Creator & IP Marketplace
-
-Minimum L3 responsibilities:
-- creator discovery
-- IP discovery
-- demand
-- matching
-- invitation
-- project
-- procurement
-- licensing demand
-- delivery
-- acceptance
-- evaluation
-- dispute
-
-### 3.10 Brand Collaboration
-
-Minimum L3 responsibilities:
-- brand identity
-- collaboration demand
-- creator matching
-- brief
-- proposal
-- campaign
-- task
-- review
-- delivery
-- performance
-- contract
-- settlement
-
-### 3.11 Campaign / Activity
-
-Minimum L3 responsibilities:
-- activity
-- challenge
-- campaign
-- task
-- eligibility
-- registration
-- reward
-- points
-- leaderboard
-- moderation
-- analytics
-- settlement
-
-### 3.12 Advertising Platform
-
-Minimum L3 responsibilities:
-- advertiser
-- ad account
-- campaign
-- ad group
-- creative
-- placement
-- targeting
-- budget
-- bid
-- auction
-- impression
-- click
-- conversion
-- attribution
-- fraud
-- billing
-- settlement
-
-### 3.13 Personal Content Space
-
-Minimum L3 responsibilities:
-- favorites
-- collections
-- playlists
-- reading/watch/listen history
-- watch later
-- liked content
-- downloads
-- offline state
-- personal drafts
-- privacy/deletion
-
-### 3.14 Podcast / Audio
-
-Minimum L3 responsibilities:
-- podcast
-- channel
-- episode
-- series/season
-- RSS/distribution
-- subscription
-- chapters/transcripts
-- discovery
-- analytics
-- monetization
-- rights
-
-## 4. Cross-domain dependency rules
-
-### 4.1 Creator growth
+Every product capability must satisfy:
 
 ```text
-Creator
-→ Creator Studio
-→ Content / IP
-→ Analytics
-→ Growth / Incentive
-→ Fan / Monetization
+L1 → L2 → L3 → L4
 ```
 
-Growth decisions must never become an authoritative substitute for creator identity or rights state.
-
-### 4.2 Fan membership
+Every L3 must have:
 
 ```text
-User
-→ Social Graph
-→ Creator/IP
-→ Membership
-→ Entitlement
-→ Content/Live/Community access
-→ Ledger
+single responsibility
+owner
+authoritative state
+authorization boundary
+lifecycle/error behavior
+observable acceptance condition
 ```
 
-Entitlement must be derived from authoritative membership state and must be rebuildable.
-
-### 4.3 Trending
+Every L4 must have:
 
 ```text
-Raw Events
-→ Trust / Risk
-→ Valid Signals
-→ Aggregation
-→ Trend Candidate
-→ Ranking
-→ Moderation/Safety
-→ Trend Surface
+input/state
+validation
+authorization
+success state
+failure state
+idempotency where applicable
+event where applicable
+derived-state effect
+cost/latency expectation
+acceptance test
 ```
 
-Raw event volume cannot directly become authoritative trend state.
+## 4. L5/L6 engineering closure
 
-### 4.4 Advertising
+After L4 closure, implementation admission requires:
 
 ```text
-Advertiser
-→ Campaign
-→ Targeting
-→ Auction
-→ Placement
-→ Impression/Click
-→ Conversion
-→ Attribution
-→ Billing
-→ Ledger/Settlement
+L4
+→ 179 L5 Execution Specification
+→ 180 L6 Verification / Evidence
+→ 176 Evidence Registry
 ```
 
-Advertising accounting must not reuse creator revenue attribution as a substitute for advertiser billing state.
+L5 and L6 are not product hierarchy extensions. They are engineering execution and verification layers.
 
-### 4.5 Remix
+## 5. Cross-domain obligations
+
+### Identity / Entity
+Canonical ID 174 is mandatory for entity-facing L3/L4.
+
+### Scope / Tenant
+168 applies to every multi-party or organization-scoped L3/L4.
+
+### Lifecycle
+160 applies to durable resources, deletion, export and retention-sensitive L3/L4.
+
+### Events
+163 applies to production events and high-frequency mutations.
+
+### Async
+165 applies to long-running, batch, media, export, moderation, settlement and deployment operations.
+
+### Saga
+164 applies to cross-domain mutations.
+
+### Cache
+167 applies to derived/hot L3/L4 read paths.
+
+### Security
+169 applies to credentials, policy, privileged operations and incident-sensitive paths.
+
+### Evidence
+176 applies to every acceptance claim and all L6 verification evidence.
+
+## 6. Reverse traceability
+
+The hierarchy must be traversable in both directions:
 
 ```text
-Source Work
-→ Authorization
-→ Derivative Work
-→ Provenance
-→ Distribution
-→ Rights / Revenue Share
+L1 → L2 → L3 → L4 → L5 → L6 → Evidence
+Evidence → L6 → L5 → L4 → L3 → L2 → L1
 ```
 
-Every monetized derivative must retain source/provenance/rights linkage.
+Any orphan L3/L4/L5/L6 is a traceability failure.
 
-## 5. Contract admission rule
+## 7. Anti-drift rules
 
-No newly split product domain may move directly from L1/L2 to code.
-
-Required sequence:
-
-```text
-L1/L2
-→ L3 traceability
-→ L4 traceability
-→ Data Contract
-→ API Contract
-→ Event Contract
-→ Permission/Security Contract
-→ Cost/Runtime Contract
-→ Test/Acceptance Contract
-→ Architecture PASS
-→ Contract PASS
-→ Code PASS
-→ CI PASS
-→ User Acceptance PASS
-```
-
-## 6. Completeness classifications
-
-Use exactly these classifications:
-
-- `PRODUCT-CLOSED` — product boundary is complete.
-- `TRACEABILITY-PENDING` — L1/L2 exists but L3/L4 inventory is incomplete.
-- `CONTRACT-READY` — L1-L4 traceability is complete and contracts may be authored.
-- `IMPLEMENTATION-READY` — all contracts pass and implementation may begin.
-- `IMPLEMENTED` — code exists and local validation passes.
-- `CI-PASS` — CI gates pass.
-- `ACCEPTED` — user acceptance passes.
-
-No document may label a feature `IMPLEMENTED` merely because it exists in a capability matrix.
-
-## 7. Anti-drift checks
-
-CI/governance should eventually enforce:
+Machine governance should eventually enforce:
 
 1. every L1 in document 37 has an owner;
 2. every L2 maps to at least one L3;
 3. every L3 maps to at least one L4;
 4. every L4 has an authoritative-state classification;
-5. every externally visible capability has an API contract;
-6. every high-frequency behavior has an event contract;
-7. every money movement has a ledger boundary;
-8. every rights-sensitive relation has rights/provenance state;
-9. every enforcement decision has evidence and appeal linkage where applicable;
-10. every derived state has a rebuild/reconciliation strategy;
-11. every capability has a cost/runtime review;
-12. every implementation claim has test and CI evidence;
-13. no orphan L3/L4 exists without an L1/L2 parent;
-14. no L5 capability is introduced.
+5. every L4 eligible for implementation maps to one or more L5 specifications;
+6. every L5 maps to one or more L6 claims;
+7. every externally visible capability has an API contract;
+8. every high-frequency behavior has an event contract;
+9. every money movement has a ledger boundary;
+10. every rights-sensitive relation has rights/provenance state;
+11. every enforcement decision has evidence and appeal linkage where applicable;
+12. every derived state has a rebuild/reconciliation strategy;
+13. every capability has a cost/runtime review;
+14. every implementation claim has test and CI evidence;
+15. no orphan L3/L4/L5/L6 exists;
+16. no new product capability is introduced at L5/L6.
 
-## 8. Decision
-
-The mainstream reverse audit is considered **product-complete at L1/L2** after document 37.
-
-The remaining work is not another broad feature brainstorm. It is controlled traceability closure for the newly split domains, followed by contract authoring.
-
-Therefore the next engineering phase is:
+## 8. Final hierarchy decision
 
 ```text
-TRACEABILITY CLOSURE
-→ CONTRACT AUTHORING
-→ IMPLEMENTATION ADMISSION
+L1 = Domain
+L2 = Capability
+L3 = Atomic Capability
+L4 = Implementation Responsibility
+L5 = Execution Specification
+L6 = Verification / Evidence Atomic Unit
 ```
 
-not further horizontal feature expansion.
+The “no L5 capability” rule is interpreted as “no new product capability at L5”. Existing L4 items may receive L5/L6 engineering definitions.
+
+## 9. Final admission sequence
+
+```text
+37 Product Boundary
+→ 34/35/36 Existing Inventory
+→ 178 L3/L4 Traceability Closure
+→ 179 L5 Execution Specification
+→ 180 L6 Verification
+→ 176 Evidence Registry
+→ 74 Final Reconciliation
+→ 75 Unified Machine Preflight
+→ 156 Center Admission where applicable
+→ Unified CL
+→ CI
+→ Implementation Admission
+```
+
+No code authorization is granted by this document alone.
