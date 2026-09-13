@@ -24,10 +24,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
+      - name: Runner diagnostics
+        run: |
+          set -euxo pipefail
+          printf 'PWD=%s\n' "$PWD"
+          node --version
+          npm --version
+          test -d contracts/schemas/common
+          find contracts/schemas/common -maxdepth 1 -type f -name '*.json' -print | sort
+          test -f scripts/contract-ci.mjs
       - name: Validate common schemas
         run: node scripts/contract-ci.mjs common
 
