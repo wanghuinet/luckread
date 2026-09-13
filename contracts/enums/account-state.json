@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/enums/account-state.json",
   "title": "AccountState",
-  "description": "User account lifecycle state. Canonical Source: docs/303 section 2.1. Extending this enum is a MINOR contract change ONLY if no transition is removed.",
+  "description": "User account lifecycle state. Canonical Source: docs/303 section 2.1. DELETED is a recoverable tombstone during the bounded reactivation window; it is not a terminal state. Extending this enum is a MINOR contract change ONLY if no transition is removed.",
   "type": "string",
   "enum": [
     "UNREGISTERED",
@@ -23,6 +23,7 @@
     "domain": "D1-01",
     "authoritative-writer": "W00",
     "cache-version-field": "account_state_version",
-    "terminal-states": ["DELETED"]
+    "terminal-states": [],
+    "recoverable-tombstone-states": ["DELETED"]
   }
 }
