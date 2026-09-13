@@ -1,0 +1,49 @@
+name: Security Hardening Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/authz/**'
+      - 'docs/19-P0-SECURITY-HARDENING-CONTRACT-v1.0.md'
+      - 'scripts/security-hardening-check.mjs'
+      - 'src/**'
+      - 'app/**'
+      - 'server/**'
+      - 'workers/**'
+      - 'packages/**'
+      - 'collections/**'
+      - 'payload/**'
+      - 'lib/**'
+      - 'routes/**'
+  pull_request:
+    paths:
+      - 'contracts/authz/**'
+      - 'docs/19-P0-SECURITY-HARDENING-CONTRACT-v1.0.md'
+      - 'scripts/security-hardening-check.mjs'
+      - 'src/**'
+      - 'app/**'
+      - 'server/**'
+      - 'workers/**'
+      - 'packages/**'
+      - 'collections/**'
+      - 'payload/**'
+      - 'lib/**'
+      - 'routes/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security-hardening:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Security hardening static gate
+        run: node scripts/security-hardening-check.mjs
