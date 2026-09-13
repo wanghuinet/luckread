@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/api-inventory-reconciliation.schema.json",
+  "title": "LuckRead API Inventory Reconciliation Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatedAt", "status", "reconciliationGreen", "inventoryCount", "openapiPolicyCount", "failureCount", "findingCount", "failures", "findings", "rule"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.2.0" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "status": { "type": "string", "enum": ["PASS", "INCOMPLETE", "CONFLICT"] },
+    "reconciliationGreen": { "type": "boolean" },
+    "inventoryCount": { "type": "integer", "minimum": 0 },
+    "openapiPolicyCount": { "type": "integer", "minimum": 0 },
+    "failureCount": { "type": "integer", "minimum": 0 },
+    "findingCount": { "type": "integer", "minimum": 0 },
+    "failures": { "type": "array", "items": { "type": "object", "additionalProperties": true, "required": ["code"], "properties": { "code": { "type": "string" } } } },
+    "findings": { "type": "array", "items": { "type": "object", "additionalProperties": true, "required": ["code"], "properties": { "code": { "type": "string" }, "operationId": { "type": ["string", "null"] }, "detail": { "type": "string" } } } },
+    "matches": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["operationId", "inventory", "openapi"], "properties": { "operationId": { "type": "string" }, "inventory": { "type": "object", "required": ["method", "path"], "properties": { "method": { "type": "string" }, "path": { "type": "string" } }, "additionalProperties": true }, "openapi": { "type": "object", "required": ["method", "path"], "properties": { "method": { "type": "string" }, "path": { "type": "string" } }, "additionalProperties": true } } } },
+    "rule": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    { "if": { "properties": { "status": { "const": "PASS" } } }, "then": { "properties": { "reconciliationGreen": { "const": true }, "failureCount": { "const": 0 }, "findingCount": { "const": 0 } } } },
+    { "if": { "properties": { "reconciliationGreen": { "const": true } } }, "then": { "properties": { "status": { "const": "PASS" } } } }
+  ]
+}
