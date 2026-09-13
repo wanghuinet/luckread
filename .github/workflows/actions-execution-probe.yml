@@ -1,0 +1,17 @@
+name: Actions Execution Probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node version
+        run: node --version
+      - name: npm version
+        run: npm --version
+      - name: Runner execution marker
+        run: echo "ACTIONS_RUNNER_EXECUTION_OK"
