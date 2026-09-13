@@ -1,4 +1,4 @@
-# Luckread Project Blueprint v1.2
+# Luckread Project Blueprint v1.3
 
 ## 1. Purpose
 
@@ -316,7 +316,201 @@ Risk must address relevant abuse patterns such as self-viewing, coordinated acco
 
 Risk processing must also follow the cost-first principle: high-volume events should be cached, aggregated, sampled or queued where the Risk Contract permits, avoiding unnecessary D1 writes.
 
-## 8. Feed and Recommendation
+## 8. Design Considerations: Reliability, Consistency, Portability and Cost
+
+The following risks are architectural guardrails, not optional implementation details. Each risk must be addressed in the relevant contract before production implementation.
+
+### 8.1 Cache Stampede / Hot-Key Expiration
+
+**Risk:** A popular article or feed item expires at the same time for many clients, causing a large concurrent miss burst and potentially overwhelming Payload/D1.
+
+**Solution:**
+
+- use request coalescing for hot keys where justified;
+- use stale-while-revalidate instead of making every requester wait for refresh;
+- add TTL jitter to avoid synchronized expiration;
+- protect known hot keys with explicit origin-load controls;
+- prefer cached immutable/versioned responses where possible;
+- do not introduce a global distributed lock for every cache request merely to solve a theoretical stampede.
+
+**Design rule:**
+
+```text
+Cache HIT
+   ↓
+Serve
+
+Cache STALE
+   ↓
+Serve stale + background refresh
+
+Cache MISS
+   ↓
+Request coalescing / hot-key protection
+   ↓
+Origin only when necessary
+```
+
+### 8.2 Cache Penetration / Cache Bypass
+
+**Risk:** Random query parameters, malformed identifiers or unbounded request variants bypass cache and turn repeated traffic into repeated Worker/D1 work.
+
+**Solution:**
+
+- normalize cache keys;
+- define an allowlist for cache-relevant parameters;
+- ignore or reject non-semantic random parameters;
+- validate identifiers before origin access;
+- use negative caching for safe, stable not-found cases where appropriate;
+- apply rate limiting and origin protection to abusive request patterns.
+
+**Design rule:** Cache keys are part of the API/cache contract, not an incidental implementation detail.
+
+### 8.3 Cache Avalanche
+
+**Risk:** Large groups of related keys expire together, causing a synchronized origin-load spike.
+
+**Solution:**
+
+- use TTL jitter;
+- stagger refreshes;
+- use stale serving where consistency permits;
+- avoid broad cache purges as a routine content-update mechanism;
+- use precise invalidation/version changes for affected resources.
+
+### 8.4 Cache Consistency and Stale Content
+
+**Risk:** Edited, unpublished or deleted content can remain cached after the authoritative Payload/D1 state changes.
+
+**Solution:**
+
+- define authoritative state in Payload/D1;
+- use versioned cache keys or explicit invalidation metadata;
+- invalidate only affected resources/tags when supported;
+- define maximum tolerated staleness per content type;
+- use stronger read-after-write behavior only where the product requirement requires it.
+
+**Design rule:** Cache is never the authoritative source of content state.
+
+### 8.5 Search and Complex Query Overload
+
+**Risk:** D1 can handle ordinary relational queries and suitable text search, but forcing large-scale fuzzy search, complex ranking, recommendation retrieval or analytical workloads into the primary content database can create cost and latency problems.
+
+**Solution:**
+
+Define a provider boundary before search becomes a bottleneck:
+
+```text
+Search Contract
+      |
+      +--> D1 / FTS implementation initially
+      |
+      +--> External Search implementation later
+```
+
+The application must not hard-code a search provider into business-domain contracts. External search is introduced only when measured workload requires it.
+
+### 8.6 Vendor Lock-In
+
+**Risk:** Directly coupling business logic to Cloudflare-specific APIs can make future runtime, database or storage migration unnecessarily expensive.
+
+**Solution:**
+
+Keep stable application-owned interfaces around infrastructure capabilities where migration value justifies the abstraction:
+
+- `DatabaseProvider`
+- `CacheProvider`
+- `QueueProvider`
+- `SearchProvider`
+- `ObjectStorageProvider`
+- runtime/environment adapter where required
+
+The interfaces do **not** require multiple providers to be deployed now. They establish a migration boundary without creating premature infrastructure.
+
+### 8.7 Global Write Latency
+
+**Risk:** Global Worker execution does not make an authoritative database write globally local. A write path that must reach the authoritative primary can experience network latency for geographically distant users.
+
+**Solution:**
+
+- keep authoritative writes on the defined primary path;
+- use cache/read replication for read-heavy workloads where appropriate;
+- keep high-frequency behavior asynchronous and aggregated;
+- avoid adding distributed databases solely to solve theoretical write latency;
+- define which operations require immediate consistency and which tolerate eventual consistency.
+
+### 8.8 Runtime Compatibility
+
+**Risk:** A Worker runtime is not equivalent to a full Node.js server/container. Dependency upgrades can introduce unsupported or partially supported runtime behavior.
+
+**Solution:**
+
+- maintain an explicit runtime compatibility contract;
+- pin and review critical runtime dependencies;
+- run production-targeted build/type/test checks in CI;
+- detect Node-only APIs and incompatible packages before deployment;
+- do not assume local Next.js/Node success proves Worker compatibility.
+
+### 8.9 Failure Isolation and Backpressure
+
+**Risk:** A failure in a high-volume async path can cascade into Payload, D1 or the request path.
+
+**Solution:**
+
+- keep user-facing authoritative writes separated from non-critical high-volume processing;
+- use bounded retries with backoff;
+- make events idempotent where retries are possible;
+- apply queue/backpressure controls where bursts exceed processing capacity;
+- ensure failure of analytics/recommendation enrichment does not corrupt authoritative content state;
+- define dead-letter/recovery behavior in the relevant reliability contract.
+
+### 8.10 Recommendation Fairness and Abuse
+
+**Risk:** Raw views, likes, follows or dwell events can be artificially generated and distort recommendation ranking, creator exposure and platform incentives.
+
+**Solution:**
+
+Never treat raw behavior as automatically trusted ranking input.
+
+```text
+raw_events
+    ↓
+Risk / Validation
+    ↓
+validated_events
+    ↓
+quality / trust signals
+    ↓
+recommendation_signals
+    ↓
+Ranking / Feed
+```
+
+Risk decisions should support graded responses such as normal, suspicious, high-risk and confirmed abuse. The exact policy thresholds belong in the Risk & Trust Contract, not in Payload collection hooks.
+
+### 8.11 Cost Guardrail for Reliability Features
+
+Reliability mechanisms must themselves pass cost review.
+
+The preferred order is:
+
+```text
+Prevent unnecessary work
+        ↓
+Cache / aggregation
+        ↓
+Stale serving / coalescing
+        ↓
+Queue / batch
+        ↓
+Targeted coordination
+        ↓
+Stronger distributed coordination only when measured necessary
+```
+
+A reliability mechanism that increases Worker executions, D1 operations or operational complexity without measurable benefit must not be accepted merely because it appears more robust.
+
+## 9. Feed and Recommendation
 
 Feed and recommendation are not Payload Core responsibilities.
 
@@ -337,7 +531,7 @@ Content
 
 Recommendation must not rely on raw view counts or raw interaction volume without validation.
 
-## 9. Storage Independence
+## 10. Storage Independence
 
 The logical business schema must not depend on D1-specific behavior.
 
@@ -355,7 +549,7 @@ PostgreSQL implementation later
 
 Primary keys, timestamps, status values, relations, indexes and constraints must be defined in the logical contract first.
 
-## 10. Enterprise Compatibility
+## 11. Enterprise Compatibility
 
 Enterprise capabilities remain optional and must not become a hard dependency for the core product.
 
@@ -373,9 +567,9 @@ Potential capabilities include SSO, publishing workflows, visual editing, collab
 
 Enterprise purchase must not replace the cost-first architecture or create a dependency that prevents normal operation without Enterprise.
 
-## 11. Feature Cost Review Gate
+## 12. Feature Cost Review Gate
 
-Every new feature must include a cost review before implementation.
+Every new feature must include a cost and reliability review before implementation.
 
 Minimum review:
 
@@ -384,17 +578,21 @@ Minimum review:
 | Worker execution | expected work/request pattern |
 | D1 reads | expected reads per user action |
 | D1 writes | expected writes per user action |
-| Cache | hit/miss strategy |
+| Cache | hit/miss, stampede and invalidation strategy |
 | Queue | whether async processing is justified |
 | Batch | whether writes can be aggregated |
 | R2 | whether object storage is more appropriate |
 | Payload impact | effect on Payload size/complexity |
 | Service count | whether a new service is actually necessary |
-| Migration | PostgreSQL compatibility |
+| Search | provider boundary and expected workload |
+| Consistency | authoritative source and tolerated staleness |
+| Failure | retry, backpressure and recovery behavior |
+| Runtime | Worker compatibility validation |
+| Migration | PostgreSQL and provider portability |
 
-A feature that cannot explain its Worker/D1 cost profile is not `READY` for implementation.
+A feature that cannot explain its Worker/D1 cost, consistency and failure profile is not `READY` for implementation.
 
-## 12. Development Sequence
+## 13. Development Sequence
 
 ```text
 Product Requirement
@@ -412,6 +610,8 @@ Payload / Service Boundary
 Cost Review
       ↓
 Risk / Security Review
+      ↓
+Reliability / Consistency Review
       ↓
 Test & Acceptance Contract
       ↓
@@ -432,7 +632,7 @@ PASS
 
 No business implementation begins before the feature reaches `READY`.
 
-## 13. Feature Lifecycle
+## 14. Feature Lifecycle
 
 ```text
 DRAFT
@@ -446,7 +646,7 @@ DRAFT
   -> DONE
 ```
 
-## 14. Five PASS Gates
+## 15. Five PASS Gates
 
 A feature is `DONE` only after all five gates pass:
 
@@ -458,7 +658,7 @@ A feature is `DONE` only after all five gates pass:
 
 GitHub-approved contracts are authoritative when discussion, local files and code disagree.
 
-## 15. Enterprise Feature Adoption Gates
+## 16. Enterprise Feature Adoption Gates
 
 An Enterprise feature may be enabled only when at least one of the following is true:
 
@@ -469,7 +669,7 @@ An Enterprise feature may be enabled only when at least one of the following is 
 
 Buying Enterprise must never be used as a substitute for architectural design.
 
-## 16. Enterprise Migration Principle
+## 17. Enterprise Migration Principle
 
 If Enterprise is purchased later, the preferred migration is:
 
@@ -486,7 +686,7 @@ Capability adapter
 
 The public API, logical schema and client-facing behavior should remain stable unless a deliberate breaking-change decision approves otherwise.
 
-## 17. Non-Goals
+## 18. Non-Goals
 
 This blueprint does not require:
 
@@ -497,11 +697,13 @@ This blueprint does not require:
 - synchronously writing every user behavior to D1;
 - using a queue where caching, local aggregation or direct batching is sufficient;
 - creating complex distributed infrastructure without a measured requirement;
+- adding external search before measured need;
+- introducing distributed locks or coordination for every request;
 - sacrificing correctness, security or durability merely to reduce cost.
 
-## 18. Decision and Status
+## 19. Decision and Status
 
-**Status: Architecture baseline v1.2 — cost-first foundation.**
+**Status: Architecture baseline v1.3 — cost-first foundation with reliability guardrails.**
 
 The following rules are frozen at blueprint level:
 
@@ -511,8 +713,13 @@ The following rules are frozen at blueprint level:
 4. **High-frequency behavior such as views is processed asynchronously and aggregated before persistence where possible.**
 5. **Cache, queue and batch processing are cost-control mechanisms, not mandatory architecture components; each must justify its own cost.**
 6. **Risk & Trust is separated from Recommendation and prevents raw behavior from automatically becoming trusted recommendation input.**
-7. **Logical database contracts remain portable to PostgreSQL.**
-8. **No feature enters implementation before its contract reaches `READY`.**
-9. **No architecture component is added without a measurable product, reliability, security or cost justification.**
+7. **Cache stampede, penetration, avalanche and stale-content risks require explicit mitigation in the relevant contracts.**
+8. **Search is provider-independent and must not force complex search/ranking workloads into D1 without measured justification.**
+9. **Infrastructure capabilities must have migration boundaries where the abstraction provides real value, without prematurely deploying multiple providers.**
+10. **Authoritative writes, eventual-consistency operations and global read paths must be explicitly classified.**
+11. **Worker runtime compatibility must be validated independently from local Node.js success.**
+12. **Logical database contracts remain portable to PostgreSQL.**
+13. **No feature enters implementation before its contract reaches `READY`.**
+14. **No architecture component is added without a measurable product, reliability, security or cost justification.**
 
 All subsequent contracts and feature designs must comply with these rules.
