@@ -149,7 +149,8 @@ function operationBlock(operationId) {
 }
 
 function hasParameterRef(block, componentName) {
-  return block.includes(`#/components/parameters/${componentName}`)
+  const exactRef = `#/components/parameters/${componentName}`
+  return block.split(/\r?\n/).some((line) => line.includes(`$ref: '${exactRef}'`) || line.includes(`$ref: "${exactRef}"`) || line.trim() === `$ref: ${exactRef}`)
 }
 
 for (const op of policyOps) {
@@ -158,17 +159,17 @@ for (const op of policyOps) {
     fail(`openapi.yaml: operation '${op.operationId}' could not be located for policy binding`)
     continue
   }
-  if (op.idempotencyRequired && !(
-    hasParameterRef(block, 'IdempotencyKey') ||
-    hasParameterRef(block, 'IdempotencyKeyRequired')
-  )) {
-    fail(`openapi.yaml: idempotency-required operation '${op.operationId}' does not declare Idempotency-Key`)
+  if (op.idempotencyRequired && !hasParameterRef(block, 'IdempotencyKeyRequired')) {
+    fail(`openapi.yaml: idempotency-required operation '${op.operationId}' must declare IdempotencyKeyRequired`)
   }
-  if (op.optimisticLockRequired && !(
-    hasParameterRef(block, 'IfMatch') ||
-    hasParameterRef(block, 'IfMatchRequired')
-  )) {
-    fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' does not declare If-Match`)
+  if (op.optimisticLockRequired && !hasParameterRef(block, 'IfMatchRequired')) {
+    fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare IfMatchRequired`)
+  }
+  if (op.optimisticLockRequired && !/^\s*'412':\s*$/m.test(block)) {
+    fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare HTTP 412`)
+  }
+  if (op.optimisticLockRequired && !/^\s*'428':\s*$/m.test(block)) {
+    fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare HTTP 428`)
   }
 }
 
