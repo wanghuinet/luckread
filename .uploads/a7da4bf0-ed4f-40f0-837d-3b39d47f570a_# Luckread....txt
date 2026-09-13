@@ -1,0 +1,1207 @@
+# Luckread 全量审计任务书
+
+## 目标：一次性识别全部阻断，形成可执行修复闭环，争取一次性全绿
+
+你现在负责对 GitHub 仓库：
+
+`wanghuinet/luckread`
+
+进行一次**最高等级的全量审计**。
+
+本项目目标不是做一个普通 CMS，而是以 Payload 为底座，最终形成一个面向浏览器/H5/Android/iOS 的**世界一流自媒体 / 内容社区 APP 基础平台**。
+
+最终体验目标参考：
+
+**Google / Meta / Apple / Alibaba / ByteDance / Baidu / NetEase / Tencent**
+
+尤其关注：
+
+* 启动与响应速度
+* Feed 流畅度
+* 内容加载速度
+* 发布体验
+* 图片/视频上传体验
+* 评论、点赞、关注等互动体验
+* 通知体验
+* 创作者工作台
+* IP / MCN / 组织协作
+* 权限与安全
+* 大规模并发
+* 容灾
+* 数据一致性
+* 可观测性
+* API 稳定性
+* 向未来 Android/iOS 扩展的能力
+* 长期版本演进能力
+
+---
+
+# 一、最高原则
+
+必须严格遵守：
+
+## 1. Contract First
+
+顺序必须是：
+
+`Requirement → Contract → Machine-readable Contract → Validator → CI → Evidence → Admission → Implementation`
+
+不能反过来。
+
+不得：
+
+* 先写代码再补合同
+* 为了测试通过修改测试而不是修改真实规则
+* 为了 CI 绿色降低质量
+* 用文档描述代替机器验证
+* 用本地执行代替 GitHub Actions 真执行证据
+* 用历史 SHA 结果代替当前 SHA
+
+---
+
+# 二、不要为了“绿”而作弊
+
+“全绿”必须是真绿。
+
+以下全部禁止作为 PASS：
+
+* SKIPPED
+* UNKNOWN
+* MISSING
+* STALE
+* NOT_EXECUTED
+* WRONG_SHA
+* UNVERIFIED
+* continue-on-error
+* workflow 存在但没有执行
+* workflow 执行但没有 step
+* 本地测试 PASS 但 GitHub Actions 没有 PASS
+* 旧 SHA PASS
+* 仅文档存在
+* 手工声称 PASS
+* 修改测试让失败消失
+* 删除检查项来制造绿色
+* 放宽安全规则制造绿色
+* 把真实阻断改名
+
+---
+
+# 三、本次审计必须覆盖整个仓库
+
+不要只看：
+
+`contracts/**`
+
+必须全量检查：
+
+* README
+* AGENTS.md
+* docs/**
+* contracts/**
+* scripts/**
+* .github/workflows/**
+* .agents/**
+* package / lockfile（若存在）
+* src/**（若存在）
+* tests/**
+* migrations/**
+* 配置文件
+* 环境变量
+* Cloudflare 配置
+* Payload 配置
+* API
+* OpenAPI
+* 权限模型
+* 状态机
+* 数据模型
+* Media
+* Feed
+* Search
+* Notification
+* Social
+* Creator
+* IP
+* Organization
+* MCN
+* Admin
+* Moderation
+* Audit
+* Billing / Subscription / Entitlement
+* Cache
+* R2
+* D1
+* Worker
+* CI/CD
+* Deployment
+* Observability
+* Security
+
+---
+
+# 四、第一步：确定仓库真实状态
+
+先回答：
+
+1. 当前 main HEAD 是什么 SHA？
+2. 当前仓库到底是不是 Contract-only？
+3. Payload runtime 是否已经删除？
+4. 是否仍存在：
+
+   * src
+   * package.json
+   * package-lock.json
+   * Payload runtime
+   * Next runtime
+   * Worker runtime
+5. `.agents/skills/payload/**` 是否只是文档/reference？
+6. 当前所有 GitHub Actions workflow 是什么？
+7. 当前哪些 workflow 实际执行过？
+8. 最近一次执行的 SHA 是什么？
+9. 最近一次成功执行的 SHA 是什么？
+10. 是否存在“workflow 创建了，但 job 直接失败且 0 steps”的情况？
+
+必须给出真实证据。
+
+---
+
+# 五、第二步：Actions Execution Probe 审计
+
+这是最高优先级之一。
+
+必须确认：
+
+`GitHub Actions → Runner → Job → Step → Log → Evidence`
+
+是否完整。
+
+特别检查：
+
+* workflow 是否被识别
+* job 是否创建
+* runner 是否分配
+* step 是否开始
+* checkout 是否执行
+* shell 是否执行
+* node 是否执行
+* npm 是否执行
+* logs 是否存在
+* artifacts 是否存在
+* current SHA 是否一致
+
+如果出现：
+
+`failure + steps=[] + logs=BlobNotFound`
+
+必须将其视为：
+
+`ACTIONS EXECUTION FAILURE`
+
+而不能当成 Contract failure。
+
+---
+
+# 六、第三步：GitHub Actions 账户/权限/计费阻断
+
+必须审计：
+
+* repository Actions enabled?
+* GitHub-hosted runners 是否允许？
+* private repo 是否具有可用 Actions entitlement？
+* billing / payment 是否正常？
+* spending limit 是否允许？
+* quota 是否耗尽？
+* runner provisioning 是否失败？
+* marketplace actions 是否允许？
+* repository policy 是否阻止第三方 Action？
+* fork / branch / workflow policy 是否影响执行？
+
+必须明确区分：
+
+`Repository configuration problem`
+
+与：
+
+`Account / GitHub infrastructure problem`
+
+---
+
+# 七、第四步：Contract 全量审计
+
+逐个检查：
+
+## A-01 Contract Completeness
+
+检查：
+
+* requirement 是否都有 contract
+* contract 是否有 machine-readable representation
+* 是否存在文档与 JSON/YAML 漂移
+* 是否存在功能写在 docs 里但没有 machine contract
+* 是否存在 machine contract 写了但没有产品意义
+
+---
+
+# 八、A-02 Machine-readable Contract
+
+必须检查：
+
+* schema
+* required
+* enum
+* format
+* range
+* pattern
+* reference
+* cross-reference
+* uniqueness
+* version
+* identifier
+* compatibility
+
+特别检查：
+
+`docs ↔ JSON/YAML ↔ OpenAPI`
+
+是否完全一致。
+
+---
+
+# 九、A-03 Contract Validator
+
+检查 validator 是否真的验证业务规则。
+
+禁止：
+
+“文件存在 = PASS”
+
+必须验证实际语义。
+
+至少检查：
+
+* common
+* enums
+* state-machines
+* authz
+* openapi
+* error
+* pagination
+* cursor
+* idempotency
+* ETag
+* audit
+* media
+* security
+* permission
+* organization
+* subscription
+* entitlement
+
+---
+
+# 十、State Machine 深度审计
+
+重点找出：
+
+* enum terminal 与 state-machine transition 冲突
+* terminal state 是否真的不可恢复
+* recoverable deletion 是否与 terminal 定义冲突
+* reverse transition
+* approval
+* actor
+* permission
+* audit
+* optimistic locking
+* version
+* side effects
+* token invalidation
+* deindex
+* data retention
+* restore
+
+必须特别检查：
+
+### Account
+
+例如：
+
+`DELETED → REACTIVATED`
+
+如果存在：
+
+必须判断“DELETED”究竟是：
+
+* 真正 terminal
+  还是
+* recoverable tombstone
+
+不能含糊。
+
+### Content
+
+检查：
+
+`DELETED → RESTORED`
+
+同样要求明确语义。
+
+---
+
+# 十一、Permission / RBAC / ABAC 深度审计
+
+必须建立：
+
+`Principal → Layer → Role → Permission → Scope → Resource → Action → Policy`
+
+检查是否存在：
+
+* role-only authorization
+* cache-only authorization
+* client-supplied org scope
+* ownership bypass
+* layer bypass
+* missing MFA
+* missing audit
+* permission 不存在于 catalog
+* state transition 使用不存在 permission
+* OpenAPI endpoint 没有 permission binding
+* scope 未声明
+* 高风险操作没有 approval
+* state machine actor 与 permission 不一致
+
+---
+
+# 十二、L0-L8 权限层级
+
+逐级审计：
+
+L0 Anonymous
+L1 RegisteredUnverified
+L2 VerifiedUser
+L3 Creator
+L4 IpPrincipalOrgLead
+L5 Operator
+L6 Moderator
+L7 Admin
+L8 SuperAdmin
+
+检查：
+
+* 顺序
+* role
+* entitlement
+* subscription
+* organization
+* account state
+* MFA
+* scope
+* ownership
+
+不能把：
+
+`Layer = Role`
+
+也不能允许：
+
+`Layer` 绕过资源所有权。
+
+---
+
+# 十三、用户身份体系
+
+完整检查是否覆盖：
+
+* anonymous
+* registered user
+* verified user
+* creator
+* creator team
+* IP member
+* IP founder
+* MCN
+* MCN admin
+* MCN editor
+* organization lead
+* operator
+* moderator
+* admin
+* super admin
+* enterprise user
+* paid user
+* subscription
+* entitlement
+* delegated identity
+
+必须检查身份之间是否冲突。
+
+特别检查：
+
+**IP Founder 是否被正式建模。**
+
+---
+
+# 十四、Auth / Account State
+
+检查：
+
+* register
+* login
+* logout
+* session
+* token
+* MFA
+* account state
+* deletion
+* suspension
+* ban
+* restore
+* reactivation
+* verification
+* revocation
+
+必须验证：
+
+`AccountState → Authorization`
+
+是否为 fail-closed。
+
+---
+
+# 十五、API Contract
+
+API 必须具备：
+
+* versioning
+* HTTP semantics
+* request schema
+* response schema
+* error schema
+* requestId
+* traceId
+* pagination
+* cursor
+* idempotency
+* ETag
+* If-Match
+* optimistic concurrency
+* rate limit
+* quota
+* authorization
+* scope
+* audit
+* deterministic ordering
+
+---
+
+# 十六、OpenAPI 深度审计
+
+必须建立机器绑定：
+
+`Endpoint → Permission → Layer → Scope → MFA → Audit → State Machine → ErrorCode`
+
+不能只检查：
+
+`paths > 0`
+
+必须检查真实一致性。
+
+特别检查：
+
+### 1. pagination
+
+文档和 OpenAPI 是否统一：
+
+`data.items`
+
+还是：
+
+`data[]`
+
+只能有一个标准。
+
+### 2. requestId
+
+统一：
+
+`requestId`
+
+还是：
+
+`request_id`
+
+只能有一个标准。
+
+### 3. error code
+
+必须引用 canonical ErrorCode enum。
+
+禁止：
+
+`string`
+
+代替 canonical error catalog。
+
+### 4. ETag
+
+所有 versioned write 是否声明：
+
+`If-Match`
+
+### 5. Idempotency-Key
+
+所有 mandatory idempotency endpoint 是否声明。
+
+### 6. authorization
+
+endpoint 是否绑定：
+
+* permission
+* scope
+* layer
+* MFA
+* audit
+
+---
+
+# 十七、Error Contract
+
+必须建立统一：
+
+`HTTP Status → ErrorCode → Error Message → RequestId → TraceId → Details`
+
+检查：
+
+* 404
+* 403
+* 401
+* 409
+* 412
+* 422
+* 429
+* 413
+* 415
+* 500
+* 503
+
+必须检查：
+
+`403 vs 404 existence disclosure`
+
+是否有统一规则。
+
+---
+
+# 十八、Pagination / Cursor
+
+必须检查：
+
+* cursor opaque
+* cursor endpoint-bound
+* query-bound
+* order-bound
+* expiration
+* invalid cursor
+* expired cursor
+* deterministic ordering
+* duplicates
+* missing records
+* empty list
+* next cursor semantics
+
+---
+
+# 十九、Idempotency
+
+必须检查：
+
+* mandatory endpoints
+* same key + same payload
+* same key + different payload
+* in-progress
+* expiration
+* retry
+* first response replay
+* conflict
+
+---
+
+# 二十、Concurrency
+
+所有 mutation 检查：
+
+* ETag
+* If-Match
+* version
+* revision
+* optimistic lock
+* conflict
+* lost update
+* duplicate update
+
+---
+
+# 二十一、Media System
+
+目标不是简单“上传图片”。
+
+必须审计：
+
+`Initiated → Uploading → Uploaded → Processing → Ready / Failed / Quarantined → Deleted`
+
+检查：
+
+* R2
+* metadata
+* media version
+* resumable upload
+* MIME validation
+* malware
+* moderation
+* rights
+* quota
+* retry
+* DLQ
+* idempotency
+* event delivery
+* quarantine
+* purge
+* lifecycle
+
+必须保证：
+
+`QUARANTINED != SERVABLE`
+
+---
+
+# 二十二、世界一流 APP 体验审计
+
+这是本次最重要的产品维度之一。
+
+不要只审后端 correctness。
+
+必须审：
+
+## Feed
+
+目标：
+
+* 首屏快
+* 分页稳定
+* cursor smooth
+* dedupe
+* personalization-ready
+* cold start
+* cache
+* retry
+
+## Content
+
+目标：
+
+* 打开快
+* 图片 lazy loading
+* 视频预加载
+* 草稿自动保存
+* 发布状态清晰
+* 失败可恢复
+
+## Social
+
+必须覆盖：
+
+* like
+* unlike
+* follow
+* unfollow
+* comment
+* reply
+* report
+* block
+* mute
+
+要求：
+
+* optimistic UI ready
+* idempotent
+* consistent counter
+* anti-duplicate
+
+## Creator
+
+必须支持：
+
+* draft
+* scheduled
+* publish
+* analytics
+* content management
+* media management
+* collaboration
+
+## Notification
+
+必须支持：
+
+* unread
+* read
+* batch
+* cursor
+* priority
+* push-ready
+
+---
+
+# 二十三、性能审计
+
+必须设计：
+
+* P50
+* P95
+* P99
+* cold
+* warm
+* cache hit
+* D1 latency
+* R2 latency
+* API latency
+
+重点不是先实现复杂系统，而是**合同阶段先定义 SLO**。
+
+---
+
+# 二十四、Cloudflare 架构审计
+
+重点检查：
+
+* Workers
+* D1
+* R2
+* Cache API
+* KV
+* Queues（若需要）
+* Cron
+* Durable Objects（只有真正需要才允许）
+* external service dependencies
+
+原则：
+
+**Cloudflare-native first**
+
+但不能因为省钱而牺牲：
+
+* correctness
+* consistency
+* recoverability
+* security
+
+---
+
+# 二十五、D1 数据设计
+
+检查：
+
+* account data
+* content metadata
+* social data
+* interaction data
+* audit data
+* organization
+* creator
+* IP
+* subscription
+
+检查是否存在：
+
+* single-D1 bottleneck
+* hot row
+* hot partition
+* N+1
+* counter contention
+* transaction boundary confusion
+
+---
+
+# 二十六、R2 内容设计
+
+检查：
+
+* article body
+* rich media
+* JSON content
+* images
+* video
+* original asset
+* derived asset
+
+必须确保：
+
+`metadata authority != binary storage`
+
+---
+
+# 二十七、安全审计
+
+必须覆盖：
+
+* authentication
+* authorization
+* CSRF
+* XSS
+* SSRF
+* IDOR
+* upload abuse
+* path traversal
+* MIME confusion
+* malware
+* privilege escalation
+* token theft
+* cache poisoning
+* replay
+* rate abuse
+* bot abuse
+* scraping
+* resource exhaustion
+
+---
+
+# 二十八、观测与灾备
+
+必须设计：
+
+* requestId
+* traceId
+* audit
+* logs
+* metrics
+* latency
+* error rate
+* availability
+* retry
+* DLQ
+* recovery
+* incident
+* rollback
+* migration rollback
+* data recovery
+
+---
+
+# 二十九、代码库复杂度控制
+
+这个非常重要。
+
+必须审计是否存在：
+
+* random abstraction
+* duplicate utilities
+* duplicate contract definitions
+* duplicate state machine
+* duplicate permission catalogs
+* duplicate error catalogs
+* duplicate API schemas
+* dead docs
+* dead code
+* conflicting contracts
+* obsolete v1 documents
+
+必须建立：
+
+**Single Source of Truth**
+
+例如：
+
+* Permission → permissions.json
+* ErrorCode → error-code.json
+* State → enums + state-machine
+* API → OpenAPI
+* AuthZ → authz contracts
+
+---
+
+# 三十、旧版本清理
+
+必须主动找：
+
+* v0
+* v1
+* legacy
+* deprecated
+* obsolete
+* abandoned
+* old workflow
+* orphan workflow
+* old PR branch
+* old docs
+
+不能让旧版本继续对现版本产生误导。
+
+---
+
+# 三十一、最终必须输出“全部阻断矩阵”
+
+格式：
+
+| ID | 阻断项 | 严重度 | 文件 | 原因 | 是否真实阻断 | 修复方案 | 验证方式 |
+| -- | --- | --- | -- | -- | ------ | ---- | ---- |
+
+至少分类：
+
+* P0 Security
+* P0 Data Integrity
+* P0 CI / Admission
+* P1 Contract
+* P1 API
+* P1 AuthZ
+* P1 State Machine
+* P1 Performance
+* P1 Reliability
+* P2 Product completeness
+* P2 UX
+* P2 Maintainability
+
+---
+
+# 三十二、必须区分三种状态
+
+每一个问题只能属于：
+
+### BLOCKER
+
+不解决不能开发。
+
+### REQUIRED BEFORE IMPLEMENTATION
+
+目前不一定阻止文档，但正式编码前必须解决。
+
+### POST-MVP
+
+当前阶段不阻塞。
+
+禁止把 BLOCKER 偷换成 POST-MVP。
+
+---
+
+# 三十三、一次性修复原则
+
+完成审计之后：
+
+不要让我一条一条告诉你修什么。
+
+你必须自己生成：
+
+`Master Remediation Plan`
+
+把可以一起修的阻断合并。
+
+目标：
+
+**尽可能一次提交解决一组完整阻断。**
+
+但不得把不相关内容混成巨大提交。
+
+---
+
+# 三十四、修复顺序必须固定
+
+1. Actions Execution / Runner
+2. Contract validator correctness
+3. Contract cross-reference
+4. State machine
+5. AuthZ
+6. OpenAPI
+7. Error
+8. Pagination
+9. Cursor
+10. Idempotency
+11. Concurrency
+12. Media
+13. Security
+14. Performance/SLO
+15. Evidence
+16. Admission
+
+---
+
+# 三十五、Evidence DAG
+
+必须最终建立：
+
+`Requirement`
+
+↓
+
+`Contract`
+
+↓
+
+`Validator`
+
+↓
+
+`Test`
+
+↓
+
+`GitHub Action`
+
+↓
+
+`Execution ID`
+
+↓
+
+`Current SHA`
+
+↓
+
+`Evidence`
+
+↓
+
+`Kernel Validator`
+
+↓
+
+`Development Admission`
+
+任何中间节点缺失：
+
+**不能 PASS**
+
+---
+
+# 三十六、Current SHA Proof
+
+必须证明：
+
+`HEAD SHA == tested SHA`
+
+不能：
+
+`old SHA passed → current branch assumed passed`
+
+---
+
+# 三十七、最终准入规则
+
+只有同时满足：
+
+* Contract PASS
+* Validator PASS
+* Actions Probe PASS
+* GitHub Actions PASS
+* Current SHA PASS
+* Evidence PASS
+* Evidence DAG PASS
+* Kernel Validator PASS
+* Security PASS
+* OpenAPI PASS
+* State Machine PASS
+* AuthZ PASS
+
+才允许：
+
+# DEVELOPMENT ADMISSION = PASS
+
+然后才能：
+
+**重新拉取最新版批准的 Payload**
+
+再开始实现。
+
+---
+
+# 三十八、本次审计输出顺序
+
+必须严格按这个顺序返回：
+
+## 1. 当前仓库真实状态
+
+## 2. 全部阻断项
+
+## 3. 隐性阻断项
+
+## 4. 文档与机器合同不一致项
+
+## 5. Validator 漏检项
+
+## 6. Actions / Runner 阻断
+
+## 7. API / OpenAPI 阻断
+
+## 8. AuthZ / RBAC / State Machine 阻断
+
+## 9. Data / D1 / R2 阻断
+
+## 10. Security 阻断
+
+## 11. Reliability 阻断
+
+## 12. Performance / UX 阻断
+
+## 13. 冗余项
+
+## 14. 缺失项
+
+## 15. Master Remediation Plan
+
+## 16. 一次性修复顺序
+
+## 17. 最终全绿验证方案
+
+## 18. Development Admission 最终判定
+
+---
+
+# 三十九、非常重要
+
+不要因为目标是“一次性全绿”就降低判断标准。
+
+正确目标是：
+
+**一次性找全阻断 → 一次性系统性修复 → 用真实 GitHub Execution Evidence 验证 → 全绿**
+
+而不是：
+
+**为了绿而改检查。**
+
+---
+
+# 四十、最终产品目标
+
+最终不是：
+
+“Payload 项目能运行”。
+
+最终目标是：
+
+**一个世界一流、移动端优先、API-first、体验优先、安全优先、可扩展、可观测、可恢复、低成本、能够长期演进的自媒体/内容社区平台。**
+
+因此审计必须同时满足：
+
+`Engineering Excellence`
+
+*
+
+`Product Excellence`
+
+*
+
+`UX Excellence`
+
+*
+
+`Security Excellence`
+
+*
+
+`Operational Excellence`
+
+*
+
+`Contract Excellence`
+
+最终请不要只告诉我“有什么问题”。
+
+必须告诉我：
+
+**哪些问题阻止现在开始开发，为什么，如何一次性消除，以及消除后怎样用机器证据证明真的全绿。**
