@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/openapi/operation-policy.json",
+  "title": "LuckRead API Operation Policy",
+  "description": "Machine-readable binding between public API operations and authorization/concurrency/idempotency/audit policy. This contract complements OpenAPI without embedding product authorization logic in a generated framework schema.",
+  "type": "object",
+  "required": ["version", "operations"],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["operationId", "auth", "auditRequired", "optimisticLockRequired", "idempotencyRequired"],
+        "properties": {
+          "operationId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+          "auth": { "type": "object" },
+          "auditRequired": { "type": "boolean" },
+          "optimisticLockRequired": { "type": "boolean" },
+          "idempotencyRequired": { "type": "boolean" },
+          "stateMachine": { "enum": ["account", "content", "none"] },
+          "permissions": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  },
+  "x-luckread": {
+    "single-source-rule": "Every OpenAPI operationId MUST appear exactly once in operations.",
+    "public-operations": ["authRegister", "authLogin"],
+    "state-transition-operations": ["transitionAccountState", "transitionContentState"]
+  },
+  "operations": [
+    { "operationId": "authRegister", "auth": { "mode": "public" }, "permissions": [], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "authLogin", "auth": { "mode": "public" }, "permissions": [], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "authLogout", "auth": { "mode": "authenticated" }, "permissions": [], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "getMe", "auth": { "mode": "permission" }, "permissions": ["user.read.self"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "updateMe", "auth": { "mode": "permission" }, "permissions": ["user.update.self"], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "transitionAccountState", "auth": { "mode": "state-machine" }, "permissions": [], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": true, "stateMachine": "account" },
+    { "operationId": "listContents", "auth": { "mode": "permission" }, "permissions": ["content.read.public"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "createContent", "auth": { "mode": "permission" }, "permissions": ["content.create"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "getContent", "auth": { "mode": "permission" }, "permissions": ["content.read.public"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "updateContent", "auth": { "mode": "permission" }, "permissions": ["content.update.own"], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "deleteContent", "auth": { "mode": "permission" }, "permissions": ["content.delete.own"], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "transitionContentState", "auth": { "mode": "state-machine" }, "permissions": [], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": true, "stateMachine": "content" },
+    { "operationId": "createMedia", "auth": { "mode": "permission" }, "permissions": ["media.upload"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "getMedia", "auth": { "mode": "permission" }, "permissions": ["media.upload"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "listComments", "auth": { "mode": "permission" }, "permissions": ["content.read.public"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "createComment", "auth": { "mode": "permission" }, "permissions": ["comment.create"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "like", "auth": { "mode": "permission" }, "permissions": ["interaction.like"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "unlike", "auth": { "mode": "permission" }, "permissions": ["interaction.like"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "follow", "auth": { "mode": "permission" }, "permissions": ["social.follow"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "unfollow", "auth": { "mode": "permission" }, "permissions": ["social.follow"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "getFeed", "auth": { "mode": "permission" }, "permissions": ["content.read.public"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "search", "auth": { "mode": "permission" }, "permissions": ["content.read.public"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "listNotifications", "auth": { "mode": "permission" }, "permissions": ["user.read.self"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "batchUpdateNotifications", "auth": { "mode": "permission" }, "permissions": ["user.update.self"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "getMyCreator", "auth": { "mode": "permission" }, "permissions": ["user.read.self"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "createIp", "auth": { "mode": "permission" }, "permissions": ["ip.member.invite"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "inviteIpMember", "auth": { "mode": "permission" }, "permissions": ["ip.member.invite"], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "removeIpMember", "auth": { "mode": "permission" }, "permissions": ["ip.member.remove"], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "createOrganization", "auth": { "mode": "permission" }, "permissions": ["org.member.manage.scope"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "listModerationCases", "auth": { "mode": "permission" }, "permissions": ["moderation.decide"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" }
+  ]
+}
