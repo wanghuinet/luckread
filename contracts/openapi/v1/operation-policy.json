@@ -12,15 +12,23 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["operationId", "auth", "auditRequired", "optimisticLockRequired", "idempotencyRequired", "stateMachine"],
+        "required": ["operationId", "auth", "permissions", "auditRequired", "optimisticLockRequired", "idempotencyRequired", "stateMachine"],
+        "additionalProperties": false,
         "properties": {
           "operationId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
-          "auth": { "type": "object" },
+          "auth": {
+            "type": "object",
+            "required": ["mode"],
+            "additionalProperties": false,
+            "properties": {
+              "mode": { "enum": ["public", "permission", "state-machine", "authenticated"] }
+            }
+          },
+          "permissions": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
           "auditRequired": { "type": "boolean" },
           "optimisticLockRequired": { "type": "boolean" },
           "idempotencyRequired": { "type": "boolean" },
-          "stateMachine": { "enum": ["account", "content", "none"] },
-          "permissions": { "type": "array", "items": { "type": "string" } }
+          "stateMachine": { "enum": ["account", "content", "none"] }
         }
       }
     }
@@ -60,6 +68,6 @@
     { "operationId": "inviteIpMember", "auth": { "mode": "permission" }, "permissions": ["ip.member.invite"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
     { "operationId": "removeIpMember", "auth": { "mode": "permission" }, "permissions": ["ip.member.remove"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
     { "operationId": "createOrganization", "auth": { "mode": "permission" }, "permissions": ["org.create"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
-    { "operationId": "listModerationCases", "auth": { "mode": "permission" }, "permissions": ["moderation.read"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" }
+    { "operationId": "listModerationCases", "auth": { "mode": "permission" }, "permissions": ["moderation.read"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" }
   ]
 }
