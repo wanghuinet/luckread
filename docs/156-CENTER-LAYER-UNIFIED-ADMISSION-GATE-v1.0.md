@@ -1,6 +1,6 @@
 # LuckRead Center Layer Unified Admission Gate v1.0
 
-**状态：ADMISSION-CONTRACT-COMPLETE / CROSS-CUTTING-CONTRACTS-INCLUDED / IMPLEMENTATION BLOCKED UNTIL UNIFIED CL**
+**状态：ADMISSION-CONTRACT-COMPLETE / L1-L6-INCLUDED / IMPLEMENTATION BLOCKED UNTIL UNIFIED CL**
 
 ## 1. Purpose
 
@@ -53,7 +53,16 @@ Center 准入必须同时符合：
 176 Evidence Registry
 ```
 
-缺少相关横向合同映射 = FAIL。
+L1-L4 implementation candidates additionally require:
+
+```text
+178 L3/L4 Traceability Closure
+179 L5 Execution Specification
+180 L6 Verification / Evidence Atomic Unit
+181 L3-L6 Hierarchy Reconciliation Addendum
+```
+
+缺少相关横向或层级合同映射 = FAIL。
 
 ## 4. Mandatory Gates
 
@@ -65,6 +74,12 @@ Center 准入必须同时符合：
 
 ### G3 Traceability
 每个 L1/L2/L3/L4 capability 必须可追踪到 UX、Domain、Data、API、Event、Permission、Test 和 Evidence。
+
+实现候选继续要求：
+
+```text
+L1 → L2 → L3 → L4 → L5 → L6 → Evidence
+```
 
 ### G4 UX
 关键 Journey 必须定义 happy path、empty、loading、error、partial、permission denied、recovery、completion。
@@ -115,14 +130,32 @@ localization/accessibility
 ### G12 Evidence
 每项 PASS/READY claim 必须能够在 176 Evidence Registry 中定位到当前 commit / version 对应证据。
 
-## 5. Required Evidence
+## 5. L5 / L6 Admission
+
+Center 能力进入实现前：
+
+```text
+L4
+→ 179 L5 Execution Specification
+→ 180 L6 Verification / Evidence
+→ 176 Evidence Registry
+```
+
+要求：
+
+- L5 不得新增未登记产品能力；
+- L5 必须定义输入、输出、前置条件、状态、授权、幂等、错误、恢复、运行时、成本与测试映射；
+- L6 必须定义单一、可判定、可复现的 verification claim；
+- PASS 必须有当前 commit 可定位 evidence。
+
+## 6. Required Evidence
 
 准入时必须提供：
 
 ```text
 18-center registry evidence
 authority map
-L1-L4 traceability matrix
+L1-L6 traceability matrix
 UX journey matrix
 API/event boundary evidence
 permission/security/privacy matrix
@@ -130,10 +163,12 @@ cross-cutting dependency map
 performance/cost assumptions
 failure/recovery matrix
 139 superiority evidence
+L5 execution specification coverage
+L6 verification/evidence coverage
 176 evidence references
 ```
 
-## 6. Blocking Conditions
+## 7. Blocking Conditions
 
 出现以下任一情况，Gate = FAIL：
 
@@ -143,6 +178,10 @@ failure/recovery matrix
 - 高风险 mutation 无权限/审计；
 - tenant/scope 隔离缺失；
 - 关键状态无 authoritative source；
+- L3/L4 无法追踪；
+- L4 无 L5；
+- L5 无 L6/evidence plan；
+- L6 claim 不可验证；
 - UX superiority 无可验证指标；
 - 关键失败无 recovery；
 - async operation 无统一 identity/state；
@@ -155,12 +194,14 @@ failure/recovery matrix
 - 用户/运营角色跨 scope 数据泄露；
 - evidence 缺失或不可对应当前版本。
 
-## 7. Admission Decision
+## 8. Admission Decision
 
 ```text
 ALL GATES PASS
 AND
 ALL REQUIRED CROSS-CUTTING DEPENDENCIES CLOSED
+AND
+ALL L1-L6 TRACEABILITY CLOSED
 AND
 ALL REQUIRED EVIDENCE PRESENT
 AND
@@ -173,11 +214,11 @@ AND
 ```text
 CENTER LAYER NOT READY
 → STOP IMPLEMENTATION
-→ REPAIR CONTRACT
+→ REPAIR CONTRACT / TRACEABILITY / EVIDENCE
 → RE-RUN UNIFIED CL
 ```
 
-## 8. Implementation Policy
+## 9. Implementation Policy
 
 在本 Gate 通过前：
 
@@ -188,11 +229,11 @@ CENTER LAYER NOT READY
 
 本 Gate 通过后，才允许按 Center 独立 admission 顺序进入实现。
 
-## 9. Current Status
+## 10. Current Status
 
 ```text
 18_CENTER_REGISTRY = COMPLETE
-CENTER_TRACEABILITY = COMPLETE
+CENTER_TRACEABILITY = L1-L6 COMPLETE
 CROSS_CUTTING_DEPENDENCIES = CLOSED
 UNIFIED_ADMISSION_GATE = COMPLETE
 CL = REQUIRED
