@@ -7,12 +7,14 @@ on:
       - 'contracts/api/**'
       - 'contracts/openapi/**'
       - 'scripts/api-inventory-reconciliation-check.mjs'
+      - 'scripts/api-inventory-report-schema-check.mjs'
       - '.github/workflows/api-inventory-reconciliation.yml'
   pull_request:
     paths:
       - 'contracts/api/**'
       - 'contracts/openapi/**'
       - 'scripts/api-inventory-reconciliation-check.mjs'
+      - 'scripts/api-inventory-report-schema-check.mjs'
       - '.github/workflows/api-inventory-reconciliation.yml'
   workflow_dispatch:
 
@@ -33,7 +35,12 @@ jobs:
           node-version: 24
 
       - name: Run reconciliation
+        id: reconciliation
         run: node scripts/api-inventory-reconciliation-check.mjs
+
+      - name: Validate reconciliation report
+        if: always()
+        run: node scripts/api-inventory-report-schema-check.mjs
 
       - name: Upload reconciliation evidence
         if: always()
