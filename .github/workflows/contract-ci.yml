@@ -1,0 +1,34 @@
+name: Contract CI
+
+on:
+  push:
+    branches: [main, 'contract/**']
+    paths:
+      - 'contracts/**'
+      - 'scripts/contract-ci.mjs'
+      - '.github/workflows/contract-ci.yml'
+  pull_request:
+    paths:
+      - 'contracts/**'
+      - 'scripts/contract-ci.mjs'
+      - '.github/workflows/contract-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  common-schema:
+    name: Common Schema
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install contract validator
+        run: npm install --no-save --no-package-lock ajv@8.17.1
+      - name: Validate common schemas
+        run: node scripts/contract-ci.mjs common
