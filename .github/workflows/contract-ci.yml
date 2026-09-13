@@ -5,11 +5,13 @@ on:
     branches: [main, 'contract/**']
     paths:
       - 'contracts/**'
+      - 'docs/**'
       - 'scripts/contract-ci.mjs'
       - '.github/workflows/contract-ci.yml'
   pull_request:
     paths:
       - 'contracts/**'
+      - 'docs/**'
       - 'scripts/contract-ci.mjs'
       - '.github/workflows/contract-ci.yml'
   workflow_dispatch:
@@ -19,8 +21,9 @@ permissions:
 
 jobs:
   # Contract CI is the CODE DEVELOPMENT ADMISSION gate.
-  # Contract -> Schema -> OpenAPI -> Migration -> DTO -> Authorization ->
-  # State Machine -> Test -> Contract CI -> Code Development Admission.
+  # This repository is contract-first: implementation is intentionally absent
+  # until the contract/evidence gates are green. Payload is restored separately
+  # from the pinned upstream version only after development admission.
   contract:
     name: Contract Admission Gate
     runs-on: ubuntu-latest
