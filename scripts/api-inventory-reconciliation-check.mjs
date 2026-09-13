@@ -43,25 +43,44 @@ else for (const op of Array.isArray(policy.operations) ? policy.operations : [])
   else openapiOps.set(op.operationId, op);
 }
 
-for (const [id] of inventory) if (openapiOps.size && !openapiOps.has(id)) finding('INVENTORY_NOT_IN_OPENAPI', id, 'operationId absent from legacy OpenAPI operation policy');
-for (const [id] of openapiOps) if (!inventory.has(id)) finding('OPENAPI_NOT_IN_INVENTORY', id, 'operationId absent from domain inventory');
+// Legacy OpenAPI policy is treated as a reconciliation reference, not a complete
+// inventory authority. Missing counterparts are unresolved until explicitly reconciled.
+for (const [id, op] of inventory) {
+  const legacy = openapiOps.get(id);
+  if (!legacy) finding('UNRECONCILED_INVENTORY_OPERATION', id, 'operationId absent from legacy OpenAPI operation policy');
+  else {
+    if (String(op.method).toUpperCase() !== String(legacy.method ?? '').toUpperCase()) finding('METHOD_MISMATCH', id, `${op.method} != ${legacy.method}`);
+    if (op.path !== legacy.path) finding('PATH_MISMATCH', id, `${op.path} != ${legacy.path}`);
+  }
+}
+for (const [id] of openapiOps) if (!inventory.has(id)) finding('UNRECONCILED_OPENAPI_OPERATION', id, 'operationId absent from domain inventory');
 
 const criticalEvidence = ['openapi','permission','state','resource','cache','antiAbuse','integration','securityE2E'];
+const allowedEvidence = new Set(['PASS', 'N/A']);
 for (const [id, op] of inventory) {
   if (!op.evidence) { finding('EVIDENCE_MISSING', id, 'evidence object absent'); continue; }
   for (const field of criticalEvidence) {
     const value = op.evidence[field];
-    if (value === 'MISSING' || value === undefined) finding('EVIDENCE_INCOMPLETE', id, field);
-    else if (value !== 'PASS') finding('EVIDENCE_NOT_PASS', id, `${field}=${value}`);
+    if (value === undefined || value === null || value === 'MISSING') finding('EVIDENCE_INCOMPLETE', id, field);
+    else if (!allowedEvidence.has(value)) finding('EVIDENCE_NOT_PASS', id, `${field}=${value}`);
   }
 }
 
-const conflictCodes = new Set(['INVALID_JSON','DUPLICATE_OPERATION_ID','OPENAPI_POLICY_MISSING_OPERATION_ID','OPENAPI_DUPLICATE_OPERATION_ID','INVENTORY_NOT_IN_OPENAPI','OPENAPI_NOT_IN_INVENTORY','MISSING_OPERATION_ID','MISSING_METHOD_OR_PATH']);
+const conflictCodes = new Set([
+  'INVALID_JSON','DUPLICATE_OPERATION_ID','OPENAPI_POLICY_MISSING_OPERATION_ID',
+  'OPENAPI_DUPLICATE_OPERATION_ID','MISSING_OPERATION_ID','MISSING_METHOD_OR_PATH',
+  'METHOD_MISMATCH','PATH_MISMATCH'
+]);
+const incompleteCodes = new Set([
+  'MISSING_API_INVENTORY_DIRECTORY','MISSING_OPENAPI_OPERATION_POLICY','MISSING_POLICY',
+  'MISSING_DOMAIN','MISSING_OPERATIONS_ARRAY','EVIDENCE_MISSING','EVIDENCE_INCOMPLETE',
+  'EVIDENCE_NOT_PASS','UNRECONCILED_INVENTORY_OPERATION','UNRECONCILED_OPENAPI_OPERATION'
+]);
 const hasConflict = failures.some((x) => conflictCodes.has(x.code)) || findings.some((x) => conflictCodes.has(x.code));
-const hasIncomplete = failures.some((x) => !conflictCodes.has(x.code)) || findings.some((x) => ['MISSING_POLICY','MISSING_DOMAIN','MISSING_OPERATIONS_ARRAY','EVIDENCE_MISSING','EVIDENCE_INCOMPLETE','EVIDENCE_NOT_PASS'].includes(x.code));
+const hasIncomplete = failures.some((x) => incompleteCodes.has(x.code)) || findings.some((x) => incompleteCodes.has(x.code));
 const status = hasConflict ? 'CONFLICT' : hasIncomplete ? 'INCOMPLETE' : 'PASS';
 const report = {
-  schemaVersion: '1.1.0',
+  schemaVersion: '1.2.0',
   generatedAt: new Date().toISOString(),
   status,
   reconciliationGreen: status === 'PASS',
@@ -71,7 +90,8 @@ const report = {
   findingCount: findings.length,
   failures,
   findings,
-  rule: 'PASS requires zero structural conflicts and zero incomplete evidence. Missing or non-PASS evidence can never be treated as Green.'
+  evidenceSemantics: { pass: ['PASS','N/A'], incomplete: ['MISSING','ABSENT'], invalid: ['unknown_or_unsupported'] },
+  rule: 'PASS requires zero structural conflicts and zero unresolved reconciliation or incomplete evidence. N/A is valid only when explicitly declared by the operation contract.'
 };
 const evidenceDir = path.join(root, 'artifacts', 'api-inventory');
 fs.mkdirSync(evidenceDir, { recursive: true });
