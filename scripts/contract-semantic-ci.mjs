@@ -60,24 +60,25 @@ for (const file of await walk(join(ROOT, 'state-machines'))) {
         if (terminal.has(t.from)) fail(`${rel}: terminal state '${t.from}' has outgoing transition ${t.from}->${t.to}`)
       }
       for (const state of recoverable) {
-        if (terminal.has(state)) fail(`${rel}: state '${state}' is both terminal and recoverable`) 
+        if (terminal.has(state)) fail(`${rel}: state '${state}' is both terminal and recoverable`)
       }
     }
   }
   for (const t of transitions) {
     if (!t.permission) continue
-    if (!permissions.has(t.permission)) fail(`${rel}: unknown permission '${t.permission}'`) 
+    if (!permissions.has(t.permission)) fail(`${rel}: unknown permission '${t.permission}'`)
   }
 }
 
 const errorDoc = await json('schemas/common/error.json')
 const code = errorDoc.properties?.code
-if (code?.$ref !== `${PREFIX}enums/error-code.json`) {
-  fail('common/error.json: code MUST reference canonical ErrorCode enum')
+const canonicalErrorRef = '../../enums/error-code.json'
+if (code?.$ref !== canonicalErrorRef) {
+  fail(`common/error.json: code MUST reference canonical ErrorCode enum via ${canonicalErrorRef}`)
 }
 
 const errorResponse = await json('schemas/common/error-response.json')
-if (!errorResponse.properties?.traceId) fail('common/error-response.json: traceId is required')
+if (!errorResponse.properties?.traceId) fail('common/error-response.json: traceId property is required for trace-capable responses')
 
 const policy = await json('openapi/v1/operation-policy.json')
 const policyOps = policy.operations ?? []
@@ -100,22 +101,30 @@ if (actualIds.size !== operationIds.length) fail('openapi.yaml: duplicate operat
 for (const id of operationIds) if (!policyIds.has(id)) fail(`openapi.yaml: operationId '${id}' missing from operation-policy.json`)
 for (const id of policyIds) if (!actualIds.has(id)) fail(`operation-policy.json: operationId '${id}' is not present in openapi.yaml`)
 
-const mutationPolicy = new Set(policyOps.filter((op) => op.idempotencyRequired).map((op) => op.operationId))
-for (const id of mutationPolicy) {
-  const idx = openapi.indexOf(`operationId: ${id}`)
-  const nextPath = openapi.indexOf('\n  /', idx + 1)
-  const block = openapi.slice(Math.max(0, idx - 1200), nextPath === -1 ? openapi.length : nextPath)
+function operationBlock(operationId) {
+  const idx = openapi.indexOf(`operationId: ${operationId}`)
+  if (idx < 0) return ''
+  const methodMatches = [...openapi.slice(0, idx).matchAll(/^    (get|post|put|patch|delete|head|options):\s*$/gm)]
+  const start = methodMatches.length ? methodMatches.at(-1).index : Math.max(0, idx - 500)
+  const nextMethod = openapi.slice(idx + 1).search(/^    (get|post|put|patch|delete|head|options):\s*$/m)
+  const nextPath = openapi.slice(idx + 1).search(/^  \/[^ ].*:\s*$/m)
+  let end = openapi.length
+  if (nextMethod >= 0) end = Math.min(end, idx + 1 + nextMethod)
+  if (nextPath >= 0) end = Math.min(end, idx + 1 + nextPath)
+  return openapi.slice(start ?? 0, end)
+}
+
+for (const op of policyOps.filter((item) => item.idempotencyRequired)) {
+  const block = operationBlock(op.operationId)
   if (!block.includes("#/components/parameters/IdempotencyKey")) {
-    fail(`openapi.yaml: idempotency-required operation '${id}' does not declare Idempotency-Key`)
+    fail(`openapi.yaml: idempotency-required operation '${op.operationId}' does not declare Idempotency-Key`)
   }
 }
 
-for (const id of policyOps.filter((op) => op.optimisticLockRequired).map((op) => op.operationId)) {
-  const idx = openapi.indexOf(`operationId: ${id}`)
-  const nextPath = openapi.indexOf('\n  /', idx + 1)
-  const block = openapi.slice(Math.max(0, idx - 1200), nextPath === -1 ? openapi.length : nextPath)
+for (const op of policyOps.filter((item) => item.optimisticLockRequired)) {
+  const block = operationBlock(op.operationId)
   if (!block.includes("#/components/parameters/IfMatch")) {
-    fail(`openapi.yaml: optimistic-lock-required operation '${id}' does not declare If-Match`)
+    fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' does not declare If-Match`)
   }
 }
 
