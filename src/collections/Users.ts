@@ -17,6 +17,7 @@ export const Users: CollectionConfig = {
     update: ({ req }) => {
       if (!req.user) return false
       if (req.user.role === 'admin') return true
+      if (req.user.status !== 'active') return false
       return { id: { equals: req.user.id } }
     },
     delete: ({ req }) => req.user?.role === 'admin',
@@ -66,6 +67,23 @@ export const Users: CollectionConfig = {
       access: {
         update: ({ req }) => req.user?.role === 'admin',
       },
+    },
+    {
+      name: 'locale',
+      type: 'text',
+      maxLength: 16,
+      defaultValue: 'en-US',
+    },
+    {
+      name: 'timezone',
+      type: 'text',
+      maxLength: 64,
+      defaultValue: 'UTC',
+    },
+    {
+      name: 'marketingConsent',
+      type: 'checkbox',
+      defaultValue: false,
     },
   ],
   versions: false,
