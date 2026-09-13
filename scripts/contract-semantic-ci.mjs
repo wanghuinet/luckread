@@ -142,16 +142,26 @@ function operationBlock(operationId) {
   return openapi.slice(start ?? 0, end)
 }
 
+function hasParameterRef(block, componentName) {
+  return block.includes(`#/components/parameters/${componentName}`)
+}
+
 for (const op of policyOps) {
   const block = operationBlock(op.operationId)
   if (!block) {
     fail(`openapi.yaml: operation '${op.operationId}' could not be located for policy binding`)
     continue
   }
-  if (op.idempotencyRequired && !block.includes("#/components/parameters/IdempotencyKey")) {
+  if (op.idempotencyRequired && !(
+    hasParameterRef(block, 'IdempotencyKey') ||
+    hasParameterRef(block, 'IdempotencyKeyRequired')
+  )) {
     fail(`openapi.yaml: idempotency-required operation '${op.operationId}' does not declare Idempotency-Key`)
   }
-  if (op.optimisticLockRequired && !block.includes("#/components/parameters/IfMatch")) {
+  if (op.optimisticLockRequired && !(
+    hasParameterRef(block, 'IfMatch') ||
+    hasParameterRef(block, 'IfMatchRequired')
+  )) {
     fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' does not declare If-Match`)
   }
 }
