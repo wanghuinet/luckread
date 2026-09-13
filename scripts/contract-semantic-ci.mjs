@@ -153,6 +153,10 @@ function hasParameterRef(block, componentName) {
   return block.split(/\r?\n/).some((line) => line.includes(`$ref: '${exactRef}'`) || line.includes(`$ref: "${exactRef}"`) || line.trim() === `$ref: ${exactRef}`)
 }
 
+function hasResponse(block, statusCode) {
+  return new RegExp(`^\\s*'${statusCode}':(?:\\s|$)`, 'm').test(block)
+}
+
 for (const op of policyOps) {
   const block = operationBlock(op.operationId)
   if (!block) {
@@ -165,10 +169,10 @@ for (const op of policyOps) {
   if (op.optimisticLockRequired && !hasParameterRef(block, 'IfMatchRequired')) {
     fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare IfMatchRequired`)
   }
-  if (op.optimisticLockRequired && !/^\s*'412':\s*$/m.test(block)) {
+  if (op.optimisticLockRequired && !hasResponse(block, '412')) {
     fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare HTTP 412`)
   }
-  if (op.optimisticLockRequired && !/^\s*'428':\s*$/m.test(block)) {
+  if (op.optimisticLockRequired && !hasResponse(block, '428')) {
     fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare HTTP 428`)
   }
 }
