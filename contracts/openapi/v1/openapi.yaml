@@ -7,6 +7,8 @@ info:
     All endpoints are authorization-enforced. Cache is never an authorization
     boundary (see AUTHZ-CACHE-INVARIANT-001). Errors use the canonical error
     contract. List endpoints use opaque cursors, never offset, for large sets.
+  license:
+    name: Proprietary
 servers:
   - url: /api/v1
     description: API v1
@@ -14,18 +16,31 @@ security:
   - bearerAuth: []
 tags:
   - name: Auth
+    description: Authentication and session lifecycle operations.
   - name: Users
+    description: User profile and account lifecycle operations.
   - name: Contents
+    description: Content creation, retrieval, updates, deletion, and lifecycle.
   - name: Media
+    description: Media upload initiation and metadata operations.
   - name: Comments
+    description: Content comment and discussion operations.
   - name: Interactions
+    description: Likes, follows, and other social interactions.
   - name: Feed
+    description: Personalized and discovery feed operations.
   - name: Search
+    description: Content search operations.
   - name: Notifications
+    description: User notification operations.
   - name: Creators
+    description: Creator profile and creator-facing operations.
   - name: IPs
+    description: Intellectual-property center and membership operations.
   - name: Organizations
+    description: Organization lifecycle operations.
   - name: Admin
+    description: Administrative and moderation operations.
 paths:
   /auth/register:
     post:
@@ -548,6 +563,8 @@ paths:
         '4XX': { $ref: '#/components/responses/ClientError' }
 
   /ips/{ipId}/members:
+    parameters:
+      - $ref: '#/components/parameters/IpId'
     post:
       tags: [IPs]
       summary: Invite an IP member
@@ -647,6 +664,11 @@ components:
       in: path
       required: true
       schema: { $ref: '#/components/schemas/ResourceId' }
+    IpId:
+      name: ipId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
     Cursor:
       name: cursor
       in: query
@@ -667,11 +689,6 @@ components:
       in: header
       required: true
       schema: { type: string, minLength: 1, maxLength: 256 }
-    IfMatch:
-      name: If-Match
-      in: header
-      required: false
-      schema: { $ref: '#/components/schemas/ETag' }
     IfMatchRequired:
       name: If-Match
       in: header
@@ -738,13 +755,13 @@ components:
       minLength: 1
       maxLength: 256
     AccountState:
-      $ref: 'https://luckread.com/contracts/v1/enums/account-state.json'
+      $ref: '../../enums/account-state.json'
     ContentState:
-      $ref: 'https://luckread.com/contracts/v1/enums/content-state.json'
+      $ref: '../../enums/content-state.json'
     ErrorResponse:
-      $ref: 'https://luckread.com/contracts/v1/schemas/common/error-response.json'
+      $ref: '../../schemas/common/error-response.json'
     ListResponse:
-      $ref: 'https://luckread.com/contracts/v1/schemas/common/list-response.json'
+      $ref: '../../schemas/common/list-response.json'
     User:
       type: object
       required: [id, username, accountState, layer]
