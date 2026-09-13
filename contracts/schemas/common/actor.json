@@ -5,11 +5,11 @@
   "description": "Security principal that performed an action. Required on every state change, audit record and domain event.",
   "type": "object",
   "properties": {
-    "actorId": { "$ref": "https://luckread.com/contracts/v1/common/resource-id.json" },
+    "actorId": { "$ref": "./resource-id.json" },
     "actorType": { "enum": ["user", "service", "admin", "system", "job"] },
     "layer": { "type": "string", "pattern": "^L[0-8]$" },
-    "sessionId": { "$ref": "https://luckread.com/contracts/v1/common/resource-id.json" },
-    "impersonatingActorId": { "$ref": "https://luckread.com/contracts/v1/common/resource-id.json" }
+    "sessionId": { "$ref": "./resource-id.json" },
+    "impersonatingActorId": { "$ref": "./resource-id.json" }
   },
   "required": ["actorId", "actorType"],
   "additionalProperties": false,
