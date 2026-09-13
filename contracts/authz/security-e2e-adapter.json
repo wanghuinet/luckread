@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/authz/security-e2e-adapter.json",
+  "version": "1.0",
+  "status": "CONTRACT_ONLY",
+  "requiredCapabilities": [
+    "authorize",
+    "executeCase",
+    "emitEvidence",
+    "revokeAuthorization",
+    "transferOwnership",
+    "removeMembership",
+    "revokeCredential",
+    "expireEntitlement"
+  ],
+  "rules": [
+    "The adapter MUST execute against the real authorization boundary used by the application.",
+    "A mock-only authorization implementation MUST NOT produce SECURITY_GREEN evidence.",
+    "Payload Local API MUST NOT be treated as an implicit authorization bypass.",
+    "Every execution MUST generate request_id and trace_id.",
+    "Every case MUST record expected and actual decisions.",
+    "Race cases MUST execute with the registered concurrency level.",
+    "Missing or malformed evidence MUST fail the evidence gate.",
+    "The adapter MUST expose the active authorization, credential, membership, entitlement and delegation versions where applicable."
+  ],
+  "greenRule": "SECURITY_GREEN requires real implementation execution plus complete PASS evidence for every applicable adversarial case."
+}
