@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/common/pagination.json",
+  "title": "Pagination Parameters",
+  "description": "Common cursor pagination request parameters.",
+  "type": "object",
+  "properties": {
+    "cursor": {
+      "$ref": "https://luckread.com/contracts/v1/common/cursor.json"
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 20
+    }
+  },
+  "additionalProperties": false
+}

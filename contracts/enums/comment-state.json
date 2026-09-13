@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/enums/comment-state.json",
+  "title": "CommentState",
+  "description": "Comment lifecycle state including moderation outcomes.",
+  "type": "string",
+  "enum": [
+    "PENDING",
+    "VISIBLE",
+    "HIDDEN",
+    "FLAGGED",
+    "UNDER_REVIEW",
+    "REJECTED",
+    "DELETED",
+    "AUTHOR_DELETED"
+  ],
+  "x-luckread": {
+    "canonical-source": "docs/307-SECURITY-THREAT-MODEL-CONTRACT-v1.0.md",
+    "domain": "D1-02",
+    "authoritative-writer": "W00",
+    "initial-state": "PENDING",
+    "terminal-states": ["DELETED"],
+    "note": "AUTHOR_DELETED distinguishes author-initiated removal from moderation removal; both render as tombstone to clients."
+  }
+}

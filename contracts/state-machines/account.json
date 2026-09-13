@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/state-machines/account.json",
+  "title": "AccountStateMachine",
+  "description": "Authoritative user account lifecycle transitions. Canonical Source: docs/303 section 2.2.",
+  "type": "object",
+  "x-luckread": {
+    "entity": "User",
+    "domain": "D1-01",
+    "state-field": "account_state",
+    "version-field": "account_state_version",
+    "audit-required": true,
+    "event": "identity.account_state_changed"
+  },
+  "properties": {
+    "initial": { "const": "UNREGISTERED" },
+    "terminal": { "type": "array", "items": { "$ref": "https://luckread.com/contracts/v1/enums/account-state.json" } },
+    "transitions": { "type": "array", "minItems": 1 }
+  },
+  "required": ["initial", "transitions"],
+  "x-transitions": [
+    { "from": "UNREGISTERED", "to": "PENDING_VERIFICATION", "actor": "user", "permission": null },
+    { "from": "PENDING_VERIFICATION", "to": "ACTIVE", "actor": "user", "permission": null, "precondition": "phone_or_email_verified" },
+    { "from": "PENDING_VERIFICATION", "to": "DELETED", "actor": "system", "permission": "job", "precondition": "verification_timeout" },
+    { "from": "ACTIVE", "to": "RESTRICTED", "actor": "operator", "permission": "user.restrict" },
+    { "from": "ACTIVE", "to": "FROZEN", "actor": "operator", "permission": "user.freeze" },
+    { "from": "ACTIVE", "to": "SUSPENDED", "actor": "admin", "permission": "user.suspend" },
+    { "from": "ACTIVE", "to": "BANNED", "actor": "admin", "permission": "user.ban", "requiresApproval": true },
+    { "from": "ACTIVE", "to": "DELETION_REQUESTED", "actor": "user", "permission": null },
+    { "from": "RESTRICTED", "to": "ACTIVE", "actor": "operator", "permission": "user.restrict" },
+    { "from": "RESTRICTED", "to": "FROZEN", "actor": "operator", "permission": "user.freeze" },
+    { "from": "RESTRICTED", "to": "SUSPENDED", "actor": "admin", "permission": "user.suspend" },
+    { "from": "RESTRICTED", "to": "BANNED", "actor": "admin", "permission": "user.ban", "requiresApproval": true },
+    { "from": "FROZEN", "to": "ACTIVE", "actor": "operator", "permission": "user.unfreeze" },
+    { "from": "FROZEN", "to": "SUSPENDED", "actor": "admin", "permission": "user.suspend" },
+    { "from": "FROZEN", "to": "BANNED", "actor": "admin", "permission": "user.ban", "requiresApproval": true },
+    { "from": "SUSPENDED", "to": "ACTIVE", "actor": "admin", "permission": "user.reinstate" },
+    { "from": "SUSPENDED", "to": "BANNED", "actor": "admin", "permission": "user.ban", "requiresApproval": true },
+    { "from": "BANNED", "to": "RESTORED", "actor": "admin", "permission": "user.restore", "requiresApproval": "L7" },
+    { "from": "BANNED", "to": "DELETED", "actor": "system", "permission": "job" },
+    { "from": "DELETION_REQUESTED", "to": "DELETION_PENDING", "actor": "system", "permission": "job" },
+    { "from": "DELETION_REQUESTED", "to": "ACTIVE", "actor": "user", "permission": null, "precondition": "within_cooling_off" },
+    { "from": "DELETION_PENDING", "to": "DELETED", "actor": "system", "permission": "job", "precondition": "cooling_off_elapsed" },
+    { "from": "DELETION_PENDING", "to": "ACTIVE", "actor": "user", "permission": null, "precondition": "within_cooling_off" },
+    { "from": "DELETED", "to": "REACTIVATED", "actor": "user", "permission": "user.reactivate", "precondition": "within_reactivation_window" },
+    { "from": "RESTORED", "to": "ACTIVE", "actor": "system", "permission": "job" },
+    { "from": "REACTIVATED", "to": "ACTIVE", "actor": "system", "permission": "job" }
+  ],
+  "x-forbidden": [
+    { "from": "DELETED", "to": "ACTIVE", "reason": "must pass through REACTIVATED within window" },
+    { "from": "BANNED", "to": "ACTIVE", "reason": "must pass through RESTORED with L7 approval" },
+    { "from": "*", "to": "UNREGISTERED", "reason": "UNREGISTERED is not reachable after registration" }
+  ],
+  "x-token-invalidation-states": ["SUSPENDED", "BANNED", "DELETION_PENDING", "DELETED"],
+  "x-deindex-states": ["FROZEN", "SUSPENDED", "BANNED", "DELETION_PENDING", "DELETED"]
+}

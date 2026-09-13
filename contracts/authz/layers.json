@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/authz/layers.json",
+  "title": "L0-L8 Permission Layers",
+  "description": "Canonical L0-L8 permission layer definitions. Canonical Source: docs/301.",
+  "type": "object",
+  "required": ["layers"],
+  "properties": {
+    "layers": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "adminAccess", "dataScope", "operationScope"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^L[0-8]$" },
+          "name": { "type": "string" },
+          "mfa": { "type": "boolean" },
+          "adminAccess": { "type": "boolean" },
+          "dataScope": { "type": "string" },
+          "operationScope": { "type": "string" },
+          "defaultPermissions": { "type": "array", "items": { "type": "string" } },
+          "roles": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  },
+  "x-luckread": {
+    "canonical-source": "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
+    "invariants": [
+      "LAYER-INVARIANT-001: Layer is not Role; a role belongs to exactly one layer at a time",
+      "LAYER-INVARIANT-002: Layer does not bypass Resource Ownership",
+      "LAYER-INVARIANT-003: Layer must never be inferred from cache"
+    ],
+    "resolution-order": [
+      "DENY",
+      "AccountStateGate",
+      "ResourceOwnership",
+      "OrganizationIpScope",
+      "EntitlementSubscription",
+      "TemporaryDelegated",
+      "RolePermission",
+      "LayerDefault",
+      "PublicDefault"
+    ]
+  },
+  "x-layers": [
+    { "id": "L0", "name": "Anonymous", "mfa": false, "adminAccess": false, "dataScope": "visibility=public", "operationScope": "read-only", "roles": [] },
+    { "id": "L1", "name": "RegisteredUnverified", "mfa": false, "adminAccess": false, "dataScope": "self", "operationScope": "account-self-service", "roles": ["user"] },
+    { "id": "L2", "name": "VerifiedUser", "mfa": false, "adminAccess": false, "dataScope": "self+public", "operationScope": "consume+interact+report", "roles": ["verified_user"] },
+    { "id": "L3", "name": "Creator", "mfa": false, "adminAccess": false, "dataScope": "self+own-content-all-states", "operationScope": "create+publish+analytics-self", "roles": ["creator"] },
+    { "id": "L4", "name": "IpPrincipalOrgLead", "mfa": false, "adminAccess": false, "dataScope": "managed-ips+managed-orgs", "operationScope": "manage-scoped-resources", "roles": ["ip_principal", "mcn_admin", "mcn_editor"] },
+    { "id": "L5", "name": "Operator", "mfa": true, "adminAccess": true, "dataScope": "platform-content-readonly", "operationScope": "curation+campaign", "roles": ["editor", "operator"] },
+    { "id": "L6", "name": "Moderator", "mfa": true, "adminAccess": true, "dataScope": "moderation-queues", "operationScope": "content-disposition+limited-user-restriction", "roles": ["moderator"] },
+    { "id": "L7", "name": "Admin", "mfa": true, "adminAccess": true, "dataScope": "tenant-all", "operationScope": "business-admin-excluding-security", "roles": ["admin"] },
+    { "id": "L8", "name": "SuperAdmin", "mfa": true, "adminAccess": true, "dataScope": "platform-all", "operationScope": "all-except-audit-mutation", "roles": ["super_admin"] }
+  ],
+  "x-required-new-roles": ["verified_user", "ip_principal", "operator"],
+  "x-forbidden-roles": ["ip_founder", "founder"]
+}

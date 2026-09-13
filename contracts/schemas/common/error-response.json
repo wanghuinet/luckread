@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/common/error-response.json",
+  "title": "Error Response",
+  "type": "object",
+  "properties": {
+    "error": {
+      "$ref": "https://luckread.com/contracts/v1/common/error.json"
+    },
+    "requestId": {
+      "$ref": "https://luckread.com/contracts/v1/common/request-id.json"
+    }
+  },
+  "required": ["error", "requestId"],
+  "additionalProperties": false
+}

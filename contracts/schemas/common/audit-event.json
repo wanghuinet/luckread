@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/common/audit-event.json",
+  "title": "Audit Event",
+  "description": "Canonical audit record. Audit events MUST NOT be mutated or deleted; they are exempt from user erasure (ADR-D001).",
+  "type": "object",
+  "properties": {
+    "eventId": { "$ref": "https://luckread.com/contracts/v1/common/resource-id.json" },
+    "requestId": { "$ref": "https://luckread.com/contracts/v1/common/request-id.json" },
+    "actor": { "$ref": "https://luckread.com/contracts/v1/common/actor.json" },
+    "action": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z][a-z0-9_.]*$" },
+    "targetType": { "type": "string", "minLength": 1 },
+    "targetId": { "$ref": "https://luckread.com/contracts/v1/common/resource-id.json" },
+    "before": { "type": "object", "additionalProperties": true },
+    "after": { "type": "object", "additionalProperties": true },
+    "reason": { "type": "string", "maxLength": 2048 },
+    "ip": { "type": "string" },
+    "userAgent": { "type": "string", "maxLength": 1024 },
+    "occurredAt": { "type": "string", "format": "date-time" }
+  },
+  "required": ["eventId", "actor", "action", "targetType", "targetId", "occurredAt"],
+  "additionalProperties": false,
+  "x-luckread": {
+    "canonical-source": "docs/169-SECURITY-SECRET-KEY-LIFECYCLE-INCIDENT-CONTRACT-v1.0.md",
+    "domain": "D1-03",
+    "authoritative-writer": "W06",
+    "immutable": true,
+    "exempt-from-user-erasure": true,
+    "adr": "ADR-D001"
+  }
+}

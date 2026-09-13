@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/common/list-response.json",
+  "title": "List Response",
+  "description": "Common cursor-paginated API response envelope.",
+  "type": "object",
+  "properties": {
+    "data": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array"
+        },
+        "nextCursor": {
+          "anyOf": [
+            { "$ref": "https://luckread.com/contracts/v1/common/cursor.json" },
+            { "type": "null" }
+          ]
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      },
+      "required": ["items", "nextCursor", "hasMore"],
+      "additionalProperties": false
+    },
+    "requestId": {
+      "$ref": "https://luckread.com/contracts/v1/common/request-id.json"
+    }
+  },
+  "required": ["data", "requestId"],
+  "additionalProperties": false
+}

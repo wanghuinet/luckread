@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/enums/account-state.json",
+  "title": "AccountState",
+  "description": "User account lifecycle state. Canonical Source: docs/303 section 2.1. Extending this enum is a MINOR contract change ONLY if no transition is removed.",
+  "type": "string",
+  "enum": [
+    "UNREGISTERED",
+    "PENDING_VERIFICATION",
+    "ACTIVE",
+    "RESTRICTED",
+    "FROZEN",
+    "SUSPENDED",
+    "BANNED",
+    "DELETION_REQUESTED",
+    "DELETION_PENDING",
+    "DELETED",
+    "RESTORED",
+    "REACTIVATED"
+  ],
+  "x-luckread": {
+    "canonical-source": "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
+    "domain": "D1-01",
+    "authoritative-writer": "W00",
+    "cache-version-field": "account_state_version",
+    "terminal-states": ["DELETED"]
+  }
+}

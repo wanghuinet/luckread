@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/enums/organization-state.json",
+  "title": "OrganizationState",
+  "description": "Organization lifecycle state. Canonical Source: docs/304 section 2.2.",
+  "type": "string",
+  "enum": [
+    "DRAFT",
+    "PENDING_VERIFICATION",
+    "ACTIVE",
+    "RESTRICTED",
+    "SUSPENDED",
+    "DISSOLVED"
+  ],
+  "x-luckread": {
+    "canonical-source": "docs/304-ORGANIZATION-ENTERPRISE-AND-IP-PRINCIPAL-CONTRACT-v1.0.md",
+    "domain": "D1-01",
+    "initial-state": "DRAFT",
+    "terminal-states": ["DISSOLVED"],
+    "invariant": "Organization must always retain at least one owner member while ACTIVE."
+  }
+}

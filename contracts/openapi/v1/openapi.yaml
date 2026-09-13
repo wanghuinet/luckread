@@ -1,0 +1,863 @@
+openapi: 3.1.0
+info:
+  title: LuckRead API
+  version: 1.0.0
+  description: >-
+    Contract-first public API for the LuckRead self-media platform.
+    All endpoints are authorization-enforced. Cache is never an authorization
+    boundary (see AUTHZ-CACHE-INVARIANT-001). Errors use the canonical error
+    contract. List endpoints use opaque cursors, never offset, for large sets.
+servers:
+  - url: /api/v1
+    description: API v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Users
+  - name: Contents
+  - name: Media
+  - name: Comments
+  - name: Interactions
+  - name: Feed
+  - name: Search
+  - name: Notifications
+  - name: Creators
+  - name: IPs
+  - name: Organizations
+  - name: Admin
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new account
+      security: []
+      operationId: authRegister
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identityType, identity, credential]
+              properties:
+                identityType: { enum: [phone, email] }
+                identity: { type: string }
+                credential: { type: string, format: password }
+                username: { type: string }
+                consent: { type: object }
+      responses:
+        '201':
+          description: Registered. Account enters PENDING_VERIFICATION.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  userId: { $ref: '#/components/schemas/ResourceId' }
+                  accountState: { $ref: '#/components/schemas/AccountState' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate and issue tokens
+      security: []
+      operationId: authLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identity, credential]
+              properties:
+                identity: { type: string }
+                credential: { type: string, format: password }
+      responses:
+        '200':
+          description: Authenticated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+                  refreshToken: { type: string }
+                  expiresIn: { type: integer }
+                  layer: { type: string, pattern: '^L[0-8]$' }
+        '401':
+          description: >-
+            Invalid credentials. The response is identical whether or not the
+            account exists, to prevent account enumeration.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke current session and increment token version
+      operationId: authLogout
+      responses:
+        '204':
+          description: Logged out; token version incremented.
+
+  /users/me:
+    get:
+      tags: [Users]
+      operationId: getMe
+      responses:
+        '200':
+          description: Current user profile.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+    patch:
+      tags: [Users]
+      operationId: updateMe
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /users/{userId}/account-state:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      tags: [Users, Admin]
+      summary: Transition account lifecycle state
+      operationId: transitionAccountState
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to, reason]
+              properties:
+                to: { $ref: '#/components/schemas/AccountState' }
+                reason: { type: string, maxLength: 2048 }
+      responses:
+        '200':
+          description: Transitioned.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from: { $ref: '#/components/schemas/AccountState' }
+                  to: { $ref: '#/components/schemas/AccountState' }
+                  auditEventId: { $ref: '#/components/schemas/ResourceId' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+
+  /contents:
+    get:
+      tags: [Contents]
+      operationId: listContents
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Content list.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListResponse' }
+    post:
+      tags: [Contents]
+      operationId: createContent
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContentInput' }
+      responses:
+        '201':
+          description: Created in DRAFT.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Content' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+
+  /contents/{contentId}:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+    get:
+      tags: [Contents]
+      operationId: getContent
+      responses:
+        '200':
+          description: >-
+            Content. Returns 404 rather than 403 when the caller may not access
+            it, to avoid existence disclosure.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Content' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Contents]
+      operationId: updateContent
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContentInput' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Content' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+    delete:
+      tags: [Contents]
+      operationId: deleteContent
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204':
+          description: Soft-deleted.
+
+  /contents/{contentId}/state:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+    post:
+      tags: [Contents]
+      summary: Transition content lifecycle state
+      operationId: transitionContentState
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to: { $ref: '#/components/schemas/ContentState' }
+                scheduledAt: { type: string, format: date-time }
+                reason: { type: string }
+      responses:
+        '200':
+          description: Transitioned.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from: { $ref: '#/components/schemas/ContentState' }
+                  to: { $ref: '#/components/schemas/ContentState' }
+                  version: { type: integer }
+                  etag: { $ref: '#/components/schemas/ETag' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
+  /media:
+    post:
+      tags: [Media]
+      summary: Initiate an upload (single or multipart)
+      operationId: createMedia
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mimeType, size, checksum]
+              properties:
+                mimeType: { type: string }
+                size: { type: integer, minimum: 1 }
+                checksum:
+                  type: string
+                  description: SHA-256 of the object
+                multipart: { type: boolean }
+      responses:
+        '201':
+          description: Upload initiated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Media' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+
+  /media/{mediaId}:
+    parameters:
+      - $ref: '#/components/parameters/MediaId'
+    get:
+      tags: [Media]
+      operationId: getMedia
+      responses:
+        '200':
+          description: Media metadata.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Media' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /contents/{contentId}/comments:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+    get:
+      tags: [Comments]
+      operationId: listComments
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Comment thread (cursor paginated, depth-limited).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListResponse' }
+    post:
+      tags: [Comments]
+      operationId: createComment
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1, maxLength: 10000 }
+                parentId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '201':
+          description: Created. May enter PENDING when moderation is required.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Comment' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /interactions/likes:
+    post:
+      tags: [Interactions]
+      summary: Idempotent like. Repeating MUST NOT create a second like.
+      operationId: like
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InteractionTarget' }
+      responses:
+        '200':
+          description: Like recorded (idempotent).
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Interactions]
+      summary: Idempotent unlike.
+      operationId: unlike
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InteractionTarget' }
+      responses:
+        '204':
+          description: Like removed (idempotent).
+
+  /social/follows:
+    post:
+      tags: [Interactions]
+      summary: Idempotent follow.
+      operationId: follow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetUserId]
+              properties:
+                targetUserId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '200':
+          description: Followed (idempotent).
+    delete:
+      tags: [Interactions]
+      summary: Idempotent unfollow.
+      operationId: unfollow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetUserId]
+              properties:
+                targetUserId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '204':
+          description: Unfollowed (idempotent).
+
+  /feed:
+    get:
+      tags: [Feed]
+      operationId: getFeed
+      parameters:
+        - name: type
+          in: query
+          schema: { enum: [following, recommendation, creator, ip, topic, hot] }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: >-
+            Feed page. Authorization-filtered server-side; never cached across
+            viewers.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListResponse' }
+        '400': { $ref: '#/components/responses/InvalidCursor' }
+
+  /search:
+    get:
+      tags: [Search]
+      operationId: search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 256 }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Search results. Permission-filtered before caching.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListResponse' }
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      operationId: listNotifications
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Notifications.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListResponse' }
+    post:
+      tags: [Notifications]
+      summary: Batch mark read / unread / delete
+      operationId: batchUpdateNotifications
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, ids]
+              properties:
+                action: { enum: [read, unread, delete] }
+                ids:
+                  type: array
+                  maxItems: 100
+                  items: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '200':
+          description: Applied.
+
+  /creators/me:
+    get:
+      tags: [Creators]
+      operationId: getMyCreator
+      responses:
+        '200':
+          description: Creator profile for the current user.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Creator' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /ips:
+    post:
+      tags: [IPs]
+      operationId: createIp
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                ownerOrgId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '201':
+          description: >-
+            Created in DRAFT. The creator is registered as 'principal'
+            (ADR-I001); no founder role exists.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Ip' }
+
+  /ips/{ipId}/members:
+    parameters:
+      - $ref: '#/components/parameters/IpId'
+    post:
+      tags: [IPs]
+      operationId: inviteIpMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, role]
+              properties:
+                userId: { $ref: '#/components/schemas/ResourceId' }
+                role: { $ref: '#/components/schemas/IpMemberRole' }
+      responses:
+        '201':
+          description: Invited.
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+    delete:
+      tags: [IPs]
+      operationId: removeIpMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '204':
+          description: Removed; organization version incremented.
+
+  /organizations:
+    post:
+      tags: [Organizations]
+      operationId: createOrganization
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type]
+              properties:
+                name: { type: string }
+                type: { enum: [mcn, enterprise, team, institution] }
+      responses:
+        '201':
+          description: Created in DRAFT.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Organization' }
+
+  /admin/moderation/cases:
+    get:
+      tags: [Admin]
+      operationId: listModerationCases
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Moderation queue.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListResponse' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    ContentId:
+      name: contentId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    MediaId:
+      name: mediaId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    IpId:
+      name: ipId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema: { $ref: '#/components/schemas/Cursor' }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { $ref: '#/components/schemas/IdempotencyKey' }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: Required for state-changing operations on versioned resources.
+      schema: { $ref: '#/components/schemas/ETag' }
+
+  responses:
+    NotFound:
+      description: >-
+        Not found. Also returned when the resource exists but the caller may not
+        access it, to prevent existence disclosure.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PermissionDenied:
+      description: Authenticated but not permitted.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ValidationFailed:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InvalidState:
+      description: Illegal state transition.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PreconditionFailed:
+      description: If-Match did not match the current version.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PreconditionRequired:
+      description: If-Match header is required for this operation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: Rate limit exceeded.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InvalidCursor:
+      description: Malformed or expired cursor.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    UnsupportedMediaType:
+      description: Media type not allowed.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  schemas:
+    ResourceId:
+      $ref: ../../schemas/common/resource-id.json
+    RequestId:
+      $ref: ../../schemas/common/request-id.json
+    Cursor:
+      $ref: ../../schemas/common/cursor.json
+    Error:
+      $ref: ../../schemas/common/error.json
+    ErrorResponse:
+      $ref: ../../schemas/common/error-response.json
+    ListResponse:
+      $ref: ../../schemas/common/list-response.json
+    Pagination:
+      $ref: ../../schemas/common/pagination.json
+    ETag:
+      $ref: ../../schemas/common/etag.json
+    IdempotencyKey:
+      $ref: ../../schemas/common/idempotency-key.json
+    Actor:
+      $ref: ../../schemas/common/actor.json
+    AuditEvent:
+      $ref: ../../schemas/common/audit-event.json
+
+    ErrorCode:
+      $ref: ../../enums/error-code.json
+    AccountState:
+      $ref: ../../enums/account-state.json
+    ContentState:
+      $ref: ../../enums/content-state.json
+    CommentState:
+      $ref: ../../enums/comment-state.json
+    IpState:
+      $ref: ../../enums/ip-state.json
+    IpMemberRole:
+      $ref: ../../enums/ip-member-role.json
+    OrganizationState:
+      $ref: ../../enums/organization-state.json
+    OrganizationMemberState:
+      $ref: ../../enums/organization-member-state.json
+    MediaState:
+      $ref: ../../enums/media-state.json
+    ModerationCaseState:
+      $ref: ../../enums/moderation-case-state.json
+    Visibility:
+      $ref: ../../enums/visibility.json
+
+    InteractionTarget:
+      type: object
+      required: [targetType, targetId]
+      properties:
+        targetType: { enum: [content, comment] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+      additionalProperties: false
+
+    User:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        displayName: { type: string }
+        accountType: { enum: [individual, enterprise] }
+        accountState: { $ref: '#/components/schemas/AccountState' }
+        layer: { type: string, pattern: '^L[0-8]$' }
+        createdAt: { type: string, format: date-time }
+      required: [id, accountState, accountType]
+      additionalProperties: false
+
+    Creator:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        userId: { $ref: '#/components/schemas/ResourceId' }
+        displayName: { type: string }
+        verified: { type: boolean }
+        level: { type: integer, minimum: 0 }
+      required: [id, userId]
+      additionalProperties: false
+
+    ContentInput:
+      type: object
+      properties:
+        type: { enum: [article, gallery, video, audio, live, short] }
+        title: { type: string, minLength: 1, maxLength: 300 }
+        summary: { type: string, maxLength: 2000 }
+        bodyRef:
+          type: string
+          description: R2 key for large body JSON
+        coverMediaId: { $ref: '#/components/schemas/ResourceId' }
+        visibility: { $ref: '#/components/schemas/Visibility' }
+        ipId: { $ref: '#/components/schemas/ResourceId' }
+        tagIds:
+          type: array
+          items: { $ref: '#/components/schemas/ResourceId' }
+        language: { type: string, pattern: '^[a-z]{2}(-[A-Z]{2})?$' }
+        commentPolicy: { enum: [open, followers, closed] }
+      required: [type, title]
+      additionalProperties: false
+
+    Content:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        type: { enum: [article, gallery, video, audio, live, short] }
+        title: { type: string }
+        state: { $ref: '#/components/schemas/ContentState' }
+        visibility: { $ref: '#/components/schemas/Visibility' }
+        version: { type: integer, minimum: 1 }
+        revision: { type: integer, minimum: 1 }
+        etag: { $ref: '#/components/schemas/ETag' }
+        authorId: { $ref: '#/components/schemas/ResourceId' }
+        creatorId: { $ref: '#/components/schemas/ResourceId' }
+        ipId: { $ref: '#/components/schemas/ResourceId' }
+        publishedAt: { type: string, format: date-time, nullable: true }
+      required: [id, type, state, visibility, version, revision]
+      additionalProperties: false
+
+    Comment:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+        parentId: { $ref: '#/components/schemas/ResourceId', nullable: true }
+        authorId: { $ref: '#/components/schemas/ResourceId' }
+        body: { type: string }
+        state: { $ref: '#/components/schemas/CommentState' }
+        depth: { type: integer, minimum: 0 }
+      required: [id, contentId, state]
+      additionalProperties: false
+
+    Media:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        state: { $ref: '#/components/schemas/MediaState' }
+        mimeType: { type: string }
+        size: { type: integer }
+        checksum: { type: string }
+        r2Key: { type: string }
+        width: { type: integer, nullable: true }
+        height: { type: integer, nullable: true }
+        durationMs: { type: integer, nullable: true }
+      required: [id, state, r2Key]
+      additionalProperties: false
+
+    Ip:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+        state: { $ref: '#/components/schemas/IpState' }
+        principalId: { $ref: '#/components/schemas/ResourceId' }
+        ownerOrgId: { $ref: '#/components/schemas/ResourceId', nullable: true }
+      required: [id, name, state, principalId]
+      additionalProperties: false
+
+    Organization:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+        type: { enum: [mcn, enterprise, team, institution] }
+        state: { $ref: '#/components/schemas/OrganizationState' }
+        enterpriseVerified: { type: boolean }
+      required: [id, name, type, state]
+      additionalProperties: false
