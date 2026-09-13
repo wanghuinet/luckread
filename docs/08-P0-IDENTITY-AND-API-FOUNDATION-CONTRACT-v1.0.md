@@ -19,7 +19,7 @@ Establish one authoritative identity model that every future API/domain can refe
 | bio | text | no | Payload/D1 | presentation only |
 | role | enum | yes | Payload/D1 | user/admin for v1 |
 | status | enum | yes | Payload/D1 | active/suspended |
-| emailVerified | boolean | yes | Payload/D1 | default false; must not grant admin privilege |
+| verified | auth verification state | yes | Payload/D1 | managed by Payload auth; never generic profile-editable |
 | locale | string | no | Payload/D1 | user preference |
 | timezone | string | no | Payload/D1 | user preference |
 | marketingConsent | boolean | yes | Payload/D1 | default false |
@@ -31,7 +31,7 @@ Establish one authoritative identity model that every future API/domain can refe
 - Anonymous users may register only through the public registration path.
 - Authenticated users may read/update their own profile fields allowed by policy.
 - Only admins may change `role` and `status`.
-- `emailVerified` is never user-editable through a generic profile update.
+- `verified` is never user-editable through a generic profile update.
 - Suspended users cannot perform protected business mutations.
 - No future domain may invent an independent user identifier.
 
@@ -67,7 +67,7 @@ Admin-only:
 
 System-only:
 
-- emailVerified
+- verified
 - timestamps
 
 ## 6. Security requirements
@@ -102,7 +102,7 @@ Audit records must identify actor, target, action, timestamp and correlation/req
 1. Existing Payload login remains functional.
 2. User records contain the contract fields with safe defaults.
 3. Non-admin users cannot change role/status.
-4. `emailVerified` cannot be changed through ordinary user profile updates.
+4. `verified` cannot be changed through ordinary user profile updates.
 5. Suspended users cannot perform protected mutations.
 6. Typecheck passes.
 7. Payload local development starts successfully.
