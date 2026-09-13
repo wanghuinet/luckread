@@ -127,18 +127,24 @@ for (const id of publicOps) {
   else if (op.auth?.mode !== 'public') fail(`operation-policy.json: '${id}' is declared public but auth.mode is not public`)
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function operationBlock(operationId) {
-  const idx = openapi.indexOf(`operationId: ${operationId}`)
-  if (idx < 0) return ''
+  const exactOperation = new RegExp(`^\\s+operationId:\\s*${escapeRegExp(operationId)}\\s*$`, 'm').exec(openapi)
+  if (!exactOperation || exactOperation.index === undefined) return ''
+
+  const idx = exactOperation.index
   const prefix = openapi.slice(0, idx)
   const methods = [...prefix.matchAll(/^    (get|post|put|patch|delete|head|options):\s*$/gm)]
   const start = methods.length ? methods.at(-1).index : Math.max(0, idx - 500)
-  const suffix = openapi.slice(idx + 1)
+  const suffix = openapi.slice(idx + exactOperation[0].length)
   const nextMethod = suffix.search(/^    (get|post|put|patch|delete|head|options):\s*$/m)
   const nextPath = suffix.search(/^  \/[^ ].*:\s*$/m)
   let end = openapi.length
-  if (nextMethod >= 0) end = Math.min(end, idx + 1 + nextMethod)
-  if (nextPath >= 0) end = Math.min(end, idx + 1 + nextPath)
+  if (nextMethod >= 0) end = Math.min(end, idx + exactOperation[0].length + nextMethod)
+  if (nextPath >= 0) end = Math.min(end, idx + exactOperation[0].length + nextPath)
   return openapi.slice(start ?? 0, end)
 }
 
