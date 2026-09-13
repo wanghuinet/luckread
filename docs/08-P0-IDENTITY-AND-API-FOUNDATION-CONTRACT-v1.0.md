@@ -19,7 +19,7 @@ Establish one authoritative identity model that every future API/domain can refe
 | bio | text | no | Payload/D1 | presentation only |
 | role | enum | yes | Payload/D1 | user/admin for v1 |
 | status | enum | yes | Payload/D1 | active/suspended |
-| verified | auth verification state | yes | Payload/D1 | managed by Payload auth; never generic profile-editable |
+| verified | auth verification state | yes | Payload auth; never generic profile-editable |
 | locale | string | no | Payload/D1 | user preference |
 | timezone | string | no | Payload/D1 | user preference |
 | marketingConsent | boolean | yes | Payload/D1 | default false |
@@ -234,7 +234,35 @@ System-only:
 - verified
 - timestamps
 
-## 8. Security requirements
+## 8. Future IAM / SSO integration boundary
+
+Payload remains the current identity authority for the LuckRead v1 Cloudflare deployment.
+
+When Web/H5, Android/iOS, Creator Center, MCN Center and Developer/Open Platform require a unified enterprise-grade SSO layer, **Keycloak** may be integrated as an external IAM/identity-broker layer rather than replacing the LuckRead User Domain authority by default. The integration must preserve stable LuckRead user IDs and keep authorization/business roles under the platform contract.
+
+Target boundary:
+
+```text
+Client
+→ Worker / Auth Adapter
+→ OIDC / OAuth2 Identity Provider
+→ Identity Mapping
+→ Payload/D1 User Authority
+→ LuckRead API
+```
+
+Rules:
+
+- no duplicate user authority;
+- external subject IDs map to immutable LuckRead user IDs;
+- OIDC/OAuth claims are validated server-side;
+- Keycloak failure must not silently grant access;
+- role/status/suspension remain enforced by LuckRead authorization;
+- session/token implementation remains behind the public `/v1/auth/*` contract.
+
+Keycloak is therefore **reserved, not required for v1**. No dependency is added until unified SSO has a concrete product requirement.
+
+## 9. Security requirements
 
 - Authentication is required for protected profile operations.
 - Authorization is evaluated server-side.
@@ -244,7 +272,7 @@ System-only:
 - Login/registration failures must use a stable error model and must not leak account existence unnecessarily.
 - Registration risk controls must be compatible with the platform Risk/Trust contract when that system is implemented.
 
-## 9. Audit requirements
+## 10. Audit requirements
 
 At minimum, audit-sensitive identity changes:
 
@@ -256,14 +284,14 @@ At minimum, audit-sensitive identity changes:
 
 Audit records must identify actor, target, action, timestamp and correlation/request ID when the operations layer is implemented.
 
-## 10. Cost requirements
+## 11. Cost requirements
 
 - Do not introduce a Worker/database write for every read.
 - `/v1/me` may be cache-assisted only if invalidation cannot create stale authorization decisions.
 - Authentication and authorization remain authoritative; cache cannot override account suspension or role state.
 - Registration steps must not create redundant account records or duplicate verification state.
 
-## 11. Acceptance criteria
+## 12. Acceptance criteria
 
 1. Existing Payload login remains functional.
 2. User records contain the contract fields with safe defaults.
@@ -280,6 +308,6 @@ Audit records must identify actor, target, action, timestamp and correlation/req
 13. The implementation does not add downstream business domains.
 14. Registration UI uses LuckRead-owned visual design and copy; TikTok is only a UX reference.
 
-## 12. Implementation boundary
+## 13. Implementation boundary
 
 Implementation is limited to the Users collection and the minimum API/UI adapter required for this contract. Creator, social, feed, risk scoring, recommendation and commerce are separate contracts.
