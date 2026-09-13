@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/authz/authorization-decision.json",
+  "title": "Canonical Authorization Decision Contract",
+  "type": "object",
+  "required": ["decision", "subject", "action", "resource", "checks", "policyVersion"],
+  "properties": {
+    "decision": { "enum": ["ALLOW", "DENY"] },
+    "subject": { "type": "object", "required": ["type", "id"], "properties": {
+      "type": { "enum": ["ANONYMOUS", "USER", "SERVICE", "API_CLIENT", "AUTOMATION"] },
+      "id": { "type": ["string", "null"] }
+    }},
+    "action": { "type": "string", "minLength": 1 },
+    "resource": { "type": "object", "required": ["type"], "properties": {
+      "type": { "type": "string" },
+      "id": { "type": ["string", "null"] },
+      "scopeType": { "enum": ["public", "user", "organization", "ip", "platform", "none"] },
+      "scopeId": { "type": ["string", "null"] }
+    }},
+    "checks": { "type": "object", "required": ["authentication", "accountState", "permission", "scope", "resource", "policy"], "properties": {
+      "authentication": { "enum": ["PASS", "FAIL", "NOT_REQUIRED"] },
+      "accountState": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+      "permission": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+      "scope": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+      "resource": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+      "entitlement": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+      "workflow": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+      "businessState": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+      "credential": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+      "policy": { "enum": ["PASS", "FAIL"] }
+    }},
+    "reasonCode": { "type": "string" },
+    "policyVersion": { "type": "string" },
+    "authorizationVersion": { "type": "string" }
+  },
+  "x-luckread": {
+    "canonical": true,
+    "deny-precedence": true,
+    "missing-input": "DENY",
+    "role-is-not-authority": true,
+    "cache-hit-is-not-proof": true
+  },
+  "x-resolution-order": [
+    "ACCOUNT_SECURITY_DENY",
+    "CREDENTIAL_DENY",
+    "SUBJECT_TYPE_CHECK",
+    "PERMISSION_CHECK",
+    "SCOPE_CHECK",
+    "RESOURCE_OWNERSHIP_OR_GRANT_CHECK",
+    "ENTITLEMENT_CHECK",
+    "WORKFLOW_APPROVAL_CHECK",
+    "BUSINESS_STATE_CHECK",
+    "POLICY_CHECK",
+    "ALLOW"
+  ],
+  "x-hard-invariants": [
+    "Any failed mandatory check produces DENY.",
+    "A role name alone can never produce ALLOW.",
+    "A resource identifier alone can never produce ALLOW.",
+    "Client-supplied owner, organization or scope cannot establish authorization.",
+    "Payload admin access cannot establish public API authorization by itself.",
+    "Authorization evaluation failure produces DENY.",
+    "Authorization cache cannot override authoritative account state or revocation."
+  ]
+}
