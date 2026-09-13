@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/authz/security-evidence.schema.json",
+  "title": "Security Adversarial Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "test_run_id", "commit_sha", "contract_sha", "policy_version", "cases"],
+  "properties": {
+    "version": {"const": "1.0"},
+    "test_run_id": {"type": "string", "minLength": 1},
+    "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "contract_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "policy_version": {"type": "string", "minLength": 1},
+    "cases": {
+      "type": "array",
+      "minItems": 29,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case_id", "expected", "actual", "result", "request_id", "trace_id", "timestamp"],
+        "properties": {
+          "case_id": {"type": "string", "minLength": 1},
+          "expected": {"type": "string", "minLength": 1},
+          "actual": {"type": "string", "minLength": 1},
+          "result": {"enum": ["PASS", "FAIL"]},
+          "request_id": {"type": "string", "minLength": 1},
+          "trace_id": {"type": "string", "minLength": 1},
+          "timestamp": {"type": "string", "minLength": 1},
+          "authorization_version": {"type": "string", "minLength": 1},
+          "subject": {"type": "string", "minLength": 1},
+          "action": {"type": "string", "minLength": 1},
+          "resource": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}
