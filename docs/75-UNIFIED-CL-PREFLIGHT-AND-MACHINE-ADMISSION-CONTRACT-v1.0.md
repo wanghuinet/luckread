@@ -1,6 +1,6 @@
 # LuckRead Unified CL Preflight & Machine Admission Contract v1.0
 
-**状态：PREFLIGHT-DEFINED / CL-CI-NOT-RUN / CROSS-CUTTING-CONTRACTS-INCLUDED**
+**状态：PREFLIGHT-DEFINED / L1-L6-INCLUDED / CL-CI-NOT-RUN**
 
 ## 1. Purpose
 
@@ -15,7 +15,10 @@
 ```text
 Contract
 → Cross-Cutting Semantics
-→ Traceability
+→ L1-L4 Traceability
+→ L5 Execution Specification
+→ L6 Verification Claim
+→ Evidence
 → Consistency
 → Machine Check
 → CL / CI
@@ -48,24 +51,11 @@ Contract
 176 Evidence Registry / Acceptance Traceability
 ```
 
-按最小文件原则：
-
-```text
-Entity Deletion / Reference Integrity
-→ covered by 160 + 84 Relationship + domain contracts
-
-Release / Smoke / Rollback Closure
-→ covered by 71 + this contract
-
-External OSS Lifecycle / Exit
-→ covered by 71 + 74 + this contract
-```
-
 缺失任一强制横向合同或引用 = FAIL。
 
 ## 4. Machine Check Domains
 
-### A. Repository Baseline
+### A. Repository / Contract Baseline
 
 检查：
 
@@ -74,21 +64,25 @@ External OSS Lifecycle / Exit
 - 不存在同路径重复合同；
 - 当前工作流、脚本与文档引用路径一致；
 - 已删除/废弃文档不会被活动代码引用；
-- 160–176 强制横向合同均能从当前 `main` 定位。
+- 160–181 强制合同均能从当前 `main` 定位；
+- 任何 active contract 均具 owner/version/status/scope/authority/dependencies/acceptance。
 
-### B. Contract Index
+### B. Capability Hierarchy
 
-检查每个 active contract 是否具有：
+必须验证：
 
 ```text
-owner
-version
-status
-scope
-authority
-dependencies
-acceptance
+L1 → L2 → L3 → L4 → L5 → L6
 ```
+
+机器检查：
+
+- 每个 L2 至少有一个 L3；
+- 每个 L3 至少有一个 L4；
+- 实现候选 L4 必须有 L5；
+- 接受候选 L5 必须有 L6；
+- L5/L6 不得创建新的未登记 L1/L2 产品能力；
+- 不得存在 orphan L3/L4/L5/L6。
 
 ### C. L1-L4 Traceability
 
@@ -103,12 +97,54 @@ L1 → L2 → L3 → L4
 → Runtime
 → Cost
 → Test / Acceptance
-→ Evidence
+→ L5
+→ L6
 ```
 
-缺任何一项即 FAIL。
+缺任何强制项即 FAIL。
 
-### D. Authority Uniqueness
+### D. L5 Execution Specification
+
+每个实现候选 L4 必须验证其 L5 至少包含：
+
+```text
+Input / Output
+Preconditions
+Validation
+Authorization / Scope
+State Transition
+Data Boundary
+Concurrency
+Idempotency
+Transaction Boundary
+Event Side Effects
+Async Operation
+Cache / Derived State
+Error Mapping
+Recovery
+Audit
+Observability
+Cost / Latency
+Test Mapping
+Evidence Mapping
+```
+
+### E. L6 Verification / Evidence
+
+每个接收候选 L5 至少具有可判定 L6 claim，并可映射：
+
+```text
+claim
+verification type
+test / check
+commit
+result
+evidence reference
+```
+
+禁止模糊 PASS。
+
+### F. Authority Uniqueness
 
 机器检查应检测：
 
@@ -127,7 +163,7 @@ AMBIGUOUS = FAIL
 DUPLICATE = BLOCK
 ```
 
-### E. Data Lifecycle / Recovery
+### G. Data Lifecycle / Recovery
 
 所有 authoritative、derived、event、cache、media、audit、backup 数据必须检查：
 
@@ -141,7 +177,7 @@ backup interaction
 purge verification
 ```
 
-### F. Schema / Migration
+### H. Schema / Migration
 
 检查：
 
@@ -152,10 +188,10 @@ migration owner
 backfill strategy
 dual-read/write where needed
 verification
-automatic rollback boundary
+rollback / forward-fix boundary
 ```
 
-### G. Event Contract
+### I. Event Contract
 
 每个生产事件检查：
 
@@ -173,7 +209,7 @@ ordering scope
 replay/DLQ semantics
 ```
 
-### H. Cross-Domain Consistency
+### J. Cross-Domain Consistency
 
 跨领域流程必须能够说明：
 
@@ -187,7 +223,7 @@ timeout policy
 reconciliation
 ```
 
-### I. Unified Async Operation
+### K. Unified Async Operation
 
 所有长时间、异步或跨域操作必须具有：
 
@@ -203,7 +239,7 @@ expiry/retention
 correlationId
 ```
 
-### J. Unified Error / State
+### L. Unified Error / State
 
 检查所有公开 API、异步 operation 和用户可见状态是否统一支持：
 
@@ -217,7 +253,7 @@ next action
 correlationId
 ```
 
-### K. Cache
+### M. Cache
 
 检查：
 
@@ -231,7 +267,7 @@ hot-key policy
 rebuildability
 ```
 
-### L. Global Scope / Tenant Isolation
+### N. Global Scope / Tenant Isolation
 
 检查：
 
@@ -248,7 +284,7 @@ break-glass audit
 cross-tenant deny
 ```
 
-### M. Security / Secret / Incident
+### O. Security / Secret / Incident
 
 检查：
 
@@ -264,7 +300,7 @@ forensics/audit
 break-glass
 ```
 
-### N. Rate / Quota / Traffic
+### P. Rate / Quota / Traffic
 
 检查：
 
@@ -279,7 +315,7 @@ fairness
 emergency throttle
 ```
 
-### O. Observability
+### Q. Observability
 
 检查：
 
@@ -298,7 +334,7 @@ PII redaction
 
 Telemetry 不得成为业务成功条件。
 
-### P. Localization / Accessibility
+### R. Localization / Accessibility
 
 检查：
 
@@ -314,7 +350,7 @@ focus
 caption/motion/touch-target acceptance where applicable
 ```
 
-### Q. Canonical Identity
+### S. Canonical Identity
 
 所有跨域实体引用必须检查：
 
@@ -327,7 +363,7 @@ non-reuse
 external reference mapping
 ```
 
-### R. Configuration / Policy Versioning
+### T. Configuration / Policy Versioning
 
 所有 feature flags、configuration、policy 必须检查：
 
@@ -344,7 +380,7 @@ rollback
 schema compatibility
 ```
 
-### S. Payload Boundary
+### U. Payload Boundary
 
 检查：
 
@@ -354,7 +390,7 @@ schema compatibility
 - 自定义逻辑通过官方 extension/API/service/event boundary；
 - Worker/domain service 不依赖 CMS internals 作为长期合同。
 
-### T. Cloudflare Runtime
+### V. Cloudflare Runtime
 
 默认路径必须保持：
 
@@ -368,39 +404,27 @@ Workers
 └── Workflows durable execution when appropriate
 ```
 
-外部基础设施必须具有：
+### W. UX / Center Traceability
+
+关键用户旅程必须能够追踪：
 
 ```text
-justification
-→ adapter/API/event boundary
-→ failure isolation
-→ cost budget
-→ upgrade policy
-→ exit/removal plan
+Journey
+→ L1-L4 capability
+→ L5 execution
+→ API/Event
+→ Domain authority
+→ Permission/Risk
+→ Runtime
+→ L6 verification
+→ Acceptance
 ```
 
-### U. UX Traceability
+### X. Evidence / Release / OSS Closure
 
-关键用户旅程必须能够追踪到后端能力和验收。
+Evidence 必须可追踪到当前 commit。
 
-### V. Evidence Registry
-
-每个重要 PASS 必须能够定位到 176 Evidence Registry，并关联：
-
-```text
-claimId
-subjectId
-commitSha
-sourceRef
-timestamp
-result
-```
-
-`BLOCKED` / `NOT-APPLICABLE` 也必须有可审计依据。
-
-### W. Release / Rollback / OSS Closure
-
-Release 必须可关联：
+Release 必须形成：
 
 ```text
 source commit
@@ -413,47 +437,46 @@ source commit
 → closure evidence
 ```
 
-外部 OSS 必须可关联版本、owner、security state、退出/替换路径。
+OSS 必须具备版本、owner、security state、adapter/failure isolation 与退出路径。
 
-## 5. Current GitHub Workflow Boundary
-
-当前 Cloudflare deployment workflow 的发布边界保持不变：文档-only 变更不触发生产部署；代码/配置变更按现有 workflow 进入 build/deploy。
-
-## 6. Unified CL / CI Sequence
+## 5. Unified CL / CI Sequence
 
 ```text
 1. Repository / Document Baseline
-2. Cross-Cutting Contract Presence (160–176)
+2. Cross-Cutting Contract Presence (160–181)
 3. Contract Index Validation
 4. L1-L4 Traceability
-5. Canonical ID / Entity Reference
-6. Authority Uniqueness
-7. Data Contract / Lifecycle / Deletion
-8. Schema / Migration / Compatibility
-9. API Contract Consistency
-10. Event Semantics / Ordering / Replay / DLQ
-11. Cross-Domain Saga / Compensation
-12. Unified Async Operation
-13. Unified Error / State
-14. Permission / Security / Privacy / Tenant Scope
-15. Cache / Invalidation / Hot-Key
-16. Rate / Quota / Traffic Shaping
-17. Observability / SLI / SLO
-18. Localization / Accessibility
-19. Feature Flag / Configuration / Policy Versioning
-20. Payload Boundary
-21. Cloudflare Runtime Boundary
-22. OSS Registry / Lifecycle / Exit
-23. UX / Center Traceability
-24. Reliability / DR / Rollback
-25. Test / Acceptance Mapping
-26. Evidence Registry Closure
-27. Existing Code / Workflow Compatibility
-28. Build / Type / Lint / Unit / Integration Checks
-29. Deployment Dry Validation
-30. Final CL Decision
+5. L5 Execution Specification Mapping
+6. L6 Verification Mapping
+7. Evidence Registry Linkage
+8. Canonical ID / Entity Reference
+9. Authority Uniqueness
+10. Data + Lifecycle + Deletion
+11. Schema / Migration / Compatibility
+12. API Contract Consistency
+13. Event Semantics / Ordering / Replay / DLQ
+14. Cross-Domain Saga / Compensation
+15. Unified Async Operation
+16. Unified Error / State
+17. Permission / Security / Privacy / Tenant Scope
+18. Cache / Invalidation / Hot-Key
+19. Rate / Quota / Traffic Shaping
+20. Observability / SLI / SLO
+21. Localization / Accessibility
+22. Feature Flag / Configuration / Policy Versioning
+23. Payload Boundary
+24. Cloudflare Runtime Boundary
+25. OSS Registry / Lifecycle / Exit
+26. UX / Center Traceability
+27. Reliability / DR / Rollback
+28. Test / Acceptance Mapping
+29. Existing Code / Workflow Compatibility
+30. Build / Type / Lint / Unit / Integration Checks
+31. Deployment Dry Validation
+32. Final CL Decision
+```
 
-## 7. CL Result States
+## 6. CL Result States
 
 机器结果只允许：
 
@@ -464,51 +487,13 @@ BLOCKED
 NOT-APPLICABLE
 ```
 
-不得使用：
+PASS 必须有 Evidence；BLOCKED 不得解释成 PASS。
 
-```text
-probably-pass
-manual-pass
-acceptable-for-now
-```
-
-### PASS
-
-所有强制检查通过。
-
-### FAIL
-
-存在可执行的合同或代码缺陷，必须修复后重新检查。
-
-### BLOCKED
-
-检查无法执行，例如缺少必要凭据、环境或前置 artifact；不得解释为 PASS。
-
-### NOT-APPLICABLE
-
-必须给出机器可审计的理由。
-
-## 8. Evidence Requirements
-
-每个 PASS 必须能够留下最小证据：
-
-```text
-checkId
-commitSha
-timestamp
-input/reference
-result
-failure reason if failed
-evidenceId
-```
-
-## 9. Final Admission
-
-只有以下链路全部通过，才允许代码进入正式 IMPLEMENTATION：
+## 7. Implementation Admission
 
 ```text
 Contract Complete
-→ Cross-Cutting Contracts Closed
+→ L1-L6 Traceability Complete
 → Reconciliation PASS
 → Machine Preflight PASS
 → CL PASS
@@ -516,39 +501,36 @@ Contract Complete
 → READY
 ```
 
-如果 CL/CI 发现合同缺陷，应回退到合同层，而不是通过修改测试来掩盖合同缺陷。
+## 8. STOP Conditions
 
-## 10. STOP Conditions
-
-- 任一 160–176 mandatory contract missing;
-- L1-L4 无法追踪；
+- mandatory contract missing;
+- L1-L6 断链；
+- L5 引入未登记产品能力；
+- L6 不可验证；
 - authority 重复；
-- Data lifecycle 缺失；
 - migration 无兼容/回滚策略；
-- Event 缺 ordering/replay/DLQ semantics；
-- Saga 无 compensation/convergence owner；
-- Async operation 无稳定 identity/state；
-- API/Event 缺统一 error/state semantics；
+- event 无 ordering/replay/DLQ semantics；
+- saga 无 compensation/convergence owner；
+- async operation 无 stable identity/state；
 - tenant isolation 缺失；
-- secret 无 rotation/revocation/incident response；
+- security lifecycle 缺失；
 - cache 无 authority/version/invalidation；
-- UX 无法追踪到能力；
+- UX 无能力与验收追踪；
 - Payload boundary 被绕过；
 - Cloudflare-first 被无理由违反；
-- OSS 无 adapter/failure isolation/exit plan；
+- OSS 无 exit/failure isolation；
 - evidence 缺失；
 - release 无 rollback evidence；
-- CL/CI 为 BLOCKED 却被当作 PASS；
-- 发现合同问题后通过测试修改掩盖问题。
+- CL/CI 为 BLOCKED 却被当作 PASS。
 
-## 11. Current Status
+## 9. Current Status
 
 ```text
-DOCUMENT CONTRACT CHAIN = CROSS-CUTTING COMPLETE
-MACHINE PREFLIGHT        = UPDATED
+DOCUMENT CONTRACT CHAIN = L1-L6 READY FOR CL
+MACHINE PREFLIGHT        = DEFINED
 CL                        = NOT RUN
 CI                        = NOT RUN
-IMPLEMENTATION            = BLOCKED UNTIL UNIFIED CL + CI PASS
+IMPLEMENTATION            = BLOCKED UNTIL PASS
 ```
 
 **本文件不执行 CL/CI。**
