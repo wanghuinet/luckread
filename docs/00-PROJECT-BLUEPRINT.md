@@ -1,4 +1,4 @@
-# Luckread Project Blueprint
+# Luckread Project Blueprint v1.1
 
 ## 1. Purpose
 
@@ -6,15 +6,99 @@ Luckread uses Payload CMS as the primary CMS/application foundation for a headle
 
 The design target includes browser/H5 first, with Android/iOS clients later, and supports articles, galleries, video metadata, creators, comments, likes, follows, bookmarks, feeds, notifications, MCN administration, live, IM, mini-app and game-related APIs as the product evolves.
 
-## 2. Core architectural rule
+This blueprint establishes the first non-negotiable architectural boundary: **Payload CMS Core is an upstream dependency and must remain unmodified.** All Luckread-specific extensions and business capabilities must be implemented outside Payload Core through supported extension points or application-owned services.
 
-**Enterprise-ready, Enterprise-optional.**
+## 2. P0 Core architectural rules
+
+### 2.1 Payload Core immutability
+
+**`PAYLOAD-CORE-IMMUTABILITY` — P0 / non-negotiable.**
+
+The official Payload CMS Core is never modified, forked, patched, copied into the application, or used as a location for Luckread business code.
+
+This includes:
+
+- `node_modules/payload` and other upstream Payload packages;
+- Payload internal source files;
+- copied Payload internal modules;
+- local patches that change Payload Core behavior;
+- business code inserted into Payload internals;
+- application-specific modifications intended to survive only by maintaining a private Payload fork.
+
+Payload upgrades must be possible by replacing the upstream Payload version rather than manually merging Luckread modifications into Payload Core.
+
+### 2.2 Supported extension points only
+
+Luckread may extend Payload only through supported and intentionally exposed mechanisms, including where appropriate:
+
+- `payload.config.ts` configuration;
+- Collections;
+- Globals;
+- Access Control;
+- Hooks for bounded, local domain behavior;
+- Custom Components;
+- official/plugin extension mechanisms;
+- application-owned APIs and services surrounding Payload.
+
+Hooks must remain lightweight. They must not become the central orchestration engine for feed, recommendation, risk, notification fan-out, search, video processing, live, IM or other high-volume workloads.
+
+### 2.3 Business code ownership
+
+Luckread business code belongs to Luckread-owned source directories, not Payload Core.
+
+Recommended ownership boundary:
+
+```text
+Payload Core
+    |
+    | upstream dependency — immutable
+    v
+Payload Extension Layer
+    |
+    +-- collections/
+    +-- globals/
+    +-- access/
+    +-- hooks/
+    +-- components/
+    +-- plugins/
+    |
+    v
+Luckread Application / Domain Layer
+    |
+    +-- domains/
+    +-- services/
+    +-- api/
+    +-- events/
+    |
+    v
+Independent high-concurrency / asynchronous services
+```
+
+The exact Worker boundary is defined separately in `03-WORKER-BOUNDARY.md`.
+
+### 2.4 Upgrade safety
+
+Every Payload upgrade must preserve this invariant:
+
+```text
+Upgrade Payload Core
+        |
+        v
+Run contracts + tests + CI
+        |
+        v
+Luckread extension layer remains outside Core
+```
+
+A Payload upgrade must not require manually re-applying business patches to Payload Core.
+
+## 3. Enterprise-ready, Enterprise-optional
 
 Every Enterprise capability that may be useful later is represented as an explicit capability boundary/interface in the project blueprint, but the core business model and API contracts must continue to work without an Enterprise subscription.
 
 No collection, API, database schema, or business workflow may be designed so that purchasing Enterprise later becomes a mandatory migration.
 
-## 3. Layering
+## 4. Layering
 
 ```text
 Client
@@ -25,16 +109,21 @@ Public API / Application Services
   +-------------------+
   |                   |
   v                   v
-Payload CMS        Worker Services
+Payload Extension   Independent Services
   |                   |
   |                   +-- high-concurrency / async workloads
-  |                   +-- feed / search / notifications / processing
+  |                   +-- feed / recommendation
+  |                   +-- risk / trust
+  |                   +-- search / indexing
+  |                   +-- notification fan-out
+  |                   +-- media / video processing
+  |                   +-- live / IM / realtime
   |
   +-- Admin CMS
   +-- Auth / users
   +-- collections / CRUD
   +-- access control
-  +-- content workflow
+  +-- bounded content workflow
   +-- versions / drafts
   |
   v
@@ -44,9 +133,9 @@ Storage contracts
   +-- R2 for large/object content
 ```
 
-The exact Worker boundary is defined separately in `03-WORKER-BOUNDARY.md`.
+Payload remains the CMS/application foundation. High-volume infrastructure is separated according to explicit contracts rather than accumulated inside Payload hooks.
 
-## 4. Enterprise capability compatibility layer
+## 5. Enterprise capability compatibility layer
 
 Enterprise capabilities are treated as optional platform capabilities, not hard dependencies.
 
@@ -76,7 +165,7 @@ The application should expose stable internal concepts such as:
 
 The implementation may initially use Payload open-source features or application-owned services. If Enterprise is purchased later, an adapter may map these concepts to Enterprise features without changing public APIs or the logical database contract.
 
-## 5. Capability ownership
+## 6. Capability ownership
 
 ### Payload-owned by default
 
@@ -102,7 +191,7 @@ The implementation may initially use Payload open-source features or application
 - A/B testing
 - enterprise support
 
-### Application/Worker-owned regardless of Enterprise
+### Application/Independent-Service-owned regardless of Enterprise
 
 Enterprise purchase does **not** replace product-specific infrastructure such as:
 
@@ -115,10 +204,10 @@ Enterprise purchase does **not** replace product-specific infrastructure such as
 - video processing pipeline
 - live infrastructure
 - IM infrastructure
-- product-specific risk control
+- product-specific risk and trust control
 - product-specific analytics
 
-## 6. Database independence
+## 7. Database independence
 
 The logical business schema must not depend on D1-specific behavior.
 
@@ -135,7 +224,102 @@ Business requirements
 
 Primary keys, timestamps, status values, relations, indexes and constraints must be specified in the logical database contract first.
 
-## 7. Enterprise feature adoption gates
+## 8. Payload size and dependency control
+
+Every proposed feature must include a **Payload Size Impact** review before implementation.
+
+| Feature | Payload | Independent Service | Size risk |
+|---|---:|---:|---:|
+| Users | Yes | — | Low |
+| Article CMS | Yes | — | Low |
+| Media Metadata | Yes | — | Low |
+| Publishing | Bounded | Optional | Medium |
+| Feed | No | Yes | High |
+| Recommendation | No | Yes | High |
+| Risk & Trust | No | Yes | High |
+| Notification Fan-out | No | Yes | High |
+| Search | No | Yes | High |
+| Video Processing | No | Yes | High |
+| Live / IM / Realtime | No | Yes | High |
+
+A feature must not enter Payload merely because Payload provides a convenient hook or API. Ownership is decided by the contract and workload characteristics.
+
+## 9. Risk & Trust architectural boundary
+
+Risk & Trust is a first-class platform capability because fraudulent engagement can distort content recommendation fairness.
+
+The core event model must distinguish observed behavior from trusted recommendation signals:
+
+```text
+raw_events
+    -> validated_events
+    -> event_quality / risk signals
+    -> recommendation signals
+    -> Feed / Recommendation
+```
+
+Raw events must not directly become trusted recommendation metrics.
+
+Risk & Trust should provide stable signals such as:
+
+- `risk_score`
+- `event_quality`
+- `trust_score`
+- `recommendation_weight`
+- `decision`
+
+The Risk Engine must be decoupled from Recommendation. Payload may administer content/account state and expose review controls, but high-volume risk evaluation must not be implemented as a Payload hook orchestration engine.
+
+Risk decisions should support graded outcomes such as normal, suspicious, high-risk and confirmed abuse, with corresponding controls such as contribution reduction, delayed attribution, review, account limits and monetization restrictions.
+
+Detailed privacy, fingerprinting, retention and abuse-detection rules belong in the dedicated Risk & Trust Contract and security/privacy contracts.
+
+## 10. Development sequence
+
+1. Freeze project blueprint.
+2. Freeze logical database contract.
+3. Freeze Payload capability map.
+4. Freeze Worker / independent-service boundary.
+5. Freeze storage contract.
+6. Freeze API and authorization contracts.
+7. Freeze Risk & Trust contract.
+8. Define tests and acceptance gates.
+9. Mark the first feature `READY`.
+10. Implement only a `READY` feature.
+11. Accept locally and through GitHub CI.
+12. Proceed feature by feature.
+
+No new business feature should be added merely because Payload exposes a convenient API. The feature must first exist in the product roadmap and contracts.
+
+## 11. Feature lifecycle
+
+```text
+DRAFT
+  -> ARCHITECTURE REVIEW
+  -> CONTRACT REVIEW
+  -> READY
+  -> IMPLEMENTING
+  -> LOCAL PASS
+  -> CI PASS
+  -> USER ACCEPTANCE
+  -> DONE
+```
+
+**No `READY` status means no business implementation.**
+
+## 12. Five PASS gates
+
+A feature is `DONE` only after all five gates pass:
+
+1. Architecture PASS
+2. Contract PASS
+3. Code PASS
+4. CI PASS
+5. User Acceptance PASS
+
+GitHub-approved contracts are the authoritative source when discussion, local files and code disagree.
+
+## 13. Enterprise feature adoption gates
 
 An Enterprise feature may be enabled only when at least one of the following is true:
 
@@ -146,22 +330,7 @@ An Enterprise feature may be enabled only when at least one of the following is 
 
 Buying Enterprise must never be used as a substitute for architectural design.
 
-## 8. Development sequence
-
-1. Freeze project blueprint.
-2. Freeze logical database contract.
-3. Freeze Payload capability map.
-4. Freeze Worker boundary.
-5. Freeze storage contract.
-6. Freeze API and authorization contracts.
-7. Define tests and acceptance gates.
-8. Implement F01 Users.
-9. Accept F01 locally and from GitHub.
-10. Proceed feature by feature.
-
-No new business feature should be added merely because Payload or Enterprise exposes a convenient API. The feature must first exist in the product roadmap and contracts.
-
-## 9. Enterprise migration principle
+## 14. Enterprise migration principle
 
 If Enterprise is purchased later, the preferred migration is:
 
@@ -178,7 +347,7 @@ Capability adapter
 
 The public API, logical schema and client-facing behavior should remain stable unless a deliberate architecture decision approves a breaking change.
 
-## 10. Non-goals
+## 15. Non-goals
 
 This blueprint does not require:
 
@@ -186,11 +355,22 @@ This blueprint does not require:
 - Enterprise-only collections;
 - Enterprise-only APIs in the core product;
 - rebuilding the application around proprietary CMS features;
-- replacing all Workers with Payload;
-- replacing all Payload functionality with Workers.
+- modifying Payload Core;
+- maintaining a private Payload fork merely for business features;
+- replacing all independent services with Payload;
+- replacing all Payload functionality with independent services.
 
-## 11. Decision
+## 16. Decision and status
 
-**Status: Architecture baseline — proposed for review.**
+**Status: Architecture baseline v1.1 — foundational rule update.**
 
-The project will proceed only after the foundational contracts are reviewed and accepted. Enterprise capability interfaces are now part of the architecture, while Enterprise itself remains optional.
+The following rules are now frozen at blueprint level:
+
+1. Payload Core is immutable and remains an upstream dependency.
+2. Luckread customizations use supported Payload extension points or Luckread-owned application/services code.
+3. High-concurrency and asynchronous capabilities are separated by explicit service boundaries.
+4. Risk & Trust is a first-class boundary and recommendation fairness signal source.
+5. Database contracts remain logically portable to PostgreSQL.
+6. No business feature enters implementation before its contract reaches `READY`.
+
+The next documents must align with these rules. In particular, the database contract, Payload capability map, service boundary, test/acceptance contract and Risk & Trust contract must not introduce exceptions to `PAYLOAD-CORE-IMMUTABILITY`.
