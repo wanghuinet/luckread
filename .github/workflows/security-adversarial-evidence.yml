@@ -1,0 +1,24 @@
+name: Security Adversarial Evidence
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'contracts/authz/**'
+      - 'scripts/security-adversarial-*.mjs'
+      - 'artifacts/security/**'
+      - '.github/workflows/security-adversarial-evidence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  adversarial-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate adversarial execution evidence
+        run: node scripts/security-adversarial-evidence.mjs
