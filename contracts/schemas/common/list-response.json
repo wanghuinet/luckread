@@ -13,7 +13,7 @@
         },
         "nextCursor": {
           "anyOf": [
-            { "$ref": "https://luckread.com/contracts/v1/common/cursor.json" },
+            { "$ref": "./cursor.json" },
             { "type": "null" }
           ]
         },
@@ -25,7 +25,10 @@
       "additionalProperties": false
     },
     "requestId": {
-      "$ref": "https://luckread.com/contracts/v1/common/request-id.json"
+      "$ref": "./request-id.json"
+    },
+    "traceId": {
+      "$ref": "./trace-id.json"
     }
   },
   "required": ["data", "requestId"],
