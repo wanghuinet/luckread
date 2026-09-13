@@ -31,7 +31,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
 
       - name: Run reconciliation
         run: node scripts/api-inventory-reconciliation-check.mjs
