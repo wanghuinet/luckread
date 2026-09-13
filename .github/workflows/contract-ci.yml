@@ -18,9 +18,16 @@ permissions:
   contents: read
 
 jobs:
-  common-schema:
-    name: Common Schema
+  # Contract CI is the CODE DEVELOPMENT ADMISSION gate.
+  # Contract -> Schema -> OpenAPI -> Migration -> DTO -> Authorization ->
+  # State Machine -> Test -> Contract CI -> Code Development Admission.
+  contract:
+    name: Contract Admission Gate
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        domain: [common, enums, state-machines, authz, openapi]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,17 +42,16 @@ jobs:
           printf 'PWD=%s\n' "$PWD"
           node --version
           npm --version
-          test -d contracts/schemas/common
-          find contracts/schemas/common -maxdepth 1 -type f -name '*.json' -print | sort
+          test -d contracts
           test -f scripts/contract-ci.mjs
-      - name: Validate common schemas
+      - name: Validate contract domain (${{ matrix.domain }})
         shell: bash
-        run: node scripts/contract-ci.mjs common
+        run: node scripts/contract-ci.mjs ${{ matrix.domain }}
 
-  openapi-foundation:
-    name: OpenAPI Foundation
+  contract-full:
+    name: Contract Admission Gate (full)
     runs-on: ubuntu-latest
-    needs: common-schema
+    needs: contract
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,6 +59,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Validate OpenAPI
+      - name: Validate all contract domains
+        shell: bash
+        run: node scripts/contract-ci.mjs
+
+  openapi-lint:
+    name: OpenAPI Lint
+    runs-on: ubuntu-latest
+    needs: contract-full
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Lint OpenAPI
         shell: bash
         run: npx --yes @redocly/cli@1.34.2 lint contracts/openapi/v1/openapi.yaml
