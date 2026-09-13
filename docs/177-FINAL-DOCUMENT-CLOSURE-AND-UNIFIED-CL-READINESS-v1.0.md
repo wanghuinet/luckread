@@ -1,6 +1,6 @@
 # LuckRead Final Document Closure & Unified CL Readiness v1.0
 
-**状态：DOCUMENT-CLOSURE-COMPLETE / CL-READY-PENDING-EXECUTION / CI-NOT-RUN**
+**状态：DOCUMENT-CLOSURE-COMPLETE / L1-L6-TRACEABILITY-INCLUDED / CL-READY-PENDING-EXECUTION / CI-NOT-RUN**
 
 ## 1. Purpose
 
@@ -12,10 +12,11 @@
 业务能力
 → Domain Authority
 → Center Experience
-→ Cross-Cutting Semantics
-→ Traceability
-→ Admission
+→ L1-L4 Traceability
+→ L5 Execution Specification
+→ L6 Verification
 → Evidence
+→ Admission
 ```
 
 已经形成完整闭环；未通过机器验证的部分不得提前宣称 PASS。
@@ -36,6 +37,15 @@
 156 Center Unified Admission Gate
 157 Center Unified Preflight
 158 Center Competitor Benchmark
+```
+
+### Capability Engineering Closure
+
+```text
+178 L3/L4 Traceability Closure
+179 L5 Execution Specification
+180 L6 Verification / Evidence Atomic Unit
+181 L3-L6 Hierarchy Reconciliation Addendum
 ```
 
 ### Cross-Cutting Platform Semantics
@@ -62,13 +72,15 @@
 
 ## 3. Consolidated Coverage
 
-当前规划层已经覆盖：
+当前规划层覆盖：
 
 ```text
 Product / UX
 Domain Authority
 Center Experience
 L1-L4 Traceability
+L5 Execution Specification
+L6 Verification / Evidence
 Data
 API
 Event
@@ -96,8 +108,6 @@ Evidence
 
 ## 4. Intentional Consolidations
 
-为避免无意义文档膨胀：
-
 ```text
 X16 Entity Deletion / Reference Integrity
 → X01 + Content Relationship + domain lifecycle rules
@@ -112,8 +122,6 @@ X20 External OSS Lifecycle / Exit
 这些项目视为 CLOSED，不再创建重复合同。
 
 ## 5. Authority Rule
-
-最终仍保持：
 
 ```text
 One Business Fact
@@ -158,13 +166,13 @@ Product Requirement
 → L2
 → L3
 → L4
-→ Authority
-→ Data Contract
-→ API / Control Contract
-→ Event Contract
+→ 178 L3/L4 Traceability Closure
+→ 179 L5 Execution Specification
+→ 180 L6 Verification
+→ Data / API / Event
 → Permission / Security / Privacy
-→ Cross-Cutting Semantics
-→ UX / Journey
+→ Cross-Cutting Semantics 160–175
+→ UX / Center Traceability 154–158
 → Payload Boundary
 → Cloudflare Runtime
 → OSS Boundary
@@ -172,10 +180,10 @@ Product Requirement
 → Observability
 → Cost
 → Test / Acceptance
-→ Evidence Registry
-→ Contract Reconciliation (74)
-→ Center Preflight / Admission (154–158)
-→ Unified Machine Preflight (75)
+→ 176 Evidence Registry
+→ 74 Final Reconciliation
+→ 157/156 Center Preflight & Admission
+→ 75 Unified Machine Preflight
 → Unified CL
 → CI
 → Implementation Admission
@@ -183,37 +191,39 @@ Product Requirement
 
 ## 8. Mandatory Unified CL Scope
 
-Unified CL 不得只检查 Center 文档，必须覆盖：
+Unified CL 必须覆盖：
 
 ```text
 1. Repository / Document Baseline
 2. Contract Presence / Metadata
 3. L1-L4 Traceability
-4. Canonical IDs / References
-5. Authority Uniqueness
-6. Data + Lifecycle
-7. Migration / Compatibility
-8. API
-9. Event / Ordering / Replay / DLQ
-10. Cross-Domain Saga / Compensation
-11. Async Operation
-12. Error / State
-13. Permission / Security / Privacy / Tenant
-14. Cache / Invalidation
-15. Rate / Quota
-16. Observability / SLI / SLO
-17. Localization / Accessibility
-18. Configuration / Policy Versioning
-19. Payload Boundary
-20. Cloudflare Runtime
-21. OSS Registry / Lifecycle / Exit
-22. UX / Center Traceability
-23. Reliability / DR / Rollback
-24. Test / Acceptance
-25. Evidence Registry
-26. Build / Type / Lint / Unit / Integration
-27. Deployment Dry Validation
-28. Final Decision
+4. L5 Execution Specification
+5. L6 Verification Mapping
+6. Evidence Registry
+7. Canonical IDs / References
+8. Authority Uniqueness
+9. Data + Lifecycle
+10. Migration / Compatibility
+11. API
+12. Event / Ordering / Replay / DLQ
+13. Cross-Domain Saga / Compensation
+14. Async Operation
+15. Error / State
+16. Permission / Security / Privacy / Tenant
+17. Cache / Invalidation
+18. Rate / Quota
+19. Observability / SLI / SLO
+20. Localization / Accessibility
+21. Configuration / Policy Versioning
+22. Payload Boundary
+23. Cloudflare Runtime
+24. OSS Registry / Lifecycle / Exit
+25. UX / Center Traceability
+26. Reliability / DR / Rollback
+27. Test / Acceptance
+28. Build / Type / Lint / Unit / Integration
+29. Deployment Dry Validation
+30. Final Decision
 ```
 
 ## 9. Result Semantics
@@ -228,7 +238,6 @@ NOT-APPLICABLE
 ```
 
 任何 `BLOCKED` 不得解释成 PASS。
-
 任何 PASS 必须有可定位 Evidence。
 
 ## 10. Current Status
@@ -236,7 +245,7 @@ NOT-APPLICABLE
 ```text
 DOCUMENTATION = FROZEN FOR CL
 ARCHITECTURE = READY
-CAPABILITY = TRACEABLE
+CAPABILITY = L1-L6 TRACEABLE
 CROSS-CUTTING LOGIC = CLOSED
 CENTER LAYER = CLOSED FOR CL
 RECONCILIATION = READY
