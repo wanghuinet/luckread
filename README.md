@@ -10,8 +10,9 @@ The repository retains:
 
 - `contracts/` — machine-readable contracts
 - `docs/` — product, architecture, API, authorization, state-machine, security, reliability, and governance specifications
-- `scripts/` — dependency-free contract validation
+- `scripts/` — dependency-free contract validation and semantic cross-contract validation
 - `.github/workflows/contract-ci.yml` — contract CI gate
+- `.github/workflows/actions-execution-probe.yml` — hosted-runner execution probe
 - `.agents/skills/payload/` — Payload development reference material, not product implementation
 
 ## Development rule
@@ -27,7 +28,9 @@ Canonical Contracts
         ↓
 Machine-readable Contracts
         ↓
-Contract Validation / CI Evidence
+Semantic Cross-Contract Validation
+        ↓
+GitHub Actions Execution Evidence
         ↓
 Development Admission GREEN
         ↓
@@ -43,3 +46,5 @@ Implementation must not redefine the contract. A framework default, generated ty
 ## Current status
 
 The repository is in contract-admission hardening. Payload implementation is intentionally absent until the admission gate is closed with current-SHA execution evidence.
+
+A hosted-runner execution blocker is tracked separately in GitHub Issue #2. Local structural and semantic validation does not override a failed or unexecuted hosted CI gate.
