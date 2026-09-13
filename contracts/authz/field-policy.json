@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/authz/field-policy.json",
+  "title": "Protected Field Authorization Policy",
+  "type": "object",
+  "required": ["classes", "rules"],
+  "properties": {
+    "classes": { "type": "array", "items": { "enum": ["PUBLIC", "SELF", "SCOPED", "PRIVILEGED", "SYSTEM"] } },
+    "rules": { "type": "array", "items": {
+      "type": "object",
+      "required": ["field", "class", "clientWritable"],
+      "properties": {
+        "field": { "type": "string" },
+        "class": { "enum": ["PUBLIC", "SELF", "SCOPED", "PRIVILEGED", "SYSTEM"] },
+        "clientWritable": { "type": "boolean" },
+        "requiresPermission": { "type": ["string", "null"] }
+      }
+    }}
+  },
+  "x-mass-assignment": {
+    "default": "DENY",
+    "unknown-fields": "REJECT_OR_IGNORE_BY_CONTRACT",
+    "protected-fields-must-use-explicit-command": true
+  },
+  "x-protected-fields": [
+    { "field": "role", "class": "PRIVILEGED", "clientWritable": false, "requiresPermission": "role.assign" },
+    { "field": "status", "class": "PRIVILEGED", "clientWritable": false, "requiresPermission": "user.suspend" },
+    { "field": "verified", "class": "SYSTEM", "clientWritable": false, "requiresPermission": null },
+    { "field": "owner_id", "class": "SYSTEM", "clientWritable": false, "requiresPermission": null },
+    { "field": "organization_id", "class": "SCOPED", "clientWritable": false, "requiresPermission": "org.member.manage.scope" },
+    { "field": "scope_id", "class": "SCOPED", "clientWritable": false, "requiresPermission": null },
+    { "field": "entitlements", "class": "PRIVILEGED", "clientWritable": false, "requiresPermission": null },
+    { "field": "subscription_state", "class": "PRIVILEGED", "clientWritable": false, "requiresPermission": null },
+    { "field": "payment_state", "class": "SYSTEM", "clientWritable": false, "requiresPermission": null },
+    { "field": "moderation_state", "class": "SYSTEM", "clientWritable": false, "requiresPermission": "moderation.decide" },
+    { "field": "security_state", "class": "SYSTEM", "clientWritable": false, "requiresPermission": null },
+    { "field": "created_at", "class": "SYSTEM", "clientWritable": false, "requiresPermission": null },
+    { "field": "updated_at", "class": "SYSTEM", "clientWritable": false, "requiresPermission": null }
+  ]
+}
