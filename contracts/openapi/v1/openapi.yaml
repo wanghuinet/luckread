@@ -10,8 +10,6 @@ info:
 servers:
   - url: /api/v1
     description: API v1
-authorization:
-  - bearerAuth: []
 security:
   - bearerAuth: []
 tags:
@@ -143,7 +141,6 @@ paths:
       summary: Transition account lifecycle state
       operationId: transitionAccountState
       parameters:
-        - $ref: '#/components/parameters/UserId'
         - $ref: '#/components/parameters/IfMatchRequired'
       requestBody:
         required: true
