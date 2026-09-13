@@ -25,7 +25,7 @@
     { "from": "REJECTED", "to": "DRAFT", "actor": "creator", "permission": "content.update.own", "event": "content.reopened" },
     { "from": "APPROVED", "to": "SCHEDULED", "actor": "creator", "permission": "content.schedule.own", "event": "content.scheduled" },
     { "from": "APPROVED", "to": "PUBLISHED", "actor": "creator", "permission": "content.publish.own", "event": "content.published" },
-    { "from": "SCHEDULED", "to": "PUBLISHED", "actor": "system", "permission": "job", "event": "content.published" },
+    { "from": "SCHEDULED", "to": "PUBLISHED", "actor": "system", "permission": "system.job", "event": "content.published" },
     { "from": "SCHEDULED", "to": "DRAFT", "actor": "creator", "permission": "content.update.own", "event": "content.unscheduled" },
     { "from": "PUBLISHED", "to": "UNPUBLISHED", "actor": "creator", "permission": "content.unpublish.own", "event": "content.unpublished" },
     { "from": "PUBLISHED", "to": "ARCHIVED", "actor": "creator", "permission": "content.archive.own", "event": "content.archived" },
@@ -38,7 +38,7 @@
     { "from": "UNPUBLISHED", "to": "DELETED", "actor": "creator", "permission": "content.delete.own", "event": "content.deleted", "softDelete": true },
     { "from": "ARCHIVED", "to": "DELETED", "actor": "creator", "permission": "content.delete.own", "event": "content.deleted", "softDelete": true },
     { "from": "DELETED", "to": "RESTORED", "actor": "creator", "permission": "content.restore.own", "precondition": "within_restore_window", "event": "content.restored" },
-    { "from": "RESTORED", "to": "DRAFT", "actor": "system", "permission": "job", "event": "content.reverted_to_draft" }
+    { "from": "RESTORED", "to": "DRAFT", "actor": "system", "permission": "system.job", "event": "content.reverted_to_draft" }
   ],
   "x-forbidden": [
     { "from": "DRAFT", "to": "PUBLISHED", "reason": "must pass review (unless creator has auto-publish entitlement)" },
