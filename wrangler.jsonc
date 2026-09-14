@@ -1,12 +1,18 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "main": ".open-next/worker.js",
+  "main": "cloudflare-worker.ts",
   "name": "luckread",
   "compatibility_date": "2025-08-15",
   "compatibility_flags": [
     "nodejs_compat",
     "global_fetch_strictly_public"
   ],
+  "triggers": {
+    "crons": ["*/1 * * * *"]
+  },
+  "secrets": {
+    "required": ["CRON_INTERNAL_TOKEN"]
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
