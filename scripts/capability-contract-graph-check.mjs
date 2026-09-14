@@ -20,7 +20,10 @@ const registryPath = path.join(root, 'contracts/capability/capability-contract-g
 const blueprint = fs.readFileSync(blueprintPath, 'utf8');
 const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
 
-const featurePattern = /\b(?:AUTH|AUTHZ|USER|CREATOR|CONTENT|MEDIA|FEED|SEARCH|INTERACTION|REL|NOTIF|MSG|MOD|RISK|ADS|AD|COMMERCE|PAY|REWARD|ANALYTICS|ADMIN|AUDIT|API|WEBHOOK|EVENT|JOB|QUEUE|CACHE|ORG|SUB|LIVE|GAME|IP|RIGHTS|SAFETY)-\d{3}\b/g;
+// Feature IDs are contract identifiers, not a hard-coded list of domains.
+// Keeping this generic prevents the validator from silently accepting a new
+// domain merely because its prefix was not added to this script.
+const featurePattern = /\b[A-Z][A-Z0-9_]*-\d{3}\b/g;
 const blueprintIds = [...new Set(blueprint.match(featurePattern) ?? [])].sort();
 const records = Array.isArray(registry.features) ? registry.features : [];
 const registryIds = records.map((r) => r?.featureId).filter(Boolean);
@@ -29,8 +32,9 @@ const duplicate = [...new Set(registryIds.filter((id, i) => registryIds.indexOf(
 const missing = blueprintIds.filter((id) => !registryIds.includes(id));
 const unknown = registryIds.filter((id) => !blueprintIds.includes(id)).sort();
 const malformed = records
-  .filter((r) => !r || typeof r !== 'object' || !r.featureId)
-  .map((_, i) => `record[${i}]`);
+  .map((record, index) => ({ record, index }))
+  .filter(({ record }) => !record || typeof record !== 'object' || !record.featureId)
+  .map(({ index }) => `record[${index}]`);
 
 const result = {
   contractVersion: '1.0',
