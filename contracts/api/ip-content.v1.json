@@ -4,8 +4,8 @@
   "title":"IP Content Projection API Contract",
   "version":"1.0.0",
   "operations":[
-    {"id":"ip.contents.list","method":"GET","path":"/v1/ips/{ipId}/contents","auth":"public-or-scoped","rules":["returns content related to the IP through authoritative content relationships","does not create or mutate ownership rights","visibility and moderation policy are applied before projection","tenant isolation is mandatory"]},
-    {"id":"ip.content.get","method":"GET","path":"/v1/ips/{ipId}/contents/{contentId}","auth":"public-or-scoped","rules":["content relationship must exist and be active","content authorization remains authoritative","private or moderated content is not leaked"]}
+    {"id":"ip.contents.list","method":"GET","path":"/ips/{ipId}/contents","auth":"public-or-scoped","rules":["returns content related to the IP through authoritative content relationships","does not create or mutate ownership rights","visibility and moderation policy are applied before projection","tenant isolation is mandatory"]},
+    {"id":"ip.content.get","method":"GET","path":"/ips/{ipId}/contents/{contentId}","auth":"public-or-scoped","rules":["content relationship must exist and be active","content authorization remains authoritative","private or moderated content is not leaked"]}
   ],
   "invariants":["IP content projection is read-only","Content Relationship is the relationship authority","Rights/Ownership remains the rights authority","principal is the canonical IP principal concept","ip_founder and founder are forbidden role values","projection must never grant access beyond content visibility and entitlement"],
   "status":"CONTRACT_COMPLETE_IMPLEMENTATION_PENDING"
