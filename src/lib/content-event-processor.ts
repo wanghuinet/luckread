@@ -4,6 +4,7 @@ import type { Payload } from 'payload'
 const MAX_ATTEMPTS = 8
 const RETRY_BASE_MS = 1_000
 const RETRY_MAX_MS = 5 * 60_000
+const PROCESSING_LEASE_MS = 5 * 60_000
 
 export type ContentEventStatus = 'PENDING' | 'PROCESSING' | 'PROCESSED' | 'FAILED'
 
@@ -13,11 +14,15 @@ export type ContentEventRecord = {
   status: ContentEventStatus
   attempts: number
   sideEffects: unknown
+  nextAttemptAt?: string | null
+  processingStartedAt?: string | null
+  processorId?: string | null
   lastError?: string | null
 }
 
 export type ContentEventProcessorResult = {
   claimed: number
+  recovered: number
   processed: number
   failed: number
   skipped: number
@@ -32,31 +37,77 @@ function normalizeEffects(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === 'string')
 }
 
+function isDue(nextAttemptAt: string | null | undefined, now: Date): boolean {
+  if (!nextAttemptAt) return true
+  const timestamp = Date.parse(nextAttemptAt)
+  return Number.isNaN(timestamp) || timestamp <= now.getTime()
+}
+
+function isStaleProcessing(processingStartedAt: string | null | undefined, now: Date): boolean {
+  if (!processingStartedAt) return true
+  const timestamp = Date.parse(processingStartedAt)
+  return Number.isNaN(timestamp) || timestamp + PROCESSING_LEASE_MS <= now.getTime()
+}
+
 export async function processContentEvents(args: {
   payload: Payload
   limit?: number
   executeSideEffect?: (effect: string, event: ContentEventRecord) => Promise<void>
   now?: Date
+  processorId?: string
 }): Promise<ContentEventProcessorResult> {
   const limit = Math.max(1, Math.min(args.limit ?? 20, 100))
   const now = args.now ?? new Date()
   const nowIso = now.toISOString()
-  const result: ContentEventProcessorResult = { claimed: 0, processed: 0, failed: 0, skipped: 0 }
+  const processorId = args.processorId ?? createProcessorInstanceId()
+  const result: ContentEventProcessorResult = { claimed: 0, recovered: 0, processed: 0, failed: 0, skipped: 0 }
 
-  const pending = await args.payload.find({
+  const candidates = await args.payload.find({
     collection: 'content-events',
-    where: { status: { equals: 'PENDING' } },
-    limit,
+    where: {
+      or: [
+        { status: { equals: 'PENDING' } },
+        { status: { equals: 'PROCESSING' } },
+      ],
+    },
+    limit: Math.min(limit * 2, 200),
     sort: 'createdAt',
     depth: 0,
     overrideAccess: true,
   })
 
-  for (const candidate of pending.docs as unknown as ContentEventRecord[]) {
+  for (const candidate of candidates.docs as unknown as ContentEventRecord[]) {
+    const processing = candidate.status === 'PROCESSING'
+    if (processing && !isStaleProcessing(candidate.processingStartedAt, now)) continue
+    if (!processing && !isDue(candidate.nextAttemptAt, now)) continue
+
+    const nextAttempts = Number(candidate.attempts ?? 0) + (processing ? 0 : 1)
     const claimed = await args.payload.update({
       collection: 'content-events',
-      where: { id: { equals: candidate.id }, status: { equals: 'PENDING' } },
-      data: { status: 'PROCESSING', attempts: Number(candidate.attempts ?? 0) + 1 },
+      where: processing
+        ? {
+            and: [
+              { id: { equals: candidate.id } },
+              { status: { equals: 'PROCESSING' } },
+              { processingStartedAt: candidate.processingStartedAt
+                  ? { equals: candidate.processingStartedAt }
+                  : { exists: false } },
+            ],
+          }
+        : {
+            and: [
+              { id: { equals: candidate.id } },
+              { status: { equals: 'PENDING' } },
+              ...(candidate.nextAttemptAt ? [{ nextAttemptAt: { equals: candidate.nextAttemptAt } }] : []),
+            ],
+          },
+      data: {
+        status: 'PROCESSING',
+        attempts: nextAttempts,
+        processingStartedAt: nowIso,
+        processorId,
+        lastError: null,
+      },
       overrideAccess: true,
       limit: 1,
     })
@@ -66,7 +117,9 @@ export async function processContentEvents(args: {
       continue
     }
 
-    result.claimed += 1
+    if (processing) result.recovered += 1
+    else result.claimed += 1
+
     const event = claimed.docs[0] as unknown as ContentEventRecord
     const effects = normalizeEffects(event.sideEffects)
 
@@ -77,8 +130,14 @@ export async function processContentEvents(args: {
 
       await args.payload.update({
         collection: 'content-events',
-        where: { id: { equals: event.id }, status: { equals: 'PROCESSING' } },
-        data: { status: 'PROCESSED', processedAt: nowIso, lastError: null },
+        where: {
+          and: [
+            { id: { equals: event.id } },
+            { status: { equals: 'PROCESSING' } },
+            { processorId: { equals: processorId } },
+          ],
+        },
+        data: { status: 'PROCESSED', processedAt: nowIso, processingStartedAt: null, processorId: null, nextAttemptAt: null, lastError: null },
         overrideAccess: true,
         limit: 1,
       })
@@ -87,12 +146,22 @@ export async function processContentEvents(args: {
       const attempts = Number(event.attempts ?? 0)
       const message = error instanceof Error ? error.message : String(error)
       const exhausted = attempts >= MAX_ATTEMPTS
+      const nextAttemptAt = exhausted ? null : new Date(now.getTime() + retryDelayMs(attempts)).toISOString()
       await args.payload.update({
         collection: 'content-events',
-        where: { id: { equals: event.id }, status: { equals: 'PROCESSING' } },
+        where: {
+          and: [
+            { id: { equals: event.id } },
+            { status: { equals: 'PROCESSING' } },
+            { processorId: { equals: processorId } },
+          ],
+        },
         data: {
           status: exhausted ? 'FAILED' : 'PENDING',
-          lastError: `${message} (retryAfterMs=${exhausted ? 0 : retryDelayMs(attempts)})`,
+          nextAttemptAt,
+          processingStartedAt: null,
+          processorId: null,
+          lastError: message,
         },
         overrideAccess: true,
         limit: 1,
@@ -104,8 +173,8 @@ export async function processContentEvents(args: {
   return result
 }
 
-export function createContentEventIdempotencyKey(eventId: string): string {
-  return `content-event:${eventId}`
+export function createContentEventIdempotencyKey(eventId: string, effect?: string): string {
+  return effect ? `content-event:${eventId}:${effect}` : `content-event:${eventId}`
 }
 
 export function createProcessorInstanceId(): string {
