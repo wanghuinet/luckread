@@ -88,6 +88,12 @@
 {"featureId":"MEDIA-012","name":"live replay","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
 {"featureId":"MEDIA-013","name":"media rights/fingerprint","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
 {"featureId":"MEDIA-014","name":"watermark/DRM extension","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
-{"featureId":"MEDIA-015","name":"storage lifecycle","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+{"featureId":"MEDIA-015","name":"storage lifecycle","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"EXTCONTENT-001","name":"novel","hierarchy":{"l1":"H. Future content types","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"EXTCONTENT-002","name":"comic","hierarchy":{"l1":"H. Future content types","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"EXTCONTENT-003","name":"drama/mini-drama","hierarchy":{"l1":"H. Future content types","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"EXTCONTENT-004","name":"course","hierarchy":{"l1":"H. Future content types","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"EXTCONTENT-005","name":"ebook","hierarchy":{"l1":"H. Future content types","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"EXTCONTENT-006","name":"game/game-community content","hierarchy":{"l1":"H. Future content types","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
   ]
 }
