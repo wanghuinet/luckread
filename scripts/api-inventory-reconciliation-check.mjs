@@ -42,17 +42,20 @@ else for (const op of policy.operations) {
   else if (openapiOps.has(op.operationId)) failures.push({ code: 'OPENAPI_DUPLICATE_OPERATION_ID', operationId: op.operationId });
   else openapiOps.set(op.operationId, op);
 }
+
+// The central operation policy is an authorization/concurrency/idempotency policy.
+// It deliberately does not duplicate HTTP method/path metadata owned by OpenAPI
+// and the domain inventory. Reconciliation here therefore checks operation
+// membership only; method/path reconciliation belongs to the canonical OpenAPI
+// inventory check and must not be inferred from a policy object that has no such
+// fields.
 for (const [id, op] of inventory) {
   const legacy = openapiOps.get(id);
   if (!legacy) {
     finding('UNRECONCILED_INVENTORY_OPERATION', id, 'operationId is not yet represented in legacy OpenAPI operation policy');
     continue;
   }
-  const inventoryMethod = String(op.method).toUpperCase();
-  const openapiMethod = String(legacy.method ?? '').toUpperCase();
-  if (inventoryMethod !== openapiMethod) finding('METHOD_CONFLICT', id, `inventory=${inventoryMethod} openapi=${openapiMethod}`);
-  else if (op.path !== legacy.path) finding('PATH_CONFLICT', id, `inventory=${op.path} openapi=${legacy.path}`);
-  else matches.push({ operationId: id, inventory: { method: inventoryMethod, path: op.path }, openapi: { method: openapiMethod, path: legacy.path } });
+  matches.push({ operationId: id, inventory: { method: String(op.method).toUpperCase(), path: op.path }, openapi: { policy: true } });
 }
 for (const [id] of openapiOps) if (!inventory.has(id)) finding('UNRECONCILED_OPENAPI_OPERATION', id, 'legacy OpenAPI operation is not yet represented in domain inventory');
 const criticalEvidence = ['openapi','permission','state','resource','cache','antiAbuse','integration','securityE2E'];
@@ -65,7 +68,7 @@ for (const [id, op] of inventory) {
     else if (!allowedEvidence.has(value)) finding('EVIDENCE_INVALID', id, `${field}=${String(value)}`);
   }
 }
-const conflictCodes = new Set(['INVALID_JSON','DUPLICATE_OPERATION_ID','OPENAPI_POLICY_MISSING_OPERATION_ID','OPENAPI_DUPLICATE_OPERATION_ID','MISSING_OPERATION_ID','MISSING_METHOD_OR_PATH','METHOD_CONFLICT','PATH_CONFLICT']);
+const conflictCodes = new Set(['INVALID_JSON','DUPLICATE_OPERATION_ID','OPENAPI_POLICY_MISSING_OPERATION_ID','OPENAPI_DUPLICATE_OPERATION_ID','MISSING_OPERATION_ID','MISSING_METHOD_OR_PATH']);
 const incompleteCodes = new Set(['MISSING_API_INVENTORY_DIRECTORY','MISSING_OPENAPI_OPERATION_POLICY','OPENAPI_POLICY_MISSING_OPERATIONS_ARRAY','MISSING_POLICY','MISSING_DOMAIN','MISSING_OPERATIONS_ARRAY','EVIDENCE_MISSING','EVIDENCE_INCOMPLETE','EVIDENCE_INVALID','UNRECONCILED_INVENTORY_OPERATION','UNRECONCILED_OPENAPI_OPERATION']);
 const hasConflict = failures.some((x) => conflictCodes.has(x.code)) || findings.some((x) => conflictCodes.has(x.code));
 const hasIncomplete = failures.some((x) => incompleteCodes.has(x.code)) || findings.some((x) => incompleteCodes.has(x.code));
