@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.0",
+  "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "batch": "R",
+  "domain": "R. Payments, wallet, revenue and settlement",
+  "status": "NOT_GREEN",
+  "records": [
+    {"featureId":"PAY-001","name":"payment provider abstraction","hierarchy":{"l1":"R","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"PAY-002","name":"orders","hierarchy":{"l1":"R","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"PAY-003","name":"invoices","hierarchy":{"l1":"R","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"PAY-004","name":"refunds","hierarchy":{"l1":"R","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"PAY-005","name":"chargebacks","hierarchy":{"l1":"R","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"PAY-006","name":"wallet/ledger","hierarchy":{"l1":"R","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"PAY-007","name":"creator revenue","hierarchy":{"l1":"R","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"PAY-008","name":"platform revenue","hierarchy":{"l1":"R","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"PAY-009","name":"MCN revenue split","hierarchy":{"l1":"R","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"PAY-010","name":"payout/withdrawal","hierarchy":{"l1":"R","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"PAY-011","name":"settlement","hierarchy":{"l1":"R","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"PAY-012","name":"tax/financial records","hierarchy":{"l1":"R","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"PAY-013","name":"currency support","hierarchy":{"l1":"R","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+  ]
+}
