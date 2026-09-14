@@ -1,4 +1,4 @@
-version: 1.0.0
+version: 1.0.1
 contract: D21
 status: CONTRACT-FROZEN
 source_of_truth: docs/21-D21-ADVERTISING-PERMISSION-MATRIX-v1.0.md
@@ -9,6 +9,62 @@ rules:
   - SYSTEM capabilities are never ordinary user permissions
   - tenant and resource scope are mandatory
   - privileged operations require audit evidence
+
+capability_index:
+  - advertising.read
+  - advertising.create
+  - advertising.update
+  - advertising.delete
+  - campaign.read
+  - campaign.create
+  - campaign.update
+  - campaign.publish
+  - campaign.pause
+  - campaign.cancel
+  - ad_group.read
+  - ad_group.create
+  - ad_group.update
+  - ad_group.delete
+  - creative.read
+  - creative.create
+  - creative.update
+  - creative.submit
+  - creative.appeal
+  - audience.read
+  - audience.create
+  - audience.update
+  - inventory.read
+  - inventory.manage
+  - placement.read
+  - placement.manage
+  - delivery.request
+  - auction.execute
+  - traffic.record
+  - traffic.validate
+  - attribution.read
+  - attribution.execute
+  - billing.read
+  - billing.export
+  - billing.make_billable
+  - billing.finalize
+  - billing.reverse
+  - billing.adjust
+  - report.read
+  - report.export
+  - dispute.create
+  - dispute.read
+  - dispute.appeal
+  - dispute.review
+  - dispute.request_evidence
+  - dispute.resolve
+  - dispute.escalate
+  - external_adapter.connect
+  - external_adapter.read
+  - external_adapter.sync
+  - external_adapter.reconcile
+  - evidence.read
+  - operations.kill_switch
+
 capabilities:
   billing.make_billable:
     mutation: true
@@ -42,6 +98,7 @@ capabilities:
     mutation: true
     allowed_profiles: [DISPUTE_MANAGER, PLATFORM_AD_OPERATOR, SYSTEM_SERVICE]
     scope: [OWN, ORGANIZATION, GLOBAL_RESTRICTED, SERVICE_SCOPE_ONLY]
+
 forbidden_authorizations:
   - billing.read -> billing.make_billable
   - billing.read -> billing.finalize
@@ -54,6 +111,7 @@ forbidden_authorizations:
   - advertiser_role -> traffic.validate
   - advertiser_role -> billing.finalize
   - external_adapter -> billing.finalize
+
 evidence:
   - capability_exists_in_machine_contract
   - capability_exists_in_D02_permission_registry
