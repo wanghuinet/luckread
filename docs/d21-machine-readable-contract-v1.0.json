@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "contract": "D21",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "status": "CONTRACT-FROZEN",
   "source_of_truth": "docs/21-D21-ADVERTISING-PLATFORM-CONTRACT-v1.0.md",
   "api_prefix": "/v1/advertising",
