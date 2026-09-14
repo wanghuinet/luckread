@@ -1040,6 +1040,412 @@ paths:
       responses:
         '200': { description: IP content projection. }
         '4XX': { $ref: '#/components/responses/ClientError' }
+  /contents/{contentId}/review:
+    parameters:
+      - name: contentId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical submitContentForReview
+      operationId: submitContentForReview
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /contents/{contentId}/schedule:
+    parameters:
+      - name: contentId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical scheduleContentPublication
+      operationId: scheduleContentPublication
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /contents/{contentId}/versions:
+    parameters:
+      - name: contentId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [API]
+      summary: Canonical getContentVersions
+      operationId: getContentVersions
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /contents/{contentId}/versions/{versionId}/restore:
+    parameters:
+      - name: contentId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+      - name: versionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical restoreContentVersion
+      operationId: restoreContentVersion
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /contents/{contentId}/reports:
+    parameters:
+      - name: contentId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical reportContent
+      operationId: reportContent
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /feed/home:
+    get:
+      tags: [API]
+      summary: Canonical getHomeFeed
+      operationId: getHomeFeed
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /feed/following:
+    get:
+      tags: [API]
+      summary: Canonical getFollowingFeed
+      operationId: getFollowingFeed
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /feed/trending:
+    get:
+      tags: [API]
+      summary: Canonical getTrendingFeed
+      operationId: getTrendingFeed
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /feed/topics/{topicId}:
+    parameters:
+      - name: topicId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [API]
+      summary: Canonical getTopicFeed
+      operationId: getTopicFeed
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /creators/{creatorId}/feed:
+    parameters:
+      - name: creatorId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [API]
+      summary: Canonical getCreatorFeed
+      operationId: getCreatorFeed
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /internal/feed/projections/refresh:
+    post:
+      tags: [API]
+      summary: Canonical refreshFeedProjection
+      operationId: refreshFeedProjection
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /interactions/bookmarks:
+    post:
+      tags: [API]
+      summary: Canonical bookmark
+      operationId: bookmark
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /interactions/reports:
+    post:
+      tags: [API]
+      summary: Canonical reportInteractionResource
+      operationId: reportInteractionResource
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/upload-intents:
+    post:
+      tags: [API]
+      summary: Canonical createUploadIntent
+      operationId: createUploadIntent
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/uploads/{uploadId}/complete:
+    parameters:
+      - name: uploadId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical completeUpload
+      operationId: completeUpload
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/processing/{jobId}:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [API]
+      summary: Canonical getProcessingJob
+      operationId: getProcessingJob
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/processing/{jobId}/cancel:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical cancelProcessingJob
+      operationId: cancelProcessingJob
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/{mediaId}/variants:
+    parameters:
+      - name: mediaId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [API]
+      summary: Canonical listMediaVariants
+      operationId: listMediaVariants
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/{mediaId}/playback-authorizations:
+    parameters:
+      - name: mediaId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical createPlaybackAuthorization
+      operationId: createPlaybackAuthorization
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/{mediaId}:
+    parameters:
+      - name: mediaId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    delete:
+      tags: [API]
+      summary: Canonical deleteMedia
+      operationId: deleteMedia
+      responses:
+        '204': { description: Deleted. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /users/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [API]
+      summary: Canonical getUserProfile
+      operationId: getUserProfile
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /users/username/availability:
+    get:
+      tags: [API]
+      summary: Canonical checkUsernameAvailability
+      operationId: checkUsernameAvailability
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /users/me/username:
+    patch:
+      tags: [API]
+      summary: Canonical updateUsername
+      operationId: updateUsername
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /account/preferences:
+    get:
+      tags: [API]
+      summary: Canonical getAccountPreferences
+      operationId: getAccountPreferences
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /account/preferences:
+    patch:
+      tags: [API]
+      summary: Canonical updateAccountPreferences
+      operationId: updateAccountPreferences
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /account/deletion:
+    post:
+      tags: [API]
+      summary: Canonical requestAccountDeletion
+      operationId: requestAccountDeletion
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /account/deletion/cancel:
+    post:
+      tags: [API]
+      summary: Canonical cancelAccountDeletion
+      operationId: cancelAccountDeletion
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /account/data-export:
+    post:
+      tags: [API]
+      summary: Canonical exportMyAccountData
+      operationId: exportMyAccountData
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
 components:
   securitySchemes:
     bearerAuth:
