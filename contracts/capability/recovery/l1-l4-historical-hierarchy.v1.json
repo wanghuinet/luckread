@@ -1,9 +1,13 @@
 {
   "version": "1.0",
-  "status": "RECOVERED_NON_AUTHORITATIVE",
+  "status": "RECOVERED_SOURCE_VERIFIED",
   "source": {
     "path": "docs/archive/1.0-reuse/RECOVERED-36-FOURTH-LEVEL-CAPABILITY-MASTER-MATRIX-v1.0.md",
-    "historicalBlobSha": "cfe71759e470f93ca85b43196961913f7c5afc63"
+    "historicalBlobSha": "cfe71759e470f93ca85b43196961913f7c5afc63",
+    "historicalBlobSizeBytes": 32861,
+    "historicalSourceLines": 1584,
+    "restoredOnMainCommit": "ef0f981e57270a095b81b6c2191d5df532614210",
+    "restoredMainPathVerified": true
   },
   "authority": "recovery-input-only",
   "rules": [
