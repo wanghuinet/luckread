@@ -1,3 +1,4 @@
+import { APIError } from 'payload'
 import type { CollectionConfig } from 'payload'
 
 export const Organizations: CollectionConfig = {
@@ -9,6 +10,37 @@ export const Organizations: CollectionConfig = {
     update: ({ req }) => Boolean(req.user),
     delete: ({ req }) => Boolean(req.user),
   },
+  endpoints: [
+    {
+      path: '/:id/members',
+      method: 'get',
+      handler: async (req) => {
+        if (!req.user) throw new APIError('Authentication required', 401)
+        const organizationId = String(req.routeParams.id)
+        const membership = await req.payload.find({
+          collection: 'organization-memberships',
+          where: { and: [{ organization: { equals: organizationId } }, { user: { equals: String(req.user.id) } }, { status: { equals: 'ACTIVE' } }] },
+          limit: 1,
+          depth: 0,
+          overrideAccess: true,
+          req,
+        })
+        if (membership.docs.length !== 1 && String((req.user as { role?: string }).role ?? '') !== 'admin' && String((req.user as { role?: string }).role ?? '') !== 'super_admin') {
+          throw new APIError('Organization membership required', 403)
+        }
+        const members = await req.payload.find({
+          collection: 'organization-memberships',
+          where: { organization: { equals: organizationId } },
+          limit: 100,
+          depth: 1,
+          overrideAccess: true,
+          req,
+        })
+        return Response.json({ data: members.docs })
+      },
+      custom: { openapi: { summary: 'List organization members within caller scope' } },
+    },
+  ],
   fields: [
     { name: 'name', type: 'text', required: true, index: true },
     { name: 'slug', type: 'text', required: true, unique: true, index: true },
