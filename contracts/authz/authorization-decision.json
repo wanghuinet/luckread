@@ -17,18 +17,22 @@
       "scopeType": { "enum": ["public", "user", "organization", "ip", "platform", "none"] },
       "scopeId": { "type": ["string", "null"] }
     }},
-    "checks": { "type": "object", "required": ["authentication", "accountState", "permission", "scope", "resource", "policy"], "properties": {
-      "authentication": { "enum": ["PASS", "FAIL", "NOT_REQUIRED"] },
-      "accountState": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
-      "permission": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
-      "scope": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
-      "resource": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
-      "entitlement": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
-      "workflow": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
-      "businessState": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
-      "credential": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
-      "policy": { "enum": ["PASS", "FAIL"] }
-    }},
+    "checks": {
+      "type": "object",
+      "required": ["authentication", "accountState", "permission", "scope", "resource", "policy"],
+      "properties": {
+        "authentication": { "enum": ["PASS", "FAIL", "NOT_REQUIRED"] },
+        "accountState": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+        "permission": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+        "scope": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+        "resource": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+        "entitlement": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+        "workflow": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+        "businessState": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+        "credential": { "enum": ["PASS", "FAIL", "NOT_APPLICABLE"] },
+        "policy": { "enum": ["PASS", "FAIL"] }
+      }
+    },
     "reasonCode": { "type": "string" },
     "policyVersion": { "type": "string" },
     "authorizationVersion": { "type": "string" }
@@ -61,5 +65,22 @@
     "Payload admin access cannot establish public API authorization by itself.",
     "Authorization evaluation failure produces DENY.",
     "Authorization cache cannot override authoritative account state or revocation."
-  ]
+  ],
+  "x-example-decision": {
+    "decision": "DENY",
+    "subject": { "type": "ANONYMOUS", "id": null },
+    "action": "example.action",
+    "resource": { "type": "example", "id": null, "scopeType": "none", "scopeId": null },
+    "checks": {
+      "authentication": "NOT_REQUIRED",
+      "accountState": "NOT_APPLICABLE",
+      "permission": "FAIL",
+      "scope": "NOT_APPLICABLE",
+      "resource": "NOT_APPLICABLE",
+      "policy": "FAIL"
+    },
+    "reasonCode": "PERMISSION_DENIED",
+    "policyVersion": "example",
+    "authorizationVersion": "example"
+  }
 }
