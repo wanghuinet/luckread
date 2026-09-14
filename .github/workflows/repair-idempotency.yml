@@ -1,0 +1,52 @@
+name: Repair OpenAPI Idempotency Declarations
+
+on:
+  push:
+    paths:
+      - 'contracts/openapi/v1/operation-policy.json'
+      - '.github/workflows/repair-idempotency.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Add required Idempotency-Key declarations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('contracts/openapi/v1/openapi.yaml')
+          s = p.read_text()
+          required = {'blockUser','unblockUser','muteUser','unmuteUser','createReport','createAppeal','rollbackContentRevision','createShare','createSubscription','cancelSubscription','inviteOrganizationMember','removeOrganizationMember','changeOrganizationMemberRole'}
+          for op in required:
+              om = re.search(r'(?ms)^      operationId:\s*'+re.escape(op)+r'\s*$.*?(?=^      responses:|^  /|^components:)', s)
+              if not om:
+                  raise SystemExit(f'missing operationId: {op}')
+              block = om.group(0)
+              if 'IdempotencyKeyRequired' in block:
+                  continue
+              ref = "        - $ref: '#/components/parameters/IdempotencyKeyRequired'\n"
+              pm = re.search(r'(?ms)^      parameters:\n(?:        .*\n)*', block)
+              if pm:
+                  block2 = block[:pm.end()] + ref + block[pm.end():]
+              else:
+                  marker = re.search(r'(?m)^      operationId:\s*'+re.escape(op)+r'\s*$', block)
+                  pos = marker.end()
+                  block2 = block[:pos] + '\n      parameters:\n' + ref.rstrip('\n') + block[pos:]
+              s = s[:om.start()] + block2 + s[om.end():]
+          p.write_text(s)
+          PY
+      - name: Commit repair
+        run: |
+          if git diff --quiet -- contracts/openapi/v1/openapi.yaml; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add contracts/openapi/v1/openapi.yaml
+          git commit -m 'fix(contract): declare required idempotency keys'
+          git push
