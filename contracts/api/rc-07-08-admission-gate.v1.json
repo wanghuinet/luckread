@@ -1,0 +1,11 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/api/rc-07-08-admission-gate.v1.json",
+  "title":"RC-07..RC-08 Admission Gate",
+  "version":"1.0.0",
+  "scope":["organization-members","ip-content"],
+  "requiredChecks":["contract-present","unique-operation-id","auth-explicit","idempotency-on-mutation","authorization-scope","last-owner-invariant","tenant-isolation","audit-event","rights-authority-separation","implementation-evidence"],
+  "forbiddenDesigns":["ip_founder-role","founder-role","IP-content-as-ownership-authority","cross-tenant-membership-access"],
+  "implementationEvidence":{"required":true,"defaultStatus":"BLOCKED_ON_IMPLEMENTATION_BASELINE","acceptedEvidence":["unit-test","integration-test","e2e-test","ci-run"],"forbiddenEvidence":["documentation-only","manual-claim"]},
+  "decision":"BLOCK_UNTIL_IMPLEMENTATION_EVIDENCE"
+}
