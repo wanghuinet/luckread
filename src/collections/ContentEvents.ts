@@ -22,11 +22,7 @@ export const ContentEvents: CollectionConfig = {
     { name: 'permission', type: 'text', required: true },
     { name: 'version', type: 'number', required: true, min: 1 },
     { name: 'revision', type: 'number', required: true, min: 1 },
-    {
-      name: 'sideEffects',
-      type: 'json',
-      required: true,
-    },
+    { name: 'sideEffects', type: 'json', required: true },
     {
       name: 'status',
       type: 'select',
@@ -41,6 +37,9 @@ export const ContentEvents: CollectionConfig = {
       index: true,
     },
     { name: 'attempts', type: 'number', required: true, defaultValue: 0, min: 0 },
+    { name: 'nextAttemptAt', type: 'date', index: true },
+    { name: 'processingStartedAt', type: 'date', index: true },
+    { name: 'processorId', type: 'text', index: true },
     { name: 'processedAt', type: 'date' },
     { name: 'lastError', type: 'textarea' },
   ],
