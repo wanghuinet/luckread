@@ -1,7 +1,9 @@
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import type { D1Database } from '@cloudflare/workers-types'
+import { getCloudflareContext, type CloudflareContext } from '@opennextjs/cloudflare'
+import type { GetPlatformProxyOptions } from 'wrangler'
 import { sqliteD1Adapter } from '@payloadcms/db-d1-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig } from 'payload'
@@ -10,15 +12,15 @@ import { Users } from './collections/Users'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
+const realpath = (value: string) => (fs.existsSync(value) ? fs.realpathSync(value) : undefined)
 
-// The Cloudflare D1 template supplies the `cloudflare.env` runtime binding.
-// Keep the binding lookup at the infrastructure boundary; no domain code may
-// depend on the binding name.
-declare const cloudflare: {
-  env: {
-    D1: D1Database
-  }
-}
+const isProduction = process.env.NODE_ENV === 'production'
+const isWorkerRuntime =
+  typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers'
+
+const cloudflare = isWorkerRuntime
+  ? await getCloudflareContext({ async: true })
+  : await getCloudflareContextFromWrangler()
 
 export default buildConfig({
   admin: {
@@ -39,3 +41,13 @@ export default buildConfig({
     disable: true,
   },
 })
+
+function getCloudflareContextFromWrangler(): Promise<CloudflareContext> {
+  return import(/* webpackIgnore: true */ `${'__wrangler'.replaceAll('_', '')}`).then(
+    ({ getPlatformProxy }) =>
+      getPlatformProxy({
+        environment: process.env.CLOUDFLARE_ENV,
+        remoteBindings: isProduction && process.argv.some((value) => realpath(value)?.endsWith(path.join('payload', 'bin.js'))),
+      } satisfies GetPlatformProxyOptions),
+  )
+}
