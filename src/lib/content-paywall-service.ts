@@ -5,10 +5,7 @@ export type PaywallMode = 'FREE' | 'SUBSCRIPTION_PREVIEW'
 
 type ArticleBody = unknown
 
-type SplitResult = {
-  preview: ArticleBody
-  premium: ArticleBody
-}
+type SplitResult = { preview: ArticleBody; premium: ArticleBody }
 
 function splitText(value: string, percent: number): SplitResult {
   const cut = Math.max(1, Math.min(value.length - 1, Math.floor(value.length * (percent / 100))))
@@ -20,20 +17,15 @@ function splitLexicalBody(body: Record<string, unknown>, percent: number): Split
   if (!root || typeof root !== 'object') throw new APIError('Unsupported article body format', 422)
   const children = (root as { children?: unknown }).children
   if (!Array.isArray(children) || children.length < 2) throw new APIError('Subscription preview requires at least two article blocks', 422)
-
   const total = children.reduce((sum, child) => sum + JSON.stringify(child).length, 0)
   const target = total * (percent / 100)
   let running = 0
   let cut = 1
   for (let index = 0; index < children.length - 1; index += 1) {
     running += JSON.stringify(children[index]).length
-    if (running >= target) {
-      cut = index + 1
-      break
-    }
     cut = index + 1
+    if (running >= target) break
   }
-
   return {
     preview: { ...body, root: { ...root, children: children.slice(0, cut) } },
     premium: { ...body, root: { ...root, children: children.slice(cut) } },
@@ -61,11 +53,7 @@ async function readR2Json(bucket: R2Bucket, key: string): Promise<unknown> {
   const object = await bucket.get(key)
   if (!object) throw new APIError('Article body object was not found', 404)
   const raw = await object.text()
-  try {
-    return JSON.parse(raw) as unknown
-  } catch {
-    return raw
-  }
+  try { return JSON.parse(raw) as unknown } catch { return raw }
 }
 
 export async function readContentBody(key: string): Promise<unknown> {
@@ -87,11 +75,7 @@ export async function generateContentPaywall(req: PayloadRequest, content: Recor
   if (!source) throw new APIError('Article body object was not found', 422)
   const raw = await source.text()
   let body: ArticleBody
-  try {
-    body = JSON.parse(raw) as ArticleBody
-  } catch {
-    body = raw
-  }
+  try { body = JSON.parse(raw) as ArticleBody } catch { body = raw }
 
   const split = splitBody(body, percent)
   const previewBodyR2Key = contentKey(contentId, version, 'preview')
@@ -106,7 +90,7 @@ export async function generateContentPaywall(req: PayloadRequest, content: Recor
     collection: 'content',
     id: contentId,
     data: { previewBodyR2Key, premiumBodyR2Key },
-    context: { allowContentStateTransition: true },
+    context: { allowContentStateTransition: true, skipContentRevision: true },
     overrideAccess: true,
     req,
   })
