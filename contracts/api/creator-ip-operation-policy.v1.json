@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/creator-ip-operation-policy.v1.json",
+  "title": "LuckRead Creator and IP Operation Policy",
+  "version": "1.0.0",
+  "domain": "creator_ip_mcn",
+  "operations": [
+    {
+      "operationId": "getMyCreator",
+      "method": "GET",
+      "path": "/creators/me",
+      "authorization": { "mode": "permission", "permission": "user.read.self", "scope": "self" },
+      "resource": { "classification": "SINGLE_AUTHORITATIVE_READ" },
+      "cache": { "policy": "PRIVATE_NO_SHARED_CACHE" },
+      "retry": { "maxAttempts": 1 },
+      "event": { "mode": "NONE" },
+      "queue": { "mode": "NONE" },
+      "antiAbuse": { "required": true },
+      "idempotency": { "required": false },
+      "security": { "required": true },
+      "evidence": { "openapi": "PASS", "permission": "PASS", "state": "N/A", "resource": "MISSING", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+    },
+    {
+      "operationId": "createIp",
+      "method": "POST",
+      "path": "/ips",
+      "authorization": { "mode": "permission", "permission": "ip.create", "scope": "self" },
+      "resource": { "classification": "SINGLE_AUTHORITATIVE_WRITE" },
+      "cache": { "policy": "NO_STORE" },
+      "retry": { "maxAttempts": 1 },
+      "event": { "mode": "DOMAIN_EVENT" },
+      "queue": { "mode": "NONE" },
+      "antiAbuse": { "required": true },
+      "idempotency": { "required": true },
+      "security": { "required": true },
+      "evidence": { "openapi": "PASS", "permission": "PASS", "state": "N/A", "resource": "MISSING", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+    },
+    {
+      "operationId": "inviteIpMember",
+      "method": "POST",
+      "path": "/ips/{ipId}/members",
+      "authorization": { "mode": "permission", "permission": "ip.member.invite", "scope": "ip" },
+      "resource": { "classification": "SINGLE_AUTHORITATIVE_WRITE" },
+      "cache": { "policy": "NO_STORE" },
+      "retry": { "maxAttempts": 1 },
+      "event": { "mode": "DOMAIN_EVENT" },
+      "queue": { "mode": "NONE" },
+      "antiAbuse": { "required": true },
+      "idempotency": { "required": true },
+      "security": { "required": true },
+      "evidence": { "openapi": "PASS", "permission": "PASS", "state": "N/A", "resource": "MISSING", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+    },
+    {
+      "operationId": "removeIpMember",
+      "method": "DELETE",
+      "path": "/ips/{ipId}/members/{memberId}",
+      "authorization": { "mode": "permission", "permission": "ip.member.remove", "scope": "ip" },
+      "resource": { "classification": "SINGLE_AUTHORITATIVE_WRITE" },
+      "cache": { "policy": "NO_STORE" },
+      "retry": { "maxAttempts": 1 },
+      "event": { "mode": "DOMAIN_EVENT" },
+      "queue": { "mode": "NONE" },
+      "antiAbuse": { "required": true },
+      "idempotency": { "required": true },
+      "security": { "required": true },
+      "evidence": { "openapi": "PASS", "permission": "PASS", "state": "N/A", "resource": "MISSING", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+    }
+  ],
+  "status": "CONTRACTED_PARTIAL"
+}
