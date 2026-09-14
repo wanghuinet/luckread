@@ -30,6 +30,8 @@ import { Follows } from './collections/Follows'
 import { ContentLikes } from './collections/ContentLikes'
 import { Comments } from './collections/Comments'
 import { Notifications } from './collections/Notifications'
+import { FeedItems } from './collections/FeedItems'
+import { SocialBlocks } from './collections/SocialBlocks'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -88,6 +90,8 @@ export default buildConfig({
     ContentLikes,
     Comments,
     Notifications,
+    FeedItems,
+    SocialBlocks,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
