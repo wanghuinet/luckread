@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { PayloadError } from 'payload'
 import type { Payload, PayloadRequest } from 'payload'
 
 import { buildContentStatePatch, resolveContentTransition } from './content-state-machine'
