@@ -1,0 +1,1553 @@
+{
+  "version": "1.0",
+  "status": "RECOVERED_NON_AUTHORITATIVE",
+  "source": "docs/archive/1.0-reuse/RECOVERED-36-FOURTH-LEVEL-CAPABILITY-MASTER-MATRIX-v1.0.md",
+  "parser": "scripts/recover-l1-l4-hierarchy.mjs",
+  "rules": [
+    "Parse headings and ordering only; do not infer Feature IDs.",
+    "Do not infer hierarchy from feature names, APIs, Payload collections, or database tables.",
+    "Historical output is reconciliation evidence only and cannot directly populate the formal Capability Contract Graph."
+  ],
+  "nodes": [
+    {
+      "order": 1,
+      "level": "L1",
+      "l1": "0. Purpose",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 5,
+      "sourceHeading": "0. Purpose"
+    },
+    {
+      "order": 2,
+      "level": "L1",
+      "l1": "0.1 Four-level model",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 13,
+      "sourceHeading": "0.1 Four-level model"
+    },
+    {
+      "order": 3,
+      "level": "L1",
+      "l1": "0.2 L4 completeness rule",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 28,
+      "sourceHeading": "0.2 L4 completeness rule"
+    },
+    {
+      "order": 4,
+      "level": "L1",
+      "l1": "1.1 Registration",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 48,
+      "sourceHeading": "1.1 Registration"
+    },
+    {
+      "order": 5,
+      "level": "L1",
+      "l1": "1.2 Authentication",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 62,
+      "sourceHeading": "1.2 Authentication"
+    },
+    {
+      "order": 6,
+      "level": "L1",
+      "l1": "1.3 Profile",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 74,
+      "sourceHeading": "1.3 Profile"
+    },
+    {
+      "order": 7,
+      "level": "L1",
+      "l1": "1.4 Security",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 87,
+      "sourceHeading": "1.4 Security"
+    },
+    {
+      "order": 8,
+      "level": "L1",
+      "l1": "1.5 Authorization",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 98,
+      "sourceHeading": "1.5 Authorization"
+    },
+    {
+      "order": 9,
+      "level": "L1",
+      "l1": "1.6 Consent/privacy",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 108,
+      "sourceHeading": "1.6 Consent/privacy"
+    },
+    {
+      "order": 10,
+      "level": "L1",
+      "l1": "1.7 Lifecycle",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 117,
+      "sourceHeading": "1.7 Lifecycle"
+    },
+    {
+      "order": 11,
+      "level": "L1",
+      "l1": "2.1 Device",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 133,
+      "sourceHeading": "2.1 Device"
+    },
+    {
+      "order": 12,
+      "level": "L1",
+      "l1": "2.2 Session",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 142,
+      "sourceHeading": "2.2 Session"
+    },
+    {
+      "order": 13,
+      "level": "L1",
+      "l1": "2.3 Login security",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 152,
+      "sourceHeading": "2.3 Login security"
+    },
+    {
+      "order": 14,
+      "level": "L1",
+      "l1": "2.4 Identity binding",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 161,
+      "sourceHeading": "2.4 Identity binding"
+    },
+    {
+      "order": 15,
+      "level": "L1",
+      "l1": "2.5 Privacy",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 172,
+      "sourceHeading": "2.5 Privacy"
+    },
+    {
+      "order": 16,
+      "level": "L1",
+      "l1": "2.6 Data rights",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 181,
+      "sourceHeading": "2.6 Data rights"
+    },
+    {
+      "order": 17,
+      "level": "L1",
+      "l1": "3.1 Identity",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 196,
+      "sourceHeading": "3.1 Identity"
+    },
+    {
+      "order": 18,
+      "level": "L1",
+      "l1": "3.2 Verification",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 205,
+      "sourceHeading": "3.2 Verification"
+    },
+    {
+      "order": 19,
+      "level": "L1",
+      "l1": "3.3 Ownership",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 215,
+      "sourceHeading": "3.3 Ownership"
+    },
+    {
+      "order": 20,
+      "level": "L1",
+      "l1": "3.4 Status",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 225,
+      "sourceHeading": "3.4 Status"
+    },
+    {
+      "order": 21,
+      "level": "L1",
+      "l1": "3.5 Relations",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 233,
+      "sourceHeading": "3.5 Relations"
+    },
+    {
+      "order": 22,
+      "level": "L1",
+      "l1": "3.6 Public surface",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 243,
+      "sourceHeading": "3.6 Public surface"
+    },
+    {
+      "order": 23,
+      "level": "L1",
+      "l1": "4.1 Workspace",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 255,
+      "sourceHeading": "4.1 Workspace"
+    },
+    {
+      "order": 24,
+      "level": "L1",
+      "l1": "4.2 Creation",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 265,
+      "sourceHeading": "4.2 Creation"
+    },
+    {
+      "order": 25,
+      "level": "L1",
+      "l1": "4.3 Publishing",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 275,
+      "sourceHeading": "4.3 Publishing"
+    },
+    {
+      "order": 26,
+      "level": "L1",
+      "l1": "4.4 Management",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 286,
+      "sourceHeading": "4.4 Management"
+    },
+    {
+      "order": 27,
+      "level": "L1",
+      "l1": "4.5 Versions",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 296,
+      "sourceHeading": "4.5 Versions"
+    },
+    {
+      "order": 28,
+      "level": "L1",
+      "l1": "4.6 Analytics",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 306,
+      "sourceHeading": "4.6 Analytics"
+    },
+    {
+      "order": 29,
+      "level": "L1",
+      "l1": "4.7 Operations",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 316,
+      "sourceHeading": "4.7 Operations"
+    },
+    {
+      "order": 30,
+      "level": "L1",
+      "l1": "5.1 Organization",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 330,
+      "sourceHeading": "5.1 Organization"
+    },
+    {
+      "order": 31,
+      "level": "L1",
+      "l1": "5.2 Team/workspace",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 339,
+      "sourceHeading": "5.2 Team/workspace"
+    },
+    {
+      "order": 32,
+      "level": "L1",
+      "l1": "5.3 Representation",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 348,
+      "sourceHeading": "5.3 Representation"
+    },
+    {
+      "order": 33,
+      "level": "L1",
+      "l1": "5.4 Contract",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 356,
+      "sourceHeading": "5.4 Contract"
+    },
+    {
+      "order": 34,
+      "level": "L1",
+      "l1": "5.5 Campaign",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 366,
+      "sourceHeading": "5.5 Campaign"
+    },
+    {
+      "order": 35,
+      "level": "L1",
+      "l1": "5.6 Governance",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 374,
+      "sourceHeading": "5.6 Governance"
+    },
+    {
+      "order": 36,
+      "level": "L1",
+      "l1": "6.1 Identity",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 385,
+      "sourceHeading": "6.1 Identity"
+    },
+    {
+      "order": 37,
+      "level": "L1",
+      "l1": "6.2 Lifecycle",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 393,
+      "sourceHeading": "6.2 Lifecycle"
+    },
+    {
+      "order": 38,
+      "level": "L1",
+      "l1": "6.3 Body",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 406,
+      "sourceHeading": "6.3 Body"
+    },
+    {
+      "order": 39,
+      "level": "L1",
+      "l1": "6.4 Publishing",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 419,
+      "sourceHeading": "6.4 Publishing"
+    },
+    {
+      "order": 40,
+      "level": "L1",
+      "l1": "6.5 Version",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 428,
+      "sourceHeading": "6.5 Version"
+    },
+    {
+      "order": 41,
+      "level": "L1",
+      "l1": "6.6 Organization",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 438,
+      "sourceHeading": "6.6 Organization"
+    },
+    {
+      "order": 42,
+      "level": "L1",
+      "l1": "6.7 Operations",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 447,
+      "sourceHeading": "6.7 Operations"
+    },
+    {
+      "order": 43,
+      "level": "L1",
+      "l1": "7.1 Structural edges",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 459,
+      "sourceHeading": "7.1 Structural edges"
+    },
+    {
+      "order": 44,
+      "level": "L1",
+      "l1": "7.2 Derivative edges",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 467,
+      "sourceHeading": "7.2 Derivative edges"
+    },
+    {
+      "order": 45,
+      "level": "L1",
+      "l1": "7.3 Distribution",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 477,
+      "sourceHeading": "7.3 Distribution"
+    },
+    {
+      "order": 46,
+      "level": "L1",
+      "l1": "7.4 Governance",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 484,
+      "sourceHeading": "7.4 Governance"
+    },
+    {
+      "order": 47,
+      "level": "L1",
+      "l1": "7.5 Traversal",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 491,
+      "sourceHeading": "7.5 Traversal"
+    },
+    {
+      "order": 48,
+      "level": "L1",
+      "l1": "8.1 Identity",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 503,
+      "sourceHeading": "8.1 Identity"
+    },
+    {
+      "order": 49,
+      "level": "L1",
+      "l1": "8.2 Ownership",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 511,
+      "sourceHeading": "8.2 Ownership"
+    },
+    {
+      "order": 50,
+      "level": "L1",
+      "l1": "8.3 Structure",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 520,
+      "sourceHeading": "8.3 Structure"
+    },
+    {
+      "order": 51,
+      "level": "L1",
+      "l1": "8.4 Relations",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 528,
+      "sourceHeading": "8.4 Relations"
+    },
+    {
+      "order": 52,
+      "level": "L1",
+      "l1": "8.5 Discovery",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 536,
+      "sourceHeading": "8.5 Discovery"
+    },
+    {
+      "order": 53,
+      "level": "L1",
+      "l1": "8.6 Economy",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 544,
+      "sourceHeading": "8.6 Economy"
+    },
+    {
+      "order": 54,
+      "level": "L1",
+      "l1": "9.1 Assets",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 556,
+      "sourceHeading": "9.1 Assets"
+    },
+    {
+      "order": 55,
+      "level": "L1",
+      "l1": "9.2 Upload",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 567,
+      "sourceHeading": "9.2 Upload"
+    },
+    {
+      "order": 56,
+      "level": "L1",
+      "l1": "9.3 Metadata",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 576,
+      "sourceHeading": "9.3 Metadata"
+    },
+    {
+      "order": 57,
+      "level": "L1",
+      "l1": "9.4 Relations",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 586,
+      "sourceHeading": "9.4 Relations"
+    },
+    {
+      "order": 58,
+      "level": "L1",
+      "l1": "9.5 Lifecycle",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 594,
+      "sourceHeading": "9.5 Lifecycle"
+    },
+    {
+      "order": 59,
+      "level": "L1",
+      "l1": "10.1 Security",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 607,
+      "sourceHeading": "10.1 Security"
+    },
+    {
+      "order": 60,
+      "level": "L1",
+      "l1": "10.2 Image",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 614,
+      "sourceHeading": "10.2 Image"
+    },
+    {
+      "order": 61,
+      "level": "L1",
+      "l1": "10.3 Video",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 622,
+      "sourceHeading": "10.3 Video"
+    },
+    {
+      "order": 62,
+      "level": "L1",
+      "l1": "10.4 Audio",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 631,
+      "sourceHeading": "10.4 Audio"
+    },
+    {
+      "order": 63,
+      "level": "L1",
+      "l1": "10.5 Subtitle",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 638,
+      "sourceHeading": "10.5 Subtitle"
+    },
+    {
+      "order": 64,
+      "level": "L1",
+      "l1": "10.6 Delivery",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 644,
+      "sourceHeading": "10.6 Delivery"
+    },
+    {
+      "order": 65,
+      "level": "L1",
+      "l1": "11.1 Follow",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 656,
+      "sourceHeading": "11.1 Follow"
+    },
+    {
+      "order": 66,
+      "level": "L1",
+      "l1": "11.2 Block",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 664,
+      "sourceHeading": "11.2 Block"
+    },
+    {
+      "order": 67,
+      "level": "L1",
+      "l1": "11.3 Mute",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 670,
+      "sourceHeading": "11.3 Mute"
+    },
+    {
+      "order": 68,
+      "level": "L1",
+      "l1": "11.4 Audience",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 678,
+      "sourceHeading": "11.4 Audience"
+    },
+    {
+      "order": 69,
+      "level": "L1",
+      "l1": "11.5 Integrity",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 686,
+      "sourceHeading": "11.5 Integrity"
+    },
+    {
+      "order": 70,
+      "level": "L1",
+      "l1": "12.1 Identity",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 697,
+      "sourceHeading": "12.1 Identity"
+    },
+    {
+      "order": 71,
+      "level": "L1",
+      "l1": "12.2 Membership",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 704,
+      "sourceHeading": "12.2 Membership"
+    },
+    {
+      "order": 72,
+      "level": "L1",
+      "l1": "12.3 Roles",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 712,
+      "sourceHeading": "12.3 Roles"
+    },
+    {
+      "order": 73,
+      "level": "L1",
+      "l1": "12.4 Content",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 719,
+      "sourceHeading": "12.4 Content"
+    },
+    {
+      "order": 74,
+      "level": "L1",
+      "l1": "12.5 Governance",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 726,
+      "sourceHeading": "12.5 Governance"
+    },
+    {
+      "order": 75,
+      "level": "L1",
+      "l1": "12.6 Discovery",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 736,
+      "sourceHeading": "12.6 Discovery"
+    },
+    {
+      "order": 76,
+      "level": "L1",
+      "l1": "13.1 Comment",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 747,
+      "sourceHeading": "13.1 Comment"
+    },
+    {
+      "order": 77,
+      "level": "L1",
+      "l1": "13.2 Reply",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 756,
+      "sourceHeading": "13.2 Reply"
+    },
+    {
+      "order": 78,
+      "level": "L1",
+      "l1": "13.3 Reaction",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 763,
+      "sourceHeading": "13.3 Reaction"
+    },
+    {
+      "order": 79,
+      "level": "L1",
+      "l1": "13.4 Favorite",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 770,
+      "sourceHeading": "13.4 Favorite"
+    },
+    {
+      "order": 80,
+      "level": "L1",
+      "l1": "13.5 Share",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 777,
+      "sourceHeading": "13.5 Share"
+    },
+    {
+      "order": 81,
+      "level": "L1",
+      "l1": "13.6 Report",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 784,
+      "sourceHeading": "13.6 Report"
+    },
+    {
+      "order": 82,
+      "level": "L1",
+      "l1": "14.1 Admission",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 795,
+      "sourceHeading": "14.1 Admission"
+    },
+    {
+      "order": 83,
+      "level": "L1",
+      "l1": "14.2 Behavior",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 803,
+      "sourceHeading": "14.2 Behavior"
+    },
+    {
+      "order": 84,
+      "level": "L1",
+      "l1": "14.3 Quality",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 815,
+      "sourceHeading": "14.3 Quality"
+    },
+    {
+      "order": 85,
+      "level": "L1",
+      "l1": "14.4 Aggregation",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 823,
+      "sourceHeading": "14.4 Aggregation"
+    },
+    {
+      "order": 86,
+      "level": "L1",
+      "l1": "15.1 Surfaces",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 835,
+      "sourceHeading": "15.1 Surfaces"
+    },
+    {
+      "order": 87,
+      "level": "L1",
+      "l1": "15.2 Sources",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 847,
+      "sourceHeading": "15.2 Sources"
+    },
+    {
+      "order": 88,
+      "level": "L1",
+      "l1": "15.3 Eligibility",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 856,
+      "sourceHeading": "15.3 Eligibility"
+    },
+    {
+      "order": 89,
+      "level": "L1",
+      "l1": "15.4 Assembly",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 866,
+      "sourceHeading": "15.4 Assembly"
+    },
+    {
+      "order": 90,
+      "level": "L1",
+      "l1": "15.5 Feedback",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 875,
+      "sourceHeading": "15.5 Feedback"
+    },
+    {
+      "order": 91,
+      "level": "L1",
+      "l1": "15.6 Recovery",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 886,
+      "sourceHeading": "15.6 Recovery"
+    },
+    {
+      "order": 92,
+      "level": "L1",
+      "l1": "16.1 Recall",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 897,
+      "sourceHeading": "16.1 Recall"
+    },
+    {
+      "order": 93,
+      "level": "L1",
+      "l1": "16.2 Signals",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 905,
+      "sourceHeading": "16.2 Signals"
+    },
+    {
+      "order": 94,
+      "level": "L1",
+      "l1": "16.3 Controls",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 915,
+      "sourceHeading": "16.3 Controls"
+    },
+    {
+      "order": 95,
+      "level": "L1",
+      "l1": "16.4 Safety",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 924,
+      "sourceHeading": "16.4 Safety"
+    },
+    {
+      "order": 96,
+      "level": "L1",
+      "l1": "16.5 Lifecycle",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 931,
+      "sourceHeading": "16.5 Lifecycle"
+    },
+    {
+      "order": 97,
+      "level": "L1",
+      "l1": "17.1 Account risk",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 944,
+      "sourceHeading": "17.1 Account risk"
+    },
+    {
+      "order": 98,
+      "level": "L1",
+      "l1": "17.2 Behavior risk",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 951,
+      "sourceHeading": "17.2 Behavior risk"
+    },
+    {
+      "order": 99,
+      "level": "L1",
+      "l1": "17.3 Content risk",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 959,
+      "sourceHeading": "17.3 Content risk"
+    },
+    {
+      "order": 100,
+      "level": "L1",
+      "l1": "17.4 Trust",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 967,
+      "sourceHeading": "17.4 Trust"
+    },
+    {
+      "order": 101,
+      "level": "L1",
+      "l1": "17.5 Actions",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 974,
+      "sourceHeading": "17.5 Actions"
+    },
+    {
+      "order": 102,
+      "level": "L1",
+      "l1": "18.1 Policy",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 987,
+      "sourceHeading": "18.1 Policy"
+    },
+    {
+      "order": 103,
+      "level": "L1",
+      "l1": "18.2 Automated moderation",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 994,
+      "sourceHeading": "18.2 Automated moderation"
+    },
+    {
+      "order": 104,
+      "level": "L1",
+      "l1": "18.3 Human moderation",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1002,
+      "sourceHeading": "18.3 Human moderation"
+    },
+    {
+      "order": 105,
+      "level": "L1",
+      "l1": "18.4 Enforcement",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1010,
+      "sourceHeading": "18.4 Enforcement"
+    },
+    {
+      "order": 106,
+      "level": "L1",
+      "l1": "18.5 Appeal",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1018,
+      "sourceHeading": "18.5 Appeal"
+    },
+    {
+      "order": 107,
+      "level": "L1",
+      "l1": "18.6 Transparency",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1026,
+      "sourceHeading": "18.6 Transparency"
+    },
+    {
+      "order": 108,
+      "level": "L1",
+      "l1": "19.1 Ownership",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1037,
+      "sourceHeading": "19.1 Ownership"
+    },
+    {
+      "order": 109,
+      "level": "L1",
+      "l1": "19.2 License",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1045,
+      "sourceHeading": "19.2 License"
+    },
+    {
+      "order": 110,
+      "level": "L1",
+      "l1": "19.3 Provenance",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1056,
+      "sourceHeading": "19.3 Provenance"
+    },
+    {
+      "order": 111,
+      "level": "L1",
+      "l1": "19.4 Claims",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1063,
+      "sourceHeading": "19.4 Claims"
+    },
+    {
+      "order": 112,
+      "level": "L1",
+      "l1": "19.5 Enforcement",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1070,
+      "sourceHeading": "19.5 Enforcement"
+    },
+    {
+      "order": 113,
+      "level": "L1",
+      "l1": "20.1 Live",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1081,
+      "sourceHeading": "20.1 Live"
+    },
+    {
+      "order": 114,
+      "level": "L1",
+      "l1": "20.2 Realtime",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1093,
+      "sourceHeading": "20.2 Realtime"
+    },
+    {
+      "order": 115,
+      "level": "L1",
+      "l1": "20.3 IM",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1104,
+      "sourceHeading": "20.3 IM"
+    },
+    {
+      "order": 116,
+      "level": "L1",
+      "l1": "21.1 Entity search",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1121,
+      "sourceHeading": "21.1 Entity search"
+    },
+    {
+      "order": 117,
+      "level": "L1",
+      "l1": "21.2 Discovery",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1134,
+      "sourceHeading": "21.2 Discovery"
+    },
+    {
+      "order": 118,
+      "level": "L1",
+      "l1": "21.3 Search interaction",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1144,
+      "sourceHeading": "21.3 Search interaction"
+    },
+    {
+      "order": 119,
+      "level": "L1",
+      "l1": "21.4 Index lifecycle",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1155,
+      "sourceHeading": "21.4 Index lifecycle"
+    },
+    {
+      "order": 120,
+      "level": "L1",
+      "l1": "22.1 Channels",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1166,
+      "sourceHeading": "22.1 Channels"
+    },
+    {
+      "order": 121,
+      "level": "L1",
+      "l1": "22.2 Events",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1173,
+      "sourceHeading": "22.2 Events"
+    },
+    {
+      "order": 122,
+      "level": "L1",
+      "l1": "22.3 Delivery",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1186,
+      "sourceHeading": "22.3 Delivery"
+    },
+    {
+      "order": 123,
+      "level": "L1",
+      "l1": "23.1 Monetization",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1202,
+      "sourceHeading": "23.1 Monetization"
+    },
+    {
+      "order": 124,
+      "level": "L1",
+      "l1": "23.2 Commerce",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1213,
+      "sourceHeading": "23.2 Commerce"
+    },
+    {
+      "order": 125,
+      "level": "L1",
+      "l1": "23.3 IP Economy",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1226,
+      "sourceHeading": "23.3 IP Economy"
+    },
+    {
+      "order": 126,
+      "level": "L1",
+      "l1": "23.4 Money safety",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1235,
+      "sourceHeading": "23.4 Money safety"
+    },
+    {
+      "order": 127,
+      "level": "L1",
+      "l1": "24.1 Ledger",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1246,
+      "sourceHeading": "24.1 Ledger"
+    },
+    {
+      "order": 128,
+      "level": "L1",
+      "l1": "24.2 Settlement",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1257,
+      "sourceHeading": "24.2 Settlement"
+    },
+    {
+      "order": 129,
+      "level": "L1",
+      "l1": "24.3 Safety",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1268,
+      "sourceHeading": "24.3 Safety"
+    },
+    {
+      "order": 130,
+      "level": "L1",
+      "l1": "25.1 Analytics",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1279,
+      "sourceHeading": "25.1 Analytics"
+    },
+    {
+      "order": 131,
+      "level": "L1",
+      "l1": "25.2 Experiment",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1293,
+      "sourceHeading": "25.2 Experiment"
+    },
+    {
+      "order": 132,
+      "level": "L1",
+      "l1": "25.3 Growth",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1304,
+      "sourceHeading": "25.3 Growth"
+    },
+    {
+      "order": 133,
+      "level": "L1",
+      "l1": "25.4 Data quality",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1314,
+      "sourceHeading": "25.4 Data quality"
+    },
+    {
+      "order": 134,
+      "level": "L1",
+      "l1": "26.1 Bootstrap",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1325,
+      "sourceHeading": "26.1 Bootstrap"
+    },
+    {
+      "order": 135,
+      "level": "L1",
+      "l1": "26.2 Remote control",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1334,
+      "sourceHeading": "26.2 Remote control"
+    },
+    {
+      "order": 136,
+      "level": "L1",
+      "l1": "26.3 Navigation",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1340,
+      "sourceHeading": "26.3 Navigation"
+    },
+    {
+      "order": 137,
+      "level": "L1",
+      "l1": "26.4 Offline",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1346,
+      "sourceHeading": "26.4 Offline"
+    },
+    {
+      "order": 138,
+      "level": "L1",
+      "l1": "26.5 Localization",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1354,
+      "sourceHeading": "26.5 Localization"
+    },
+    {
+      "order": 139,
+      "level": "L1",
+      "l1": "27.1 Operations",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1369,
+      "sourceHeading": "27.1 Operations"
+    },
+    {
+      "order": 140,
+      "level": "L1",
+      "l1": "27.2 Audit",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1382,
+      "sourceHeading": "27.2 Audit"
+    },
+    {
+      "order": 141,
+      "level": "L1",
+      "l1": "27.3 Reliability",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1393,
+      "sourceHeading": "27.3 Reliability"
+    },
+    {
+      "order": 142,
+      "level": "L1",
+      "l1": "27.4 Observability",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1405,
+      "sourceHeading": "27.4 Observability"
+    },
+    {
+      "order": 143,
+      "level": "L1",
+      "l1": "28.1 Developer",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1421,
+      "sourceHeading": "28.1 Developer"
+    },
+    {
+      "order": 144,
+      "level": "L1",
+      "l1": "28.2 SDK/API",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1437,
+      "sourceHeading": "28.2 SDK/API"
+    },
+    {
+      "order": 145,
+      "level": "L1",
+      "l1": "28.3 Apps/Mini Apps",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1446,
+      "sourceHeading": "28.3 Apps/Mini Apps"
+    },
+    {
+      "order": 146,
+      "level": "L1",
+      "l1": "28.4 Games",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1459,
+      "sourceHeading": "28.4 Games"
+    },
+    {
+      "order": 147,
+      "level": "L1",
+      "l1": "28.5 Isolation",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1469,
+      "sourceHeading": "28.5 Isolation"
+    },
+    {
+      "order": 148,
+      "level": "L1",
+      "l1": "29.1 Creation assistance",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1480,
+      "sourceHeading": "29.1 Creation assistance"
+    },
+    {
+      "order": 149,
+      "level": "L1",
+      "l1": "29.2 Language/media AI",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1487,
+      "sourceHeading": "29.2 Language/media AI"
+    },
+    {
+      "order": 150,
+      "level": "L1",
+      "l1": "29.3 Search/knowledge",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1494,
+      "sourceHeading": "29.3 Search/knowledge"
+    },
+    {
+      "order": 151,
+      "level": "L1",
+      "l1": "29.4 Safety AI",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1501,
+      "sourceHeading": "29.4 Safety AI"
+    },
+    {
+      "order": 152,
+      "level": "L1",
+      "l1": "29.5 AI governance",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1507,
+      "sourceHeading": "29.5 AI governance"
+    },
+    {
+      "order": 153,
+      "level": "L1",
+      "l1": "31.1 Admission sequence",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1562,
+      "sourceHeading": "31.1 Admission sequence"
+    },
+    {
+      "order": 154,
+      "level": "L1",
+      "l1": "31.2 Stop condition",
+      "l2": null,
+      "l3": null,
+      "l4": null,
+      "sourceLine": 1580,
+      "sourceHeading": "31.2 Stop condition"
+    }
+  ]
+}
