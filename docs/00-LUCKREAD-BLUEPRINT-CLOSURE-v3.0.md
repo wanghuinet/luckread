@@ -1,6 +1,6 @@
 # Luckread Ultimate Feature Blueprint Closure v3.0
 
-> Status: **FROZEN / B01-B20 CLOSED / CONTRACT-FIRST DEVELOPMENT GATE**
+> Status: **FROZEN / B01-B20 CLOSED / FINAL-FEATURE-RECONCILIATION-READY / CONTRACT-FIRST DEVELOPMENT GATE**
 >
 > Scope: Luckread Payload self-media platform.
 >
@@ -114,14 +114,48 @@ The following distinctions are normative:
 
 B01-B20 are the bounded feature-completeness inventory. No new product domain is to be invented during contract reconciliation. Any genuinely new capability discovered later must use formal Change Control and receive a Feature ID before implementation.
 
+### 6.1 Final functional closure / Batch 20 reconciliation
+
+The final feature-completeness pass is closed as a **capability reconciliation**, not as another feature-expansion pass. The following rules are now normative:
+
+1. Every product capability has one canonical capability owner; domain-specific surfaces must reuse that owner rather than creating parallel business systems.
+2. Content types share the Content Kernel and lifecycle; article, video, audio, live replay, novel, comic, drama and future types extend the canonical model instead of duplicating CMS kernels.
+3. Feed, Recommendation, Search, Trending, Topic and Discovery remain distinct capabilities with explicit boundaries; none becomes a second content source of truth.
+4. Interaction capabilities share the canonical user/content/authorization model.
+5. Creator, organization/MCN and monetization capabilities reuse Identity, Authorization, Entitlement and financial authorities instead of creating duplicate user or permission systems.
+6. Admin, Moderation, Safety, Governance and Audit remain management/governance planes and cannot silently become alternative business authorities.
+7. API is an exposure layer over canonical capabilities; an endpoint does not create a new domain model merely because it exists.
+8. Storage, Cache, Queue/Job, Search and Analytics are infrastructure/derived systems and cannot become hidden sources of truth.
+9. Cloudflare-specific adapters remain replaceable; domain contracts and stable identifiers must remain portable to standard PostgreSQL/GCP-class infrastructure.
+10. The final functional baseline is now frozen. New product capabilities require Change Control and a new Feature ID.
+
+### 6.2 Reconciliation status
+
+The project now advances from feature completeness into deterministic contract reconciliation:
+
+```text
+Blueprint B01-B20 CLOSED
+        -> Canonical Capability Inventory
+        -> API Inventory Reconciliation
+        -> API <-> DTO <-> Entity Reconciliation
+        -> Entity <-> Database Field Reconciliation
+        -> Security / Authorization Reconciliation
+        -> Migration / Portability Reconciliation
+        -> Foundation Build
+        -> CI / Actions GREEN
+        -> Implementation
+```
+
+No additional feature batch is required before these gates. Discovery of a true functional gap is handled through Change Control rather than informal feature expansion.
+
 ## 7. Development sequence
 
 ```text
 B01-B20 CLOSED
-    -> Cross-Domain Audit
+    -> Final Functional Closure
     -> API Inventory Reconciliation
-    -> Contract Reconciliation
-    -> Database Contract Audit
+    -> API/DTO/Entity Contract Reconciliation
+    -> Database Field Contract Audit
     -> Security Contract Audit
     -> Migration Contract Audit
     -> Foundation Build
@@ -134,7 +168,7 @@ B01-B20 CLOSED
 The blueprint phase is considered complete only when:
 
 - B01-B20 are CLOSED;
-- all cross-domain ownership conflicts are resolved or explicitly contracted;
+- final cross-domain ownership conflicts are resolved or explicitly contracted;
 - API inventory is GREEN;
 - contract reconciliation is GREEN;
 - database contract is GREEN;
