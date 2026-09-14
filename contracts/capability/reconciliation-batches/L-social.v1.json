@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.0",
+  "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "batch": "L",
+  "domain": "L. Social graph and interaction",
+  "status": "NOT_GREEN",
+  "records": [
+    {"featureId":"SOCIAL-001","name":"follow/unfollow","hierarchy":{"l1":"L. Social graph and interaction","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SOCIAL-002","name":"followers/following","hierarchy":{"l1":"L. Social graph and interaction","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SOCIAL-003","name":"like/reaction","hierarchy":{"l1":"L. Social graph and interaction","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SOCIAL-004","name":"comment/reply","hierarchy":{"l1":"L. Social graph and interaction","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SOCIAL-005","name":"favorite/bookmark","hierarchy":{"l1":"L. Social graph and interaction","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SOCIAL-006","name":"share/repost/quote","hierarchy":{"l1":"L. Social graph and interaction","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SOCIAL-007","name":"mention/hashtag","hierarchy":{"l1":"L. Social graph and interaction","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SOCIAL-008","name":"poll/vote","hierarchy":{"l1":"L. Social graph and interaction","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SOCIAL-009","name":"block/mute/hide","hierarchy":{"l1":"L. Social graph and interaction","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SOCIAL-010","name":"relationship graph","hierarchy":{"l1":"L. Social graph and interaction","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+  ]
+}
