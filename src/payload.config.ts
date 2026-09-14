@@ -42,24 +42,6 @@ const isCLI = process.argv.some((value) => realpath(value)?.endsWith(path.join('
 const isProduction = process.env.NODE_ENV === 'production'
 const isNextBuild = process.env.NEXT_PHASE === 'phase-production-build'
 
-const createLog =
-  (level: string, fn: typeof console.log) => (objOrMsg: object | string, msg?: string) => {
-    if (typeof objOrMsg === 'string') fn(JSON.stringify({ level, msg: objOrMsg }))
-    else fn(JSON.stringify({ level, ...objOrMsg, msg: msg ?? (objOrMsg as { msg?: string }).msg }))
-  }
-
-const cloudflareLogger = {
-  level: process.env.PAYLOAD_LOG_LEVEL || 'info',
-  msgPrefix: '',
-  trace: createLog('trace', console.debug),
-  debug: createLog('debug', console.debug),
-  info: createLog('info', console.log),
-  warn: createLog('warn', console.warn),
-  error: createLog('error', console.error),
-  fatal: createLog('fatal', console.error),
-  silent: () => {},
-}
-
 const cloudflare =
   isCLI || isNextBuild || !isProduction
     ? await getCloudflareContextFromWrangler()
@@ -102,7 +84,13 @@ export default buildConfig({
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
   db: sqliteD1Adapter({ binding: cloudflare.env.D1, transactionOptions: {} }),
-  logger: isProduction ? cloudflareLogger : undefined,
+  logger: isProduction
+    ? {
+        options: {
+          level: process.env.PAYLOAD_LOG_LEVEL || 'info',
+        },
+      }
+    : undefined,
   plugins: [
     r2Storage({
       bucket: cloudflare.env.R2,
