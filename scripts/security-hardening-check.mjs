@@ -25,10 +25,15 @@ const revocation = json('contracts/authz/revocation-policy.json');
 const fields = json('contracts/authz/field-policy.json');
 
 if (decision) {
-  const checks = decision.checks;
-  const requiredChecks = ['authentication','accountState','permission','scope','resource','policy'];
-  if (!checks || typeof checks !== 'object') fail('authorization decision must expose checks object');
-  for (const key of requiredChecks) if (!checks || !Object.hasOwn(checks, key)) fail(`decision check missing: ${key}`);
+  // authorization-decision.json is the canonical decision *schema*.
+  // Validate its declared checks instead of treating the schema itself as a runtime decision instance.
+  const checks = decision.properties?.checks;
+  const requiredChecks = checks?.required ?? [];
+  if (!checks || checks.type !== 'object') fail('authorization decision schema must declare checks as an object');
+  for (const key of ['authentication','accountState','permission','scope','resource','policy']) {
+    if (!requiredChecks.includes(key)) fail(`decision check missing: ${key}`);
+    if (!checks?.properties?.[key]) fail(`decision check property missing: ${key}`);
+  }
   const order = decision['x-resolution-order'] ?? [];
   if (order[0] !== 'ACCOUNT_SECURITY_DENY' || order[1] !== 'CREDENTIAL_DENY') fail('security deny precedence must start with account and credential deny');
   const invariants = decision['x-hard-invariants'] ?? [];
