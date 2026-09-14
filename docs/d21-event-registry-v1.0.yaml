@@ -1,4 +1,4 @@
-version: 1.0.0
+version: 1.0.1
 contract: D21
 status: CONTRACT-FROZEN
 source_of_truth: docs/21-D21-ADVERTISING-PLATFORM-CONTRACT-v1.0.md
@@ -20,22 +20,12 @@ rules:
   payment_boundary: D15
   analytics_boundary: D14
 envelope:
-  required:
-    - event_id
-    - event_type
-    - event_version
-    - occurred_at
-    - producer
-    - request_id
-    - trace_id
-    - tenant_id
-    - subject_id
-    - idempotency_key
-    - payload
+  required: [event_id, event_type, event_version, schema_version, occurred_at, producer, request_id, trace_id, tenant_id, subject_id, idempotency_key, privacy_classification, payload]
   fields:
     event_id: string
     event_type: string
     event_version: integer
+    schema_version: string
     occurred_at: datetime
     producer: string
     request_id: string
@@ -47,7 +37,9 @@ envelope:
     idempotency_key: string
     correlation_id: string|null
     causation_id: string|null
+    privacy_classification: [PUBLIC, INTERNAL, CONFIDENT, RESTRICTED]
     payload: object
+    forbidden_payloads: [password, access_token, refresh_token, payment_card_data, secret]
 events:
   - {type: advertising.account.created, aggregate: advertiser, version: 1, source: D21}
   - {type: advertising.account.updated, aggregate: advertiser, version: 1, source: D21}
@@ -71,6 +63,7 @@ events:
   - {type: advertising.creative.created, aggregate: creative, version: 1, source: D21}
   - {type: advertising.creative.updated, aggregate: creative, version: 1, source: D21}
   - {type: advertising.creative.submitted, aggregate: creative, version: 1, source: D21}
+  - {type: advertising.creative.review_started, aggregate: creative, version: 1, source: D21}
   - {type: advertising.creative.approved, aggregate: creative, version: 1, source: D21}
   - {type: advertising.creative.rejected, aggregate: creative, version: 1, source: D21}
   - {type: advertising.creative.activated, aggregate: creative, version: 1, source: D21}
@@ -127,14 +120,11 @@ consumer_rules:
   - replay must preserve original event_id and append replay metadata
 ordering:
   campaign: [created, submitted, review_started, approved, activated, paused, resumed, suspended, cancelled, completed, expired]
-  creative: [created, submitted, approved, activated, suspended, archived]
+  creative: [created, submitted, review_started, approved, activated, suspended, archived]
   traffic: [pending, validated, suspicious, invalidated, reversed]
   billing: [pending, validated, billable, finalized, reversed, adjusted]
 idempotency:
-  key_scope:
-    - producer
-    - event_type
-    - idempotency_key
+  key_scope: [producer, event_type, idempotency_key]
   duplicate_policy: return_original_result
   conflicting_reuse_policy: reject
 replay:
@@ -146,15 +136,4 @@ dead_letter:
   required: true
   reasons: [schema_invalid, unknown_event, unknown_version, authorization_failure, tenant_violation, poison_message, retry_exhausted]
   replay_requires: [operator_authorization, evidence, idempotency_check]
-evidence_requirements:
-  - event_schema_validation
-  - producer_contract_validation
-  - consumer_idempotency_tests
-  - duplicate_delivery_tests
-  - ordering_tests
-  - out_of_order_tests
-  - replay_tests
-  - dead_letter_tests
-  - tenant_isolation_tests
-  - billing_replay_safety_tests
-  - cross_domain_boundary_tests
+evidence_requirements: [event_schema_validation, producer_contract_validation, consumer_idempotency_tests, duplicate_delivery_tests, ordering_tests, out_of_order_tests, replay_tests, dead_letter_tests, tenant_isolation_tests, billing_replay_safety_tests, cross_domain_boundary_tests]
