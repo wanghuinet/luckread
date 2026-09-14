@@ -32,16 +32,18 @@ jobs:
           PY
       - name: Validate Auth operations
         run: |
-          node - <<'NODE'
-          const fs=require('fs'); const yaml=require('yaml');
-          const doc=yaml.parse(fs.readFileSync('contracts/openapi/v1/openapi.yaml','utf8'));
-          const targets=new Set(['authRefresh','authSessionList','authSessionRevoke']);
-          const found=new Set();
-          for(const item of Object.values(doc.paths||{})) for(const op of Object.values(item||{})) if(op&&typeof op==='object'&&targets.has(op.operationId)) found.add(op.operationId);
-          const missing=[...targets].filter(x=>!found.has(x));
-          if(missing.length) { console.error(missing.join('\n')); process.exit(1); }
-          console.log('Auth registry operations present.');
-          NODE
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s = Path('contracts/openapi/v1/openapi.yaml').read_text()
+          targets = {'authRefresh', 'authSessionList', 'authSessionRevoke'}
+          found = set(re.findall(r'^\s*operationId:\s*([^\s#]+)\s*$', s, re.MULTILINE))
+          missing = sorted(targets - found)
+          if missing:
+              print('\n'.join(missing))
+              raise SystemExit(1)
+          print('Auth registry operations present:', ', '.join(sorted(targets)))
+          PY
       - name: Commit repair
         run: |
           git config user.name github-actions[bot]
