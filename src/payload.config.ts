@@ -26,6 +26,10 @@ import { Reports } from './collections/Reports'
 import { Appeals } from './collections/Appeals'
 import { ContentShares } from './collections/ContentShares'
 import { ModerationEvents } from './collections/ModerationEvents'
+import { Follows } from './collections/Follows'
+import { ContentLikes } from './collections/ContentLikes'
+import { Comments } from './collections/Comments'
+import { Notifications } from './collections/Notifications'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -80,6 +84,10 @@ export default buildConfig({
     Appeals,
     ContentShares,
     ModerationEvents,
+    Follows,
+    ContentLikes,
+    Comments,
+    Notifications,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
