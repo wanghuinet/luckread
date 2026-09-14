@@ -16,6 +16,7 @@ export const EntitlementGrants: CollectionConfig = {
     { name: 'entitlement', type: 'relationship', relationTo: 'entitlements', required: true, index: true },
     { name: 'sourceType', type: 'select', required: true, options: sources.map((value) => ({ label: value, value })) },
     { name: 'sourceId', type: 'text', index: true },
+    { name: 'grantKey', type: 'text', required: true, unique: true, index: true },
     { name: 'scope', type: 'json' },
     { name: 'startsAt', type: 'date', required: true },
     { name: 'endsAt', type: 'date' },
