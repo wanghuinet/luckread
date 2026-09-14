@@ -3,7 +3,7 @@
   "$id":"https://luckread.com/contracts/api/search-feed-consistency.v1.json",
   "title":"Search and Feed Consistency Contract",
   "version":"1.0.0",
-  "operations":[{"id":"search.content","method":"GET","path":"/v1/search/content","auth":"public-or-scoped","rules":["search index is a derived projection, never the content authority","authorization, visibility and moderation are rechecked at serving time when required","index lag must not expose revoked/private content"]},{"id":"search.reconcile","method":"POST","path":"/v1/search/reconcile","auth":"internal-scoped","rules":["reconciliation is idempotent","source of truth remains authoritative content metadata","reconciliation emits auditable evidence"]}],
+  "operations":[{"id":"search.content","method":"GET","path":"/v1/search","auth":"public-or-scoped","rules":["search index is a derived projection, never the content authority","authorization, visibility and moderation are rechecked at serving time when required","index lag must not expose revoked/private content"]}],
   "consistencyModel":{"contentAuthority":"primary-content-metadata","searchAuthority":"derived-index","feedAuthority":"derived-delivery","allowedIndexLag":"bounded-and-observable","staleReadPolicy":"must-not-bypass-authorization"},
   "invariants":["search and feed projections cannot mutate canonical content state","deleted/unpublished/moderated content must converge to non-deliverable state","entitlement checks remain authoritative for gated content","projection replay is idempotent","reconciliation is observable and auditable"],
   "status":"CONTRACT_COMPLETE_IMPLEMENTATION_PENDING"
