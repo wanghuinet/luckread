@@ -36,30 +36,17 @@ function parseOpenApiOperations(file) {
   let currentPath = null;
   let currentMethod = null;
   let currentOperationId = null;
-  const methods = new Set(['get','post','put','patch','delete','head','options','trace']);
   const flush = () => {
     if (!currentOperationId) return;
-    if (operations.has(currentOperationId)) {
-      failures.push({ code: 'OPENAPI_DUPLICATE_OPERATION_ID', operationId: currentOperationId });
-    } else {
-      operations.set(currentOperationId, { operationId: currentOperationId, method: String(currentMethod ?? '').toUpperCase(), path: currentPath });
-    }
+    if (operations.has(currentOperationId)) failures.push({ code: 'OPENAPI_DUPLICATE_OPERATION_ID', operationId: currentOperationId });
+    else operations.set(currentOperationId, { operationId: currentOperationId, method: String(currentMethod ?? '').toUpperCase(), path: currentPath });
     currentOperationId = null;
   };
   for (const line of lines) {
     const pathMatch = line.match(/^  (\/[^:#]+):\s*$/);
-    if (pathMatch) {
-      flush();
-      currentPath = pathMatch[1].trim();
-      currentMethod = null;
-      continue;
-    }
+    if (pathMatch) { flush(); currentPath = pathMatch[1].trim(); currentMethod = null; continue; }
     const methodMatch = line.match(/^    (get|post|put|patch|delete|head|options|trace):\s*$/i);
-    if (methodMatch && currentPath) {
-      flush();
-      currentMethod = methodMatch[1].toLowerCase();
-      continue;
-    }
+    if (methodMatch && currentPath) { flush(); currentMethod = methodMatch[1].toLowerCase(); continue; }
     if (currentPath && currentMethod) {
       const operationMatch = line.match(/^\s+operationId:\s*([^#\s]+)\s*(?:#.*)?$/);
       if (operationMatch) currentOperationId = operationMatch[1].trim();
@@ -89,13 +76,9 @@ else for (const op of policy.operations) {
 }
 
 const openapiOps = parseOpenApiOperations(openapiSpec);
-
 for (const [id, op] of inventory) {
   const openapi = openapiOps.get(id);
-  if (!openapi) {
-    finding('UNRECONCILED_INVENTORY_OPERATION', id, 'operationId is not represented in canonical OpenAPI paths');
-    continue;
-  }
+  if (!openapi) { finding('UNRECONCILED_INVENTORY_OPERATION', id, 'operationId is not represented in canonical OpenAPI paths'); continue; }
   const inventoryMethod = String(op.method).toUpperCase();
   const openapiMethod = String(openapi.method).toUpperCase();
   if (inventoryMethod !== openapiMethod) finding('METHOD_CONFLICT', id, `inventory=${inventoryMethod} openapi=${openapiMethod}`);
@@ -116,14 +99,13 @@ for (const [id, op] of inventory) {
     else if (!allowedEvidence.has(value)) finding('EVIDENCE_INVALID', id, `${field}=${String(value)}`);
   }
 }
-
-const conflictCodes = new Set(['INVALID_JSON','DUPLICATE_OPERATION_ID','OPENAPI_POLICY_MISSING_OPERATION_ID','OPENAPI_DUPLICATE_OPERATION_ID','MISSING_OPERATION_ID','MISSING_METHOD_OR_PATH','METHOD_CONFLICT','PATH_CONFLICT','OPENAPI_DUPLICATE_OPERATION_ID']);
+const conflictCodes = new Set(['INVALID_JSON','DUPLICATE_OPERATION_ID','OPENAPI_POLICY_MISSING_OPERATION_ID','OPENAPI_DUPLICATE_OPERATION_ID','MISSING_OPERATION_ID','MISSING_METHOD_OR_PATH','METHOD_CONFLICT','PATH_CONFLICT']);
 const incompleteCodes = new Set(['MISSING_API_INVENTORY_DIRECTORY','MISSING_OPENAPI_SPEC','MISSING_OPENAPI_OPERATION_POLICY','OPENAPI_POLICY_MISSING_OPERATIONS_ARRAY','MISSING_POLICY','MISSING_DOMAIN','MISSING_OPERATIONS_ARRAY','EVIDENCE_MISSING','EVIDENCE_INCOMPLETE','EVIDENCE_INVALID','UNRECONCILED_INVENTORY_OPERATION','UNRECONCILED_OPENAPI_OPERATION','UNRECONCILED_OPENAPI_POLICY_OPERATION','UNRECONCILED_POLICY_OPERATION']);
 const hasConflict = failures.some((x) => conflictCodes.has(x.code)) || findings.some((x) => conflictCodes.has(x.code));
 const hasIncomplete = failures.some((x) => incompleteCodes.has(x.code)) || findings.some((x) => incompleteCodes.has(x.code));
 const status = hasConflict ? 'CONFLICT' : hasIncomplete ? 'INCOMPLETE' : 'PASS';
 const report = {
-  schemaVersion: '1.3.0',
+  schemaVersion: '1.2.0',
   generatedAt: new Date().toISOString(),
   status,
   reconciliationGreen: status === 'PASS',
