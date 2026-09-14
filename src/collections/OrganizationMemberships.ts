@@ -1,5 +1,5 @@
+import { APIError, type PayloadRequest } from 'payload'
 import type { CollectionConfig } from 'payload'
-import { APIError } from 'payload'
 
 import { hasPermission, type AuthorizationUser } from '../lib/authorization'
 
@@ -15,19 +15,11 @@ function platformAdmin(user: unknown): boolean {
   const role = String((user as { role?: string } | null)?.role ?? '')
   return role === 'admin' || role === 'super_admin'
 }
-async function canManageOrganization(req: Parameters<NonNullable<CollectionConfig['hooks']>['beforeChange']>[number]['req'], organizationId: string, user: unknown): Promise<boolean> {
-  if (!user) return false
-  if (platformAdmin(user) && hasPermission(user as AuthorizationUser, 'organization.members.manage')) return true
-  const result = await req.payload.find({
-    collection: 'organization-memberships',
-    where: { and: [{ organization: { equals: organizationId } }, { user: { equals: String((user as { id: string | number }).id) } }, { status: { equals: 'ACTIVE' } }] },
-    limit: 1,
-    depth: 0,
-    overrideAccess: true,
-    req,
-  })
+async function canManageOrganization(req: PayloadRequest, organizationId: string, user: AuthorizationUser): Promise<boolean> {
+  if (platformAdmin(user) && hasPermission(user, 'organization.members.manage')) return true
+  const result = await req.payload.find({ collection: 'organization-memberships', where: { and: [{ organization: { equals: organizationId } }, { user: { equals: String(user.id) } }, { status: { equals: 'ACTIVE' } }] }, limit: 1, depth: 0, overrideAccess: true, req })
   const membership = result.docs[0]
-  return Boolean(membership && (membership.role === 'owner' || membership.role === 'admin') && hasPermission(user as AuthorizationUser, 'organization.members.manage'))
+  return Boolean(membership && (membership.role === 'owner' || membership.role === 'admin') && hasPermission(user, 'organization.members.manage'))
 }
 
 export const OrganizationMemberships: CollectionConfig = {
@@ -44,7 +36,7 @@ export const OrganizationMemberships: CollectionConfig = {
       if (!req.user) throw new APIError('Authentication required', 401)
       const organizationId = relationshipId(data.organization)
       if (!organizationId) throw new APIError('Organization is required', 400)
-      if (!await canManageOrganization(req, organizationId, req.user)) throw new APIError('Organization membership management permission denied for this organization', 403)
+      if (!await canManageOrganization(req, organizationId, req.user as AuthorizationUser)) throw new APIError('Organization membership management permission denied for this organization', 403)
       if (data.role && !membershipRoles.includes(data.role)) throw new APIError('Invalid organization membership role')
       if (data.status && !membershipStatuses.includes(data.status)) throw new APIError('Invalid organization membership status')
       return data
