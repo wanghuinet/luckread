@@ -5,6 +5,7 @@ on:
     branches: [fix/contract-idempotency-openapi]
     paths:
       - '.github/workflows/repair-missing-idempotency.yml'
+      - 'contracts/openapi/v1/openapi.yaml'
 
 permissions:
   contents: write
@@ -33,12 +34,10 @@ jobs:
                   op=line.split(':',1)[1].strip()
                   out.append(line); i+=1
                   if op in targets:
-                      depth = len(line)-len(line.lstrip())
                       block=[]
                       while i < len(lines):
                           n=lines[i]
-                          if n.strip() and len(n)-len(n.lstrip()) <= depth and n.lstrip().startswith(('operationId:','summary:','description:','parameters:','requestBody:','responses:','security:','tags:')):
-                              break
+                          if n.startswith('      operationId: '): break
                           block.append(n); i+=1
                       text=''.join(block)
                       if 'IdempotencyKeyRequired' not in text:
