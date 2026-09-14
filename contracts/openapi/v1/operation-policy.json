@@ -16,12 +16,7 @@
         "additionalProperties": false,
         "properties": {
           "operationId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
-          "auth": {
-            "type": "object",
-            "required": ["mode"],
-            "additionalProperties": false,
-            "properties": { "mode": { "enum": ["public", "permission", "state-machine", "authenticated"] } }
-          },
+          "auth": { "type": "object", "required": ["mode"], "additionalProperties": false, "properties": { "mode": { "enum": ["public", "permission", "state-machine", "authenticated"] } } },
           "permissions": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
           "auditRequired": { "type": "boolean" },
           "optimisticLockRequired": { "type": "boolean" },
