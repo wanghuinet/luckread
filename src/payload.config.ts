@@ -50,6 +50,7 @@ const createLog =
 
 const cloudflareLogger = {
   level: process.env.PAYLOAD_LOG_LEVEL || 'info',
+  msgPrefix: '',
   trace: createLog('trace', console.debug),
   debug: createLog('debug', console.debug),
   info: createLog('info', console.log),
