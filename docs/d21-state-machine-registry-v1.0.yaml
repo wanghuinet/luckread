@@ -1,4 +1,4 @@
-version: 1.0.3
+version: 1.0.4
 contract: D21
 status: CONTRACT-FROZEN
 source_of_truth: docs/21-D21-ADVERTISING-PLATFORM-CONTRACT-v1.0.md
@@ -102,14 +102,14 @@ machines:
       - {from: ESCALATED, to: UNDER_REVIEW, action: assign_review, capability: dispute.review, event: advertising.dispute.review_started}
   reconciliation:
     initial: MATCHED
-    terminal: []
+    terminal: [RESOLVED]
     transitions:
       - {from: MATCHED, to: MINOR_VARIANCE, action: detect_variance, capability: external_adapter.reconcile, event: advertising.reconciliation.variance_detected}
       - {from: MATCHED, to: MATERIAL_VARIANCE, action: detect_variance, capability: external_adapter.reconcile, event: advertising.reconciliation.variance_detected}
       - {from: MINOR_VARIANCE, to: MATCHED, action: reconcile, capability: external_adapter.reconcile, event: advertising.reconciliation.matched}
       - {from: MINOR_VARIANCE, to: DISPUTED, action: dispute, capability: dispute.create, event: advertising.reconciliation.disputed}
       - {from: MATERIAL_VARIANCE, to: DISPUTED, action: dispute, capability: dispute.create, event: advertising.reconciliation.disputed}
-      - {from: DISPUTED, to: MATCHED, action: resolve, capability: external_adapter.reconcile, event: advertising.reconciliation.resolved}
+      - {from: DISPUTED, to: RESOLVED, action: resolve, capability: external_adapter.reconcile, event: advertising.reconciliation.resolved}
       - {from: DISPUTED, to: MATERIAL_VARIANCE, action: unresolved_variance, capability: external_adapter.reconcile, event: advertising.reconciliation.variance_detected}
 validation_rules:
   - every state must be declared in machine-readable contract
