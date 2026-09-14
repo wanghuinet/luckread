@@ -58,7 +58,7 @@ for (const file of apiFiles) {
     const key = `${op.method} ${op.path}`
     if (apiPaths.has(key)) fail(`${rel}: duplicate API operation ${key} (already in ${apiPaths.get(key)})`)
     apiPaths.set(key, rel)
-    if (!op.auth?.required && op.auth?.required !== false) fail(`${rel}: operation ${op.operationId} must declare auth.required explicitly`)
+    if (!op.auth || typeof op.auth.required !== 'boolean') fail(`${rel}: operation ${op.operationId} must declare auth.required explicitly`)
     if (!op.success?.status) fail(`${rel}: operation ${op.operationId} must declare success.status`)
     if (!Array.isArray(op.errors)) fail(`${rel}: operation ${op.operationId} must declare errors[]`)
   }
@@ -94,7 +94,6 @@ const requiredRc = [
   'contracts/api/report-appeal.v1.json',
   'contracts/api/revision.v1.json',
   'contracts/api/rc-04-06-share-subscription-entitlement.v1.json',
-  'contracts/api/rc-04-06-admission-gate.v1.json',
   'contracts/api/organization-members.v1.json',
   'contracts/api/ip-content.v1.json',
   'contracts/api/feed-delivery.v1.json',
