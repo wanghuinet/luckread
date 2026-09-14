@@ -54,9 +54,6 @@ export const Content: CollectionConfig = {
           const previewPercent = Number(data.paywallPreviewPercent)
           if (!Number.isFinite(previewPercent) || previewPercent <= 0 || previewPercent >= 100) throw new APIError('paywallPreviewPercent must be between 1 and 99', 400)
           if (!data.paywallEntitlementCode) throw new APIError('paywallEntitlementCode is required for subscription content', 400)
-          if (originalDoc?.state !== 'PUBLISHED' && (!data.previewBodyR2Key || !data.premiumBodyR2Key)) {
-            // Keys are generated automatically when the content is published.
-          }
         }
         if (data.paywallMode === 'FREE') {
           data.paywallEntitlementCode = undefined
@@ -69,6 +66,7 @@ export const Content: CollectionConfig = {
     ],
     afterChange: [
       async ({ doc, operation, req }) => {
+        if (req.context?.skipContentRevision) return
         const actorId = req.user ? String(req.user.id) : String(relationshipId(doc.author))
         await req.payload.create({ collection: 'content-revisions', data: { revisionId: randomUUID(), content: String(doc.id), revision: Number(doc.revision), version: Number(doc.version), author: String(relationshipId(doc.author)), state: String(doc.state), snapshot: { title: doc.title, slug: doc.slug, contentType: doc.contentType, locale: doc.locale, excerpt: doc.excerpt, bodyR2Key: doc.bodyR2Key, coverMedia: doc.coverMedia, state: doc.state, paywallMode: doc.paywallMode, paywallPreviewPercent: doc.paywallPreviewPercent, paywallEntitlementCode: doc.paywallEntitlementCode, previewBodyR2Key: doc.previewBodyR2Key, premiumBodyR2Key: doc.premiumBodyR2Key }, changeReason: operation, createdBy: actorId }, overrideAccess: true, req })
       },
@@ -104,11 +102,13 @@ export const Content: CollectionConfig = {
     { path: '/:id/reject', method: 'post', handler: async (req) => transitionContentState(req, 'REJECTED'), custom: { openapi: { summary: 'Reject content' } } },
     { path: '/:id/publish', method: 'post', handler: async (req) => {
       const body = (await req.json()) as { expectedVersion?: number; expectedRevision?: number }
-      const result = await transitionContentState(req, 'PUBLISHED', body)
-      const content = await req.payload.findByID({ collection: 'content', id: String(req.routeParams?.id ?? ''), depth: 0, overrideAccess: true, req })
-      if (content.paywallMode === 'SUBSCRIPTION_PREVIEW') await generateContentPaywall(req, content as Record<string, unknown>)
-      return result
-    }, custom: { openapi: { summary: 'Publish content and generate subscription preview/premium bodies' } } },
+      const id = String(req.routeParams?.id ?? '')
+      const current = await req.payload.findByID({ collection: 'content', id, depth: 0, overrideAccess: true, req })
+      if (current.paywallMode === 'SUBSCRIPTION_PREVIEW') {
+        await generateContentPaywall(req, { ...(current as Record<string, unknown>), version: Number(current.version) + 1 })
+      }
+      return transitionContentState(req, 'PUBLISHED', body)
+    }, custom: { openapi: { summary: 'Generate paywall bodies and publish content' } } },
     { path: '/:id/restore', method: 'post', handler: async (req) => transitionContentState(req, 'RESTORED'), custom: { openapi: { summary: 'Restore deleted content within the restore window' } } },
   ],
   fields: [
