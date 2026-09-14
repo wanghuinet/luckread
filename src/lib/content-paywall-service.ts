@@ -57,6 +57,22 @@ async function getR2Bucket(): Promise<R2Bucket> {
   return bucket
 }
 
+async function readR2Json(bucket: R2Bucket, key: string): Promise<unknown> {
+  const object = await bucket.get(key)
+  if (!object) throw new APIError('Article body object was not found', 404)
+  const raw = await object.text()
+  try {
+    return JSON.parse(raw) as unknown
+  } catch {
+    return raw
+  }
+}
+
+export async function readContentBody(key: string): Promise<unknown> {
+  if (!key) throw new APIError('Article body key is unavailable', 404)
+  return readR2Json(await getR2Bucket(), key)
+}
+
 export async function generateContentPaywall(req: PayloadRequest, content: Record<string, unknown>): Promise<{ previewBodyR2Key: string; premiumBodyR2Key: string }> {
   if (content.paywallMode !== 'SUBSCRIPTION_PREVIEW') throw new APIError('Paywall generation requires SUBSCRIPTION_PREVIEW', 400)
   const sourceKey = String(content.bodyR2Key ?? '')
