@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/interaction-social-removal-operation-policy.v1.json",
+  "title": "LuckRead Interaction Social Removal Operation Policy",
+  "version": "1.0.0",
+  "domain": "interaction",
+  "status": "CONTRACTED_PARTIAL",
+  "operations": [
+    {
+      "operationId": "unblockUser",
+      "method": "DELETE",
+      "path": "/interactions/blocks/{targetUserId}",
+      "authorization": { "mode": "permission", "permission": "interaction.block", "scope": "self" },
+      "resource": { "classification": "SINGLE_AUTHORITATIVE_WRITE", "maxItems": 1 },
+      "cache": { "policy": "PRIVATE_INVALIDATE_OR_VERSION_BUMP" },
+      "retry": { "maxAttempts": 1 },
+      "event": { "mode": "DOMAIN_EVENT" },
+      "queue": { "mode": "NONE" },
+      "antiAbuse": { "required": true },
+      "idempotency": { "required": true },
+      "security": { "required": true },
+      "evidence": { "openapi": "PASS", "permission": "PASS", "state": "MISSING", "resource": "MISSING", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+    },
+    {
+      "operationId": "unmuteUser",
+      "method": "DELETE",
+      "path": "/interactions/mutes/{targetUserId}",
+      "authorization": { "mode": "permission", "permission": "interaction.mute", "scope": "self" },
+      "resource": { "classification": "SINGLE_AUTHORITATIVE_WRITE", "maxItems": 1 },
+      "cache": { "policy": "PRIVATE_INVALIDATE_OR_VERSION_BUMP" },
+      "retry": { "maxAttempts": 1 },
+      "event": { "mode": "DOMAIN_EVENT" },
+      "queue": { "mode": "NONE" },
+      "antiAbuse": { "required": true },
+      "idempotency": { "required": true },
+      "security": { "required": true },
+      "evidence": { "openapi": "PASS", "permission": "PASS", "state": "MISSING", "resource": "MISSING", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+    }
+  ]
+}
