@@ -36,7 +36,7 @@
   "version": "1.0.0",
   "x-luckread": {
     "single-source-rule": "Every OpenAPI operationId MUST appear exactly once in operations.",
-    "public-operations": ["authRegister", "authLogin"],
+    "public-operations": ["authRegister", "authLogin", "resolveShare", "listIpContents", "getIpContent"],
     "state-transition-operations": ["transitionAccountState", "transitionContentState"]
   },
   "operations": [
@@ -69,6 +69,28 @@
     { "operationId": "inviteIpMember", "auth": { "mode": "permission" }, "permissions": ["ip.member.invite"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
     { "operationId": "removeIpMember", "auth": { "mode": "permission" }, "permissions": ["ip.member.remove"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
     { "operationId": "createOrganization", "auth": { "mode": "permission" }, "permissions": ["org.create"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
-    { "operationId": "listModerationCases", "auth": { "mode": "permission" }, "permissions": ["moderation.read"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" }
+    { "operationId": "listModerationCases", "auth": { "mode": "permission" }, "permissions": ["moderation.read"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "blockUser", "auth": { "mode": "permission" }, "permissions": ["interaction.block"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "unblockUser", "auth": { "mode": "permission" }, "permissions": ["interaction.block"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "muteUser", "auth": { "mode": "permission" }, "permissions": ["interaction.mute"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "unmuteUser", "auth": { "mode": "permission" }, "permissions": ["interaction.mute"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "createReport", "auth": { "mode": "permission" }, "permissions": ["report.create"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "createAppeal", "auth": { "mode": "permission" }, "permissions": ["appeal.create"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "listContentRevisions", "auth": { "mode": "permission" }, "permissions": ["content.revision.read"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "getContentRevision", "auth": { "mode": "permission" }, "permissions": ["content.revision.read"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "rollbackContentRevision", "auth": { "mode": "permission" }, "permissions": ["content.revision.rollback"], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "createShare", "auth": { "mode": "permission" }, "permissions": ["share.create"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "resolveShare", "auth": { "mode": "public" }, "permissions": ["share.resolve"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "createSubscription", "auth": { "mode": "permission" }, "permissions": ["subscription.create"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "getSubscription", "auth": { "mode": "permission" }, "permissions": ["subscription.read"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "cancelSubscription", "auth": { "mode": "permission" }, "permissions": ["subscription.cancel"], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "getEntitlements", "auth": { "mode": "permission" }, "permissions": ["entitlement.read"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "checkEntitlement", "auth": { "mode": "permission" }, "permissions": ["entitlement.check"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "listOrganizationMembers", "auth": { "mode": "permission" }, "permissions": ["organization.member.read"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "inviteOrganizationMember", "auth": { "mode": "permission" }, "permissions": ["organization.member.manage"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "removeOrganizationMember", "auth": { "mode": "permission" }, "permissions": ["organization.member.manage"], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "changeOrganizationMemberRole", "auth": { "mode": "permission" }, "permissions": ["organization.role.manage"], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": true, "stateMachine": "none" },
+    { "operationId": "listIpContents", "auth": { "mode": "public" }, "permissions": ["ip.content.read"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "getIpContent", "auth": { "mode": "public" }, "permissions": ["ip.content.read"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" }
   ]
 }
