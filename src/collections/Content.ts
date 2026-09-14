@@ -6,6 +6,7 @@ import { hasMaterialContentEdit } from '../lib/content-state-machine'
 import { hasPermission, type AuthorizationUser } from '../lib/authorization'
 import { transitionContentState } from '../lib/content-transition-service'
 import { rollbackContent } from '../lib/content-rollback-service'
+import { generateContentPaywall, readContentBody } from '../lib/content-paywall-service'
 
 const contentTypes = ['article', 'post', 'video_metadata', 'gallery', 'live_metadata', 'series'] as const
 const contentStates = ['DRAFT', 'PENDING_REVIEW', 'REJECTED', 'APPROVED', 'SCHEDULED', 'PUBLISHED', 'UNPUBLISHED', 'ARCHIVED', 'DELETED', 'RESTORED'] as const
@@ -53,7 +54,9 @@ export const Content: CollectionConfig = {
           const previewPercent = Number(data.paywallPreviewPercent)
           if (!Number.isFinite(previewPercent) || previewPercent <= 0 || previewPercent >= 100) throw new APIError('paywallPreviewPercent must be between 1 and 99', 400)
           if (!data.paywallEntitlementCode) throw new APIError('paywallEntitlementCode is required for subscription content', 400)
-          if (!data.previewBodyR2Key || !data.premiumBodyR2Key) throw new APIError('Preview and premium body R2 keys are required for subscription content', 400)
+          if (originalDoc?.state !== 'PUBLISHED' && (!data.previewBodyR2Key || !data.premiumBodyR2Key)) {
+            // Keys are generated automatically when the content is published.
+          }
         }
         if (data.paywallMode === 'FREE') {
           data.paywallEntitlementCode = undefined
@@ -67,7 +70,7 @@ export const Content: CollectionConfig = {
     afterChange: [
       async ({ doc, operation, req }) => {
         const actorId = req.user ? String(req.user.id) : String(relationshipId(doc.author))
-        await req.payload.create({ collection: 'content-revisions', data: { revisionId: randomUUID(), content: String(doc.id), revision: Number(doc.revision), version: Number(doc.version), author: String(relationshipId(doc.author)), state: String(doc.state), snapshot: { title: doc.title, slug: doc.slug, contentType: doc.contentType, locale: doc.locale, excerpt: doc.excerpt, bodyR2Key: doc.bodyR2Key, coverMedia: doc.coverMedia, state: doc.state, paywallMode: doc.paywallMode, paywallPreviewPercent: doc.paywallPreviewPercent, paywallEntitlementCode: doc.paywallEntitlementCode, previewBodyR2Key: doc.previewBodyR2Key, premiumBodyR2Key: doc.premiumBodyR2Key }, changeReason: operation, createdBy: actorId }, overrideAccess: true, req)
+        await req.payload.create({ collection: 'content-revisions', data: { revisionId: randomUUID(), content: String(doc.id), revision: Number(doc.revision), version: Number(doc.version), author: String(relationshipId(doc.author)), state: String(doc.state), snapshot: { title: doc.title, slug: doc.slug, contentType: doc.contentType, locale: doc.locale, excerpt: doc.excerpt, bodyR2Key: doc.bodyR2Key, coverMedia: doc.coverMedia, state: doc.state, paywallMode: doc.paywallMode, paywallPreviewPercent: doc.paywallPreviewPercent, paywallEntitlementCode: doc.paywallEntitlementCode, previewBodyR2Key: doc.previewBodyR2Key, premiumBodyR2Key: doc.premiumBodyR2Key }, changeReason: operation, createdBy: actorId }, overrideAccess: true, req })
       },
     ],
   },
@@ -77,20 +80,35 @@ export const Content: CollectionConfig = {
     { path: '/:id/read', method: 'get', handler: async (req) => {
       const content = await req.payload.findByID({ collection: 'content', id: String(req.routeParams?.id ?? ''), depth: 0, overrideAccess: true, req })
       if (content.state !== 'PUBLISHED') throw new APIError('Content is not available', 404)
-      if (content.paywallMode !== 'SUBSCRIPTION_PREVIEW') return Response.json({ data: { contentId: content.id, access: 'FULL', bodyR2Key: content.bodyR2Key } })
+      if (content.paywallMode !== 'SUBSCRIPTION_PREVIEW') return Response.json({ data: { contentId: content.id, access: 'FULL', body: await readContentBody(String(content.bodyR2Key ?? '')) } })
       const entitlementCode = String(content.paywallEntitlementCode)
       let entitled = false
       if (req.user) {
-        const grants = await req.payload.find({ collection: 'entitlement-grants', where: { and: [{ user: { equals: String(req.user.id) } }, { status: { equals: 'ACTIVE' } }, { entitlement: { equals: entitlementCode } }] }, limit: 1, depth: 0, overrideAccess: true, req })
-        entitled = grants.docs.some((grant) => !grant.endsAt || new Date(String(grant.endsAt)).getTime() > Date.now())
+        const entitlement = await req.payload.find({ collection: 'entitlements', where: { code: { equals: entitlementCode } }, limit: 1, depth: 0, overrideAccess: true, req })
+        const entitlementId = entitlement.docs[0]?.id
+        if (entitlementId) {
+          const grants = await req.payload.find({ collection: 'entitlement-grants', where: { and: [{ user: { equals: String(req.user.id) } }, { entitlement: { equals: String(entitlementId) } }, { status: { equals: 'ACTIVE' } }] }, limit: 10, depth: 0, overrideAccess: true, req })
+          entitled = grants.docs.some((grant) => {
+            const now = Date.now()
+            const startsAt = grant.startsAt ? new Date(String(grant.startsAt)).getTime() : Number.NEGATIVE_INFINITY
+            const endsAt = grant.endsAt ? new Date(String(grant.endsAt)).getTime() : Number.POSITIVE_INFINITY
+            return startsAt <= now && now < endsAt
+          })
+        }
       }
-      if (entitled) return Response.json({ data: { contentId: content.id, access: 'FULL', bodyR2Key: content.premiumBodyR2Key, entitlement: entitlementCode } })
-      return Response.json({ data: { contentId: content.id, access: 'PREVIEW', previewPercent: content.paywallPreviewPercent, bodyR2Key: content.previewBodyR2Key, requiredEntitlement: entitlementCode } })
+      if (entitled) return Response.json({ data: { contentId: content.id, access: 'FULL', body: await readContentBody(String(content.premiumBodyR2Key ?? '')), entitlement: entitlementCode } })
+      return Response.json({ data: { contentId: content.id, access: 'PREVIEW', previewPercent: content.paywallPreviewPercent, body: await readContentBody(String(content.previewBodyR2Key ?? '')), requiredEntitlement: entitlementCode } })
     }, custom: { openapi: { summary: 'Read free content or subscription-gated article preview' } } },
     { path: '/:id/submit-review', method: 'post', handler: async (req) => transitionContentState(req, 'PENDING_REVIEW'), custom: { openapi: { summary: 'Submit content for review' } } },
     { path: '/:id/approve', method: 'post', handler: async (req) => transitionContentState(req, 'APPROVED'), custom: { openapi: { summary: 'Approve content' } } },
     { path: '/:id/reject', method: 'post', handler: async (req) => transitionContentState(req, 'REJECTED'), custom: { openapi: { summary: 'Reject content' } } },
-    { path: '/:id/publish', method: 'post', handler: async (req) => transitionContentState(req, 'PUBLISHED'), custom: { openapi: { summary: 'Publish content' } } },
+    { path: '/:id/publish', method: 'post', handler: async (req) => {
+      const body = (await req.json()) as { expectedVersion?: number; expectedRevision?: number }
+      const result = await transitionContentState(req, 'PUBLISHED', body)
+      const content = await req.payload.findByID({ collection: 'content', id: String(req.routeParams?.id ?? ''), depth: 0, overrideAccess: true, req })
+      if (content.paywallMode === 'SUBSCRIPTION_PREVIEW') await generateContentPaywall(req, content as Record<string, unknown>)
+      return result
+    }, custom: { openapi: { summary: 'Publish content and generate subscription preview/premium bodies' } } },
     { path: '/:id/restore', method: 'post', handler: async (req) => transitionContentState(req, 'RESTORED'), custom: { openapi: { summary: 'Restore deleted content within the restore window' } } },
   ],
   fields: [
