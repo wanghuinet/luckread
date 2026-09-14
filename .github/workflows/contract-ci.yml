@@ -20,10 +20,6 @@ permissions:
   contents: read
 
 jobs:
-  # Contract CI is the CODE DEVELOPMENT ADMISSION gate.
-  # This repository is contract-first: implementation is intentionally absent
-  # until the contract/evidence gates are green. Payload is restored separately
-  # from the pinned upstream version only after development admission.
   contract:
     name: Contract Admission Gate
     runs-on: ubuntu-latest
@@ -79,6 +75,9 @@ jobs:
       - name: Validate Blueprint-to-Registry reconciliation
         shell: bash
         run: node scripts/capability-contract-graph-check.mjs
+      - name: Validate L1-L4 reconciliation baseline
+        shell: bash
+        run: node scripts/l1-l4-reconciliation-baseline-check.mjs
 
   contract-full:
     name: Contract Admission Gate (full)
