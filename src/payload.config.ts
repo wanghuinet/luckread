@@ -14,6 +14,9 @@ import { Content } from './collections/Content'
 import { Taxonomies } from './collections/Taxonomies'
 import { ContentSeries } from './collections/ContentSeries'
 import { ContentMetadata } from './collections/ContentMetadata'
+import { VideoAssets } from './collections/VideoAssets'
+import { VideoVariants } from './collections/VideoVariants'
+import { VideoSubtitles } from './collections/VideoSubtitles'
 import { ContentEvents } from './collections/ContentEvents'
 import { ContentEventEffects } from './collections/ContentEventEffects'
 import { AccountStateEvents } from './collections/AccountStateEvents'
@@ -36,7 +39,7 @@ import { Notifications } from './collections/Notifications'
 import { FeedItems } from './collections/FeedItems'
 import { SocialBlocks } from './collections/SocialBlocks'
 import { SocialMutes } from './collections/SocialMutes'
-import { ContentFavorites } from './collections/ContentFavorites'
+import { ContentFavorites } from './collections/ContentFavorites']
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -45,14 +48,11 @@ const isCLI = process.argv.some((value) => realpath(value)?.endsWith(path.join('
 const isProduction = process.env.NODE_ENV === 'production'
 const isNextBuild = process.env.NEXT_PHASE === 'phase-production-build'
 
-const cloudflare =
-  isCLI || isNextBuild || !isProduction
-    ? await getCloudflareContextFromWrangler()
-    : await getCloudflareContext({ async: true })
+const cloudflare = isCLI || isNextBuild || !isProduction ? await getCloudflareContextFromWrangler() : await getCloudflareContext({ async: true })
 
 export default buildConfig({
   admin: { user: Users.slug, importMap: { baseDir: path.resolve(dirname) } },
-  collections: [Users, Media, Content, Taxonomies, ContentSeries, ContentMetadata, ContentEvents, ContentEventEffects, AccountStateEvents, Entitlements, EntitlementGrants, SubscriptionPlans, Subscriptions, Organizations, OrganizationMemberships, IPs, ContentRevisions, Reports, Appeals, ContentShares, ModerationEvents, Follows, ContentLikes, Comments, Notifications, FeedItems, SocialBlocks, SocialMutes, ContentFavorites],
+  collections: [Users, Media, Content, Taxonomies, ContentSeries, ContentMetadata, VideoAssets, VideoVariants, VideoSubtitles, ContentEvents, ContentEventEffects, AccountStateEvents, Entitlements, EntitlementGrants, SubscriptionPlans, Subscriptions, Organizations, OrganizationMemberships, IPs, ContentRevisions, Reports, Appeals, ContentShares, ModerationEvents, Follows, ContentLikes, Comments, Notifications, FeedItems, SocialBlocks, SocialMutes, ContentFavorites],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
@@ -62,7 +62,5 @@ export default buildConfig({
 })
 
 function getCloudflareContextFromWrangler(): Promise<CloudflareContext> {
-  return import(/* webpackIgnore: true */ `${'__wrangler'.replaceAll('_', '')}`).then(
-    ({ getPlatformProxy }) => getPlatformProxy({ environment: process.env.CLOUDFLARE_ENV, remoteBindings: isProduction && !isNextBuild } satisfies GetPlatformProxyOptions),
-  )
+  return import(/* webpackIgnore: true */ `${'__wrangler'.replaceAll('_', '')}`).then(({ getPlatformProxy }) => getPlatformProxy({ environment: process.env.CLOUDFLARE_ENV, remoteBindings: isProduction && !isNextBuild } satisfies GetPlatformProxyOptions))
 }
