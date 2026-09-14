@@ -21,6 +21,16 @@
     {"featureId":"AUTH-013","name":"account freeze/suspension/ban","hierarchy":{"l1":"A. Identity, account and access","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
     {"featureId":"AUTH-014","name":"account recovery","hierarchy":{"l1":"A. Identity, account and access","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
     {"featureId":"AUTH-015","name":"account deletion and restoration policy","hierarchy":{"l1":"A. Identity, account and access","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
-    {"featureId":"AUTH-016","name":"identity/age/creator/organization verification","hierarchy":{"l1":"A. Identity, account and access","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+    {"featureId":"AUTH-016","name":"identity/age/creator/organization verification","hierarchy":{"l1":"A. Identity, account and access","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"USER-001","name":"profile","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"USER-002","name":"avatar/banner/bio/display name","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"USER-003","name":"locale/language/timezone","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"USER-004","name":"interests/preferences","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"USER-005","name":"privacy settings","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"USER-006","name":"blocked/muted users","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"USER-007","name":"user history and activity","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"USER-008","name":"badges/levels/achievements","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"USER-009","name":"points/reputation","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"USER-010","name":"data export/deletion","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
   ]
 }
