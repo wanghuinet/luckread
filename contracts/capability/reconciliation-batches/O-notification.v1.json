@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.0",
+  "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "batch": "O",
+  "domain": "O. Notification",
+  "status": "NOT_GREEN",
+  "records": [
+    {"featureId":"NOTIFY-001","name":"in-app notifications","hierarchy":{"l1":"O. Notification","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"NOTIFY-002","name":"push notifications","hierarchy":{"l1":"O. Notification","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"NOTIFY-003","name":"email notifications","hierarchy":{"l1":"O. Notification","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"NOTIFY-004","name":"SMS extension","hierarchy":{"l1":"O. Notification","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"NOTIFY-005","name":"notification preferences","hierarchy":{"l1":"O. Notification","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"NOTIFY-006","name":"digest","hierarchy":{"l1":"O. Notification","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"NOTIFY-007","name":"quiet hours","hierarchy":{"l1":"O. Notification","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"NOTIFY-008","name":"security/payment/moderation notifications","hierarchy":{"l1":"O. Notification","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+  ]
+}
