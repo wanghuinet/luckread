@@ -14,6 +14,11 @@ import { Content } from './collections/Content'
 import { ContentEvents } from './collections/ContentEvents'
 import { ContentEventEffects } from './collections/ContentEventEffects'
 import { AccountStateEvents } from './collections/AccountStateEvents'
+import { Entitlements } from './collections/Entitlements'
+import { EntitlementGrants } from './collections/EntitlementGrants'
+import { Subscriptions } from './collections/Subscriptions'
+import { Organizations } from './collections/Organizations'
+import { OrganizationMemberships } from './collections/OrganizationMemberships'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -49,7 +54,19 @@ export default buildConfig({
     user: Users.slug,
     importMap: { baseDir: path.resolve(dirname) },
   },
-  collections: [Users, Media, Content, ContentEvents, ContentEventEffects, AccountStateEvents],
+  collections: [
+    Users,
+    Media,
+    Content,
+    ContentEvents,
+    ContentEventEffects,
+    AccountStateEvents,
+    Entitlements,
+    EntitlementGrants,
+    Subscriptions,
+    Organizations,
+    OrganizationMemberships,
+  ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
