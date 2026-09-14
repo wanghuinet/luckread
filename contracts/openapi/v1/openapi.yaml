@@ -591,6 +591,8 @@ paths:
       tags: [IPs]
       summary: Remove an IP member
       operationId: removeIpMember
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
       requestBody:
         required: true
         content:
@@ -603,6 +605,8 @@ paths:
       responses:
         '204':
           description: Membership removed.
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
   /organizations:
