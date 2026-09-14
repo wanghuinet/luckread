@@ -1,4 +1,7 @@
+import { randomUUID } from 'node:crypto'
+import { APIError } from 'payload'
 import type { CollectionConfig } from 'payload'
+import { validateVideoUploadInput, buildVideoObjectKey, VIDEO_UPLOAD_TTL_MS } from '../lib/video-upload-contract'
 
 const states = ['OPEN', 'COMPLETING', 'COMPLETED', 'EXPIRED', 'CANCELLED', 'FAILED'] as const
 
@@ -11,6 +14,25 @@ export const VideoUploadSessions: CollectionConfig = {
     update: ({ req }) => Boolean(req.user),
     delete: ({ req }) => Boolean(req.user),
   },
+  endpoints: [{
+    path: '/init',
+    method: 'post',
+    handler: async (req) => {
+      if (!req.user) throw new APIError('Authentication required', 401)
+      const body = await req.json() as Record<string, unknown>
+      if (!body.content || !body.originalFilename || !body.mimeType || !body.sizeBytes || !body.sha256) throw new APIError('content, originalFilename, mimeType, sizeBytes and sha256 are required', 400)
+      const input = validateVideoUploadInput(body as Parameters<typeof validateVideoUploadInput>[0])
+      const existing = await req.payload.find({ collection: 'video-assets', where: { sha256: { equals: input.sha256 }, sizeBytes: { equals: input.sizeBytes } }, limit: 1, depth: 0, overrideAccess: true, req })
+      if (existing.docs.length) return Response.json({ data: { mode: 'DEDUPLICATED', videoAsset: existing.docs[0].id } })
+      const uploadId = randomUUID()
+      const objectKey = buildVideoObjectKey(String(req.user.id), uploadId, input.originalFilename)
+      const expiresAt = new Date(Date.now() + VIDEO_UPLOAD_TTL_MS).toISOString()
+      const asset = await req.payload.create({ collection: 'video-assets', data: { content: input.content, originalFilename: input.originalFilename, mimeType: input.mimeType, sizeBytes: input.sizeBytes, sha256: input.sha256, uploadId, state: 'UPLOADING', chunkSizeBytes: input.chunkSizeBytes, totalChunks: input.totalChunks, uploadedChunks: 0, uploadExpiresAt: expiresAt, retryCount: 0, sourceR2Key: objectKey }, overrideAccess: true, req })
+      const session = await req.payload.create({ collection: 'video-upload-sessions', data: { uploadId, videoAsset: asset.id, owner: String(req.user.id), state: 'OPEN', objectKey, expectedSha256: input.sha256, expectedSizeBytes: input.sizeBytes, chunkSizeBytes: input.chunkSizeBytes, totalChunks: input.totalChunks, receivedChunks: 0, expiresAt, version: 1 }, overrideAccess: true, req })
+      return Response.json({ data: { mode: 'UPLOAD', uploadId, videoAsset: asset.id, sessionId: session.id, objectKey, chunkSizeBytes: input.chunkSizeBytes, totalChunks: input.totalChunks, expiresAt } }, { status: 201 })
+    },
+    custom: { openapi: { summary: 'Initialize an idempotent resumable video upload session' } },
+  }],
   fields: [
     { name: 'uploadId', type: 'text', required: true, unique: true, index: true },
     { name: 'videoAsset', type: 'relationship', relationTo: 'video-assets', required: true, unique: true, index: true },
