@@ -1,12 +1,12 @@
 {
   "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "$id":"https://luckread.com/contracts/api/feed-delivery.v1.json",
-  "title":"Feed Delivery Contract",
+  "$id":"https://luckread.com/contracts/v1/api/feed-delivery.json",
+  "title":"LuckRead Feed Delivery API Contract",
   "version":"1.0.0",
-  "operations":[{"id":"feed.list","method":"GET","path":"/v1/feed","auth":"public-or-scoped","rules":["cursor pagination is mandatory","ordering is deterministic within a rankingVersion and request snapshot","same item identity must not appear twice in one page","cursor is opaque and server-owned","invalid or expired cursor fails closed"]}],
-  "ordering":{"requiredTieBreakers":["rankingScore","publishedAt","contentId"],"direction":"descending","stableAcrossPageTraversal":true,"rankingVersionRequired":true},
-  "dedup":{"identity":"contentId","scope":"single-response-and-page-traversal","duplicatePolicy":"drop-later-occurrence"},
-  "cursor":{"opaque":true,"bindsTo":["feedType","rankingVersion","snapshot","filters"],"tamperHandling":"INVALID_CURSOR","expiryRequired":true},
-  "invariants":["no duplicate content in one logical feed traversal","no client-controlled ranking authority","visibility/moderation/entitlement are evaluated before delivery","pagination cannot leak unauthorized content","feed materialization creates no new content authority"],
-  "status":"CONTRACT_COMPLETE_IMPLEMENTATION_PENDING"
+  "domain":"feed",
+  "purpose":"Production feed delivery semantics subordinate to canonical OpenAPI and recommendation contracts.",
+  "invariants":["cursor pagination is mandatory","ordering is deterministic within rankingVersion and request snapshot","contentId cannot repeat within one logical feed traversal","cursor is opaque, server-owned and context-bound","visibility, moderation and entitlement are evaluated before delivery","feed materialization creates no new content authority","client cannot control authoritative ranking score"],
+  "operations":[{"operationId":"getFeed","method":"GET","path":"/feed","auth":{"required":false,"permission":"feed.read","scope":"viewer"},"parameters":["type","cursor","limit"],"success":{"status":200,"idempotent":false},"errors":["INVALID_CURSOR","PERMISSION_DENIED","RATE_LIMITED","SERVICE_UNAVAILABLE"],"cache":{"mode":"AUTHORIZATION_AWARE","shared":false},"ordering":{"tieBreakers":["rankingScore","publishedAt","contentId"],"direction":"descending","rankingVersionRequired":true},"dedup":{"identity":"contentId","scope":"logical-feed-traversal","duplicatePolicy":"drop-later-occurrence"},"cursor":{"opaque":true,"bindsTo":["feedType","rankingVersion","snapshot","filters"],"tamperHandling":"INVALID_CURSOR","expiryRequired":true}}],
+  "definitions":{"ResourceId":{"type":"string","minLength":1,"maxLength":128}},
+  "greenEvidence":{"openapi":"required","permission":"required","cursorStability":"required","deduplication":"required","authorizationFiltering":"required","securityE2E":"required"}
 }
