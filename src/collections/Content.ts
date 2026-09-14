@@ -3,25 +3,27 @@ import type { CollectionConfig } from 'payload'
 const contentTypes = ['article', 'post', 'video_metadata', 'gallery', 'live_metadata', 'series'] as const
 const contentStates = [
   'DRAFT',
-  'REVIEW_PENDING',
-  'REVIEW_REJECTED',
+  'PENDING_REVIEW',
+  'REJECTED',
+  'APPROVED',
   'SCHEDULED',
   'PUBLISHED',
   'UNPUBLISHED',
   'ARCHIVED',
   'DELETED',
+  'RESTORED',
 ] as const
 
 export const Content: CollectionConfig = {
   slug: 'content',
   admin: {
     useAsTitle: 'title',
-    defaultColumns: ['title', 'contentType', 'status', 'author', 'updatedAt'],
+    defaultColumns: ['title', 'contentType', 'state', 'author', 'updatedAt'],
   },
   access: {
     read: ({ req }) => {
       if (req.user) return true
-      return { status: { equals: 'PUBLISHED' } }
+      return { state: { equals: 'PUBLISHED' } }
     },
     create: ({ req }) => Boolean(req.user),
     update: ({ req }) => Boolean(req.user),
@@ -49,12 +51,13 @@ export const Content: CollectionConfig = {
       index: true,
     },
     {
-      name: 'status',
+      name: 'state',
       type: 'select',
       required: true,
       defaultValue: 'DRAFT',
       options: contentStates.map((value) => ({ label: value, value })),
       index: true,
+      admin: { description: 'Canonical lifecycle state. Mutations must use the state-transition contract.' },
     },
     {
       name: 'author',
@@ -62,6 +65,7 @@ export const Content: CollectionConfig = {
       relationTo: 'users',
       required: true,
       index: true,
+      admin: { description: 'Server-owned author identity; public APIs must never accept arbitrary author assignment.' },
     },
     {
       name: 'locale',
@@ -107,6 +111,13 @@ export const Content: CollectionConfig = {
     },
     {
       name: 'version',
+      type: 'number',
+      required: true,
+      defaultValue: 1,
+      min: 1,
+    },
+    {
+      name: 'revision',
       type: 'number',
       required: true,
       defaultValue: 1,
