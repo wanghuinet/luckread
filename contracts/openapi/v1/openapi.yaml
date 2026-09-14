@@ -810,6 +810,8 @@ paths:
         '4XX': { $ref: '#/components/responses/ClientError' }
 
   /content/{contentId}/shares:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
     post:
       tags: [Contents]
       summary: Create a share token for content
@@ -1226,5 +1228,5 @@ components:
       type: object
       required: [id, name]
       properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
+        id: { $ref: '#/components/schemas/OrganizationId' }
         name: { type: string }
