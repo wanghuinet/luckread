@@ -1,0 +1,17 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+  "title":"RC-04..RC-06 Share, Subscription and Entitlement API Contract",
+  "version":"1.0.0",
+  "operations":[
+    {"id":"share.create","method":"POST","path":"/v1/content/{contentId}/shares","auth":"required","idempotency":"required","rules":["actor may share only publishable content","server owns actorId and timestamps","duplicate idempotency key returns original result"]},
+    {"id":"share.resolve","method":"GET","path":"/v1/shares/{shareId}","auth":"public-or-scoped","rules":["must not expose private actor data","revoked content must not produce an active share target"]},
+    {"id":"subscription.create","method":"POST","path":"/v1/memberships/subscriptions","auth":"required","idempotency":"required","rules":["plan must be active","one authoritative subscription transition","payment authority is external to membership","replay-safe"]},
+    {"id":"subscription.cancel","method":"POST","path":"/v1/memberships/subscriptions/{subscriptionId}/cancel","auth":"required","concurrency":"If-Match-required","rules":["only owner or authorized organization actor","cancel is idempotent","historical subscription record is immutable"]},
+    {"id":"subscription.get","method":"GET","path":"/v1/memberships/subscriptions/{subscriptionId}","auth":"required","rules":["ownership or organization scope required","server returns effective state only"]},
+    {"id":"entitlement.get","method":"GET","path":"/v1/entitlements/{subjectId}","auth":"required","rules":["effective entitlements are server-derived","role cannot directly mutate entitlement","expired or revoked grants are excluded"]},
+    {"id":"entitlement.check","method":"POST","path":"/v1/entitlements/check","auth":"required","rules":["fail closed on ambiguity","cache cannot override authoritative denial","decision is auditable"]}
+  ],
+  "globalInvariants":["tenant/organization scope is enforced","server-owned security fields cannot be client-written","state transitions must conform to subscription state machine","all mutating operations are auditable","payment does not become entitlement authority"],
+  "status":"CONTRACT_COMPLETE_IMPLEMENTATION_PENDING"
+}
