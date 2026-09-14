@@ -6,7 +6,7 @@ on:
       - feat/cloudflare-payload-baseline
   pull_request:
     branches:
-      - feat/cloudflare-payload-baseline
+      - main
 
 permissions:
   contents: read
