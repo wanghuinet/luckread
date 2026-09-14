@@ -34,6 +34,7 @@ export const ContentEvents: CollectionConfig = {
       defaultValue: 'PENDING',
       options: [
         { label: 'Pending', value: 'PENDING' },
+        { label: 'Processing', value: 'PROCESSING' },
         { label: 'Processed', value: 'PROCESSED' },
         { label: 'Failed', value: 'FAILED' },
       ],
