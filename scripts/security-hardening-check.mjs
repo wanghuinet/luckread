@@ -31,15 +31,15 @@ if (decision) {
   for (const key of requiredChecks) if (!checks || !Object.hasOwn(checks, key)) fail(`decision check missing: ${key}`);
   const order = decision['x-resolution-order'] ?? [];
   if (order[0] !== 'ACCOUNT_SECURITY_DENY' || order[1] !== 'CREDENTIAL_DENY') fail('security deny precedence must start with account and credential deny');
-  const invariants = decision['x-hard-invariants'] ?? [];
+  const invariants = (decision['x-hard-invariants'] ?? []).map((x) => String(x).toLowerCase());
   const requiredInvariantFragments = [
-    'role name alone can never produce ALLOW',
-    'resource identifier alone can never produce ALLOW',
-    'Authorization evaluation failure produces DENY',
-    'Authorization cache cannot override authoritative account state or revocation'
+    'role name alone can never produce allow',
+    'resource identifier alone can never produce allow',
+    'authorization evaluation failure produces deny',
+    'authorization cache cannot override authoritative account state or revocation'
   ];
   for (const fragment of requiredInvariantFragments) {
-    if (!invariants.some((x) => String(x).includes(fragment))) fail(`missing hard invariant: ${fragment}`);
+    if (!invariants.some((x) => x.includes(fragment))) fail(`missing hard invariant: ${fragment}`);
   }
 }
 
