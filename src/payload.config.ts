@@ -11,6 +11,8 @@ import { r2Storage } from '@payloadcms/storage-r2'
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
 import { Content } from './collections/Content'
+import { Taxonomies } from './collections/Taxonomies'
+import { ContentSeries } from './collections/ContentSeries'
 import { ContentEvents } from './collections/ContentEvents'
 import { ContentEventEffects } from './collections/ContentEventEffects'
 import { AccountStateEvents } from './collections/AccountStateEvents'
@@ -52,59 +54,17 @@ export default buildConfig({
     user: Users.slug,
     importMap: { baseDir: path.resolve(dirname) },
   },
-  collections: [
-    Users,
-    Media,
-    Content,
-    ContentEvents,
-    ContentEventEffects,
-    AccountStateEvents,
-    Entitlements,
-    EntitlementGrants,
-    SubscriptionPlans,
-    Subscriptions,
-    Organizations,
-    OrganizationMemberships,
-    IPs,
-    ContentRevisions,
-    Reports,
-    Appeals,
-    ContentShares,
-    ModerationEvents,
-    Follows,
-    ContentLikes,
-    Comments,
-    Notifications,
-    FeedItems,
-    SocialBlocks,
-    SocialMutes,
-    ContentFavorites,
-  ],
+  collections: [Users, Media, Content, Taxonomies, ContentSeries, ContentEvents, ContentEventEffects, AccountStateEvents, Entitlements, EntitlementGrants, SubscriptionPlans, Subscriptions, Organizations, OrganizationMemberships, IPs, ContentRevisions, Reports, Appeals, ContentShares, ModerationEvents, Follows, ContentLikes, Comments, Notifications, FeedItems, SocialBlocks, SocialMutes, ContentFavorites],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
   db: sqliteD1Adapter({ binding: cloudflare.env.D1, transactionOptions: {} }),
-  logger: isProduction
-    ? {
-        options: {
-          level: process.env.PAYLOAD_LOG_LEVEL || 'info',
-        },
-      }
-    : undefined,
-  plugins: [
-    r2Storage({
-      bucket: cloudflare.env.R2,
-      collections: { media: true },
-    }),
-  ],
+  logger: isProduction ? { options: { level: process.env.PAYLOAD_LOG_LEVEL || 'info' } } : undefined,
+  plugins: [r2Storage({ bucket: cloudflare.env.R2, collections: { media: true } })],
 })
 
 function getCloudflareContextFromWrangler(): Promise<CloudflareContext> {
   return import(/* webpackIgnore: true */ `${'__wrangler'.replaceAll('_', '')}`).then(
-    ({ getPlatformProxy }) =>
-      getPlatformProxy({
-        environment: process.env.CLOUDFLARE_ENV,
-        remoteBindings: isProduction && !isNextBuild,
-      } satisfies GetPlatformProxyOptions),
+    ({ getPlatformProxy }) => getPlatformProxy({ environment: process.env.CLOUDFLARE_ENV, remoteBindings: isProduction && !isNextBuild } satisfies GetPlatformProxyOptions),
   )
 }
