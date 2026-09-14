@@ -132,7 +132,7 @@ export const Content: CollectionConfig = {
     { name: 'title', type: 'text', required: true, maxLength: 200 },
     { name: 'slug', type: 'text', required: true, unique: true, index: true },
     { name: 'contentType', type: 'select', required: true, options: contentTypes.map((value) => ({ label: value, value })), index: true },
-    { name: 'state', type: 'select', required: true, options: contentStates.map((value) => ({ label: value, value })), index: true },
+    { name: 'state', type: 'select', required: true, defaultValue: 'DRAFT', options: contentStates.map((value) => ({ label: value, value })), index: true },
     { name: 'author', type: 'relationship', relationTo: 'users', required: true, index: true },
     { name: 'locale', type: 'text', required: true, defaultValue: 'en-US', index: true },
     { name: 'excerpt', type: 'textarea', maxLength: 1000 },
