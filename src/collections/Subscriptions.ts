@@ -1,5 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
+import { syncSubscriptionEntitlements } from '../lib/subscription-entitlement-service'
+
 const statuses = ['PENDING', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'EXPIRED'] as const
 
 export const Subscriptions: CollectionConfig = {
@@ -10,6 +12,13 @@ export const Subscriptions: CollectionConfig = {
     create: ({ req }) => Boolean(req.user),
     update: ({ req }) => Boolean(req.user),
     delete: ({ req }) => Boolean(req.user),
+  },
+  hooks: {
+    afterChange: [
+      async ({ doc, req }) => {
+        await syncSubscriptionEntitlements(req.payload, doc)
+      },
+    ],
   },
   fields: [
     { name: 'user', type: 'relationship', relationTo: 'users', required: true, index: true },
