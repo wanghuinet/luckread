@@ -1,0 +1,52 @@
+name: Repair Auth Registry
+
+on:
+  push:
+    branches: [fix/contract-idempotency-openapi]
+    paths:
+      - '.github/workflows/repair-auth-registry.yml'
+      - 'contracts/openapi/v1/openapi.yaml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add missing Auth operations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('contracts/openapi/v1/openapi.yaml')
+          s = p.read_text()
+          anchor = "  /users/me:\n"
+          if "operationId: authRefresh" not in s:
+              block = '''  /auth/refresh:\n    post:\n      tags: [Auth]\n      summary: Rotate the current refresh credential and issue new tokens\n      operationId: authRefresh\n      responses:\n        '200':\n          description: Tokens refreshed and the prior refresh credential invalidated.\n          content:\n            application/json:\n              schema:\n                type: object\n                required: [accessToken, refreshToken, expiresIn]\n                properties:\n                  accessToken: { type: string }\n                  refreshToken: { type: string }\n                  expiresIn: { type: integer }\n        '401': { $ref: '#/components/responses/ClientError' }\n  /auth/sessions:\n    get:\n      tags: [Auth]\n      summary: List the current user's active sessions\n      operationId: authSessionList\n      responses:\n        '200':\n          description: Active sessions for the authenticated user.\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/ListResponse' }\n        '4XX': { $ref: '#/components/responses/ClientError' }\n    '''
+              s = s.replace(anchor, block + anchor, 1)
+          if "operationId: authSessionRevoke" not in s:
+              anchor = "  /users/me:\n"
+              block = '''  /auth/sessions/{sessionId}:\n    parameters:\n      - name: sessionId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n    delete:\n      tags: [Auth]\n      summary: Revoke one of the current user's sessions\n      operationId: authSessionRevoke\n      parameters:\n        - $ref: '#/components/parameters/IdempotencyKeyRequired'\n      responses:\n        '204': { description: Session revoked. }\n        '404': { $ref: '#/components/responses/NotFound' }\n        '4XX': { $ref: '#/components/responses/ClientError' }\n  '''
+              s = s.replace(anchor, block + anchor, 1)
+          p.write_text(s)
+          PY
+      - name: Validate Auth operations
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'); const yaml=require('yaml');
+          const doc=yaml.parse(fs.readFileSync('contracts/openapi/v1/openapi.yaml','utf8'));
+          const targets=new Set(['authRefresh','authSessionList','authSessionRevoke']);
+          const found=new Set();
+          for(const item of Object.values(doc.paths||{})) for(const op of Object.values(item||{})) if(op&&typeof op==='object'&&targets.has(op.operationId)) found.add(op.operationId);
+          const missing=[...targets].filter(x=>!found.has(x));
+          if(missing.length) { console.error(missing.join('\n')); process.exit(1); }
+          console.log('Auth registry operations present.');
+          NODE
+      - name: Commit repair
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add contracts/openapi/v1/openapi.yaml
+          git diff --cached --quiet || git commit -m "fix(contract): register auth session operations"
+          git push
