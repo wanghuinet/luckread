@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/governance/cross-domain-audit.v1.json",
+  "title": "Luckread B01-B20 Cross-Domain Audit v1",
+  "version": "1.0.0",
+  "status": "NOT_GREEN",
+  "baseline": "docs/00-LUCKREAD-BLUEPRINT-CLOSURE-v3.0.md",
+  "rule": "No downstream gate may be GREEN while an unresolved source-of-truth, lifecycle, authorization, event, data, API or migration boundary exists.",
+  "evidence": {
+    "api_domain_audit": "contracts/api/api-domain-audit.v1.json",
+    "api_inventory": "contracts/api/api-inventory.v1.json",
+    "api_inventory_reconciliation": "contracts/api/api-inventory-reconciliation.schema.json"
+  },
+  "domains": {
+    "B01_identity_auth_account": {"owner":"identity","status":"NOT_GREEN","dependsOn":["B02","B03","B12","B19","B20"],"criticalBoundaries":["account-state denial","credential/session lifecycle","security events","recovery/MFA","device/session revocation"],"blockingGaps":["current API domain audit covers only partial auth families","runtime security E2E evidence must be mapped"]},
+    "B02_user_profile_social": {"owner":"user-social","status":"NOT_GREEN","dependsOn":["B01","B03","B11","B12","B09","B10","B19"],"criticalBoundaries":["relationship authority","block/mute propagation","profile privacy","username lifecycle"],"blockingGaps":["full endpoint inventory coverage is not yet reconciled","cross-domain block/mute enforcement evidence missing"]},
+    "B03_authorization_entitlement_organization": {"owner":"authorization","status":"NOT_GREEN","dependsOn":["B01","B02","B14","B15","B20"],"criticalBoundaries":["principal-role-permission-scope","ownership","subscription entitlement","organization scope","operator/service authorization"],"blockingGaps":["one machine-readable authorization mapping for all B01-B20 operations is missing"]},
+    "B04_unified_content": {"owner":"content","status":"NOT_GREEN","dependsOn":["B01","B02","B03","B05","B06","B07","B08","B09","B10","B11","B14","B19","B20"],"criticalBoundaries":["content identity","state machine","visibility","ownership","moderation separation","version/revision"],"blockingGaps":["existing inventory does not cover the full frozen content state/resource contract"]},
+    "B05_article": {"owner":"article","status":"NOT_GREEN","dependsOn":["B04","B08","B10","B11","B14","B18","B19"],"criticalBoundaries":["paywall segment","revision/published version","SEO","translation","media references"],"blockingGaps":["article-specific API and access evidence not fully reconciled"]},
+    "B06_post": {"owner":"post","status":"NOT_GREEN","dependsOn":["B04","B07","B08","B09","B11","B19"],"criticalBoundaries":["visibility","thread/repost/quote","poll","moderation","feed eligibility"],"blockingGaps":["post feature families are not represented in the current domain audit"]},
+    "B07_video": {"owner":"video","status":"NOT_GREEN","dependsOn":["B04","B08","B14","B16","B18","B19"],"criticalBoundaries":["upload-processing-playback","signed delivery","paywall","recording","copyright","moderation"],"blockingGaps":["current media inventory lacks complete processing/playback/security evidence"]},
+    "B08_media_audio_podcast": {"owner":"media","status":"NOT_GREEN","dependsOn":["B04","B07","B16","B19","B20"],"criticalBoundaries":["media-storage separation","processing","retention","signed delivery","provider portability"],"blockingGaps":["multipart/variant/retention/resource budgets are explicitly listed as current gaps"]},
+    "B09_feed_discovery": {"owner":"feed","status":"NOT_GREEN","dependsOn":["B02","B04","B09","B10","B11","B14","B17","B18","B19"],"criticalBoundaries":["eligibility","privacy","block/mute","access","safety","ranking","sponsored content"],"blockingGaps":["existing audit explicitly lacks eligibility/cache/ranking context and bounded budgets"]},
+    "B10_search_topic_tag": {"owner":"search","status":"NOT_GREEN","dependsOn":["B02","B04","B09","B19","B20"],"criticalBoundaries":["index source of truth","privacy","paywall","de-index","topic/hashtag"],"blockingGaps":["search domain is not fully represented in current API domain audit"]},
+    "B11_interaction": {"owner":"interaction","status":"NOT_GREEN","dependsOn":["B02","B04","B09","B12","B18","B19"],"criticalBoundaries":["idempotent mutation","block/mute","counter projection","comment moderation"],"blockingGaps":["existing audit lists missing favorite/report/block/mute/thread/state/budget/security evidence"]},
+    "B12_notification_messaging": {"owner":"notification-messaging","status":"NOT_GREEN","dependsOn":["B01","B02","B03","B11","B14","B15","B16","B19","B20"],"criticalBoundaries":["event-to-notification","delivery retry","deep-link authorization","private messaging","block/mute"],"blockingGaps":["current inventory has basic notifications but not complete messaging/event delivery contract"]},
+    "B13_creator_studio": {"owner":"creator","status":"NOT_GREEN","dependsOn":["B03","B04","B08","B11","B14","B15","B17","B18","B19","B20"],"criticalBoundaries":["workspace scope","bulk operations","creator analytics","revenue","team collaboration"],"blockingGaps":["creator studio is not represented as a complete endpoint family in the current inventory"]},
+    "B14_membership_paywall": {"owner":"entitlement","status":"NOT_GREEN","dependsOn":["B03","B04","B05","B07","B08","B15","B18"],"criticalBoundaries":["access decision","preview","partial paywall","subscription lifecycle","cache invalidation"],"blockingGaps":["current inventory has subscriptions/plans but not complete access/preview/paywall operation coverage"]},
+    "B15_commerce_payment": {"owner":"commerce","status":"NOT_GREEN","dependsOn":["B03","B14","B17","B18","B20"],"criticalBoundaries":["order/payment truth","provider webhook","refund/dispute","fulfillment","settlement/payout"],"blockingGaps":["current inventory does not cover full order/refund/fulfillment/settlement lifecycle"]},
+    "B16_live": {"owner":"live","status":"NOT_GREEN","dependsOn":["B07","B08","B11","B12","B14","B15","B18","B19","B20"],"criticalBoundaries":["room/session","stream key","playback","chat","moderation","recording","commerce"],"blockingGaps":["live is not fully represented in current API inventory"]},
+    "B17_advertising": {"owner":"advertising","status":"NOT_GREEN","dependsOn":["B03","B04","B09","B10","B15","B18","B19","B20"],"criticalBoundaries":["ad eligibility","privacy/consent","auction","frequency cap","fraud","external network revenue"],"blockingGaps":["advertising API family is absent from current inventory"]},
+    "B18_analytics_recommendation_growth": {"owner":"analytics-recommendation","status":"NOT_GREEN","dependsOn":["B02","B04","B09","B10","B11","B14","B15","B16","B17","B19","B20"],"criticalBoundaries":["trusted event tiers","privacy","metric source of truth","recommendation eligibility","experimentation"],"blockingGaps":["current inventory has basic analytics/recommendation endpoints but not complete event/metric/experiment contracts"]},
+    "B19_moderation_safety_copyright": {"owner":"trust-safety","status":"NOT_GREEN","dependsOn":["B01","B02","B03","B04","B07","B08","B09","B10","B11","B12","B15","B16","B17","B18","B20"],"criticalBoundaries":["moderation state","risk decision","enforcement","appeal","copyright","legal hold","emergency controls"],"blockingGaps":["moderation/safety/copyright API families are absent from current inventory"]},
+    "B20_admin_audit_integration_migration": {"owner":"platform-governance","status":"NOT_GREEN","dependsOn":["B01","B03","B04","B08","B14","B15","B18","B19"],"criticalBoundaries":["admin scope","immutable audit","provider adapters","webhooks","jobs","migration","backup/restore"],"blockingGaps":["current API inventory has only a narrow audit/compliance subset and lacks full platform governance families"]}
+  },
+  "global_blockers": [
+    "The current api-domain-audit.v1.json covers only auth, user-account, content, media, feed and interaction; B07-B20 are not fully represented there.",
+    "The current api-inventory.v1.json has endpoint groups for only a subset of the frozen B01-B20 feature inventory.",
+    "Every OpenAPI operation must be reconciled to exactly one domain owner and one Feature ID.",
+    "Authorization, scope, state-machine, resource budget, retry, event, queue, anti-abuse and idempotency evidence must exist per operation where applicable.",
+    "Cross-domain lifecycle transitions and invalidation paths must be machine-readable before Contract Green.",
+    "Runtime/security/integration evidence cannot be inferred from document existence."
+  ],
+  "next_action": "Expand the API inventory reconciliation to B01-B20 and produce one operation record per canonical OpenAPI operation; then rerun G01 before G02 is declared GREEN."
+}
