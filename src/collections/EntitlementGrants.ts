@@ -11,12 +11,22 @@ export const EntitlementGrants: CollectionConfig = {
     update: ({ req }) => Boolean(req.user),
     delete: ({ req }) => Boolean(req.user),
   },
+  hooks: {
+    beforeChange: [
+      ({ data }) => {
+        if (!data.grantKey && data.user && data.entitlement && data.sourceType && data.sourceId) {
+          data.grantKey = `${String(typeof data.user === 'object' ? data.user.id : data.user)}:${String(typeof data.entitlement === 'object' ? data.entitlement.id : data.entitlement)}:${data.sourceType}:${String(data.sourceId)}`
+        }
+        return data
+      },
+    ],
+  },
   fields: [
     { name: 'user', type: 'relationship', relationTo: 'users', required: true, index: true },
     { name: 'entitlement', type: 'relationship', relationTo: 'entitlements', required: true, index: true },
     { name: 'sourceType', type: 'select', required: true, options: sources.map((value) => ({ label: value, value })) },
     { name: 'sourceId', type: 'text', index: true },
-    { name: 'grantKey', type: 'text', required: true, unique: true, index: true },
+    { name: 'grantKey', type: 'text', unique: true, index: true },
     { name: 'scope', type: 'json' },
     { name: 'startsAt', type: 'date', required: true },
     { name: 'endsAt', type: 'date' },
