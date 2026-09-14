@@ -6,6 +6,8 @@ import { type AuthorizationUser } from './authorization'
 
 const CONTENT_STATES = ['DRAFT', 'PENDING_REVIEW', 'REJECTED', 'APPROVED', 'SCHEDULED', 'PUBLISHED', 'UNPUBLISHED', 'ARCHIVED', 'DELETED', 'RESTORED'] as const
 
+type TransitionBody = { expectedVersion?: number; expectedRevision?: number }
+
 function toAuthorizationUser(value: unknown): AuthorizationUser | null {
   if (!value || typeof value !== 'object') return null
   return value as AuthorizationUser
@@ -19,11 +21,11 @@ function sideEffectsForState(state: ContentState): string[] {
   return []
 }
 
-export async function transitionContentState(req: PayloadRequest, to: ContentState): Promise<Response> {
+export async function transitionContentState(req: PayloadRequest, to: ContentState, parsedBody?: TransitionBody): Promise<Response> {
   if (!req.user) throw new APIError('Authentication required', 401)
   if (!CONTENT_STATES.includes(to)) throw new APIError('A valid target state is required', 400)
 
-  const body = (await req.json()) as { expectedVersion?: number; expectedRevision?: number }
+  const body = parsedBody ?? (await req.json() as TransitionBody)
   if (!Number.isInteger(body.expectedVersion) || body.expectedVersion < 1) throw new APIError('expectedVersion is required for optimistic concurrency', 400)
   if (!Number.isInteger(body.expectedRevision) || body.expectedRevision < 1) throw new APIError('expectedRevision is required for optimistic concurrency', 400)
 
