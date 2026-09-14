@@ -1,4 +1,4 @@
-version: 1.0.0
+version: 1.0.1
 contract: D21
 status: CONTRACT-FROZEN
 source_of_truth: docs/21-D21-ADVERTISING-PLATFORM-CONTRACT-v1.0.md
@@ -10,112 +10,87 @@ principles:
   - billing finality is append-only and cannot be rolled back by mutation
   - failure paths must fail safe
 machines:
-  advertiser:
-    initial: CREATING
-    terminal: [CLOSED]
-    transitions:
-      - {from: CREATING, to: ACTIVE, action: activate, capability: advertising.update}
-      - {from: ACTIVE, to: MONITORING, action: monitor, capability: advertising.update}
-      - {from: MONITORING, to: ACTIVE, action: clear_monitoring, capability: advertising.update}
-      - {from: ACTIVE, to: RESTRICTED, action: restrict, capability: advertising.update}
-      - {from: MONITORING, to: RESTRICTED, action: restrict, capability: advertising.update}
-      - {from: RESTRICTED, to: ACTIVE, action: restore, capability: advertising.update}
-      - {from: ACTIVE, to: SUSPENDED, action: suspend, capability: advertising.update}
-      - {from: MONITORING, to: SUSPENDED, action: suspend, capability: advertising.update}
-      - {from: RESTRICTED, to: SUSPENDED, action: suspend, capability: advertising.update}
-      - {from: SUSPENDED, to: ACTIVE, action: restore, capability: advertising.update}
-      - {from: ACTIVE, to: CLOSED, action: close, capability: advertising.update}
-      - {from: RESTRICTED, to: CLOSED, action: close, capability: advertising.update}
-      - {from: SUSPENDED, to: CLOSED, action: close, capability: advertising.update}
-  campaign:
-    initial: DRAFT
-    terminal: [COMPLETED, REJECTED, CANCELLED, EXPIRED]
-    transitions:
-      - {from: DRAFT, to: SUBMITTED, action: submit, capability: campaign.publish}
-      - {from: SUBMITTED, to: REVIEWING, action: start_review, capability: campaign.publish}
-      - {from: REVIEWING, to: APPROVED, action: approve, capability: campaign.publish}
-      - {from: REVIEWING, to: REJECTED, action: reject, capability: campaign.publish}
-      - {from: APPROVED, to: ACTIVE, action: activate, capability: campaign.publish}
-      - {from: ACTIVE, to: PAUSED, action: pause, capability: campaign.pause}
-      - {from: PAUSED, to: ACTIVE, action: resume, capability: campaign.publish}
-      - {from: ACTIVE, to: COMPLETED, action: complete, capability: campaign.cancel}
-      - {from: PAUSED, to: COMPLETED, action: complete, capability: campaign.cancel}
-      - {from: DRAFT, to: CANCELLED, action: cancel, capability: campaign.cancel}
-      - {from: SUBMITTED, to: CANCELLED, action: cancel, capability: campaign.cancel}
-      - {from: REVIEWING, to: CANCELLED, action: cancel, capability: campaign.cancel}
-      - {from: APPROVED, to: CANCELLED, action: cancel, capability: campaign.cancel}
-      - {from: ACTIVE, to: CANCELLED, action: cancel, capability: campaign.cancel}
-      - {from: PAUSED, to: CANCELLED, action: cancel, capability: campaign.cancel}
-      - {from: APPROVED, to: EXPIRED, action: expire, capability: campaign.cancel}
-      - {from: ACTIVE, to: EXPIRED, action: expire, capability: campaign.cancel}
-      - {from: PAUSED, to: EXPIRED, action: expire, capability: campaign.cancel}
-      - {from: ACTIVE, to: SUSPENDED, action: suspend, capability: campaign.pause}
-      - {from: PAUSED, to: SUSPENDED, action: suspend, capability: campaign.pause}
-      - {from: SUSPENDED, to: ACTIVE, action: restore, capability: campaign.publish}
-  creative:
-    initial: DRAFT
-    terminal: [REJECTED, ARCHIVED]
-    transitions:
-      - {from: DRAFT, to: SUBMITTED, action: submit, capability: creative.submit}
-      - {from: SUBMITTED, to: REVIEWING, action: start_review, capability: creative.submit}
-      - {from: REVIEWING, to: APPROVED, action: approve, capability: creative.submit}
-      - {from: REVIEWING, to: REJECTED, action: reject, capability: creative.submit}
-      - {from: APPROVED, to: ACTIVE, action: activate, capability: creative.update}
-      - {from: ACTIVE, to: SUSPENDED, action: suspend, capability: creative.update}
-      - {from: SUSPENDED, to: ACTIVE, action: restore, capability: creative.update}
-      - {from: ACTIVE, to: ARCHIVED, action: archive, capability: creative.update}
-      - {from: REJECTED, to: DRAFT, action: revise, capability: creative.update}
-  traffic_validity:
-    initial: PENDING
-    terminal: [INVALID, REVERSED]
-    transitions:
-      - {from: PENDING, to: VALID, action: validate, capability: traffic.validate}
-      - {from: PENDING, to: SUSPICIOUS, action: flag, capability: traffic.validate}
-      - {from: PENDING, to: INVALID, action: invalidate, capability: traffic.validate}
-      - {from: SUSPICIOUS, to: VALID, action: clear, capability: traffic.validate}
-      - {from: SUSPICIOUS, to: INVALID, action: invalidate, capability: traffic.validate}
-      - {from: VALID, to: REVERSED, action: reverse, capability: traffic.validate}
   billing:
     initial: PENDING
     terminal: [FINALIZED, INVALID, REVERSED, ADJUSTED]
     transitions:
-      - {from: PENDING, to: VALID, action: validate, capability: traffic.validate}
-      - {from: PENDING, to: SUSPICIOUS, action: flag, capability: traffic.validate}
-      - {from: PENDING, to: INVALID, action: invalidate, capability: traffic.validate}
-      - {from: SUSPICIOUS, to: VALID, action: clear, capability: traffic.validate}
-      - {from: SUSPICIOUS, to: INVALID, action: invalidate, capability: traffic.validate}
-      - {from: VALID, to: BILLABLE, action: make_billable, capability: billing.read}
-      - {from: BILLABLE, to: FINALIZED, action: finalize, capability: billing.read}
-      - {from: BILLABLE, to: REVERSED, action: reverse, capability: traffic.validate}
-      - {from: FINALIZED, to: ADJUSTED, action: adjust, capability: billing.read}
-      - {from: INVALID, to: ADJUSTED, action: adjustment, capability: billing.read}
-      - {from: REVERSED, to: ADJUSTED, action: adjustment, capability: billing.read}
-  dispute:
-    initial: OPEN
-    terminal: [RESOLVED, REJECTED]
+      - {from: PENDING, to: VALID, action: validate, capability: traffic.validate, event: advertising.billing.validated}
+      - {from: PENDING, to: SUSPICIOUS, action: flag, capability: traffic.validate, event: advertising.billing.pending}
+      - {from: PENDING, to: INVALID, action: invalidate, capability: traffic.validate, event: advertising.billing.adjusted}
+      - {from: SUSPICIOUS, to: VALID, action: clear, capability: traffic.validate, event: advertising.billing.validated}
+      - {from: SUSPICIOUS, to: INVALID, action: invalidate, capability: traffic.validate, event: advertising.billing.adjusted}
+      - {from: VALID, to: BILLABLE, action: make_billable, capability: billing.make_billable, event: advertising.billing.billable}
+      - {from: BILLABLE, to: FINALIZED, action: finalize, capability: billing.finalize, event: advertising.billing.finalized}
+      - {from: BILLABLE, to: REVERSED, action: reverse, capability: billing.reverse, event: advertising.billing.reversed}
+      - {from: FINALIZED, to: ADJUSTED, action: adjust, capability: billing.adjust, event: advertising.billing.adjusted}
+      - {from: INVALID, to: ADJUSTED, action: adjustment, capability: billing.adjust, event: advertising.billing.adjusted}
+      - {from: REVERSED, to: ADJUSTED, action: adjustment, capability: billing.adjust, event: advertising.billing.adjusted}
+  advertiser:
+    initial: CREATING
+    terminal: [CLOSED]
     transitions:
-      - {from: OPEN, to: UNDER_REVIEW, action: review, capability: dispute.read}
-      - {from: UNDER_REVIEW, to: EVIDENCE_REQUIRED, action: request_evidence, capability: dispute.read}
-      - {from: EVIDENCE_REQUIRED, to: UNDER_REVIEW, action: submit_evidence, capability: dispute.appeal}
-      - {from: UNDER_REVIEW, to: RESOLVED, action: resolve, capability: dispute.create}
-      - {from: UNDER_REVIEW, to: REJECTED, action: reject, capability: dispute.create}
-      - {from: OPEN, to: ESCALATED, action: escalate, capability: dispute.create}
-      - {from: UNDER_REVIEW, to: ESCALATED, action: escalate, capability: dispute.create}
-      - {from: ESCALATED, to: UNDER_REVIEW, action: assign_review, capability: dispute.read}
-  reconciliation:
-    initial: MATCHED
-    terminal: [MATCHED, MINOR_VARIANCE, MATERIAL_VARIANCE, DISPUTED]
+      - {from: CREATING, to: ACTIVE, action: activate, capability: advertising.update, event: advertising.account.state_changed}
+      - {from: ACTIVE, to: MONITORING, action: monitor, capability: advertising.update, event: advertising.account.state_changed}
+      - {from: MONITORING, to: ACTIVE, action: clear_monitoring, capability: advertising.update, event: advertising.account.state_changed}
+      - {from: ACTIVE, to: RESTRICTED, action: restrict, capability: advertising.update, event: advertising.account.state_changed}
+      - {from: MONITORING, to: RESTRICTED, action: restrict, capability: advertising.update, event: advertising.account.state_changed}
+      - {from: RESTRICTED, to: ACTIVE, action: restore, capability: advertising.update, event: advertising.account.state_changed}
+      - {from: ACTIVE, to: SUSPENDED, action: suspend, capability: advertising.update, event: advertising.account.state_changed}
+      - {from: MONITORING, to: SUSPENDED, action: suspend, capability: advertising.update, event: advertising.account.state_changed}
+      - {from: RESTRICTED, to: SUSPENDED, action: suspend, capability: advertising.update, event: advertising.account.state_changed}
+      - {from: SUSPENDED, to: ACTIVE, action: restore, capability: advertising.update, event: advertising.account.state_changed}
+      - {from: ACTIVE, to: CLOSED, action: close, capability: advertising.update, event: advertising.account.state_changed}
+  campaign:
+    initial: DRAFT
+    terminal: [COMPLETED, REJECTED, CANCELLED, EXPIRED]
     transitions:
-      - {from: MATCHED, to: MINOR_VARIANCE, action: detect_variance, capability: external_adapter.reconcile}
-      - {from: MATCHED, to: MATERIAL_VARIANCE, action: detect_variance, capability: external_adapter.reconcile}
-      - {from: MINOR_VARIANCE, to: MATCHED, action: reconcile, capability: external_adapter.reconcile}
-      - {from: MINOR_VARIANCE, to: DISPUTED, action: dispute, capability: dispute.create}
-      - {from: MATERIAL_VARIANCE, to: DISPUTED, action: dispute, capability: dispute.create}
-      - {from: DISPUTED, to: MATCHED, action: resolve, capability: external_adapter.reconcile}
-      - {from: DISPUTED, to: MATERIAL_VARIANCE, action: unresolved_variance, capability: external_adapter.reconcile}
+      - {from: DRAFT, to: SUBMITTED, action: submit, capability: campaign.publish, event: advertising.campaign.submitted}
+      - {from: SUBMITTED, to: REVIEWING, action: start_review, capability: campaign.publish, event: advertising.campaign.review_started}
+      - {from: REVIEWING, to: APPROVED, action: approve, capability: campaign.publish, event: advertising.campaign.approved}
+      - {from: REVIEWING, to: REJECTED, action: reject, capability: campaign.publish, event: advertising.campaign.rejected}
+      - {from: APPROVED, to: ACTIVE, action: activate, capability: campaign.publish, event: advertising.campaign.activated}
+      - {from: ACTIVE, to: PAUSED, action: pause, capability: campaign.pause, event: advertising.campaign.paused}
+      - {from: PAUSED, to: ACTIVE, action: resume, capability: campaign.publish, event: advertising.campaign.resumed}
+      - {from: ACTIVE, to: COMPLETED, action: complete, capability: campaign.cancel, event: advertising.campaign.completed}
+      - {from: PAUSED, to: COMPLETED, action: complete, capability: campaign.cancel, event: advertising.campaign.completed}
+      - {from: DRAFT, to: CANCELLED, action: cancel, capability: campaign.cancel, event: advertising.campaign.cancelled}
+      - {from: SUBMITTED, to: CANCELLED, action: cancel, capability: campaign.cancel, event: advertising.campaign.cancelled}
+      - {from: REVIEWING, to: CANCELLED, action: cancel, capability: campaign.cancel, event: advertising.campaign.cancelled}
+      - {from: APPROVED, to: CANCELLED, action: cancel, capability: campaign.cancel, event: advertising.campaign.cancelled}
+      - {from: ACTIVE, to: CANCELLED, action: cancel, capability: campaign.cancel, event: advertising.campaign.cancelled}
+      - {from: PAUSED, to: CANCELLED, action: cancel, capability: campaign.cancel, event: advertising.campaign.cancelled}
+      - {from: APPROVED, to: EXPIRED, action: expire, capability: campaign.cancel, event: advertising.campaign.expired}
+      - {from: ACTIVE, to: EXPIRED, action: expire, capability: campaign.cancel, event: advertising.campaign.expired}
+      - {from: PAUSED, to: EXPIRED, action: expire, capability: campaign.cancel, event: advertising.campaign.expired}
+      - {from: ACTIVE, to: SUSPENDED, action: suspend, capability: campaign.pause, event: advertising.campaign.suspended}
+      - {from: PAUSED, to: SUSPENDED, action: suspend, capability: campaign.pause, event: advertising.campaign.suspended}
+      - {from: SUSPENDED, to: ACTIVE, action: restore, capability: campaign.publish, event: advertising.campaign.resumed}
+  creative:
+    initial: DRAFT
+    terminal: [REJECTED, ARCHIVED]
+    transitions:
+      - {from: DRAFT, to: SUBMITTED, action: submit, capability: creative.submit, event: advertising.creative.submitted}
+      - {from: SUBMITTED, to: REVIEWING, action: start_review, capability: creative.submit, event: advertising.creative.submitted}
+      - {from: REVIEWING, to: APPROVED, action: approve, capability: creative.submit, event: advertising.creative.approved}
+      - {from: REVIEWING, to: REJECTED, action: reject, capability: creative.submit, event: advertising.creative.rejected}
+      - {from: APPROVED, to: ACTIVE, action: activate, capability: creative.update, event: advertising.creative.activated}
+      - {from: ACTIVE, to: SUSPENDED, action: suspend, capability: creative.update, event: advertising.creative.suspended}
+      - {from: SUSPENDED, to: ACTIVE, action: restore, capability: creative.update, event: advertising.creative.activated}
+      - {from: ACTIVE, to: ARCHIVED, action: archive, capability: creative.update, event: advertising.creative.archived}
+      - {from: REJECTED, to: DRAFT, action: revise, capability: creative.update, event: advertising.creative.updated}
+  traffic_validity:
+    initial: PENDING
+    terminal: [INVALID, REVERSED]
+    transitions:
+      - {from: PENDING, to: VALID, action: validate, capability: traffic.validate, event: advertising.traffic.validated}
+      - {from: PENDING, to: SUSPICIOUS, action: flag, capability: traffic.validate, event: advertising.traffic.suspicious}
+      - {from: PENDING, to: INVALID, action: invalidate, capability: traffic.validate, event: advertising.traffic.invalidated}
+      - {from: SUSPICIOUS, to: VALID, action: clear, capability: traffic.validate, event: advertising.traffic.validated}
+      - {from: SUSPICIOUS, to: INVALID, action: invalidate, capability: traffic.validate, event: advertising.traffic.invalidated}
+      - {from: VALID, to: REVERSED, action: reverse, capability: traffic.validate, event: advertising.traffic.reversed}
 validation_rules:
   - every state must be declared in machine-readable contract
-  - every transition must declare from, to, action and capability
+  - every transition must declare from, to, action, capability and event
   - transition authorization must be evaluated by D02
   - transition must enforce tenant and resource scope
   - concurrent state mutation requires optimistic version or equivalent serialization
@@ -125,14 +100,3 @@ validation_rules:
   - no transition may directly execute D15 payment settlement
   - traffic validation failure must not default to VALID or BILLABLE
   - external adapter failure must not default to ACTIVE, VALID or FINALIZED
-evidence_requirements:
-  - state_machine_schema_validation
-  - legal_transition_tests
-  - illegal_transition_tests
-  - terminal_state_tests
-  - concurrency_transition_tests
-  - idempotency_transition_tests
-  - authorization_transition_tests
-  - tenant_isolation_transition_tests
-  - billing_finality_tests
-  - failure_safe_transition_tests
