@@ -119,7 +119,7 @@ export async function processContentEventEffects(args: {
       const exhausted = attemptCount >= MAX_ATTEMPTS
       await args.payload.update({
         collection: 'content-event-effects',
-        where: { and: [{ id: { equals: event.id } }, { status: { equals: 'PROCESSING' } }, { processorId: { equals: processorId }] },
+        where: { and: [{ id: { equals: event.id } }, { status: { equals: 'PROCESSING' } }, { processorId: { equals: processorId } }] },
         data: {
           status: exhausted ? 'FAILED' : 'PENDING',
           nextAttemptAt: exhausted ? null : new Date(now.getTime() + retryDelayMs(attemptCount)).toISOString(),
