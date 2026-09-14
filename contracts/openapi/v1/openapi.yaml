@@ -119,7 +119,53 @@ paths:
       responses:
         '204': { description: Logged out; token version incremented. }
         '4XX': { $ref: '#/components/responses/ClientError' }
-  /users/me:
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate the current refresh credential and issue new tokens
+      operationId: authRefresh
+      responses:
+        '200':
+          description: Tokens refreshed and the prior refresh credential invalidated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accessToken, refreshToken, expiresIn]
+                properties:
+                  accessToken: { type: string }
+                  refreshToken: { type: string }
+                  expiresIn: { type: integer }
+        '401': { $ref: '#/components/responses/ClientError' }
+  /auth/sessions:
+    get:
+      tags: [Auth]
+      summary: List the current user's active sessions
+      operationId: authSessionList
+      responses:
+        '200':
+          description: Active sessions for the authenticated user.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListResponse' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+      /auth/sessions/{sessionId}:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    delete:
+      tags: [Auth]
+      summary: Revoke one of the current user's sessions
+      operationId: authSessionRevoke
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '204': { description: Session revoked. }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+    /users/me:
     get:
       tags: [Users]
       summary: Get current user profile
