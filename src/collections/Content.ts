@@ -69,8 +69,8 @@ export const Content: CollectionConfig = {
         const sideEffects = sideEffectsForState(body.to)
         const eventId = randomUUID()
 
-        // Payload's update-by-where operation applies the optimistic-lock predicate
-        // in the write itself, closing the read/modify/write race between callers.
+        // The conditional write makes the version/revision predicate part of the
+        // mutation itself, closing the read/modify/write race between callers.
         const result = await req.payload.update({
           collection: 'content',
           where: {
@@ -83,14 +83,9 @@ export const Content: CollectionConfig = {
           data: { ...buildContentStatePatch(body.to, now), version: nextVersion, revision: nextRevision },
           context: { allowContentStateTransition: true },
           overrideAccess: true,
-          limit: 1,
-          pagination: false,
         })
 
-        if (!result.docs.length) {
-          throw new APIError('Content version conflict; reload and retry', 409)
-        }
-
+        if (!result.docs.length) throw new APIError('Content version conflict; reload and retry', 409)
         const updated = result.docs[0]
 
         await req.payload.create({
