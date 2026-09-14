@@ -41,6 +41,20 @@
     {"featureId":"AUTHZ-007","name":"account-state authorization","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
     {"featureId":"AUTHZ-008","name":"privileged operation controls","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
     {"featureId":"AUTHZ-009","name":"local API permission-bypass invariant","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
-    {"featureId":"AUTHZ-010","name":"authorization auditability","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+    {"featureId":"AUTHZ-010","name":"authorization auditability","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CREATOR-001","name":"creator profile","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CREATOR-002","name":"creator verification","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CREATOR-003","name":"creator center/dashboard","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CREATOR-004","name":"creator level/growth","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CREATOR-005","name":"creator tasks/rewards","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CREATOR-006","name":"creator analytics","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CREATOR-007","name":"creator workspace/team","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ORG-001","name":"organization/company","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ORG-002","name":"MCN","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ORG-003","name":"teams/departments/members","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ORG-004","name":"creator binding","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ORG-005","name":"creator contracts/revenue split","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ORG-006","name":"organization analytics/settlement","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ORG-007","name":"organization approval/audit/transfer","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
   ]
 }
