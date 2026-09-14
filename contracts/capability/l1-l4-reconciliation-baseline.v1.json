@@ -31,6 +31,16 @@
     {"featureId":"USER-007","name":"user history and activity","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
     {"featureId":"USER-008","name":"badges/levels/achievements","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
     {"featureId":"USER-009","name":"points/reputation","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
-    {"featureId":"USER-010","name":"data export/deletion","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+    {"featureId":"USER-010","name":"data export/deletion","hierarchy":{"l1":"B. User profile and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"AUTHZ-001","name":"role model","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"AUTHZ-002","name":"permission model","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"AUTHZ-003","name":"scoped authorization","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"AUTHZ-004","name":"entitlements","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"AUTHZ-005","name":"subscription-aware access","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"AUTHZ-006","name":"organization-aware access","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"AUTHZ-007","name":"account-state authorization","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"AUTHZ-008","name":"privileged operation controls","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"AUTHZ-009","name":"local API permission-bypass invariant","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"AUTHZ-010","name":"authorization auditability","hierarchy":{"l1":"C. Roles, authorization and entitlements","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
   ]
 }
