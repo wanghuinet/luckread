@@ -53,7 +53,7 @@
     {
       "operationId": "removeIpMember",
       "method": "DELETE",
-      "path": "/ips/{ipId}/members/{memberId}",
+      "path": "/ips/{ipId}/members",
       "authorization": { "mode": "permission", "permission": "ip.member.remove", "scope": "ip" },
       "resource": { "classification": "SINGLE_AUTHORITATIVE_WRITE" },
       "cache": { "policy": "NO_STORE" },
