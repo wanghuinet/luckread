@@ -1,4 +1,4 @@
-version: 1.0.1
+version: 1.0.2
 contract: D21
 status: CONTRACT-FROZEN
 source_of_truth: docs/21-D21-ADVERTISING-PLATFORM-CONTRACT-v1.0.md
@@ -15,10 +15,10 @@ machines:
     terminal: [FINALIZED, INVALID, REVERSED, ADJUSTED]
     transitions:
       - {from: PENDING, to: VALID, action: validate, capability: traffic.validate, event: advertising.billing.validated}
-      - {from: PENDING, to: SUSPICIOUS, action: flag, capability: traffic.validate, event: advertising.billing.pending}
-      - {from: PENDING, to: INVALID, action: invalidate, capability: traffic.validate, event: advertising.billing.adjusted}
+      - {from: PENDING, to: SUSPICIOUS, action: flag, capability: traffic.validate, event: advertising.traffic.suspicious}
+      - {from: PENDING, to: INVALID, action: invalidate, capability: traffic.validate, event: advertising.traffic.invalidated}
       - {from: SUSPICIOUS, to: VALID, action: clear, capability: traffic.validate, event: advertising.billing.validated}
-      - {from: SUSPICIOUS, to: INVALID, action: invalidate, capability: traffic.validate, event: advertising.billing.adjusted}
+      - {from: SUSPICIOUS, to: INVALID, action: invalidate, capability: traffic.validate, event: advertising.traffic.invalidated}
       - {from: VALID, to: BILLABLE, action: make_billable, capability: billing.make_billable, event: advertising.billing.billable}
       - {from: BILLABLE, to: FINALIZED, action: finalize, capability: billing.finalize, event: advertising.billing.finalized}
       - {from: BILLABLE, to: REVERSED, action: reverse, capability: billing.reverse, event: advertising.billing.reversed}
@@ -70,7 +70,7 @@ machines:
     terminal: [REJECTED, ARCHIVED]
     transitions:
       - {from: DRAFT, to: SUBMITTED, action: submit, capability: creative.submit, event: advertising.creative.submitted}
-      - {from: SUBMITTED, to: REVIEWING, action: start_review, capability: creative.submit, event: advertising.creative.submitted}
+      - {from: SUBMITTED, to: REVIEWING, action: start_review, capability: creative.submit, event: advertising.creative.review_started}
       - {from: REVIEWING, to: APPROVED, action: approve, capability: creative.submit, event: advertising.creative.approved}
       - {from: REVIEWING, to: REJECTED, action: reject, capability: creative.submit, event: advertising.creative.rejected}
       - {from: APPROVED, to: ACTIVE, action: activate, capability: creative.update, event: advertising.creative.activated}
@@ -88,6 +88,29 @@ machines:
       - {from: SUSPICIOUS, to: VALID, action: clear, capability: traffic.validate, event: advertising.traffic.validated}
       - {from: SUSPICIOUS, to: INVALID, action: invalidate, capability: traffic.validate, event: advertising.traffic.invalidated}
       - {from: VALID, to: REVERSED, action: reverse, capability: traffic.validate, event: advertising.traffic.reversed}
+  dispute:
+    initial: OPEN
+    terminal: [RESOLVED, REJECTED]
+    transitions:
+      - {from: OPEN, to: UNDER_REVIEW, action: review, capability: dispute.review, event: advertising.dispute.review_started}
+      - {from: UNDER_REVIEW, to: EVIDENCE_REQUIRED, action: request_evidence, capability: dispute.request_evidence, event: advertising.dispute.evidence_required}
+      - {from: EVIDENCE_REQUIRED, to: UNDER_REVIEW, action: submit_evidence, capability: dispute.appeal, event: advertising.dispute.evidence_submitted}
+      - {from: UNDER_REVIEW, to: RESOLVED, action: resolve, capability: dispute.resolve, event: advertising.dispute.resolved}
+      - {from: UNDER_REVIEW, to: REJECTED, action: reject, capability: dispute.resolve, event: advertising.dispute.rejected}
+      - {from: OPEN, to: ESCALATED, action: escalate, capability: dispute.escalate, event: advertising.dispute.escalated}
+      - {from: UNDER_REVIEW, to: ESCALATED, action: escalate, capability: dispute.escalate, event: advertising.dispute.escalated}
+      - {from: ESCALATED, to: UNDER_REVIEW, action: assign_review, capability: dispute.review, event: advertising.dispute.review_started}
+  reconciliation:
+    initial: MATCHED
+    terminal: [MATCHED, MINOR_VARIANCE, MATERIAL_VARIANCE, DISPUTED]
+    transitions:
+      - {from: MATCHED, to: MINOR_VARIANCE, action: detect_variance, capability: external_adapter.reconcile, event: advertising.reconciliation.variance_detected}
+      - {from: MATCHED, to: MATERIAL_VARIANCE, action: detect_variance, capability: external_adapter.reconcile, event: advertising.reconciliation.variance_detected}
+      - {from: MINOR_VARIANCE, to: MATCHED, action: reconcile, capability: external_adapter.reconcile, event: advertising.reconciliation.matched}
+      - {from: MINOR_VARIANCE, to: DISPUTED, action: dispute, capability: dispute.create, event: advertising.reconciliation.disputed}
+      - {from: MATERIAL_VARIANCE, to: DISPUTED, action: dispute, capability: dispute.create, event: advertising.reconciliation.disputed}
+      - {from: DISPUTED, to: MATCHED, action: resolve, capability: external_adapter.reconcile, event: advertising.reconciliation.resolved}
+      - {from: DISPUTED, to: MATERIAL_VARIANCE, action: unresolved_variance, capability: external_adapter.reconcile, event: advertising.reconciliation.variance_detected}
 validation_rules:
   - every state must be declared in machine-readable contract
   - every transition must declare from, to, action, capability and event
