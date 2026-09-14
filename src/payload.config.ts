@@ -25,6 +25,7 @@ import { ContentRevisions } from './collections/ContentRevisions'
 import { Reports } from './collections/Reports'
 import { Appeals } from './collections/Appeals'
 import { ContentShares } from './collections/ContentShares'
+import { ModerationEvents } from './collections/ModerationEvents'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -78,6 +79,7 @@ export default buildConfig({
     Reports,
     Appeals,
     ContentShares,
+    ModerationEvents,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
