@@ -55,6 +55,18 @@
     {"featureId":"ORG-004","name":"creator binding","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
     {"featureId":"ORG-005","name":"creator contracts/revenue split","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
     {"featureId":"ORG-006","name":"organization analytics/settlement","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
-    {"featureId":"ORG-007","name":"organization approval/audit/transfer","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+    {"featureId":"ORG-007","name":"organization approval/audit/transfer","hierarchy":{"l1":"D. Creator and organization / MCN","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CONTENT-001","name":"draft","hierarchy":{"l1":"E. Content creation and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CONTENT-002","name":"autosave","hierarchy":{"l1":"E. Content creation and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CONTENT-003","name":"revision/version","hierarchy":{"l1":"E. Content creation and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CONTENT-004","name":"collaborative editing","hierarchy":{"l1":"E. Content creation and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CONTENT-005","name":"review workflow","hierarchy":{"l1":"E. Content creation and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CONTENT-006","name":"scheduled publishing","hierarchy":{"l1":"E. Content creation and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CONTENT-007","name":"publish/update/unpublish","hierarchy":{"l1":"E. Content creation and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CONTENT-008","name":"archive/restore/delete","hierarchy":{"l1":"E. Content creation and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CONTENT-009","name":"content ownership","hierarchy":{"l1":"E. Content creation and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CONTENT-010","name":"content lifecycle state machine","hierarchy":{"l1":"E. Content creation and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CONTENT-011","name":"content policy metadata","hierarchy":{"l1":"E. Content creation and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"CONTENT-012","name":"content audit trail","hierarchy":{"l1":"E. Content creation and lifecycle","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
   ]
 }
