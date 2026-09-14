@@ -67,8 +67,10 @@ export async function syncSubscriptionEntitlements(
     overrideAccess: true,
   })
   const plan = planResult.docs[0] as unknown as PlanRecord | undefined
+  if (!plan) throw new Error(`Active subscription plan not found: ${subscription.planCode}`)
+
   const desiredEntitlementIds = new Set(
-    (plan?.entitlements ?? []).map(relationshipId).filter((id): id is string => Boolean(id)),
+    (plan.entitlements ?? []).map(relationshipId).filter((id): id is string => Boolean(id)),
   )
 
   const existing = await payload.find({
