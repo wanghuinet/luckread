@@ -1,16 +1,14 @@
 import type { CollectionConfig } from 'payload'
-
-const isAdmin = (req: { user?: { role?: string } | null }) =>
-  req.user?.role === 'admin' || req.user?.role === 'super_admin'
+import { hasPermission } from '../lib/authorization'
 
 export const SubscriptionPlans: CollectionConfig = {
   slug: 'subscription-plans',
   admin: { useAsTitle: 'code' },
   access: {
     read: ({ req }) => Boolean(req.user),
-    create: ({ req }) => isAdmin(req),
-    update: ({ req }) => isAdmin(req),
-    delete: ({ req }) => isAdmin(req),
+    create: ({ req }) => hasPermission(req.user, 'subscription.plan.manage'),
+    update: ({ req }) => hasPermission(req.user, 'subscription.plan.manage'),
+    delete: ({ req }) => hasPermission(req.user, 'subscription.plan.manage'),
   },
   fields: [
     { name: 'code', type: 'text', required: true, unique: true, index: true },
