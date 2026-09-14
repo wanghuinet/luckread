@@ -1,67 +1,11 @@
 {
-  "version": "1.1",
-  "status": "RECOVERED_SOURCE_VERIFIED",
-  "source": {
-    "path": "docs/archive/1.0-reuse/RECOVERED-36-FOURTH-LEVEL-CAPABILITY-MASTER-MATRIX-v1.0.md",
-    "historicalBlobSha": "cfe71759e470f93ca85b43196961913f7c5afc63",
-    "historicalBlobSizeBytes": 32861,
-    "historicalSourceLines": 1584,
-    "restoredOnMainCommit": "ef0f981e57270a095b81b6c2191d5df532614210",
-    "restoredMainPathVerified": true,
-    "parsedArtifact": "contracts/capability/recovery/l1-l4-historical-hierarchy.parsed.json",
-    "parsedArtifactStatus": "RECOVERED_NON_AUTHORITATIVE",
-    "parsedArtifactVersion": "1.1",
-    "parsedCounts": {
-      "L1": 31,
-      "L2": 151,
-      "L3": 0,
-      "L4": 0
-    },
-    "explicitHierarchyGap": "The recovered matrix contains explicit L1/L2 headings but no explicit L3/heading-level L4 nodes. Bullet-level L4 candidates are preserved separately without inventing an L3."
+  "version":"1.2",
+  "status":"RECOVERED_SOURCES_VERIFIED",
+  "sources":{
+    "l3":{"path":"docs/archive/1.0-reuse/RECOVERED-35-THIRD-LEVEL-CAPABILITY-MASTER-MATRIX-v1.0.md","historicalBlobSha":"d76dddaea13746acd01dd6d65f627676ed7ebe95","restoredOnMainCommit":"d22825e6f7f589023b008d51f62d53ce41262b71","restoredMainPathVerified":true},
+    "l1l2":{"path":"docs/archive/1.0-reuse/RECOVERED-36-FOURTH-LEVEL-CAPABILITY-MASTER-MATRIX-v1.0.md","historicalBlobSha":"cfe71759e470f93ca85b43196961913f7c5afc63","restoredOnMainCommit":"ef0f981e57270a095b81b6c2191d5df532614210","restoredMainPathVerified":true,"parsedArtifact":"contracts/capability/recovery/l1-l4-historical-hierarchy.parsed.json","parsedCounts":{"L1":31,"L2":151,"L3":0,"L4":0}}
   },
-  "authority": "recovery-input-only",
-  "rules": [
-    "Historical hierarchy is evidence, not Blueprint authority.",
-    "No Feature ID is assigned from name similarity alone.",
-    "L1/L2/L3/L4 relationships must be reconciled before capability admission.",
-    "Unresolved hierarchy remains blocking and cannot be promoted to the formal capability graph.",
-    "Missing L3 is a blocking gap; no synthetic L3 is permitted."
-  ],
-  "nodes": [
-    {"anchor":"36 §1","l1":"1","name":"Identity","sourceHeading":"1 Identity"},
-    {"anchor":"36 §2","l1":"2","name":"Device / Session / Privacy","sourceHeading":"2 Device/Session/Privacy"},
-    {"anchor":"36 §3","l1":"3","name":"Creator","sourceHeading":"3 Creator"},
-    {"anchor":"36 §4","l1":"4","name":"Creator Studio","sourceHeading":"4 Creator Studio"},
-    {"anchor":"36 §5","l1":"5","name":"Organization / MCN","sourceHeading":"5 Organization/MCN"},
-    {"anchor":"36 §6","l1":"6","name":"Content","sourceHeading":"6 Content"},
-    {"anchor":"36 §7","l1":"7","name":"Content Graph","sourceHeading":"7 Content Graph"},
-    {"anchor":"36 §8","l1":"8","name":"IP Graph / IP Economy","sourceHeading":"8 IP Graph/IP Economy"},
-    {"anchor":"36 §9","l1":"9","name":"Media","sourceHeading":"9 Media"},
-    {"anchor":"36 §10","l1":"10","name":"Media Processing","sourceHeading":"10 Media Processing"},
-    {"anchor":"36 §11","l1":"11","name":"Social Graph","sourceHeading":"11 Social Graph"},
-    {"anchor":"36 §12","l1":"12","name":"Community","sourceHeading":"12 Community"},
-    {"anchor":"36 §13","l1":"13","name":"Interaction","sourceHeading":"13 Interaction"},
-    {"anchor":"36 §14","l1":"14","name":"Event / High-Frequency Interaction","sourceHeading":"14 Event/High-Frequency Interaction"},
-    {"anchor":"36 §15","l1":"15","name":"Feed","sourceHeading":"15 Feed"},
-    {"anchor":"36 §16","l1":"16","name":"Recommendation","sourceHeading":"16 Recommendation"},
-    {"anchor":"36 §17","l1":"17","name":"Risk / Trust","sourceHeading":"17 Risk/Trust"},
-    {"anchor":"36 §18","l1":"18","name":"Safety / Moderation / Appeal","sourceHeading":"18 Safety/Moderation/Appeal"},
-    {"anchor":"36 §19","l1":"19","name":"Search / Discovery","sourceHeading":"19 Search/Discovery"},
-    {"anchor":"36 §20","l1":"20","name":"Live / Realtime / IM","sourceHeading":"20 Live/Realtime/IM"},
-    {"anchor":"36 §21","l1":"21","name":"Notification","sourceHeading":"21 Notification"},
-    {"anchor":"36 §22","l1":"22","name":"Localization / Regionalization","sourceHeading":"22 Localization/Regionalization"},
-    {"anchor":"36 §23","l1":"23","name":"Monetization / Commerce / IP Economy","sourceHeading":"23 Monetization/Commerce/IP Economy"},
-    {"anchor":"36 §24","l1":"24","name":"Ledger / Settlement","sourceHeading":"24 Ledger/Settlement"},
-    {"anchor":"36 §25","l1":"25","name":"Analytics / Experiment / Growth","sourceHeading":"25 Analytics/Experiment/Growth"},
-    {"anchor":"36 §26","l1":"26","name":"APP Experience / Localization","sourceHeading":"26 APP Experience/Localization"},
-    {"anchor":"36 §27","l1":"27","name":"Platform Operations / Governance","sourceHeading":"27 Platform Operations/Governance"},
-    {"anchor":"36 §28","l1":"28","name":"Open Platform / Developer / Apps / Games","sourceHeading":"28 Open Platform/Developer/Apps/Games"},
-    {"anchor":"36 §29","l1":"29","name":"AI Capability Layer","sourceHeading":"29 AI Capability Layer"},
-    {"anchor":"36 §30","l1":"30","name":"Cross-Domain L4 Invariants","sourceHeading":"30 Cross-Domain L4 Invariants"}
-  ],
-  "featureCrosswalk": {
-    "status": "NOT_STARTED",
-    "classification": ["MATCH","BLUEPRINT_ONLY","LEGACY_ONLY","CONFLICT","DUPLICATE","UNRESOLVED"],
-    "records": []
-  }
+  "authority":"recovery-input-only",
+  "rules":["Historical sources are evidence only until reconciled with Blueprint 2.0.","Do not synthesize L3/L4.","Do not map Feature IDs by name similarity.","Unresolved hierarchy blocks Capability Graph admission."],
+  "featureCrosswalk":{"status":"NOT_STARTED","classification":["MATCH","BLUEPRINT_ONLY","LEGACY_ONLY","CONFLICT","DUPLICATE","UNRESOLVED"],"records":[]}
 }
