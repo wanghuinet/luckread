@@ -1,0 +1,14 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/api/organization-members.v1.json",
+  "title":"Organization Members API Contract",
+  "version":"1.0.0",
+  "operations":[
+    {"id":"organization.members.list","method":"GET","path":"/v1/organizations/{organizationId}/members","auth":"organization-scoped","rules":["caller must have organization member-read scope","inactive members are returned only when explicitly requested","tenant isolation is mandatory"]},
+    {"id":"organization.members.invite","method":"POST","path":"/v1/organizations/{organizationId}/members/invitations","auth":"organization-scoped","idempotency":"required","rules":["caller must have member-manage scope","invitation is server-owned","replay-safe"]},
+    {"id":"organization.members.remove","method":"DELETE","path":"/v1/organizations/{organizationId}/members/{memberId}","auth":"organization-scoped","concurrency":"If-Match-required","rules":["caller must have member-manage scope","last active owner cannot be removed","historical membership remains auditable"]},
+    {"id":"organization.members.roleChange","method":"POST","path":"/v1/organizations/{organizationId}/members/{memberId}/role","auth":"organization-scoped","concurrency":"If-Match-required","rules":["caller must have role-manage scope","role assignment cannot cross tenant scope","last owner invariant remains enforced"]}
+  ],
+  "invariants":["organization membership is distinct from global user identity","role is distinct from entitlement","all mutations emit auditable organization membership events","server owns organizationId/memberId/actorId/timestamps","authorization is evaluated against current organization membership state"],
+  "status":"CONTRACT_COMPLETE_IMPLEMENTATION_PENDING"
+}
