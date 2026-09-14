@@ -1,0 +1,36 @@
+name: Cloudflare Payload Baseline Manual
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: Cloudflare Payload Baseline Manual
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify runtime skeleton
+        run: |
+          set -euxo pipefail
+          test -f package.json
+          test -f payload.config.ts
+          test -f wrangler.jsonc
+          test -f next.config.ts
+          test -f open-next.config.ts
+          test -f src/app/'(payload)'/layout.tsx
+          test -f src/app/'(payload)'/api/'[...slug]'/route.ts
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Build
+        run: npm run build
