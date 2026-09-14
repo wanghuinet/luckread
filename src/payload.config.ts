@@ -39,7 +39,7 @@ import { Notifications } from './collections/Notifications'
 import { FeedItems } from './collections/FeedItems'
 import { SocialBlocks } from './collections/SocialBlocks'
 import { SocialMutes } from './collections/SocialMutes'
-import { ContentFavorites } from './collections/ContentFavorites']
+import { ContentFavorites } from './collections/ContentFavorites'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
