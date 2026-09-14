@@ -50,7 +50,12 @@ export default buildConfig({
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
   db: sqliteD1Adapter({ binding: cloudflare.env.D1 }),
   logger: isProduction ? cloudflareLogger : undefined,
-  storage: [r2Storage({ bucket: cloudflare.env.R2, collections: { media: true } })],
+  plugins: [
+    r2Storage({
+      bucket: cloudflare.env.R2,
+      collections: { media: true },
+    }),
+  ],
 })
 
 function getCloudflareContextFromWrangler(): Promise<CloudflareContext> {
