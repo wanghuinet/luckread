@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { APIError } from 'payload'
 import type { CollectionConfig } from 'payload'
 
@@ -9,7 +10,7 @@ const contentStates = ['DRAFT', 'PENDING_REVIEW', 'REJECTED', 'APPROVED', 'SCHED
 
 export const Content: CollectionConfig = {
   slug: 'content',
-  admin: { useAsTitle: 'title', defaultColumns: ['title', 'contentType', 'state', 'author', 'updatedAt'] },
+  admin: { useAsTitle: 'title', defaultColumns: ['title', 'contentType', 'state', 'author', 'ip', 'updatedAt'] },
   access: {
     read: ({ req }) => (req.user ? true : { state: { equals: 'PUBLISHED' } }),
     create: ({ req }) => Boolean(req.user),
@@ -37,6 +38,36 @@ export const Content: CollectionConfig = {
         return data
       },
     ],
+    afterChange: [
+      async ({ doc, operation, req }) => {
+        const actorId = req.user ? String(req.user.id) : String(doc.author)
+        await req.payload.create({
+          collection: 'content-revisions',
+          data: {
+            revisionId: randomUUID(),
+            content: String(doc.id),
+            revision: Number(doc.revision),
+            version: Number(doc.version),
+            author: String(doc.author),
+            state: String(doc.state),
+            snapshot: {
+              title: doc.title,
+              slug: doc.slug,
+              contentType: doc.contentType,
+              locale: doc.locale,
+              excerpt: doc.excerpt,
+              bodyR2Key: doc.bodyR2Key,
+              coverMedia: doc.coverMedia,
+              state: doc.state,
+            },
+            changeReason: operation,
+            createdBy: actorId,
+          },
+          overrideAccess: true,
+          req,
+        })
+      },
+    ],
   },
   endpoints: [
     {
@@ -47,18 +78,7 @@ export const Content: CollectionConfig = {
         if (!body.to || !contentStates.includes(body.to)) throw new APIError('A valid target state is required', 400)
         return transitionContentState(req, body.to, body)
       },
-      custom: {
-        openapi: {
-          summary: 'Transition content lifecycle state',
-          responses: {
-            200: { description: 'Content state transitioned' },
-            400: { description: 'Invalid transition request' },
-            401: { description: 'Authentication required' },
-            403: { description: 'Permission denied' },
-            409: { description: 'Invalid transition, lifecycle precondition, or optimistic concurrency conflict' },
-          },
-        },
-      },
+      custom: { openapi: { summary: 'Transition content lifecycle state' } },
     },
     {
       path: '/:id/submit-review',
@@ -97,6 +117,7 @@ export const Content: CollectionConfig = {
     { name: 'contentType', type: 'select', required: true, options: contentTypes.map((value) => ({ label: value, value })), index: true },
     { name: 'state', type: 'select', required: true, defaultValue: 'DRAFT', options: contentStates.map((value) => ({ label: value, value })), index: true },
     { name: 'author', type: 'relationship', relationTo: 'users', required: true, index: true },
+    { name: 'ip', type: 'relationship', relationTo: 'ips', index: true },
     { name: 'locale', type: 'text', required: true, defaultValue: 'en-US', index: true },
     { name: 'excerpt', type: 'textarea', maxLength: 1000 },
     { name: 'bodyR2Key', type: 'text' },
