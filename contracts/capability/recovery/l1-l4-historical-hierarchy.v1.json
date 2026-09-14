@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "status": "RECOVERED_SOURCE_VERIFIED",
   "source": {
     "path": "docs/archive/1.0-reuse/RECOVERED-36-FOURTH-LEVEL-CAPABILITY-MASTER-MATRIX-v1.0.md",
@@ -7,14 +7,25 @@
     "historicalBlobSizeBytes": 32861,
     "historicalSourceLines": 1584,
     "restoredOnMainCommit": "ef0f981e57270a095b81b6c2191d5df532614210",
-    "restoredMainPathVerified": true
+    "restoredMainPathVerified": true,
+    "parsedArtifact": "contracts/capability/recovery/l1-l4-historical-hierarchy.parsed.json",
+    "parsedArtifactStatus": "RECOVERED_NON_AUTHORITATIVE",
+    "parsedArtifactVersion": "1.1",
+    "parsedCounts": {
+      "L1": 31,
+      "L2": 151,
+      "L3": 0,
+      "L4": 0
+    },
+    "explicitHierarchyGap": "The recovered matrix contains explicit L1/L2 headings but no explicit L3/heading-level L4 nodes. Bullet-level L4 candidates are preserved separately without inventing an L3."
   },
   "authority": "recovery-input-only",
   "rules": [
     "Historical hierarchy is evidence, not Blueprint authority.",
     "No Feature ID is assigned from name similarity alone.",
     "L1/L2/L3/L4 relationships must be reconciled before capability admission.",
-    "Unresolved hierarchy remains blocking and cannot be promoted to the formal capability graph."
+    "Unresolved hierarchy remains blocking and cannot be promoted to the formal capability graph.",
+    "Missing L3 is a blocking gap; no synthetic L3 is permitted."
   ],
   "nodes": [
     {"anchor":"36 §1","l1":"1","name":"Identity","sourceHeading":"1 Identity"},
