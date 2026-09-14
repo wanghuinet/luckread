@@ -66,6 +66,7 @@ for (const file of apiFiles) {
 }
 
 const evidenceIds = new Map()
+const evidenceByContract = new Map()
 for (const file of evidenceFiles) {
   const doc = await load(file)
   if (!doc) continue
@@ -75,6 +76,17 @@ for (const file of evidenceFiles) {
   if (evidenceIds.has(doc.$id)) fail(`${rel}: duplicate $id ${doc.$id}`)
   evidenceIds.set(doc.$id, rel)
   if (!doc.contract || typeof doc.contract !== 'string') fail(`${rel}: contract reference is required`)
+  else {
+    const refs = Array.isArray(doc.contract) ? doc.contract : doc.contract.split(/\s*\+\s*/).map((value) => value.trim()).filter(Boolean)
+    for (const contract of refs) {
+      if (!apiFiles.some((filePath) => filePath.replace(`${root}/`, '') === contract)) fail(`${rel}: contract reference does not resolve to an API contract: ${contract}`)
+      else {
+        const list = evidenceByContract.get(contract) ?? []
+        list.push(rel)
+        evidenceByContract.set(contract, list)
+      }
+    }
+  }
   const required = doc.requiredEvidence
   if (!Array.isArray(required) || required.length === 0) fail(`${rel}: requiredEvidence must be non-empty`)
   else {
@@ -87,6 +99,13 @@ for (const file of evidenceFiles) {
     }
   }
   if (!['BLOCKED_ON_IMPLEMENTATION_BASELINE', 'GREEN'].includes(doc.status)) fail(`${rel}: invalid gate status ${doc.status}`)
+}
+
+// Every API contract must be covered by at least one resolvable evidence gate.
+// Evidence gates may cover multiple API contracts (for example the feed/search gate).
+for (const file of apiFiles) {
+  const rel = file.replace(`${root}/`, '')
+  if (!evidenceByContract.has(rel)) fail(`${rel}: no evidence gate references this API contract`)
 }
 
 const requiredRc = [
