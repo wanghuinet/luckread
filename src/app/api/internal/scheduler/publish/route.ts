@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server'
 import config from '../../../../../payload.config'
 import { publishScheduledContent } from '../../../../../lib/content-scheduler'
 
-export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
 function constantTimeEqual(left: string, right: string): boolean {
