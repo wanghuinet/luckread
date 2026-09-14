@@ -81,7 +81,7 @@
       "antiAbuse": { "required": true, "scopes": ["session", "account", "device", "endpoint"], "actions": ["ALLOW", "THROTTLE", "BLOCK"] },
       "idempotency": { "required": false },
       "security": ["refresh_token_rotation", "reuse_detection", "revoked_session_denied", "old_refresh_token_invalidated"],
-      "evidence": { "openapi": "MISSING", "inventory": "PASS", "permission": "MISSING", "state": "MISSING", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "evidence": { "openapi": "PASS", "inventory": "PASS", "permission": "PASS", "state": "MISSING", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
     },
     {
       "operationId": "authSessionList",
@@ -100,7 +100,7 @@
       "antiAbuse": { "required": true, "scopes": ["account", "endpoint"], "actions": ["ALLOW", "THROTTLE", "BLOCK"] },
       "idempotency": { "required": false },
       "security": ["self_scope_only", "revoked_sessions_not_hidden_by_stale_cache"],
-      "evidence": { "openapi": "MISSING", "inventory": "PASS", "permission": "MISSING", "state": "MISSING", "resource": "PASS", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "evidence": { "openapi": "PASS", "inventory": "PASS", "permission": "PASS", "state": "MISSING", "resource": "PASS", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
     },
     {
       "operationId": "authSessionRevoke",
@@ -119,7 +119,7 @@
       "antiAbuse": { "required": true, "scopes": ["account", "session", "endpoint"], "actions": ["ALLOW", "BLOCK"] },
       "idempotency": { "required": true, "semantic": "repeated-revoke-is-successful-no-op" },
       "security": ["self_scope_only", "cannot_revoke_other_account", "revocation_wins_over_cache"],
-      "evidence": { "openapi": "MISSING", "inventory": "PASS", "permission": "MISSING", "state": "MISSING", "resource": "PASS", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "evidence": { "openapi": "PASS", "inventory": "PASS", "permission": "PASS", "state": "MISSING", "resource": "PASS", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
     }
   ]
 }
