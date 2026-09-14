@@ -32,6 +32,8 @@ import { Comments } from './collections/Comments'
 import { Notifications } from './collections/Notifications'
 import { FeedItems } from './collections/FeedItems'
 import { SocialBlocks } from './collections/SocialBlocks'
+import { SocialMutes } from './collections/SocialMutes'
+import { ContentFavorites } from './collections/ContentFavorites'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -92,6 +94,8 @@ export default buildConfig({
     Notifications,
     FeedItems,
     SocialBlocks,
+    SocialMutes,
+    ContentFavorites,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
