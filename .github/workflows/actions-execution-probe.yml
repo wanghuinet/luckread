@@ -3,7 +3,9 @@ name: Actions Execution Probe
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'feat/**'
     paths:
       - '.github/workflows/actions-execution-probe.yml'
 
