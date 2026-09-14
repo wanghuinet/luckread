@@ -69,10 +69,6 @@ export const Content: CollectionConfig = {
         const sideEffects = sideEffectsForState(body.to)
         const eventId = randomUUID()
 
-        // The conditional write makes the version/revision predicate part of the
-        // mutation itself, closing the read/modify/write race between callers.
-        // Passing the request keeps the content update and outbox insert in the
-        // same Payload transaction when transactions are enabled by the adapter.
         const result = await req.payload.update({
           collection: 'content',
           where: {
@@ -110,6 +106,22 @@ export const Content: CollectionConfig = {
           overrideAccess: true,
           req,
         })
+
+        for (const effect of sideEffects) {
+          await req.payload.create({
+            collection: 'content-event-effects',
+            data: {
+              effectId: `content-event:${eventId}:${effect}`,
+              eventId,
+              contentEvent: eventId,
+              effect,
+              status: 'PENDING',
+              attempts: 0,
+            },
+            overrideAccess: true,
+            req,
+          })
+        }
 
         return Response.json({
           data: updated,
