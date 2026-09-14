@@ -25,13 +25,32 @@ export type AuthorizationUser = {
   organizationScopes?: string[] | null
 }
 
+const CONTENT_OWN_PERMISSIONS = [
+  'content.submit_review.own',
+  'content.update.own',
+  'content.schedule.own',
+  'content.publish.own',
+  'content.unpublish.own',
+  'content.archive.own',
+  'content.delete.own',
+  'content.restore.own',
+]
+
+const ACCOUNT_OPERATOR_PERMISSIONS = ['user.restrict', 'user.freeze', 'user.unfreeze']
+const ACCOUNT_ADMIN_PERMISSIONS = ['user.suspend', 'user.ban', 'user.reinstate', 'user.restore', 'user.reactivate']
+
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-  user: ['content.submit_review.own', 'content.update.own', 'content.schedule.own', 'content.publish.own', 'content.unpublish.own', 'content.archive.own', 'content.delete.own', 'content.restore.own'],
-  verified_user: ['content.submit_review.own', 'content.update.own', 'content.schedule.own', 'content.publish.own', 'content.unpublish.own', 'content.archive.own', 'content.delete.own', 'content.restore.own'],
-  creator: ['content.submit_review.own', 'content.update.own', 'content.schedule.own', 'content.publish.own', 'content.unpublish.own', 'content.archive.own', 'content.delete.own', 'content.restore.own'],
-  moderator: ['moderation.decide'],
-  admin: ['moderation.decide'],
-  super_admin: ['moderation.decide'],
+  user: CONTENT_OWN_PERMISSIONS,
+  verified_user: CONTENT_OWN_PERMISSIONS,
+  creator: CONTENT_OWN_PERMISSIONS,
+  ip_principal: CONTENT_OWN_PERMISSIONS,
+  mcn_admin: CONTENT_OWN_PERMISSIONS,
+  mcn_editor: CONTENT_OWN_PERMISSIONS,
+  editor: CONTENT_OWN_PERMISSIONS,
+  operator: ACCOUNT_OPERATOR_PERMISSIONS,
+  moderator: ['moderation.decide', ...ACCOUNT_OPERATOR_PERMISSIONS],
+  admin: ['moderation.decide', ...ACCOUNT_OPERATOR_PERMISSIONS, ...ACCOUNT_ADMIN_PERMISSIONS],
+  super_admin: ['moderation.decide', ...ACCOUNT_OPERATOR_PERMISSIONS, ...ACCOUNT_ADMIN_PERMISSIONS],
 }
 
 const WRITE_BLOCKED = new Set<AccountState>(['FROZEN', 'SUSPENDED', 'BANNED', 'DELETION_REQUESTED', 'DELETION_PENDING', 'DELETED'])
