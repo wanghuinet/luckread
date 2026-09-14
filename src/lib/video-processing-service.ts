@@ -33,3 +33,32 @@ export async function markVideoValidationSucceeded(req: PayloadRequest, videoAss
     req,
   })
 }
+
+export async function runVideoValidationJob(req: PayloadRequest, jobId: string | number) {
+  const job = await req.payload.findByID({ collection: 'video-processing-jobs', id: jobId, depth: 1, overrideAccess: true, req })
+  if (job.stage !== 'VALIDATE') throw new APIError('Only VALIDATE jobs can be run by this runner', 409)
+  if (job.status !== 'QUEUED') throw new APIError(`Job is already ${job.status}`, 409)
+
+  const running = await req.payload.update({
+    collection: 'video-processing-jobs', id: job.id,
+    data: { status: 'RUNNING', attempts: Number(job.attempts ?? 0) + 1, startedAt: new Date().toISOString(), lastErrorCode: null, lastErrorMessage: null },
+    overrideAccess: true, req,
+  })
+
+  try {
+    const asset = typeof job.videoAsset === 'object' ? job.videoAsset : await req.payload.findByID({ collection: 'video-assets', id: job.videoAsset, depth: 0, overrideAccess: true, req })
+    const result = await validateUploadedVideo(String(asset.sourceR2Key), Number(asset.sizeBytes), String(asset.mimeType))
+    await markVideoValidationSucceeded(req, asset.id, result)
+    await req.payload.update({ collection: 'video-processing-jobs', id: running.id, data: { status: 'SUCCEEDED', finishedAt: new Date().toISOString() }, overrideAccess: true, req })
+    const probe = await req.payload.find({ collection: 'video-processing-jobs', where: { videoAsset: { equals: asset.id }, stage: { equals: 'PROBE' }, status: { in: ['QUEUED', 'RUNNING'] } }, limit: 1, depth: 0, overrideAccess: true, req })
+    if (!probe.docs.length) {
+      await req.payload.create({ collection: 'video-processing-jobs', data: { jobId: crypto.randomUUID(), videoAsset: asset.id, stage: 'PROBE', status: 'QUEUED', attempts: 0, maxAttempts: 3 }, overrideAccess: true, req })
+    }
+    return { status: 'SUCCEEDED', nextStage: 'PROBE' }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Video validation failed'
+    await req.payload.update({ collection: 'video-processing-jobs', id: running.id, data: { status: 'FAILED', finishedAt: new Date().toISOString(), lastErrorCode: 'VALIDATION_FAILED', lastErrorMessage: message }, overrideAccess: true, req })
+    await req.payload.update({ collection: 'video-assets', id: typeof job.videoAsset === 'object' ? job.videoAsset.id : job.videoAsset, data: { state: 'FAILED', failureCode: 'VALIDATION_FAILED', failureMessage: message, lastAttemptAt: new Date().toISOString() }, overrideAccess: true, req })
+    throw error
+  }
+}
