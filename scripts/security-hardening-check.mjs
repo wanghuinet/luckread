@@ -62,9 +62,10 @@ if (revocation) {
 }
 
 if (fields) {
-  const protectedFields = fields.protected_fields ?? fields.server_owned_fields ?? [];
+  const protectedFields = fields.protected_fields ?? fields.server_owned_fields ?? fields['x-protected-fields'] ?? [];
+  const protectedFieldNames = protectedFields.map((entry) => typeof entry === 'string' ? entry : entry?.field).filter(Boolean);
   for (const field of ['role','status','verified','owner_id','organization_id','scope_id','entitlements','subscription_state','payment_state','moderation_state','security_state']) {
-    if (!protectedFields.includes(field)) fail(`protected field missing: ${field}`);
+    if (!protectedFieldNames.includes(field)) fail(`protected field missing: ${field}`);
   }
 }
 
