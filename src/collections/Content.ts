@@ -7,6 +7,7 @@ import { hasPermission, type AuthorizationUser } from '../lib/authorization'
 import { transitionContentState } from '../lib/content-transition-service'
 import { rollbackContent } from '../lib/content-rollback-service'
 import { generateContentPaywall, readContentBody } from '../lib/content-paywall-service'
+import { garbageCollectPaywallObjects } from '../lib/content-paywall-gc'
 
 const contentTypes = ['article', 'post', 'video_metadata', 'gallery', 'live_metadata', 'series'] as const
 const contentStates = ['DRAFT', 'PENDING_REVIEW', 'REJECTED', 'APPROVED', 'SCHEDULED', 'PUBLISHED', 'UNPUBLISHED', 'ARCHIVED', 'DELETED', 'RESTORED'] as const
@@ -56,10 +57,10 @@ export const Content: CollectionConfig = {
           if (!data.paywallEntitlementCode) throw new APIError('paywallEntitlementCode is required for subscription content', 400)
         }
         if (data.paywallMode === 'FREE') {
-          data.paywallEntitlementCode = undefined
-          data.previewBodyR2Key = undefined
-          data.premiumBodyR2Key = undefined
-          data.paywallPreviewPercent = undefined
+          data.paywallEntitlementCode = null
+          data.previewBodyR2Key = null
+          data.premiumBodyR2Key = null
+          data.paywallPreviewPercent = null
         }
         return data
       },
@@ -69,6 +70,14 @@ export const Content: CollectionConfig = {
         if (req.context?.skipContentRevision) return
         const actorId = req.user ? String(req.user.id) : String(relationshipId(doc.author))
         await req.payload.create({ collection: 'content-revisions', data: { revisionId: randomUUID(), content: String(doc.id), revision: Number(doc.revision), version: Number(doc.version), author: String(relationshipId(doc.author)), state: String(doc.state), snapshot: { title: doc.title, slug: doc.slug, contentType: doc.contentType, locale: doc.locale, excerpt: doc.excerpt, bodyR2Key: doc.bodyR2Key, coverMedia: doc.coverMedia, state: doc.state, paywallMode: doc.paywallMode, paywallPreviewPercent: doc.paywallPreviewPercent, paywallEntitlementCode: doc.paywallEntitlementCode, previewBodyR2Key: doc.previewBodyR2Key, premiumBodyR2Key: doc.premiumBodyR2Key }, changeReason: operation, createdBy: actorId }, overrideAccess: true, req })
+      },
+      async ({ doc, previousDoc, req }) => {
+        if (req.context?.skipPaywallGarbageCollection) return
+        const previousKeys = [previousDoc?.previewBodyR2Key, previousDoc?.premiumBodyR2Key].filter(Boolean).map(String)
+        const currentKeys = [doc.previewBodyR2Key, doc.premiumBodyR2Key].filter(Boolean).map(String)
+        const changed = previousKeys.some((key) => !currentKeys.includes(key)) || currentKeys.some((key) => !previousKeys.includes(key))
+        if (!changed) return
+        await garbageCollectPaywallObjects(req, String(doc.id))
       },
     ],
   },
