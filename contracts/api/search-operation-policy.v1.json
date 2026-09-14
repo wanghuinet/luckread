@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/search-operation-policy.v1.json",
+  "title": "LuckRead Search Operation Policy",
+  "version": "1.0.0",
+  "domain": "search_discovery",
+  "operations": [
+    {
+      "operationId": "search",
+      "method": "GET",
+      "path": "/search",
+      "authorization": { "mode": "public_or_authenticated", "permission": "content.read.public", "scope": "public-or-self" },
+      "resource": { "classification": "BOUNDED_READ", "maxItems": 50 },
+      "cache": { "policy": "PRIVATE_OR_PUBLIC_BY_QUERY" },
+      "retry": { "maxAttempts": 1 },
+      "event": { "mode": "NONE" },
+      "queue": { "mode": "NONE" },
+      "antiAbuse": { "required": true },
+      "idempotency": { "required": false },
+      "security": { "required": true },
+      "evidence": { "openapi": "PASS", "permission": "PASS", "state": "N/A", "resource": "MISSING", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+    }
+  ],
+  "status": "CONTRACTED_PARTIAL"
+}
