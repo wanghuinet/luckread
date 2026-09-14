@@ -13,6 +13,7 @@ import { Media } from './collections/Media'
 import { Content } from './collections/Content'
 import { Taxonomies } from './collections/Taxonomies'
 import { ContentSeries } from './collections/ContentSeries'
+import { ContentMetadata } from './collections/ContentMetadata'
 import { ContentEvents } from './collections/ContentEvents'
 import { ContentEventEffects } from './collections/ContentEventEffects'
 import { AccountStateEvents } from './collections/AccountStateEvents'
@@ -50,11 +51,8 @@ const cloudflare =
     : await getCloudflareContext({ async: true })
 
 export default buildConfig({
-  admin: {
-    user: Users.slug,
-    importMap: { baseDir: path.resolve(dirname) },
-  },
-  collections: [Users, Media, Content, Taxonomies, ContentSeries, ContentEvents, ContentEventEffects, AccountStateEvents, Entitlements, EntitlementGrants, SubscriptionPlans, Subscriptions, Organizations, OrganizationMemberships, IPs, ContentRevisions, Reports, Appeals, ContentShares, ModerationEvents, Follows, ContentLikes, Comments, Notifications, FeedItems, SocialBlocks, SocialMutes, ContentFavorites],
+  admin: { user: Users.slug, importMap: { baseDir: path.resolve(dirname) } },
+  collections: [Users, Media, Content, Taxonomies, ContentSeries, ContentMetadata, ContentEvents, ContentEventEffects, AccountStateEvents, Entitlements, EntitlementGrants, SubscriptionPlans, Subscriptions, Organizations, OrganizationMemberships, IPs, ContentRevisions, Reports, Appeals, ContentShares, ModerationEvents, Follows, ContentLikes, Comments, Notifications, FeedItems, SocialBlocks, SocialMutes, ContentFavorites],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
