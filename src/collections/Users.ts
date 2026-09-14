@@ -1,7 +1,8 @@
+import { randomUUID } from 'node:crypto'
 import { APIError } from 'payload'
 import type { CollectionConfig } from 'payload'
 
-import { authorizationUser } from '../lib/request-authorization'
+import { type AuthorizationUser } from '../lib/authorization'
 import {
   ACCOUNT_STATES,
   assertAccountRestoreWindow,
@@ -9,6 +10,11 @@ import {
   resolveAccountStateTransition,
   type AccountState,
 } from '../lib/account-state-machine'
+
+function authorizationUser(value: unknown): AuthorizationUser | null {
+  if (!value || typeof value !== 'object') return null
+  return value as AuthorizationUser
+}
 
 export const Users: CollectionConfig = {
   slug: 'users',
@@ -71,7 +77,7 @@ export const Users: CollectionConfig = {
       const event = await req.payload.create({
         collection: 'account-state-events',
         data: {
-          eventId: crypto.randomUUID(),
+          eventId: randomUUID(),
           user: id,
           fromState: from,
           toState: body.to,
