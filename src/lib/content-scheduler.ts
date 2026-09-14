@@ -6,7 +6,7 @@ import { generateContentPaywall } from './content-paywall-service'
 
 const PUBLISH_EFFECTS = ['feed.index', 'search.index', 'notify.followers', 'cache.invalidate'] as const
 
-type ScheduledCandidate = { id: string | number; state: string; version: number; revision: number }
+type ScheduledCandidate = { id: string | number; state: string; version: number; revision: number; paywallMode?: string; bodyR2Key?: string; paywallPreviewPercent?: number; paywallEntitlementCode?: string }
 
 export type ContentSchedulerResult = { claimed: number; published: number; skipped: number }
 
@@ -40,6 +40,13 @@ export async function publishScheduledContent(args: { payload: Payload; req?: Pa
       const nextRevision = Number(candidate.revision) + 1
       const eventId = randomUUID()
 
+      // Materialize the same paywall version before the lifecycle transition
+      // used by manual publication. This keeps scheduled and manual publishing
+      // on one deterministic publication contract.
+      if (candidate.paywallMode === 'SUBSCRIPTION_PREVIEW') {
+        await generateContentPaywall(req, { ...(candidate as Record<string, unknown>), version: nextVersion })
+      }
+
       const updated = await args.payload.update({
         collection: 'content',
         where: { and: [{ id: { equals: candidate.id } }, { state: { equals: 'SCHEDULED' } }, { version: { equals: candidate.version } }, { revision: { equals: candidate.revision } }] },
@@ -55,9 +62,6 @@ export async function publishScheduledContent(args: { payload: Payload; req?: Pa
         result.skipped += 1
         continue
       }
-
-      const publishedDoc = updated.docs[0] as unknown as Record<string, unknown>
-      if (publishedDoc.paywallMode === 'SUBSCRIPTION_PREVIEW') await generateContentPaywall(req, publishedDoc)
 
       const event = await args.payload.create({
         collection: 'content-events',
