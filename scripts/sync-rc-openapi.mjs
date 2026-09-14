@@ -69,6 +69,36 @@ if (fs.existsSync(interactionPolicyFile)) {
   }
 }
 
+function syncOperationPolicy() {
+  const policyFile = 'contracts/openapi/v1/operation-policy.json';
+  const policy = JSON.parse(fs.readFileSync(policyFile, 'utf8'));
+  const existing = new Map((policy.operations ?? []).map((op) => [op.operationId, op]));
+  const inventoryOps = readOperations();
+  let changed = false;
+  for (const op of inventoryOps) {
+    if (existing.has(op.operationId)) continue;
+    const required = op.authorization?.required === true;
+    const permission = op.authorization?.permission;
+    const stateMachineRequired = op.stateMachine?.required === true;
+    policy.operations.push({
+      operationId: op.operationId,
+      auth: { mode: stateMachineRequired ? 'state-machine' : required ? (permission ? 'permission' : 'authenticated') : 'public' },
+      permissions: permission ? [permission] : [],
+      stateMachine: stateMachineRequired ? (op.operationId.toLowerCase().includes('account') ? 'account' : 'content') : 'none',
+      idempotencyRequired: op.idempotency?.required === true,
+      optimisticLockRequired: op.retry?.requiresOptimisticConcurrency === true,
+      auditRequired: true
+    });
+    changed = true;
+  }
+  if (changed) {
+    fs.writeFileSync(policyFile, JSON.stringify(policy, null, 2) + '\n');
+    console.log(`synchronized ${policy.operations.length - existing.size} domain inventory operations into ${policyFile}`);
+  }
+}
+
+syncOperationPolicy();
+
 const ops = readOperations();
 const seenRoute = new Map();
 for (const op of ops) {
