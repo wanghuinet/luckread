@@ -1,0 +1,107 @@
+#!/usr/bin/env node
+/**
+ * LuckRead API Contract CI.
+ * Validates machine-readable contracts/api/*.json and contracts/evidence/*.json.
+ * This gate is intentionally independent from Payload implementation code.
+ */
+import { readFile, readdir } from 'node:fs/promises'
+import { extname, join, resolve } from 'node:path'
+
+const root = resolve('contracts')
+const errors = []
+const fail = (message) => errors.push(message)
+const idPrefix = 'https://luckread.com/contracts/v1/'
+
+async function jsonFiles(dir) {
+  const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])
+  return entries
+    .filter((entry) => entry.isFile() && extname(entry.name) === '.json')
+    .map((entry) => join(dir, entry.name))
+    .sort()
+}
+
+async function load(file) {
+  try {
+    return JSON.parse(await readFile(file, 'utf8'))
+  } catch (error) {
+    fail(`${file}: invalid JSON (${error.message})`)
+    return null
+  }
+}
+
+const apiDir = join(root, 'api')
+const evidenceDir = join(root, 'evidence')
+const apiFiles = await jsonFiles(apiDir)
+const evidenceFiles = await jsonFiles(evidenceDir)
+const apiIds = new Map()
+const apiPaths = new Map()
+
+for (const file of apiFiles) {
+  const doc = await load(file)
+  if (!doc) continue
+  const rel = file.replace(`${root}/`, '')
+  if (doc.$schema !== 'https://json-schema.org/draft/2020-12/schema') fail(`${rel}: missing Draft 2020-12 schema declaration`)
+  if (typeof doc.$id !== 'string' || !doc.$id.startsWith(`${idPrefix}api/`)) fail(`${rel}: invalid api $id`)
+  if (apiIds.has(doc.$id)) fail(`${rel}: duplicate $id ${doc.$id}`)
+  apiIds.set(doc.$id, rel)
+  if (!Array.isArray(doc.operations) || doc.operations.length === 0) {
+    fail(`${rel}: operations must be a non-empty array`)
+    continue
+  }
+  const operationIds = new Set()
+  for (const op of doc.operations) {
+    if (!op.operationId || !/^[A-Za-z][A-Za-z0-9]+$/.test(op.operationId)) fail(`${rel}: invalid operationId`)
+    if (operationIds.has(op.operationId)) fail(`${rel}: duplicate operationId ${op.operationId}`)
+    operationIds.add(op.operationId)
+    if (!['GET', 'POST', 'PATCH', 'PUT', 'DELETE'].includes(op.method)) fail(`${rel}: unsupported method ${op.method}`)
+    if (!op.path || !op.path.startsWith('/')) fail(`${rel}: operation ${op.operationId} has invalid path`)
+    const key = `${op.method} ${op.path}`
+    if (apiPaths.has(key)) fail(`${rel}: duplicate API operation ${key} (already in ${apiPaths.get(key)})`)
+    apiPaths.set(key, rel)
+    if (!op.auth?.required) fail(`${rel}: operation ${op.operationId} must declare auth.required`)
+    if (!op.success?.status) fail(`${rel}: operation ${op.operationId} must declare success.status`)
+    if (!Array.isArray(op.errors)) fail(`${rel}: operation ${op.operationId} must declare errors[]`)
+  }
+  if (!doc.greenEvidence || typeof doc.greenEvidence !== 'object') fail(`${rel}: greenEvidence is required`)
+}
+
+const evidenceIds = new Map()
+for (const file of evidenceFiles) {
+  const doc = await load(file)
+  if (!doc) continue
+  const rel = file.replace(`${root}/`, '')
+  if (doc.$schema !== 'https://json-schema.org/draft/2020-12/schema') fail(`${rel}: missing Draft 2020-12 schema declaration`)
+  if (typeof doc.$id !== 'string' || !doc.$id.startsWith(`${idPrefix}evidence/`)) fail(`${rel}: invalid evidence $id`)
+  if (evidenceIds.has(doc.$id)) fail(`${rel}: duplicate $id ${doc.$id}`)
+  evidenceIds.set(doc.$id, rel)
+  if (!doc.contract || typeof doc.contract !== 'string') fail(`${rel}: contract reference is required`)
+  const required = doc.requiredEvidence
+  if (!Array.isArray(required) || required.length === 0) fail(`${rel}: requiredEvidence must be non-empty`)
+  else {
+    const ids = new Set()
+    for (const item of required) {
+      if (!item.id || !item.requirement) fail(`${rel}: evidence item must declare id and requirement`)
+      if (ids.has(item.id)) fail(`${rel}: duplicate evidence id ${item.id}`)
+      ids.add(item.id)
+      if (item.status !== 'PENDING' && item.status !== 'PASS') fail(`${rel}: evidence ${item.id} has invalid status ${item.status}`)
+    }
+  }
+  if (!['BLOCKED_ON_IMPLEMENTATION_BASELINE', 'GREEN'].includes(doc.status)) fail(`${rel}: invalid gate status ${doc.status}`)
+}
+
+const requiredRc = [
+  'contracts/api/block-mute.v1.json',
+  'contracts/api/report-appeal.v1.json',
+  'contracts/api/revision.v1.json',
+]
+for (const required of requiredRc) {
+  if (!apiFiles.includes(join(apiDir, required.split('/').pop()))) fail(`missing required P0 API contract: ${required}`)
+}
+
+if (errors.length) {
+  console.error('API Contract CI RED')
+  for (const error of errors) console.error(`  - ${error}`)
+  process.exit(1)
+}
+
+console.log(`API Contract CI GREEN — api=${apiFiles.length} evidence=${evidenceFiles.length} operations=${apiPaths.size}`)
