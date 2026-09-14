@@ -49,7 +49,6 @@ paths:
       security: []
       operationId: authRegister
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -205,7 +204,6 @@ paths:
       summary: Create content draft
       operationId: createContent
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -309,7 +307,6 @@ paths:
       summary: Initiate an upload (single or multipart)
       operationId: createMedia
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -369,7 +366,6 @@ paths:
       summary: Create content comment
       operationId: createComment
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -570,7 +566,6 @@ paths:
       summary: Invite an IP member
       operationId: inviteIpMember
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -674,7 +669,7 @@ paths:
       operationId: unblockUser
 
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'      responses:
+      responses:
         '204': { description: Unblocked (idempotent). }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
@@ -710,7 +705,7 @@ paths:
       operationId: unmuteUser
 
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'      responses:
+      responses:
         '204': { description: Unmuted (idempotent). }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
@@ -794,7 +789,6 @@ paths:
       operationId: rollbackContentRevision
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: false
         content:
@@ -803,7 +797,6 @@ paths:
               type: object
               properties:
                 reason: { type: string, maxLength: 2048 }
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
         '200': { description: Rollback completed and a new revision was created. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
@@ -852,7 +845,6 @@ paths:
       summary: Create a subscription
       operationId: createSubscription
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -862,7 +854,6 @@ paths:
               required: [planId]
               properties:
                 planId: { $ref: '#/components/schemas/ResourceId' }
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
         '201': { description: Subscription created. }
         '4XX': { $ref: '#/components/responses/ClientError' }
@@ -893,7 +884,6 @@ paths:
       operationId: cancelSubscription
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
         '200': { description: Subscription canceled. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
@@ -961,8 +951,6 @@ paths:
       summary: Invite an organization member
       operationId: inviteOrganizationMember
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
         '201': { description: Organization invitation created. }
         '4XX': { $ref: '#/components/responses/ClientError' }
@@ -983,7 +971,6 @@ paths:
       operationId: removeOrganizationMember
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
         '204': { description: Organization member removed. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
@@ -1015,7 +1002,6 @@ paths:
               required: [role]
               properties:
                 role: { type: string, minLength: 1, maxLength: 128 }
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
         '200': { description: Organization member role changed. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
