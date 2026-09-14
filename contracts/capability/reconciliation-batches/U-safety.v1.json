@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.0",
+  "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "batch": "U",
+  "domain": "Safety",
+  "status": "NOT_GREEN",
+  "records": [
+    {"featureId":"SAFETY-001","name":"content moderation","hierarchy":{"l1":"U","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SAFETY-002","name":"image/video/audio moderation","hierarchy":{"l1":"U","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SAFETY-003","name":"comment moderation","hierarchy":{"l1":"U","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SAFETY-004","name":"user/device/IP risk","hierarchy":{"l1":"U","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SAFETY-005","name":"spam/bot detection","hierarchy":{"l1":"U","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SAFETY-006","name":"fake engagement detection","hierarchy":{"l1":"U","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SAFETY-007","name":"scraping protection","hierarchy":{"l1":"U","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SAFETY-008","name":"brute-force/rate controls","hierarchy":{"l1":"U","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SAFETY-009","name":"fraud/payment abuse","hierarchy":{"l1":"U","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SAFETY-010","name":"enforcement","hierarchy":{"l1":"U","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SAFETY-011","name":"appeal","hierarchy":{"l1":"U","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SAFETY-012","name":"trust/risk scoring","hierarchy":{"l1":"U","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"SAFETY-013","name":"child/age safety","hierarchy":{"l1":"U","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+  ]
+}
