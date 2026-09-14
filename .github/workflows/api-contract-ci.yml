@@ -1,0 +1,29 @@
+name: API Contract CI
+
+on:
+  push:
+    paths:
+      - 'contracts/api/**'
+      - 'contracts/evidence/**'
+      - 'scripts/api-contract-ci.mjs'
+      - '.github/workflows/api-contract-ci.yml'
+  pull_request:
+    paths:
+      - 'contracts/api/**'
+      - 'contracts/evidence/**'
+      - 'scripts/api-contract-ci.mjs'
+      - '.github/workflows/api-contract-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  api-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate API and evidence contracts
+        run: node scripts/api-contract-ci.mjs
