@@ -9,6 +9,7 @@ info:
     contract. List endpoints use opaque cursors, never offset, for large sets.
   license:
     name: Proprietary
+    identifier: LicenseRef-LuckRead-Proprietary
 servers:
   - url: /api/v1
     description: API v1
@@ -802,6 +803,8 @@ paths:
         '4XX': { $ref: '#/components/responses/ClientError' }
 
   /content/{contentId}/shares:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
     post:
       tags: [Contents]
       summary: Create a share token for content
