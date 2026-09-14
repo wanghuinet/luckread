@@ -24,6 +24,7 @@ const ACCOUNT_OPERATOR_PERMISSIONS = ['user.restrict', 'user.freeze', 'user.unfr
 const ACCOUNT_ADMIN_PERMISSIONS = ['user.suspend', 'user.ban', 'user.reinstate', 'user.restore', 'user.reactivate']
 const ORGANIZATION_PERMISSIONS = ['organization.members.manage', 'organization.scope.read', 'organization.scope.write']
 const MODERATION_PERMISSIONS = ['moderation.decide', 'report.review', 'appeal.review']
+const SUBSCRIPTION_PERMISSIONS = ['subscription.plan.manage']
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   user: CONTENT_OWN_PERMISSIONS,
@@ -35,8 +36,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   editor: [...CONTENT_OWN_PERMISSIONS, 'organization.scope.read'],
   operator: [...ACCOUNT_OPERATOR_PERMISSIONS, 'organization.scope.read'],
   moderator: [...MODERATION_PERMISSIONS, ...ACCOUNT_OPERATOR_PERMISSIONS, 'organization.scope.read'],
-  admin: [...MODERATION_PERMISSIONS, ...ACCOUNT_OPERATOR_PERMISSIONS, ...ACCOUNT_ADMIN_PERMISSIONS, ...ORGANIZATION_PERMISSIONS],
-  super_admin: [...MODERATION_PERMISSIONS, ...ACCOUNT_OPERATOR_PERMISSIONS, ...ACCOUNT_ADMIN_PERMISSIONS, ...ORGANIZATION_PERMISSIONS],
+  admin: [...MODERATION_PERMISSIONS, ...ACCOUNT_OPERATOR_PERMISSIONS, ...ACCOUNT_ADMIN_PERMISSIONS, ...ORGANIZATION_PERMISSIONS, ...SUBSCRIPTION_PERMISSIONS],
+  super_admin: [...MODERATION_PERMISSIONS, ...ACCOUNT_OPERATOR_PERMISSIONS, ...ACCOUNT_ADMIN_PERMISSIONS, ...ORGANIZATION_PERMISSIONS, ...SUBSCRIPTION_PERMISSIONS],
 }
 
 const WRITE_BLOCKED = new Set<AccountState>(['FROZEN', 'SUSPENDED', 'BANNED', 'DELETION_REQUESTED', 'DELETION_PENDING', 'DELETED'])
