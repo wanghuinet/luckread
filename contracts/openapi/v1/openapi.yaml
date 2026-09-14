@@ -149,7 +149,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ListResponse' }
         '4XX': { $ref: '#/components/responses/ClientError' }
-      /auth/sessions/{sessionId}:
+  /auth/sessions/{sessionId}:
     parameters:
       - name: sessionId
         in: path
@@ -165,7 +165,7 @@ paths:
         '204': { description: Session revoked. }
         '404': { $ref: '#/components/responses/NotFound' }
         '4XX': { $ref: '#/components/responses/ClientError' }
-    /users/me:
+  /users/me:
     get:
       tags: [Users]
       summary: Get current user profile
