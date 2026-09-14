@@ -24,24 +24,30 @@ jobs:
           p = Path('contracts/openapi/v1/openapi.yaml')
           s = p.read_text()
           required = {'blockUser','unblockUser','muteUser','unmuteUser','createReport','createAppeal','rollbackContentRevision','createShare','createSubscription','cancelSubscription','inviteOrganizationMember','removeOrganizationMember','changeOrganizationMemberRole'}
-          for op in required:
-              om = re.search(r'(?ms)^      operationId:\s*'+re.escape(op)+r'\s*$.*?(?=^      responses:|^  /|^components:)', s)
+          ref = "        - $ref: '#/components/parameters/IdempotencyKeyRequired'"
+          for op in sorted(required):
+              om = re.search(r'(?ms)^  /[^\n]+:\n(?:    .*\n)*?^      operationId:\s*'+re.escape(op)+r'\s*$.*?(?=^  /[^\n]+:\n|^components:\n)', s)
               if not om:
                   raise SystemExit(f'missing operationId: {op}')
               block = om.group(0)
               if 'IdempotencyKeyRequired' in block:
                   continue
-              ref = "        - $ref: '#/components/parameters/IdempotencyKeyRequired'\n"
-              pm = re.search(r'(?ms)^      parameters:\n(?:        .*\n)*', block)
+              pm = re.search(r'(?ms)^      parameters:\n(?:        .*\n|      [^\n]*\n)*?(?=^      (?:requestBody|responses):)', block)
               if pm:
-                  block2 = block[:pm.end()] + ref + block[pm.end():]
+                  body = pm.group(0)
+                  if ref not in body:
+                      body = body.rstrip('\n') + '\n' + ref + '\n'
+                  block2 = block[:pm.start()] + body + block[pm.end():]
               else:
                   marker = re.search(r'(?m)^      operationId:\s*'+re.escape(op)+r'\s*$', block)
                   pos = marker.end()
-                  block2 = block[:pos] + '\n      parameters:\n' + ref.rstrip('\n') + block[pos:]
+                  block2 = block[:pos] + '\n      parameters:\n' + ref + '\n' + block[pos:]
               s = s[:om.start()] + block2 + s[om.end():]
           p.write_text(s)
           PY
+      - name: Validate OpenAPI YAML
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; import yaml from 'yaml'; yaml.parse(fs.readFileSync('contracts/openapi/v1/openapi.yaml','utf8')); console.log('OpenAPI YAML parse: PASS')"
       - name: Commit repair
         run: |
           if git diff --quiet -- contracts/openapi/v1/openapi.yaml; then exit 0; fi
