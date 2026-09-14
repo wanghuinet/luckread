@@ -1,0 +1,50 @@
+name: Payload Foundation CI
+
+on:
+  push:
+    paths:
+      - 'package.json'
+      - 'next.config.mjs'
+      - 'tsconfig.json'
+      - 'next-env.d.ts'
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/payload-foundation-ci.yml'
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'next.config.mjs'
+      - 'tsconfig.json'
+      - 'next-env.d.ts'
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/payload-foundation-ci.yml'
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Security unit tests
+        run: npm test
+
+      - name: Payload admission gate
+        run: npm run payload:admission
+
+      - name: Production build
+        run: npm run build
