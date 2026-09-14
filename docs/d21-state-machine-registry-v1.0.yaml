@@ -1,4 +1,4 @@
-version: 1.0.2
+version: 1.0.3
 contract: D21
 status: CONTRACT-FROZEN
 source_of_truth: docs/21-D21-ADVERTISING-PLATFORM-CONTRACT-v1.0.md
@@ -12,7 +12,7 @@ principles:
 machines:
   billing:
     initial: PENDING
-    terminal: [FINALIZED, INVALID, REVERSED, ADJUSTED]
+    terminal: [ADJUSTED]
     transitions:
       - {from: PENDING, to: VALID, action: validate, capability: traffic.validate, event: advertising.billing.validated}
       - {from: PENDING, to: SUSPICIOUS, action: flag, capability: traffic.validate, event: advertising.traffic.suspicious}
@@ -67,7 +67,7 @@ machines:
       - {from: SUSPENDED, to: ACTIVE, action: restore, capability: campaign.publish, event: advertising.campaign.resumed}
   creative:
     initial: DRAFT
-    terminal: [REJECTED, ARCHIVED]
+    terminal: [ARCHIVED]
     transitions:
       - {from: DRAFT, to: SUBMITTED, action: submit, capability: creative.submit, event: advertising.creative.submitted}
       - {from: SUBMITTED, to: REVIEWING, action: start_review, capability: creative.submit, event: advertising.creative.review_started}
@@ -102,7 +102,7 @@ machines:
       - {from: ESCALATED, to: UNDER_REVIEW, action: assign_review, capability: dispute.review, event: advertising.dispute.review_started}
   reconciliation:
     initial: MATCHED
-    terminal: [MATCHED, MINOR_VARIANCE, MATERIAL_VARIANCE, DISPUTED]
+    terminal: []
     transitions:
       - {from: MATCHED, to: MINOR_VARIANCE, action: detect_variance, capability: external_adapter.reconcile, event: advertising.reconciliation.variance_detected}
       - {from: MATCHED, to: MATERIAL_VARIANCE, action: detect_variance, capability: external_adapter.reconcile, event: advertising.reconciliation.variance_detected}
