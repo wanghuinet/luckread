@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract": "D21",
+  "version": "1.0.0",
+  "status": "CONTRACT-FROZEN",
+  "source_of_truth": "docs/21-D21-ADVERTISING-PLATFORM-CONTRACT-v1.0.md",
+  "api_prefix": "/v1/advertising",
+  "kernels": [
+    "K01_ADVERTISER",
+    "K02_CAMPAIGN",
+    "K03_CREATIVE_AUDIENCE",
+    "K04_INVENTORY_PLACEMENT",
+    "K05_DELIVERY_AUCTION",
+    "K06_TRAFFIC_VALIDITY",
+    "K07_ATTRIBUTION",
+    "K08_ADVERTISING_BILLING",
+    "K09_EXTERNAL_DEMAND",
+    "K10_REPORTING_DISPUTE_EVIDENCE"
+  ],
+  "capabilities": [
+    "advertising.read", "advertising.create", "advertising.update", "advertising.delete",
+    "campaign.read", "campaign.create", "campaign.update", "campaign.publish", "campaign.pause", "campaign.cancel",
+    "ad_group.read", "ad_group.create", "ad_group.update", "ad_group.delete",
+    "creative.read", "creative.create", "creative.update", "creative.submit", "creative.appeal",
+    "audience.read", "audience.create", "audience.update",
+    "inventory.read", "inventory.manage", "placement.read", "placement.manage",
+    "delivery.request", "auction.execute", "traffic.record", "traffic.validate",
+    "attribution.read", "attribution.execute", "billing.read", "billing.export",
+    "report.read", "report.export", "dispute.create", "dispute.read", "dispute.appeal",
+    "external_adapter.connect", "external_adapter.read", "external_adapter.sync", "external_adapter.reconcile",
+    "evidence.read", "operations.kill_switch"
+  ],
+  "states": {
+    "advertiser": ["CREATING", "ACTIVE", "MONITORING", "RESTRICTED", "SUSPENDED", "CLOSED"],
+    "campaign": ["DRAFT", "SUBMITTED", "REVIEWING", "APPROVED", "ACTIVE", "PAUSED", "COMPLETED", "REJECTED", "SUSPENDED", "CANCELLED", "EXPIRED"],
+    "creative": ["DRAFT", "SUBMITTED", "REVIEWING", "APPROVED", "ACTIVE", "REJECTED", "SUSPENDED", "ARCHIVED"],
+    "traffic_validity": ["PENDING", "VALID", "SUSPICIOUS", "INVALID", "REVERSED"],
+    "billing": ["PENDING", "VALID", "BILLABLE", "FINALIZED", "INVALID", "SUSPICIOUS", "REVERSED", "ADJUSTED"],
+    "dispute": ["OPEN", "UNDER_REVIEW", "EVIDENCE_REQUIRED", "RESOLVED", "REJECTED", "ESCALATED"],
+    "reconciliation": ["MATCHED", "MINOR_VARIANCE", "MATERIAL_VARIANCE", "DISPUTED"]
+  },
+  "events": [
+    "advertising.account.created", "advertising.account.updated",
+    "advertising.campaign.created", "advertising.campaign.updated", "advertising.campaign.submitted",
+    "advertising.campaign.approved", "advertising.campaign.rejected", "advertising.campaign.activated",
+    "advertising.campaign.paused", "advertising.campaign.completed",
+    "advertising.creative.created", "advertising.creative.approved", "advertising.creative.rejected",
+    "advertising.impression.recorded", "advertising.click.recorded", "advertising.conversion.recorded",
+    "advertising.risk.evaluated", "advertising.traffic.validated", "advertising.traffic.invalidated",
+    "advertising.traffic.reversed", "advertising.billing.created", "advertising.billing.finalized",
+    "advertising.billing.adjusted", "advertising.dispute.created", "advertising.dispute.resolved",
+    "advertising.reconciliation.detected"
+  ],
+  "error_codes": [
+    "ADVERTISER_NOT_FOUND", "ADVERTISER_FORBIDDEN", "CAMPAIGN_NOT_FOUND", "CAMPAIGN_INVALID_STATE",
+    "CREATIVE_NOT_FOUND", "CREATIVE_NOT_APPROVED", "AUDIENCE_NOT_FOUND", "AUDIENCE_NOT_ELIGIBLE",
+    "PLACEMENT_NOT_FOUND", "PLACEMENT_NOT_ELIGIBLE", "BUDGET_EXCEEDED", "BUDGET_RESERVATION_FAILED",
+    "FREQUENCY_LIMIT_REACHED", "POLICY_BLOCKED", "RISK_BLOCKED", "INVALID_TRAFFIC",
+    "AUCTION_UNAVAILABLE", "DEMAND_SOURCE_UNAVAILABLE", "BILLING_NOT_FINAL", "ATTRIBUTION_INVALID",
+    "DUPLICATE_EVENT", "IDEMPOTENCY_CONFLICT", "EXTERNAL_SYNC_FAILED", "RECONCILIATION_REQUIRED"
+  ],
+  "invariants": [
+    {"id":"D21-AD-001","rule":"unvalidated traffic cannot create irreversible final cost"},
+    {"id":"D21-AD-002","rule":"INVALID traffic cannot enter final settlement"},
+    {"id":"D21-AD-003","rule":"late fraud discovery creates reversal/adjustment; history remains immutable"},
+    {"id":"D21-AD-004","rule":"raw event, validity decision, billable event and settlement are independently auditable"},
+    {"id":"D21-AD-005","rule":"advertising billing history is append-only"},
+    {"id":"D21-AD-006","rule":"sponsored and organic delivery are distinguishable"},
+    {"id":"D21-AD-007","rule":"external demand cannot bypass the D21 core contract"},
+    {"id":"D21-AD-008","rule":"D21 cannot bypass D02 authorization"},
+    {"id":"D21-AD-009","rule":"D21 cannot bypass D13 risk/policy governance"},
+    {"id":"D21-AD-010","rule":"D21 cannot directly execute D15 payment/settlement"},
+    {"id":"D21-AD-011","rule":"historical ad decisions are reconstructable from evidence"},
+    {"id":"D21-AD-012","rule":"core failures fail safe, not fail open"}
+  ],
+  "evidence_requirements": [
+    "contract_version", "commit_sha", "workflow_run", "schema_validation", "openapi_validation",
+    "permission_tests", "state_machine_tests", "event_contract_tests", "tenant_isolation_tests",
+    "idempotency_tests", "concurrency_tests", "traffic_validity_tests", "billing_finality_tests",
+    "reversal_tests", "attribution_tests", "external_adapter_failure_tests", "reconciliation_tests",
+    "security_probe", "execution_probe"
+  ],
+  "green_rule": "CODE_COMPLETE != VALIDATION_COMPLETE != EVIDENCE_COMPLETE != GREEN",
+  "unknown_evidence_status": "BLOCKED"
+}
