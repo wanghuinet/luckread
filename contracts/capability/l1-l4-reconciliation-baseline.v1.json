@@ -73,6 +73,21 @@
 {"featureId":"ARTICLE-009","name":"partial-content/paywall support","hierarchy":{"l1":"F. Article and text","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
 {"featureId":"ARTICLE-010","name":"article SEO metadata","hierarchy":{"l1":"F. Article and text","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
 {"featureId":"ARTICLE-011","name":"article related-content linking","hierarchy":{"l1":"F. Article and text","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
-{"featureId":"ARTICLE-012","name":"article version/restore","hierarchy":{"l1":"F. Article and text","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+{"featureId":"ARTICLE-012","name":"article version/restore","hierarchy":{"l1":"F. Article and text","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-001","name":"media asset","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-002","name":"upload/resumable upload","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-003","name":"image processing","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-004","name":"video processing/transcoding","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-005","name":"short video","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-006","name":"long video","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-007","name":"audio/podcast","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-008","name":"subtitle/transcript","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-009","name":"thumbnail/poster/cover","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-010","name":"CDN/delivery metadata","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-011","name":"live stream","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-012","name":"live replay","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-013","name":"media rights/fingerprint","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-014","name":"watermark/DRM extension","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+{"featureId":"MEDIA-015","name":"storage lifecycle","hierarchy":{"l1":"G. Video, audio, live and media","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
   ]
 }
