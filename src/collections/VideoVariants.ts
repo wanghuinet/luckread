@@ -11,6 +11,7 @@ export const VideoVariants: CollectionConfig = {
   },
   fields: [
     { name: 'videoAsset', type: 'relationship', relationTo: 'video-assets', required: true, index: true },
+    { name: 'variantKey', type: 'text', required: true, unique: true, index: true, maxLength: 300 },
     { name: 'name', type: 'text', required: true, maxLength: 100 },
     { name: 'format', type: 'select', required: true, options: [{ label: 'MP4', value: 'MP4' }, { label: 'HLS', value: 'HLS' }], index: true },
     { name: 'width', type: 'number', required: true, min: 1 },
