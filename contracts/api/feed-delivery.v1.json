@@ -3,7 +3,7 @@
   "$id":"https://luckread.com/contracts/api/feed-delivery.v1.json",
   "title":"Feed Delivery Contract",
   "version":"1.0.0",
-  "operations":[{"id":"feed.list","method":"GET","path":"/v1/feed","auth":"public-or-scoped","rules":["cursor pagination is mandatory","ordering is deterministic within a rankingVersion and request snapshot","same item identity must not appear twice in one page","cursor is opaque and server-owned","invalid or expired cursor fails closed"]},{"id":"feed.refresh","method":"POST","path":"/v1/feed/refresh","auth":"public-or-scoped","idempotency":"recommended","rules":["refresh may advance the feed snapshot","client cannot supply authoritative ranking score","deduplication remains mandatory"]}],
+  "operations":[{"id":"feed.list","method":"GET","path":"/v1/feed","auth":"public-or-scoped","rules":["cursor pagination is mandatory","ordering is deterministic within a rankingVersion and request snapshot","same item identity must not appear twice in one page","cursor is opaque and server-owned","invalid or expired cursor fails closed"]}],
   "ordering":{"requiredTieBreakers":["rankingScore","publishedAt","contentId"],"direction":"descending","stableAcrossPageTraversal":true,"rankingVersionRequired":true},
   "dedup":{"identity":"contentId","scope":"single-response-and-page-traversal","duplicatePolicy":"drop-later-occurrence"},
   "cursor":{"opaque":true,"bindsTo":["feedType","rankingVersion","snapshot","filters"],"tamperHandling":"INVALID_CURSOR","expiryRequired":true},
