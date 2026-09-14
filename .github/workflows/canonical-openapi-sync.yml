@@ -24,17 +24,17 @@ jobs:
         with:
           node-version: 24
 
-      - name: Synchronize canonical OpenAPI and canonical route corrections
+      - name: Synchronize canonical OpenAPI
         run: node scripts/sync-rc-openapi.mjs
 
-      - name: Commit canonical contract synchronization when changed
+      - name: Commit canonical OpenAPI when changed
         run: |
-          if git diff --quiet -- contracts/openapi/v1/openapi.yaml contracts/api/interaction-operation-policy.v1.json; then
-            echo "No canonical contract change required."
+          if git diff --quiet -- contracts/openapi/v1/openapi.yaml; then
+            echo "No canonical OpenAPI change required."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add contracts/openapi/v1/openapi.yaml contracts/api/interaction-operation-policy.v1.json
-          git commit -m "chore(api): synchronize domain inventory into canonical OpenAPI"
+          git add contracts/openapi/v1/openapi.yaml
+          git commit -m "chore(api): synchronize RC operations into canonical OpenAPI"
           git push
