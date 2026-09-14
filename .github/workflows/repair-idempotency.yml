@@ -16,43 +16,69 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Add required Idempotency-Key declarations
+      - name: Repair required idempotency declarations
+        shell: python
         run: |
-          python3 - <<'PY'
           from pathlib import Path
           import re
           p = Path('contracts/openapi/v1/openapi.yaml')
           s = p.read_text()
-          required = {'blockUser','unblockUser','muteUser','unmuteUser','createReport','createAppeal','rollbackContentRevision','createShare','createSubscription','cancelSubscription','inviteOrganizationMember','removeOrganizationMember','changeOrganizationMemberRole'}
-          ref = "        - $ref: '#/components/parameters/IdempotencyKeyRequired'"
-          for op in sorted(required):
-              om = re.search(r'(?ms)^  /[^\n]+:\n(?:    .*\n)*?^      operationId:\s*'+re.escape(op)+r'\s*$.*?(?=^  /[^\n]+:\n|^components:\n)', s)
-              if not om:
+          ops = [
+              'blockUser','unblockUser','muteUser','unmuteUser','createReport','createAppeal',
+              'rollbackContentRevision','createShare','createSubscription','cancelSubscription',
+              'inviteOrganizationMember','removeOrganizationMember','changeOrganizationMemberRole'
+          ]
+          required_line = "        - $ref: '#/components/parameters/IdempotencyKeyRequired'"
+          for op in ops:
+              m = re.search(r'(?ms)^  /[^\n]+:\n.*?^      operationId:\s*'+re.escape(op)+r'\s*$.*?(?=^  /[^\n]+:\n|^components:\n)', s)
+              if not m:
                   raise SystemExit(f'missing operationId: {op}')
-              block = om.group(0)
-              if 'IdempotencyKeyRequired' in block:
-                  continue
-              pm = re.search(r'(?ms)^      parameters:\n(?:        .*\n|      [^\n]*\n)*?(?=^      (?:requestBody|responses):)', block)
-              if pm:
-                  body = pm.group(0)
-                  if ref not in body:
-                      body = body.rstrip('\n') + '\n' + ref + '\n'
-                  block2 = block[:pm.start()] + body + block[pm.end():]
-              else:
+              block = m.group(0)
+              block = block.replace("        - $ref: '#/components/parameters/IdempotencyKeyRequired'      responses:", "        - $ref: '#/components/parameters/IdempotencyKeyRequired'\n      responses:")
+              block = block.replace("        - $ref: '#/components/parameters/IdempotencyKey'\n", "")
+              block = block.replace("        - $ref: '#/components/parameters/IdempotencyKeyRequired'      requestBody:", "        - $ref: '#/components/parameters/IdempotencyKeyRequired'\n      requestBody:")
+              block = block.replace("        - $ref: '#/components/parameters/IdempotencyKeyRequired'      responses:", "        - $ref: '#/components/parameters/IdempotencyKeyRequired'\n      responses:")
+              if 'IdempotencyKeyRequired' not in block:
                   marker = re.search(r'(?m)^      operationId:\s*'+re.escape(op)+r'\s*$', block)
+                  if not marker:
+                      raise SystemExit(f'operationId marker missing: {op}')
                   pos = marker.end()
-                  block2 = block[:pos] + '\n      parameters:\n' + ref + '\n' + block[pos:]
-              s = s[:om.start()] + block2 + s[om.end():]
+                  block = block[:pos] + '\n      parameters:\n' + required_line + '\n' + block[pos:]
+              else:
+                  # Normalize any required parameter that was accidentally left inside requestBody.
+                  block = re.sub(r'(?ms)(^      requestBody:\n.*?)(^        - \$ref: \'#/components/parameters/IdempotencyKeyRequired\'\n)(?=      responses:)', r'\1', block)
+                  # Ensure it is present in the operation parameter section.
+                  if not re.search(r"(?m)^      parameters:\n(?:        .*\n)*        - \$ref: '#/components/parameters/IdempotencyKeyRequired'\s*$", block):
+                      block = re.sub(r"(?m)^      parameters:\n", "      parameters:\n" + required_line + "\n", block, count=1)
+              s = s[:m.start()] + block + s[m.end():]
           p.write_text(s)
-          PY
+          print('Repaired required idempotency declarations:', ', '.join(ops))
       - name: Validate OpenAPI YAML
+        shell: bash
         run: |
-          node --input-type=module -e "import fs from 'node:fs'; import yaml from 'yaml'; yaml.parse(fs.readFileSync('contracts/openapi/v1/openapi.yaml','utf8')); console.log('OpenAPI YAML parse: PASS')"
+          python3 - <<'PY'
+          import yaml
+          from pathlib import Path
+          yaml.safe_load(Path('contracts/openapi/v1/openapi.yaml').read_text())
+          print('OpenAPI YAML parse: PASS')
+          PY
+      - name: Verify required declarations
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          s = Path('contracts/openapi/v1/openapi.yaml').read_text()
+          ops = ['blockUser','unblockUser','muteUser','unmuteUser','createReport','createAppeal','rollbackContentRevision','createShare','createSubscription','cancelSubscription','inviteOrganizationMember','removeOrganizationMember','changeOrganizationMemberRole']
+          for op in ops:
+              m = re.search(r'(?ms)^  /[^\n]+:\n.*?^      operationId:\s*'+re.escape(op)+r'\s*$.*?(?=^  /[^\n]+:\n|^components:\n)', s)
+              if not m or "IdempotencyKeyRequired" not in m.group(0):
+                  raise SystemExit(f'missing required declaration: {op}')
+          print('Required idempotency verification: PASS')
       - name: Commit repair
         run: |
           if git diff --quiet -- contracts/openapi/v1/openapi.yaml; then exit 0; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add contracts/openapi/v1/openapi.yaml
-          git commit -m 'fix(contract): declare required idempotency keys'
+          git commit -m 'fix(contract): normalize required idempotency declarations'
           git push
