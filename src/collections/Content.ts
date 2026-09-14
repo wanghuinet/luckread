@@ -53,7 +53,7 @@ export const Content: CollectionConfig = {
         if (!Number.isInteger(body.expectedVersion) || body.expectedVersion < 1) throw new APIError('expectedVersion is required for optimistic concurrency', 400)
         if (!Number.isInteger(body.expectedRevision) || body.expectedRevision < 1) throw new APIError('expectedRevision is required for optimistic concurrency', 400)
 
-        const current = await req.payload.findByID({ collection: 'content', id, depth: 0, overrideAccess: true })
+        const current = await req.payload.findByID({ collection: 'content', id, depth: 0, overrideAccess: true, req })
         const currentState = current.state as ContentState
         const transition = resolveContentTransition(currentState, body.to)
         const authorId = typeof current.author === 'object' ? current.author.id : current.author
@@ -71,6 +71,8 @@ export const Content: CollectionConfig = {
 
         // The conditional write makes the version/revision predicate part of the
         // mutation itself, closing the read/modify/write race between callers.
+        // Passing the request keeps the content update and outbox insert in the
+        // same Payload transaction when transactions are enabled by the adapter.
         const result = await req.payload.update({
           collection: 'content',
           where: {
@@ -83,6 +85,7 @@ export const Content: CollectionConfig = {
           data: { ...buildContentStatePatch(body.to, now), version: nextVersion, revision: nextRevision },
           context: { allowContentStateTransition: true },
           overrideAccess: true,
+          req,
         })
 
         if (!result.docs.length) throw new APIError('Content version conflict; reload and retry', 409)
@@ -105,6 +108,7 @@ export const Content: CollectionConfig = {
             attempts: 0,
           },
           overrideAccess: true,
+          req,
         })
 
         return Response.json({
@@ -128,7 +132,7 @@ export const Content: CollectionConfig = {
     { name: 'title', type: 'text', required: true, maxLength: 200 },
     { name: 'slug', type: 'text', required: true, unique: true, index: true },
     { name: 'contentType', type: 'select', required: true, options: contentTypes.map((value) => ({ label: value, value })), index: true },
-    { name: 'state', type: 'select', required: true, defaultValue: 'DRAFT', options: contentStates.map((value) => ({ label: value, value })), index: true },
+    { name: 'state', type: 'select', required: true, options: contentStates.map((value) => ({ label: value, value })), index: true },
     { name: 'author', type: 'relationship', relationTo: 'users', required: true, index: true },
     { name: 'locale', type: 'text', required: true, defaultValue: 'en-US', index: true },
     { name: 'excerpt', type: 'textarea', maxLength: 1000 },
