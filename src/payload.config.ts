@@ -19,6 +19,11 @@ import { EntitlementGrants } from './collections/EntitlementGrants'
 import { Subscriptions } from './collections/Subscriptions'
 import { Organizations } from './collections/Organizations'
 import { OrganizationMemberships } from './collections/OrganizationMemberships'
+import { IPs } from './collections/IPs'
+import { ContentRevisions } from './collections/ContentRevisions'
+import { Reports } from './collections/Reports'
+import { Appeals } from './collections/Appeals'
+import { ContentShares } from './collections/ContentShares'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -42,7 +47,7 @@ const cloudflareLogger = {
   error: createLog('error', console.error),
   fatal: createLog('fatal', console.error),
   silent: () => {},
-} as any
+}
 
 const cloudflare =
   isCLI || isNextBuild || !isProduction
@@ -66,6 +71,11 @@ export default buildConfig({
     Subscriptions,
     Organizations,
     OrganizationMemberships,
+    IPs,
+    ContentRevisions,
+    Reports,
+    Appeals,
+    ContentShares,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
