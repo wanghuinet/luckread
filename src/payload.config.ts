@@ -16,6 +16,7 @@ import { ContentEventEffects } from './collections/ContentEventEffects'
 import { AccountStateEvents } from './collections/AccountStateEvents'
 import { Entitlements } from './collections/Entitlements'
 import { EntitlementGrants } from './collections/EntitlementGrants'
+import { SubscriptionPlans } from './collections/SubscriptionPlans'
 import { Subscriptions } from './collections/Subscriptions'
 import { Organizations } from './collections/Organizations'
 import { OrganizationMemberships } from './collections/OrganizationMemberships'
@@ -68,6 +69,7 @@ export default buildConfig({
     AccountStateEvents,
     Entitlements,
     EntitlementGrants,
+    SubscriptionPlans,
     Subscriptions,
     Organizations,
     OrganizationMemberships,
