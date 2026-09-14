@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": "cloudflare-worker.ts",
+  "name": "luckread",
+  "compatibility_date": "2025-08-15",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
+  "triggers": {
+    "crons": ["*/1 * * * *"]
+  },
+  "secrets": {
+    "required": ["CRON_INTERNAL_TOKEN"]
+  },
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "D1",
+      "database_id": "DATABASE_ID",
+      "database_name": "luckread",
+      "remote": true
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "luckread"
+    }
+  ]
+}

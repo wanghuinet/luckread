@@ -25,21 +25,22 @@ const revocation = json('contracts/authz/revocation-policy.json');
 const fields = json('contracts/authz/field-policy.json');
 
 if (decision) {
-  const checks = decision.checks;
+  const checks = decision.properties?.checks;
   const requiredChecks = ['authentication','accountState','permission','scope','resource','policy'];
-  if (!checks || typeof checks !== 'object') fail('authorization decision must expose checks object');
-  for (const key of requiredChecks) if (!checks || !Object.hasOwn(checks, key)) fail(`decision check missing: ${key}`);
+  if (!checks || typeof checks !== 'object') fail('authorization decision contract must define checks schema');
+  const checkRequired = new Set(checks.required ?? []);
+  for (const key of requiredChecks) if (!checkRequired.has(key)) fail(`decision check missing from schema: ${key}`);
   const order = decision['x-resolution-order'] ?? [];
   if (order[0] !== 'ACCOUNT_SECURITY_DENY' || order[1] !== 'CREDENTIAL_DENY') fail('security deny precedence must start with account and credential deny');
-  const invariants = decision['x-hard-invariants'] ?? [];
+  const invariants = (decision['x-hard-invariants'] ?? []).map((x) => String(x).toLowerCase());
   const requiredInvariantFragments = [
-    'role name alone can never produce ALLOW',
-    'resource identifier alone can never produce ALLOW',
-    'Authorization evaluation failure produces DENY',
-    'Authorization cache cannot override authoritative account state or revocation'
+    'role name alone can never produce allow',
+    'resource identifier alone can never produce allow',
+    'authorization evaluation failure produces deny',
+    'authorization cache cannot override authoritative account state or revocation'
   ];
   for (const fragment of requiredInvariantFragments) {
-    if (!invariants.some((x) => String(x).includes(fragment))) fail(`missing hard invariant: ${fragment}`);
+    if (!invariants.some((x) => x.includes(fragment))) fail(`missing hard invariant: ${fragment}`);
   }
 }
 
@@ -62,7 +63,8 @@ if (revocation) {
 }
 
 if (fields) {
-  const protectedFields = fields.protected_fields ?? fields.server_owned_fields ?? [];
+  const protectedFieldEntries = fields['x-protected-fields'] ?? [];
+  const protectedFields = fields.protected_fields ?? fields.server_owned_fields ?? protectedFieldEntries.map((entry) => entry?.field).filter(Boolean);
   for (const field of ['role','status','verified','owner_id','organization_id','scope_id','entitlements','subscription_state','payment_state','moderation_state','security_state']) {
     if (!protectedFields.includes(field)) fail(`protected field missing: ${field}`);
   }

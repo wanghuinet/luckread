@@ -1,0 +1,46 @@
+name: Cloudflare Payload Baseline
+
+on:
+  push:
+    branches:
+      - feat/cloudflare-payload-baseline
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-payload-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Generate Cloudflare binding types
+        run: pnpm run generate:types:cloudflare
+
+      - name: TypeScript
+        run: pnpm exec tsc --noEmit
+
+      - name: Build
+        run: pnpm run build
