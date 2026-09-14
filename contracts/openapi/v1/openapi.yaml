@@ -642,6 +642,392 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ListResponse' }
         '4XX': { $ref: '#/components/responses/ClientError' }
+  /interactions/blocks:
+    post:
+      tags: [Interactions]
+      summary: Block a user
+      operationId: blockUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetUserId]
+              properties:
+                targetUserId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '200': { description: Blocked (idempotent). }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /interactions/blocks/{targetUserId}:
+    parameters:
+      - name: targetUserId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    delete:
+      tags: [Interactions]
+      summary: Unblock a user
+      operationId: unblockUser
+      responses:
+        '204': { description: Unblocked (idempotent). }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /interactions/mutes:
+    post:
+      tags: [Interactions]
+      summary: Mute a user
+      operationId: muteUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetUserId]
+              properties:
+                targetUserId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '200': { description: Muted (idempotent). }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /interactions/mutes/{targetUserId}:
+    parameters:
+      - name: targetUserId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    delete:
+      tags: [Interactions]
+      summary: Unmute a user
+      operationId: unmuteUser
+      responses:
+        '204': { description: Unmuted (idempotent). }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /reports:
+    post:
+      tags: [Admin]
+      summary: Create a moderation report
+      operationId: createReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetType, targetId, reasonCode]
+              properties:
+                targetType: { enum: [content, comment, creator, media, profile] }
+                targetId: { $ref: '#/components/schemas/ResourceId' }
+                reasonCode: { type: string, maxLength: 128 }
+                description: { type: string, maxLength: 4000 }
+                evidenceRefs: { type: array, maxItems: 20, items: { type: string, maxLength: 512 } }
+      responses:
+        '201': { description: Report created (idempotent). }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /appeals:
+    post:
+      tags: [Admin]
+      summary: Create a moderation appeal
+      operationId: createAppeal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [moderationCaseId, reason]
+              properties:
+                moderationCaseId: { $ref: '#/components/schemas/ResourceId' }
+                reason: { type: string, minLength: 1, maxLength: 4000 }
+                evidenceRefs: { type: array, maxItems: 20, items: { type: string, maxLength: 512 } }
+      responses:
+        '201': { description: Appeal created (idempotent). }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /contents/{contentId}/revisions:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+    get:
+      tags: [Contents]
+      summary: List immutable content revisions
+      operationId: listContentRevisions
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200': { description: Content revisions. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /contents/{contentId}/revisions/{revisionId}:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+      - name: revisionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [Contents]
+      summary: Get an immutable content revision
+      operationId: getContentRevision
+      responses:
+        '200': { description: Content revision. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+    post:
+      tags: [Contents]
+      summary: Roll back content to a revision by creating a new revision
+      operationId: rollbackContentRevision
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 2048 }
+      responses:
+        '200': { description: Rollback completed and a new revision was created. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /content/{contentId}/shares:
+    post:
+      tags: [Contents]
+      summary: Create a share token for content
+      operationId: createShare
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contentId]
+              properties:
+                contentId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '201': { description: Share created. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /shares/{shareId}:
+    parameters:
+      - name: shareId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [Contents]
+      summary: Resolve a share token
+      security: []
+      operationId: resolveShare
+      responses:
+        '200': { description: Share resolved. }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+
+  /memberships/subscriptions:
+    post:
+      tags: [Users]
+      summary: Create a subscription
+      operationId: createSubscription
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [planId]
+              properties:
+                planId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '201': { description: Subscription created. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /memberships/subscriptions/{subscriptionId}:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [Users]
+      summary: Get a subscription
+      operationId: getSubscription
+      responses:
+        '200': { description: Subscription. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /memberships/subscriptions/{subscriptionId}/cancel:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Cancel a subscription
+      operationId: cancelSubscription
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+      responses:
+        '200': { description: Subscription canceled. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /entitlements/{subjectId}:
+    parameters:
+      - name: subjectId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [Users]
+      summary: Get effective entitlements
+      operationId: getEntitlements
+      responses:
+        '200': { description: Effective server-derived entitlements. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /entitlements/check:
+    post:
+      tags: [Users]
+      summary: Check an entitlement
+      operationId: checkEntitlement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subjectId, entitlement]
+              properties:
+                subjectId: { $ref: '#/components/schemas/ResourceId' }
+                entitlement: { type: string, minLength: 1, maxLength: 256 }
+      responses:
+        '200': { description: Entitlement decision. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /organizations/{organizationId}/members:
+    parameters:
+      - name: organizationId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [Organizations]
+      summary: List organization members
+      operationId: listOrganizationMembers
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200': { description: Organization members. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /organizations/{organizationId}/members/invitations:
+    parameters:
+      - name: organizationId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Organizations]
+      summary: Invite an organization member
+      operationId: inviteOrganizationMember
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201': { description: Organization invitation created. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /organizations/{organizationId}/members/{memberId}:
+    parameters:
+      - name: organizationId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+      - name: memberId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    delete:
+      tags: [Organizations]
+      summary: Remove an organization member
+      operationId: removeOrganizationMember
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+      responses:
+        '204': { description: Organization member removed. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /organizations/{organizationId}/members/{memberId}/role:
+    parameters:
+      - name: organizationId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+      - name: memberId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Organizations]
+      summary: Change an organization member role
+      operationId: changeOrganizationMemberRole
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, minLength: 1, maxLength: 128 }
+      responses:
+        '200': { description: Organization member role changed. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /ips/{ipId}/contents:
+    parameters:
+      - $ref: '#/components/parameters/IpId'
+    get:
+      tags: [IPs]
+      summary: List content belonging to an IP projection
+      operationId: listIpContents
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200': { description: IP content projection. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /ips/{ipId}/contents/{contentId}:
+    parameters:
+      - $ref: '#/components/parameters/IpId'
+      - $ref: '#/components/parameters/ContentId'
+    get:
+      tags: [IPs]
+      summary: Get an IP content projection
+      operationId: getIpContent
+      responses:
+        '200': { description: IP content projection. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
 components:
   securitySchemes:
     bearerAuth:
