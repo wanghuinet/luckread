@@ -5,6 +5,7 @@ on:
     paths:
       - 'contracts/api/**'
       - 'scripts/sync-rc-openapi.mjs'
+      - 'scripts/normalize-openapi.mjs'
       - '.github/workflows/canonical-openapi-sync.yml'
 
 permissions:
@@ -27,6 +28,9 @@ jobs:
       - name: Synchronize canonical OpenAPI
         run: node scripts/sync-rc-openapi.mjs
 
+      - name: Normalize canonical OpenAPI
+        run: node scripts/normalize-openapi.mjs
+
       - name: Commit canonical OpenAPI when changed
         run: |
           if git diff --quiet -- contracts/openapi/v1/openapi.yaml; then
@@ -36,5 +40,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add contracts/openapi/v1/openapi.yaml
-          git commit -m "chore(api): synchronize RC operations into canonical OpenAPI"
+          git commit -m "chore(api): synchronize canonical OpenAPI"
           git push

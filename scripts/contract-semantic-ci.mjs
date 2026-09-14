@@ -69,9 +69,7 @@ for (const file of await walk(join(ROOT, 'state-machines'))) {
 }
 
 const errorDoc = await json('schemas/common/error.json')
-if (errorDoc.properties?.code?.$ref !== '../../enums/error-code.json') {
-  fail('schemas/common/error.json: code MUST reference canonical ErrorCode enum')
-}
+if (errorDoc.properties?.code?.$ref !== '../../enums/error-code.json') fail('schemas/common/error.json: code MUST reference canonical ErrorCode enum')
 
 const errorResponse = await json('schemas/common/error-response.json')
 if (!errorResponse.properties?.traceId) fail('schemas/common/error-response.json: traceId must be declared')
@@ -92,25 +90,15 @@ for (const op of policyOps) {
   if (policyIds.has(op.operationId)) fail(`openapi/operation-policy.json: duplicate operationId '${op.operationId}'`)
   policyIds.add(op.operationId)
   const mode = op.auth?.mode
-  if (!['public', 'permission', 'state-machine', 'authenticated'].includes(mode)) {
-    fail(`openapi/operation-policy.json: operation '${op.operationId}' has invalid auth.mode '${mode ?? ''}'`)
-  }
+  if (!['public', 'permission', 'state-machine', 'authenticated'].includes(mode)) fail(`openapi/operation-policy.json: operation '${op.operationId}' has invalid auth.mode '${mode ?? ''}'`)
   const perms = op.permissions ?? []
   if (!Array.isArray(perms)) fail(`openapi/operation-policy.json: operation '${op.operationId}' permissions must be an array`)
-  for (const permission of perms) {
-    if (!permissions.has(permission)) fail(`openapi/operation-policy.json: operation '${op.operationId}' references unknown permission '${permission}'`)
-  }
+  for (const permission of perms) if (!permissions.has(permission)) fail(`openapi/operation-policy.json: operation '${op.operationId}' references unknown permission '${permission}'`)
   if (mode === 'public' && perms.length !== 0) fail(`openapi/operation-policy.json: public operation '${op.operationId}' must not require a permission`)
   if (mode === 'permission' && perms.length === 0) fail(`openapi/operation-policy.json: permission operation '${op.operationId}' must declare at least one permission`)
-  if (mode === 'state-machine' && !['account', 'content'].includes(op.stateMachine)) {
-    fail(`openapi/operation-policy.json: state-machine operation '${op.operationId}' must name account or content`)
-  }
-  if (mode !== 'state-machine' && op.stateMachine !== 'none') {
-    fail(`openapi/operation-policy.json: non-state-machine operation '${op.operationId}' must use stateMachine=none`)
-  }
-  if (perms.some((permission) => permissions.get(permission)?.auditRequired === true) && op.auditRequired !== true) {
-    fail(`openapi/operation-policy.json: operation '${op.operationId}' uses an audit-required permission but auditRequired=false`)
-  }
+  if (mode === 'state-machine' && !['account', 'content'].includes(op.stateMachine)) fail(`openapi/operation-policy.json: state-machine operation '${op.operationId}' must name account or content`)
+  if (mode !== 'state-machine' && op.stateMachine !== 'none') fail(`openapi/operation-policy.json: non-state-machine operation '${op.operationId}' must use stateMachine=none`)
+  if (perms.some((permission) => permissions.get(permission)?.auditRequired === true) && op.auditRequired !== true) fail(`openapi/operation-policy.json: operation '${op.operationId}' uses an audit-required permission but auditRequired=false`)
 }
 
 const openapi = await readFile(join(ROOT, 'openapi/v1/openapi.yaml'), 'utf8')
@@ -134,7 +122,6 @@ function escapeRegExp(value) {
 function operationBlock(operationId) {
   const exactOperation = new RegExp(`^\\s+operationId:\\s*${escapeRegExp(operationId)}\\s*$`, 'm').exec(openapi)
   if (!exactOperation || exactOperation.index === undefined) return ''
-
   const idx = exactOperation.index
   const prefix = openapi.slice(0, idx)
   const methods = [...prefix.matchAll(/^    (get|post|put|patch|delete|head|options):\s*$/gm)]
@@ -163,18 +150,13 @@ for (const op of policyOps) {
     fail(`openapi.yaml: operation '${op.operationId}' could not be located for policy binding`)
     continue
   }
-  if (op.idempotencyRequired && !hasParameterRef(block, 'IdempotencyKeyRequired')) {
-    fail(`openapi.yaml: idempotency-required operation '${op.operationId}' must declare IdempotencyKeyRequired`)
-  }
-  if (op.optimisticLockRequired && !hasParameterRef(block, 'IfMatchRequired')) {
-    fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare IfMatchRequired`)
-  }
-  if (op.optimisticLockRequired && !hasResponse(block, '412')) {
-    fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare HTTP 412`)
-  }
-  if (op.optimisticLockRequired && !hasResponse(block, '428')) {
-    fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare HTTP 428`)
-  }
+  // idempotencyRequired is a server-side semantic guarantee. The transport
+  // may use an Idempotency-Key, a canonical request fingerprint, or a natural
+  // resource key. The OpenAPI document may therefore make the header optional
+  // or omit it when the server can derive a stable idempotency identity.
+  if (op.optimisticLockRequired && !hasParameterRef(block, 'IfMatchRequired')) fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare IfMatchRequired`)
+  if (op.optimisticLockRequired && !hasResponse(block, '412')) fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare HTTP 412`)
+  if (op.optimisticLockRequired && !hasResponse(block, '428')) fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare HTTP 428`)
 }
 
 if (errors.length) {

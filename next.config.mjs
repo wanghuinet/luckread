@@ -4,7 +4,8 @@ import { withPayload } from '@payloadcms/next/withPayload'
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    webpackBuildWorker: true,
+    cpus: 1,
+    webpackBuildWorker: false,
   },
 }
 

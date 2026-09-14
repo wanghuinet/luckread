@@ -1,4 +1,4 @@
-import type { Access, Request } from 'payload'
+import type { Access, PayloadRequest } from 'payload'
 
 export type AuthorizationContext = {
   actorId: string | null
@@ -10,7 +10,7 @@ export type AuthorizationContext = {
   correlationId: string | null
 }
 
-export function authorizationContext(req: Request, subjectId?: string | null): AuthorizationContext {
+export function authorizationContext(req: PayloadRequest, subjectId?: string | null): AuthorizationContext {
   const actor = req.user as { id?: string | number } | null | undefined
   const headers = req.headers
 
