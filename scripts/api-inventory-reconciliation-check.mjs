@@ -5,6 +5,7 @@ import path from 'node:path';
 const root = process.cwd();
 const inventoryDir = path.join(root, 'contracts', 'api');
 const openapiPolicy = path.join(root, 'contracts', 'openapi', 'v1', 'operation-policy.json');
+const openapiSpec = path.join(root, 'contracts', 'openapi', 'v1', 'openapi.yaml');
 const failures = [];
 const findings = [];
 const matches = [];
@@ -25,6 +26,49 @@ function addInventory(op, source) {
     if (!op[field]) finding('MISSING_POLICY', id, field);
   }
 }
+function parseOpenApiOperations(file) {
+  const operations = new Map();
+  if (!fs.existsSync(file)) {
+    failures.push({ code: 'MISSING_OPENAPI_SPEC', source: path.relative(root, file) });
+    return operations;
+  }
+  const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+  let currentPath = null;
+  let currentMethod = null;
+  let currentOperationId = null;
+  const methods = new Set(['get','post','put','patch','delete','head','options','trace']);
+  const flush = () => {
+    if (!currentOperationId) return;
+    if (operations.has(currentOperationId)) {
+      failures.push({ code: 'OPENAPI_DUPLICATE_OPERATION_ID', operationId: currentOperationId });
+    } else {
+      operations.set(currentOperationId, { operationId: currentOperationId, method: String(currentMethod ?? '').toUpperCase(), path: currentPath });
+    }
+    currentOperationId = null;
+  };
+  for (const line of lines) {
+    const pathMatch = line.match(/^  (\/[^:#]+):\s*$/);
+    if (pathMatch) {
+      flush();
+      currentPath = pathMatch[1].trim();
+      currentMethod = null;
+      continue;
+    }
+    const methodMatch = line.match(/^    (get|post|put|patch|delete|head|options|trace):\s*$/i);
+    if (methodMatch && currentPath) {
+      flush();
+      currentMethod = methodMatch[1].toLowerCase();
+      continue;
+    }
+    if (currentPath && currentMethod) {
+      const operationMatch = line.match(/^\s+operationId:\s*([^#\s]+)\s*(?:#.*)?$/);
+      if (operationMatch) currentOperationId = operationMatch[1].trim();
+    }
+  }
+  flush();
+  return operations;
+}
+
 if (!fs.existsSync(inventoryDir)) failures.push({ code: 'MISSING_API_INVENTORY_DIRECTORY' });
 else for (const file of fs.readdirSync(inventoryDir).filter((f) => f.endsWith('-operation-policy.v1.json')).sort()) {
   const doc = readJson(path.join(inventoryDir, file));
@@ -33,28 +77,35 @@ else for (const file of fs.readdirSync(inventoryDir).filter((f) => f.endsWith('-
   if (!Array.isArray(doc.operations)) finding('MISSING_OPERATIONS_ARRAY', null, file);
   else doc.operations.forEach((op) => addInventory(op, file));
 }
+
 const policy = fs.existsSync(openapiPolicy) ? readJson(openapiPolicy) : null;
-const openapiOps = new Map();
+const policyOps = new Map();
 if (!policy) failures.push({ code: 'MISSING_OPENAPI_OPERATION_POLICY' });
 else if (!Array.isArray(policy.operations)) failures.push({ code: 'OPENAPI_POLICY_MISSING_OPERATIONS_ARRAY' });
 else for (const op of policy.operations) {
   if (!op?.operationId) failures.push({ code: 'OPENAPI_POLICY_MISSING_OPERATION_ID' });
-  else if (openapiOps.has(op.operationId)) failures.push({ code: 'OPENAPI_DUPLICATE_OPERATION_ID', operationId: op.operationId });
-  else openapiOps.set(op.operationId, op);
+  else if (policyOps.has(op.operationId)) failures.push({ code: 'OPENAPI_DUPLICATE_OPERATION_ID', operationId: op.operationId });
+  else policyOps.set(op.operationId, op);
 }
+
+const openapiOps = parseOpenApiOperations(openapiSpec);
+
 for (const [id, op] of inventory) {
-  const legacy = openapiOps.get(id);
-  if (!legacy) {
-    finding('UNRECONCILED_INVENTORY_OPERATION', id, 'operationId is not yet represented in legacy OpenAPI operation policy');
+  const openapi = openapiOps.get(id);
+  if (!openapi) {
+    finding('UNRECONCILED_INVENTORY_OPERATION', id, 'operationId is not represented in canonical OpenAPI paths');
     continue;
   }
   const inventoryMethod = String(op.method).toUpperCase();
-  const openapiMethod = String(legacy.method ?? '').toUpperCase();
+  const openapiMethod = String(openapi.method).toUpperCase();
   if (inventoryMethod !== openapiMethod) finding('METHOD_CONFLICT', id, `inventory=${inventoryMethod} openapi=${openapiMethod}`);
-  else if (op.path !== legacy.path) finding('PATH_CONFLICT', id, `inventory=${op.path} openapi=${legacy.path}`);
-  else matches.push({ operationId: id, inventory: { method: inventoryMethod, path: op.path }, openapi: { method: openapiMethod, path: legacy.path } });
+  else if (op.path !== openapi.path) finding('PATH_CONFLICT', id, `inventory=${op.path} openapi=${openapi.path}`);
+  else matches.push({ operationId: id, inventory: { method: inventoryMethod, path: op.path }, openapi });
 }
-for (const [id] of openapiOps) if (!inventory.has(id)) finding('UNRECONCILED_OPENAPI_OPERATION', id, 'legacy OpenAPI operation is not yet represented in domain inventory');
+for (const [id] of openapiOps) if (!inventory.has(id)) finding('UNRECONCILED_OPENAPI_OPERATION', id, 'canonical OpenAPI operation is not represented in domain inventory');
+for (const [id] of openapiOps) if (!policyOps.has(id)) finding('UNRECONCILED_OPENAPI_POLICY_OPERATION', id, 'canonical OpenAPI operationId is missing from operation-policy registry');
+for (const [id] of policyOps) if (!openapiOps.has(id)) finding('UNRECONCILED_POLICY_OPERATION', id, 'operation-policy operationId is not represented in canonical OpenAPI');
+
 const criticalEvidence = ['openapi','permission','state','resource','cache','antiAbuse','integration','securityE2E'];
 const allowedEvidence = new Set(['PASS', 'N/A']);
 for (const [id, op] of inventory) {
@@ -65,12 +116,28 @@ for (const [id, op] of inventory) {
     else if (!allowedEvidence.has(value)) finding('EVIDENCE_INVALID', id, `${field}=${String(value)}`);
   }
 }
-const conflictCodes = new Set(['INVALID_JSON','DUPLICATE_OPERATION_ID','OPENAPI_POLICY_MISSING_OPERATION_ID','OPENAPI_DUPLICATE_OPERATION_ID','MISSING_OPERATION_ID','MISSING_METHOD_OR_PATH','METHOD_CONFLICT','PATH_CONFLICT']);
-const incompleteCodes = new Set(['MISSING_API_INVENTORY_DIRECTORY','MISSING_OPENAPI_OPERATION_POLICY','OPENAPI_POLICY_MISSING_OPERATIONS_ARRAY','MISSING_POLICY','MISSING_DOMAIN','MISSING_OPERATIONS_ARRAY','EVIDENCE_MISSING','EVIDENCE_INCOMPLETE','EVIDENCE_INVALID','UNRECONCILED_INVENTORY_OPERATION','UNRECONCILED_OPENAPI_OPERATION']);
+
+const conflictCodes = new Set(['INVALID_JSON','DUPLICATE_OPERATION_ID','OPENAPI_POLICY_MISSING_OPERATION_ID','OPENAPI_DUPLICATE_OPERATION_ID','MISSING_OPERATION_ID','MISSING_METHOD_OR_PATH','METHOD_CONFLICT','PATH_CONFLICT','OPENAPI_DUPLICATE_OPERATION_ID']);
+const incompleteCodes = new Set(['MISSING_API_INVENTORY_DIRECTORY','MISSING_OPENAPI_SPEC','MISSING_OPENAPI_OPERATION_POLICY','OPENAPI_POLICY_MISSING_OPERATIONS_ARRAY','MISSING_POLICY','MISSING_DOMAIN','MISSING_OPERATIONS_ARRAY','EVIDENCE_MISSING','EVIDENCE_INCOMPLETE','EVIDENCE_INVALID','UNRECONCILED_INVENTORY_OPERATION','UNRECONCILED_OPENAPI_OPERATION','UNRECONCILED_OPENAPI_POLICY_OPERATION','UNRECONCILED_POLICY_OPERATION']);
 const hasConflict = failures.some((x) => conflictCodes.has(x.code)) || findings.some((x) => conflictCodes.has(x.code));
 const hasIncomplete = failures.some((x) => incompleteCodes.has(x.code)) || findings.some((x) => incompleteCodes.has(x.code));
 const status = hasConflict ? 'CONFLICT' : hasIncomplete ? 'INCOMPLETE' : 'PASS';
-const report = { schemaVersion: '1.2.0', generatedAt: new Date().toISOString(), status, reconciliationGreen: status === 'PASS', inventoryCount: inventory.size, openapiPolicyCount: openapiOps.size, failureCount: failures.length, findingCount: findings.length, failures, findings, matches, evidenceSemantics: { pass: ['PASS','N/A'], incomplete: ['MISSING','ABSENT'], invalid: ['unknown_or_unsupported'] }, rule: 'PASS requires zero structural conflicts, zero unresolved inventory membership, and zero incomplete/invalid evidence. N/A is valid only when explicitly declared by the operation contract.' };
+const report = {
+  schemaVersion: '1.3.0',
+  generatedAt: new Date().toISOString(),
+  status,
+  reconciliationGreen: status === 'PASS',
+  inventoryCount: inventory.size,
+  openapiOperationCount: openapiOps.size,
+  openapiPolicyCount: policyOps.size,
+  failureCount: failures.length,
+  findingCount: findings.length,
+  failures,
+  findings,
+  matches,
+  evidenceSemantics: { pass: ['PASS','N/A'], incomplete: ['MISSING','ABSENT'], invalid: ['unknown_or_unsupported'] },
+  rule: 'PASS requires zero structural conflicts, zero unresolved inventory/OpenAPI/policy membership, and zero incomplete/invalid evidence. N/A is valid only when explicitly declared by the operation contract.'
+};
 const evidenceDir = path.join(root, 'artifacts', 'api-inventory');
 fs.mkdirSync(evidenceDir, { recursive: true });
 fs.writeFileSync(path.join(evidenceDir, 'reconciliation-report.json'), JSON.stringify(report, null, 2) + '\n');
