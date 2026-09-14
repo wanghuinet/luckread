@@ -43,9 +43,10 @@ export const Content: CollectionConfig = {
       path: '/:id/state',
       method: 'post',
       handler: async (req) => {
-        const body = (await req.clone().json()) as { to?: (typeof contentStates)[number] }
-        if (!body.to || !contentStates.includes(body.to)) throw new APIError('A valid target state is required', 400)
-        return transitionContentState(req, body.to)
+        const url = new URL(req.url)
+        const to = url.searchParams.get('to') as (typeof contentStates)[number] | null
+        if (!to || !contentStates.includes(to)) throw new APIError('A valid target state is required', 400)
+        return transitionContentState(req, to)
       },
       custom: {
         openapi: {
