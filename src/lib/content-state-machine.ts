@@ -38,15 +38,19 @@ export const CONTENT_TRANSITIONS: readonly ContentTransition[] = [
   { from: 'UNPUBLISHED', to: 'PUBLISHED', actor: 'creator', permission: 'content.publish.own', event: 'content.published' },
   { from: 'UNPUBLISHED', to: 'DRAFT', actor: 'creator', permission: 'content.update.own', event: 'content.reverted_to_draft' },
   { from: 'ARCHIVED', to: 'DRAFT', actor: 'creator', permission: 'content.unarchive.own', event: 'content.unarchived' },
+  { from: 'DRAFT', to: 'DELETED', actor: 'creator', permission: 'content.delete.own', event: 'content.deleted' },
+  { from: 'PUBLISHED', to: 'DELETED', actor: 'creator', permission: 'content.delete.own', event: 'content.deleted' },
+  { from: 'UNPUBLISHED', to: 'DELETED', actor: 'creator', permission: 'content.delete.own', event: 'content.deleted' },
+  { from: 'ARCHIVED', to: 'DELETED', actor: 'creator', permission: 'content.delete.own', event: 'content.deleted' },
+  { from: 'DELETED', to: 'RESTORED', actor: 'creator', permission: 'content.restore.own', event: 'content.restored' },
+  { from: 'RESTORED', to: 'DRAFT', actor: 'system', permission: 'system.job', event: 'content.reverted_to_draft' },
 ]
 
 const MODERATOR_ROLES = new Set(['moderator', 'admin', 'super_admin'])
 
 export function resolveContentTransition(from: ContentState, to: ContentState): ContentTransition {
   const transition = CONTENT_TRANSITIONS.find((candidate) => candidate.from === from && candidate.to === to)
-  if (!transition) {
-    throw new APIError(`Forbidden content transition: ${from} -> ${to}`, 409)
-  }
+  if (!transition) throw new APIError(`Forbidden content transition: ${from} -> ${to}`, 409)
   return transition
 }
 
@@ -61,10 +65,7 @@ export function assertContentTransitionActor(args: {
   if (transition.actor === 'system') throw new APIError('System-only transition', 403)
 
   const isOwner = String(user.id) === String(authorId)
-  if (transition.actor === 'creator' && !isOwner) {
-    throw new APIError('Content ownership required', 403)
-  }
-
+  if (transition.actor === 'creator' && !isOwner) throw new APIError('Content ownership required', 403)
   if (transition.actor === 'moderator' && !MODERATOR_ROLES.has(user.role ?? '')) {
     throw new APIError('Moderator permission required', 403)
   }
@@ -77,9 +78,8 @@ export function buildContentStatePatch(to: ContentState, now: string): Record<st
   if (to === 'PUBLISHED') patch.publishedAt = now
   if (to === 'ARCHIVED') patch.archivedAt = now
   if (to === 'DELETED') patch.deletedAt = now
-  if (to === 'DRAFT' || to === 'UNPUBLISHED' || to === 'REJECTED') {
-    if (to !== 'DRAFT') patch.scheduledAt = null
-  }
+  if (to === 'DRAFT' || to === 'UNPUBLISHED' || to === 'REJECTED') patch.scheduledAt = null
+  if (to === 'RESTORED') patch.deletedAt = null
 
   return patch
 }
