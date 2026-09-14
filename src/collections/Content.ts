@@ -35,22 +35,23 @@ export const Content: CollectionConfig = {
   hooks: {
     beforeChange: [
       ({ data, originalDoc, req }) => {
-        if (!req.user) throw new APIError('Authentication required', 401)
-        const actorId = String(req.user.id)
-        const isModerator = canModerate(req.user)
+        const isSystemJob = Boolean(req.context?.systemJob)
+        if (!req.user && !isSystemJob) throw new APIError('Authentication required', 401)
+        const actorId = req.user ? String(req.user.id) : 'system:scheduler'
+        const isModerator = req.user ? canModerate(req.user) : false
         if (!originalDoc) {
           const authorId = relationshipId(data.author)
           if (!authorId) throw new APIError('Content author is required', 400)
-          if (!isModerator && authorId !== actorId) throw new APIError('Content author must match the authenticated user', 403)
+          if (!isSystemJob && !isModerator && authorId !== actorId) throw new APIError('Content author must match the authenticated user', 403)
         } else {
           const ownerId = relationshipId(originalDoc.author)
-          if (!isModerator && ownerId !== actorId) throw new APIError('Content ownership permission denied', 403)
+          if (!isSystemJob && !isModerator && ownerId !== actorId) throw new APIError('Content ownership permission denied', 403)
           if (data.author !== undefined && relationshipId(data.author) !== ownerId) throw new APIError('Content author is immutable', 400)
         }
         if (originalDoc && data.state !== undefined && data.state !== originalDoc.state && !req.context?.allowContentStateTransition) throw new APIError('Content state must be changed through the lifecycle transition API', 400)
         if (originalDoc?.state === 'PUBLISHED' && hasMaterialContentEdit(data as Record<string, unknown>, originalDoc as Record<string, unknown>)) throw new APIError('Material edits to published content require PUBLISHED -> PENDING_REVIEW before editing', 409)
         if (originalDoc?.state === 'DELETED' && data.state !== 'RESTORED' && data.state !== undefined) throw new APIError('Deleted content can only be restored through the lifecycle API', 409)
-        if (req.context?.systemJob && !req.context.allowContentStateTransition) throw new APIError('System job context cannot mutate content directly', 403)
+        if (isSystemJob && !req.context?.allowContentStateTransition) throw new APIError('System job context cannot mutate content directly', 403)
         if (data.paywallMode === 'SUBSCRIPTION_PREVIEW') {
           const previewPercent = Number(data.paywallPreviewPercent)
           if (!Number.isFinite(previewPercent) || previewPercent <= 0 || previewPercent >= 100) throw new APIError('paywallPreviewPercent must be between 1 and 99', 400)
