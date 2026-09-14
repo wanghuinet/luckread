@@ -49,6 +49,7 @@ paths:
       security: []
       operationId: authRegister
       parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -204,6 +205,7 @@ paths:
       summary: Create content draft
       operationId: createContent
       parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -307,6 +309,7 @@ paths:
       summary: Initiate an upload (single or multipart)
       operationId: createMedia
       parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -366,6 +369,7 @@ paths:
       summary: Create content comment
       operationId: createComment
       parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -566,6 +570,7 @@ paths:
       summary: Invite an IP member
       operationId: inviteIpMember
       parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -642,8 +647,6 @@ paths:
       tags: [Interactions]
       summary: Block a user
       operationId: blockUser
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       requestBody:
         required: true
         content:
@@ -667,8 +670,6 @@ paths:
       tags: [Interactions]
       summary: Unblock a user
       operationId: unblockUser
-
-      parameters:
       responses:
         '204': { description: Unblocked (idempotent). }
         '4XX': { $ref: '#/components/responses/ClientError' }
@@ -678,8 +679,6 @@ paths:
       tags: [Interactions]
       summary: Mute a user
       operationId: muteUser
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       requestBody:
         required: true
         content:
@@ -703,8 +702,6 @@ paths:
       tags: [Interactions]
       summary: Unmute a user
       operationId: unmuteUser
-
-      parameters:
       responses:
         '204': { description: Unmuted (idempotent). }
         '4XX': { $ref: '#/components/responses/ClientError' }
@@ -714,8 +711,6 @@ paths:
       tags: [Admin]
       summary: Create a moderation report
       operationId: createReport
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       requestBody:
         required: true
         content:
@@ -738,8 +733,6 @@ paths:
       tags: [Admin]
       summary: Create a moderation appeal
       operationId: createAppeal
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       requestBody:
         required: true
         content:
@@ -789,6 +782,7 @@ paths:
       operationId: rollbackContentRevision
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       requestBody:
         required: false
         content:
@@ -808,8 +802,6 @@ paths:
       tags: [Contents]
       summary: Create a share token for content
       operationId: createShare
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       requestBody:
         required: true
         content:
@@ -845,6 +837,7 @@ paths:
       summary: Create a subscription
       operationId: createSubscription
       parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       requestBody:
         required: true
         content:
@@ -884,6 +877,7 @@ paths:
       operationId: cancelSubscription
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
         '200': { description: Subscription canceled. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
@@ -951,6 +945,7 @@ paths:
       summary: Invite an organization member
       operationId: inviteOrganizationMember
       parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
         '201': { description: Organization invitation created. }
         '4XX': { $ref: '#/components/responses/ClientError' }
@@ -971,6 +966,7 @@ paths:
       operationId: removeOrganizationMember
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
         '204': { description: Organization member removed. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
@@ -993,6 +989,7 @@ paths:
       operationId: changeOrganizationMemberRole
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       requestBody:
         required: true
         content:
