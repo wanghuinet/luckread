@@ -16,69 +16,75 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Repair required idempotency declarations
-        shell: python
+      - name: Restore canonical OpenAPI and repair required declarations
+        shell: bash
         run: |
+          set -euo pipefail
+          git show e80433de0b99599a13fc5aab40231a5c4f60414d:contracts/openapi/v1/openapi.yaml > contracts/openapi/v1/openapi.yaml
+          python3 - <<'PY'
           from pathlib import Path
-          import re
-          p = Path('contracts/openapi/v1/openapi.yaml')
-          s = p.read_text()
-          ops = [
+          ops = {
               'blockUser','unblockUser','muteUser','unmuteUser','createReport','createAppeal',
               'rollbackContentRevision','createShare','createSubscription','cancelSubscription',
               'inviteOrganizationMember','removeOrganizationMember','changeOrganizationMemberRole'
-          ]
-          required_line = "        - $ref: '#/components/parameters/IdempotencyKeyRequired'"
-          for op in ops:
-              m = re.search(r'(?ms)^  /[^\n]+:\n.*?^      operationId:\s*'+re.escape(op)+r'\s*$.*?(?=^  /[^\n]+:\n|^components:\n)', s)
-              if not m:
-                  raise SystemExit(f'missing operationId: {op}')
-              block = m.group(0)
-              block = block.replace("        - $ref: '#/components/parameters/IdempotencyKeyRequired'      responses:", "        - $ref: '#/components/parameters/IdempotencyKeyRequired'\n      responses:")
-              block = block.replace("        - $ref: '#/components/parameters/IdempotencyKey'\n", "")
-              block = block.replace("        - $ref: '#/components/parameters/IdempotencyKeyRequired'      requestBody:", "        - $ref: '#/components/parameters/IdempotencyKeyRequired'\n      requestBody:")
-              block = block.replace("        - $ref: '#/components/parameters/IdempotencyKeyRequired'      responses:", "        - $ref: '#/components/parameters/IdempotencyKeyRequired'\n      responses:")
-              if 'IdempotencyKeyRequired' not in block:
-                  marker = re.search(r'(?m)^      operationId:\s*'+re.escape(op)+r'\s*$', block)
-                  if not marker:
-                      raise SystemExit(f'operationId marker missing: {op}')
-                  pos = marker.end()
-                  block = block[:pos] + '\n      parameters:\n' + required_line + '\n' + block[pos:]
-              else:
-                  # Normalize any required parameter that was accidentally left inside requestBody.
-                  block = re.sub(r'(?ms)(^      requestBody:\n.*?)(^        - \$ref: \'#/components/parameters/IdempotencyKeyRequired\'\n)(?=      responses:)', r'\1', block)
-                  # Ensure it is present in the operation parameter section.
-                  if not re.search(r"(?m)^      parameters:\n(?:        .*\n)*        - \$ref: '#/components/parameters/IdempotencyKeyRequired'\s*$", block):
-                      block = re.sub(r"(?m)^      parameters:\n", "      parameters:\n" + required_line + "\n", block, count=1)
-              s = s[:m.start()] + block + s[m.end():]
-          p.write_text(s)
-          print('Repaired required idempotency declarations:', ', '.join(ops))
-      - name: Validate OpenAPI YAML
+          }
+          p = Path('contracts/openapi/v1/openapi.yaml')
+          lines = p.read_text().splitlines()
+          out = []
+          current_op = None
+          param_section = False
+          for line in lines:
+              if line.startswith('      operationId: '):
+                  current_op = line.split(': ',1)[1].strip()
+                  param_section = False
+                  out.append(line)
+                  continue
+              if line.startswith('      parameters:') and current_op in ops:
+                  param_section = True
+                  out.append(line)
+                  continue
+              if current_op in ops and param_section and line.startswith('      requestBody:'):
+                  if not any("IdempotencyKeyRequired" in x for x in out[-8:]):
+                      out.append("        - $ref: '#/components/parameters/IdempotencyKeyRequired'")
+                  param_section = False
+                  out.append(line)
+                  continue
+              if current_op in ops and param_section and line.startswith('      responses:'):
+                  if not any("IdempotencyKeyRequired" in x for x in out[-8:]):
+                      out.append("        - $ref: '#/components/parameters/IdempotencyKeyRequired'")
+                  param_section = False
+                  out.append(line)
+                  continue
+              if current_op in ops and param_section and "#/components/parameters/IdempotencyKey" in line:
+                  if "IdempotencyKeyRequired" not in line:
+                      out.append("        - $ref: '#/components/parameters/IdempotencyKeyRequired'")
+                  continue
+              out.append(line)
+          p.write_text('\n'.join(out) + '\n')
+          PY
+      - name: Validate and verify OpenAPI
         shell: bash
         run: |
           python3 - <<'PY'
           import yaml
-          from pathlib import Path
-          yaml.safe_load(Path('contracts/openapi/v1/openapi.yaml').read_text())
-          print('OpenAPI YAML parse: PASS')
-          PY
-      - name: Verify required declarations
-        shell: python
-        run: |
-          from pathlib import Path
           import re
+          from pathlib import Path
           s = Path('contracts/openapi/v1/openapi.yaml').read_text()
+          yaml.safe_load(s)
           ops = ['blockUser','unblockUser','muteUser','unmuteUser','createReport','createAppeal','rollbackContentRevision','createShare','createSubscription','cancelSubscription','inviteOrganizationMember','removeOrganizationMember','changeOrganizationMemberRole']
           for op in ops:
               m = re.search(r'(?ms)^  /[^\n]+:\n.*?^      operationId:\s*'+re.escape(op)+r'\s*$.*?(?=^  /[^\n]+:\n|^components:\n)', s)
-              if not m or "IdempotencyKeyRequired" not in m.group(0):
+              if not m or "#/components/parameters/IdempotencyKeyRequired" not in m.group(0):
                   raise SystemExit(f'missing required declaration: {op}')
+          print('OpenAPI YAML parse: PASS')
           print('Required idempotency verification: PASS')
+          PY
       - name: Commit repair
+        shell: bash
         run: |
           if git diff --quiet -- contracts/openapi/v1/openapi.yaml; then exit 0; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add contracts/openapi/v1/openapi.yaml
-          git commit -m 'fix(contract): normalize required idempotency declarations'
+          git commit -m 'fix(contract): restore canonical OpenAPI idempotency declarations'
           git push
