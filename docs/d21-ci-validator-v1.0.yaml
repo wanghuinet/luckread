@@ -1,0 +1,181 @@
+version: 1.0.0
+contract: D21
+status: CONTRACT-FROZEN
+source_of_truth: docs/21-D21-ADVERTISING-PLATFORM-CONTRACT-v1.0.md
+validator_id: D21-CONTRACT-CI-V1
+purpose: >-
+  Deterministically validate the D21 advertising contract graph before implementation
+  and before any release is considered GREEN.
+inputs:
+  required:
+    - docs/d21-machine-readable-contract-v1.0.json
+    - docs/d21-openapi-v1.0.yaml
+    - docs/d21-state-machine-registry-v1.0.yaml
+    - docs/d21-event-registry-v1.0.yaml
+    - docs/21-D21-ADVERTISING-PERMISSION-MATRIX-v1.0.md
+    - docs/21-D21-ADVERTISING-PLATFORM-CONTRACT-v1.0.md
+pipeline:
+  - id: schema
+    name: machine_readable_schema
+    gate: BLOCK_ON_ERROR
+    checks:
+      - valid_json
+      - valid_yaml
+      - required_top_level_fields
+      - unique_capabilities
+      - unique_states
+      - unique_events
+  - id: cross_registry
+    name: registry_consistency
+    gate: BLOCK_ON_ERROR
+    checks:
+      - every_state_machine_state_exists_in_machine_contract
+      - every_state_machine_capability_exists_in_machine_contract
+      - every_event_registry_event_exists_in_event_contract_or_is_explicitly_extension_registered
+      - every_openapi_operation_maps_to_declared_capability
+      - every declared capability has a permission-matrix mapping
+      - every state transition has a registered event
+  - id: permission
+    name: authorization_integrity
+    gate: BLOCK_ON_ERROR
+    checks:
+      - no_read_capability_may_authorize_mutation
+      - no_wildcard_permission
+      - D02_is_authorization_source
+      - tenant_scope_required
+      - resource_scope_required
+      - system_capability_not_exposed_as_normal_user_permission
+      - advertiser_cannot_validate_traffic
+      - advertiser_cannot_finalize_billing
+      - external_adapter_cannot_finalize_billing
+      - local_or_internal_api_cannot_bypass_D02
+  - id: state
+    name: state_machine_integrity
+    gate: BLOCK_ON_ERROR
+    checks:
+      - initial_state_declared
+      - terminal_states_declared
+      - every_transition_has_from_to_action_capability
+      - illegal_transition_denied
+      - unknown_transition_denied
+      - terminal_mutation_denied
+      - optimistic_version_or_equivalent_concurrency_control
+      - duplicate_transition_idempotent
+      - billing_finalized_is_append_only
+      - failure_safe_defaults
+  - id: event
+    name: event_integrity
+    gate: BLOCK_ON_ERROR
+    checks:
+      - required_envelope_fields
+      - schema_version_required
+      - event_version_required
+      - event_id_required
+      - idempotency_key_required
+      - at_least_once_consumer_idempotency
+      - duplicate_delivery_safe
+      - out_of_order_policy_declared
+      - replay_supported
+      - replay_cannot_duplicate_final_billing
+      - dead_letter_policy_declared
+      - tenant_boundary_enforced
+      - no_secret_or_payment_credential_payloads
+  - id: api
+    name: openapi_integrity
+    gate: BLOCK_ON_ERROR
+    checks:
+      - valid_openapi_3_1
+      - every_mutation_has_authorization_mapping
+      - every_mutation_has_idempotency_policy_when_required
+      - errors_use_unified_error_contract
+      - pagination_uses_declared_cursor_contract
+      - versioning_present
+      - sponsored_disclosure_present_on_delivery
+      - no_direct_D15_payment_settlement_operation
+  - id: invariant
+    name: business_invariant_integrity
+    gate: BLOCK_ON_ERROR
+    checks:
+      - unvalidated_traffic_cannot_be_final_cost
+      - invalid_traffic_cannot_be_finalized
+      - delayed_fraud_discovery_uses_adjustment_or_reversal
+      - raw_validity_billable_billing_facts_are_separate
+      - billing_history_append_only
+      - sponsored_vs_organic_distinguishable
+      - external_demand_cannot_bypass_core
+      - D13_risk_boundary_preserved
+      - D15_payment_boundary_preserved
+      - historical_decision_reconstructable
+      - core_failures_fail_safe
+  - id: security
+    name: security_execution_probes
+    gate: BLOCK_ON_ERROR
+    checks:
+      - cross_tenant_access_denied
+      - cross_advertiser_access_denied
+      - known_id_does_not_bypass_authorization
+      - expired_delegation_denied
+      - suspended_advertiser_denied_launch
+      - auditor_mutation_denied
+      - advertiser_traffic_validation_denied
+      - advertiser_billing_finalization_denied
+      - kill_switch_user_access_denied
+      - internal_api_bypass_denied
+      - external_adapter_billing_mutation_denied
+  - id: concurrency
+    name: concurrency_and_idempotency
+    gate: BLOCK_ON_ERROR
+    checks:
+      - duplicate_campaign_create_safe
+      - duplicate_impression_safe
+      - duplicate_click_safe
+      - duplicate_conversion_safe
+      - concurrent_budget_reservation_atomic
+      - no_negative_budget
+      - concurrent_state_transition_safe
+      - duplicate_billing_finalize_safe
+      - duplicate_adjustment_safe
+  - id: evidence
+    name: evidence_completeness
+    gate: BLOCK_ON_ERROR
+    checks:
+      - request_id_present
+      - trace_id_present
+      - actor_or_service_identity_present
+      - tenant_id_present
+      - authorization_decision_present
+      - state_version_present
+      - resulting_event_id_present
+      - billing_evidence_chain_complete
+      - workflow_run_recorded
+      - commit_sha_recorded
+status_model:
+  PASS: verified_by_automated_or_explicit_evidence
+  FAIL: known_check_failed
+  BLOCKED: required_evidence_missing_or_contract_inconsistent
+  UNKNOWN: not executed; treated as BLOCKED_for_green
+green_rule:
+  ordered_gates:
+    - schema
+    - cross_registry
+    - permission
+    - state
+    - event
+    - api
+    - invariant
+    - security
+    - concurrency
+    - evidence
+  rule: >-
+    GREEN requires every gate PASS. FAIL or BLOCKED in any required gate means
+    D21 is not GREEN. CODE_COMPLETE is never sufficient.
+current_known_blockers:
+  - id: D21-CI-BLOCKER-001
+    finding: billing state transitions currently reference billing.read for mutation operations
+    required_fix: introduce dedicated mutation capabilities such as billing.make_billable, billing.finalize, billing.adjust and map them through D02/permission matrix
+  - id: D21-CI-BLOCKER-002
+    finding: machine-readable event registry and machine-readable contract event lists are not yet identical
+    required_fix: reconcile the canonical event set before implementation
+  - id: D21-CI-BLOCKER-003
+    finding: state-transition capabilities must have one-to-one permission registry coverage
+    required_fix: validator must reject undeclared or read-authorized mutation capabilities
