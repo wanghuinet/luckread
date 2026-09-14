@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// Canonical synchronization is intentionally contract-only: it reconciles
-// domain inventory membership into OpenAPI and the cross-contract policy registry.
+// Contract-only synchronizer: domain inventory is the source for membership;
+// runtime evidence is deliberately not synthesized by this script.
 const file = 'contracts/openapi/v1/openapi.yaml';
 const raw = fs.readFileSync(file, 'utf8');
 const inventoryDir = 'contracts/api';
