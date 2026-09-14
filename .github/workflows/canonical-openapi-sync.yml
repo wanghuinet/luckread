@@ -1,0 +1,40 @@
+name: Canonical OpenAPI RC Sync
+
+on:
+  push:
+    paths:
+      - 'contracts/api/**'
+      - 'scripts/sync-rc-openapi.mjs'
+      - '.github/workflows/canonical-openapi-sync.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Synchronize canonical OpenAPI
+        run: node scripts/sync-rc-openapi.mjs
+
+      - name: Commit canonical OpenAPI when changed
+        run: |
+          if git diff --quiet -- contracts/openapi/v1/openapi.yaml; then
+            echo "No canonical OpenAPI change required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add contracts/openapi/v1/openapi.yaml
+          git commit -m "chore(api): synchronize RC operations into canonical OpenAPI"
+          git push
