@@ -18,12 +18,16 @@ def main():
     m,s,e,p,a,o=load_json(MACHINE),load_yaml(STATE),load_yaml(EVENT),load_yaml(PERM),load_yaml(API_MAP),load_yaml(OPENAPI)
     caps=set(m.get('capabilities',[])); mev=set(m.get('events',[])); mst=m.get('states',{})
     en={x.get('type') for x in (e.get('events',[]) or []) if isinstance(x,dict) and x.get('type')}
-    pc=p.get('capabilities',p.get('registry',[])) or []; pc=list(pc.values()) if isinstance(pc,dict) else pc
-    pcaps={x if isinstance(x,str) else (x.get('capability') or x.get('name')) for x in pc}; pcaps.discard(None)
+    pc=p.get('capability_index',[]) or []
+    if not isinstance(pc,list): fail('capability_index_shape','capability_index must be a list'); pc=[]
+    pcaps=set(pc)
+    explicit=p.get('capabilities',{}) or {}
+    if not isinstance(explicit,dict): fail('capability_metadata_shape','capabilities must be mapping'); explicit={}
+    pcaps |= set(explicit)
     if mev==en: ok('event_set_equality',str(len(mev)))
     else: fail('event_set_equality',f'missing={sorted(mev-en)} extra={sorted(en-mev)}')
-    if caps<=pcaps: ok('capability_registry_coverage')
-    else: fail('capability_registry_coverage',f'missing={sorted(caps-pcaps)}')
+    if caps==pcaps: ok('capability_registry_coverage',str(len(caps)))
+    else: fail('capability_registry_coverage',f'missing={sorted(caps-pcaps)} extra={sorted(pcaps-caps)}')
     machines=s.get('machines',{})
     for name,expected_list in mst.items():
         reg=machines.get(name,{}) or {}; actual=set(expected_list or []); declared=set()
