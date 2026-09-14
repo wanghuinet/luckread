@@ -20,9 +20,7 @@
             "type": "object",
             "required": ["mode"],
             "additionalProperties": false,
-            "properties": {
-              "mode": { "enum": ["public", "permission", "state-machine", "authenticated"] }
-            }
+            "properties": { "mode": { "enum": ["public", "permission", "state-machine", "authenticated"] } }
           },
           "permissions": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
           "auditRequired": { "type": "boolean" },
@@ -80,7 +78,7 @@
     { "operationId": "getContentRevision", "auth": { "mode": "permission" }, "permissions": ["content.revision.read"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
     { "operationId": "rollbackContentRevision", "auth": { "mode": "permission" }, "permissions": ["content.revision.rollback"], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": true, "stateMachine": "none" },
     { "operationId": "createShare", "auth": { "mode": "permission" }, "permissions": ["share.create"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
-    { "operationId": "resolveShare", "auth": { "mode": "public" }, "permissions": ["share.resolve"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "resolveShare", "auth": { "mode": "public" }, "permissions": [], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
     { "operationId": "createSubscription", "auth": { "mode": "permission" }, "permissions": ["subscription.create"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
     { "operationId": "getSubscription", "auth": { "mode": "permission" }, "permissions": ["subscription.read"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
     { "operationId": "cancelSubscription", "auth": { "mode": "permission" }, "permissions": ["subscription.cancel"], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": true, "stateMachine": "none" },
@@ -90,7 +88,7 @@
     { "operationId": "inviteOrganizationMember", "auth": { "mode": "permission" }, "permissions": ["organization.member.manage"], "auditRequired": true, "optimisticLockRequired": false, "idempotencyRequired": true, "stateMachine": "none" },
     { "operationId": "removeOrganizationMember", "auth": { "mode": "permission" }, "permissions": ["organization.member.manage"], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": true, "stateMachine": "none" },
     { "operationId": "changeOrganizationMemberRole", "auth": { "mode": "permission" }, "permissions": ["organization.role.manage"], "auditRequired": true, "optimisticLockRequired": true, "idempotencyRequired": true, "stateMachine": "none" },
-    { "operationId": "listIpContents", "auth": { "mode": "public" }, "permissions": ["ip.content.read"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
-    { "operationId": "getIpContent", "auth": { "mode": "public" }, "permissions": ["ip.content.read"], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" }
+    { "operationId": "listIpContents", "auth": { "mode": "public" }, "permissions": [], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" },
+    { "operationId": "getIpContent", "auth": { "mode": "public" }, "permissions": [], "auditRequired": false, "optimisticLockRequired": false, "idempotencyRequired": false, "stateMachine": "none" }
   ]
 }
