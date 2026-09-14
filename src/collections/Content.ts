@@ -71,53 +71,25 @@ export const Content: CollectionConfig = {
 
         const result = await req.payload.update({
           collection: 'content',
-          where: {
-            and: [
-              { id: { equals: id } },
-              { version: { equals: body.expectedVersion } },
-              { revision: { equals: body.expectedRevision } },
-            ],
-          },
+          where: { and: [{ id: { equals: id } }, { version: { equals: body.expectedVersion } }, { revision: { equals: body.expectedRevision } }] },
           data: { ...buildContentStatePatch(body.to, now), version: nextVersion, revision: nextRevision },
           context: { allowContentStateTransition: true },
           overrideAccess: true,
           req,
         })
-
         if (!result.docs.length) throw new APIError('Content version conflict; reload and retry', 409)
         const updated = result.docs[0]
 
         const event = await req.payload.create({
           collection: 'content-events',
-          data: {
-            eventId,
-            content: id,
-            event: transition.event,
-            fromState: transition.from,
-            toState: transition.to,
-            actorId: String(req.user.id),
-            permission: transition.permission,
-            version: nextVersion,
-            revision: nextRevision,
-            sideEffects,
-            status: 'PENDING',
-            attempts: 0,
-          },
+          data: { eventId, content: id, event: transition.event, fromState: transition.from, toState: transition.to, actorId: String(req.user.id), permission: transition.permission, version: nextVersion, revision: nextRevision, sideEffects, status: 'PENDING', attempts: 0 },
           overrideAccess: true,
           req,
         })
-
         for (const effect of sideEffects) {
           await req.payload.create({
             collection: 'content-event-effects',
-            data: {
-              effectId: `content-event:${eventId}:${effect}`,
-              eventId,
-              contentEvent: event.id,
-              effect,
-              status: 'PENDING',
-              attempts: 0,
-            },
+            data: { effectId: `content-event:${eventId}:${effect}`, eventId, contentEvent: event.id, effect, status: 'PENDING', attempts: 0 },
             overrideAccess: true,
             req,
           })
@@ -144,7 +116,7 @@ export const Content: CollectionConfig = {
     { name: 'title', type: 'text', required: true, maxLength: 200 },
     { name: 'slug', type: 'text', required: true, unique: true, index: true },
     { name: 'contentType', type: 'select', required: true, options: contentTypes.map((value) => ({ label: value, value })), index: true },
-    { name: 'state', type: 'select', required: true, options: contentStates.map((value) => ({ label: value, value })), index: true },
+    { name: 'state', type: 'select', required: true, defaultValue: 'DRAFT', options: contentStates.map((value) => ({ label: value, value })), index: true },
     { name: 'author', type: 'relationship', relationTo: 'users', required: true, index: true },
     { name: 'locale', type: 'text', required: true, defaultValue: 'en-US', index: true },
     { name: 'excerpt', type: 'textarea', maxLength: 1000 },
