@@ -43,7 +43,7 @@ export const Content: CollectionConfig = {
       path: '/:id/state',
       method: 'post',
       handler: async (req) => {
-        const body = (await req.json()) as { to?: (typeof contentStates)[number]; expectedVersion?: number; expectedRevision?: number }
+        const body = (await req.clone().json()) as { to?: (typeof contentStates)[number] }
         if (!body.to || !contentStates.includes(body.to)) throw new APIError('A valid target state is required', 400)
         return transitionContentState(req, body.to)
       },
