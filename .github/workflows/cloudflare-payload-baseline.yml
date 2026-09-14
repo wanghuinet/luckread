@@ -36,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Generate Cloudflare binding types
+        run: pnpm run generate:types:cloudflare
+
       - name: TypeScript
         run: pnpm exec tsc --noEmit
 
