@@ -5,6 +5,8 @@ import { validateVideoUploadInput, buildVideoObjectKey, VIDEO_UPLOAD_TTL_MS } fr
 
 const states = ['OPEN', 'COMPLETING', 'COMPLETED', 'EXPIRED', 'CANCELLED', 'FAILED'] as const
 
+type ContentAuthorRef = string | number | { id: string | number }
+
 export const VideoUploadSessions: CollectionConfig = {
   slug: 'video-upload-sessions',
   admin: { useAsTitle: 'uploadId', defaultColumns: ['uploadId', 'videoAsset', 'state', 'expiresAt', 'updatedAt'] },
@@ -24,7 +26,8 @@ export const VideoUploadSessions: CollectionConfig = {
         if (!body.content || !body.originalFilename || !body.mimeType || !body.sizeBytes || !body.sha256) throw new APIError('content, originalFilename, mimeType, sizeBytes and sha256 are required', 400)
         const input = validateVideoUploadInput(body as Parameters<typeof validateVideoUploadInput>[0])
         const content = await req.payload.findByID({ collection: 'content', id: input.content, depth: 0, overrideAccess: true, req })
-        const authorId = String((content as { author?: string | { id: string | number } }).author && typeof (content as { author?: unknown }).author === 'object' ? ((content as { author: { id: string | number } }).author).id : (content as { author?: string }).author || '')
+        const author = (content as { author?: unknown }).author as ContentAuthorRef | undefined
+        const authorId = author && typeof author === 'object' ? String(author.id) : String(author ?? '')
         if (authorId !== String(req.user.id)) throw new APIError('Content ownership required', 403)
         const existing = await req.payload.find({ collection: 'video-assets', where: { sha256: { equals: input.sha256 }, sizeBytes: { equals: input.sizeBytes }, state: { equals: 'READY' } }, limit: 1, depth: 0, overrideAccess: true, req })
         if (existing.docs.length) return Response.json({ data: { mode: 'DEDUPLICATED', videoAsset: existing.docs[0].id } })
