@@ -90,7 +90,7 @@ export async function generateContentPaywall(req: PayloadRequest, content: Recor
     collection: 'content',
     id: contentId,
     data: { previewBodyR2Key, premiumBodyR2Key },
-    context: { allowContentStateTransition: true, skipContentRevision: true },
+    context: { allowContentStateTransition: true, skipContentRevision: true, systemJob: true },
     overrideAccess: true,
     req,
   })
