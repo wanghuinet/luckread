@@ -22,7 +22,7 @@ export const ContentMetadata: CollectionConfig = {
         data.sourceContent = null
         data.sourceUrl = null
       }
-      if (data.sourceUrl && !/^https?:\\/\\//i.test(String(data.sourceUrl))) throw new APIError('sourceUrl must use http or https', 400)
+      if (data.sourceUrl && !/^https?:\/\//i.test(String(data.sourceUrl))) throw new APIError('sourceUrl must use http or https', 400)
       return data
     }],
   },
