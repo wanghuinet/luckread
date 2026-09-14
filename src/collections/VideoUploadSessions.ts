@@ -17,6 +17,7 @@ export const VideoUploadSessions: CollectionConfig = {
     { name: 'owner', type: 'relationship', relationTo: 'users', required: true, index: true },
     { name: 'state', type: 'select', required: true, defaultValue: 'OPEN', options: states.map((value) => ({ label: value, value })), index: true },
     { name: 'objectKey', type: 'text', required: true, unique: true, index: true },
+    { name: 'multipartUploadId', type: 'text', index: true },
     { name: 'expectedSha256', type: 'text', required: true, index: true },
     { name: 'expectedSizeBytes', type: 'number', required: true, min: 1 },
     { name: 'chunkSizeBytes', type: 'number', required: true, min: 1 },
