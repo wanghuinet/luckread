@@ -17,6 +17,7 @@ import { ContentMetadata } from './collections/ContentMetadata'
 import { VideoAssets } from './collections/VideoAssets'
 import { VideoVariants } from './collections/VideoVariants'
 import { VideoSubtitles } from './collections/VideoSubtitles'
+import { VideoProcessingJobs } from './collections/VideoProcessingJobs'
 import { ContentEvents } from './collections/ContentEvents'
 import { ContentEventEffects } from './collections/ContentEventEffects'
 import { AccountStateEvents } from './collections/AccountStateEvents'
@@ -52,7 +53,7 @@ const cloudflare = isCLI || isNextBuild || !isProduction ? await getCloudflareCo
 
 export default buildConfig({
   admin: { user: Users.slug, importMap: { baseDir: path.resolve(dirname) } },
-  collections: [Users, Media, Content, Taxonomies, ContentSeries, ContentMetadata, VideoAssets, VideoVariants, VideoSubtitles, ContentEvents, ContentEventEffects, AccountStateEvents, Entitlements, EntitlementGrants, SubscriptionPlans, Subscriptions, Organizations, OrganizationMemberships, IPs, ContentRevisions, Reports, Appeals, ContentShares, ModerationEvents, Follows, ContentLikes, Comments, Notifications, FeedItems, SocialBlocks, SocialMutes, ContentFavorites],
+  collections: [Users, Media, Content, Taxonomies, ContentSeries, ContentMetadata, VideoAssets, VideoVariants, VideoSubtitles, VideoProcessingJobs, ContentEvents, ContentEventEffects, AccountStateEvents, Entitlements, EntitlementGrants, SubscriptionPlans, Subscriptions, Organizations, OrganizationMemberships, IPs, ContentRevisions, Reports, Appeals, ContentShares, ModerationEvents, Follows, ContentLikes, Comments, Notifications, FeedItems, SocialBlocks, SocialMutes, ContentFavorites],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
