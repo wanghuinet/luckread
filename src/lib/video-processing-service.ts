@@ -1,4 +1,4 @@
-import { APIError } from 'payload'
+import { APIError, type PayloadRequest } from 'payload'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 
 export type VideoValidationResult = {
@@ -24,11 +24,11 @@ export async function validateUploadedVideo(sourceR2Key: string, expectedSizeByt
   return { sizeBytes: object.size, contentType: object.httpMetadata?.contentType ?? expectedMimeType }
 }
 
-export async function markVideoValidationSucceeded(req: Parameters<typeof validateUploadedVideo>[0] extends never ? never : any, videoAssetId: string | number, result: VideoValidationResult) {
+export async function markVideoValidationSucceeded(req: PayloadRequest, videoAssetId: string | number, result: VideoValidationResult) {
   await req.payload.update({
     collection: 'video-assets',
     id: videoAssetId,
-    data: { state: 'VALIDATING', failureCode: null, failureMessage: null, sizeBytes: result.sizeBytes },
+    data: { state: 'QUEUED', failureCode: null, failureMessage: null, sizeBytes: result.sizeBytes },
     overrideAccess: true,
     req,
   })
