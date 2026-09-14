@@ -34,11 +34,20 @@ export const Content: CollectionConfig = {
   hooks: {
     beforeChange: [
       ({ data, originalDoc, req }) => {
+        if (!req.user) throw new APIError('Authentication required', 401)
+        const actorId = String(req.user.id)
+        const isModerator = canModerate(req.user)
+        if (!originalDoc) {
+          const authorId = relationshipId(data.author)
+          if (!authorId) throw new APIError('Content author is required', 400)
+          if (!isModerator && authorId !== actorId) throw new APIError('Content author must match the authenticated user', 403)
+        } else {
+          const ownerId = relationshipId(originalDoc.author)
+          if (!isModerator && ownerId !== actorId) throw new APIError('Content ownership permission denied', 403)
+          if (data.author !== undefined && relationshipId(data.author) !== ownerId) throw new APIError('Content author is immutable', 400)
+        }
         if (originalDoc && data.state !== undefined && data.state !== originalDoc.state && !req.context?.allowContentStateTransition) {
           throw new APIError('Content state must be changed through the lifecycle transition API', 400)
-        }
-        if (originalDoc && data.author !== undefined && relationshipId(data.author) !== relationshipId(originalDoc.author)) {
-          throw new APIError('Content author is immutable', 400)
         }
         if (originalDoc?.state === 'PUBLISHED' && hasMaterialContentEdit(data as Record<string, unknown>, originalDoc as Record<string, unknown>)) {
           throw new APIError('Material edits to published content require PUBLISHED -> PENDING_REVIEW before editing', 409)
@@ -58,32 +67,18 @@ export const Content: CollectionConfig = {
         await req.payload.create({
           collection: 'content-revisions',
           data: {
-            revisionId: randomUUID(),
-            content: String(doc.id),
-            revision: Number(doc.revision),
-            version: Number(doc.version),
-            author: String(relationshipId(doc.author)),
-            state: String(doc.state),
+            revisionId: randomUUID(), content: String(doc.id), revision: Number(doc.revision), version: Number(doc.version),
+            author: String(relationshipId(doc.author)), state: String(doc.state),
             snapshot: { title: doc.title, slug: doc.slug, contentType: doc.contentType, locale: doc.locale, excerpt: doc.excerpt, bodyR2Key: doc.bodyR2Key, coverMedia: doc.coverMedia, state: doc.state },
-            changeReason: operation,
-            createdBy: actorId,
+            changeReason: operation, createdBy: actorId,
           },
-          overrideAccess: true,
-          req,
+          overrideAccess: true, req,
         })
       },
     ],
   },
   endpoints: [
-    {
-      path: '/:id/state', method: 'post',
-      handler: async (req) => {
-        const body = (await req.json()) as { to?: (typeof contentStates)[number]; expectedVersion?: number; expectedRevision?: number }
-        if (!body.to || !contentStates.includes(body.to)) throw new APIError('A valid target state is required', 400)
-        return transitionContentState(req, body.to, body)
-      },
-      custom: { openapi: { summary: 'Transition content lifecycle state' } },
-    },
+    { path: '/:id/state', method: 'post', handler: async (req) => { const body = (await req.json()) as { to?: (typeof contentStates)[number]; expectedVersion?: number; expectedRevision?: number }; if (!body.to || !contentStates.includes(body.to)) throw new APIError('A valid target state is required', 400); return transitionContentState(req, body.to, body) }, custom: { openapi: { summary: 'Transition content lifecycle state' } } },
     { path: '/:id/submit-review', method: 'post', handler: async (req) => transitionContentState(req, 'PENDING_REVIEW'), custom: { openapi: { summary: 'Submit content for review' } } },
     { path: '/:id/approve', method: 'post', handler: async (req) => transitionContentState(req, 'APPROVED'), custom: { openapi: { summary: 'Approve content' } } },
     { path: '/:id/reject', method: 'post', handler: async (req) => transitionContentState(req, 'REJECTED'), custom: { openapi: { summary: 'Reject content' } } },
@@ -91,22 +86,13 @@ export const Content: CollectionConfig = {
     { path: '/:id/restore', method: 'post', handler: async (req) => transitionContentState(req, 'RESTORED'), custom: { openapi: { summary: 'Restore deleted content within the restore window' } } },
   ],
   fields: [
-    { name: 'title', type: 'text', required: true, maxLength: 200 },
-    { name: 'slug', type: 'text', required: true, unique: true, index: true },
+    { name: 'title', type: 'text', required: true, maxLength: 200 }, { name: 'slug', type: 'text', required: true, unique: true, index: true },
     { name: 'contentType', type: 'select', required: true, options: contentTypes.map((value) => ({ label: value, value })), index: true },
     { name: 'state', type: 'select', required: true, defaultValue: 'DRAFT', options: contentStates.map((value) => ({ label: value, value })), index: true },
-    { name: 'author', type: 'relationship', relationTo: 'users', required: true, index: true },
-    { name: 'ip', type: 'relationship', relationTo: 'ips', index: true },
-    { name: 'locale', type: 'text', required: true, defaultValue: 'en-US', index: true },
-    { name: 'excerpt', type: 'textarea', maxLength: 1000 },
-    { name: 'bodyR2Key', type: 'text' },
-    { name: 'coverMedia', type: 'relationship', relationTo: 'media' },
-    { name: 'scheduledAt', type: 'date', index: true },
-    { name: 'publishedAt', type: 'date', index: true },
-    { name: 'archivedAt', type: 'date' },
-    { name: 'deletedAt', type: 'date' },
-    { name: 'version', type: 'number', required: true, defaultValue: 1, min: 1 },
-    { name: 'revision', type: 'number', required: true, defaultValue: 1, min: 1 },
+    { name: 'author', type: 'relationship', relationTo: 'users', required: true, index: true }, { name: 'ip', type: 'relationship', relationTo: 'ips', index: true },
+    { name: 'locale', type: 'text', required: true, defaultValue: 'en-US', index: true }, { name: 'excerpt', type: 'textarea', maxLength: 1000 }, { name: 'bodyR2Key', type: 'text' },
+    { name: 'coverMedia', type: 'relationship', relationTo: 'media' }, { name: 'scheduledAt', type: 'date', index: true }, { name: 'publishedAt', type: 'date', index: true },
+    { name: 'archivedAt', type: 'date' }, { name: 'deletedAt', type: 'date' }, { name: 'version', type: 'number', required: true, defaultValue: 1, min: 1 }, { name: 'revision', type: 'number', required: true, defaultValue: 1, min: 1 },
   ],
   timestamps: true,
 }
