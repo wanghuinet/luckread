@@ -1,0 +1,38 @@
+name: Migration Admission CI
+
+on:
+  push:
+    paths:
+      - 'package.json'
+      - 'src/payload.config.ts'
+      - 'src/migrations/**'
+      - 'scripts/migration-admission-check.mjs'
+      - '.github/workflows/migration-admission-ci.yml'
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'src/payload.config.ts'
+      - 'src/migrations/**'
+      - 'scripts/migration-admission-check.mjs'
+      - '.github/workflows/migration-admission-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  migration-admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies from committed lockfile
+        run: npm ci --no-audit --no-fund
+
+      - name: Migration admission gate
+        run: npm run migration:admission
