@@ -62,7 +62,7 @@ for (const [rawPath, pathItem] of Object.entries(paths)) {
       path: canonicalPath,
       openapiPath: rawPath,
       domain: declaration.domain,
-      status: 'DRAFT',
+      status: 'DISCOVERED',
       featureIds: [],
       schemaRef: '',
       openapiRef: `${openapiPath}#${method}:${rawPath}`,
@@ -82,7 +82,7 @@ for (const [key] of declared) {
 records.sort((a, b) => `${a.method} ${a.path}`.localeCompare(`${b.method} ${b.path}`));
 const output = {
   version: '1.0.0',
-  status: 'NOT_GREEN',
+  status: 'DISCOVERED',
   sourceOfTruth: 'contracts/openapi/v1/openapi.yaml + contracts/api/api-inventory.v1.json',
   generatedBy: 'scripts/build-api-alignment-inventory.mjs',
   serverPrefix: serverUrl || null,
