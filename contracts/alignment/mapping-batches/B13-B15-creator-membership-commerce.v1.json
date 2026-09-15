@@ -5,18 +5,10 @@
   "mode":"evidence-only-inventory",
   "sourceOfTruth":"docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
   "domains":[
-    {"domain":"B13","name":"Creator Studio","featureIds":["CREATOR-001","CREATOR-002","CREATOR-003","CREATOR-004","CREATOR-005","CREATOR-006","CREATOR-007"]},
     {"domain":"B14","name":"Membership / Paywall / Entitlement","featureIds":["MON-001","MON-002","MON-003","MON-004","MON-005","MON-006","MON-007","MON-008","MON-009","MON-010","MON-011"]},
     {"domain":"B15","name":"Commerce / Payment / Digital Product","featureIds":["PAY-001","PAY-002","PAY-003","PAY-004","PAY-005","PAY-006","PAY-007","PAY-008","PAY-009","PAY-010","PAY-011","PAY-012","PAY-013"]}
   ],
   "records":[
-    {"featureId":"CREATOR-001","status":"UNRESOLVED","evidenceRefs":["docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"],"blockers":["API/DTO/entity/field/security/lifecycle/code mapping not evidence-bound"]},
-    {"featureId":"CREATOR-002","status":"UNRESOLVED","evidenceRefs":["docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"],"blockers":["API/entity/security/lifecycle mapping not evidence-bound"]},
-    {"featureId":"CREATOR-003","status":"UNRESOLVED","evidenceRefs":["docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"],"blockers":["Creator Studio API/authorization/data mapping not evidence-bound"]},
-    {"featureId":"CREATOR-004","status":"UNRESOLVED","evidenceRefs":["docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"],"blockers":["Creator growth model and persistence mapping not evidence-bound"]},
-    {"featureId":"CREATOR-005","status":"UNRESOLVED","evidenceRefs":["docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"],"blockers":["API/DTO/entity/field/security/lifecycle mapping not evidence-bound"]},
-    {"featureId":"CREATOR-006","status":"UNRESOLVED","evidenceRefs":["docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"],"blockers":["Creator analytics/data authority mapping not evidence-bound"]},
-    {"featureId":"CREATOR-007","status":"UNRESOLVED","evidenceRefs":["docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"],"blockers":["Creator monetization API/security/revenue mapping not evidence-bound"]},
     {"featureId":"MON-001","status":"UNRESOLVED","evidenceRefs":["docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"],"blockers":["Membership plan/API/entitlement persistence mapping not evidence-bound"]},
     {"featureId":"MON-002","status":"UNRESOLVED","evidenceRefs":["docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"],"blockers":["Creator membership API/entitlement mapping not evidence-bound"]},
     {"featureId":"MON-003","status":"UNRESOLVED","evidenceRefs":["docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"],"blockers":["Membership plan lifecycle/API/data mapping not evidence-bound"]},
@@ -44,8 +36,8 @@
   ],
   "batchBlockers":[
     "B13-B15 remain mapping inventory only; no Contract GREEN claim is permitted.",
-    "The Blueprint confirms MON and PAY identifiers, while commerce/product-specific identifiers beyond the verified PAY family require further exact-ID discovery before being added.",
-    "This batch is not automatically merged into contracts/alignment/cross-system-mapping.v1.json.",
+    "CREATOR-001..007 are canonically owned by B04-B06 and are intentionally not duplicated here.",
+    "The Blueprint confirms MON and PAY identifiers; further identifiers require exact canonical-ID discovery before addition.",
     "All records remain UNRESOLVED until repository evidence binds the complete five-way contract graph and security/lifecycle/test evidence."
   ]
 }
