@@ -1,0 +1,21 @@
+{
+  "version": "1.0",
+  "status": "NOT_GREEN",
+  "sourceOfTruth": "contracts/entity/entity-catalog.v1.json",
+  "records": [
+    {"entityId":"ENT-USER","status":"PROPOSED","fields":[],"evidenceRefs":[]},
+    {"entityId":"ENT-IDENTITY","status":"PROPOSED","fields":[],"evidenceRefs":[]},
+    {"entityId":"ENT-CREDENTIAL","status":"PROPOSED","fields":[],"evidenceRefs":[]},
+    {"entityId":"ENT-SESSION","status":"PROPOSED","fields":[],"evidenceRefs":[]}
+  ],
+  "rules": {
+    "noInference": true,
+    "fieldMustHaveType": true,
+    "fieldMustDeclareNullability": true,
+    "fieldMustDeclareLifecycle": true,
+    "sensitiveFieldsMustDeclareClassification": true,
+    "credentialMaterialMustNeverBePublic": true,
+    "nativePayloadFieldsMustNotBeDuplicatedAsExtension": true,
+    "schemaChangesRequireMigration": true
+  }
+}
