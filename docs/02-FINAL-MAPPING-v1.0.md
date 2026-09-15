@@ -78,7 +78,7 @@ No additional Worker or D1 domain may be introduced implicitly by Mapping or imp
 | T24 | W01 | API boundary / no direct D1 authority |
 | T25 | W09 | D1-03 platform/runtime authority |
 
-This table is authoritative only at Task/Worker/D1-boundary level. Entity-level ownership remains governed by the D1 Master.
+This table is authoritative only at Task/Worker/D1-boundary level. Entity-level ownership remains governed by the D1 Master and the feature-level exceptions defined below.
 
 ## 5. Feature-Domain → Task → Worker → D1 Mapping
 
@@ -91,7 +91,7 @@ This table is authoritative only at Task/Worker/D1-boundary level. Entity-level 
 | E | CONTENT-001..012 | T05 | W03 | D1-02 | MAPPED |
 | F | ARTICLE-001..012 | T06 | W03 | D1-02 | MAPPED |
 | G | MEDIA-001..015 | T07 | W03 | D1-02 | MAPPED |
-| H | EXTCONTENT-001..006 | T25 | W09 | D1-03 platform boundary; content authority remains D1-02 where applicable | CONFLICT |
+| H | EXTCONTENT-001..006 | T25 | W09 | Extension/platform boundary; authoritative content entities follow D1-02/W03/T05-T07 by content type | MAPPED |
 | I | FEED-001..013 | T08 | W04 | Projection boundary; no authoritative D1 | BOUNDARY |
 | J | REC-001..009 | T09 | W04 | Projection boundary; no authoritative D1 | BOUNDARY |
 | K | SEARCH-001..010 | T10 | W04 | Projection boundary; no authoritative D1 | BOUNDARY |
@@ -115,7 +115,7 @@ This table is authoritative only at Task/Worker/D1-boundary level. Entity-level 
 | AC | DEVELOPER-* / SDK-* / WEBHOOK-* | T24 | W01 | API/integration boundary; no direct D1 authority | BOUNDARY |
 | AD | ADMIN-* / SUPPORT-* / OPERATIONS-* | T24 | W01 | API/admin boundary; underlying state remains owning domain | BOUNDARY |
 | AE | CONFIG-* / EXPERIMENT-* / FEATUREFLAG-* | T25 | W09 | D1-03 platform/runtime state | MAPPED |
-| AF | TENANT-* / ENTERPRISE-* / ORGANIZATION-* | T25 | W09 | Potential D1-01 identity/org authority conflicts with T25→W09→D1-03 | CONFLICT |
+| AF | TENANT-* / ENTERPRISE-* / ORGANIZATION-* | T25 | W09 | Tenant control-plane boundary; identity/org authority remains D1-01 via T01-T04/W02/W08; operational tenant config/quota may use D1-03 | MAPPED |
 | AG | STORAGE-* / MEDIA-INFRA-* | T25 | W09 | D1-03 runtime/storage-control boundary; media metadata remains D1-02 | MAPPED |
 | AH | ASYNC-* / QUEUE-* / SCHEDULE-* | T25 | W09 | D1-03 | MAPPED |
 | AI | DATA-GOV-* / PORTABILITY-* | T25 | W09 | D1-03 governance/runtime boundary; entity authority remains owning D1 | MAPPED |
@@ -126,25 +126,47 @@ This table is authoritative only at Task/Worker/D1-boundary level. Entity-level 
 | AN | SECURITY-* / CRYPTO-* / SECRETS-* | T25 | W09 | D1-03 platform/security runtime boundary; business authorization remains owning D1 | MAPPED |
 | AO | PRIVACY-* / COMPLIANCE-* | T25 | W09 | D1-03 governance/runtime boundary; subject data remains owning D1 | MAPPED |
 | AP | INTEGRATION-* / ECOSYSTEM-* | T25 | W09 | Integration runtime boundary; business state remains owning D1 | MAPPED |
-| AQ | EXTENSION-* / COMMERCE-* / FUTURE-* | T25 | W09 | Potential D1-04 commerce authority conflicts with T25→W09→D1-03 | CONFLICT |
+| AQ | EXTENSION-* / COMMERCE-* / FUTURE-* | T25 | W09 | Extension boundary; commerce features route to T16-T18/W07 and D1-04 when commercial/financial authority is involved | MAPPED |
 
-## 6. Conflict findings from this batch
+## 6. Conflict resolution record
 
-This batch intentionally does **not** force ambiguous domains into a false GREEN state.
+The previous batch identified H, AF and AQ as conflicts. They are now resolved at the Mapping layer without changing the frozen topology.
 
-### H — Future content types
+### H — Future content types — RESOLVED
 
-T25/W09 is the frozen task/worker allocation, while future content types can create authoritative content entities that belong to D1-02. This requires feature-level authority rules rather than assigning all H state to D1-03.
+T25/W09 owns the platform/extension boundary for future content types. It does **not** become authoritative for future content records merely because H is grouped under T25.
 
-### AF — Multi-tenant / enterprise
+For each `EXTCONTENT-*` feature that creates durable content, the authoritative entity must follow the existing content ownership model: D1-02 and the applicable content Task/Worker boundary (T05/T06/T07 → W03). T25/W09 may own extension registration, runtime capability and infrastructure concerns only where the feature explicitly requires them.
 
-The functional mapping currently assigns AF to T25, while organization identity authority is D1-01/W08. This is a cross-layer allocation conflict that must be resolved before Contract GREEN.
+Therefore H has one domain-level Primary Task (T25) while its business entities retain their existing authoritative content owner. No fifth D1 and no new Worker are required.
 
-### AQ — Extension / future commerce
+### AF — Multi-tenant / enterprise — RESOLVED
 
-AQ is currently assigned to T25/W09, while commerce authority belongs to W07/D1-04. Future commerce cannot silently acquire D1-03 authority merely because the domain was grouped under T25.
+T25/W09 owns the tenant/enterprise **control-plane boundary**. It does not absorb identity, organization or access authority.
 
-These are **architecture/mapping conflicts**, not implementation failures. No new Worker or D1 is introduced to resolve them.
+Tenant users, roles, organization identity and creator/organization relationships remain authoritative in D1-01 through the existing T01-T04/W02/W08 ownership model. Tenant-specific operational configuration, quotas and platform-runtime state may be owned by D1-03 when the corresponding feature requires durable platform state.
+
+Thus AF is not a new identity D1 and does not create a second organization owner. The feature-level contract must declare which side of this boundary it belongs to.
+
+### AQ — Extension / future commerce — RESOLVED
+
+T25/W09 owns the generic extension boundary only. Any future commerce capability must be reconciled to the already frozen commerce ownership before implementation: access/entitlement → D1-01/T16/W07; commercial/financial authority → D1-04/T16-T18/W07 as applicable.
+
+AQ cannot grant W09 or D1-03 financial authority. Future commerce state must therefore enter the existing commerce/financial contracts rather than creating a parallel commerce store.
+
+### Resolution invariant
+
+The resolution pattern is:
+
+```text
+Domain-level Primary Task/Worker
+        ↓
+Feature-level authority rule
+        ↓
+Existing canonical D1 owner
+```
+
+A domain-level grouping never overrides entity-level authority in the D1 Master. No Worker or D1 was added, removed or repurposed by this resolution.
 
 ## 7. Mapping invariants
 
@@ -156,6 +178,8 @@ These are **architecture/mapping conflicts**, not implementation failures. No ne
 6. No Worker/D1 assignment is inferred from code, routes, Payload Collections or directories.
 7. No fifth D1 may be introduced to resolve a conflict.
 8. `CONFLICT` blocks Mapping Freeze and Contract GREEN.
+9. Domain-level Primary Worker assignment does not override feature-level entity authority defined by the D1 Master.
+10. Future/extension domains must route new authoritative entities into an existing canonical Task/Worker/D1 owner before Contract GREEN.
 
 ## 8. Batch progress
 
@@ -170,14 +194,26 @@ These are **architecture/mapping conflicts**, not implementation failures. No ne
 | Worker × D1 Binding | 100% |
 | Feature → Task | 100% |
 | Feature → Task → Worker | 43/43 = 100% |
-| Feature → Task → Worker → D1 | **40/43 directly resolved; 3 CONFLICT** |
+| Feature → Task → Worker → D1 | **43/43 = 100% at Mapping layer** |
+| H / AF / AQ conflicts | **3/3 RESOLVED** |
 | API/Data/Security/Event/Test/Evidence | Pending |
 | Conflict/orphan/duplicate audit | Pending |
-| Mapping Freeze | Blocked |
+| Mapping Freeze | Blocked pending downstream audit |
 | Contract generation | Blocked |
 
 ## 9. Next gate
 
-The next batch must resolve only the three identified mapping conflicts (H, AF, AQ) using the existing Blueprint, Worker Master and D1 Master. It must not add Workers, D1 domains, or capabilities.
+The three Mapping conflicts are closed. The next mandatory batch is the **reverse/forward orphan and duplicate audit** across the canonical Blueprint, 25 Tasks, 12 Workers and 4 D1 domains.
 
-After those conflicts close, perform the reverse/forward orphan and duplicate audit before Mapping Freeze.
+That audit must detect, at minimum:
+
+- Blueprint feature/domain without Task ownership;
+- Task without a valid Primary Worker;
+- Worker without a justified boundary;
+- authoritative entity without a D1 owner;
+- duplicate authoritative owners;
+- D1 authority assigned to a projection/runtime boundary;
+- cross-D1 ownership without explicit event/reconciliation path;
+- Worker/D1 assignments that contradict the canonical Masters.
+
+Only after that audit passes can Mapping Freeze be considered. Contract generation remains blocked until Mapping Freeze.
