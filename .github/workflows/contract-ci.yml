@@ -49,6 +49,7 @@ jobs:
       - run: node scripts/l1-l4-reconciliation-baseline-check.mjs
       - run: node scripts/entity-catalog-check.mjs
       - run: node scripts/entity-field-contract-check.mjs
+      - run: node scripts/entity-field-schema-contract-check.mjs
       - run: node scripts/feature-entity-persistence-registry-check.mjs
 
   contract-full:
@@ -57,7 +58,7 @@ jobs:
     needs: [contract, contract-semantic, capability-graph]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v24
         with: {node-version: 24}
       - run: node scripts/contract-ci.mjs
 
