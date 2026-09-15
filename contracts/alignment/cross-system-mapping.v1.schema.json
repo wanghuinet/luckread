@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/alignment/cross-system-mapping.v1.schema.json",
+  "title": "Luckread Five-Way Cross-System Mapping Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "status", "sourceOfTruth", "records"],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "status": { "enum": ["DISCOVERED", "NOT_GREEN", "BLOCKED"] },
+    "sourceOfTruth": { "const": "contracts/alignment/five-way-alignment.v1.json" },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["mappingId", "featureId", "status", "evidence"],
+        "properties": {
+          "mappingId": { "type": "string", "pattern": "^MAP-[A-Z0-9._-]+$" },
+          "featureId": { "type": "string", "minLength": 1 },
+          "status": {
+            "enum": ["MATCH", "MAPPED", "MISSING", "EXTRA", "DRIFT", "CONFLICT", "DUPLICATE", "UNRESOLVED", "BLOCKED"]
+          },
+          "entityIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "apiOperationIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "payloadCollections": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "codeEvidenceRefs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "evidence": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "blockers": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+        }
+      }
+    }
+  }
+}
