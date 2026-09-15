@@ -1,4 +1,4 @@
-# Pre-Contract Step 2 — Feature Inventory Closure v1.1
+# Pre-Contract Step 2 — Feature Inventory Closure v1.2
 
 Status: **BLOCKED / REBASE REQUIRED**
 
@@ -21,9 +21,27 @@ Convert the canonical Blueprint v2.0 capability inventory into a contract-admiss
 
 No Worker, D1, Task, API, entity, field, permission, or implementation authority may be invented by this step.
 
+## Machine-readable admission input
+
+The canonical machine-readable inventory is:
+
+`contracts/alignment/feature-inventory.v1.json`
+
+It MUST be generated only by:
+
+`scripts/build-feature-inventory.mjs`
+
+using:
+
+`docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md`
+
+The generator admits only explicit Blueprint feature-list items. It does not infer Feature IDs from prose, historical references, URLs, headings, or implementation code, and duplicate Feature IDs fail closed.
+
 ## Blocking finding
 
 The previous version of this document used B01-B20 as its authoritative feature inventory. That baseline is superseded by Blueprint v2.0, which defines the canonical feature domains and stable Feature IDs.
+
+The generated `contracts/alignment/feature-inventory.v1.json` is also a required committed CI input. If it is absent, stale, non-reproducible, or modified after regeneration, Step 2 remains BLOCKED.
 
 Therefore the previous B01-B20 readiness table cannot be promoted to Contract GREEN. It must be replaced by a Blueprint-v2.0-derived inventory before downstream Data/API/Payload reconciliation is considered complete.
 
@@ -48,17 +66,18 @@ A verified Mapping owner does not by itself prove that the API, data, security, 
 
 ## Current evidence state
 
-The repository already contains Mapping and alignment inventories, but the pre-contract Feature Inventory still referenced the superseded B01-B20 baseline. The repository also contains fail-closed reconciliation tooling; missing authoritative inputs must remain blocking rather than being inferred.
+The repository contains the generator, schema, and CI entry points for the Blueprint-derived inventory. The committed generated inventory is still a required admission artifact and must be produced and verified from the current Blueprint before Step 2 can become GREEN.
 
 ## Exit criteria
 
 Step 2 becomes GREEN only when:
 
 1. Blueprint v2.0 is the explicit authority.
-2. All canonical Blueprint Feature IDs are represented in the pre-contract inventory.
-3. Each Feature ID has a stable Task/Worker/D1-or-boundary owner from the frozen Mapping.
-4. No historical B01-B20 record remains authoritative.
-5. No unresolved Feature ownership/conflict remains.
-6. The resulting inventory is accepted by the downstream five-way reconciliation and CI gates.
+2. All canonical Blueprint Feature IDs are represented in the generated inventory.
+3. The generated inventory is reproducible with zero working-tree drift.
+4. Each Feature ID has a stable Task/Worker/D1-or-boundary owner from the frozen Mapping.
+5. No historical B01-B20 record remains authoritative.
+6. No unresolved Feature ownership/conflict remains.
+7. The resulting inventory is accepted by the downstream five-way reconciliation and CI gates.
 
-Until all six conditions pass, Contract generation and implementation remain blocked.
+Until all seven conditions pass, Contract generation and implementation remain blocked.
