@@ -92,7 +92,7 @@ jobs:
         with: {node-version: 24}
       - run: npm ci
       - run: node scripts/alignment-ci.mjs
-      - run: git diff --exit-code -- contracts/alignment/feature-inventory.v1.json contracts/alignment/api-inventory.v1.json contracts/alignment/payload-inventory.v1.json contracts/alignment/code-evidence-inventory.v1.json contracts/alignment/change-impact.v1.json
+      - run: git diff --exit-code -- contracts/alignment/feature-inventory.v1.json contracts/alignment/api-inventory.v1.json contracts/alignment/payload-inventory.v1.json contracts/alignment/code-evidence-inventory.v1.json contracts/alignment/five-way-reconciliation.v1.json contracts/alignment/change-impact.v1.json
 
   contract-full:
     name: Contract Admission Gate (full)
