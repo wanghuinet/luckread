@@ -1,6 +1,6 @@
 # Luckread Pre-Contract Closure — Step 8
 
-Status: **ACTIVE / PRE-CONTRACT / STEP 8 OF 8**
+Status: **ACTIVE / PRE-CONTRACT / STEP 8 OF 8 / NOT GREEN**
 
 ## Objective
 
@@ -13,7 +13,7 @@ The repository already has a Contract CI workflow with contract, semantic, featu
 ## Required final admission chain
 
 ```text
-Blueprint B01-B20
+Blueprint v2.0
   -> Feature Inventory
   -> Data/Entity/Persistence
   -> API/DTO/Payload
@@ -24,11 +24,20 @@ Blueprint B01-B20
   -> Contract Freeze
 ```
 
+Historical B01-B20 material may be consumed as evidence during reconciliation, but it MUST NOT be used as the current functional authority.
+
 ## Fail-closed conditions
 
 CI must fail when any required inventory is missing, stale, nondeterministic, or contains blocking states such as `CONFLICT`, `UNRESOLVED`, `BLOCKED`, unauthorized `EXTRA`, or unresolved `DUPLICATE`.
 
-CI must also fail when generated inventories change during validation, when required evidence cannot be traced, or when a contract claims a capability that has no frozen Feature ID.
+CI must also fail when generated inventories change during validation, when required evidence cannot be traced, or when a contract claims a capability that has no frozen Blueprint Feature ID and Mapping owner.
+
+CI must preserve the frozen topology:
+
+- 25 Tasks
+- 12 Workers
+- 4 D1 Domains
+- no new Worker/D1 introduced by reconciliation
 
 ## Evidence requirement
 
@@ -40,7 +49,7 @@ Step 8 does not itself freeze every future Contract. It establishes the admissio
 
 ## Final pre-contract status
 
-The eight-step process is now defined end-to-end. Existing repository evidence still contains known partial reconciliation areas; therefore the process is **not declared globally GREEN** until CI and actual inventories prove it.
+The eight-step process is defined end-to-end, but the repository still contains partial reconciliation areas and the generated Blueprint feature inventory is a required admission artifact. Therefore the process is **not declared globally GREEN** until CI and actual inventories prove it.
 
 ## Next phase
 
