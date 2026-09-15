@@ -1,7 +1,7 @@
 {
   "version":"1.0",
-  "status":"NOT_GREEN",
-  "sourceOfTruth":"docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
+  "status":"BLOCKED",
+  "sourceOfTruth":"docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
   "records":[
     {"entityId":"ENT-USER","name":"User","domainId":"D1-01","classification":"AUTHORITATIVE","status":"VERIFIED","implementationRef":"src/collections/Users.ts","evidenceRefs":["docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md","src/collections/Users.ts","src/payload.config.ts"]},
     {"entityId":"ENT-IDENTITY","name":"Identity","domainId":"D1-01","classification":"AUTHORITATIVE","status":"PROPOSED","evidenceRefs":["docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"]},
@@ -13,5 +13,10 @@
     {"entityId":"ENT-ENTITLEMENT-GRANT","name":"EntitlementGrant","domainId":"D1-01","classification":"AUTHORIZATION","status":"PROPOSED","evidenceRefs":["docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"]},
     {"entityId":"ENT-SUBSCRIPTION","name":"Subscription","domainId":"D1-01","classification":"BILLING","status":"PROPOSED","evidenceRefs":["docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"]},
     {"entityId":"ENT-ORG-MEMBERSHIP","name":"OrgMembership","domainId":"D1-01","classification":"AUTHORIZATION","status":"PROPOSED","evidenceRefs":["docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"]}
+  ],
+  "blockers":[
+    "Historical entity baseline has not yet been reconciled against the complete Blueprint v2.0 Feature Inventory.",
+    "Proposed records are evidence only and cannot define the current canonical entity model.",
+    "Step 03 remains blocked until Feature Inventory is generated and the entity/persistence chain is rebuilt from it."
   ]
 }
