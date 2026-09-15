@@ -49,7 +49,12 @@ for (const collection of inventory.collections) {
     if (Boolean(contracted.unique) !== Boolean(discovered.unique)) drift.push(`unique ${Boolean(contracted.unique)} != ${Boolean(discovered.unique)}`)
     if (Object.prototype.hasOwnProperty.call(discovered, 'defaultValue') && contracted.defaultValue !== discovered.defaultValue) drift.push(`defaultValue ${JSON.stringify(contracted.defaultValue)} != ${JSON.stringify(discovered.defaultValue)}`)
     if (contracted.sourceRef !== discovered.sourceRef.split(':field:')[0]) drift.push(`sourceRef ${contracted.sourceRef} != ${discovered.sourceRef.split(':field:')[0]}`)
-    if (contracted.payloadConfigRef !== discovered.sourceRef) drift.push(`payloadConfigRef ${contracted.payloadConfigRef} != ${discovered.sourceRef}`)
+
+    // Payload inventory records a field as `:field:<name>` while the Entity field
+    // contract intentionally records the canonical config path as `:fields.<name>`.
+    // Normalize the generated inventory reference before comparing the two forms.
+    const normalizedPayloadConfigRef = discovered.sourceRef.replace(':field:', ':fields.')
+    if (contracted.payloadConfigRef !== normalizedPayloadConfigRef) drift.push(`payloadConfigRef ${contracted.payloadConfigRef} != ${normalizedPayloadConfigRef}`)
 
     if (drift.length) {
       fieldResults.push({ name: discovered.name, status: 'DRIFT', details: drift })
