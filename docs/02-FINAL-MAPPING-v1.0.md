@@ -1,6 +1,6 @@
 # Luckread Final Mapping v1.0
 
-> Status: **ACTIVE / FEATURE-DOMAIN MAPPING COMPLETE — WORKER/D1 BINDING PENDING**
+> Status: **ACTIVE / FEATURE → TASK → WORKER → D1 BINDING COMPLETE — CROSS-LAYER DETAIL PENDING**
 >
 > Scope: Luckread Payload self-media platform.
 >
@@ -14,149 +14,170 @@
 
 This document is the canonical traceability Mapping for Contract-First development.
 
-It reconciles:
+The current frozen chain is:
 
 ```text
-Feature ID ↔ Task ID ↔ Worker ID ↔ D1 Domain ID
-                     ↕
-       API / Data / Security / Event / Consistency
-                     ↕
-       Test / CI / Deployment / Smoke / Evidence
+Feature Domain → Primary Task → Primary Worker → D1 Authority / Boundary
+```
+
+The downstream chain remains mandatory before Contract GREEN:
+
+```text
+Feature → Task → Primary Worker → Primary D1 → API → Data → Security → Event → Test → Evidence
 ```
 
 Worker and D1 ownership must never be inferred from implementation code.
 
 ## 2. Mapping Status Rules
 
-- `MAPPED` — source capability and ownership dimensions are explicitly mapped.
-- `PENDING` — source information exists, but the corresponding authoritative master has not yet frozen the assignment.
-- `CONFLICT` — authoritative sources disagree; implementation is blocked.
-- `EXCLUDED` — capability is outside the current contract scope but remains in the functional Blueprint.
+- `MAPPED` — the current layer has an explicit authoritative assignment.
+- `BOUNDARY` — the capability is infrastructure/client/projection/API boundary and has no direct business D1 authority.
+- `CONFLICT` — authoritative layers require resolution before GREEN.
+- `PENDING` — a downstream detail is not yet frozen.
 - `GREEN` — all applicable API/Data/Security/Runtime/Test/Evidence links are verified.
 
-`PENDING` is not `GREEN` and cannot authorize implementation.
+`MAPPED`, `BOUNDARY`, and `CONFLICT` at this layer do not authorize Contract GREEN. Full downstream validation is still required.
 
 ## 3. Frozen Topology
 
-| Dimension | Final target | Source |
+| Dimension | Final target | Status |
 |---|---:|---|
-| Contract Tasks | 25 | Architecture Blueprint v1.4 |
-| Workers | 12 | Architecture Blueprint v1.4 |
-| D1 Domains | 4 | Architecture Blueprint v1.4 |
+| Contract Tasks | 25 | CANONICAL |
+| Workers | 12 | CANONICAL |
+| D1 Domains | 4 | CANONICAL |
 
 No additional Worker or D1 domain may be introduced implicitly by Mapping or implementation.
 
-## 4. Canonical Task Master
+## 4. Canonical Task → Worker → D1 baseline
 
-| Task | Responsibility | Primary Blueprint domains |
+| Task | Primary Worker | Primary D1 / Boundary |
 |---|---|---|
-| T01 | Identity & Account | A |
-| T02 | Profile & User Lifecycle | B |
-| T03 | Role & Authorization | C |
-| T04 | Creator / Organization | D |
-| T05 | Content Creation & Lifecycle | E |
-| T06 | Article & Text | F |
-| T07 | Media & Asset | G |
-| T08 | Feed & Discovery | I |
-| T09 | Recommendation | J |
-| T10 | Search | K |
-| T11 | Social Graph | L |
-| T12 | Interaction & Community | L, M |
-| T13 | Messaging | N |
-| T14 | Notification | O |
-| T15 | Translation & i18n | P |
-| T16 | Subscription & Paid Content | Q |
-| T17 | Payment & Revenue | R |
-| T18 | Advertising | S |
-| T19 | Copyright & Rights | T |
-| T20 | Trust & Safety | U |
-| T21 | Reports & Governance | V |
-| T22 | Growth & Campaign | W, X |
-| T23 | Analytics & Operations | Y, AM |
-| T24 | API / Developer / Admin | AB, AC, AD |
-| T25 | Platform / Infrastructure / Reliability | H, AG, AH, AI, AJ, AK, AL, AN, AO, AP, AQ |
+| T01 | W02 | D1-01 |
+| T02 | W02 | D1-01 |
+| T03 | W02 | D1-01 |
+| T04 | W08 | D1-01 |
+| T05 | W03 | D1-02 |
+| T06 | W03 | D1-02 |
+| T07 | W03 | D1-02 |
+| T08 | W04 | Derived/projection boundary |
+| T09 | W04 | Derived/projection boundary |
+| T10 | W04 | Derived/projection boundary |
+| T11 | W05 | D1-02 |
+| T12 | W05 | D1-02 |
+| T13 | W05 | D1-02 / scoped D1-03 runtime delivery |
+| T14 | W05 | Scoped D1-03 runtime delivery |
+| T15 | W03 | D1-02 |
+| T16 | W07 | D1-01 access authority + D1-04 commerce authority |
+| T17 | W07 | D1-04 |
+| T18 | W07 | Blueprint-owned advertising state; D1-04 only for financial effects |
+| T19 | W06 | D1-03 |
+| T20 | W06 | D1-03 |
+| T21 | W06 | D1-03 |
+| T22 | W11 | D1-03 |
+| T23 | W11 | D1-03 |
+| T24 | W01 | API boundary / no direct D1 authority |
+| T25 | W09 | D1-03 platform/runtime authority |
 
-## 5. Feature-Domain Mapping — Complete
+This table is authoritative only at Task/Worker/D1-boundary level. Entity-level ownership remains governed by the D1 Master.
 
-| Domain | Feature range | Primary Task | Worker | D1 | API/Data/Security/Event/Test |
+## 5. Feature-Domain → Task → Worker → D1 Mapping
+
+| Domain | Feature range | Task | Worker | D1 / Boundary | Status |
 |---|---|---|---|---|---|
-| A | AUTH-001..016 | T01 | PENDING | PENDING | PENDING |
-| B | USER-001..010 | T02 | PENDING | PENDING | PENDING |
-| C | AUTHZ-001..010 | T03 | PENDING | PENDING | PENDING |
-| D | CREATOR-001..007; ORG-001..007 | T04 | PENDING | PENDING | PENDING |
-| E | CONTENT-001..012 | T05 | PENDING | PENDING | PENDING |
-| F | ARTICLE-001..012 | T06 | PENDING | PENDING | PENDING |
-| G | MEDIA-001..015 | T07 | PENDING | PENDING | PENDING |
-| H | EXTCONTENT-001..006 | T25 | PENDING | PENDING | PENDING |
-| I | FEED-001..013 | T08 | PENDING | PENDING | PENDING |
-| J | REC-001..009 | T09 | PENDING | PENDING | PENDING |
-| K | SEARCH-001..010 | T10 | PENDING | PENDING | PENDING |
-| L | SOCIAL-001..010 | T11 | PENDING | PENDING | PENDING |
-| M | COMMUNITY-001..008 | T12 | PENDING | PENDING | PENDING |
-| N | MSG-* | T13 | PENDING | PENDING | PENDING |
-| O | NOTIFY-* | T14 | PENDING | PENDING | PENDING |
-| P | I18N-* / TRANSLATION-* | T15 | PENDING | PENDING | PENDING |
-| Q | SUB-* / MEMBERSHIP-* / PAID-* | T16 | PENDING | PENDING | PENDING |
-| R | PAYMENT-* / WALLET-* / REVENUE-* / SETTLEMENT-* | T17 | PENDING | PENDING | PENDING |
-| S | ADS-* / ADVERTISING-* | T18 | PENDING | PENDING | PENDING |
-| T | RIGHTS-* / COPYRIGHT-* | T19 | PENDING | PENDING | PENDING |
-| U | TRUST-* / SAFETY-* / MODERATION-* / ANTIABUSE-* | T20 | PENDING | PENDING | PENDING |
-| V | REPORT-* / APPEAL-* / GOVERNANCE-* | T21 | PENDING | PENDING | PENDING |
-| W | GROWTH-* / ENGAGEMENT-* | T22 | PENDING | PENDING | PENDING |
-| X | CAMPAIGN-* / OPERATIONS-* | T22 | PENDING | PENDING | PENDING |
-| Y | ANALYTICS-* | T23 | PENDING | PENDING | PENDING |
-| Z | SEO-* / PUBLIC-DISCOVERY-* | T24 | PENDING | PENDING | PENDING |
-| AA | CLIENT-* / WEB-* / H5-* / MOBILE-* / MINIAPP-* | T24 | PENDING | PENDING | PENDING |
-| AB | API-* / OPENAPI-* / VERSIONING-* | T24 | PENDING | PENDING | PENDING |
-| AC | DEVELOPER-* / SDK-* / WEBHOOK-* | T24 | PENDING | PENDING | PENDING |
-| AD | ADMIN-* / SUPPORT-* / OPERATIONS-* | T24 | PENDING | PENDING | PENDING |
-| AE | CONFIG-* / EXPERIMENT-* / FEATUREFLAG-* | T25 | PENDING | PENDING | PENDING |
-| AF | TENANT-* / ENTERPRISE-* / ORGANIZATION-* | T25 | PENDING | PENDING | PENDING |
-| AG | STORAGE-* / MEDIA-INFRA-* | T25 | PENDING | PENDING | PENDING |
-| AH | ASYNC-* / QUEUE-* / SCHEDULE-* | T25 | PENDING | PENDING | PENDING |
-| AI | DATA-GOV-* / PORTABILITY-* | T25 | PENDING | PENDING | PENDING |
-| AJ | CLOUDFLARE-* / DEPLOY-* | T25 | PENDING | PENDING | PENDING |
-| AK | POSTGRES-* / GCP-* / MIGRATION-* | T25 | PENDING | PENDING | PENDING |
-| AL | RELIABILITY-* / DR-* / BACKUP-* | T25 | PENDING | PENDING | PENDING |
-| AM | OBSERVABILITY-* / TELEMETRY-* | T23 | PENDING | PENDING | PENDING |
-| AN | SECURITY-* / CRYPTO-* / SECRETS-* | T25 | PENDING | PENDING | PENDING |
-| AO | PRIVACY-* / COMPLIANCE-* | T25 | PENDING | PENDING | PENDING |
-| AP | INTEGRATION-* / ECOSYSTEM-* | T25 | PENDING | PENDING | PENDING |
-| AQ | EXTENSION-* / COMMERCE-* / FUTURE-* | T25 | PENDING | PENDING | PENDING |
+| A | AUTH-001..016 | T01 | W02 | D1-01 | MAPPED |
+| B | USER-001..010 | T02 | W02 | D1-01 | MAPPED |
+| C | AUTHZ-001..010 | T03 | W02 | D1-01 | MAPPED |
+| D | CREATOR-001..007; ORG-001..007 | T04 | W08 | D1-01 | MAPPED |
+| E | CONTENT-001..012 | T05 | W03 | D1-02 | MAPPED |
+| F | ARTICLE-001..012 | T06 | W03 | D1-02 | MAPPED |
+| G | MEDIA-001..015 | T07 | W03 | D1-02 | MAPPED |
+| H | EXTCONTENT-001..006 | T25 | W09 | D1-03 platform boundary; content authority remains D1-02 where applicable | CONFLICT |
+| I | FEED-001..013 | T08 | W04 | Projection boundary; no authoritative D1 | BOUNDARY |
+| J | REC-001..009 | T09 | W04 | Projection boundary; no authoritative D1 | BOUNDARY |
+| K | SEARCH-001..010 | T10 | W04 | Projection boundary; no authoritative D1 | BOUNDARY |
+| L | SOCIAL-001..010 | T11 | W05 | D1-02 | MAPPED |
+| M | COMMUNITY-001..008 | T12 | W05 | D1-02 | MAPPED |
+| N | MSG-* | T13 | W05 | D1-02 + scoped D1-03 runtime delivery | MAPPED |
+| O | NOTIFY-* | T14 | W05 | Scoped D1-03 runtime delivery | MAPPED |
+| P | I18N-* / TRANSLATION-* | T15 | W03 | D1-02 | MAPPED |
+| Q | SUB-* / MEMBERSHIP-* / PAID-* | T16 | W07 | D1-01 access + D1-04 commerce/financial transition | MAPPED |
+| R | PAYMENT-* / WALLET-* / REVENUE-* / SETTLEMENT-* | T17 | W07 | D1-04 | MAPPED |
+| S | ADS-* / ADVERTISING-* | T18 | W07 | Blueprint-owned ad state; D1-04 only reconciled financial effects | MAPPED |
+| T | RIGHTS-* / COPYRIGHT-* | T19 | W06 | D1-03 governance/right operational state; authoritative content references remain owning domain | MAPPED |
+| U | TRUST-* / SAFETY-* / MODERATION-* / ANTIABUSE-* | T20 | W06 | D1-03 | MAPPED |
+| V | REPORT-* / APPEAL-* / GOVERNANCE-* | T21 | W06 | D1-03 | MAPPED |
+| W | GROWTH-* / ENGAGEMENT-* | T22 | W11 | D1-03 operational/campaign state | MAPPED |
+| X | CAMPAIGN-* / OPERATIONS-* | T22 | W11 | D1-03 operational state | MAPPED |
+| Y | ANALYTICS-* | T23 | W11 | D1-03 analytics/operational state; projections only | MAPPED |
+| Z | SEO-* / PUBLIC-DISCOVERY-* | T24 | W01 | API/public discovery boundary; no direct D1 authority | BOUNDARY |
+| AA | CLIENT-* / WEB-* / H5-* / MOBILE-* / MINIAPP-* | T24 | W01 | Client/API boundary; no direct D1 authority | BOUNDARY |
+| AB | API-* / OPENAPI-* / VERSIONING-* | T24 | W01 | API boundary; no direct D1 authority | BOUNDARY |
+| AC | DEVELOPER-* / SDK-* / WEBHOOK-* | T24 | W01 | API/integration boundary; no direct D1 authority | BOUNDARY |
+| AD | ADMIN-* / SUPPORT-* / OPERATIONS-* | T24 | W01 | API/admin boundary; underlying state remains owning domain | BOUNDARY |
+| AE | CONFIG-* / EXPERIMENT-* / FEATUREFLAG-* | T25 | W09 | D1-03 platform/runtime state | MAPPED |
+| AF | TENANT-* / ENTERPRISE-* / ORGANIZATION-* | T25 | W09 | Potential D1-01 identity/org authority conflicts with T25→W09→D1-03 | CONFLICT |
+| AG | STORAGE-* / MEDIA-INFRA-* | T25 | W09 | D1-03 runtime/storage-control boundary; media metadata remains D1-02 | MAPPED |
+| AH | ASYNC-* / QUEUE-* / SCHEDULE-* | T25 | W09 | D1-03 | MAPPED |
+| AI | DATA-GOV-* / PORTABILITY-* | T25 | W09 | D1-03 governance/runtime boundary; entity authority remains owning D1 | MAPPED |
+| AJ | CLOUDFLARE-* / DEPLOY-* | T25 | W09 | Runtime/deployment boundary; no business D1 authority | BOUNDARY |
+| AK | POSTGRES-* / GCP-* / MIGRATION-* | T25 | W09 | Portability boundary; no new D1 authority | BOUNDARY |
+| AL | RELIABILITY-* / DR-* / BACKUP-* | T25 | W09 | D1-03 runtime/recovery state | MAPPED |
+| AM | OBSERVABILITY-* / TELEMETRY-* | T23 | W11 | D1-03 operational/analytics state | MAPPED |
+| AN | SECURITY-* / CRYPTO-* / SECRETS-* | T25 | W09 | D1-03 platform/security runtime boundary; business authorization remains owning D1 | MAPPED |
+| AO | PRIVACY-* / COMPLIANCE-* | T25 | W09 | D1-03 governance/runtime boundary; subject data remains owning D1 | MAPPED |
+| AP | INTEGRATION-* / ECOSYSTEM-* | T25 | W09 | Integration runtime boundary; business state remains owning D1 | MAPPED |
+| AQ | EXTENSION-* / COMMERCE-* / FUTURE-* | T25 | W09 | Potential D1-04 commerce authority conflicts with T25→W09→D1-03 | CONFLICT |
 
-### Domain-level mapping rule
-The ranges above preserve the functional Blueprint as the source of truth. Where the exact Feature IDs are not explicitly reproduced in this Mapping, the Mapping does **not** create or rename them. Exact Feature-level expansion is required before Contract GREEN.
+## 6. Conflict findings from this batch
 
-## 6. Mapping Invariants
+This batch intentionally does **not** force ambiguous domains into a false GREEN state.
 
-1. Every Feature ID maps to exactly one primary Contract Task.
-2. A feature may reference multiple APIs, Data IDs, Security IDs and Events when required.
-3. A feature may execute through one Worker or a justified bounded set of runtime boundaries; this must be explicit.
-4. A feature may touch more than one D1 domain only when cross-domain ownership and consistency are explicitly contracted.
-5. Cross-domain writes require authoritative owner, local transaction boundary, event, idempotency, consistency window, retry/failure policy and compensation where required.
-6. No Worker/D1 assignment is inferred from directory names, Payload collections, route names or existing code.
-7. No API, data entity, security rule, event or test may exist without a traceable Feature/Task owner unless explicitly marked infrastructure-level by the Architecture Blueprint.
-8. A missing mapping link blocks `GREEN`.
+### H — Future content types
 
-## 7. Batch Progress
+T25/W09 is the frozen task/worker allocation, while future content types can create authoritative content entities that belong to D1-02. This requires feature-level authority rules rather than assigning all H state to D1-03.
+
+### AF — Multi-tenant / enterprise
+
+The functional mapping currently assigns AF to T25, while organization identity authority is D1-01/W08. This is a cross-layer allocation conflict that must be resolved before Contract GREEN.
+
+### AQ — Extension / future commerce
+
+AQ is currently assigned to T25/W09, while commerce authority belongs to W07/D1-04. Future commerce cannot silently acquire D1-03 authority merely because the domain was grouped under T25.
+
+These are **architecture/mapping conflicts**, not implementation failures. No new Worker or D1 is introduced to resolve them.
+
+## 7. Mapping invariants
+
+1. Every Blueprint domain has exactly one current Primary Task assignment.
+2. Every Task with a canonical Primary Worker resolves to that Worker.
+3. A D1 value may represent a direct authority, a scoped boundary, or no authoritative D1; these meanings are explicit.
+4. Cross-D1 features require explicit ownership, event, idempotency, consistency, retry/failure and reconciliation contracts.
+5. A projection/API/runtime boundary must not become an implicit source of truth.
+6. No Worker/D1 assignment is inferred from code, routes, Payload Collections or directories.
+7. No fifth D1 may be introduced to resolve a conflict.
+8. `CONFLICT` blocks Mapping Freeze and Contract GREEN.
+
+## 8. Batch progress
 
 | Stage | Status |
 |---|---|
-| Batch 1 A–G | COMPLETE |
-| Batch 2 H–M | COMPLETE |
-| Batch 3 N–T | COMPLETE |
-| Batch 4 U–AQ | COMPLETE |
-| Feature → Task | COMPLETE at domain/range level |
-| 12 Worker Master binding | NEXT |
-| 4 D1 Master binding | PENDING |
-| API/Data/Security/Event/Test/Evidence | PENDING |
-| Conflict / orphan / duplicate audit | PENDING |
-| Mapping Freeze | PENDING |
+| Blueprint | 100% |
+| Architecture Blueprint | 100% |
+| 25 Tasks | 100% |
+| 43 Feature Domains | 100% |
+| 12 Worker Master | 100% |
+| 4 D1 Master | 100% |
+| Worker × D1 Binding | 100% |
+| Feature → Task | 100% |
+| Feature → Task → Worker | 43/43 = 100% |
+| Feature → Task → Worker → D1 | **40/43 directly resolved; 3 CONFLICT** |
+| API/Data/Security/Event/Test/Evidence | Pending |
+| Conflict/orphan/duplicate audit | Pending |
+| Mapping Freeze | Blocked |
+| Contract generation | Blocked |
 
-Feature-domain coverage: **43 / 43 Blueprint domains = 100%**.
+## 9. Next gate
 
-This **100% means every Blueprint domain has a Mapping row**. It does not mean every Feature/API/Data/Worker/D1/Contract has been fully validated.
+The next batch must resolve only the three identified mapping conflicts (H, AF, AQ) using the existing Blueprint, Worker Master and D1 Master. It must not add Workers, D1 domains, or capabilities.
 
-## 8. Contract Gate
-
-The Mapping is **NOT contract-ready** until Worker, D1, API, Data, Security, Runtime, Event, Test and Evidence links are resolved and the conflict/orphan/duplicate audit passes.
+After those conflicts close, perform the reverse/forward orphan and duplicate audit before Mapping Freeze.
