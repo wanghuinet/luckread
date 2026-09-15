@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "contract:ci": "node scripts/contract-ci.mjs",
     "api:contract:ci": "node scripts/api-contract-ci.mjs",
-    "payload:admission": "node scripts/payload-implementation-admission-check.mjs"
+    "payload:admission": "node scripts/payload-implementation-admission-check.mjs",
+    "payload:native:inventory": "node scripts/payload-native-inventory.mjs"
   },
   "dependencies": {
     "@payloadcms/db-d1-sqlite": "3.87.1",
