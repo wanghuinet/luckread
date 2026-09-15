@@ -22,10 +22,12 @@ const fields = read(fieldContractPath);
 const payload = read(payloadPath);
 const api = read(apiPath);
 
+const entityRecords = entities.records ?? [];
+const fieldRecords = fields.records ?? [];
 const evidenceByEntity = new Map((evidence.records ?? []).map((r) => [r.entityId, r]));
 const records = [];
 
-for (const entity of entities.entities ?? []) {
+for (const entity of entityRecords) {
   const ev = evidenceByEntity.get(entity.entityId);
   if (!ev) {
     records.push({ evidenceId: `ENTITY:${entity.entityId}`, subjectType: 'ENTITY', subjectId: entity.entityId, implementationStatus: 'UNRESOLVED', implementationRefs: [], testRefs: [], schemaEvidenceRefs: [], sourceRefs: [entityCatalogPath], blockers: ['Missing entity implementation evidence'] });
@@ -44,18 +46,20 @@ for (const entity of entities.entities ?? []) {
   });
 }
 
-for (const field of fields.fields ?? []) {
-  records.push({
-    evidenceId: `FIELD:${field.fieldId}`,
-    subjectType: 'FIELD',
-    subjectId: field.fieldId,
-    implementationStatus: field.status === 'VERIFIED' ? 'IMPLEMENTED' : 'UNRESOLVED',
-    implementationRefs: field.sourceRef ? [field.sourceRef] : [],
-    testRefs: [],
-    schemaEvidenceRefs: field.sourceRef ? [field.sourceRef] : [],
-    sourceRefs: [fieldContractPath],
-    blockers: field.status === 'VERIFIED' && field.sourceRef ? [] : ['Field implementation evidence is incomplete'],
-  });
+for (const entity of fieldRecords) {
+  for (const field of entity.fields ?? []) {
+    records.push({
+      evidenceId: `FIELD:${field.fieldId}`,
+      subjectType: 'FIELD',
+      subjectId: field.fieldId,
+      implementationStatus: field.status === 'VERIFIED' ? 'IMPLEMENTED' : 'UNRESOLVED',
+      implementationRefs: field.sourceRef ? [field.sourceRef] : [],
+      testRefs: [],
+      schemaEvidenceRefs: field.sourceRef ? [field.sourceRef] : [],
+      sourceRefs: [fieldContractPath],
+      blockers: field.status === 'VERIFIED' && field.sourceRef ? [] : ['Field implementation evidence is incomplete'],
+    });
+  }
 }
 
 for (const collection of payload.records ?? []) {
@@ -64,10 +68,10 @@ for (const collection of payload.records ?? []) {
     subjectType: 'PAYLOAD_COLLECTION',
     subjectId: collection.collection,
     implementationStatus: collection.origin === 'PAYLOAD_CONFIG_DISCOVERED' ? 'IMPLEMENTED' : 'UNRESOLVED',
-    implementationRefs: [collection.collectionSourceRef],
+    implementationRefs: collection.collectionSourceRef ? [collection.collectionSourceRef] : [],
     testRefs: [],
-    schemaEvidenceRefs: [collection.collectionSourceRef],
-    sourceRefs: [payloadPath, collection.collectionSourceRef],
+    schemaEvidenceRefs: collection.collectionSourceRef ? [collection.collectionSourceRef] : [],
+    sourceRefs: [payloadPath, collection.collectionSourceRef].filter(Boolean),
     blockers: collection.origin === 'PAYLOAD_CONFIG_DISCOVERED' ? [] : ['Payload collection origin unresolved'],
   });
   for (const field of collection.fields ?? []) {
@@ -76,10 +80,10 @@ for (const collection of payload.records ?? []) {
       subjectType: 'PAYLOAD_FIELD',
       subjectId: `${collection.collection}.${field.name}`,
       implementationStatus: field.origin === 'PAYLOAD_CONFIG_DISCOVERED' ? 'IMPLEMENTED' : 'UNRESOLVED',
-      implementationRefs: [field.sourceRef],
+      implementationRefs: field.sourceRef ? [field.sourceRef] : [],
       testRefs: [],
-      schemaEvidenceRefs: [field.sourceRef],
-      sourceRefs: [payloadPath, field.sourceRef],
+      schemaEvidenceRefs: field.sourceRef ? [field.sourceRef] : [],
+      sourceRefs: [payloadPath, field.sourceRef].filter(Boolean),
       blockers: field.origin === 'PAYLOAD_CONFIG_DISCOVERED' ? [] : ['Payload field origin unresolved'],
     });
   }
