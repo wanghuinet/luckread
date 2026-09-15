@@ -8,7 +8,13 @@
     "version":{"const":"1.0"},
     "status":{"enum":["NOT_GREEN","GREEN"]},
     "sourceOfTruth":{"const":"contracts/entity/entity-catalog.v1.json"},
-    "records":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["entityId","status","fields","evidenceRefs"],"properties":{"entityId":{"type":"string","minLength":1},"status":{"enum":["PROPOSED","VERIFIED","BLOCKED"]},"fields":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["fieldId","name","type","nullable","lifecycle","classification","status"],"properties":{"fieldId":{"type":"string","minLength":1},"name":{"type":"string","minLength":1},"type":{"type":"string","minLength":1},"nullable":{"type":"boolean"},"lifecycle":{"type":"string","minLength":1},"classification":{"type":"string","minLength":1},"status":{"enum":["PROPOSED","VERIFIED","BLOCKED"]},"payloadNative":{"type":"boolean"},"unique":{"type":"boolean"},"indexed":{"type":"boolean"}}}},"evidenceRefs":{"type":"array","items":{"type":"string"}}}},
+    "records":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["entityId","status","fields","evidenceRefs"],"properties":{
+      "entityId":{"type":"string","minLength":1},
+      "status":{"enum":["PROPOSED","VERIFIED","BLOCKED"]},
+      "fields":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["fieldId","name","type","nullable","lifecycle","classification","status"],"properties":{
+        "fieldId":{"type":"string","minLength":1},"name":{"type":"string","minLength":1},"type":{"type":"string","minLength":1},"nullable":{"type":"boolean"},"required":{"type":"boolean"},"unique":{"type":"boolean"},"indexed":{"type":"boolean"},"lifecycle":{"type":"string","minLength":1},"classification":{"type":"string","minLength":1},"status":{"enum":["PROPOSED","VERIFIED","BLOCKED"]},"payloadNative":{"type":"boolean"},"sourceRef":{"type":"string","minLength":1},"payloadConfigRef":{"type":"string","minLength":1},"apiExposure":{"type":"string","minLength":1},"adminExposure":{"type":"string","minLength":1},"eventExposure":{"type":"string","minLength":1},"migrationVersion":{"type":"string","minLength":1},"postgresqlPortability":{"type":"string","minLength":1},"evidenceRefs":{"type":"array","items":{"type":"string"}}}},
+      "evidenceRefs":{"type":"array","items":{"type":"string"}}
+    }}},
     "rules":{"type":"object","additionalProperties":{"type":"boolean"}}
   }
 }
