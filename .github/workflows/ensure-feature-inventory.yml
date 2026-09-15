@@ -19,9 +19,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-
-      - run: npm ci
 
       - name: Generate canonical feature inventory when absent
         run: |
@@ -31,6 +28,13 @@ jobs:
           fi
           node scripts/build-feature-inventory.mjs
           test -f contracts/alignment/feature-inventory.v1.json
+
+      - name: Validate generated inventory is non-empty and deterministic
+        run: |
+          test -s contracts/alignment/feature-inventory.v1.json
+          cp contracts/alignment/feature-inventory.v1.json /tmp/feature-inventory.v1.json
+          node scripts/build-feature-inventory.mjs
+          cmp -s contracts/alignment/feature-inventory.v1.json /tmp/feature-inventory.v1.json
 
       - name: Commit generated inventory
         run: |
