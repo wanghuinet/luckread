@@ -87,6 +87,9 @@ jobs:
       - name: Validate L1-L4 reconciliation baseline
         shell: bash
         run: node scripts/l1-l4-reconciliation-baseline-check.mjs
+      - name: Enforce R4 Feature Entity Persistence ownership gate
+        shell: bash
+        run: node scripts/feature-entity-persistence-registry-check.mjs
 
   contract-full:
     name: Contract Admission Gate (full)
