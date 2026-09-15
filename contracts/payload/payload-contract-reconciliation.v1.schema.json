@@ -1,0 +1,22 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/payload/payload-contract-reconciliation.v1.schema.json",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["version","status","source","results"],
+  "properties":{
+    "version":{"const":"1.0.0"},
+    "status":{"enum":["GREEN","BLOCKED"]},
+    "source":{"type":"string","minLength":1},
+    "results":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["entityId","collection","status","fields"],"properties":{
+      "entityId":{"type":"string","minLength":1},
+      "collection":{"type":"string","minLength":1},
+      "status":{"enum":["MATCH","MISSING","EXTRA","DRIFT","CONFLICT","UNKNOWN"]},
+      "fields":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["name","status"],"properties":{
+        "name":{"type":"string","minLength":1},
+        "status":{"enum":["MATCH","MISSING","EXTRA","DRIFT","CONFLICT","UNKNOWN"]},
+        "details":{"type":"array","items":{"type":"string"}}
+      }}}
+    }}}
+  }
+}
