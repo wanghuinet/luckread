@@ -75,6 +75,9 @@ jobs:
       - name: Recover and gate historical L1-L4 hierarchy
         shell: bash
         run: node scripts/l1-l4-recovery-gate.mjs
+      - name: Build deterministic Feature L1-L4 exact crosswalk
+        shell: bash
+        run: node scripts/build-feature-l1-l4-exact-crosswalk.mjs
       - name: Validate Blueprint-to-Registry reconciliation
         shell: bash
         run: node scripts/capability-contract-graph-check.mjs
