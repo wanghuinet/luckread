@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract": "five-way-reconciliation",
+  "version": "1.0.0",
+  "status": "NOT_GREEN",
+  "records": [],
+  "blockers": [
+    {
+      "id": "ALIGNMENT-BOOTSTRAP-001",
+      "status": "BLOCKED",
+      "reason": "Canonical reconciliation records have not yet been generated from the repository inventories. Empty records are never treated as GREEN.",
+      "requiredNextStep": "Generate deterministic records from Feature/API/Payload/Code/Data inventories and classify every relationship."
+    }
+  ],
+  "sourceOfTruth": {
+    "feature": "docs/00-LUCKREAD-BLUEPRINT-CLOSURE-v3.0.md",
+    "alignmentGate": "docs/ALIGNMENT-PRE-CONTRACT-CLOSURE-v2.0.md",
+    "step6": "docs/PRE-CONTRACT-STEP-6-FIVE-WAY-MAPPING-REGISTRY-v1.0.md"
+  }
+}
