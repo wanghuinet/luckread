@@ -19,6 +19,15 @@ const inventory = JSON.parse(fs.readFileSync(apiInventoryPath, 'utf8'));
 const paths = openapi?.paths;
 if (!paths || typeof paths !== 'object') fail('canonical OpenAPI paths are missing');
 
+const serverUrl = String(openapi?.servers?.[0]?.url ?? '').replace(/\/$/, '');
+const versionPrefix = '/v1';
+const canonicalizePath = (rawPath) => {
+  const path = String(rawPath);
+  if (path.startsWith(versionPrefix + '/')) return path;
+  if (serverUrl.endsWith(versionPrefix) && path.startsWith('/')) return `${versionPrefix}${path}`;
+  return path;
+};
+
 const groups = inventory.domains ?? {};
 const declared = new Map();
 for (const [domain, group] of Object.entries(groups)) {
@@ -33,12 +42,16 @@ for (const [domain, group] of Object.entries(groups)) {
 }
 
 const records = [];
-for (const [path, pathItem] of Object.entries(paths)) {
-  if (!path.startsWith('/v1/')) continue;
+const seenCanonical = new Set();
+for (const [rawPath, pathItem] of Object.entries(paths)) {
+  const canonicalPath = canonicalizePath(rawPath);
+  if (!canonicalPath.startsWith('/v1/')) continue;
   for (const [method, operation] of Object.entries(pathItem ?? {})) {
     if (!['get','post','put','patch','delete','head','options'].includes(method)) continue;
     const upper = method.toUpperCase();
-    const key = `${upper} ${path}`;
+    const key = `${upper} ${canonicalPath}`;
+    if (seenCanonical.has(key)) fail(`duplicate canonical OpenAPI endpoint '${key}'`);
+    seenCanonical.add(key);
     const declaration = declared.get(key);
     const operationId = operation?.operationId;
     if (!operationId) fail(`OpenAPI operationId missing for ${key}`);
@@ -46,21 +59,24 @@ for (const [path, pathItem] of Object.entries(paths)) {
     records.push({
       operationId,
       method: upper,
-      path,
+      path: canonicalPath,
+      openapiPath: rawPath,
       domain: declaration.domain,
       status: 'DRAFT',
       featureIds: [],
       schemaRef: '',
-      openapiRef: `${openapiPath}#${method}:${path}`,
+      openapiRef: `${openapiPath}#${method}:${rawPath}`,
       sourceRefs: [openapiPath, apiInventoryPath],
     });
   }
 }
 
-for (const [key, declaration] of declared) {
-  if (!paths[declaration.path]?.[declaration.method.toLowerCase()]) {
-    fail(`API inventory endpoint missing from canonical OpenAPI: ${key}`);
-  }
+for (const [key] of declared) {
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const canonicalPath = key.slice(separator + 1);
+  const matchingRecord = records.find((record) => record.method === method && record.path === canonicalPath);
+  if (!matchingRecord) fail(`API inventory endpoint missing from canonical OpenAPI: ${key}`);
 }
 
 records.sort((a, b) => `${a.method} ${a.path}`.localeCompare(`${b.method} ${b.path}`));
@@ -69,6 +85,7 @@ const output = {
   status: 'NOT_GREEN',
   sourceOfTruth: 'contracts/openapi/v1/openapi.yaml + contracts/api/api-inventory.v1.json',
   generatedBy: 'scripts/build-api-alignment-inventory.mjs',
+  serverPrefix: serverUrl || null,
   records,
 };
 fs.writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`);
