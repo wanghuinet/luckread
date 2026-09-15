@@ -38,12 +38,18 @@ jobs:
 
       - name: Commit lockfile when required
         run: |
-          if git diff --quiet -- package-lock.json; then
-            echo "package-lock.json is already current"
-            exit 0
+          if git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
+            if git diff --quiet -- package-lock.json; then
+              echo "package-lock.json is already current"
+              exit 0
+            fi
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package-lock.json
+          git diff --cached --quiet -- package-lock.json && {
+            echo "package-lock.json has no staged changes"
+            exit 0
+          }
           git commit -m "chore: bootstrap npm lockfile"
           git push origin main
