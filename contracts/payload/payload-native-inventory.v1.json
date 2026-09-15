@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "DISCOVERED",
-  "source": "src/payload.config.ts + statically imported collection configs",
+  "source": "TypeScript AST of src/payload.config.ts + statically imported collection configs",
   "generatedBy": "scripts/payload-native-inventory.mjs",
   "collections": [
     {
