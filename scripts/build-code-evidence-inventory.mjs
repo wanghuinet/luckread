@@ -106,7 +106,7 @@ for (const operation of api.records ?? []) {
 records.sort((a, b) => a.evidenceId.localeCompare(b.evidenceId));
 write(outPath, {
   version: '1.0.0',
-  status: 'NOT_GREEN',
+  status: 'DISCOVERED',
   sourceOfTruth: `${entityCatalogPath} + ${entityEvidencePath} + ${fieldContractPath} + ${payloadPath} + ${apiPath}`,
   generatedBy: 'scripts/build-code-evidence-inventory.mjs',
   records,
