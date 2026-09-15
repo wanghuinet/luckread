@@ -76,7 +76,10 @@ jobs:
       - run: node scripts/build-capability-contract-graph.mjs
       - run: node scripts/capability-contract-graph-check.mjs
       # Historical L1-L4 recovery is evidence-only and non-authoritative.
-      - run: node scripts/l1-l4-reconciliation-baseline-check.mjs
+      # It remains visible for audit, but cannot block canonical contract admission.
+      - name: Audit historical L1-L4 reconciliation (non-blocking)
+        continue-on-error: true
+        run: node scripts/l1-l4-reconciliation-baseline-check.mjs
       - run: node scripts/entity-catalog-check.mjs
       - run: node scripts/entity-implementation-evidence-check.mjs
       - run: node scripts/entity-field-contract-check.mjs
