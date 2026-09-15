@@ -72,6 +72,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Recover and gate historical L1-L4 hierarchy
+        shell: bash
+        run: node scripts/l1-l4-recovery-gate.mjs
       - name: Validate Blueprint-to-Registry reconciliation
         shell: bash
         run: node scripts/capability-contract-graph-check.mjs
