@@ -6,25 +6,37 @@ const source = 'docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md'
 const output = 'contracts/alignment/feature-inventory.v1.json'
 const markdown = fs.readFileSync(path.join(root, source), 'utf8')
 
-// Feature IDs are authoritative only when explicitly present in the Blueprint.
-// This generator never invents IDs or infers capabilities from prose.
-const pattern = /\b([A-Z][A-Z0-9-]+-\d{3,})\b(?:\s+([^\n]+))?/g
+// Feature IDs are authoritative only when explicitly declared as list items in
+// the active Blueprint. Never infer capabilities from prose, headings, URLs,
+// examples, historical references, or implementation text.
+const featureLine = /^\s*[-*]\s+([A-Z][A-Z0-9-]+-\d{3,})\s+(.+?)\s*$/
 const features = new Map()
+const duplicateIds = []
 
-for (const match of markdown.matchAll(pattern)) {
+markdown.split('\n').forEach((rawLine, index) => {
+  const match = rawLine.match(featureLine)
+  if (!match) return
+
   const featureId = match[1]
-  const name = (match[2] ?? '').trim().replace(/[`*_]+/g, '').trim()
-  if (!features.has(featureId)) {
-    const offset = match.index ?? 0
-    const before = markdown.slice(0, offset)
-    const line = before.split('\n').length
-    features.set(featureId, {
-      featureId,
-      name: name || featureId,
-      sourceRef: `${source}:L${line}`,
-      alignmentState: 'DISCOVERED',
-    })
+  const name = match[2].replace(/[`*_]+/g, '').trim()
+  const sourceRef = `${source}:L${index + 1}`
+
+  if (features.has(featureId)) {
+    duplicateIds.push({ featureId, sourceRef, firstRef: features.get(featureId).sourceRef })
+    return
   }
+
+  features.set(featureId, {
+    featureId,
+    name: name || featureId,
+    sourceRef,
+    alignmentState: 'DISCOVERED',
+  })
+})
+
+if (duplicateIds.length > 0) {
+  const details = duplicateIds.map((d) => `${d.featureId} (${d.firstRef}, ${d.sourceRef})`).join('; ')
+  throw new Error(`FEATURE_INVENTORY_DUPLICATE_ID: ${details}`)
 }
 
 const ordered = [...features.values()].sort((a, b) => a.featureId.localeCompare(b.featureId))
