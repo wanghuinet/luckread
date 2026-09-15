@@ -1,107 +1,71 @@
 # Luckread 12-Worker Master v1.0
 
-> Status: **ACTIVE / CANONICAL WORKER TOPOLOGY MASTER**
+> Status: **PROPOSED / PENDING BLUEPRINT CHANGE CONTROL**
 >
-> Scope: final Luckread implementation topology.
+> Scope: candidate final Luckread Worker topology.
 >
-> Source of truth: `docs/00-PROJECT-BLUEPRINT-v1.4.md`.
+> Authoritative architecture source: `docs/00-PROJECT-BLUEPRINT-v1.4.md`.
 
-## 1. Frozen topology
+## 1. Critical status
 
-Luckread final implementation target:
+The architecture Blueprint freezes the **count** at 12 Workers / 4 D1 domains / 25 Contract Tasks, but it does not itself publish the canonical identity and responsibility definition for W01–W12.
 
-- 25 Contract Tasks
-- 12 Workers
-- 4 D1 Domains
+Therefore the Worker definitions in this document are a **proposal only**. They must not be treated as frozen architecture, used to authorize implementation, or used as the basis for Contract GREEN until formally promoted by Blueprint Change Control.
 
-The 12 Workers below are the only canonical runtime boundaries for this implementation baseline. Legacy Worker identifiers from superseded topology documents are not canonical and must not be reused as an alternative topology.
+This correction is intentional: Contract-First development must not convert an inferred allocation into an authoritative architecture decision.
 
-## 2. Worker Master
+## 2. Candidate Worker Master
 
-| ID | Canonical responsibility | Primary Tasks | Boundary |
+| ID | Proposed responsibility | Proposed primary Tasks | Status |
 |---|---|---|---|
-| W01 | Public API / Gateway | T01,T02,T03,T08,T10,T11,T12,T13,T14,T15,T16,T17,T18,T19,T20,T21,T22,T23,T24 | Client-facing API admission, canonical DTO/error/auth entry, rate-limit admission |
-| W02 | Identity & Access | T01,T02,T03 | Identity, account state, sessions, authorization, entitlement and scope decisions |
-| W03 | Content & Media | T05,T06,T07,T19 | Authoritative content lifecycle, article/text, media metadata and rights-linked content operations |
-| W04 | Feed & Discovery | T08,T09,T10,T11 | Feed/discovery, recommendation, search and social read models |
-| W05 | Community & Messaging | T12,T13,T14 | Comments/community, messaging and notification workflows |
-| W06 | Trust & Safety | T20,T21,T19 | Moderation, abuse/risk, reports, appeals and safety enforcement |
-| W07 | Commerce & Monetization | T16,T17,T18,T22 | Subscription, paid content, payment/revenue, advertising and monetization growth |
-| W08 | Creator & Organization | T04,T22,T24 | Creator, organization/MCN, enterprise-facing creator operations |
-| W09 | Platform & Storage | T25 | R2/object storage, cache boundary, provider adapters and platform storage services |
-| W10 | Async & Jobs | T23,T25 | Queue, scheduled jobs, aggregation, indexing/rebuild, compensation and batch work |
-| W11 | Operations & Administration | T23,T24,T25 | Admin/support, configuration, feature flags, operational controls and deployment boundary |
-| W12 | Developer & Integration Platform | T24,T25 | Open API, SDK, webhooks, integrations, ecosystem and extension boundary |
+| W01 | Public API / Gateway | T01,T02,T03,T08,T10,T11,T12,T13,T14,T15,T16,T17,T18,T19,T20,T21,T22,T23,T24 | PROPOSED |
+| W02 | Identity & Access | T01,T02,T03 | PROPOSED |
+| W03 | Content & Media | T05,T06,T07,T19 | PROPOSED |
+| W04 | Feed & Discovery | T08,T09,T10,T11 | PROPOSED |
+| W05 | Community & Messaging | T12,T13,T14 | PROPOSED |
+| W06 | Trust & Safety | T20,T21,T19 | PROPOSED |
+| W07 | Commerce & Monetization | T16,T17,T18,T22 | PROPOSED |
+| W08 | Creator & Organization | T04,T22,T24 | PROPOSED |
+| W09 | Platform & Storage | T25 | PROPOSED |
+| W10 | Async & Jobs | T23,T25 | PROPOSED |
+| W11 | Operations & Administration | T23,T24,T25 | PROPOSED |
+| W12 | Developer & Integration Platform | T24,T25 | PROPOSED |
 
-## 3. Ownership rules
+## 3. Why this is not yet canonical
 
-1. W01 is the public API admission boundary; it does not become the authoritative owner of every business domain it exposes.
-2. W02 is authoritative for identity/access decisions.
-3. W03 is authoritative for content/media business state.
-4. W04 owns discovery/read-model computation and does not become authoritative for source business state.
-5. W05 owns community/messaging/notification workflows within its contract scope.
-6. W06 is the authoritative trust/safety enforcement boundary and owns security-sensitive governance actions within its scope.
-7. W07 owns monetization workflows; financial provider confirmation remains event/signature validated.
-8. W08 owns creator/organization operations; authorization still follows W02 policy.
-9. W09 provides infrastructure adapters and object/cache boundaries; it is not a business source of truth.
-10. W10 owns asynchronous execution and must use idempotent jobs/consumers.
-11. W11 owns administrative/operational controls and must not bypass domain authorization.
-12. W12 owns developer/integration contracts and webhook delivery; it must not bypass internal authorization.
+Repository evidence contains older and incompatible Worker models, including W00–W08 and another topology containing W01–W13. Those historical artifacts cannot be silently reconciled by deleting or merging a Worker.
 
-## 4. Runtime rules
+The current Blueprint requires formal Change Control when the frozen topology or its authoritative boundaries are changed. The proposal therefore remains non-binding until that gate is passed.
 
-- Client → Worker chains are not the default. A request should terminate at one appropriate Worker whenever practical.
-- Worker-to-Worker calls require explicit contract ownership, authorization, timeout, retry, observability and cost justification.
-- No Worker may introduce a new D1 domain.
-- No Worker may write another domain's authoritative tables merely because it can access them.
-- Derived/read-model Workers cannot silently become authoritative sources.
-- High-frequency events use W10 where asynchronous aggregation is justified.
-- Payload Core remains immutable; Payload is the application/CMS foundation, not a generic Worker business-code dumping ground.
+## 4. Promotion criteria
 
-## 5. Legacy reconciliation
+Before this Master can become canonical, Change Control must explicitly approve:
 
-The repository contains historical topology artifacts defining W00–W08 and another historical topology artifact containing W01–W13 logical workers. Those documents are retained as evidence/reference only.
+1. W01–W12 immutable identities.
+2. Worker names and responsibilities.
+3. Primary Task ownership.
+4. API/runtime ownership.
+5. Authentication and authorization boundaries.
+6. D1 read/write permissions.
+7. R2/cache/queue permissions.
+8. Cross-worker call rules.
+9. Timeout/retry/backpressure rules.
+10. Deployment and environment boundary.
+11. Payload extension boundary.
+12. Test and evidence ownership.
 
-They do not override this Master. The current architecture explicitly requires 12 Workers, and historical identifiers must not be promoted into the final topology without formal Blueprint Change Control.
+## 5. Current binding status
 
-## 6. Task binding summary
-
-| Task | Primary Worker |
+| Dimension | Status |
 |---|---|
-| T01 | W02 |
-| T02 | W02 |
-| T03 | W02 |
-| T04 | W08 |
-| T05 | W03 |
-| T06 | W03 |
-| T07 | W03 |
-| T08 | W04 |
-| T09 | W04 |
-| T10 | W04 |
-| T11 | W04 |
-| T12 | W05 |
-| T13 | W05 |
-| T14 | W05 |
-| T15 | W01 |
-| T16 | W07 |
-| T17 | W07 |
-| T18 | W07 |
-| T19 | W03 |
-| T20 | W06 |
-| T21 | W06 |
-| T22 | W07 |
-| T23 | W11 |
-| T24 | W12 |
-| T25 | W09 |
+| Worker count | **12/12 frozen by Blueprint** |
+| Worker identities | **0/12 canonical** |
+| Task → Worker | **0/25 canonical** |
+| Worker → D1 | **BLOCKED** |
+| Contract authorization | **BLOCKED** |
 
-Secondary participation does not transfer authoritative ownership.
+No implementation may use the proposed assignments as authoritative ownership.
 
-## 7. Binding gate
+## 6. Next gate
 
-This Master freezes Worker identity and primary Task ownership. D1 ownership remains a separate Data Master and must not be inferred from this document.
-
-Required next artifact:
-
-`docs/05-D1-MASTER-v1.0.md`
-
-That artifact must define the four D1 domains, authoritative entities, write ownership, cross-domain reference rules and migration boundary.
+The next required artifact is a formal **Worker Topology Change Control / Reconciliation Record**. Only after approval should this proposal be promoted to the canonical Worker Master and used for the 25-Task binding.
