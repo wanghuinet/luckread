@@ -48,7 +48,7 @@ for (const collection of inventory.collections) {
 records.sort((a, b) => a.collection.localeCompare(b.collection));
 const output = {
   version: '1.0.0',
-  status: 'NOT_GREEN',
+  status: 'DISCOVERED',
   sourceOfTruth: sourcePath,
   generatedBy: 'scripts/build-payload-alignment-inventory.mjs',
   records,
