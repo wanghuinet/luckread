@@ -26,7 +26,11 @@ const batchFiles = fs.readdirSync(batchDir)
 if (batchFiles.length === 0) fail('no mapping batch files discovered');
 
 const featureInventory = readJson(featurePath);
-const featureRecords = Array.isArray(featureInventory.records) ? featureInventory.records : [];
+const featureRecords = Array.isArray(featureInventory.features)
+  ? featureInventory.features
+  : Array.isArray(featureInventory.records)
+    ? featureInventory.records
+    : [];
 const masterIds = featureRecords.map((record) => record.featureId).filter(Boolean).sort();
 if (masterIds.length === 0) fail('feature inventory contains no canonical Feature IDs');
 const masterSet = new Set(masterIds);
