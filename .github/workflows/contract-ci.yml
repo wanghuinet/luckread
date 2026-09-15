@@ -42,6 +42,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: 24}
       - run: node scripts/payload-native-inventory.mjs
+      - run: git diff --exit-code -- contracts/payload/payload-native-inventory.v1.json
       - run: node scripts/payload-contract-reconciliation-check.mjs
 
   capability-graph:
