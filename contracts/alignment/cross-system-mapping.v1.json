@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0",
+  "status": "NOT_GREEN",
+  "sourceOfTruth": "contracts/alignment/five-way-alignment.v1.json",
+  "records": []
+}
