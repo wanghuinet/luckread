@@ -1,0 +1,14 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/entity/entity-field-contract.v1.schema.json",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["version","status","sourceOfTruth","records","rules"],
+  "properties":{
+    "version":{"const":"1.0"},
+    "status":{"enum":["NOT_GREEN","GREEN"]},
+    "sourceOfTruth":{"const":"contracts/entity/entity-catalog.v1.json"},
+    "records":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["entityId","status","fields","evidenceRefs"],"properties":{"entityId":{"type":"string","minLength":1},"status":{"enum":["PROPOSED","VERIFIED","BLOCKED"]},"fields":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["fieldId","name","type","nullable","lifecycle","classification","status"],"properties":{"fieldId":{"type":"string","minLength":1},"name":{"type":"string","minLength":1},"type":{"type":"string","minLength":1},"nullable":{"type":"boolean"},"lifecycle":{"type":"string","minLength":1},"classification":{"type":"string","minLength":1},"status":{"enum":["PROPOSED","VERIFIED","BLOCKED"]},"payloadNative":{"type":"boolean"},"unique":{"type":"boolean"},"indexed":{"type":"boolean"}}}},"evidenceRefs":{"type":"array","items":{"type":"string"}}}},
+    "rules":{"type":"object","additionalProperties":{"type":"boolean"}}
+  }
+}
