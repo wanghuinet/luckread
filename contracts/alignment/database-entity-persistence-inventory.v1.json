@@ -1,23 +1,27 @@
 {
   "version":"1.0.0",
-  "status":"BLOCKED",
+  "status":"NOT_GREEN",
   "sourceOfTruth":"docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "featureInventoryRef":"contracts/alignment/feature-inventory.v1.json",
   "generatedBy":"manual-baseline-step-03",
   "records":[
     {"entityId":"ENT-USER","entityName":"User","entityStatus":"VERIFIED","implementationRef":"src/collections/Users.ts","persistenceStatus":"NOT_VERIFIED","adapter":"@payloadcms/db-d1-sqlite","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json","src/collections/Users.ts","src/payload.config.ts"]},
     {"entityId":"ENT-IDENTITY","entityName":"Identity","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
     {"entityId":"ENT-CREDENTIAL","entityName":"Credential","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-SESSION","entityName":"Session","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-VERIFICATION","entityName":"Verification","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-DEVICE-RECORD","entityName":"DeviceRecord","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-ROLE-ASSIGNMENT","entityName":"RoleAssignment","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-ENTITLEMENT-GRANT","entityName":"EntitlementGrant","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-SUBSCRIPTION","entityName":"Subscription","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-ORG-MEMBERSHIP","entityName":"OrgMembership","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]}
+    {"entityId":"ENT-SESSION","entityName":"Session","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
+    {"entityId":"ENT-VERIFICATION","entityName":"Verification","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
+    {"entityId":"ENT-DEVICE-RECORD","entityName":"DeviceRecord","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
+    {"entityId":"ENT-ROLE-ASSIGNMENT","entityName":"RoleAssignment","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
+    {"entityId":"ENT-ENTITLEMENT-GRANT","entityName":"EntitlementGrant","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
+    {"entityId":"ENT-SUBSCRIPTION","entityName":"Subscription","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
+    {"entityId":"ENT-ORG-MEMBERSHIP","entityName":"OrgMembership","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]}
   ],
+  "rules":{"noInference":true,"persistenceRequiresImplementationEvidence":true,"migrationEvidenceRequiredForSchemaChanges":true,"authorityMustResolveToMapping":true,"featureInventoryMustExist":true},
   "blockers":[
-    "This persistence inventory is historical evidence and is not a canonical Blueprint v2.0 entity inventory.",
-    "Feature Inventory must be generated before entity, field, relation and persistence records are rebuilt.",
-    "No proposed entity or persistence record may be promoted to GREEN by inference."
+    "Feature Inventory is now present and deterministic.",
+    "User persistence is configured through @payloadcms/db-d1-sqlite but migration evidence is not yet verified in the repository.",
+    "Identity/account auxiliary entities are contract-defined but not implemented, so their persistence cannot be promoted by inference.",
+    "Entity completeness against the full Blueprint v2.0 domain inventory is not yet reconciled.",
+    "Step 03 remains NOT_GREEN until implementation, migration, authority and completeness evidence are reconciled."
   ]
 }
