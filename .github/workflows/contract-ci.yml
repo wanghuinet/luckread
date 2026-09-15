@@ -70,9 +70,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
-      - run: node scripts/l1-l4-recovery-gate.mjs
-      - run: node scripts/build-feature-l1-l4-exact-crosswalk.mjs
-      - run: node scripts/r3-feature-crosswalk-gate.mjs
+      # Historical L1-L4 recovery is evidence-only and non-authoritative.
+      # It remains covered by the dedicated recovery workflow and must not
+      # block the canonical Blueprint v2 contract admission path.
       - run: node scripts/capability-contract-graph-check.mjs
       - run: node scripts/l1-l4-reconciliation-baseline-check.mjs
       - run: node scripts/entity-catalog-check.mjs
