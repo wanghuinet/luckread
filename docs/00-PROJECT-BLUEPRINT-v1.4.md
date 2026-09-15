@@ -10,7 +10,7 @@
 >
 > **Functional source of truth:** `docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md`.
 >
-> Historical worker/domain counts from earlier contracts are not architectural truth and are intentionally not carried forward.
+> **Final implementation target:** 12 Workers / 4 D1 domains / 25 Contract Tasks.
 
 ## 1. Source-of-Truth Hierarchy
 
@@ -19,11 +19,11 @@ Functional capability
     ↓
 docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md
     ↓
-Architecture
+Architecture + final topology
     ↓
 docs/00-PROJECT-BLUEPRINT-v1.4.md
     ↓
-Domain Contract / API / Data / Security / Runtime Contracts
+25 Contract Tasks / API / Data / Security / Runtime Contracts
     ↓
 Implementation
     ↓
@@ -38,6 +38,7 @@ Rules:
 4. Contracts must reconcile against both the functional Blueprint and this architecture Blueprint.
 5. If authoritative documents conflict, implementation stops until the conflict is formally resolved.
 6. Historical documents are evidence/reference unless explicitly promoted by Change Control.
+7. **12 Workers / 4 D1 domains / 25 Contract Tasks are the final implementation target and must be reflected by the Mapping and contracts.**
 
 ## 2. P0 Non-Negotiable Architecture Rules
 
@@ -45,17 +46,17 @@ Rules:
 
 Worker execution and D1 read/write consumption are budgeted resources. Every architecture decision must first minimize unnecessary work while preserving correctness, security, reliability and durability.
 
-Every new component must answer:
+Every component must answer:
 
-- Can Worker executions be reduced?
-- Can D1 reads be reduced?
+- Can Worker executions be reduced without violating the 12-Worker target?
+- Can D1 reads be reduced without violating the 4-D1 target?
 - Can D1 writes be reduced?
 - Can cache serve repeated reads?
 - Can high-frequency events be aggregated?
 - Can asynchronous processing remove synchronous work?
 - Can writes be batched?
 - Can R2 replace inappropriate D1 object storage?
-- Is the component actually necessary?
+- Is the component required by one of the 25 Contract Tasks or the functional Blueprint?
 
 Preferred order:
 
@@ -85,11 +86,23 @@ Hooks are bounded extension points, not the platform orchestration engine.
 
 Payload/application-owned persistence is authoritative for low-frequency structured business state. High-frequency telemetry, derived projections and recommendation signals are not automatically authoritative.
 
-### 2.4 No Mandatory Historical Topology
+### 2.4 Final Topology Is Fixed
 
-The architecture does **not** freeze a historical number of Workers, runtime services or physical D1 domains.
+The final Luckread implementation target is:
 
-A runtime or storage boundary is created only when justified by ownership, transaction isolation, security, traffic/scaling, lifecycle, capacity evidence, operational benefit or migration benefit. “Future may become large” is insufficient by itself.
+```text
+25 Contract Tasks
+        ↓
+12 Workers
+        ↓
+4 D1 Domains
+```
+
+This is the target topology for implementation and deployment. It is not a license to create arbitrary additional Workers or D1 domains.
+
+A split inside the final topology is permitted only when it remains within the frozen target and is justified by ownership, transaction isolation, security isolation, traffic/scaling, lifecycle, capacity, operational or migration requirements.
+
+If implementation evidence shows that the target itself must change, that is an explicit architecture change requiring Blueprint Change Control; it must not be changed implicitly during coding.
 
 ## 3. Architecture Layers
 
@@ -104,7 +117,7 @@ Web / H5 / Android / iOS / Mini Program
           /               \
          /                 \
         v                   v
- Payload Application     Async/Event Processing
+  12 Worker Runtime Set   Async/Event Processing
         |                   |
         |                   +-- behavior events
         |                   +-- counters
@@ -121,38 +134,34 @@ Web / H5 / Android / iOS / Mini Program
         +-- drafts/versions
                 |
                 v
-       Infrastructure Adapters
-       +-- database
-       +-- cache
-       +-- queue
-       +-- object storage
-       +-- search
-       +-- runtime/environment
+          4 D1 Domains + R2 + Cache + Queue + Search
 ```
 
-Not every box requires a separate Worker or service. Boundaries are contract decisions supported by evidence.
+The 12 Workers are execution boundaries. The 25 Contract Tasks define delivery responsibilities. The 4 D1 domains define the final relational storage topology. These three dimensions must be explicitly mapped rather than inferred from code.
 
 ## 4. Runtime Boundary Rules
 
 ### 4.1 Terminal Request Principle
 
-A normal user request should terminate at one appropriate application/runtime boundary whenever practical:
+A normal user request should terminate at one appropriate Worker/application boundary whenever practical:
 
 ```text
-Client → Terminal Runtime → Cache / Read Model / Authoritative Store → Response
+Client → Terminal Worker → Cache / Read Model / Authoritative Store → Response
 ```
 
 The following is not a default architecture:
 
 ```text
-Client → Runtime A → Runtime B → Runtime C → Runtime D → Database
+Client → Worker A → Worker B → Worker C → Worker D → Database
 ```
 
-Service-to-service calls require explicit justification covering ownership, latency, failure, cost, authorization and observability.
+Worker-to-Worker calls require explicit justification covering ownership, latency, failure, cost, authorization and observability, and must remain consistent with the 12-Worker target.
 
-### 4.2 Runtime Is Not Product Ownership
+### 4.2 Runtime and Task Ownership
 
-A Worker/runtime boundary is an execution boundary, not a business feature definition. Multiple features may share a runtime when ownership, security and workload characteristics permit it.
+A Worker is an execution boundary. A Contract Task is a delivery/ownership boundary. They are not interchangeable.
+
+Multiple Contract Tasks may share one Worker when the frozen Mapping permits it. A Worker may not silently acquire responsibilities belonging to another Task.
 
 ### 4.3 Payload Boundary
 
@@ -171,6 +180,8 @@ Logical Data Model
        ↓
 Data Contract
        ↓
+4-Domain Data Mapping
+       ↓
 Provider Adapter
        ↓
 D1 initially / PostgreSQL later
@@ -180,7 +191,9 @@ Primary keys, timestamps, states, relations, indexes, constraints, retention and
 
 ### 5.2 D1
 
-D1 may be the initial relational implementation. D1-specific behavior must not leak into public business contracts when it creates migration coupling.
+Luckread's final implementation target is **4 D1 domains**. Domain ownership, tables, cross-domain references, transaction boundaries and read/write rules must be frozen in the Data Mapping and Data Contracts.
+
+D1-specific behavior must not leak into public business contracts when it creates migration coupling.
 
 ### 5.3 R2
 
@@ -252,7 +265,7 @@ Queue
 Idempotent Consumers
 ```
 
-The exact implementation may differ when a simpler path is demonstrably correct and cheaper.
+The exact implementation may differ when a simpler path is demonstrably correct and cheaper, but it must remain within the 12-Worker / 4-D1 / 25-Task target.
 
 ### 7.1 Cross-Store / Cross-Domain Writes
 
@@ -331,13 +344,13 @@ Cloudflare Worker compatibility must be tested independently from local Node.js 
 
 ## 11. API Contract Boundary
 
-Every API must bind to Feature ID, API ID/version, authentication, authorization/entitlement, input schema, output schema, error contract, Data Contract, runtime owner, consistency level, cache policy, rate limit, idempotency where applicable, tests and evidence.
+Every API must bind to Feature ID, API ID/version, authentication, authorization/entitlement, input schema, output schema, error contract, Data Contract, Worker owner, consistency level, cache policy, rate limit, idempotency where applicable, tests and evidence.
 
 An API without a canonical capability owner and Data/Security Contract is not contract-complete.
 
 ## 12. Data Contract Boundary
 
-Every authoritative entity must declare owner, logical domain, provider implementation, primary key, references, lifecycle/state machine, indexes, retention/deletion, audit requirements, migration rules, read-model behavior and cache strategy.
+Every authoritative entity must declare owner, one of the 4 D1 domains where applicable, provider implementation, primary key, references, lifecycle/state machine, indexes, retention/deletion, audit requirements, migration rules, read-model behavior and cache strategy.
 
 Schema changes require a traceable Feature/Data Contract change.
 
@@ -375,17 +388,40 @@ payload
 trace_id
 ```
 
-Events are versioned and consumers are idempotent. The exact event registry is maintained by domain contracts and must map back to Feature IDs.
+Events are versioned and consumers are idempotent. The exact event registry is maintained by domain contracts and must map back to Feature IDs and the responsible Worker/Task.
 
-## 15. API / Data / Security / Runtime Mapping
+## 15. Final Architecture Mapping
+
+The canonical mapping is:
 
 ```text
-Feature ↔ API ↔ Data ↔ Security ↔ Runtime ↔ Event/Consistency
-        ↕
-Implementation ↔ Test ↔ CI ↔ Deployment ↔ Smoke ↔ Evidence
+Feature
+  ↕
+25 Contract Tasks
+  ↕
+12 Workers
+  ↕
+4 D1 Domains
+  ↕
+API / Data / Security / Runtime / Event / Consistency
+  ↕
+Implementation / Test / CI / Deployment / Smoke / Evidence
 ```
 
-A missing link blocks `GREEN`.
+The mapping must explicitly record:
+
+- Feature ID
+- Task ID
+- Worker ID
+- D1 Domain ID where applicable
+- API ID/version
+- Data ID
+- Security ID
+- Event ID where applicable
+- Test ID
+- Evidence ID
+
+A missing mapping link blocks `GREEN`.
 
 ## 16. Cost Review Gate
 
@@ -393,8 +429,8 @@ Every feature must document, where applicable:
 
 | Area | Required decision |
 |---|---|
-| Worker | expected executions/work per request |
-| D1 | expected reads and writes |
+| Worker | expected executions and assigned Worker |
+| D1 | expected reads/writes and assigned domain |
 | Cache | hit target and invalidation strategy |
 | Queue | why async processing is justified |
 | Batch | aggregation/persistence strategy |
@@ -424,6 +460,8 @@ These interfaces do not require multiple providers to be deployed today.
 
 Migration requirements include provider-neutral logical models, versioned migrations, migration checksum/reconciliation, stable identifiers, backward-compatible API evolution, controlled dual-read/dual-write only when required, and isolation of Cloudflare-specific behavior behind adapters.
 
+The 4-D1 target is the initial/final Cloudflare relational topology for this implementation baseline; migration to PostgreSQL/GCP changes the provider implementation, not the public Feature/API contracts.
+
 ## 18. Enterprise Compatibility
 
 Enterprise features remain optional and must not become a hard dependency for core operation.
@@ -445,6 +483,7 @@ Enterprise adoption must materially improve product, governance, operational sup
 Every feature change reconciles:
 
 ```text
+Feature ↔ Task ↔ Worker ↔ D1
 Feature ↔ API
 API ↔ Data
 API ↔ Security
@@ -454,7 +493,7 @@ API ↔ Test
 Feature ↔ Evidence
 ```
 
-Reconciliation must detect missing APIs, missing data entities/fields, missing security policies, missing tests, missing runtime ownership, missing evidence, orphan APIs, orphan database artifacts, orphan code, orphan tests and orphan events/cache entries.
+Reconciliation must detect missing APIs, missing data entities/fields, missing security policies, missing tests, missing Worker ownership, missing D1 ownership, missing evidence, orphan APIs, orphan database artifacts, orphan code, orphan tests and orphan events/cache entries.
 
 ## 20. Evidence and GREEN
 
@@ -463,10 +502,11 @@ Evidence cannot pass merely because a registry is non-empty.
 A completed capability requires verifiable evidence connecting:
 
 ```text
-Feature → API → Data → Security → Implementation → Test → CI → Deployment → Smoke
+Feature → Task → Worker → D1 → API → Data → Security
+       → Implementation → Test → CI → Deployment → Smoke
 ```
 
-Where applicable, evidence includes Feature ID, API ID, Data ID, Security ID, Test ID, commit SHA, workflow run, deployment result and smoke result.
+Where applicable, evidence includes Feature ID, Task ID, Worker ID, D1 Domain ID, API ID, Data ID, Security ID, Test ID, commit SHA, workflow run, deployment result and smoke result.
 
 `GREEN` requires all applicable gates:
 
@@ -495,6 +535,12 @@ GitHub Actions green alone does not constitute platform GREEN.
 
 ```text
 Blueprint
+  ↓
+25-Task Mapping Freeze
+  ↓
+12-Worker Mapping Freeze
+  ↓
+4-D1 Mapping Freeze
   ↓
 Feature Contract
   ↓
@@ -536,38 +582,58 @@ DRAFT → ARCHITECTURE REVIEW → CONTRACT REVIEW → READY → IMPLEMENTING
       → LOCAL PASS → CI PASS → USER ACCEPTANCE → DONE
 ```
 
-## 23. Split / Boundary Gate
+## 23. Final Topology Change Gate
 
-A new Worker, runtime service, queue, storage domain or database boundary requires documented evidence for at least one of ownership, transaction isolation, security isolation, traffic/scaling, lifecycle, capacity, operational benefit or migration benefit. The proposal must include cost impact and failure behavior.
+The 12-Worker / 4-D1 / 25-Task topology is frozen for this implementation baseline.
 
-No historical count is automatically preserved as a permanent limit.
+Any request to add, remove, merge or repurpose a Worker, D1 domain or Contract Task requires explicit Blueprint Change Control and must include:
 
-## 24. Explicitly Superseded Historical Rules
+- reason and affected capabilities;
+- ownership impact;
+- transaction/security impact;
+- cost impact;
+- failure/recovery impact;
+- migration impact;
+- Mapping impact;
+- Contract impact;
+- test/evidence impact.
 
-The following historical statements from `docs/01-PLATFORM-CONTRACT-v1.0.md` are **not** carried into the canonical architecture:
+No topology change may be introduced implicitly through implementation.
 
-- “25 Business Contract Tasks” as a frozen platform count;
-- “12 Runtime Workers” as a frozen runtime count;
-- “4 Physical D1 Domains” as a frozen storage topology;
-- worker numbering that existed only to support those historical counts;
-- any assumption that a runtime count itself defines product capability boundaries.
+## 24. Historical Document Treatment
 
-Their useful principles have been migrated into this Blueprint: Contract-First traceability, terminal runtime boundaries, read/write separation, cross-domain write controls, cache/source-of-truth rules, event idempotency, security invariants, cost review, portability, reconciliation, evidence and GREEN gates.
+Historical documents remain evidence/reference only unless explicitly promoted through Change Control.
+
+The previous statements that treated **25 Business Contract Tasks / 12 Runtime Workers / 4 Physical D1 Domains** as historical or superseded are themselves superseded by this Blueprint revision.
+
+The final target is now explicitly:
+
+```text
+25 Contract Tasks
+12 Workers
+4 D1 Domains
+```
+
+Their exact ownership and responsibility must be frozen by the Mapping before implementation.
 
 ## 25. Relationship to Functional Blueprint
 
 `docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md` remains the functional capability source of truth.
 
-This architecture Blueprint does not replace or duplicate the functional inventory. It defines how those capabilities cross API, data, security, runtime, storage, event, reliability and migration boundaries.
+This architecture Blueprint defines the final implementation topology and how those capabilities cross API, data, security, runtime, storage, event, reliability and migration boundaries.
 
-Every new product capability must first be added to the functional Blueprint with a Feature ID. Its architecture mapping is then defined here and in the relevant contracts.
+Every new product capability must first be added to the functional Blueprint with a Feature ID. Its implementation must then map to one of the 25 Contract Tasks, one of the 12 Workers where runtime execution is required, and one of the 4 D1 domains where relational persistence is required.
 
 ## 26. Non-Goals
 
-This Blueprint does not require immediate Enterprise purchase, Payload Core modification, a private Payload fork, one Worker per feature, synchronous persistence for every user action, a queue for every operation, external search before measured need, distributed coordination without measured need, a fixed Worker/D1 topology merely because an older document used one, or sacrificing correctness, security, reliability or durability for cost reduction.
+This Blueprint does not require Payload Core modification, a private Payload fork, one Worker per feature, synchronous persistence for every user action, a queue for every operation, external search before measured need, distributed coordination without measured need, or sacrificing correctness, security, reliability or durability for cost reduction.
+
+It also does **not** permit silently replacing the final 12-Worker / 4-D1 / 25-Task topology with an ad hoc topology during implementation.
 
 ## 27. Canonical Decision
 
 This v1.4 Blueprint is the canonical architecture baseline for Luckread.
+
+**Final implementation target: 12 Workers / 4 D1 domains / 25 Contract Tasks.**
 
 The former `docs/01-PLATFORM-CONTRACT-v1.0.md` remains historical evidence only after its migration is recorded. Domain contracts must reconcile against this Blueprint before implementation.
