@@ -9,12 +9,46 @@
       "sourceRef": "src/collections/Users.ts:Users",
       "auth": true,
       "fields": [
-        { "name": "username", "type": "text", "sourceRef": "src/collections/Users.ts:field:username", "classification": "PAYLOAD_CONFIG_DISCOVERED", "required": true, "unique": true },
-        { "name": "displayName", "type": "text", "sourceRef": "src/collections/Users.ts:field:displayName", "classification": "PAYLOAD_CONFIG_DISCOVERED" },
-        { "name": "bio", "type": "textarea", "sourceRef": "src/collections/Users.ts:field:bio", "classification": "PAYLOAD_CONFIG_DISCOVERED" },
-        { "name": "avatar", "type": "text", "sourceRef": "src/collections/Users.ts:field:avatar", "classification": "PAYLOAD_CONFIG_DISCOVERED" },
-        { "name": "locale", "type": "text", "sourceRef": "src/collections/Users.ts:field:locale", "classification": "PAYLOAD_CONFIG_DISCOVERED", "defaultValue": "en-US" },
-        { "name": "timezone", "type": "text", "sourceRef": "src/collections/Users.ts:field:timezone", "classification": "PAYLOAD_CONFIG_DISCOVERED", "defaultValue": "UTC" }
+        {
+          "name": "username",
+          "type": "text",
+          "sourceRef": "src/collections/Users.ts:field:username",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED",
+          "required": true,
+          "unique": true
+        },
+        {
+          "name": "displayName",
+          "type": "text",
+          "sourceRef": "src/collections/Users.ts:field:displayName",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED"
+        },
+        {
+          "name": "bio",
+          "type": "textarea",
+          "sourceRef": "src/collections/Users.ts:field:bio",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED"
+        },
+        {
+          "name": "avatar",
+          "type": "text",
+          "sourceRef": "src/collections/Users.ts:field:avatar",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED"
+        },
+        {
+          "name": "locale",
+          "type": "text",
+          "sourceRef": "src/collections/Users.ts:field:locale",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED",
+          "defaultValue": "en-US"
+        },
+        {
+          "name": "timezone",
+          "type": "text",
+          "sourceRef": "src/collections/Users.ts:field:timezone",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED",
+          "defaultValue": "UTC"
+        }
       ]
     }
   ]
