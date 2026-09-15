@@ -1,0 +1,18 @@
+{
+  "$schema": "https://luckread.com/contracts/v1/entity/entity-implementation-evidence.v1.schema.json",
+  "version": "1.0",
+  "status": "NOT_GREEN",
+  "sourceOfTruth": "contracts/entity/entity-catalog.v1.json",
+  "records": [
+    {"entityId":"ENT-USER","catalogStatus":"VERIFIED","implementationStatus":"IMPLEMENTED","implementationRefs":["src/collections/Users.ts","src/payload.config.ts"],"schemaEvidenceRefs":["src/collections/Users.ts"],"migrationEvidenceRefs":["src/payload.config.ts"],"payloadNativeEvidenceRefs":[],"extensionEvidenceRefs":["src/collections/Users.ts"],"blockers":["Migration execution evidence is not yet independently recorded."],"status":"NOT_GREEN"},
+    {"entityId":"ENT-IDENTITY","catalogStatus":"PROPOSED","implementationStatus":"CONTRACT_ONLY","implementationRefs":[],"schemaEvidenceRefs":[],"migrationEvidenceRefs":[],"payloadNativeEvidenceRefs":[],"extensionEvidenceRefs":[],"blockers":["No concrete implementation evidence recorded."],"status":"BLOCKED"},
+    {"entityId":"ENT-CREDENTIAL","catalogStatus":"PROPOSED","implementationStatus":"CONTRACT_ONLY","implementationRefs":[],"schemaEvidenceRefs":[],"migrationEvidenceRefs":[],"payloadNativeEvidenceRefs":[],"extensionEvidenceRefs":[],"blockers":["No concrete implementation evidence recorded."],"status":"BLOCKED"},
+    {"entityId":"ENT-SESSION","catalogStatus":"PROPOSED","implementationStatus":"CONTRACT_ONLY","implementationRefs":[],"schemaEvidenceRefs":[],"migrationEvidenceRefs":[],"payloadNativeEvidenceRefs":[],"extensionEvidenceRefs":[],"blockers":["No concrete implementation evidence recorded."],"status":"BLOCKED"},
+    {"entityId":"ENT-VERIFICATION","catalogStatus":"PROPOSED","implementationStatus":"CONTRACT_ONLY","implementationRefs":[],"schemaEvidenceRefs":[],"migrationEvidenceRefs":[],"payloadNativeEvidenceRefs":[],"extensionEvidenceRefs":[],"blockers":["No concrete implementation evidence recorded."],"status":"BLOCKED"},
+    {"entityId":"ENT-DEVICE-RECORD","catalogStatus":"PROPOSED","implementationStatus":"CONTRACT_ONLY","implementationRefs":[],"schemaEvidenceRefs":[],"migrationEvidenceRefs":[],"payloadNativeEvidenceRefs":[],"extensionEvidenceRefs":[],"blockers":["No concrete implementation evidence recorded."],"status":"BLOCKED"},
+    {"entityId":"ENT-ROLE-ASSIGNMENT","catalogStatus":"PROPOSED","implementationStatus":"CONTRACT_ONLY","implementationRefs":[],"schemaEvidenceRefs":[],"migrationEvidenceRefs":[],"payloadNativeEvidenceRefs":[],"extensionEvidenceRefs":[],"blockers":["No concrete implementation evidence recorded."],"status":"BLOCKED"},
+    {"entityId":"ENT-ENTITLEMENT-GRANT","catalogStatus":"PROPOSED","implementationStatus":"CONTRACT_ONLY","implementationRefs":[],"schemaEvidenceRefs":[],"migrationEvidenceRefs":[],"payloadNativeEvidenceRefs":[],"extensionEvidenceRefs":[],"blockers":["No concrete implementation evidence recorded."],"status":"BLOCKED"},
+    {"entityId":"ENT-SUBSCRIPTION","catalogStatus":"PROPOSED","implementationStatus":"CONTRACT_ONLY","implementationRefs":[],"schemaEvidenceRefs":[],"migrationEvidenceRefs":[],"payloadNativeEvidenceRefs":[],"extensionEvidenceRefs":[],"blockers":["No concrete implementation evidence recorded."],"status":"BLOCKED"},
+    {"entityId":"ENT-ORG-MEMBERSHIP","catalogStatus":"PROPOSED","implementationStatus":"CONTRACT_ONLY","implementationRefs":[],"schemaEvidenceRefs":[],"migrationEvidenceRefs":[],"payloadNativeEvidenceRefs":[],"extensionEvidenceRefs":[],"blockers":["No concrete implementation evidence recorded."],"status":"BLOCKED"}
+  ]
+}
