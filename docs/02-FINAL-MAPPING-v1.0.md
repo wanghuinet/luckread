@@ -1,6 +1,6 @@
 # Luckread Final Mapping v1.0
 
-> Status: **ACTIVE / MAPPING AUDIT PASSED — FREEZE CANDIDATE**
+> Status: **FROZEN / CANONICAL MAPPING**
 >
 > Scope: Luckread Payload self-media platform.
 >
@@ -9,6 +9,8 @@
 > Architecture source of truth: `docs/00-PROJECT-BLUEPRINT-v1.4.md`.
 >
 > Final implementation target: **25 Contract Tasks / 12 Workers / 4 D1 Domains**.
+>
+> Formal freeze decision: `docs/05-MAPPING-FREEZE-v1.0.md`.
 
 ## 1. Purpose
 
@@ -207,14 +209,13 @@ Historical candidate/change-control documents found in the repository are not pr
 | Orphan audit | PASS |
 | Duplicate-owner audit | PASS |
 | Canonical topology contradiction audit | PASS |
-| API/Data/Security/Event/Test/Evidence | Pending |
-| Mapping Freeze | **NEXT GATE** |
-| Contract generation | Blocked until Mapping Freeze |
+| Mapping Freeze | **GREEN / CLOSED** |
+| API/Data/Security/Event/Test/Evidence | Pending — next layer |
+| Contract generation | Eligible after downstream mapping/readiness gates |
+| Implementation | Blocked until applicable Contract gates are GREEN |
 
-## 10. Next gate
+## 10. Freeze handoff
 
-The orphan/duplicate audit is closed. The next mandatory gate is **Mapping Freeze**.
+The Mapping layer is formally frozen by `docs/05-MAPPING-FREEZE-v1.0.md`.
 
-Mapping Freeze must freeze the current 43-domain → 25-Task → 12-Worker → 4-D1 topology and explicitly authorize the next downstream layer: API/Data/Security/Event/Test/Evidence mapping.
-
-**Contract generation remains blocked until Mapping Freeze is formally recorded.**
+The next mandatory work is downstream API/Data/Security/Event/Lifecycle/Test/Evidence mapping. That layer must consume this Mapping as immutable input and must not introduce new topology or business authority.
