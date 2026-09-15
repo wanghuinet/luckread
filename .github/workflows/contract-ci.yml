@@ -42,8 +42,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: 24}
       - run: node scripts/build-feature-inventory.mjs
+      - run: test -f contracts/alignment/feature-inventory.v1.json
       - run: git diff --exit-code -- contracts/alignment/feature-inventory.v1.json
-      - run: git status --short --untracked-files=all
+      - run: test -z "$(git status --porcelain --untracked-files=all)"
 
   payload-reconciliation:
     name: Payload Contract Reconciliation Gate
