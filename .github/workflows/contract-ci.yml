@@ -48,9 +48,11 @@ jobs:
       - run: node scripts/capability-contract-graph-check.mjs
       - run: node scripts/l1-l4-reconciliation-baseline-check.mjs
       - run: node scripts/entity-catalog-check.mjs
+      - run: node scripts/entity-implementation-evidence-check.mjs
       - run: node scripts/entity-field-contract-check.mjs
       - run: node scripts/entity-field-schema-contract-check.mjs
       - run: node scripts/feature-entity-persistence-registry-check.mjs
+      - run: node scripts/r5-foundation-contract-check.mjs
 
   contract-full:
     name: Contract Admission Gate (full)
