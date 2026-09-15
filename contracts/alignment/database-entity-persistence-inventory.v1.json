@@ -1,7 +1,7 @@
 {
   "version":"1.0.0",
-  "status":"NOT_GREEN",
-  "sourceOfTruth":"contracts/entity/entity-catalog.v1.json",
+  "status":"BLOCKED",
+  "sourceOfTruth":"docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
   "generatedBy":"manual-baseline-step-03",
   "records":[
     {"entityId":"ENT-USER","entityName":"User","entityStatus":"VERIFIED","implementationRef":"src/collections/Users.ts","persistenceStatus":"NOT_VERIFIED","adapter":"@payloadcms/db-d1-sqlite","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json","src/collections/Users.ts","src/payload.config.ts"]},
@@ -14,5 +14,10 @@
     {"entityId":"ENT-ENTITLEMENT-GRANT","entityName":"EntitlementGrant","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
     {"entityId":"ENT-SUBSCRIPTION","entityName":"Subscription","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
     {"entityId":"ENT-ORG-MEMBERSHIP","entityName":"OrgMembership","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]}
+  ],
+  "blockers":[
+    "This persistence inventory is historical evidence and is not a canonical Blueprint v2.0 entity inventory.",
+    "Feature Inventory must be generated before entity, field, relation and persistence records are rebuilt.",
+    "No proposed entity or persistence record may be promoted to GREEN by inference."
   ]
 }
