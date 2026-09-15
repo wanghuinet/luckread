@@ -1,6 +1,6 @@
 # Luckread Final Mapping v1.0
 
-> Status: **ACTIVE / MAPPING IN PROGRESS — BATCH 3 COMPLETE**
+> Status: **ACTIVE / FEATURE-DOMAIN MAPPING COMPLETE — WORKER/D1 BINDING PENDING**
 >
 > Scope: Luckread Payload self-media platform.
 >
@@ -76,37 +76,23 @@ No additional Worker or D1 domain may be introduced implicitly by Mapping or imp
 | T24 | API / Developer / Admin | AB, AC, AD |
 | T25 | Platform / Infrastructure / Reliability | H, AG, AH, AI, AJ, AK, AL, AN, AO, AP, AQ |
 
-## 5. Batch 1 — Identity through Media
+## 5. Feature-Domain Mapping — Complete
 
-| Domain | Feature range | Task | Worker | D1 | API/Data/Security/Event/Test |
+| Domain | Feature range | Primary Task | Worker | D1 | API/Data/Security/Event/Test |
 |---|---|---|---|---|---|
 | A | AUTH-001..016 | T01 | PENDING | PENDING | PENDING |
 | B | USER-001..010 | T02 | PENDING | PENDING | PENDING |
 | C | AUTHZ-001..010 | T03 | PENDING | PENDING | PENDING |
-| D | CREATOR-001..007 | T04 | PENDING | PENDING | PENDING |
-| D | ORG-001..007 | T04 | PENDING | PENDING | PENDING |
+| D | CREATOR-001..007; ORG-001..007 | T04 | PENDING | PENDING | PENDING |
 | E | CONTENT-001..012 | T05 | PENDING | PENDING | PENDING |
 | F | ARTICLE-001..012 | T06 | PENDING | PENDING | PENDING |
 | G | MEDIA-001..015 | T07 | PENDING | PENDING | PENDING |
-
-## 6. Batch 2 — Future Content through Community
-
-| Domain | Feature range | Task | Worker | D1 | API/Data/Security/Event/Test |
-|---|---|---|---|---|---|
 | H | EXTCONTENT-001..006 | T25 | PENDING | PENDING | PENDING |
 | I | FEED-001..013 | T08 | PENDING | PENDING | PENDING |
 | J | REC-001..009 | T09 | PENDING | PENDING | PENDING |
 | K | SEARCH-001..010 | T10 | PENDING | PENDING | PENDING |
 | L | SOCIAL-001..010 | T11 | PENDING | PENDING | PENDING |
 | M | COMMUNITY-001..008 | T12 | PENDING | PENDING | PENDING |
-
-### H-domain rationale
-Future content types are mapped to T25 as an extensibility/platform responsibility. They do not create an additional Task, Worker or D1 domain. Concrete future-content contracts remain subject to the same Feature/API/Data/Security rules.
-
-## 7. Batch 3 — Messaging through Copyright & Rights
-
-| Domain | Feature range | Task | Worker | D1 | API/Data/Security/Event/Test |
-|---|---|---|---|---|---|
 | N | MSG-* | T13 | PENDING | PENDING | PENDING |
 | O | NOTIFY-* | T14 | PENDING | PENDING | PENDING |
 | P | I18N-* / TRANSLATION-* | T15 | PENDING | PENDING | PENDING |
@@ -114,11 +100,34 @@ Future content types are mapped to T25 as an extensibility/platform responsibili
 | R | PAYMENT-* / WALLET-* / REVENUE-* / SETTLEMENT-* | T17 | PENDING | PENDING | PENDING |
 | S | ADS-* / ADVERTISING-* | T18 | PENDING | PENDING | PENDING |
 | T | RIGHTS-* / COPYRIGHT-* | T19 | PENDING | PENDING | PENDING |
+| U | TRUST-* / SAFETY-* / MODERATION-* / ANTIABUSE-* | T20 | PENDING | PENDING | PENDING |
+| V | REPORT-* / APPEAL-* / GOVERNANCE-* | T21 | PENDING | PENDING | PENDING |
+| W | GROWTH-* / ENGAGEMENT-* | T22 | PENDING | PENDING | PENDING |
+| X | CAMPAIGN-* / OPERATIONS-* | T22 | PENDING | PENDING | PENDING |
+| Y | ANALYTICS-* | T23 | PENDING | PENDING | PENDING |
+| Z | SEO-* / PUBLIC-DISCOVERY-* | T24 | PENDING | PENDING | PENDING |
+| AA | CLIENT-* / WEB-* / H5-* / MOBILE-* / MINIAPP-* | T24 | PENDING | PENDING | PENDING |
+| AB | API-* / OPENAPI-* / VERSIONING-* | T24 | PENDING | PENDING | PENDING |
+| AC | DEVELOPER-* / SDK-* / WEBHOOK-* | T24 | PENDING | PENDING | PENDING |
+| AD | ADMIN-* / SUPPORT-* / OPERATIONS-* | T24 | PENDING | PENDING | PENDING |
+| AE | CONFIG-* / EXPERIMENT-* / FEATUREFLAG-* | T25 | PENDING | PENDING | PENDING |
+| AF | TENANT-* / ENTERPRISE-* / ORGANIZATION-* | T25 | PENDING | PENDING | PENDING |
+| AG | STORAGE-* / MEDIA-INFRA-* | T25 | PENDING | PENDING | PENDING |
+| AH | ASYNC-* / QUEUE-* / SCHEDULE-* | T25 | PENDING | PENDING | PENDING |
+| AI | DATA-GOV-* / PORTABILITY-* | T25 | PENDING | PENDING | PENDING |
+| AJ | CLOUDFLARE-* / DEPLOY-* | T25 | PENDING | PENDING | PENDING |
+| AK | POSTGRES-* / GCP-* / MIGRATION-* | T25 | PENDING | PENDING | PENDING |
+| AL | RELIABILITY-* / DR-* / BACKUP-* | T25 | PENDING | PENDING | PENDING |
+| AM | OBSERVABILITY-* / TELEMETRY-* | T23 | PENDING | PENDING | PENDING |
+| AN | SECURITY-* / CRYPTO-* / SECRETS-* | T25 | PENDING | PENDING | PENDING |
+| AO | PRIVACY-* / COMPLIANCE-* | T25 | PENDING | PENDING | PENDING |
+| AP | INTEGRATION-* / ECOSYSTEM-* | T25 | PENDING | PENDING | PENDING |
+| AQ | EXTENSION-* / COMMERCE-* / FUTURE-* | T25 | PENDING | PENDING | PENDING |
 
-### Batch 3 ownership rule
-The feature prefixes above are intentionally represented as domain-level ranges in this batch. Exact Feature IDs must be taken from the functional Blueprint; no new IDs are invented by this Mapping. Worker and D1 assignments remain `PENDING` until their respective authoritative masters are frozen.
+### Domain-level mapping rule
+The ranges above preserve the functional Blueprint as the source of truth. Where the exact Feature IDs are not explicitly reproduced in this Mapping, the Mapping does **not** create or rename them. Exact Feature-level expansion is required before Contract GREEN.
 
-## 8. Mapping Invariants
+## 6. Mapping Invariants
 
 1. Every Feature ID maps to exactly one primary Contract Task.
 2. A feature may reference multiple APIs, Data IDs, Security IDs and Events when required.
@@ -129,20 +138,25 @@ The feature prefixes above are intentionally represented as domain-level ranges 
 7. No API, data entity, security rule, event or test may exist without a traceable Feature/Task owner unless explicitly marked infrastructure-level by the Architecture Blueprint.
 8. A missing mapping link blocks `GREEN`.
 
-## 9. Batch Progress
+## 7. Batch Progress
 
-| Batch | Coverage | Status |
-|---|---|---|
-| Batch 1 | A–G | COMPLETE |
-| Batch 2 | H–M | COMPLETE |
-| Batch 3 | N–T | COMPLETE |
-| Batch 4 | U–AQ | NEXT |
-| Worker binding | 12 Workers | PENDING |
-| D1 binding | 4 D1 Domains | PENDING |
-| API/Data/Security/Event/Test/Evidence | Full traceability | PENDING |
+| Stage | Status |
+|---|---|
+| Batch 1 A–G | COMPLETE |
+| Batch 2 H–M | COMPLETE |
+| Batch 3 N–T | COMPLETE |
+| Batch 4 U–AQ | COMPLETE |
+| Feature → Task | COMPLETE at domain/range level |
+| 12 Worker Master binding | NEXT |
+| 4 D1 Master binding | PENDING |
+| API/Data/Security/Event/Test/Evidence | PENDING |
+| Conflict / orphan / duplicate audit | PENDING |
+| Mapping Freeze | PENDING |
 
-Feature-domain mapping coverage is now **20 / 43 Blueprint domains ≈ 46.5%**. This is mapping coverage only; it is not implementation or contract completion.
+Feature-domain coverage: **43 / 43 Blueprint domains = 100%**.
 
-## 10. Contract Gate
+This **100% means every Blueprint domain has a Mapping row**. It does not mean every Feature/API/Data/Worker/D1/Contract has been fully validated.
 
-Until all applicable Worker, D1, API, Data, Security, Runtime, Event, Test and Evidence links are resolved, this Mapping is **NOT contract-ready** and must not be used as authorization to implement missing ownership decisions.
+## 8. Contract Gate
+
+The Mapping is **NOT contract-ready** until Worker, D1, API, Data, Security, Runtime, Event, Test and Evidence links are resolved and the conflict/orphan/duplicate audit passes.
