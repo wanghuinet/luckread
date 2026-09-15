@@ -1,8 +1,24 @@
-# ALIGNMENT STEP 08 — Five-Way Reconciliation v1.0
+# ALIGNMENT STEP 08 — Five-Way Reconciliation v1.1
+
+## Status
+
+**ACTIVE / GATE-ENFORCED / NOT_GREEN**
+
+## Authority
+
+The active functional source of truth is:
+
+`docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md`
+
+The frozen topology is:
+
+`25 Tasks / 12 Workers / 4 D1 Domains`
+
+Historical B01-B20 reconciliation records may be retained as evidence, but they cannot define current Feature scope or create new ownership.
 
 ## Purpose
 
-Step 08 converts the five evidence planes into a deterministic reconciliation result:
+Convert the five evidence planes into a deterministic reconciliation result:
 
 `Feature × DB/Entity × API × Payload × Code`
 
@@ -10,7 +26,7 @@ It consumes inventories and the explicit cross-system mapping. It does not inven
 
 ## Rules
 
-1. Every active Blueprint feature must have exactly one mapping record.
+1. Every active Blueprint Feature ID must have exactly one reconciliation record.
 2. A missing mapping is `UNRESOLVED` and blocks green.
 3. A mapping status other than `MATCH` or `MAPPED` blocks green.
 4. Extra mapping records referencing absent Blueprint features are `EXTRA` and block green.
@@ -20,27 +36,25 @@ It consumes inventories and the explicit cross-system mapping. It does not inven
 8. Empty inventories and empty mappings cannot pass.
 9. Reconciliation is generated; it is not hand-edited.
 10. `GREEN` is a proof result, not a declaration of intent.
+11. Reconciliation must preserve the frozen Feature → Task → Worker → D1/boundary topology.
+12. Reconciliation may not add a Worker, D1 domain, Task, API authority, or product capability.
 
-## Why the first implementation is intentionally strict
+## Required inputs
 
-The first gate validates the integrity of the mapping graph before attempting deeper semantic equivalence. This prevents a partially populated system from appearing green merely because several inventories exist.
+- `contracts/alignment/feature-inventory.v1.json`
+- `contracts/alignment/database-entity-persistence-inventory.v1.json`
+- `contracts/alignment/api-inventory.v1.json`
+- `contracts/alignment/payload-inventory.v1.json`
+- `contracts/alignment/code-evidence-inventory.v1.json`
+- `contracts/alignment/cross-system-mapping.v1.json`
 
-Later reconciliation iterations may add deterministic checks for:
-
-- entity-to-feature cardinality;
-- API operation-to-feature mapping;
-- Payload collection/field compatibility;
-- persistence evidence;
-- implementation evidence;
-- permission/state/schema compatibility.
-
-Those checks must consume explicit evidence and must fail closed when evidence is absent.
+Missing authoritative inputs are blocking. They must not be manufactured from implementation assumptions.
 
 ## Output
 
 `contracts/alignment/five-way-reconciliation.v1.json`
 
-The output contains one record per Blueprint feature plus any extra mapping records, with:
+The output contains one record per active Blueprint Feature plus any extra mapping records, with:
 
 `MATCH / MAPPED / MISSING / EXTRA / DRIFT / CONFLICT / DUPLICATE / UNRESOLVED / BLOCKED`
 
@@ -48,6 +62,6 @@ and a top-level blocker list.
 
 ## Gate
 
-The generator exits non-zero unless the complete feature mapping is green and all consumed inventories are in an acceptable discovered state.
+The generator exits non-zero unless the complete feature mapping is green and all consumed inventories are valid, reproducible, and in an acceptable state.
 
-This is the prerequisite for Step 09 drift and impact analysis.
+This is the prerequisite for change-impact analysis and Contract admission.
