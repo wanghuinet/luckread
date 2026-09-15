@@ -34,10 +34,20 @@ jobs:
         with: {node-version: 24}
       - run: node scripts/contract-semantic-ci.mjs
 
+  payload-reconciliation:
+    name: Payload Contract Reconciliation Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 24}
+      - run: node scripts/payload-native-inventory.mjs
+      - run: node scripts/payload-contract-reconciliation-check.mjs
+
   capability-graph:
     name: Capability Contract Graph Gate
     runs-on: ubuntu-latest
-    needs: [contract, contract-semantic]
+    needs: [contract, contract-semantic, payload-reconciliation]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
