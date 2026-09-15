@@ -70,10 +70,12 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
-      # Historical L1-L4 recovery is evidence-only and non-authoritative.
-      # It remains covered by the dedicated recovery workflow and must not
-      # block the canonical Blueprint v2 contract admission path.
+      # Build a deterministic coverage bridge from the already-authoritative
+      # Feature Inventory + mapping batches. This does not fabricate downstream
+      # evidence: generated records remain PROPOSED/NOT_GREEN until contracted.
+      - run: node scripts/build-capability-contract-graph.mjs
       - run: node scripts/capability-contract-graph-check.mjs
+      # Historical L1-L4 recovery is evidence-only and non-authoritative.
       - run: node scripts/l1-l4-reconciliation-baseline-check.mjs
       - run: node scripts/entity-catalog-check.mjs
       - run: node scripts/entity-implementation-evidence-check.mjs
