@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "status": "NOT_GREEN",
+  "authority": "Payload migration lifecycle + repository CI evidence",
+  "rules": {
+    "migrationDirectory": "src/migrations",
+    "productionPush": false,
+    "generation": "developer_or_release_preparation_only",
+    "execution": "committed_migration_only",
+    "statusVerification": "required",
+    "remoteExecutionEvidence": "required_before_persistence_verification"
+  },
+  "gates": [
+    {"id":"MIG-001","name":"migration-directory","status":"BLOCKED","evidenceRefs":[]},
+    {"id":"MIG-002","name":"migration-artifact","status":"BLOCKED","evidenceRefs":[]},
+    {"id":"MIG-003","name":"migration-execution","status":"BLOCKED","evidenceRefs":[]},
+    {"id":"MIG-004","name":"migration-status","status":"BLOCKED","evidenceRefs":[]},
+    {"id":"MIG-005","name":"d1-persistence-verification","status":"BLOCKED","evidenceRefs":[]}
+  ],
+  "failClosed": true,
+  "notes": [
+    "No remote D1 execution is inferred from local configuration.",
+    "No entity is promoted to VERIFIED without independent persistence evidence."
+  ]
+}
