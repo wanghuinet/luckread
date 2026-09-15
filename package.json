@@ -15,7 +15,9 @@
     "api:contract:ci": "node scripts/api-contract-ci.mjs",
     "payload:admission": "node scripts/payload-implementation-admission-check.mjs",
     "payload:native:inventory": "node scripts/payload-native-inventory.mjs",
-    "payload:native:verify": "node scripts/payload-native-inventory.mjs && git diff --exit-code -- contracts/payload/payload-native-inventory.v1.json"
+    "payload:native:verify": "node scripts/payload-native-inventory.mjs && git diff --exit-code -- contracts/payload/payload-native-inventory.v1.json",
+    "feature:inventory": "node scripts/build-feature-inventory.mjs",
+    "feature:inventory:verify": "node scripts/build-feature-inventory.mjs && git diff --exit-code -- contracts/alignment/feature-inventory.v1.json"
   },
   "dependencies": {
     "@payloadcms/db-d1-sqlite": "3.87.1",
