@@ -78,6 +78,9 @@ jobs:
       - name: Build deterministic Feature L1-L4 exact crosswalk
         shell: bash
         run: node scripts/build-feature-l1-l4-exact-crosswalk.mjs
+      - name: Enforce R3 Feature L1-L4 admission gate
+        shell: bash
+        run: node scripts/r3-feature-crosswalk-gate.mjs
       - name: Validate Blueprint-to-Registry reconciliation
         shell: bash
         run: node scripts/capability-contract-graph-check.mjs
