@@ -1,6 +1,176 @@
 {
   "version": "1.0.0",
   "status": "NOT_GREEN",
-  "sourceOfTruth": "contracts/alignment/five-way-alignment.v1.json",
-  "records": []
+  "sourceOfTruth": "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+  "generatedBy": "manual-evidence-bound-bootstrap",
+  "records": [
+    {
+      "featureId": "AUTH-001",
+      "status": "PARTIAL",
+      "apiOperationIds": ["authRegister"],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["DTO mapping missing", "Entity/Field mapping missing", "Page mapping missing", "Worker/D1 canonical mapping missing", "security and integration evidence incomplete"]
+    },
+    {
+      "featureId": "AUTH-002",
+      "status": "PARTIAL",
+      "apiOperationIds": ["authLogin", "authLogout"],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["session DTO/entity mappings incomplete", "state/security E2E evidence missing"]
+    },
+    {
+      "featureId": "AUTH-003",
+      "status": "PARTIAL",
+      "apiOperationIds": [],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["canonical API IDs not established in current inventory", "Entity/Field contract not fully bound"]
+    },
+    {
+      "featureId": "AUTH-004",
+      "status": "PARTIAL",
+      "apiOperationIds": [],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["canonical recovery/change API mapping missing", "single-use token evidence missing"]
+    },
+    {
+      "featureId": "AUTH-005",
+      "status": "PARTIAL",
+      "apiOperationIds": [],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["verification API and event IDs missing", "security E2E evidence missing"]
+    },
+    {
+      "featureId": "AUTH-006",
+      "status": "MISSING",
+      "apiOperationIds": [],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["canonical API/DTO/data/security contracts not established"]
+    },
+    {
+      "featureId": "AUTH-007",
+      "status": "MISSING",
+      "apiOperationIds": [],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["canonical MFA contracts not established"]
+    },
+    {
+      "featureId": "AUTH-008",
+      "status": "PARTIAL",
+      "apiOperationIds": [],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["provider integration and linked-identity contract mapping missing"]
+    },
+    {
+      "featureId": "AUTH-009",
+      "status": "PARTIAL",
+      "apiOperationIds": [],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["canonical linked-identity entity/API mapping missing"]
+    },
+    {
+      "featureId": "AUTH-010",
+      "status": "PARTIAL",
+      "apiOperationIds": ["authSessionList", "authSessionRevoke"],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "securityIds": ["user.session.read", "user.session.revoke"],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["Page/DTO/Entity/Field/Event/Worker/D1/Test/Evidence IDs not fully reconciled"]
+    },
+    {
+      "featureId": "AUTH-011",
+      "status": "PARTIAL",
+      "apiOperationIds": ["authRefresh"],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "securityIds": ["user.session.refresh"],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["refresh OpenAPI/DTO/state/security E2E evidence missing"]
+    },
+    {
+      "featureId": "AUTH-012",
+      "status": "PARTIAL",
+      "apiOperationIds": ["authLogin"],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["risk contract remains open"]
+    },
+    {
+      "featureId": "AUTH-013",
+      "status": "PARTIAL",
+      "apiOperationIds": [],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["account-state enforcement mapping incomplete"]
+    },
+    {
+      "featureId": "AUTH-014",
+      "status": "PARTIAL",
+      "apiOperationIds": [],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["recovery API/DTO/entity/security mapping incomplete"]
+    },
+    {
+      "featureId": "AUTH-015",
+      "status": "PARTIAL",
+      "apiOperationIds": [],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["deletion/restoration contract mapping incomplete"]
+    },
+    {
+      "featureId": "AUTH-016",
+      "status": "PARTIAL",
+      "apiOperationIds": [],
+      "entityIds": [],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": ["contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"],
+      "blockers": ["verification API/DTO/entity/security mapping incomplete"]
+    }
+  ],
+  "blockers": [
+    "B01 mapping is evidence-bound but not contract-complete",
+    "AUTH-001 through AUTH-016 require remaining DTO/entity/field/security/state/event/worker/D1/test mappings where applicable",
+    "Remaining Blueprint features have not yet been mapped",
+    "Mapping cannot be marked GREEN by inference"
+  ]
 }
