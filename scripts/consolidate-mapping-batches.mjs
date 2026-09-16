@@ -42,6 +42,7 @@ const masterSet = new Set(masterIds);
 
 const byId = new Map();
 const sourceFiles = new Map();
+const orphanRecords = [];
 const invalid = [];
 
 for (const file of batchFiles) {
@@ -53,7 +54,6 @@ for (const file of batchFiles) {
       if (!(key in record)) invalid.push(`${file}: ${record.featureId ?? '<unknown>'}: missing ${key}`);
     }
     if (!record.featureId) continue;
-    if (!masterSet.has(record.featureId)) invalid.push(`${file}: ${record.featureId}: not present in canonical feature inventory`);
 
     const isUnresolved = record.status === 'UNRESOLVED' || record.status === 'BLOCKED';
     if (!isUnresolved) {
@@ -66,8 +66,27 @@ for (const file of batchFiles) {
       invalid.push(`${file}: ${record.featureId}: duplicate Feature ID; already supplied by ${sourceFiles.get(record.featureId)}`);
       continue;
     }
+
     byId.set(record.featureId, record);
     sourceFiles.set(record.featureId, file);
+
+    if (!masterSet.has(record.featureId)) {
+      orphanRecords.push({
+        featureId: record.featureId,
+        status: 'EXTRA',
+        apiOperationIds: [...(record.apiOperationIds ?? [])].sort(),
+        entityIds: [...(record.entityIds ?? [])].sort(),
+        payloadCollections: [...(record.payloadCollections ?? [])].sort(),
+        codeEvidenceRefs: [...(record.codeEvidenceRefs ?? [])].sort(),
+        ...(record.securityIds ? { securityIds: [...record.securityIds].sort() } : {}),
+        ...(record.lifecycleIds ? { lifecycleIds: [...record.lifecycleIds].sort() } : {}),
+        evidence: [...(record.evidence ?? [])].sort(),
+        blockers: [
+          'MAPPING_REFERENCES_NON_CANONICAL_FEATURE',
+          ...(record.blockers ?? []),
+        ].sort(),
+      });
+    }
   }
 }
 
@@ -103,6 +122,8 @@ const records = masterIds.map((id) => {
   };
 });
 
+records.push(...orphanRecords.sort((a, b) => a.featureId.localeCompare(b.featureId)));
+
 const blockers = records.filter((record) => BLOCKING.has(record.status) || record.blockers.length > 0);
 const status = blockers.length === 0 ? 'GREEN' : 'NOT_GREEN';
 const output = {
@@ -114,7 +135,9 @@ const output = {
   inputScope: 'canonical feature mapping batches matching B<number>*.json',
   excludedJsonFiles,
   recordCount: records.length,
+  canonicalFeatureCount: masterIds.length,
   missingBatchRecordCount: missing.length,
+  orphanMappingRecordCount: orphanRecords.length,
   blockers: blockers.length ? [
     `Canonical mapping is NOT_GREEN: ${blockers.length} Feature IDs retain blocking status or explicit blockers.`,
     'Unresolved mappings are preserved; this consolidator never invents API/DTO/entity/field/Persistence/Payload/security/lifecycle/code/test evidence.',
@@ -123,4 +146,4 @@ const output = {
 };
 
 fs.writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`);
-console.log(`MAPPING_CONSOLIDATION: ${status}; records=${records.length}; blocking=${blockers.length}; missing-batch-records=${missing.length}; excluded-json=${excludedJsonFiles.length}`);
+console.log(`MAPPING_CONSOLIDATION: ${status}; records=${records.length}; canonical=${masterIds.length}; blocking=${blockers.length}; missing-batch-records=${missing.length}; orphan-mappings=${orphanRecords.length}; excluded-json=${excludedJsonFiles.length}`);
