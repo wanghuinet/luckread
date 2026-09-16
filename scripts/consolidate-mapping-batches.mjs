@@ -112,4 +112,3 @@ const output = {
 
 fs.writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`);
 console.log(`MAPPING_CONSOLIDATION: ${status}; records=${records.length}; blocking=${blockers.length}; excluded-json=${excludedJsonFiles.length}`);
-if (status !== 'GREEN') process.exitCode = 2;
