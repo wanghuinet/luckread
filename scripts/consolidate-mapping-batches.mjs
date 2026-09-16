@@ -7,8 +7,8 @@ const featurePath = path.join(root, 'contracts/alignment/feature-inventory.v1.js
 const outPath = path.join(root, 'contracts/alignment/cross-system-mapping.v1.json');
 
 const BLOCKING = new Set(['MISSING','EXTRA','DRIFT','CONFLICT','DUPLICATE','UNRESOLVED','BLOCKED']);
-const BASE_REQUIRED_KEYS = ['featureId','status','evidence','blockers'];
-const RESOLVED_REQUIRED_KEYS = ['apiOperationIds','entityIds','payloadCollections','codeEvidenceRefs'];
+const BASE_REQUIRED_KEYS = ['featureId','status'];
+const RESOLVED_REQUIRED_KEYS = ['apiOperationIds','entityIds','payloadCollections','codeEvidenceRefs','evidence','blockers'];
 const FEATURE_BATCH_FILE = /^B\d+(?:-.*)?\.json$/;
 
 function fail(message) {
