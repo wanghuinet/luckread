@@ -6,20 +6,28 @@ on:
     paths:
       - 'contracts/alignment/mapping-batches/AUTH-002-promotion-matrix.v1.json'
       - 'scripts/auth-002-promotion-matrix-validate.mjs'
+      - 'scripts/auth-002-mapping0-preflight.mjs'
       - 'contracts/entity/AUTH-002-session-field-contract.v1.json'
       - 'contracts/persistence/AUTH-002-*.json'
       - 'contracts/evidence/AUTH-002-006-persistence-evidence-contract.v1.json'
       - 'contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json'
+      - 'contracts/dto/auth-dto-contract.v1.json'
+      - 'contracts/dto/auth-dto-records.v1.json'
+      - 'contracts/entity/entity-field-contract.v1.json'
       - 'contracts/api/auth-operation-policy.v1.json'
       - '.github/workflows/auth-002-promotion-matrix.yml'
   pull_request:
     paths:
       - 'contracts/alignment/mapping-batches/AUTH-002-promotion-matrix.v1.json'
       - 'scripts/auth-002-promotion-matrix-validate.mjs'
+      - 'scripts/auth-002-mapping0-preflight.mjs'
       - 'contracts/entity/AUTH-002-session-field-contract.v1.json'
       - 'contracts/persistence/AUTH-002-*.json'
       - 'contracts/evidence/AUTH-002-006-persistence-evidence-contract.v1.json'
       - 'contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json'
+      - 'contracts/dto/auth-dto-contract.v1.json'
+      - 'contracts/dto/auth-dto-records.v1.json'
+      - 'contracts/entity/entity-field-contract.v1.json'
       - 'contracts/api/auth-operation-policy.v1.json'
       - '.github/workflows/auth-002-promotion-matrix.yml'
 
@@ -42,6 +50,9 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
+
+      - name: Validate AUTH-002 canonical Mapping0 preflight
+        run: node scripts/auth-002-mapping0-preflight.mjs
 
       - name: Validate AUTH-002 promotion matrix
         run: node scripts/auth-002-promotion-matrix-validate.mjs
