@@ -7,7 +7,8 @@ const featurePath = path.join(root, 'contracts/alignment/feature-inventory.v1.js
 const outPath = path.join(root, 'contracts/alignment/cross-system-mapping.v1.json');
 
 const BLOCKING = new Set(['MISSING','EXTRA','DRIFT','CONFLICT','DUPLICATE','UNRESOLVED','BLOCKED']);
-const REQUIRED_KEYS = ['featureId','status','apiOperationIds','entityIds','payloadCollections','codeEvidenceRefs','evidence','blockers'];
+const BASE_REQUIRED_KEYS = ['featureId','status','evidence','blockers'];
+const RESOLVED_REQUIRED_KEYS = ['apiOperationIds','entityIds','payloadCollections','codeEvidenceRefs'];
 const FEATURE_BATCH_FILE = /^B\d+(?:-.*)?\.json$/;
 
 function fail(message) {
@@ -48,11 +49,19 @@ for (const file of batchFiles) {
   const batch = readJson(full);
   if (!Array.isArray(batch.records)) fail(`${file}: records must be an array`);
   for (const record of batch.records) {
-    for (const key of REQUIRED_KEYS) {
+    for (const key of BASE_REQUIRED_KEYS) {
       if (!(key in record)) invalid.push(`${file}: ${record.featureId ?? '<unknown>'}: missing ${key}`);
     }
     if (!record.featureId) continue;
     if (!masterSet.has(record.featureId)) invalid.push(`${file}: ${record.featureId}: not present in canonical feature inventory`);
+
+    const isUnresolved = record.status === 'UNRESOLVED' || record.status === 'BLOCKED';
+    if (!isUnresolved) {
+      for (const key of RESOLVED_REQUIRED_KEYS) {
+        if (!(key in record)) invalid.push(`${file}: ${record.featureId}: missing ${key} for non-unresolved mapping`);
+      }
+    }
+
     if (byId.has(record.featureId)) {
       invalid.push(`${file}: ${record.featureId}: duplicate Feature ID; already supplied by ${sourceFiles.get(record.featureId)}`);
       continue;
