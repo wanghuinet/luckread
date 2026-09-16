@@ -1,4 +1,4 @@
-# AUTH-002 — Session Authentication Real-Evidence Reconciliation v1.2
+# AUTH-002 — Session Authentication Real-Evidence Reconciliation v1.3
 
 ## Status
 
@@ -12,79 +12,104 @@ Canonical feature: `AUTH-002` — login / logout.
 
 1. `contracts/openapi/v1/openapi.yaml` defines `authLogin` and `authLogout`.
 2. The canonical Session field contract freezes nine fields and their security/lifecycle semantics.
-3. The persistence/runtime contract freezes D1 mapping, migration invariants and runtime boundaries.
-4. Payload 3.87.1 native sessions are stored as `user.sessions[]` with `id`, `createdAt`, and `expiresAt`; login creates `sid`, JWT validation checks `sid`, logout removes the session, and refresh extends `expiresAt`.
-5. Payload 3.87.1 native Session therefore cannot directly satisfy the canonical Session contract because `deviceId`, `tokenVersion`, `refreshCredentialHash`, `revokedAt`, and `lastSeenAt` are absent or semantically incompatible.
+3. Payload 3.87.1 native sessions are stored as `user.sessions[]` with `id`, `createdAt`, and `expiresAt`; login creates `sid`, JWT validation checks `sid`, logout removes the session, and refresh extends `expiresAt`.
+4. Payload 3.87.1 native Session therefore cannot directly satisfy the canonical Session contract because `deviceId`, `tokenVersion`, `refreshCredentialHash`, `revokedAt`, and `lastSeenAt` are absent or semantically incompatible.
+5. The earlier persistence mapping that assumed an independent canonical `sessions` table is superseded by the native-session architecture and must not be implemented.
 
 ## Minimum integration contract
 
-`contracts/persistence/AUTH-002-minimum-session-integration-contract.v1.json` is now the implementation input for the missing dimensions.
+`contracts/persistence/AUTH-002-minimum-session-integration-contract.v1.json` remains the implementation behavior contract.
 
-It defines a minimum extension around the native Payload session identity rather than a duplicate session system. Native `sid`, user association, `createdAt`, and `expiresAt` remain reuse candidates subject to physical/runtime evidence. The five unsupported dimensions receive explicit application-owned state and verification requirements.
+`contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json` is now the authoritative physical persistence contract for the extension state. It stores only the five unsupported canonical dimensions and keys them by the native Payload `sid`.
 
 ## Architecture decision
 
-**Direct native promotion is rejected. Full parallel Session persistence is also rejected.**
+**Direct native promotion is rejected. Full parallel Session persistence is rejected.**
 
-The admitted path is:
+The admitted architecture is:
 
-`Payload native auth/session identity -> minimal canonical integration state -> single authorization decision`
+`Payload native auth/session identity -> minimal D1 extension state -> single authorization decision`
 
-The integration MUST reference the native `sid`; it MUST NOT mint an independent session identifier.
+The native Payload session remains the only source of native session identity. The extension state MUST NOT mint or substitute an independent session identifier.
+
+## Physical persistence decision
+
+The extension state is proposed as:
+
+`auth_session_state`
+
+with:
+
+- `session_id` — native Payload `sid`, primary key;
+- `user_id` — authoritative User identity;
+- `device_id` — canonical device binding;
+- `token_version` — server-controlled invalidation version;
+- `refresh_credential_hash` — one-way derived refresh verifier;
+- `revoked_at` — durable canonical revocation timestamp;
+- `last_seen_at` — bounded activity timestamp.
+
+This table is **contract-only** until actual schema and migration evidence exists. It is explicitly not a mirror of `users.sessions[]` and must not duplicate `createdAt` or `expiresAt`.
 
 ## Current mapping state
 
 | Dimension | State |
 |---|---|
-| `id` / native `sid` | Candidate reuse; physical/runtime proof required |
-| `userId` | Candidate reuse; physical/runtime proof required |
-| `createdAt` | Candidate reuse; physical/runtime proof required |
-| `expiresAt` | Candidate reuse; physical/runtime proof required |
-| `deviceId` | Explicit integration state required |
-| `tokenVersion` | Explicit integration state required |
-| `refreshCredentialHash` | Explicit secret-derived integration state required |
-| `revokedAt` | Explicit durable revocation state required |
-| `lastSeenAt` | Explicit runtime activity state required |
+| `id` / native `sid` | Native Payload identity; physical/runtime proof required |
+| `userId` | Native User identity + extension binding; physical/runtime proof required |
+| `createdAt` | Native Payload session field; physical proof required |
+| `expiresAt` | Native Payload session field; physical/runtime proof required |
+| `deviceId` | `auth_session_state.device_id` proposed |
+| `tokenVersion` | `auth_session_state.token_version` proposed |
+| `refreshCredentialHash` | `auth_session_state.refresh_credential_hash` proposed |
+| `revokedAt` | `auth_session_state.revoked_at` proposed |
+| `lastSeenAt` | `auth_session_state.last_seen_at` proposed |
 
-## Implementation admission
+## Migration admission
 
-No migration or runtime code is admitted until:
+No migration is admitted as applied until all of the following exist:
 
-1. the actual Payload-generated D1 schema for `users.sessions` is captured;
-2. the minimal extension storage is selected and mapped without duplicating native session identity;
-3. migration semantics are versioned;
-4. runtime ordering and compensation behavior are bound;
-5. security/concurrency test cases are bound;
-6. Evidence Registry execution records are defined.
+1. actual generated Payload/D1 schema evidence for the authentication-enabled `users` collection and native `sessions` representation;
+2. exact extension-table schema evidence;
+3. versioned migration artifact;
+4. successful execution result;
+5. migration status evidence;
+6. relationship/integrity evidence for `session_id -> users.sessions[].id` and `user_id -> ENT-USER`;
+7. secret non-persistence evidence;
+8. rollback/compensation analysis.
 
-## Required failure invariants
+A physical foreign key from `auth_session_state.session_id` to a native embedded session element is not permitted; the native relationship is logical because `users.sessions[]` is embedded in the user record.
 
-- Native `sid` removed or invalid -> request fails closed.
-- Canonical revocation present -> request fails closed even if a stale JWT exists.
-- Token version invalidated -> affected session authorization fails closed.
-- Refresh predecessor already consumed -> replay fails.
-- Concurrent refresh -> at most one successful successor.
-- Raw access token, raw refresh token or password persisted -> immediate gate failure.
-- Device binding missing or inconsistent -> request fails closed where the contract requires binding.
-- Failure to persist required canonical state -> operation cannot report successful completion.
+## Runtime admission
+
+The implementation must ensure:
+
+- login creates the Payload native session first and then exactly one extension row for the same `sid`;
+- a failure to establish required extension state prevents successful authorization/session issuance according to the transaction/compensation contract;
+- validation checks native sid existence and expiry plus extension device/tokenVersion/revocation state;
+- logout remains idempotent while preserving required durable revocation evidence;
+- refresh rotation uses compare-and-update or a transactionally equivalent mechanism on the extension state;
+- refresh replay fails and concurrent refresh allows at most one valid successor;
+- `lastSeenAt` updates are bounded and are never the sole authorization predicate.
 
 ## Current gate
 
 ```text
-Contract layer                 = CLOSED
-Payload 3.87.1 source analysis = COMPLETE
-Native direct equivalence      = REJECTED
-Minimum integration contract   = CLOSED_FOR_IMPLEMENTATION_INPUT
-Actual D1 schema               = NOT VERIFIED
-Migration                      = NOT VERIFIED
-Runtime implementation         = NOT VERIFIED
-Security/E2E                   = NOT VERIFIED
-Concurrency/E2E                = NOT VERIFIED
-Evidence Registry              = NOT BOUND
-ENT-SESSION                    = PROPOSED
-AUTH-002                       = BLOCKED_NOT_GREEN
+Contract layer                  = CLOSED
+Payload 3.87.1 source analysis  = COMPLETE
+Native direct equivalence       = REJECTED
+Minimum integration contract    = CLOSED
+Extension persistence contract  = CLOSED_FOR_IMPLEMENTATION_INPUT
+Actual D1 schema                = NOT VERIFIED
+Migration artifact              = NOT VERIFIED
+Migration applied               = NOT VERIFIED
+Runtime implementation          = NOT VERIFIED
+Security/E2E                    = NOT VERIFIED
+Concurrency/E2E                 = NOT VERIFIED
+Evidence Registry               = NOT BOUND
+ENT-SESSION                     = PROPOSED
+AUTH-002                        = BLOCKED_NOT_GREEN
 ```
 
 ## Next closure action
 
-Capture the actual `users`/`sessions` physical D1 schema and generate the smallest migration for the five explicitly contracted integration dimensions. Do not create a full duplicate `sessions` table.
+Capture the real Payload-generated D1 schema first. Then implement only the minimum `auth_session_state` extension and produce its migration/execution evidence. No second full Session table may be introduced.
