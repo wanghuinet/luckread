@@ -71,13 +71,25 @@ for (const file of batchFiles) {
   }
 }
 
-const missing = masterIds.filter((id) => !byId.has(id));
-if (missing.length) invalid.push(`canonical features missing from mapping batches: ${missing.join(', ')}`);
 if (invalid.length) fail(invalid.join('\n'));
 
+const missing = masterIds.filter((id) => !byId.has(id));
 const records = masterIds.map((id) => {
   const record = byId.get(id);
-  const normalized = {
+  if (!record) {
+    return {
+      featureId: id,
+      status: 'UNRESOLVED',
+      apiOperationIds: [],
+      entityIds: [],
+      payloadCollections: [],
+      codeEvidenceRefs: [],
+      evidence: [],
+      blockers: ['MISSING_MAPPING_BATCH_RECORD'],
+    };
+  }
+
+  return {
     featureId: id,
     status: record.status,
     apiOperationIds: [...(record.apiOperationIds ?? [])].sort(),
@@ -89,7 +101,6 @@ const records = masterIds.map((id) => {
     evidence: [...(record.evidence ?? [])].sort(),
     blockers: [...(record.blockers ?? [])].sort(),
   };
-  return normalized;
 });
 
 const blockers = records.filter((record) => BLOCKING.has(record.status) || record.blockers.length > 0);
@@ -103,6 +114,7 @@ const output = {
   inputScope: 'canonical feature mapping batches matching B<number>*.json',
   excludedJsonFiles,
   recordCount: records.length,
+  missingBatchRecordCount: missing.length,
   blockers: blockers.length ? [
     `Canonical mapping is NOT_GREEN: ${blockers.length} Feature IDs retain blocking status or explicit blockers.`,
     'Unresolved mappings are preserved; this consolidator never invents API/DTO/entity/field/Persistence/Payload/security/lifecycle/code/test evidence.',
@@ -111,4 +123,4 @@ const output = {
 };
 
 fs.writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`);
-console.log(`MAPPING_CONSOLIDATION: ${status}; records=${records.length}; blocking=${blockers.length}; excluded-json=${excludedJsonFiles.length}`);
+console.log(`MAPPING_CONSOLIDATION: ${status}; records=${records.length}; blocking=${blockers.length}; missing-batch-records=${missing.length}; excluded-json=${excludedJsonFiles.length}`);
