@@ -87,7 +87,7 @@ jobs:
           migration_exit=$?
           set -e
 
-          MIGRATION_EXIT_CODE="$migration_exit" node -e '
+          MIGRATION_EXIT_CODE="$migration_exit" DATABASE_NAME="$DATABASE_NAME" WRANGLER_VERSION="$WRANGLER_VERSION" node -e '
             const fs = require("node:fs");
             const output = fs.readFileSync("artifacts/evidence/auth-002/migration-status.txt", "utf8");
             fs.writeFileSync(
@@ -160,7 +160,6 @@ jobs:
           const payloadLocked = lock.packages?.['node_modules/payload']?.version ?? null;
           const d1AdapterLocked = lock.packages?.['node_modules/@payloadcms/db-d1-sqlite']?.version ?? null;
           const commitSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-          const nodeVersion = process.version;
           const manifest = {
             testedCommitSha: commitSha,
             environmentClass: process.env.EVIDENCE_ENVIRONMENT,
@@ -169,7 +168,7 @@ jobs:
             payloadLockedVersion: payloadLocked,
             d1AdapterVersion: pkg.dependencies?.['@payloadcms/db-d1-sqlite'] ?? null,
             d1AdapterLockedVersion: d1AdapterLocked,
-            nodeVersion,
+            nodeVersion: process.version,
             wranglerVersion: process.env.WRANGLER_VERSION,
             executedAt: new Date().toISOString(),
             evidenceFiles: Object.fromEntries(evidenceFiles.map((file) => [file, sha256(file)])),
