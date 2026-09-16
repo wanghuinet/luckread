@@ -1,4 +1,4 @@
-# AUTH-002 — Session Authentication Real-Evidence Reconciliation v1.4
+# AUTH-002 — Session Authentication Real-Evidence Reconciliation v1.5
 
 ## Status
 
@@ -16,6 +16,8 @@ Canonical feature: `AUTH-002` — login / logout.
 4. Payload 3.87.1 native Session therefore cannot directly satisfy the canonical Session contract because `deviceId`, `tokenVersion`, `refreshCredentialHash`, `revokedAt`, and `lastSeenAt` are absent or semantically incompatible.
 5. The earlier persistence mapping that assumed an independent canonical `sessions` table is superseded by the native-session architecture and must not be implemented.
 6. Repository inspection confirms `src/collections/Users.ts` enables Payload auth and `src/payload.config.ts` uses `sqliteD1Adapter`, `push: false`, and `src/migrations`; however, the current `main` tree contains no executable migration artifact that can establish actual D1 schema evidence.
+7. `.github/workflows/auth-session-schema-evidence.yml` now provides an explicit `workflow_dispatch` path for a controlled remote D1 target. It captures D1 metadata, remote migration status, SQLite catalog, `users` table structure, indexes, foreign keys, and a reproducible manifest bound to the tested commit and locked Payload/D1-adapter versions.
+8. The evidence workflow is capture-only: it does not apply migrations or mutate the target D1.
 
 ## Minimum integration contract
 
@@ -25,11 +27,11 @@ Canonical feature: `AUTH-002` — login / logout.
 
 ## Schema evidence gate
 
-`contracts/persistence/AUTH-002-schema-evidence-capture-contract.v1.0.md` now defines the required reproducible procedure for obtaining actual Payload/D1 schema evidence.
+`contracts/persistence/AUTH-002-schema-evidence-capture-contract.v1.0.md` defines the required reproducible procedure for obtaining actual Payload/D1 schema evidence.
 
 `contracts/persistence/AUTH-002-schema-evidence-manifest.v1.json` defines the machine-readable evidence package and promotion rules.
 
-These are procedural contracts only. They do not constitute actual schema evidence.
+The workflow implementation is now present, but its execution against a controlled D1 target is still not evidenced in the repository. Procedural capability is therefore not equivalent to schema verification.
 
 ## Architecture decision
 
@@ -109,7 +111,8 @@ Native direct equivalence       = REJECTED
 Minimum integration contract    = CLOSED
 Extension persistence contract  = CLOSED_FOR_IMPLEMENTATION_INPUT
 Schema evidence procedure       = CLOSED
-Schema evidence execution       = NOT_EXECUTED
+Remote evidence workflow        = IMPLEMENTED
+Remote schema evidence          = NOT_EXECUTED
 Actual D1 schema                = NOT VERIFIED
 Migration artifact              = NOT VERIFIED
 Migration applied               = NOT VERIFIED
@@ -123,4 +126,4 @@ AUTH-002                        = BLOCKED_NOT_GREEN
 
 ## Next closure action
 
-Execute the schema evidence contract against a controlled Payload/D1 environment. Only its generated evidence may unlock the physical migration and runtime implementation stages. No second full Session table may be introduced.
+Run the `AUTH-002 Session Schema Evidence` workflow manually against a controlled remote D1 target using the actual database name and repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Review the generated artifact package before admitting any migration or runtime implementation. No second full Session table may be introduced.
