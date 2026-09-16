@@ -44,8 +44,21 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Validate migration generation admission
-        run: node scripts/auth-002-migration-generation-admission.mjs
+      - name: Validate migration generation prerequisites
+        id: admission
+        run: |
+          set +e
+          node scripts/auth-002-migration-generation-admission.mjs
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo 'artifact_present=true' >> "$GITHUB_OUTPUT"
+          elif [ "$status" -eq 2 ]; then
+            echo 'artifact_present=false' >> "$GITHUB_OUTPUT"
+            echo 'Pre-artifact admission is expected; continuing to generator.'
+          else
+            exit "$status"
+          fi
 
       - name: Select stable migration name
         id: migration-name
