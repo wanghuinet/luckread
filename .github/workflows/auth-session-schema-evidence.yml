@@ -87,7 +87,7 @@ jobs:
           migration_exit=$?
           set -e
 
-          node -e '
+          MIGRATION_EXIT_CODE="$migration_exit" node -e '
             const fs = require("node:fs");
             const output = fs.readFileSync("artifacts/evidence/auth-002/migration-status.txt", "utf8");
             fs.writeFileSync(
@@ -100,7 +100,6 @@ jobs:
               }, null, 2) + "\n"
             );
           '
-          MIGRATION_EXIT_CODE="$migration_exit" node -e 'void 0'
           test "$migration_exit" -eq 0
 
       - name: Capture remote D1 catalog evidence
