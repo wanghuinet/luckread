@@ -7,6 +7,7 @@
       "kind": "request",
       "featureId": "AUTH-001",
       "operationId": "authRegister",
+      "schemaRef": "#/paths/~1auth~1register/post/requestBody/content/application~1json/schema",
       "fieldAuthority": "OPENAPI_REQUEST_SCHEMA",
       "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
     },
@@ -15,9 +16,37 @@
       "kind": "response",
       "featureId": "AUTH-001",
       "operationId": "authRegister",
+      "schemaRef": "#/paths/~1auth~1register/post/responses/201/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-LOGIN-REQUEST",
+      "kind": "request",
+      "featureId": "AUTH-002",
+      "operationId": "authLogin",
+      "schemaRef": "#/paths/~1auth~1login/post/requestBody/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_REQUEST_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-LOGIN-RESPONSE",
+      "kind": "response",
+      "featureId": "AUTH-002",
+      "operationId": "authLogin",
+      "schemaRef": "#/paths/~1auth~1login/post/responses/200/content/application~1json/schema",
       "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
       "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
     }
   ],
-  "rule": "Only DTO IDs are introduced here; concrete field definitions must be copied from verified OpenAPI schemas before implementation."
+  "noBodyOperations": [
+    {
+      "featureId": "AUTH-002",
+      "operationId": "authLogout",
+      "responseStatus": 204,
+      "dtoRequired": false
+    }
+  ],
+  "unresolvedFeatures": ["AUTH-003", "AUTH-004", "AUTH-005"],
+  "rule": "Only operation IDs present in the verified OpenAPI contract may be bound. Concrete field definitions and runtime bindings require separate evidence."
 }
