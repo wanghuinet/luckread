@@ -1,5 +1,5 @@
 {
-  "version":"1.0",
+  "version":"1.1",
   "status":"NOT_GREEN",
   "sourceOfTruth":"contracts/entity/entity-catalog.v1.json",
   "featureInventoryRef":"contracts/alignment/feature-inventory.v1.json",
@@ -14,7 +14,17 @@
     ],"evidenceRefs":["src/collections/Users.ts","src/payload.config.ts"]},
     {"entityId":"ENT-IDENTITY","status":"PROPOSED","fields":[],"evidenceRefs":["docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"]},
     {"entityId":"ENT-CREDENTIAL","status":"PROPOSED","fields":[],"evidenceRefs":["docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"]},
-    {"entityId":"ENT-SESSION","status":"PROPOSED","fields":[],"evidenceRefs":["docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"]},
+    {"entityId":"ENT-SESSION","status":"CONTRACTED_NOT_VERIFIED","fieldContractRef":"contracts/entity/AUTH-002-session-field-contract.v1.json","fieldsRef":"contracts/entity/AUTH-002-session-field-contract.v1.json#fields","fields":[
+      {"fieldId":"ENT-SESSION-F-ID","name":"id","type":"text","nullable":false,"required":true,"unique":true,"indexed":true,"lifecycle":"immutable","classification":"INTERNAL_IDENTIFIER","status":"CONTRACTED_NOT_VERIFIED"},
+      {"fieldId":"ENT-SESSION-F-USER-ID","name":"userId","type":"text","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"INTERNAL_RELATION","status":"CONTRACTED_NOT_VERIFIED"},
+      {"fieldId":"ENT-SESSION-F-DEVICE-ID","name":"deviceId","type":"text","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"PRIVACY_SENSITIVE_IDENTIFIER","status":"CONTRACTED_NOT_VERIFIED"},
+      {"fieldId":"ENT-SESSION-F-TOKEN-VERSION","name":"tokenVersion","type":"integer","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"monotonic","classification":"AUTHORIZATION_STATE","status":"CONTRACTED_NOT_VERIFIED"},
+      {"fieldId":"ENT-SESSION-F-REFRESH-CREDENTIAL-HASH","name":"refreshCredentialHash","type":"text","nullable":false,"required":true,"unique":false,"indexed":false,"lifecycle":"rotating","classification":"SECRET_DERIVED_MATERIAL","status":"CONTRACTED_NOT_VERIFIED"},
+      {"fieldId":"ENT-SESSION-F-EXPIRES-AT","name":"expiresAt","type":"datetime","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"SECURITY_METADATA","status":"CONTRACTED_NOT_VERIFIED"},
+      {"fieldId":"ENT-SESSION-F-REVOKED-AT","name":"revokedAt","type":"datetime","nullable":true,"required":false,"unique":false,"indexed":true,"lifecycle":"write-once","classification":"SECURITY_METADATA","status":"CONTRACTED_NOT_VERIFIED"},
+      {"fieldId":"ENT-SESSION-F-CREATED-AT","name":"createdAt","type":"datetime","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"AUDIT_METADATA","status":"CONTRACTED_NOT_VERIFIED"},
+      {"fieldId":"ENT-SESSION-F-LAST-SEEN-AT","name":"lastSeenAt","type":"datetime","nullable":true,"required":false,"unique":false,"indexed":false,"lifecycle":"mutable","classification":"SECURITY_METADATA","status":"CONTRACTED_NOT_VERIFIED"}
+    ],"evidenceRefs":["contracts/entity/AUTH-002-session-field-contract.v1.json","docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md","docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"]},
     {"entityId":"ENT-VERIFICATION","status":"PROPOSED","fields":[],"evidenceRefs":["docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"]},
     {"entityId":"ENT-DEVICE-RECORD","status":"PROPOSED","fields":[],"evidenceRefs":["docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"]},
     {"entityId":"ENT-ROLE-ASSIGNMENT","status":"PROPOSED","fields":[],"evidenceRefs":["docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"]},
