@@ -23,6 +23,7 @@ on:
       - 'src/payload.config.ts'
       - 'src/migrations/**'
       - 'scripts/auth-session-schema-evidence-probe.mjs'
+      - 'scripts/auth-session-schema-evidence-validate.mjs'
       - '.github/workflows/auth-session-schema-evidence.yml'
   pull_request:
     paths:
@@ -32,6 +33,7 @@ on:
       - 'src/payload.config.ts'
       - 'src/migrations/**'
       - 'scripts/auth-session-schema-evidence-probe.mjs'
+      - 'scripts/auth-session-schema-evidence-validate.mjs'
       - '.github/workflows/auth-session-schema-evidence.yml'
 
 permissions:
@@ -182,6 +184,10 @@ jobs:
           }
           fs.writeFileSync(`${dir}/manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
           NODE
+
+      - name: Validate evidence package
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: node scripts/auth-session-schema-evidence-validate.mjs
 
       - name: Upload schema evidence artifacts
         if: ${{ github.event_name == 'workflow_dispatch' && always() }}
