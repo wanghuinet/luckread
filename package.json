@@ -20,6 +20,7 @@
     "payload:native:inventory": "node scripts/payload-native-inventory.mjs",
     "payload:native:verify": "node scripts/payload-native-inventory.mjs && git diff --exit-code -- contracts/payload/payload-native-inventory.v1.json",
     "auth:session:schema:evidence": "node scripts/auth-session-schema-evidence-probe.mjs",
+    "auth:session:schema:validate": "node scripts/auth-session-schema-evidence-validate.mjs",
     "feature:inventory": "node scripts/build-feature-inventory.mjs",
     "feature:inventory:verify": "node scripts/build-feature-inventory.mjs && git diff --exit-code -- contracts/alignment/feature-inventory.v1.json"
   },
