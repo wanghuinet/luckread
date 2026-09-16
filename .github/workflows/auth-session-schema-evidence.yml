@@ -130,6 +130,30 @@ jobs:
             --command 'PRAGMA foreign_key_list("users");' \
             > artifacts/evidence/auth-002/users-foreign-keys.json
 
+      - name: Build reproducible evidence provenance
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          DATABASE_NAME: ${{ inputs.database_name }}
+          EVIDENCE_ENVIRONMENT: ${{ inputs.environment_class }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const provenance = {
+            repository: process.env.GITHUB_REPOSITORY,
+            workflow: process.env.GITHUB_WORKFLOW,
+            workflowRef: process.env.GITHUB_WORKFLOW_REF,
+            workflowSha: process.env.GITHUB_SHA,
+            runId: Number(process.env.GITHUB_RUN_ID),
+            runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            eventName: process.env.GITHUB_EVENT_NAME,
+            databaseName: process.env.DATABASE_NAME,
+            environmentClass: process.env.EVIDENCE_ENVIRONMENT,
+          };
+          fs.mkdirSync('artifacts/evidence/auth-002', { recursive: true });
+          fs.writeFileSync('artifacts/evidence/auth-002/provenance.json', `${JSON.stringify(provenance, null, 2)}\n`);
+          NODE
+
       - name: Build reproducible evidence manifest
         if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
@@ -150,38 +174,26 @@ jobs:
             'users-schema.json',
             'users-indexes.json',
             'users-foreign-keys.json',
+            'provenance.json',
           ];
-
-          const sha256 = (file) => crypto
-            .createHash('sha256')
-            .update(fs.readFileSync(`${dir}/${file}`))
-            .digest('hex');
-
+          const sha256 = (file) => crypto.createHash('sha256').update(fs.readFileSync(`${dir}/${file}`)).digest('hex');
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
-          const payloadLocked = lock.packages?.['node_modules/payload']?.version ?? null;
-          const d1AdapterLocked = lock.packages?.['node_modules/@payloadcms/db-d1-sqlite']?.version ?? null;
-          const commitSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
           const manifest = {
-            testedCommitSha: commitSha,
+            testedCommitSha: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
             environmentClass: process.env.EVIDENCE_ENVIRONMENT,
             databaseName: process.env.DATABASE_NAME,
             payloadVersion: pkg.dependencies?.payload ?? null,
-            payloadLockedVersion: payloadLocked,
+            payloadLockedVersion: lock.packages?.['node_modules/payload']?.version ?? null,
             d1AdapterVersion: pkg.dependencies?.['@payloadcms/db-d1-sqlite'] ?? null,
-            d1AdapterLockedVersion: d1AdapterLocked,
+            d1AdapterLockedVersion: lock.packages?.['node_modules/@payloadcms/db-d1-sqlite']?.version ?? null,
             nodeVersion: process.version,
             wranglerVersion: process.env.WRANGLER_VERSION,
             executedAt: new Date().toISOString(),
             evidenceFiles: Object.fromEntries(evidenceFiles.map((file) => [file, sha256(file)])),
           };
-
-          if (manifest.payloadVersion !== '3.87.1' || manifest.payloadLockedVersion !== '3.87.1') {
-            throw new Error('Payload dependency lock mismatch');
-          }
-          if (manifest.d1AdapterVersion !== '3.87.1' || manifest.d1AdapterLockedVersion !== '3.87.1') {
-            throw new Error('D1 adapter dependency lock mismatch');
-          }
+          if (manifest.payloadVersion !== '3.87.1' || manifest.payloadLockedVersion !== '3.87.1') throw new Error('Payload dependency lock mismatch');
+          if (manifest.d1AdapterVersion !== '3.87.1' || manifest.d1AdapterLockedVersion !== '3.87.1') throw new Error('D1 adapter dependency lock mismatch');
           fs.writeFileSync(`${dir}/manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
           NODE
 
