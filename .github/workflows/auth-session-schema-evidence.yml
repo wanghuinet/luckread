@@ -60,9 +60,6 @@ jobs:
       - name: Validate schema evidence preconditions
         run: node scripts/auth-session-schema-evidence-probe.mjs
 
-      - name: Generate Payload migration status evidence
-        run: npm run payload -- migrate:status
-
       - name: Require controlled remote evidence target
         if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
@@ -72,6 +69,39 @@ jobs:
           set -euo pipefail
           test "$EVIDENCE_ENVIRONMENT" = "CONTROLLED_REMOTE_D1"
           test -n "$DATABASE_NAME"
+
+      - name: Capture remote D1 migration evidence
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/evidence/auth-002
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+          set +e
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 migrations list "$DATABASE_NAME" --remote > artifacts/evidence/auth-002/migration-status.txt 2>&1
+          migration_exit=$?
+          set -e
+
+          node -e '
+            const fs = require("node:fs");
+            const output = fs.readFileSync("artifacts/evidence/auth-002/migration-status.txt", "utf8");
+            fs.writeFileSync(
+              "artifacts/evidence/auth-002/migration-status.json",
+              JSON.stringify({
+                databaseName: process.env.DATABASE_NAME,
+                command: `wrangler@${process.env.WRANGLER_VERSION} d1 migrations list <database> --remote`,
+                exitCode: Number(process.env.MIGRATION_EXIT_CODE),
+                output
+              }, null, 2) + "\n"
+            );
+          '
+          MIGRATION_EXIT_CODE="$migration_exit" node -e 'void 0'
+          test "$migration_exit" -eq 0
 
       - name: Capture remote D1 catalog evidence
         if: ${{ github.event_name == 'workflow_dispatch' }}
