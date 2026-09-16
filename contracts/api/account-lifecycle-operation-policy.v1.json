@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/account-lifecycle-operation-policy.v1.json",
+  "title": "LuckRead Account Lifecycle Operation Policy",
+  "version": "1.0.0",
+  "domain": "users_accounts",
+  "status": "CONTRACTED_PARTIAL",
+  "operations": [
+    {
+      "operationId": "transitionAccountState",
+      "method": "POST",
+      "path": "/users/{userId}/account-state",
+      "authorization": { "mode": "state-machine", "permission": "user.account.state.transition", "scope": "admin_or_scope" },
+      "resource": { "classification": "SINGLE_AUTHORITATIVE_WRITE", "maxItems": 1 },
+      "cache": { "policy": "NO_STORE" },
+      "retry": { "maxAttempts": 1 },
+      "event": { "mode": "DOMAIN_EVENT" },
+      "queue": { "mode": "NONE" },
+      "antiAbuse": { "required": true },
+      "idempotency": { "required": false },
+      "security": { "required": true },
+      "evidence": { "openapi": "PASS", "permission": "MISSING", "state": "MISSING", "resource": "MISSING", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+    }
+  ]
+}

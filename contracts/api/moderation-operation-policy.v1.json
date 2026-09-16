@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/moderation-operation-policy.v1.json",
+  "title": "LuckRead Moderation Operation Policy",
+  "version": "1.0.0",
+  "domain": "audit_compliance",
+  "status": "CONTRACTED_PARTIAL",
+  "operations": [
+    {
+      "operationId": "listModerationCases",
+      "method": "GET",
+      "path": "/admin/moderation",
+      "authorization": { "mode": "permission", "permission": "moderation.case.read", "scope": "platform" },
+      "resource": { "classification": "BOUNDED_READ", "maxItems": 50 },
+      "cache": { "policy": "PRIVATE_NO_SHARED_CACHE" },
+      "retry": { "maxAttempts": 1 },
+      "event": { "mode": "NONE" },
+      "queue": { "mode": "NONE" },
+      "antiAbuse": { "required": true },
+      "idempotency": { "required": false },
+      "security": { "required": true },
+      "evidence": { "openapi": "PASS", "permission": "MISSING", "state": "N/A", "resource": "MISSING", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+    },
+    {
+      "operationId": "createReport",
+      "method": "POST",
+      "path": "/reports",
+      "authorization": { "mode": "permission", "permission": "report.create", "scope": "actor_and_resource" },
+      "resource": { "classification": "SINGLE_AUTHORITATIVE_WRITE", "maxItems": 1 },
+      "cache": { "policy": "NO_STORE" },
+      "retry": { "maxAttempts": 1 },
+      "event": { "mode": "DOMAIN_EVENT" },
+      "queue": { "mode": "DOMAIN_QUEUE" },
+      "antiAbuse": { "required": true },
+      "idempotency": { "required": true },
+      "security": { "required": true },
+      "evidence": { "openapi": "PASS", "permission": "MISSING", "state": "MISSING", "resource": "MISSING", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+    },
+    {
+      "operationId": "createAppeal",
+      "method": "POST",
+      "path": "/appeals",
+      "authorization": { "mode": "permission", "permission": "appeal.create", "scope": "actor_and_case" },
+      "resource": { "classification": "SINGLE_AUTHORITATIVE_WRITE", "maxItems": 1 },
+      "cache": { "policy": "NO_STORE" },
+      "retry": { "maxAttempts": 1 },
+      "event": { "mode": "DOMAIN_EVENT" },
+      "queue": { "mode": "DOMAIN_QUEUE" },
+      "antiAbuse": { "required": true },
+      "idempotency": { "required": true },
+      "security": { "required": true },
+      "evidence": { "openapi": "PASS", "permission": "MISSING", "state": "MISSING", "resource": "MISSING", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+    }
+  ]
+}

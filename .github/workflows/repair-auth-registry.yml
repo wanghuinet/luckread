@@ -1,0 +1,60 @@
+name: Repair Auth Registry
+
+on:
+  push:
+    branches: [fix/contract-idempotency-openapi]
+    paths:
+      - '.github/workflows/repair-auth-registry.yml'
+      - 'contracts/openapi/v1/openapi.yaml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add missing Auth operations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('contracts/openapi/v1/openapi.yaml')
+          s = p.read_text()
+          anchor = "\n  /users/me:\n"
+          if "operationId: authRefresh" not in s:
+              block = '''\n  /auth/refresh:\n    post:\n      tags: [Auth]\n      summary: Rotate the current refresh credential and issue new tokens\n      operationId: authRefresh\n      responses:\n        '200':\n          description: Tokens refreshed and the prior refresh credential invalidated.\n          content:\n            application/json:\n              schema:\n                type: object\n                required: [accessToken, refreshToken, expiresIn]\n                properties:\n                  accessToken: { type: string }\n                  refreshToken: { type: string }\n                  expiresIn: { type: integer }\n        '401': { $ref: '#/components/responses/ClientError' }\n  /auth/sessions:\n    get:\n      tags: [Auth]\n      summary: List the current user's active sessions\n      operationId: authSessionList\n      responses:\n        '200':\n          description: Active sessions for the authenticated user.\n          content:\n            application/json:\n              schema: { $ref: '#/components/schemas/ListResponse' }\n        '4XX': { $ref: '#/components/responses/ClientError' }\n  /auth/sessions/{sessionId}:\n    parameters:\n      - name: sessionId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n    delete:\n      tags: [Auth]\n      summary: Revoke one of the current user's sessions\n      operationId: authSessionRevoke\n      parameters:\n        - $ref: '#/components/parameters/IdempotencyKeyRequired'\n      responses:\n        '204': { description: Session revoked. }\n        '404': { $ref: '#/components/responses/NotFound' }\n        '4XX': { $ref: '#/components/responses/ClientError' }\n'''
+              s = s.replace(anchor, block + anchor, 1)
+          else:
+              # Repair the malformed indentation produced by an earlier run.
+              s = s.replace("      /auth/sessions/{sessionId}:\n", "  /auth/sessions/{sessionId}:\n")
+              s = s.replace("    /users/me:\n", "  /users/me:\n")
+          p.write_text(s)
+          PY
+      - name: Validate Auth operations and path structure
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s = Path('contracts/openapi/v1/openapi.yaml').read_text()
+          targets = {'authRefresh', 'authSessionList', 'authSessionRevoke'}
+          found = set(re.findall(r'^\s*operationId:\s*([^\s#]+)\s*$', s, re.MULTILINE))
+          missing = sorted(targets - found)
+          if missing:
+              print('Missing Auth operations:', ', '.join(missing))
+              raise SystemExit(1)
+          if re.search(r'^\s{4,}/auth/sessions', s, re.MULTILINE):
+              print('Auth session path is incorrectly nested')
+              raise SystemExit(1)
+          if re.search(r'^\s{4,}/users/me:', s, re.MULTILINE):
+              print('users/me path is incorrectly nested')
+              raise SystemExit(1)
+          print('Auth registry operations and path structure are present')
+          PY
+      - name: Commit repair
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add contracts/openapi/v1/openapi.yaml
+          git diff --cached --quiet || git commit -m "fix(contract): normalize auth path structure"
+          git push

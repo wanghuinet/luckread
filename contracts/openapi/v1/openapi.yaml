@@ -76,7 +76,6 @@ paths:
                   accountState: { $ref: '#/components/schemas/AccountState' }
         '422': { $ref: '#/components/responses/ValidationFailed' }
         '429': { $ref: '#/components/responses/RateLimited' }
-
   /auth/login:
     post:
       tags: [Auth]
@@ -113,17 +112,60 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
         '429': { $ref: '#/components/responses/RateLimited' }
-
   /auth/logout:
     post:
       tags: [Auth]
       summary: Revoke current session and increment token version
       operationId: authLogout
       responses:
-        '204':
-          description: Logged out; token version incremented.
+        '204': { description: Logged out; token version incremented. }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate the current refresh credential and issue new tokens
+      operationId: authRefresh
+      responses:
+        '200':
+          description: Tokens refreshed and the prior refresh credential invalidated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accessToken, refreshToken, expiresIn]
+                properties:
+                  accessToken: { type: string }
+                  refreshToken: { type: string }
+                  expiresIn: { type: integer }
+        '401': { $ref: '#/components/responses/ClientError' }
+  /auth/sessions:
+    get:
+      tags: [Auth]
+      summary: List the current user's active sessions
+      operationId: authSessionList
+      responses:
+        '200':
+          description: Active sessions for the authenticated user.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListResponse' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+  /auth/sessions/{sessionId}:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    delete:
+      tags: [Auth]
+      summary: Revoke one of the current user's sessions
+      operationId: authSessionRevoke
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '204': { description: Session revoked. }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
   /users/me:
     get:
       tags: [Users]
@@ -150,7 +192,6 @@ paths:
               schema: { $ref: '#/components/schemas/User' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
-
   /users/{userId}/account-state:
     parameters:
       - $ref: '#/components/parameters/UserId'
@@ -185,7 +226,6 @@ paths:
         '409': { $ref: '#/components/responses/InvalidState' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
-
   /contents:
     get:
       tags: [Contents]
@@ -219,7 +259,6 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Content' }
         '403': { $ref: '#/components/responses/PermissionDenied' }
-
   /contents/{contentId}:
     parameters:
       - $ref: '#/components/parameters/ContentId'
@@ -262,11 +301,9 @@ paths:
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
       responses:
-        '204':
-          description: Soft-deleted.
+        '204': { description: Soft-deleted. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
-
   /contents/{contentId}/state:
     parameters:
       - $ref: '#/components/parameters/ContentId'
@@ -303,7 +340,6 @@ paths:
         '409': { $ref: '#/components/responses/InvalidState' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
-
   /media:
     post:
       tags: [Media]
@@ -321,9 +357,7 @@ paths:
               properties:
                 mimeType: { type: string }
                 size: { type: integer, minimum: 1 }
-                checksum:
-                  type: string
-                  description: SHA-256 of the object
+                checksum: { type: string, description: SHA-256 of the object }
                 multipart: { type: boolean }
       responses:
         '201':
@@ -332,7 +366,6 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Media' }
         '415': { $ref: '#/components/responses/UnsupportedMediaType' }
-
   /media/{mediaId}:
     parameters:
       - $ref: '#/components/parameters/MediaId'
@@ -347,7 +380,6 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Media' }
         '404': { $ref: '#/components/responses/NotFound' }
-
   /contents/{contentId}/comments:
     parameters:
       - $ref: '#/components/parameters/ContentId'
@@ -388,7 +420,6 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Comment' }
         '429': { $ref: '#/components/responses/RateLimited' }
-
   /interactions/likes:
     post:
       tags: [Interactions]
@@ -400,8 +431,7 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/InteractionTarget' }
       responses:
-        '200':
-          description: Like recorded (idempotent).
+        '200': { description: Like recorded (idempotent). }
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       tags: [Interactions]
@@ -413,10 +443,8 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/InteractionTarget' }
       responses:
-        '204':
-          description: Like removed (idempotent).
+        '204': { description: Like removed (idempotent). }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /social/follows:
     post:
       tags: [Interactions]
@@ -432,8 +460,7 @@ paths:
               properties:
                 targetUserId: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '200':
-          description: Followed (idempotent).
+        '200': { description: Followed (idempotent). }
         '4XX': { $ref: '#/components/responses/ClientError' }
     delete:
       tags: [Interactions]
@@ -449,10 +476,8 @@ paths:
               properties:
                 targetUserId: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '204':
-          description: Unfollowed (idempotent).
+        '204': { description: Unfollowed (idempotent). }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /feed:
     get:
       tags: [Feed]
@@ -466,14 +491,11 @@ paths:
         - $ref: '#/components/parameters/Limit'
       responses:
         '200':
-          description: >-
-            Feed page. Authorization-filtered server-side; never cached across
-            viewers.
+          description: Feed page.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ListResponse' }
         '400': { $ref: '#/components/responses/InvalidCursor' }
-
   /search:
     get:
       tags: [Search]
@@ -488,12 +510,11 @@ paths:
         - $ref: '#/components/parameters/Limit'
       responses:
         '200':
-          description: Search results. Permission-filtered before caching.
+          description: Search results.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ListResponse' }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /notifications:
     get:
       tags: [Notifications]
@@ -524,10 +545,8 @@ paths:
                 ids: { type: array, items: { $ref: '#/components/schemas/ResourceId' }, minItems: 1, maxItems: 100 }
                 action: { enum: [read, unread] }
       responses:
-        '204':
-          description: Notifications updated.
+        '204': { description: Notifications updated. }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /creators/me:
     get:
       tags: [Creators]
@@ -540,7 +559,6 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Creator' }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /ips:
     post:
       tags: [IPs]
@@ -562,7 +580,6 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/IP' }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /ips/{ipId}/members:
     parameters:
       - $ref: '#/components/parameters/IpId'
@@ -602,10 +619,8 @@ paths:
               properties:
                 userId: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '204':
-          description: Membership removed.
+        '204': { description: Membership removed. }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /organizations:
     post:
       tags: [Organizations]
@@ -627,7 +642,6 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Organization' }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /admin/moderation:
     get:
       tags: [Admin]
@@ -662,7 +676,6 @@ paths:
       responses:
         '200': { description: Blocked (idempotent). }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /interactions/blocks/{targetUserId}:
     parameters:
       - name: targetUserId
@@ -678,7 +691,6 @@ paths:
       responses:
         '204': { description: Unblocked (idempotent). }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /interactions/mutes:
     post:
       tags: [Interactions]
@@ -698,7 +710,6 @@ paths:
       responses:
         '200': { description: Muted (idempotent). }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /interactions/mutes/{targetUserId}:
     parameters:
       - name: targetUserId
@@ -714,7 +725,6 @@ paths:
       responses:
         '204': { description: Unmuted (idempotent). }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /reports:
     post:
       tags: [Admin]
@@ -738,7 +748,6 @@ paths:
       responses:
         '201': { description: Report created (idempotent). }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /appeals:
     post:
       tags: [Admin]
@@ -760,7 +769,6 @@ paths:
       responses:
         '201': { description: Appeal created (idempotent). }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /contents/{contentId}/revisions:
     parameters:
       - $ref: '#/components/parameters/ContentId'
@@ -774,7 +782,6 @@ paths:
       responses:
         '200': { description: Content revisions. }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /contents/{contentId}/revisions/{revisionId}:
     parameters:
       - $ref: '#/components/parameters/ContentId'
@@ -809,7 +816,6 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /content/{contentId}/shares:
     parameters:
       - $ref: '#/components/parameters/ContentId'
@@ -831,7 +837,6 @@ paths:
       responses:
         '201': { description: Share created. }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /shares/{shareId}:
     parameters:
       - name: shareId
@@ -847,7 +852,6 @@ paths:
         '200': { description: Share resolved. }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/InvalidState' }
-
   /memberships/subscriptions:
     post:
       tags: [Users]
@@ -867,7 +871,6 @@ paths:
       responses:
         '201': { description: Subscription created. }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /memberships/subscriptions/{subscriptionId}:
     parameters:
       - name: subscriptionId
@@ -881,7 +884,6 @@ paths:
       responses:
         '200': { description: Subscription. }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /memberships/subscriptions/{subscriptionId}/cancel:
     parameters:
       - name: subscriptionId
@@ -900,7 +902,6 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /entitlements/{subjectId}:
     parameters:
       - name: subjectId
@@ -914,7 +915,6 @@ paths:
       responses:
         '200': { description: Effective server-derived entitlements. }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /entitlements/check:
     post:
       tags: [Users]
@@ -933,7 +933,6 @@ paths:
       responses:
         '200': { description: Entitlement decision. }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /organizations/{organizationId}/members:
     parameters:
       - name: organizationId
@@ -950,7 +949,6 @@ paths:
       responses:
         '200': { description: Organization members. }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /organizations/{organizationId}/members/invitations:
     parameters:
       - name: organizationId
@@ -966,7 +964,6 @@ paths:
       responses:
         '201': { description: Organization invitation created. }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /organizations/{organizationId}/members/{memberId}:
     parameters:
       - name: organizationId
@@ -989,7 +986,6 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /organizations/{organizationId}/members/{memberId}/role:
     parameters:
       - name: organizationId
@@ -1021,7 +1017,6 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /ips/{ipId}/contents:
     parameters:
       - $ref: '#/components/parameters/IpId'
@@ -1035,7 +1030,6 @@ paths:
       responses:
         '200': { description: IP content projection. }
         '4XX': { $ref: '#/components/responses/ClientError' }
-
   /ips/{ipId}/contents/{contentId}:
     parameters:
       - $ref: '#/components/parameters/IpId'
@@ -1046,6 +1040,411 @@ paths:
       operationId: getIpContent
       responses:
         '200': { description: IP content projection. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+  /contents/{contentId}/review:
+    parameters:
+      - name: contentId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical submitContentForReview
+      operationId: submitContentForReview
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /contents/{contentId}/schedule:
+    parameters:
+      - name: contentId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical scheduleContentPublication
+      operationId: scheduleContentPublication
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /contents/{contentId}/versions:
+    parameters:
+      - name: contentId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [API]
+      summary: Canonical getContentVersions
+      operationId: getContentVersions
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /contents/{contentId}/versions/{versionId}/restore:
+    parameters:
+      - name: contentId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+      - name: versionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical restoreContentVersion
+      operationId: restoreContentVersion
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /contents/{contentId}/reports:
+    parameters:
+      - name: contentId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical reportContent
+      operationId: reportContent
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /feed/home:
+    get:
+      tags: [API]
+      summary: Canonical getHomeFeed
+      operationId: getHomeFeed
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /feed/following:
+    get:
+      tags: [API]
+      summary: Canonical getFollowingFeed
+      operationId: getFollowingFeed
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /feed/trending:
+    get:
+      tags: [API]
+      summary: Canonical getTrendingFeed
+      operationId: getTrendingFeed
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /feed/topics/{topicId}:
+    parameters:
+      - name: topicId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [API]
+      summary: Canonical getTopicFeed
+      operationId: getTopicFeed
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /creators/{creatorId}/feed:
+    parameters:
+      - name: creatorId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [API]
+      summary: Canonical getCreatorFeed
+      operationId: getCreatorFeed
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /internal/feed/projections/refresh:
+    post:
+      tags: [API]
+      summary: Canonical refreshFeedProjection
+      operationId: refreshFeedProjection
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /interactions/bookmarks:
+    post:
+      tags: [API]
+      summary: Canonical bookmark
+      operationId: bookmark
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /interactions/reports:
+    post:
+      tags: [API]
+      summary: Canonical reportInteractionResource
+      operationId: reportInteractionResource
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/upload-intents:
+    post:
+      tags: [API]
+      summary: Canonical createUploadIntent
+      operationId: createUploadIntent
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/uploads/{uploadId}/complete:
+    parameters:
+      - name: uploadId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical completeUpload
+      operationId: completeUpload
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/processing/{jobId}:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [API]
+      summary: Canonical getProcessingJob
+      operationId: getProcessingJob
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/processing/{jobId}/cancel:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical cancelProcessingJob
+      operationId: cancelProcessingJob
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/{mediaId}/variants:
+    parameters:
+      - name: mediaId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [API]
+      summary: Canonical listMediaVariants
+      operationId: listMediaVariants
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/{mediaId}/playback-authorizations:
+    parameters:
+      - name: mediaId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [API]
+      summary: Canonical createPlaybackAuthorization
+      operationId: createPlaybackAuthorization
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /media/{mediaId}:
+    parameters:
+      - name: mediaId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    delete:
+      tags: [API]
+      summary: Canonical deleteMedia
+      operationId: deleteMedia
+      responses:
+        '204': { description: Deleted. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /users/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [API]
+      summary: Canonical getUserProfile
+      operationId: getUserProfile
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /users/username/availability:
+    get:
+      tags: [API]
+      summary: Canonical checkUsernameAvailability
+      operationId: checkUsernameAvailability
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /users/me/username:
+    patch:
+      tags: [API]
+      summary: Canonical updateUsername
+      operationId: updateUsername
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /account/preferences:
+    get:
+      tags: [API]
+      summary: Canonical getAccountPreferences
+      operationId: getAccountPreferences
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /account/preferences:
+    patch:
+      tags: [API]
+      summary: Canonical updateAccountPreferences
+      operationId: updateAccountPreferences
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /account/deletion:
+    post:
+      tags: [API]
+      summary: Canonical requestAccountDeletion
+      operationId: requestAccountDeletion
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /account/deletion/cancel:
+    post:
+      tags: [API]
+      summary: Canonical cancelAccountDeletion
+      operationId: cancelAccountDeletion
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /account/data-export:
+    post:
+      tags: [API]
+      summary: Canonical exportMyAccountData
+      operationId: exportMyAccountData
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Operation completed. }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
 components:

@@ -1,0 +1,87 @@
+name: Repair Auth Operation Policy
+
+on:
+  push:
+    branches: [fix/contract-idempotency-openapi]
+    paths:
+      - '.github/workflows/repair-auth-operation-policy.yml'
+      - 'contracts/openapi/v1/operation-policy.json'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add missing Auth operations to canonical policy
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('contracts/openapi/v1/operation-policy.json')
+          doc = json.loads(p.read_text())
+          ops = doc['operations']
+          existing = {x['operationId'] for x in ops}
+          additions = [
+            {
+              'operationId': 'authRefresh',
+              'auth': {'mode': 'permission'},
+              'permissions': ['user.session.refresh'],
+              'auditRequired': True,
+              'optimisticLockRequired': False,
+              'idempotencyRequired': False,
+              'stateMachine': 'none'
+            },
+            {
+              'operationId': 'authSessionList',
+              'auth': {'mode': 'permission'},
+              'permissions': ['user.session.read'],
+              'auditRequired': False,
+              'optimisticLockRequired': False,
+              'idempotencyRequired': False,
+              'stateMachine': 'none'
+            },
+            {
+              'operationId': 'authSessionRevoke',
+              'auth': {'mode': 'permission'},
+              'permissions': ['user.session.revoke'],
+              'auditRequired': True,
+              'optimisticLockRequired': False,
+              'idempotencyRequired': True,
+              'stateMachine': 'none'
+            }
+          ]
+          for item in additions:
+              if item['operationId'] not in existing:
+                  ops.append(item)
+          p.write_text(json.dumps(doc, indent=2) + '\n')
+          PY
+      - name: Validate Auth policy registration
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          doc = json.loads(Path('contracts/openapi/v1/operation-policy.json').read_text())
+          by_id = {x['operationId']: x for x in doc['operations']}
+          expected = {
+            'authRefresh': ('permission', ['user.session.refresh'], False, False),
+            'authSessionList': ('permission', ['user.session.read'], False, False),
+            'authSessionRevoke': ('permission', ['user.session.revoke'], True, True),
+          }
+          for op, (mode, perms, audit, idem) in expected.items():
+              if op not in by_id:
+                  raise SystemExit(f'Missing policy operation: {op}')
+              x = by_id[op]
+              if x['auth']['mode'] != mode or x['permissions'] != perms or x['auditRequired'] != audit or x['idempotencyRequired'] != idem:
+                  raise SystemExit(f'Incorrect policy declaration: {op}')
+          print('Auth operations are registered in canonical operation-policy.json')
+          PY
+      - name: Commit repair
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add contracts/openapi/v1/operation-policy.json
+          git diff --cached --quiet || git commit -m "fix(contract): register auth operations in operation policy"
+          git push
