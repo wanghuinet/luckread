@@ -45,11 +45,20 @@ for (const entityId of auth002?.entityRefs ?? []) {
   if (!Array.isArray(entity.fields) || entity.fields.length === 0) {
     fail(`AUTH-002 entity has no canonical fields: ${entityId}`)
   }
+  if (entity.status === 'PROPOSED') {
+    fail(`AUTH-002 entity remains PROPOSED: ${entityId}`)
+  }
 }
 
-const requiredFieldAuthority = 'contracts/entity/AUTH-002-session-field-contract.v1.json#fields'
-if (!(auth002?.fieldAuthorityRefs ?? []).includes(requiredFieldAuthority)) {
-  fail(`AUTH-002 missing required Session field authority: ${requiredFieldAuthority}`)
+const requiredFieldAuthorities = [
+  'contracts/entity/AUTH-003-identity-field-contract.v1.json#fields',
+  'contracts/entity/AUTH-003-credential-field-contract.v1.json#fieldAuthority',
+  'contracts/entity/AUTH-002-session-field-contract.v1.json#fields',
+]
+for (const authorityRef of requiredFieldAuthorities) {
+  if (!(auth002?.fieldAuthorityRefs ?? []).some((ref) => ref === authorityRef)) {
+    fail(`AUTH-002 missing required field authority: ${authorityRef}`)
+  }
 }
 
 if (auth002?.persistenceOwnerStatus !== 'REQUIRES_VERIFICATION') {
