@@ -1,4 +1,4 @@
-# AUTH-002 — Session Authentication Real-Evidence Reconciliation v1.1
+# AUTH-002 — Session Authentication Real-Evidence Reconciliation v1.2
 
 ## Status
 
@@ -8,95 +8,83 @@
 
 Canonical feature: `AUTH-002` — login / logout.
 
-Canonical operations currently evidenced by repository contracts:
-- `authLogin` — `POST /auth/login`
-- `authLogout` — `POST /auth/logout`
-
 ## Evidence-supported facts
 
-1. `contracts/openapi/v1/openapi.yaml` defines `authLogin` with request fields `identity` and `credential`, and a 200 response containing `accessToken`, `refreshToken`, `expiresIn`, and `layer`.
-2. `contracts/openapi/v1/openapi.yaml` defines `authLogout` as a 204 no-body operation.
-3. `contracts/api/auth-operation-policy.v1.json` defines anti-abuse, account-state evaluation, refresh rotation requirements for login, and current-user/self-scope plus idempotent revocation requirements for logout.
-4. `contracts/dto/auth-dto-contract.v1.json` canonically binds `authLogin` to `DTO-AUTH-LOGIN-REQUEST` and `DTO-AUTH-LOGIN-RESPONSE`.
-5. `contracts/dto/auth-dto-records.v1.json` records those login DTO schema references. `authLogout` is explicitly recorded as a no-body operation.
-6. `docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md` provides L5/L6 validation claims for session creation, refresh rotation, session revocation, concurrent-session policy, session listing, device binding, expiry, login events, and compromised-session revocation.
-7. `contracts/entity/AUTH-002-session-field-contract.v1.json` freezes the canonical AUTH-002 Session field contract with explicit field IDs, types, nullability, lifecycle, classification, exposure boundaries, security invariants and verification requirements.
-8. `contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json` defines the required D1 persistence mapping, migration invariants, runtime read/write boundaries, refresh/revocation concurrency semantics and required evidence. It remains `CONTRACTED_NOT_VERIFIED`.
-9. `contracts/persistence/AUTH-002-payload-session-integration-boundary.v1.json` defines the single-authority boundary between Payload authentication and canonical Session persistence.
-10. `contracts/persistence/AUTH-002-payload-3.87.1-session-runtime-evidence-gate.v1.md` defines version-pinned evidence requirements.
-11. `contracts/persistence/AUTH-002-payload-native-session-decision.v1.md` records the decision that Payload native Session cannot directly satisfy the canonical Session contract without semantic loss.
-12. Pinned Payload v3.87.1 source confirms `UserSession` contains only `id`, `createdAt`, and `expiresAt`, and is persisted inside the authenticated User document as `user.sessions[]` rather than as an independent Session entity. (Pinned sources: `packages/payload/src/auth/types.ts`, `packages/payload/src/auth/sessions.ts`.)
-13. Pinned Payload v3.87.1 login creates a session UUID, persists `createdAt`/`expiresAt`, and places the session id into the JWT as `sid`. (Pinned source: `packages/payload/src/auth/operations/login.ts`.)
-14. Pinned Payload v3.87.1 JWT authentication requires a matching `user.sessions[].id`; otherwise authentication returns no user. (Pinned source: `packages/payload/src/auth/strategies/jwt.ts`.)
-15. Pinned Payload v3.87.1 logout removes the current session from `user.sessions`, or clears the array for all-session logout. It does not provide the canonical durable `revokedAt` field. (Pinned source: `packages/payload/src/auth/operations/logout.ts`.)
-16. Pinned Payload v3.87.1 refresh updates the matched session `expiresAt` and signs a new JWT; it does not replace a persisted refresh-credential hash or implement the canonical predecessor-credential rotation model. (Pinned source: `packages/payload/src/auth/operations/refresh.ts`.)
-17. Pinned Payload v3.87.1 JWT signing includes `id`, `collection`, `email`, optional `sid`, plus configured `saveToJWT` fields, and uses HS256 with JWT expiration. (Pinned sources: `packages/payload/src/auth/getFieldsToSign.ts`, `packages/payload/src/auth/jwt.ts`.)
+1. `contracts/openapi/v1/openapi.yaml` defines `authLogin` and `authLogout`.
+2. The canonical Session field contract freezes nine fields and their security/lifecycle semantics.
+3. The persistence/runtime contract freezes D1 mapping, migration invariants and runtime boundaries.
+4. Payload 3.87.1 native sessions are stored as `user.sessions[]` with `id`, `createdAt`, and `expiresAt`; login creates `sid`, JWT validation checks `sid`, logout removes the session, and refresh extends `expiresAt`.
+5. Payload 3.87.1 native Session therefore cannot directly satisfy the canonical Session contract because `deviceId`, `tokenVersion`, `refreshCredentialHash`, `revokedAt`, and `lastSeenAt` are absent or semantically incompatible.
 
-## Mapping decision
+## Minimum integration contract
 
-Evidence-backed links may be retained:
+`contracts/persistence/AUTH-002-minimum-session-integration-contract.v1.json` is now the implementation input for the missing dimensions.
 
-- `AUTH-002 -> authLogin`
-- `AUTH-002 -> authLogout`
-- `AUTH-002 -> DTO-AUTH-LOGIN-REQUEST`
-- `AUTH-002 -> DTO-AUTH-LOGIN-RESPONSE`
-- `AUTH-002 -> L5/L6 session validation claims in docs/184-*`
-- `AUTH-002 -> ENT-SESSION -> contracts/entity/AUTH-002-session-field-contract.v1.json`
-- `ENT-SESSION -> contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json`
-- `AUTH-002 -> contracts/persistence/AUTH-002-payload-session-integration-boundary.v1.json`
-- `AUTH-002 -> contracts/persistence/AUTH-002-payload-3.87.1-session-runtime-evidence-gate.v1.md`
-- `AUTH-002 -> contracts/persistence/AUTH-002-payload-native-session-decision.v1.md`
+It defines a minimum extension around the native Payload session identity rather than a duplicate session system. Native `sid`, user association, `createdAt`, and `expiresAt` remain reuse candidates subject to physical/runtime evidence. The five unsupported dimensions receive explicit application-owned state and verification requirements.
 
-### Resolved at contract/source-analysis layer
+## Architecture decision
 
-- canonical session field IDs and semantics;
-- explicit secret/non-secret classification and exposure boundary;
-- persistence and migration invariants;
-- Runtime session creation/logout/validation/refresh boundaries;
-- Payload native-vs-canonical Session authority boundary;
-- pinned Payload v3.87.1 source analysis;
-- decision that native Payload Session is not directly canonical-equivalent.
+**Direct native promotion is rejected. Full parallel Session persistence is also rejected.**
 
-### Proven native incompatibilities
+The admitted path is:
 
-The following canonical dimensions are absent or semantically incompatible in Payload v3.87.1 native Session:
+`Payload native auth/session identity -> minimal canonical integration state -> single authorization decision`
 
-- `deviceId` — absent;
-- `tokenVersion` — absent;
-- `refreshCredentialHash` — absent; native refresh extends session expiry instead;
-- `revokedAt` — absent; native logout removes the session entry;
-- `lastSeenAt` — absent.
+The integration MUST reference the native `sid`; it MUST NOT mint an independent session identifier.
 
-Therefore **direct native promotion of `ENT-SESSION` is rejected**.
+## Current mapping state
 
-### Remaining blocking evidence
+| Dimension | State |
+|---|---|
+| `id` / native `sid` | Candidate reuse; physical/runtime proof required |
+| `userId` | Candidate reuse; physical/runtime proof required |
+| `createdAt` | Candidate reuse; physical/runtime proof required |
+| `expiresAt` | Candidate reuse; physical/runtime proof required |
+| `deviceId` | Explicit integration state required |
+| `tokenVersion` | Explicit integration state required |
+| `refreshCredentialHash` | Explicit secret-derived integration state required |
+| `revokedAt` | Explicit durable revocation state required |
+| `lastSeenAt` | Explicit runtime activity state required |
 
-- actual LuckRead D1 schema evidence;
-- concrete migration artifact and applied migration result;
-- chosen minimum integration implementation contract;
-- runtime implementation binding for canonical Session authority;
-- device-record authority and relationship evidence;
-- refresh rotation/replay protection tests;
-- revocation and expiry E2E tests;
-- account-state-driven invalidation tests;
-- anti-abuse executable evidence;
-- integration/concurrency/security evidence;
-- Evidence Registry execution records.
+## Implementation admission
 
-## Security boundary
+No migration or runtime code is admitted until:
 
-Credentials and session secrets must not become public DTO fields, logs, analytics payloads, feed/search data, or client-controlled authorization state. Session revocation must remain authoritative over stale cache or stale credentials.
+1. the actual Payload-generated D1 schema for `users.sessions` is captured;
+2. the minimal extension storage is selected and mapped without duplicating native session identity;
+3. migration semantics are versioned;
+4. runtime ordering and compensation behavior are bound;
+5. security/concurrency test cases are bound;
+6. Evidence Registry execution records are defined.
 
-The canonical field and persistence contracts forbid raw access/refresh token persistence and forbid public/admin/event exposure of `refreshCredentialHash`.
+## Required failure invariants
 
-## Fail-closed rule
+- Native `sid` removed or invalid -> request fails closed.
+- Canonical revocation present -> request fails closed even if a stale JWT exists.
+- Token version invalidated -> affected session authorization fails closed.
+- Refresh predecessor already consumed -> replay fails.
+- Concurrent refresh -> at most one successful successor.
+- Raw access token, raw refresh token or password persisted -> immediate gate failure.
+- Device binding missing or inconsistent -> request fails closed where the contract requires binding.
+- Failure to persist required canonical state -> operation cannot report successful completion.
 
-This reconciliation does not promote `AUTH-002` to GREEN. Framework behavior, source inspection, contract existence, or L5/L6 claims do not substitute for executed LuckRead schema, migration, runtime, security, test and Evidence Registry evidence.
+## Current gate
 
-Required chain:
-
-`Feature -> API -> DTO -> Session Entity -> Field -> Persistence -> Migration -> Code -> Security -> Lifecycle -> Test -> Evidence`
+```text
+Contract layer                 = CLOSED
+Payload 3.87.1 source analysis = COMPLETE
+Native direct equivalence      = REJECTED
+Minimum integration contract   = CLOSED_FOR_IMPLEMENTATION_INPUT
+Actual D1 schema               = NOT VERIFIED
+Migration                      = NOT VERIFIED
+Runtime implementation         = NOT VERIFIED
+Security/E2E                   = NOT VERIFIED
+Concurrency/E2E                = NOT VERIFIED
+Evidence Registry              = NOT BOUND
+ENT-SESSION                    = PROPOSED
+AUTH-002                       = BLOCKED_NOT_GREEN
+```
 
 ## Next closure action
 
-Create the **AUTH-002 Minimum Session Integration Contract v1.0**. It must define the exact single-authority model, synchronization boundary with Payload auth, and implementation semantics for the five proven native gaps before any migration or runtime code is authored.
+Capture the actual `users`/`sessions` physical D1 schema and generate the smallest migration for the five explicitly contracted integration dimensions. Do not create a full duplicate `sessions` table.
