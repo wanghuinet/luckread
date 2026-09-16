@@ -80,7 +80,7 @@ const walk = (value, path = '$') => {
     walk(child, `${path}.${key}`)
   }
 }
-walk({ d1Info, migration, catalog, users, indexes, foreignKeys })
+walk({ d1Info, migration, catalog, users, indexes, foreignKeys, extensionSchema, extensionIndexes, extensionForeignKeys })
 const serializedEvidence = JSON.stringify({ d1Info, migration, catalog, users, indexes, foreignKeys, extensionSchema, extensionIndexes, extensionForeignKeys, provenance })
 for (const pattern of forbiddenValuePatterns) {
   if (pattern.test(serializedEvidence)) fail(`sensitive value pattern detected: ${pattern}`)
@@ -94,7 +94,6 @@ const unwrapRows = (value) => {
 }
 const catalogRows = unwrapRows(catalog)
 if (!catalogRows.some((row) => row?.type === 'table' && row?.name === 'users')) fail('catalog does not prove a physical users table')
-if (!catalogRows.some((row) => row?.type === 'table' && row?.name === 'auth_session_state')) fail('catalog does not prove a physical auth_session_state table')
 
 const usersRows = unwrapRows(users)
 const indexRows = unwrapRows(indexes)
@@ -110,6 +109,8 @@ if (!Array.isArray(extensionSchemaRows)) fail('auth-session-state-schema evidenc
 if (!Array.isArray(extensionIndexRows)) fail('auth-session-state-indexes evidence is not row-shaped')
 if (!Array.isArray(extensionForeignKeyRows)) fail('auth-session-state-foreign-keys evidence is not row-shaped')
 
+const extensionTablePresent = catalogRows.some((row) => row?.type === 'table' && row?.name === 'auth_session_state')
+
 const expectedColumns = [
   { name: 'session_id', type: 'TEXT', notnull: 1, pk: 1 },
   { name: 'user_id', type: 'TEXT', notnull: 1, pk: 0 },
@@ -120,44 +121,50 @@ const expectedColumns = [
   { name: 'last_seen_at', type: 'TEXT', notnull: 0, pk: 0 },
 ]
 
-if (extensionSchemaRows.length !== expectedColumns.length) fail(`auth_session_state column count mismatch: expected ${expectedColumns.length}, found ${extensionSchemaRows.length}`)
-for (const expected of expectedColumns) {
-  const actual = extensionSchemaRows.find((row) => String(row?.name ?? '') === expected.name)
-  if (!actual) fail(`missing auth_session_state column: ${expected.name}`)
-  if (String(actual.type ?? '').toUpperCase() !== expected.type) fail(`auth_session_state.${expected.name} type mismatch`)
-  if (Number(actual.notnull) !== expected.notnull) fail(`auth_session_state.${expected.name} nullability mismatch`)
-  if (Number(actual.pk) !== expected.pk) fail(`auth_session_state.${expected.name} primary-key role mismatch`)
-}
-
-const extensionIndexNames = new Set(extensionIndexRows.map((row) => String(row?.name ?? '')))
-for (const requiredIndex of [
-  'auth_session_state_user_id_idx',
-  'auth_session_state_device_id_idx',
-  'auth_session_state_token_version_idx',
-  'auth_session_state_revoked_at_idx',
-]) {
-  if (!extensionIndexNames.has(requiredIndex)) fail(`missing required auth_session_state index: ${requiredIndex}`)
-}
-
-const extensionPkCount = extensionSchemaRows.filter((row) => Number(row?.pk) > 0).length
-if (extensionPkCount !== 1) fail(`auth_session_state primary-key column count must be 1, found ${extensionPkCount}`)
-const extensionPk = extensionSchemaRows.find((row) => Number(row?.pk) === 1)
-if (String(extensionPk?.name ?? '') !== 'session_id') fail('auth_session_state primary key must be session_id')
-
-const forbiddenColumns = new Set(['raw_access_token', 'raw_refresh_token', 'password'])
-for (const row of extensionSchemaRows) {
-  if (forbiddenColumns.has(String(row?.name ?? '').toLowerCase())) fail(`forbidden auth_session_state column detected: ${row.name}`)
-}
-for (const row of catalogRows) {
-  if (forbiddenColumns.has(String(row?.name ?? '').toLowerCase())) fail(`forbidden catalog object detected: ${row.name}`)
-  const sql = String(row?.sql ?? '').toLowerCase()
-  for (const forbiddenColumn of forbiddenColumns) {
-    if (sql.includes(forbiddenColumn)) fail(`forbidden secret identifier detected in catalog SQL: ${forbiddenColumn}`)
+if (extensionTablePresent) {
+  if (extensionSchemaRows.length !== expectedColumns.length) fail(`auth_session_state column count mismatch: expected ${expectedColumns.length}, found ${extensionSchemaRows.length}`)
+  for (const expected of expectedColumns) {
+    const actual = extensionSchemaRows.find((row) => String(row?.name ?? '') === expected.name)
+    if (!actual) fail(`missing auth_session_state column: ${expected.name}`)
+    if (String(actual.type ?? '').toUpperCase() !== expected.type) fail(`auth_session_state.${expected.name} type mismatch`)
+    if (Number(actual.notnull) !== expected.notnull) fail(`auth_session_state.${expected.name} nullability mismatch`)
+    if (Number(actual.pk) !== expected.pk) fail(`auth_session_state.${expected.name} primary-key role mismatch`)
   }
-}
 
-const sessionForeignKeys = extensionForeignKeyRows.filter((row) => String(row?.table ?? row?.table_name ?? '').toLowerCase().includes('session') || String(row?.from ?? '').toLowerCase() === 'session_id')
-if (sessionForeignKeys.length > 0) fail('auth_session_state.session_id must not use a physical FK to embedded users.sessions[]')
+  const extensionIndexNames = new Set(extensionIndexRows.map((row) => String(row?.name ?? '')))
+  for (const requiredIndex of [
+    'auth_session_state_user_id_idx',
+    'auth_session_state_device_id_idx',
+    'auth_session_state_token_version_idx',
+    'auth_session_state_revoked_at_idx',
+  ]) {
+    if (!extensionIndexNames.has(requiredIndex)) fail(`missing required auth_session_state index: ${requiredIndex}`)
+  }
+
+  const extensionPkCount = extensionSchemaRows.filter((row) => Number(row?.pk) > 0).length
+  if (extensionPkCount !== 1) fail(`auth_session_state primary-key column count must be 1, found ${extensionPkCount}`)
+  const extensionPk = extensionSchemaRows.find((row) => Number(row?.pk) === 1)
+  if (String(extensionPk?.name ?? '') !== 'session_id') fail('auth_session_state primary key must be session_id')
+
+  const forbiddenColumns = new Set(['raw_access_token', 'raw_refresh_token', 'password'])
+  for (const row of extensionSchemaRows) {
+    if (forbiddenColumns.has(String(row?.name ?? '').toLowerCase())) fail(`forbidden auth_session_state column detected: ${row.name}`)
+  }
+  for (const row of catalogRows) {
+    if (forbiddenColumns.has(String(row?.name ?? '').toLowerCase())) fail(`forbidden catalog object detected: ${row.name}`)
+    const sql = String(row?.sql ?? '').toLowerCase()
+    for (const forbiddenColumn of forbiddenColumns) {
+      if (sql.includes(forbiddenColumn)) fail(`forbidden secret identifier detected in catalog SQL: ${forbiddenColumn}`)
+    }
+  }
+
+  const sessionForeignKeys = extensionForeignKeyRows.filter((row) => String(row?.table ?? row?.table_name ?? '').toLowerCase().includes('session') || String(row?.from ?? '').toLowerCase() === 'session_id')
+  if (sessionForeignKeys.length > 0) fail('auth_session_state.session_id must not use a physical FK to embedded users.sessions[]')
+} else {
+  if (extensionSchemaRows.length !== 0) fail('auth_session_state schema rows exist but catalog table is absent')
+  if (extensionIndexRows.length !== 0) fail('auth_session_state index rows exist but catalog table is absent')
+  if (extensionForeignKeyRows.length !== 0) fail('auth_session_state foreign-key rows exist but catalog table is absent')
+}
 
 const expectedEvidenceFiles = required.filter((file) => file !== 'manifest.json')
 const manifestEvidence = manifest.evidenceFiles ?? {}
@@ -168,5 +175,5 @@ for (const file of expectedEvidenceFiles) {
 }
 
 console.log('AUTH-002_SCHEMA_EVIDENCE_VALIDATION_PASS')
-console.log('Validated artifact completeness, controlled-environment binding, dependency identity, database identity, Actions provenance, command success, users and auth_session_state physical schemas, required extension indexes, primary-key uniqueness, forbidden secret exclusion, embedded-session FK prohibition, and evidence hashes.')
+console.log(`Validated Gate-1 artifact completeness, controlled-environment binding, dependency identity, database identity, Actions provenance, command success, users physical schema, ${extensionTablePresent ? 'present auth_session_state schema and required indexes' : 'absence of unadmitted auth_session_state extension table'}, secret exclusion, embedded-session FK prohibition, and evidence hashes.`)
 console.log('This validator does not promote AUTH-002 or infer native session semantics; runtime correlation remains a separate evidence gate.')
