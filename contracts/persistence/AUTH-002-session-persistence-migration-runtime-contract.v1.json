@@ -16,8 +16,8 @@
     "tableAuthority": "CONTRACT_ONLY_UNTIL_MIGRATION_EVIDENCE",
     "primaryKey": "id",
     "foreignKeys": [
-      { "column": "userId", "references": "users.id", "onDelete": "RESTRICT" },
-      { "column": "deviceId", "references": "device_records.id", "onDelete": "RESTRICT" }
+      { "column": "user_id", "logicalTarget": "ENT-USER.id", "physicalTargetAuthority": "REQUIRES_SCHEMA_EVIDENCE", "onDelete": "RESTRICT" },
+      { "column": "device_id", "logicalTarget": "ENT-DEVICE-RECORD.id", "physicalTargetAuthority": "REQUIRES_DEVICE_ENTITY_PERSISTENCE_EVIDENCE", "onDelete": "RESTRICT" }
     ],
     "columns": [
       { "fieldId": "ENT-SESSION-F-ID", "column": "id", "dbType": "TEXT", "nullable": false, "primaryKey": true },
@@ -54,7 +54,7 @@
     "mustProve": [
       "table and columns match the canonical field contract",
       "nullability and primary-key semantics match",
-      "foreign-key targets are authoritative",
+      "foreign-key targets are proven authoritative before physical FK creation",
       "indexes required by contract exist",
       "no plaintext credential column exists",
       "migration is idempotent or execution is protected from duplicate application",
@@ -65,7 +65,8 @@
       "silent field rename",
       "semantic type change",
       "dropping session data without an explicit contracted lifecycle operation",
-      "creating duplicate session representations outside the canonical table"
+      "creating duplicate session representations outside the canonical table",
+      "creating a physical foreign key to an unverified entity table"
     ]
   },
   "runtime": {
