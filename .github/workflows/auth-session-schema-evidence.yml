@@ -40,6 +40,10 @@ permissions:
 env:
   WRANGLER_VERSION: 4.33.1
 
+authentication:
+  # Evidence capture never applies migrations and never mutates D1.
+  # Cloudflare credentials are read only from repository secrets at dispatch time.
+
 jobs:
   schema-evidence:
     runs-on: ubuntu-latest
@@ -127,6 +131,62 @@ jobs:
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
             --command 'PRAGMA foreign_key_list("users");' \
             > artifacts/evidence/auth-002/users-foreign-keys.json
+
+      - name: Build reproducible evidence manifest
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          DATABASE_NAME: ${{ inputs.database_name }}
+          EVIDENCE_ENVIRONMENT: ${{ inputs.environment_class }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+          const { execFileSync } = require('node:child_process');
+
+          const dir = 'artifacts/evidence/auth-002';
+          const evidenceFiles = [
+            'd1-info.json',
+            'migration-status.json',
+            'catalog.json',
+            'users-schema.json',
+            'users-indexes.json',
+            'users-foreign-keys.json',
+          ];
+
+          const sha256 = (file) => crypto
+            .createHash('sha256')
+            .update(fs.readFileSync(`${dir}/${file}`))
+            .digest('hex');
+
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const payloadLocked = lock.packages?.['node_modules/payload']?.version ?? null;
+          const d1AdapterLocked = lock.packages?.['node_modules/@payloadcms/db-d1-sqlite']?.version ?? null;
+          const commitSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const nodeVersion = process.version;
+          const manifest = {
+            testedCommitSha: commitSha,
+            environmentClass: process.env.EVIDENCE_ENVIRONMENT,
+            databaseName: process.env.DATABASE_NAME,
+            payloadVersion: pkg.dependencies?.payload ?? null,
+            payloadLockedVersion: payloadLocked,
+            d1AdapterVersion: pkg.dependencies?.['@payloadcms/db-d1-sqlite'] ?? null,
+            d1AdapterLockedVersion: d1AdapterLocked,
+            nodeVersion,
+            wranglerVersion: process.env.WRANGLER_VERSION,
+            executedAt: new Date().toISOString(),
+            evidenceFiles: Object.fromEntries(evidenceFiles.map((file) => [file, sha256(file)])),
+          };
+
+          if (manifest.payloadVersion !== '3.87.1' || manifest.payloadLockedVersion !== '3.87.1') {
+            throw new Error('Payload dependency lock mismatch');
+          }
+          if (manifest.d1AdapterVersion !== '3.87.1' || manifest.d1AdapterLockedVersion !== '3.87.1') {
+            throw new Error('D1 adapter dependency lock mismatch');
+          }
+          fs.writeFileSync(`${dir}/manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+          NODE
 
       - name: Upload schema evidence artifacts
         if: ${{ github.event_name == 'workflow_dispatch' && always() }}
