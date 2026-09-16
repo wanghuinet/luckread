@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractId": "AUTH-DTO-CONTRACT-v1.0",
+  "status": "CONTRACT_READY_IMPLEMENTATION_PENDING",
+  "sourceOfTruth": "contracts/openapi/v1/openapi.yaml",
+  "purpose": "Canonical DTO bindings for AUTH-001..005 without claiming runtime implementation or persistence evidence.",
+  "records": [
+    {
+      "featureId": "AUTH-001",
+      "operationId": "authRegister",
+      "requestDtoId": "DTO-AUTH-REGISTER-REQUEST",
+      "responseDtoId": "DTO-AUTH-REGISTER-RESPONSE",
+      "entityIds": ["ENT-USER"],
+      "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "AUTH-002",
+      "operationIds": ["authLogin", "authLogout"],
+      "requestDtoId": "DTO-AUTH-LOGIN-REQUEST",
+      "responseDtoId": "DTO-AUTH-SESSION-RESPONSE",
+      "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "AUTH-003",
+      "operationIds": ["authIdentityResolve"],
+      "requestDtoId": "DTO-AUTH-IDENTITY-RESOLVE-REQUEST",
+      "responseDtoId": "DTO-AUTH-IDENTITY-RESPONSE",
+      "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "AUTH-004",
+      "operationIds": ["authPasswordResetRequest", "authPasswordResetConfirm", "authPasswordChange"],
+      "requestDtoId": "DTO-AUTH-PASSWORD-RECOVERY-REQUEST",
+      "responseDtoId": "DTO-AUTH-PASSWORD-RECOVERY-RESPONSE",
+      "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "AUTH-005",
+      "operationIds": ["authEmailVerify", "authPhoneVerify"],
+      "requestDtoId": "DTO-AUTH-VERIFICATION-REQUEST",
+      "responseDtoId": "DTO-AUTH-VERIFICATION-RESPONSE",
+      "status": "CONTRACT_BOUND"
+    }
+  ],
+  "bindingRules": {
+    "no_runtime_claim": true,
+    "no_persistence_claim": true,
+    "no_security_evidence_claim": true,
+    "dtoIdsMustBeStable": true,
+    "operationIdsMustExistInOpenApi": true,
+    "implementationGateRemainsClosedUntilEvidence": true
+  }
+}
