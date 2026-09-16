@@ -179,6 +179,7 @@ jobs:
           const sha256 = (file) => crypto.createHash('sha256').update(fs.readFileSync(`${dir}/${file}`)).digest('hex');
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const provenance = JSON.parse(fs.readFileSync(`${dir}/provenance.json`, 'utf8'));
           const manifest = {
             testedCommitSha: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
             environmentClass: process.env.EVIDENCE_ENVIRONMENT,
@@ -190,8 +191,11 @@ jobs:
             nodeVersion: process.version,
             wranglerVersion: process.env.WRANGLER_VERSION,
             executedAt: new Date().toISOString(),
+            provenance,
             evidenceFiles: Object.fromEntries(evidenceFiles.map((file) => [file, sha256(file)])),
           };
+          if (manifest.testedCommitSha !== process.env.GITHUB_SHA) throw new Error('GitHub SHA mismatch');
+          if (provenance.workflowSha !== process.env.GITHUB_SHA) throw new Error('provenance workflow SHA mismatch');
           if (manifest.payloadVersion !== '3.87.1' || manifest.payloadLockedVersion !== '3.87.1') throw new Error('Payload dependency lock mismatch');
           if (manifest.d1AdapterVersion !== '3.87.1' || manifest.d1AdapterLockedVersion !== '3.87.1') throw new Error('D1 adapter dependency lock mismatch');
           fs.writeFileSync(`${dir}/manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
