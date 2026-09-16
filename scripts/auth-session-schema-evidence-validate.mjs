@@ -1,7 +1,7 @@
-import { readFileSync, existsSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 
 const dir = 'artifacts/evidence/auth-002'
-
 const required = [
   'd1-info.json',
   'migration-status.json',
@@ -11,32 +11,19 @@ const required = [
   'users-foreign-keys.json',
   'manifest.json',
 ]
-
-const forbiddenValuePatterns = [
-  /bearer\s+[a-z0-9._-]{20,}/i,
-  /refresh[_-]?token\s*[:=]/i,
-  /access[_-]?token\s*[:=]/i,
-  /cookie\s*[:=]/i,
-  /authorization\s*[:=]/i,
-  /password\s*[:=]\s*['\"][^'\"]+/i,
-  /refresh[_-]?credential[_-]?hash\s*[:=]\s*['\"][^'\"]+/i,
-]
-
 const fail = (message) => {
   console.error(`AUTH-002_SCHEMA_EVIDENCE_REJECTED: ${message}`)
   process.exit(1)
 }
-
-for (const file of required) {
-  if (!existsSync(`${dir}/${file}`)) fail(`missing artifact: ${file}`)
-}
-
 const readJson = (file) => {
   try {
     return JSON.parse(readFileSync(`${dir}/${file}`, 'utf8'))
-  } catch (error) {
+  } catch {
     fail(`invalid JSON artifact: ${file}`)
   }
+}
+for (const file of required) {
+  if (!existsSync(`${dir}/${file}`)) fail(`missing artifact: ${file}`)
 }
 
 const manifest = readJson('manifest.json')
@@ -47,25 +34,40 @@ const indexes = readJson('users-indexes.json')
 const foreignKeys = readJson('users-foreign-keys.json')
 const d1Info = readJson('d1-info.json')
 
-if (manifest.environmentClass !== 'CONTROLLED_REMOTE_D1') {
-  fail('manifest environmentClass is not CONTROLLED_REMOTE_D1')
-}
-if (!manifest.databaseName || !manifest.testedCommitSha || !manifest.executedAt) {
-  fail('manifest missing required execution identity')
-}
-if (manifest.payloadVersion !== '3.87.1' || manifest.payloadLockedVersion !== '3.87.1') {
-  fail('manifest Payload version mismatch')
-}
-if (manifest.d1AdapterVersion !== '3.87.1' || manifest.d1AdapterLockedVersion !== '3.87.1') {
-  fail('manifest D1 adapter version mismatch')
-}
-if (typeof migration.exitCode !== 'number' || migration.exitCode !== 0) {
-  fail('remote migration evidence command did not succeed')
-}
+if (manifest.environmentClass !== 'CONTROLLED_REMOTE_D1') fail('manifest environmentClass is not CONTROLLED_REMOTE_D1')
+if (!manifest.databaseName || !manifest.testedCommitSha || !manifest.executedAt) fail('manifest missing required execution identity')
+if (manifest.payloadVersion !== '3.87.1' || manifest.payloadLockedVersion !== '3.87.1') fail('manifest Payload version mismatch')
+if (manifest.d1AdapterVersion !== '3.87.1' || manifest.d1AdapterLockedVersion !== '3.87.1') fail('manifest D1 adapter version mismatch')
+if (typeof migration.exitCode !== 'number' || migration.exitCode !== 0) fail('remote migration evidence command did not succeed')
+if (migration.databaseName !== manifest.databaseName) fail('migration evidence databaseName mismatch')
 
-const serialized = JSON.stringify({ d1Info, migration, catalog, users, indexes, foreignKeys, manifest })
+const forbiddenKeyPatterns = [
+  /^(authorization|cookie|password|access[_-]?token|refresh[_-]?token|refresh[_-]?credential[_-]?hash)$/i,
+]
+const forbiddenValuePatterns = [
+  /bearer\s+[a-z0-9._-]{20,}/i,
+  /refresh[_-]?token\s*[:=]/i,
+  /access[_-]?token\s*[:=]/i,
+  /cookie\s*[:=]/i,
+  /authorization\s*[:=]/i,
+  /password\s*[:=]\s*["'][^"']+/i,
+  /refresh[_-]?credential[_-]?hash\s*[:=]\s*["'][^"']+/i,
+]
+const walk = (value, path = '$') => {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => walk(item, `${path}[${index}]`))
+    return
+  }
+  if (!value || typeof value !== 'object') return
+  for (const [key, child] of Object.entries(value)) {
+    if (forbiddenKeyPatterns.some((pattern) => pattern.test(key))) fail(`forbidden sensitive field key detected at ${path}.${key}`)
+    walk(child, `${path}.${key}`)
+  }
+}
+walk({ d1Info, migration, catalog, users, indexes, foreignKeys })
+const serializedEvidence = JSON.stringify({ d1Info, migration, catalog, users, indexes, foreignKeys })
 for (const pattern of forbiddenValuePatterns) {
-  if (pattern.test(serialized)) fail(`sensitive value pattern detected: ${pattern}`)
+  if (pattern.test(serializedEvidence)) fail(`sensitive value pattern detected: ${pattern}`)
 }
 
 const unwrapRows = (value) => {
@@ -74,19 +76,20 @@ const unwrapRows = (value) => {
   if (value && Array.isArray(value.result)) return value.result
   return []
 }
-
 const catalogRows = unwrapRows(catalog)
-const userRows = unwrapRows(users)
-const indexRows = unwrapRows(indexes)
-const foreignKeyRows = unwrapRows(foreignKeys)
+if (!catalogRows.some((row) => row?.type === 'table' && row?.name === 'users')) fail('catalog does not prove a physical users table')
+if (!Array.isArray(unwrapRows(users))) fail('users-schema evidence is not row-shaped')
+if (!Array.isArray(unwrapRows(indexes))) fail('users-indexes evidence is not row-shaped')
+if (!Array.isArray(unwrapRows(foreignKeys))) fail('users-foreign-keys evidence is not row-shaped')
 
-if (!catalogRows.some((row) => row?.type === 'table' && row?.name === 'users')) {
-  fail('catalog does not prove a physical users table')
+const expectedEvidenceFiles = required.filter((file) => file !== 'manifest.json')
+const manifestEvidence = manifest.evidenceFiles ?? {}
+for (const file of expectedEvidenceFiles) {
+  if (!manifestEvidence[file]) fail(`manifest missing hash entry for ${file}`)
+  const actualHash = createHash('sha256').update(readFileSync(`${dir}/${file}`)).digest('hex')
+  if (manifestEvidence[file] !== actualHash) fail(`evidence hash mismatch for ${file}`)
 }
-if (!Array.isArray(userRows)) fail('users-schema evidence is not row-shaped')
-if (!Array.isArray(indexRows)) fail('users-indexes evidence is not row-shaped')
-if (!Array.isArray(foreignKeyRows)) fail('users-foreign-keys evidence is not row-shaped')
 
 console.log('AUTH-002_SCHEMA_EVIDENCE_VALIDATION_PASS')
-console.log('Validated artifact completeness, controlled-environment binding, dependency lock identity, command success, users catalog presence, and sensitive-value exclusion patterns.')
+console.log('Validated artifact completeness, controlled-environment binding, dependency identity, database identity, command success, users catalog presence, evidence hashes, and sensitive-field/value exclusion patterns.')
 console.log('This validator does not promote AUTH-002 or infer native session semantics; runtime correlation remains a separate evidence gate.')
