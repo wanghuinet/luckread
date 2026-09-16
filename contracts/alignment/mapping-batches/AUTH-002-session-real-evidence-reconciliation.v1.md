@@ -20,12 +20,13 @@ Canonical operations currently evidenced by repository contracts:
 4. `contracts/dto/auth-dto-contract.v1.json` canonically binds `authLogin` to `DTO-AUTH-LOGIN-REQUEST` and `DTO-AUTH-LOGIN-RESPONSE`.
 5. `contracts/dto/auth-dto-records.v1.json` records those login DTO schema references. `authLogout` is explicitly recorded as a no-body operation.
 6. `docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md` provides L5/L6 validation claims for session creation, refresh rotation, session revocation, concurrent-session policy, session listing, device binding, expiry, login events, and compromised-session revocation.
-7. `contracts/entity/AUTH-002-session-field-contract.v1.json` now freezes the canonical AUTH-002 Session field contract with explicit field IDs, types, nullability, lifecycle, classification, exposure boundaries, security invariants and verification requirements.
-8. `contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json` now defines the required D1 persistence mapping, migration invariants, runtime read/write boundaries, refresh/revocation concurrency semantics and required evidence. It remains `CONTRACTED_NOT_VERIFIED`.
-9. `contracts/entity/entity-field-contract.v1.json` now binds `ENT-SESSION` to the AUTH-002 Session field contract. The fields remain `CONTRACTED_NOT_VERIFIED` until executable schema/persistence/runtime evidence exists.
-10. `contracts/entity/entity-catalog.v1.json` still marks `ENT-SESSION` as `PROPOSED`; contract existence does not promote entity implementation status.
-11. `contracts/alignment/database-entity-persistence-inventory.v1.json` now records the AUTH-002 Session persistence contract, while keeping persistence status unverified.
-12. Repository evidence still does not establish an executed session migration, executable `authLogin` / `authLogout` handlers, verified session persistence, runtime security behavior, or Evidence Registry execution results.
+7. `contracts/entity/AUTH-002-session-field-contract.v1.json` freezes the canonical AUTH-002 Session field contract with explicit field IDs, types, nullability, lifecycle, classification, exposure boundaries, security invariants and verification requirements.
+8. `contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json` defines the required D1 persistence mapping, migration invariants, runtime read/write boundaries, refresh/revocation concurrency semantics and required evidence. It remains `CONTRACTED_NOT_VERIFIED`.
+9. `contracts/persistence/AUTH-002-payload-session-integration-boundary.v1.json` closes the integration-boundary decision: Payload's discovered native inventory cannot by itself prove canonical Session persistence; native equivalence must be field- and runtime-verified before it may become authoritative, and duplicate session authority is forbidden.
+10. `contracts/entity/entity-field-contract.v1.json` binds `ENT-SESSION` to the AUTH-002 Session field contract. The fields remain `CONTRACTED_NOT_VERIFIED` until executable schema/persistence/runtime evidence exists.
+11. `contracts/entity/entity-catalog.v1.json` still marks `ENT-SESSION` as `PROPOSED`; contract existence does not promote entity implementation status.
+12. `contracts/alignment/database-entity-persistence-inventory.v1.json` records the AUTH-002 Session persistence contract, while keeping persistence status unverified.
+13. Repository evidence still does not establish an executed session migration, executable `authLogin` / `authLogout` handlers, verified session persistence, runtime security behavior, or Evidence Registry execution results.
 
 ## Mapping decision
 
@@ -38,6 +39,7 @@ Evidence-backed links may be retained:
 - `AUTH-002 -> L5/L6 session validation claims in docs/184-*`
 - `AUTH-002 -> ENT-SESSION -> contracts/entity/AUTH-002-session-field-contract.v1.json`
 - `ENT-SESSION -> contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json`
+- `AUTH-002 -> contracts/persistence/AUTH-002-payload-session-integration-boundary.v1.json`
 
 ### Resolved at contract layer
 
@@ -48,7 +50,8 @@ The following contract-layer blockers are closed:
 - field-level invariants for device binding, token version, rotation, expiry and revocation;
 - persistence column mapping and required D1 migration semantics;
 - runtime session creation, logout, validation and refresh-rotation boundaries;
-- fail-closed migration and concurrency requirements.
+- fail-closed migration and concurrency requirements;
+- Payload native-vs-canonical Session authority boundary.
 
 ### Remaining blocking evidence
 
@@ -82,4 +85,4 @@ Required chain:
 
 ## Next closure action
 
-Proceed from contract closure to **real persistence/migration/runtime evidence**. The implementation may use only the frozen Session field and persistence contracts. Any discovered mismatch must produce a contract revision before implementation is accepted. Mapping 0 must remain fail-closed until the complete chain is evidenced.
+Proceed from contract closure to **real persistence/migration/runtime evidence**. The implementation may use only the frozen Session field, persistence, and Payload integration-boundary contracts. Any discovered mismatch must produce a contract revision before implementation is accepted. Mapping 0 must remain fail-closed until the complete chain is evidenced.
