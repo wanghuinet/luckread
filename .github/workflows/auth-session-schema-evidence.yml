@@ -1,0 +1,49 @@
+name: AUTH-002 Session Schema Evidence
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'src/collections/Users.ts'
+      - 'src/payload.config.ts'
+      - 'src/migrations/**'
+      - 'scripts/auth-session-schema-evidence-probe.mjs'
+      - '.github/workflows/auth-session-schema-evidence.yml'
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'src/collections/Users.ts'
+      - 'src/payload.config.ts'
+      - 'src/migrations/**'
+      - 'scripts/auth-session-schema-evidence-probe.mjs'
+      - '.github/workflows/auth-session-schema-evidence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  schema-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Validate schema evidence preconditions
+        run: node scripts/auth-session-schema-evidence-probe.mjs
+
+      - name: Generate Payload migration status evidence
+        run: npm run payload -- migrate:status
