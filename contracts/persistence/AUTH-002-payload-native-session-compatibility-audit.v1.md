@@ -1,4 +1,4 @@
-# AUTH-002 — Payload Native Session Compatibility Audit v1.0
+# AUTH-002 — Payload Native Session Compatibility Audit v1.1
 
 **Status:** `CONTRACT_CLOSED / RUNTIME_EVIDENCE_REQUIRED`
 
@@ -8,90 +8,105 @@ Determine whether Payload's authentication/session implementation can serve as t
 
 This audit does not promote `ENT-SESSION`, does not create a migration, and does not infer physical schema from framework behavior.
 
-## 2. Verified repository baseline
+## 2. Locked repository baseline
 
-1. `src/collections/Users.ts` enables `auth: true`.
-2. `src/payload.config.ts` configures `@payloadcms/db-d1-sqlite`, binds `cloudflare.env.D1`, sets `push: false`, and configures `src/migrations` as the migration directory.
-3. The repository currently has no verified Session implementation reference and no verified applied migration evidence.
-4. The canonical Session contract contains nine fields and explicit security/lifecycle invariants.
+1. `package.json` pins `payload` and `@payloadcms/db-d1-sqlite` to `3.87.1`.
+2. `src/collections/Users.ts` enables `auth: true`.
+3. `src/payload.config.ts` configures `@payloadcms/db-d1-sqlite`, binds `cloudflare.env.D1`, sets `push: false`, and configures `src/migrations` as the migration directory.
+4. The repository currently has no verified Session implementation reference and no verified applied migration evidence.
+5. The canonical Session contract contains nine fields and explicit security/lifecycle invariants.
 
-## 3. External Payload capability evidence
+## 3. Version evidence
 
-Payload documentation states that authentication-enabled collections receive authentication operations and that `useSessions` is enabled by default; setting `useSessions: false` switches to stateless JWT authentication. Payload also documents generated authentication fields including `sessions` when sessions are enabled.
+Payload release history records `v3.87.1` as an official release dated 2026-08-06. The LuckRead package baseline is pinned to that exact version. Compatibility decisions for AUTH-002 therefore require evidence from the pinned runtime/package rather than a generic or newer Payload baseline.
 
-Payload's authentication implementation therefore establishes a framework-native session capability, but this does not by itself prove field-level equivalence with the LuckRead canonical Session contract.
+## 4. Framework capability evidence
 
-Payload's migration documentation establishes versioned migration files under the configured migration directory, with `up`/`down` migration functions and explicit migrate/create/status commands. The repository must still provide execution evidence before persistence is considered verified.
+Current Payload authentication documentation states that authentication-enabled collections receive login, logout, refresh-token and related authentication operations. Payload documents `useSessions` as enabled by default; setting `useSessions: false` switches to stateless JWT authentication.
 
-## 4. Compatibility matrix
+Payload authentication operations further document that, when sessions are enabled, logout can terminate the current session or all sessions, and refresh operates against the authenticated session.
 
-| Canonical requirement | Payload native capability | Current decision |
+Payload's logout implementation reads the current authenticated session identifier from the request and removes either that session or all sessions from the authenticated user's session set. This establishes native session lifecycle behavior, but it does not prove that Payload's physical persistence schema is identical to the LuckRead canonical nine-field contract.
+
+## 5. Canonical compatibility matrix
+
+| Canonical requirement | Payload native evidence | Decision |
 |---|---|---|
-| Session instance exists | `useSessions` enabled by default | Candidate reuse |
-| Session identified by stable session identity | Runtime evidence must expose/trace session identity | Not verified |
-| User association | Auth session is associated with authenticated user | Candidate reuse; runtime/schema evidence required |
-| Device association | No repository evidence yet proves canonical `deviceId` binding | Blocking |
-| `tokenVersion` | No verified 1:1 canonical field mapping | Blocking |
-| Hashed refresh credential | Payload session/refresh semantics exist, but canonical hash field equivalence is not yet established | Blocking |
-| `expiresAt` | Authentication has token expiration semantics | Candidate reuse; physical field evidence required |
-| `revokedAt` | Logout/session invalidation behavior exists conceptually | Candidate reuse; durable field/runtime evidence required |
-| `createdAt` | Collection/session lifecycle has timestamps/metadata | Candidate reuse; physical mapping required |
-| `lastSeenAt` | No canonical repository evidence establishes this exact native field mapping | Blocking |
-| Raw token non-persistence | Canonical contract requires it | Must prove with schema/runtime/telemetry evidence |
+| Session instance exists | `useSessions` is enabled by default and logout/refresh operate on sessions | Candidate reuse |
+| Stable session identity | Current implementation evidence exposes a session identifier used during logout/refresh flows | Runtime/schema proof required |
+| User association | Session is stored under an authentication-enabled user collection | Candidate reuse; schema proof required |
+| Device association | No verified LuckRead `deviceId` binding in current repository | **BLOCKING** |
+| `tokenVersion` | No verified one-to-one native mapping to canonical `tokenVersion` | **BLOCKING** |
+| `refreshCredentialHash` | Payload has refresh/session semantics, but canonical hashed-credential field equivalence and physical storage are not verified | **BLOCKING** |
+| `expiresAt` | Payload authentication defines token expiration semantics | Candidate reuse; schema/runtime proof required |
+| `revokedAt` | Logout invalidates the current/all sessions, but canonical durable `revokedAt` field mapping is not established | Candidate reuse only after proof |
+| `createdAt` | Authentication/session lifecycle has persisted metadata, but exact canonical mapping is not verified | Candidate reuse only after proof |
+| `lastSeenAt` | No verified exact native mapping | **BLOCKING** |
+| Raw token/password non-persistence | Canonical contract forbids raw secret persistence | Must prove with schema/runtime/telemetry evidence |
 | Revocation authoritative over stale cache | Canonical contract requires fail-closed validation | Must prove by E2E test |
-| Refresh replay blocked | Canonical contract requires rotation/replay protection | Must prove by concurrency test |
+| Refresh replay blocked | Canonical contract requires predecessor invalidation and concurrency safety | Must prove by concurrency test |
+| Account-state invalidation | Canonical lifecycle requires immediate session invalidation for terminal states | Must prove by runtime test |
 
-## 5. Decision
+## 6. Critical architectural decision
 
-Payload native Session support is an **implementation candidate**, not yet an admitted canonical persistence authority.
+**Do not create a custom `sessions` table at this stage.**
 
-No independent custom `sessions` table may be authored solely from the existing contract until the native implementation has been inspected at the pinned Payload version and reconciled against the canonical nine-field contract.
+The native Payload session implementation is already a concrete candidate for the single session authority. Creating a parallel custom session table before proving native incompatibilities would create two potential authorities and increase migration/runtime complexity.
 
-Conversely, Payload native Session support must not be treated as canonical merely because `auth: true` is present.
+The next step is therefore evidence collection against the pinned `3.87.1` implementation, not schema invention.
 
-The authoritative implementation decision requires all of:
+If evidence proves that a required canonical dimension is unsupported (for example `deviceId`, `tokenVersion`, or `lastSeenAt`), the unsupported dimension must be documented first. Only then may a minimum integration extension be contracted.
 
-1. version-pinned Payload source/runtime inspection;
-2. actual generated D1 schema inspection;
-3. concrete migration artifact;
-4. applied migration evidence;
-5. runtime tracing of login/logout/refresh/session validation;
-6. field-by-field reconciliation against `AUTH-002-session-field-contract.v1.json`;
-7. security/concurrency tests;
-8. Evidence Registry execution record.
+## 7. Required evidence for admission
 
-## 6. Important current-version caution
+The pinned `3.87.1` implementation must produce evidence for:
 
-A recent Payload issue reports a session-related refresh failure involving `autoLogin` when `useSessions` is enabled and indicates that real login creates a session and binds a session identifier into the JWT. This is evidence that session-backed refresh behavior is runtime-sensitive; LuckRead must therefore verify the exact pinned dependency version rather than rely on generic framework assumptions.
+1. actual persisted session representation in D1;
+2. session identifier and user association;
+3. session expiration and invalidation semantics;
+4. refresh behavior and predecessor invalidation;
+5. current-session and all-session logout behavior;
+6. concurrent refresh race handling;
+7. account-state-driven session invalidation;
+8. exact location and protection of persisted refresh/session credential material;
+9. device binding semantics or a documented unsupported dimension;
+10. canonical mapping for each of the nine Session fields;
+11. integration/security tests and Evidence Registry execution records.
 
-This issue is not treated as proof of a defect in the LuckRead deployment; it is a reason to require version-pinned runtime evidence.
+## 8. Migration gate
 
-## 7. Migration gate
+The migration gate remains `BLOCKED` until the actual Payload/D1 migration artifact exists under the configured `src/migrations` path and its applied execution status is evidenced.
 
-The migration gate remains `BLOCKED` until the repository contains:
+The repository's existing migration workflow contract explicitly states that configuration, documented CLI commands, or historical files are not execution evidence.
 
-- a concrete migration under `src/migrations`;
-- schema evidence matching the admitted implementation;
-- migration execution/status evidence;
-- no duplicate session authority;
-- no undocumented secret persistence.
+## 9. Current gate
 
-Payload documentation confirms that `migrationDir` controls migration location and that `migrate:create`, `migrate`, and `migrate:status` are the supported workflow. Documentation alone is not execution evidence.
+```text
+Payload auth capability          = PROVEN
+Native session capability        = PROVEN
+Pinned version                   = 3.87.1
+Canonical field equivalence      = NOT PROVEN
+Actual D1 session schema         = NOT VERIFIED
+Migration artifact               = NOT VERIFIED
+Applied migration                = NOT VERIFIED
+Runtime equivalence              = NOT VERIFIED
+Device binding                   = BLOCKING
+Token-version mapping            = BLOCKING
+Last-seen mapping                = BLOCKING
+ENT-SESSION promotion            = BLOCKED
+AUTH-002                         = BLOCKED_NOT_GREEN
+```
 
-## 8. Next action
+## 10. Next closure action
 
-The next implementation-adjacent batch is **version-pinned Payload session runtime inspection**. It must answer one binary question without architectural speculation:
+Run the version-pinned Payload session runtime/schema evidence pass against the actual LuckRead installation. Record concrete findings only. Do not create duplicate session persistence or promote `ENT-SESSION` until the evidence chain is complete.
 
-> Can the pinned Payload session implementation satisfy the canonical `ENT-SESSION` semantics directly, including device binding, token invalidation, refresh rotation, revocation, expiry and audit/security constraints?
+## Sources
 
-If yes, reuse the native implementation and bind it into the canonical mapping. If no, record the exact unsupported contract dimensions before designing the minimum required integration boundary.
-
-## 9. Fail-closed rule
-
-Until the above evidence exists:
-
-- `ENT-SESSION` remains `PROPOSED`;
-- session persistence remains unverified;
-- AUTH-002 remains non-green;
-- no migration may be claimed as applied;
-- no runtime handler may be claimed as evidenced.
+- Payload v3.87.1 release: https://github.com/payloadcms/payload/releases/tag/v3.87.1
+- Payload authentication overview: https://payloadcms.com/docs/authentication/overview
+- Payload authentication operations: https://payloadcms.com/docs/authentication/operations
+- Payload logout implementation: https://github.com/payloadcms/payload/blob/main/packages/payload/src/auth/operations/logout.ts
+- LuckRead `package.json`
+- LuckRead `src/collections/Users.ts`
+- LuckRead `src/payload.config.ts`
