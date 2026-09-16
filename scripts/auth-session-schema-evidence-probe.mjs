@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const root = resolve(process.cwd())
+const gate1Only = process.argv.includes('--gate1')
 const packageJsonPath = join(root, 'package.json')
 const payloadConfigPath = join(root, 'src', 'payload.config.ts')
 const usersPath = join(root, 'src', 'collections', 'Users.ts')
@@ -35,7 +36,11 @@ if (!config.includes('push: false')) fail('Payload migration safety requires pus
 if (!config.includes('migrationDir')) fail('Payload migrationDir is not configured')
 
 if (!existsSync(migrationsDir)) {
-  fail('src/migrations is absent; actual Payload-generated migration/schema evidence cannot be captured yet')
+  if (!gate1Only) {
+    fail('src/migrations is absent; runtime/migration evidence cannot be captured yet')
+  } else {
+    console.log('Gate-1 mode: src/migrations is absent; this is allowed because Gate-1 is capture-only.')
+  }
 } else {
   const migrationFiles = []
   const collect = (dir) => {
@@ -46,8 +51,12 @@ if (!existsSync(migrationsDir)) {
     }
   }
   collect(migrationsDir)
-  if (migrationFiles.length === 0) fail('src/migrations exists but contains no migration artifact; schema remains unverified')
-  else console.log(`Migration artifacts discovered: ${migrationFiles.length}`)
+  if (migrationFiles.length === 0) {
+    if (!gate1Only) fail('src/migrations exists but contains no migration artifact; runtime/migration evidence cannot be captured yet')
+    else console.log('Gate-1 mode: no local migration artifact; remote migration state will be captured independently.')
+  } else {
+    console.log(`Migration artifacts discovered: ${migrationFiles.length}`)
+  }
 }
 
 if (blocked) {
@@ -55,7 +64,7 @@ if (blocked) {
   process.exit(1)
 }
 
-console.log('AUTH-002 schema evidence preconditions: PASS')
+console.log(`AUTH-002 schema evidence preconditions: PASS (${gate1Only ? 'GATE1_CAPTURE_ONLY' : 'FULL'})`)
 console.log(`Payload: ${pkg.dependencies.payload}`)
 console.log(`D1 adapter: ${pkg.dependencies['@payloadcms/db-d1-sqlite']}`)
 console.log('NOTE: preconditions passing does not itself prove D1 schema or promote AUTH-002.')
