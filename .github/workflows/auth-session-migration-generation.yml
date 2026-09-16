@@ -23,9 +23,12 @@ on:
 permissions:
   contents: read
 
+env:
+  DEFAULT_MIGRATION_NAME: MIG-AUTH-002-SESSION-V1
+
 jobs:
   generate:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -44,13 +47,22 @@ jobs:
       - name: Validate migration generation admission
         run: node scripts/auth-002-migration-generation-admission.mjs
 
-      - name: Generate Payload migration only
+      - name: Select stable migration name
+        id: migration-name
         env:
-          MIGRATION_NAME: ${{ inputs.migration_name }}
+          INPUT_MIGRATION_NAME: ${{ inputs.migration_name }}
+          DEFAULT_MIGRATION_NAME: ${{ env.DEFAULT_MIGRATION_NAME }}
         run: |
           set -euo pipefail
-          test -n "$MIGRATION_NAME"
-          printf '%s' "$MIGRATION_NAME" | grep -Eq '^MIG-AUTH-002-SESSION-V1$'
+          migration_name="${INPUT_MIGRATION_NAME:-$DEFAULT_MIGRATION_NAME}"
+          test "$migration_name" = "$DEFAULT_MIGRATION_NAME"
+          printf 'migration_name=%s\n' "$migration_name" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Payload migration only
+        env:
+          MIGRATION_NAME: ${{ steps.migration-name.outputs.migration_name }}
+        run: |
+          set -euo pipefail
           test ! -d src/migrations
           npm run payload -- migrate:create "$MIGRATION_NAME"
 
