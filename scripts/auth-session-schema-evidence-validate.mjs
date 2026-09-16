@@ -9,6 +9,9 @@ const required = [
   'users-schema.json',
   'users-indexes.json',
   'users-foreign-keys.json',
+  'auth-session-state-schema.json',
+  'auth-session-state-indexes.json',
+  'auth-session-state-foreign-keys.json',
   'provenance.json',
   'manifest.json',
 ]
@@ -34,6 +37,9 @@ const catalog = readJson('catalog.json')
 const users = readJson('users-schema.json')
 const indexes = readJson('users-indexes.json')
 const foreignKeys = readJson('users-foreign-keys.json')
+const extensionSchema = readJson('auth-session-state-schema.json')
+const extensionIndexes = readJson('auth-session-state-indexes.json')
+const extensionForeignKeys = readJson('auth-session-state-foreign-keys.json')
 const d1Info = readJson('d1-info.json')
 
 if (manifest.environmentClass !== 'CONTROLLED_REMOTE_D1') fail('manifest environmentClass is not CONTROLLED_REMOTE_D1')
@@ -75,7 +81,7 @@ const walk = (value, path = '$') => {
   }
 }
 walk({ d1Info, migration, catalog, users, indexes, foreignKeys })
-const serializedEvidence = JSON.stringify({ d1Info, migration, catalog, users, indexes, foreignKeys, provenance })
+const serializedEvidence = JSON.stringify({ d1Info, migration, catalog, users, indexes, foreignKeys, extensionSchema, extensionIndexes, extensionForeignKeys, provenance })
 for (const pattern of forbiddenValuePatterns) {
   if (pattern.test(serializedEvidence)) fail(`sensitive value pattern detected: ${pattern}`)
 }
@@ -88,9 +94,70 @@ const unwrapRows = (value) => {
 }
 const catalogRows = unwrapRows(catalog)
 if (!catalogRows.some((row) => row?.type === 'table' && row?.name === 'users')) fail('catalog does not prove a physical users table')
-if (!Array.isArray(unwrapRows(users))) fail('users-schema evidence is not row-shaped')
-if (!Array.isArray(unwrapRows(indexes))) fail('users-indexes evidence is not row-shaped')
-if (!Array.isArray(unwrapRows(foreignKeys))) fail('users-foreign-keys evidence is not row-shaped')
+if (!catalogRows.some((row) => row?.type === 'table' && row?.name === 'auth_session_state')) fail('catalog does not prove a physical auth_session_state table')
+
+const usersRows = unwrapRows(users)
+const indexRows = unwrapRows(indexes)
+const foreignKeyRows = unwrapRows(foreignKeys)
+const extensionSchemaRows = unwrapRows(extensionSchema)
+const extensionIndexRows = unwrapRows(extensionIndexes)
+const extensionForeignKeyRows = unwrapRows(extensionForeignKeys)
+
+if (!Array.isArray(usersRows)) fail('users-schema evidence is not row-shaped')
+if (!Array.isArray(indexRows)) fail('users-indexes evidence is not row-shaped')
+if (!Array.isArray(foreignKeyRows)) fail('users-foreign-keys evidence is not row-shaped')
+if (!Array.isArray(extensionSchemaRows)) fail('auth-session-state-schema evidence is not row-shaped')
+if (!Array.isArray(extensionIndexRows)) fail('auth-session-state-indexes evidence is not row-shaped')
+if (!Array.isArray(extensionForeignKeyRows)) fail('auth-session-state-foreign-keys evidence is not row-shaped')
+
+const expectedColumns = [
+  { name: 'session_id', type: 'TEXT', notnull: 1, pk: 1 },
+  { name: 'user_id', type: 'TEXT', notnull: 1, pk: 0 },
+  { name: 'device_id', type: 'TEXT', notnull: 1, pk: 0 },
+  { name: 'token_version', type: 'INTEGER', notnull: 1, pk: 0 },
+  { name: 'refresh_credential_hash', type: 'TEXT', notnull: 1, pk: 0 },
+  { name: 'revoked_at', type: 'TEXT', notnull: 0, pk: 0 },
+  { name: 'last_seen_at', type: 'TEXT', notnull: 0, pk: 0 },
+]
+
+if (extensionSchemaRows.length !== expectedColumns.length) fail(`auth_session_state column count mismatch: expected ${expectedColumns.length}, found ${extensionSchemaRows.length}`)
+for (const expected of expectedColumns) {
+  const actual = extensionSchemaRows.find((row) => String(row?.name ?? '') === expected.name)
+  if (!actual) fail(`missing auth_session_state column: ${expected.name}`)
+  if (String(actual.type ?? '').toUpperCase() !== expected.type) fail(`auth_session_state.${expected.name} type mismatch`)
+  if (Number(actual.notnull) !== expected.notnull) fail(`auth_session_state.${expected.name} nullability mismatch`)
+  if (Number(actual.pk) !== expected.pk) fail(`auth_session_state.${expected.name} primary-key role mismatch`)
+}
+
+const extensionIndexNames = new Set(extensionIndexRows.map((row) => String(row?.name ?? '')))
+for (const requiredIndex of [
+  'auth_session_state_user_id_idx',
+  'auth_session_state_device_id_idx',
+  'auth_session_state_token_version_idx',
+  'auth_session_state_revoked_at_idx',
+]) {
+  if (!extensionIndexNames.has(requiredIndex)) fail(`missing required auth_session_state index: ${requiredIndex}`)
+}
+
+const extensionPkCount = extensionSchemaRows.filter((row) => Number(row?.pk) > 0).length
+if (extensionPkCount !== 1) fail(`auth_session_state primary-key column count must be 1, found ${extensionPkCount}`)
+const extensionPk = extensionSchemaRows.find((row) => Number(row?.pk) === 1)
+if (String(extensionPk?.name ?? '') !== 'session_id') fail('auth_session_state primary key must be session_id')
+
+const forbiddenColumns = new Set(['raw_access_token', 'raw_refresh_token', 'password'])
+for (const row of extensionSchemaRows) {
+  if (forbiddenColumns.has(String(row?.name ?? '').toLowerCase())) fail(`forbidden auth_session_state column detected: ${row.name}`)
+}
+for (const row of catalogRows) {
+  if (forbiddenColumns.has(String(row?.name ?? '').toLowerCase())) fail(`forbidden catalog object detected: ${row.name}`)
+  const sql = String(row?.sql ?? '').toLowerCase()
+  for (const forbiddenColumn of forbiddenColumns) {
+    if (sql.includes(forbiddenColumn)) fail(`forbidden secret identifier detected in catalog SQL: ${forbiddenColumn}`)
+  }
+}
+
+const sessionForeignKeys = extensionForeignKeyRows.filter((row) => String(row?.table ?? row?.table_name ?? '').toLowerCase().includes('session') || String(row?.from ?? '').toLowerCase() === 'session_id')
+if (sessionForeignKeys.length > 0) fail('auth_session_state.session_id must not use a physical FK to embedded users.sessions[]')
 
 const expectedEvidenceFiles = required.filter((file) => file !== 'manifest.json')
 const manifestEvidence = manifest.evidenceFiles ?? {}
@@ -101,5 +168,5 @@ for (const file of expectedEvidenceFiles) {
 }
 
 console.log('AUTH-002_SCHEMA_EVIDENCE_VALIDATION_PASS')
-console.log('Validated artifact completeness, controlled-environment binding, dependency identity, database identity, Actions provenance, command success, users catalog presence, evidence hashes, and sensitive-field/value exclusion patterns.')
+console.log('Validated artifact completeness, controlled-environment binding, dependency identity, database identity, Actions provenance, command success, users and auth_session_state physical schemas, required extension indexes, primary-key uniqueness, forbidden secret exclusion, embedded-session FK prohibition, and evidence hashes.')
 console.log('This validator does not promote AUTH-002 or infer native session semantics; runtime correlation remains a separate evidence gate.')
