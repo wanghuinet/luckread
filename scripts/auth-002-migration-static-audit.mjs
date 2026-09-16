@@ -21,23 +21,44 @@ if (files.length === 0) {
   process.exit(2)
 }
 
-const source = files.map((file) => readFileSync(file, 'utf8')).join('\n')
+const sourceByFile = files.map((file) => ({
+  file,
+  source: readFileSync(file, 'utf8'),
+}))
+const source = sourceByFile.map(({ source }) => source).join('\n')
+const normalized = source.toLowerCase()
 
-const forbiddenPatterns = [
-  /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?sessions\b/i,
-  /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?session\b/i,
-  /\b(createdAt|created_at)\b[\s\S]*\b(auth_session_state|sessions?)\b/i,
-  /\b(expiresAt|expires_at)\b[\s\S]*\b(auth_session_state|sessions?)\b/i,
-  /raw_access_token/i,
-  /raw_refresh_token/i,
+if (!/export\s+(?:async\s+)?function\s+up\b/.test(source)) fail('migration artifact set has no exported up function')
+if (!/export\s+(?:async\s+)?function\s+down\b/.test(source)) fail('migration artifact set has no exported down function')
+
+const forbiddenParallelSessionTables = [
+  /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["'`]?sessions["'`]?\b/i,
+  /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["'`]?session["'`]?\b/i,
 ]
-
-for (const pattern of forbiddenPatterns) {
-  if (pattern.test(source)) fail(`forbidden or contradictory migration pattern detected: ${pattern}`)
+for (const pattern of forbiddenParallelSessionTables) {
+  if (pattern.test(source)) fail(`parallel Session table detected: ${pattern}`)
 }
 
-if (!/auth_session_state/i.test(source)) {
+const extensionMentions = []
+let offset = 0
+while (true) {
+  const position = normalized.indexOf('auth_session_state', offset)
+  if (position === -1) break
+  extensionMentions.push(position)
+  offset = position + 'auth_session_state'.length
+}
+
+if (extensionMentions.length === 0) {
   fail('migration artifact does not contain auth_session_state; cannot satisfy AUTH-002 extension migration scope')
+}
+
+const extensionWindows = extensionMentions.map((position) => normalized.slice(Math.max(0, position - 1800), Math.min(normalized.length, position + 3600)))
+const extensionSource = extensionWindows.join('\n')
+
+for (const forbidden of ['raw_access_token', 'raw_refresh_token', 'password', 'created_at', 'expires_at', 'createdat', 'expiresat']) {
+  if (extensionSource.includes(forbidden)) {
+    fail(`forbidden identifier appears in auth_session_state migration context: ${forbidden}`)
+  }
 }
 
 const requiredColumns = [
@@ -50,7 +71,9 @@ const requiredColumns = [
   'last_seen_at',
 ]
 for (const column of requiredColumns) {
-  if (!new RegExp(`\\b${column}\\b`, 'i').test(source)) fail(`required extension column missing from migration artifact: ${column}`)
+  if (!new RegExp(`\\b${column}\\b`, 'i').test(extensionSource)) {
+    fail(`required extension column missing from auth_session_state migration context: ${column}`)
+  }
 }
 
 const requiredIndexes = [
@@ -60,13 +83,17 @@ const requiredIndexes = [
   'auth_session_state_revoked_at_idx',
 ]
 for (const index of requiredIndexes) {
-  if (!source.includes(index)) fail(`required extension index missing from migration artifact: ${index}`)
+  if (!extensionSource.includes(index)) fail(`required extension index missing from migration context: ${index}`)
 }
 
-if (!/session_id[\s\S]{0,300}(PRIMARY\s+KEY|primaryKey)/i.test(source)) {
-  fail('session_id primary-key intent is not statically provable from migration artifact')
+if (!/session_id[\s\S]{0,500}(primary\s+key|primarykey)/i.test(extensionSource)) {
+  fail('session_id primary-key intent is not statically provable from auth_session_state migration context')
+}
+
+if (/foreign\s+key[\s\S]{0,500}(session_id|users\.sessions|sessions\.)/i.test(extensionSource)) {
+  fail('physical foreign-key relationship for embedded native session identity detected')
 }
 
 console.log('AUTH-002_MIGRATION_STATIC_AUDIT_PASS')
-console.log(`Audited ${files.length} migration artifact(s) for extension-table scope, required fields/indexes, native-field duplication, parallel Session tables, and raw secret persistence.`)
-console.log('Static audit does not prove execution, D1 schema state, runtime behavior, or AUTH-002 GREEN.')
+console.log(`Audited ${files.length} migration artifact(s) for AUTH-002 extension scope, required fields/indexes, native-field duplication, parallel Session tables, forbidden secret persistence, and embedded-session FK prohibition.`)
+console.log('Static audit does not prove migration execution, D1 schema state, runtime behavior, or AUTH-002 GREEN.')
