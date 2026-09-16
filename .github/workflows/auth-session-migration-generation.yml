@@ -1,0 +1,76 @@
+name: AUTH-002 Migration Generation
+
+on:
+  workflow_dispatch:
+    inputs:
+      migration_name:
+        description: 'Stable AUTH-002 migration name'
+        required: true
+        default: MIG-AUTH-002-SESSION-V1
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'src/payload.config.ts'
+      - 'src/collections/Users.ts'
+      - 'src/db/auth-session-state.ts'
+      - 'scripts/auth-002-migration-generation-admission.mjs'
+      - 'scripts/auth-002-migration-static-audit.mjs'
+      - '.github/workflows/auth-session-migration-generation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Validate migration generation admission
+        run: node scripts/auth-002-migration-generation-admission.mjs
+
+      - name: Generate Payload migration only
+        env:
+          MIGRATION_NAME: ${{ inputs.migration_name }}
+        run: |
+          set -euo pipefail
+          test -n "$MIGRATION_NAME"
+          printf '%s' "$MIGRATION_NAME" | grep -Eq '^MIG-AUTH-002-SESSION-V1$'
+          test ! -d src/migrations
+          npm run payload -- migrate:create "$MIGRATION_NAME"
+
+      - name: Audit generated migration
+        run: node scripts/auth-002-migration-static-audit.mjs
+
+      - name: Enforce generation-only change boundary
+        run: |
+          set -euo pipefail
+          changed=$(git status --short)
+          printf '%s\n' "$changed"
+          printf '%s\n' "$changed" | grep -Eq '^\?\? src/migrations/'
+          unexpected=$(printf '%s\n' "$changed" | grep -Ev '^\?\? src/migrations/' || true)
+          test -z "$unexpected"
+          test "$(find src/migrations -maxdepth 1 -type f \\( -name '*.ts' -o -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \\) | wc -l)" -ge 1
+
+      - name: Upload generated migration for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-002-migration-${{ github.run_id }}
+          path: src/migrations/
+          if-no-files-found: error
+          retention-days: 14
