@@ -1,0 +1,73 @@
+{
+  "version": "1.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "promotion": "NOT_GREEN",
+  "purpose": "Stable migration manifest for AUTH-002 through AUTH-006. This defines migration identity and required postconditions without claiming execution.",
+  "sourceRefs": [
+    "contracts/migration/AUTH-002-006-migration-gate.v1.md",
+    "contracts/persistence/AUTH-002-006-persistence-closure-contract.v1.md",
+    "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json"
+  ],
+  "globalRules": {
+    "ordered": true,
+    "deterministic": true,
+    "destructiveChangesRequireRecoveryContract": true,
+    "executionRequiresIsolatedVerification": true,
+    "promotionRequiresRemoteD1SchemaEvidence": true,
+    "evidenceMustReferenceExactTestedCommit": true,
+    "noMigrationExecutionClaimFromManifest": true
+  },
+  "migrations": [
+    {
+      "migrationId": "MIG-AUTH-002-SESSION-V1",
+      "featureId": "AUTH-002",
+      "entities": ["ENT-SESSION"],
+      "fieldContract": "contracts/entity/AUTH-002-session-field-contract.v1.json",
+      "requiredPostconditions": ["session identity uniqueness", "user isolation index", "expiry index", "revocation state index", "required non-null fields", "secret-derived field protected"],
+      "requiredChecks": ["empty-schema", "expected-pre-schema", "migration-apply", "post-schema", "runtime-write-read-revoke", "concurrency"],
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "migrationId": "MIG-AUTH-003-CREDENTIAL-V1",
+      "featureId": "AUTH-003",
+      "entities": ["ENT-IDENTITY", "ENT-CREDENTIAL"],
+      "fieldContract": "contracts/entity/entity-field-contract.v1.json#AUTH-003-field-contract-pending",
+      "requiredPostconditions": ["canonical identity fields exist", "versioned normalized representations exist", "authoritative uniqueness constraints exist", "secret-derived material is protected", "verification/lifecycle state is persisted"],
+      "requiredChecks": ["field-contract-complete", "empty-schema", "migration-apply", "post-schema", "normalization-uniqueness-negative-tests", "enumeration-resistance"],
+      "status": "BLOCKED_ON_FIELD_CONTRACT"
+    },
+    {
+      "migrationId": "MIG-AUTH-004-PASSWORD-RECOVERY-V1",
+      "featureId": "AUTH-004",
+      "entities": ["ENT-CREDENTIAL", "ENT-VERIFICATION", "ENT-SESSION"],
+      "fieldContract": "contracts/entity/entity-field-contract.v1.json#AUTH-004-field-contract-pending",
+      "requiredPostconditions": ["recovery challenge persisted", "purpose persisted", "token derived representation only", "expiry persisted", "single-use consumption persisted", "successful reset revokes affected sessions"],
+      "requiredChecks": ["field-contract-complete", "migration-apply", "post-schema", "expired-token-negative", "replay-negative", "raw-secret-absence", "session-revocation"],
+      "status": "BLOCKED_ON_FIELD_CONTRACT"
+    },
+    {
+      "migrationId": "MIG-AUTH-005-VERIFICATION-V1",
+      "featureId": "AUTH-005",
+      "entities": ["ENT-VERIFICATION", "ENT-CREDENTIAL", "ENT-IDENTITY"],
+      "fieldContract": "contracts/entity/entity-field-contract.v1.json#AUTH-005-field-contract-pending",
+      "requiredPostconditions": ["verification challenge persisted", "identity and channel bound", "purpose bound", "token derived representation only", "expiry persisted", "single-use consumption persisted", "credential lifecycle update is authoritative"],
+      "requiredChecks": ["field-contract-complete", "migration-apply", "post-schema", "wrong-purpose-negative", "expired-negative", "replay-negative", "concurrent-consumption"],
+      "status": "BLOCKED_ON_FIELD_CONTRACT"
+    },
+    {
+      "migrationId": "MIG-AUTH-006-PASSKEY-V1",
+      "featureId": "AUTH-006",
+      "entities": ["ENT-CREDENTIAL", "ENT-VERIFICATION", "ENT-IDENTITY"],
+      "fieldContract": "contracts/entity/entity-field-contract.v1.json#AUTH-006-field-contract-pending",
+      "requiredPostconditions": ["credential owner persisted", "public key persisted", "RP ID binding persisted", "authenticator state persisted", "challenge state persisted", "private key absent"],
+      "requiredChecks": ["field-contract-complete", "migration-apply", "post-schema", "credential-ownership-negative", "challenge-replay-negative", "signature-verification", "private-key-absence"],
+      "status": "BLOCKED_ON_FIELD_CONTRACT"
+    }
+  ],
+  "evidenceRequirements": {
+    "requiredPerMigration": ["repo", "environment", "migrationId", "exactCommitSha", "preSchemaSnapshot", "postSchemaSnapshot", "expectedPostconditions", "actualPostconditions", "testResult"],
+    "missingEvidenceMeans": "NOT_VERIFIED",
+    "emptyEvidenceRegistryMeans": "FAIL",
+    "staleCommitMeans": "FAIL"
+  }
+}
