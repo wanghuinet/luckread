@@ -1,4 +1,4 @@
-# AUTH-002 — Session Authentication Real-Evidence Reconciliation v1.3
+# AUTH-002 — Session Authentication Real-Evidence Reconciliation v1.4
 
 ## Status
 
@@ -15,12 +15,21 @@ Canonical feature: `AUTH-002` — login / logout.
 3. Payload 3.87.1 native sessions are stored as `user.sessions[]` with `id`, `createdAt`, and `expiresAt`; login creates `sid`, JWT validation checks `sid`, logout removes the session, and refresh extends `expiresAt`.
 4. Payload 3.87.1 native Session therefore cannot directly satisfy the canonical Session contract because `deviceId`, `tokenVersion`, `refreshCredentialHash`, `revokedAt`, and `lastSeenAt` are absent or semantically incompatible.
 5. The earlier persistence mapping that assumed an independent canonical `sessions` table is superseded by the native-session architecture and must not be implemented.
+6. Repository inspection confirms `src/collections/Users.ts` enables Payload auth and `src/payload.config.ts` uses `sqliteD1Adapter`, `push: false`, and `src/migrations`; however, the current `main` tree contains no executable migration artifact that can establish actual D1 schema evidence.
 
 ## Minimum integration contract
 
 `contracts/persistence/AUTH-002-minimum-session-integration-contract.v1.json` remains the implementation behavior contract.
 
-`contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json` is now the authoritative physical persistence contract for the extension state. It stores only the five unsupported canonical dimensions and keys them by the native Payload `sid`.
+`contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json` is the authoritative physical persistence contract for the extension state. It stores only the five unsupported canonical dimensions and keys them by the native Payload `sid`.
+
+## Schema evidence gate
+
+`contracts/persistence/AUTH-002-schema-evidence-capture-contract.v1.0.md` now defines the required reproducible procedure for obtaining actual Payload/D1 schema evidence.
+
+`contracts/persistence/AUTH-002-schema-evidence-manifest.v1.json` defines the machine-readable evidence package and promotion rules.
+
+These are procedural contracts only. They do not constitute actual schema evidence.
 
 ## Architecture decision
 
@@ -48,7 +57,7 @@ with:
 - `revoked_at` — durable canonical revocation timestamp;
 - `last_seen_at` — bounded activity timestamp.
 
-This table is **contract-only** until actual schema and migration evidence exists. It is explicitly not a mirror of `users.sessions[]` and must not duplicate `createdAt` or `expiresAt`.
+This table remains **contract-only** until actual schema and migration evidence exists. It is explicitly not a mirror of `users.sessions[]` and must not duplicate `createdAt` or `expiresAt`.
 
 ## Current mapping state
 
@@ -99,6 +108,8 @@ Payload 3.87.1 source analysis  = COMPLETE
 Native direct equivalence       = REJECTED
 Minimum integration contract    = CLOSED
 Extension persistence contract  = CLOSED_FOR_IMPLEMENTATION_INPUT
+Schema evidence procedure       = CLOSED
+Schema evidence execution       = NOT_EXECUTED
 Actual D1 schema                = NOT VERIFIED
 Migration artifact              = NOT VERIFIED
 Migration applied               = NOT VERIFIED
@@ -112,4 +123,4 @@ AUTH-002                        = BLOCKED_NOT_GREEN
 
 ## Next closure action
 
-Capture the real Payload-generated D1 schema first. Then implement only the minimum `auth_session_state` extension and produce its migration/execution evidence. No second full Session table may be introduced.
+Execute the schema evidence contract against a controlled Payload/D1 environment. Only its generated evidence may unlock the physical migration and runtime implementation stages. No second full Session table may be introduced.
