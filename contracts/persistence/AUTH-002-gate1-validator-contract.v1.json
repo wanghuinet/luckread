@@ -1,0 +1,62 @@
+{
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_EXECUTED",
+  "featureId": "AUTH-002",
+  "gateId": "AUTH-002-G1",
+  "purpose": "Machine-checkable acceptance rules for controlled remote D1 schema evidence.",
+  "authority": "D1-01",
+  "requiredArtifacts": [
+    "d1-info.json",
+    "migration-status.json",
+    "catalog.json",
+    "users-schema.json",
+    "users-indexes.json",
+    "users-foreign-keys.json",
+    "auth-session-state-schema.json",
+    "auth-session-state-indexes.json",
+    "auth-session-state-foreign-keys.json",
+    "provenance.json",
+    "manifest.json"
+  ],
+  "requiredPhysicalTable": "auth_session_state",
+  "requiredColumns": [
+    {"name":"session_id","type":"TEXT","notnull":1,"pk":1},
+    {"name":"user_id","type":"TEXT","notnull":1,"pk":0},
+    {"name":"device_id","type":"TEXT","notnull":1,"pk":0},
+    {"name":"token_version","type":"INTEGER","notnull":1,"pk":0},
+    {"name":"refresh_credential_hash","type":"TEXT","notnull":1,"pk":0},
+    {"name":"revoked_at","type":"TEXT","notnull":0,"pk":0},
+    {"name":"last_seen_at","type":"TEXT","notnull":0,"pk":0}
+  ],
+  "requiredIndexes": [
+    "auth_session_state_user_id_idx",
+    "auth_session_state_device_id_idx",
+    "auth_session_state_token_version_idx",
+    "auth_session_state_revoked_at_idx"
+  ],
+  "forbiddenColumns": [
+    "raw_access_token",
+    "raw_refresh_token",
+    "password"
+  ],
+  "forbiddenPhysicalSessionFk": {
+    "fromColumn": "session_id",
+    "reason": "native Payload users.sessions[] is embedded; no relational FK target exists for the embedded session element"
+  },
+  "acceptanceRules": [
+    "all required artifacts exist and are valid JSON",
+    "catalog proves users table exists",
+    "catalog proves auth_session_state table exists",
+    "auth_session_state has exactly seven contracted columns",
+    "types, nullability and primary-key role match exactly",
+    "session_id is the sole primary-key column and therefore unique",
+    "all four required indexes are present",
+    "forbidden secret columns are absent",
+    "auth_session_state.session_id has no physical FK",
+    "manifest hashes match all required evidence artifacts",
+    "workflow/database/commit provenance is internally consistent",
+    "successful validation does not promote AUTH-002 beyond Gate-1"
+  ],
+  "promotionState": "GATE1_PASS_ONLY",
+  "nonPromotionRule": "This validator proves physical evidence only. Native session runtime, migration correctness, authorization behavior, refresh concurrency and Evidence Registry binding remain unproven."
+}
