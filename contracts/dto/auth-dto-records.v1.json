@@ -1,0 +1,23 @@
+{
+  "contractId": "AUTH-DTO-RECORDS-v1.0",
+  "status": "DEFINITION_PENDING_VERIFICATION",
+  "records": [
+    {
+      "dtoId": "DTO-AUTH-REGISTER-REQUEST",
+      "kind": "request",
+      "featureId": "AUTH-001",
+      "operationId": "authRegister",
+      "fieldAuthority": "OPENAPI_REQUEST_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-REGISTER-RESPONSE",
+      "kind": "response",
+      "featureId": "AUTH-001",
+      "operationId": "authRegister",
+      "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    }
+  ],
+  "rule": "Only DTO IDs are introduced here; concrete field definitions must be copied from verified OpenAPI schemas before implementation."
+}
