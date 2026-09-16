@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/persistence/AUTH-002-schema-catalog-evidence-contract.v1.json",
   "title": "AUTH-002 Remote D1 Schema Catalog Evidence Contract",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "CONTRACTED_NOT_EXECUTED",
   "scope": "REMOTE_SCHEMA_CATALOG_ONLY",
   "requiredFiles": [
@@ -12,6 +12,7 @@
     "users-schema.json",
     "users-indexes.json",
     "users-foreign-keys.json",
+    "provenance.json",
     "manifest.json"
   ],
   "requiredMetadata": [
@@ -25,8 +26,29 @@
     "nodeVersion",
     "wranglerVersion",
     "executedAt",
+    "provenance",
     "evidenceFiles"
   ],
+  "provenance": {
+    "requiredFields": [
+      "repository",
+      "workflow",
+      "workflowRef",
+      "workflowSha",
+      "runId",
+      "runAttempt",
+      "eventName",
+      "databaseName",
+      "environmentClass"
+    ],
+    "mustMatch": {
+      "repository": "wanghuinet/luckread",
+      "workflow": "AUTH-002 Session Schema Evidence",
+      "workflowSha": "testedCommitSha",
+      "databaseName": "databaseName",
+      "environmentClass": "environmentClass"
+    }
+  },
   "environmentClass": {
     "const": "CONTROLLED_REMOTE_D1"
   },
@@ -53,6 +75,8 @@
     "schemaMustBeDatabaseQueried": true,
     "commitMustMatchTestedSource": true,
     "dependencyMustMatchLockfile": true,
+    "provenanceMustMatchExecution": true,
+    "evidenceHashesMustMatchFiles": true,
     "noSyntheticSchemaAllowed": true,
     "migrationCommandMustNotMutateDatabase": true,
     "nativeSessionRuntimeCorrelationIsNotSatisfied": true
