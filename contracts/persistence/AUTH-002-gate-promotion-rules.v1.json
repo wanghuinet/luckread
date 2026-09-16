@@ -2,12 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/persistence/AUTH-002-gate-promotion-rules.v1.json",
   "title": "AUTH-002 Evidence Gate Promotion Rules",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "CONTRACTED",
   "rules": {
     "gate1": {
       "name": "REMOTE_SCHEMA_CATALOG",
-      "promotionState": "GATE1_PASS",
+      "promotionState": "NOT_EVALUATED_UNTIL_EXECUTED",
+      "passState": "GATE1_PASS",
       "requires": [
         "all Gate-1 artifact files",
         "controlled remote D1 environment",
@@ -29,7 +30,8 @@
     },
     "gate2": {
       "name": "NATIVE_SESSION_RUNTIME",
-      "promotionState": "GATE2_PASS",
+      "promotionState": "NOT_EVALUATED_UNTIL_EXECUTED",
+      "passState": "GATE2_PASS",
       "requires": [
         "Payload 3.87.1 runtime identity",
         "disposable controlled authentication flow",
