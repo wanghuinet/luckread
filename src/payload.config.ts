@@ -6,6 +6,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig } from 'payload'
 
 import { Users } from './collections/Users'
+import { authSessionState } from './db/auth-session-state'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -28,6 +29,15 @@ export default buildConfig({
   secret: process.env.PAYLOAD_SECRET || 'development-only-secret',
   db: sqliteD1Adapter({
     binding: cloudflare.env.D1,
+    beforeSchemaInit: [
+      ({ schema }) => ({
+        ...schema,
+        tables: {
+          ...schema.tables,
+          authSessionState,
+        },
+      }),
+    ],
     push: false,
     migrationDir: path.resolve(dirname, './migrations'),
   }),
