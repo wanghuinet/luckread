@@ -87,7 +87,7 @@ jobs:
 
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 info "$DATABASE_NAME" --json > artifacts/evidence/auth-002/d1-info.json
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
-            --command 'SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE type IN (''table'',''index'',''trigger'') ORDER BY type,name;' \
+            --command 'SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE type IN ("table","index","trigger") ORDER BY type,name;' \
             > artifacts/evidence/auth-002/catalog.json
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
             --command 'PRAGMA table_info("users");' \
