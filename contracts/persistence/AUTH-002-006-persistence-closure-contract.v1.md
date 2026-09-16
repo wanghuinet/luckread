@@ -1,4 +1,4 @@
-# AUTH-002–AUTH-006 Persistence Closure Contract v1.0
+# AUTH-002–AUTH-006 Persistence Closure Contract v1.1
 
 ## Status
 
@@ -12,6 +12,7 @@ This contract freezes the persistence obligations before runtime implementation.
 - `contracts/entity/entity-catalog.v1.json`
 - `contracts/entity/entity-field-contract.v1.json`
 - `contracts/api/auth-operation-policy.v1.json`
+- `contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json`
 
 ## Common persistence invariants
 
@@ -28,21 +29,40 @@ This contract freezes the persistence obligations before runtime implementation.
 
 Canonical entity: `ENT-SESSION`.
 
-Required persisted fields are the fields frozen by `contracts/entity/AUTH-002-session-field-contract.v1.json`.
+### Native Payload persistence authority
 
-Required persistence properties:
+Payload 3.87.1 native session state in `users.sessions[]` remains authoritative for:
 
-- `id` unique and authoritative;
-- `userId` indexed relation to User;
-- `deviceId` indexed privacy-sensitive identifier;
-- `tokenVersion` indexed monotonic authorization state;
-- `refreshCredentialHash` secret-derived material and never returned;
-- `expiresAt` indexed security metadata;
-- `revokedAt` nullable write-once revocation state;
-- `createdAt` immutable audit metadata;
-- `lastSeenAt` mutable security metadata.
+- `id`;
+- `createdAt`;
+- `expiresAt`.
 
-Required verification: uniqueness, expiry lookup, revocation write, token-version change, and session isolation by user.
+These native fields MUST be reused and MUST NOT be duplicated into extension storage.
+
+### Extension persistence authority
+
+The unsupported canonical dimensions are persisted only in `auth_session_state`, keyed by the native session identifier:
+
+- `session_id` = native `users.sessions[].id`, primary key;
+- `user_id` = authoritative User identity;
+- `device_id` = canonical device binding;
+- `token_version` = server-controlled invalidation state;
+- `refresh_credential_hash` = secret-derived refresh verifier;
+- `revoked_at` = durable revocation state;
+- `last_seen_at` = bounded activity state.
+
+Required supporting indexes:
+
+- `auth_session_state_user_id_idx`;
+- `auth_session_state_device_id_idx`;
+- `auth_session_state_token_version_idx`;
+- `auth_session_state_revoked_at_idx`.
+
+`session_id` uniqueness is mandatory. A physical foreign key to a native embedded `users.sessions[]` element is not permitted; that relationship is logical.
+
+`raw_access_token`, `raw_refresh_token`, and `password` MUST NOT exist in the extension schema.
+
+Required verification: extension uniqueness, user isolation lookup, token-version state, revocation state, secret non-persistence, native session shape preservation, and one-to-one native-sid correlation.
 
 ## AUTH-003 Credential
 
@@ -121,6 +141,8 @@ For each AUTH-002–006 persistence change, the implementation batch must produc
 7. executable migration test;
 8. remote D1 schema evidence;
 9. evidence record bound to the tested commit SHA.
+
+For AUTH-002 specifically, the migration MUST create only the contracted extension state and MUST NOT modify Payload native `users.sessions[]` shape or duplicate native `id`, `createdAt`, or `expiresAt`.
 
 ## Fail-closed gate
 
