@@ -1,0 +1,103 @@
+{
+  "version":"1.1.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "featureId":"AUTH-002",
+  "entityId":"ENT-SESSION",
+  "supersedes":"contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json",
+  "purpose":"Reconcile canonical Session semantics with Payload 3.87.1 native persistence by storing only the five proven unsupported dimensions in a minimal extension record keyed by the native session id.",
+  "authority":"D1-01",
+  "nativePersistence":{
+    "owner":"Payload auth-enabled users collection",
+    "sessionLocation":"users.sessions[]",
+    "authoritativeFields":["id","createdAt","expiresAt"],
+    "mustBeReused":true
+  },
+  "extensionPersistence":{
+    "purpose":"Store only canonical dimensions absent from Payload native UserSession.",
+    "table":"auth_session_state",
+    "tableAuthority":"CONTRACT_ONLY_UNTIL_MIGRATION_EVIDENCE",
+    "primaryKey":"session_id",
+    "columns":[
+      {"fieldId":"NATIVE-SID","column":"session_id","dbType":"TEXT","nullable":false,"primaryKey":true},
+      {"fieldId":"NATIVE-USER-ID","column":"user_id","dbType":"TEXT","nullable":false},
+      {"fieldId":"ENT-SESSION-F-DEVICE-ID","column":"device_id","dbType":"TEXT","nullable":false},
+      {"fieldId":"ENT-SESSION-F-TOKEN-VERSION","column":"token_version","dbType":"INTEGER","nullable":false},
+      {"fieldId":"ENT-SESSION-F-REFRESH-CREDENTIAL-HASH","column":"refresh_credential_hash","dbType":"TEXT","nullable":false},
+      {"fieldId":"ENT-SESSION-F-REVOKED-AT","column":"revoked_at","dbType":"TEXT","nullable":true},
+      {"fieldId":"ENT-SESSION-F-LAST-SEEN-AT","column":"last_seen_at","dbType":"TEXT","nullable":true}
+    ],
+    "indexes":["auth_session_state_user_id_idx","auth_session_state_device_id_idx","auth_session_state_token_version_idx","auth_session_state_revoked_at_idx"],
+    "uniqueness":["session_id"],
+    "forbiddenColumns":["raw_access_token","raw_refresh_token","password"]
+  },
+  "canonicalMapping":{
+    "id":"users.sessions[].id = auth_session_state.session_id",
+    "userId":"users.id = auth_session_state.user_id",
+    "createdAt":"users.sessions[].createdAt",
+    "expiresAt":"users.sessions[].expiresAt",
+    "deviceId":"auth_session_state.device_id",
+    "tokenVersion":"auth_session_state.token_version",
+    "refreshCredentialHash":"auth_session_state.refresh_credential_hash",
+    "revokedAt":"auth_session_state.revoked_at",
+    "lastSeenAt":"auth_session_state.last_seen_at"
+  },
+  "authorityRules":[
+    "The native Payload session id is the only Session identity; the extension row MUST NOT mint another session identifier.",
+    "Native session existence and expiry are mandatory prerequisites for authorization.",
+    "Canonical revocation, tokenVersion and device binding are additional mandatory authorization predicates.",
+    "If either native session state or extension state is unavailable, authorization MUST fail closed.",
+    "The extension record is not a replacement or mirror of users.sessions[]; it stores only unsupported canonical dimensions.",
+    "No alternate cache may become an authorization authority."
+  ],
+  "lifecycle":{
+    "login":"Payload creates native sid; integration creates exactly one extension row for that sid.",
+    "logout":"Payload removes native session; extension revocation is durably recorded before success is reported when canonical audit requires it.",
+    "refresh":"Native sid remains stable; refresh credential verifier is atomically advanced and predecessor replay is rejected.",
+    "expiry":"Native expiresAt is authoritative and extension checks may only add restrictions.",
+    "accountInvalidation":"Increment/invalidate tokenVersion according to the canonical account-state contract; stale sessions must fail validation.",
+    "activity":"last_seen_at may be updated with bounded frequency and must never be the sole authorization predicate."
+  },
+  "migrationRules":{
+    "required":true,
+    "mustNotModifyPayloadNativeSessionShape":true,
+    "mustCreateOnlyExtensionState":true,
+    "mustProve":["actual Payload-generated users/session schema","extension table and columns","foreign-key or logical reference strategy","indexes","secret non-persistence","applied migration status"],
+    "rollback":"No destructive rollback of live session state; use compensating migration where necessary."
+  },
+  "foreignKeyPolicy":{
+    "userId":"Physical FK only after ENT-USER schema authority is proven; otherwise logical reference with application integrity checks.",
+    "sessionId":"References native users.sessions[].id logically; no physical FK is required because native session is embedded data, not a relational table row."
+  },
+  "runtimeRules":[
+    "authLogin MUST NOT report success unless native sid and extension state are both durably established when extension state is required.",
+    "session validation MUST verify native sid, native expiry, user binding, device binding, tokenVersion and revokedAt.",
+    "refresh MUST use compare-and-update or transactional equivalent on the extension record.",
+    "concurrent refresh for the same predecessor credential MUST allow at most one success.",
+    "logout MUST be idempotent and MUST NOT silently lose canonical revocation state.",
+    "refreshCredentialHash MUST never be returned, logged or included in events/DTOs."
+  ],
+  "verificationMatrix":[
+    "native session schema evidence",
+    "extension migration evidence",
+    "native sid to extension row one-to-one proof",
+    "login dual-state creation",
+    "logout revocation",
+    "expiry",
+    "tokenVersion invalidation",
+    "device binding",
+    "refresh replay prevention",
+    "concurrent refresh",
+    "lastSeenAt bounded update",
+    "no secret persistence",
+    "fail-closed disagreement behavior"
+  ],
+  "readiness":{
+    "contract":"CLOSED_FOR_IMPLEMENTATION_INPUT",
+    "schema":"NOT_VERIFIED",
+    "migration":"NOT_STARTED",
+    "runtime":"NOT_STARTED",
+    "tests":"NOT_STARTED",
+    "evidence":"NOT_BOUND",
+    "entityPromotion":"BLOCKED"
+  }
+}
