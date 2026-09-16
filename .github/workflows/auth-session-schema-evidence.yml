@@ -102,6 +102,7 @@ jobs:
               }, null, 2) + "\n"
             );
           '
+          rm -f artifacts/evidence/auth-002/migration-status.txt
           test "$migration_exit" -eq 0
 
       - name: Capture remote D1 catalog evidence
@@ -113,6 +114,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/evidence/auth-002
+          test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
 
