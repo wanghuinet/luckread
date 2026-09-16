@@ -40,10 +40,6 @@ permissions:
 env:
   WRANGLER_VERSION: 4.33.1
 
-authentication:
-  # Evidence capture never applies migrations and never mutates D1.
-  # Cloudflare credentials are read only from repository secrets at dispatch time.
-
 jobs:
   schema-evidence:
     runs-on: ubuntu-latest
