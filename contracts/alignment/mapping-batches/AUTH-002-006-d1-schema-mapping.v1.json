@@ -1,0 +1,18 @@
+{
+  "version":"1.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "promotion":"NOT_GREEN",
+  "purpose":"Freeze the mapping boundary from canonical auth entities/fields to D1 persistence without inventing physical tables or columns that are not yet evidenced.",
+  "authority":"contracts/alignment/database-entity-persistence-inventory.v1.json",
+  "rules":{"noInferredTableNames":true,"noInferredColumns":true,"noInferredIndexes":true,"noInferredConstraints":true,"realSchemaEvidenceRequired":true,"migrationEvidenceRequired":true},
+  "domain":{"domainId":"D1-01","currentPersistenceAdapter":"@payloadcms/db-d1-sqlite for verified User only","authAuxiliaryPersistenceStatus":"NOT_VERIFIED"},
+  "records":[
+    {"featureId":"AUTH-002","entityId":"ENT-SESSION","fieldContractRef":"contracts/entity/AUTH-002-session-field-contract.v1.json","physicalTableId":"PENDING_SCHEMA_EVIDENCE","columnMappings":"PENDING_FIELD_BY_FIELD_SCHEMA_EVIDENCE","indexes":"PENDING_SCHEMA_EVIDENCE","constraints":"PENDING_SCHEMA_EVIDENCE","migrationId":"MIG-AUTH-002-SESSION-V1"},
+    {"featureId":"AUTH-003","entityIds":["ENT-IDENTITY","ENT-CREDENTIAL"],"fieldContractRef":"contracts/entity/AUTH-003-credential-field-contract.v1.json","physicalTableIds":"PENDING_SCHEMA_EVIDENCE","columnMappings":"PENDING_FIELD_BY_FIELD_SCHEMA_EVIDENCE","indexes":"PENDING_SCHEMA_EVIDENCE","constraints":"PENDING_SCHEMA_EVIDENCE","migrationId":"MIG-AUTH-003-CREDENTIAL-V1"},
+    {"featureId":"AUTH-004","entityIds":["ENT-CREDENTIAL","ENT-VERIFICATION","ENT-SESSION"],"fieldContractRefs":["contracts/entity/AUTH-003-credential-field-contract.v1.json","contracts/entity/AUTH-004-password-recovery-field-contract.v1.json","contracts/entity/AUTH-002-session-field-contract.v1.json"],"physicalTableIds":"PENDING_SCHEMA_EVIDENCE","columnMappings":"PENDING_FIELD_BY_FIELD_SCHEMA_EVIDENCE","indexes":"PENDING_SCHEMA_EVIDENCE","constraints":"PENDING_SCHEMA_EVIDENCE","migrationId":"MIG-AUTH-004-PASSWORD-RECOVERY-V1"},
+    {"featureId":"AUTH-005","entityIds":["ENT-VERIFICATION","ENT-CREDENTIAL","ENT-IDENTITY"],"fieldContractRef":"contracts/entity/AUTH-005-verification-field-contract.v1.json","physicalTableIds":"PENDING_SCHEMA_EVIDENCE","columnMappings":"PENDING_FIELD_BY_FIELD_SCHEMA_EVIDENCE","indexes":"PENDING_SCHEMA_EVIDENCE","constraints":"PENDING_SCHEMA_EVIDENCE","migrationId":"MIG-AUTH-005-VERIFICATION-V1"},
+    {"featureId":"AUTH-006","entityIds":["ENT-CREDENTIAL","ENT-VERIFICATION","ENT-IDENTITY"],"fieldContractRef":"contracts/entity/AUTH-006-passkey-field-contract.v1.json","physicalTableIds":"PENDING_SCHEMA_EVIDENCE","columnMappings":"PENDING_FIELD_BY_FIELD_SCHEMA_EVIDENCE","indexes":"PENDING_SCHEMA_EVIDENCE","constraints":"PENDING_SCHEMA_EVIDENCE","migrationId":"MIG-AUTH-006-PASSKEY-V1"}
+  ],
+  "requiredSchemaEvidence":{"environment":"exact D1 target","databaseIdentifier":"exact target identity","schemaSnapshot":"pre/post migration","tableNames":"actual","columns":"actual with types/nullability/defaults","indexes":"actual","constraints":"actual","commitSha":"exact tested SHA"},
+  "promotionGate":"A record cannot leave PENDING_SCHEMA_EVIDENCE until actual D1 schema inspection and migration execution produce durable evidence tied to the same commit SHA."
+}
