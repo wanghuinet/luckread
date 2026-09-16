@@ -131,6 +131,15 @@ jobs:
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
             --command 'PRAGMA foreign_key_list("users");' \
             > artifacts/evidence/auth-002/users-foreign-keys.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
+            --command 'PRAGMA table_info("auth_session_state");' \
+            > artifacts/evidence/auth-002/auth-session-state-schema.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
+            --command 'PRAGMA index_list("auth_session_state");' \
+            > artifacts/evidence/auth-002/auth-session-state-indexes.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
+            --command 'PRAGMA foreign_key_list("auth_session_state");' \
+            > artifacts/evidence/auth-002/auth-session-state-foreign-keys.json
 
       - name: Build reproducible evidence provenance
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -176,6 +185,9 @@ jobs:
             'users-schema.json',
             'users-indexes.json',
             'users-foreign-keys.json',
+            'auth-session-state-schema.json',
+            'auth-session-state-indexes.json',
+            'auth-session-state-foreign-keys.json',
             'provenance.json',
           ];
           const sha256 = (file) => crypto.createHash('sha256').update(fs.readFileSync(`${dir}/${file}`)).digest('hex');
