@@ -8,6 +8,7 @@ const outPath = path.join(root, 'contracts/alignment/cross-system-mapping.v1.jso
 
 const BLOCKING = new Set(['MISSING','EXTRA','DRIFT','CONFLICT','DUPLICATE','UNRESOLVED','BLOCKED']);
 const REQUIRED_KEYS = ['featureId','status','apiOperationIds','entityIds','payloadCollections','codeEvidenceRefs','evidence','blockers'];
+const FEATURE_BATCH_FILE = /^B\d+(?:-.*)?\.json$/;
 
 function fail(message) {
   console.error(`MAPPING_CONSOLIDATION_BLOCKED: ${message}`);
@@ -20,10 +21,13 @@ function readJson(file) {
 }
 
 if (!fs.existsSync(batchDir)) fail('mapping batch directory is missing');
-const batchFiles = fs.readdirSync(batchDir)
+const allJsonFiles = fs.readdirSync(batchDir)
   .filter((name) => name.endsWith('.json'))
   .sort();
-if (batchFiles.length === 0) fail('no mapping batch files discovered');
+const batchFiles = allJsonFiles.filter((name) => FEATURE_BATCH_FILE.test(name));
+const excludedJsonFiles = allJsonFiles.filter((name) => !FEATURE_BATCH_FILE.test(name));
+
+if (batchFiles.length === 0) fail('no canonical feature mapping batch files discovered');
 
 const featureInventory = readJson(featurePath);
 const featureRecords = Array.isArray(featureInventory.features)
@@ -87,6 +91,8 @@ const output = {
   sourceOfTruth: 'docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md + contracts/alignment/feature-inventory.v1.json',
   generatedBy: 'scripts/consolidate-mapping-batches.mjs',
   generatedDeterministically: true,
+  inputScope: 'canonical feature mapping batches matching B<number>*.json',
+  excludedJsonFiles,
   recordCount: records.length,
   blockers: blockers.length ? [
     `Canonical mapping is NOT_GREEN: ${blockers.length} Feature IDs retain blocking status or explicit blockers.`,
@@ -96,5 +102,5 @@ const output = {
 };
 
 fs.writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`);
-console.log(`MAPPING_CONSOLIDATION: ${status}; records=${records.length}; blocking=${blockers.length}`);
+console.log(`MAPPING_CONSOLIDATION: ${status}; records=${records.length}; blocking=${blockers.length}; excluded-json=${excludedJsonFiles.length}`);
 if (status !== 'GREEN') process.exitCode = 2;
