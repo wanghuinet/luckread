@@ -1,4 +1,4 @@
-# AUTH-002 — Session Authentication Real-Evidence Reconciliation v1.0
+# AUTH-002 — Session Authentication Real-Evidence Reconciliation v1.1
 
 ## Status
 
@@ -22,12 +22,15 @@ Canonical operations currently evidenced by repository contracts:
 6. `docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md` provides L5/L6 validation claims for session creation, refresh rotation, session revocation, concurrent-session policy, session listing, device binding, expiry, login events, and compromised-session revocation.
 7. `contracts/entity/AUTH-002-session-field-contract.v1.json` freezes the canonical AUTH-002 Session field contract with explicit field IDs, types, nullability, lifecycle, classification, exposure boundaries, security invariants and verification requirements.
 8. `contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json` defines the required D1 persistence mapping, migration invariants, runtime read/write boundaries, refresh/revocation concurrency semantics and required evidence. It remains `CONTRACTED_NOT_VERIFIED`.
-9. `contracts/persistence/AUTH-002-payload-session-integration-boundary.v1.json` closes the integration-boundary decision: Payload's discovered native inventory cannot by itself prove canonical Session persistence; native equivalence must be field- and runtime-verified before it may become authoritative, and duplicate session authority is forbidden.
-10. `contracts/persistence/AUTH-002-payload-3.87.1-session-runtime-evidence-gate.v1.md` now defines the version-pinned evidence gate. It requires exact Payload 3.87.1 dependency evidence, actual D1 schema/migration evidence, runtime probes, field-by-field canonical reconciliation and security/concurrency evidence before ENT-SESSION promotion.
-11. `contracts/entity/entity-field-contract.v1.json` binds `ENT-SESSION` to the AUTH-002 Session field contract. The fields remain `CONTRACTED_NOT_VERIFIED` until executable schema/persistence/runtime evidence exists.
-12. `contracts/entity/entity-catalog.v1.json` still marks `ENT-SESSION` as `PROPOSED`; contract existence does not promote entity implementation status.
-13. `contracts/alignment/database-entity-persistence-inventory.v1.json` records the AUTH-002 Session persistence contract, while keeping persistence status unverified.
-14. Repository evidence still does not establish an executed session migration, executable `authLogin` / `authLogout` handlers, verified session persistence, runtime security behavior, or Evidence Registry execution results.
+9. `contracts/persistence/AUTH-002-payload-session-integration-boundary.v1.json` defines the single-authority boundary between Payload authentication and canonical Session persistence.
+10. `contracts/persistence/AUTH-002-payload-3.87.1-session-runtime-evidence-gate.v1.md` defines version-pinned evidence requirements.
+11. `contracts/persistence/AUTH-002-payload-native-session-decision.v1.md` records the decision that Payload native Session cannot directly satisfy the canonical Session contract without semantic loss.
+12. Pinned Payload v3.87.1 source confirms `UserSession` contains only `id`, `createdAt`, and `expiresAt`, and is persisted inside the authenticated User document as `user.sessions[]` rather than as an independent Session entity. (Pinned sources: `packages/payload/src/auth/types.ts`, `packages/payload/src/auth/sessions.ts`.)
+13. Pinned Payload v3.87.1 login creates a session UUID, persists `createdAt`/`expiresAt`, and places the session id into the JWT as `sid`. (Pinned source: `packages/payload/src/auth/operations/login.ts`.)
+14. Pinned Payload v3.87.1 JWT authentication requires a matching `user.sessions[].id`; otherwise authentication returns no user. (Pinned source: `packages/payload/src/auth/strategies/jwt.ts`.)
+15. Pinned Payload v3.87.1 logout removes the current session from `user.sessions`, or clears the array for all-session logout. It does not provide the canonical durable `revokedAt` field. (Pinned source: `packages/payload/src/auth/operations/logout.ts`.)
+16. Pinned Payload v3.87.1 refresh updates the matched session `expiresAt` and signs a new JWT; it does not replace a persisted refresh-credential hash or implement the canonical predecessor-credential rotation model. (Pinned source: `packages/payload/src/auth/operations/refresh.ts`.)
+17. Pinned Payload v3.87.1 JWT signing includes `id`, `collection`, `email`, optional `sid`, plus configured `saveToJWT` fields, and uses HS256 with JWT expiration. (Pinned sources: `packages/payload/src/auth/getFieldsToSign.ts`, `packages/payload/src/auth/jwt.ts`.)
 
 ## Mapping decision
 
@@ -42,36 +45,43 @@ Evidence-backed links may be retained:
 - `ENT-SESSION -> contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json`
 - `AUTH-002 -> contracts/persistence/AUTH-002-payload-session-integration-boundary.v1.json`
 - `AUTH-002 -> contracts/persistence/AUTH-002-payload-3.87.1-session-runtime-evidence-gate.v1.md`
+- `AUTH-002 -> contracts/persistence/AUTH-002-payload-native-session-decision.v1.md`
 
-### Resolved at contract layer
+### Resolved at contract/source-analysis layer
 
-The following contract-layer blockers are closed:
-
-- canonical session field IDs and field semantics;
+- canonical session field IDs and semantics;
 - explicit secret/non-secret classification and exposure boundary;
-- field-level invariants for device binding, token version, rotation, expiry and revocation;
-- persistence column mapping and required D1 migration semantics;
-- runtime session creation, logout, validation and refresh-rotation boundaries;
-- fail-closed migration and concurrency requirements;
+- persistence and migration invariants;
+- Runtime session creation/logout/validation/refresh boundaries;
 - Payload native-vs-canonical Session authority boundary;
-- version-pinned Session runtime evidence admission criteria.
+- pinned Payload v3.87.1 source analysis;
+- decision that native Payload Session is not directly canonical-equivalent.
+
+### Proven native incompatibilities
+
+The following canonical dimensions are absent or semantically incompatible in Payload v3.87.1 native Session:
+
+- `deviceId` — absent;
+- `tokenVersion` — absent;
+- `refreshCredentialHash` — absent; native refresh extends session expiry instead;
+- `revokedAt` — absent; native logout removes the session entry;
+- `lastSeenAt` — absent.
+
+Therefore **direct native promotion of `ENT-SESSION` is rejected**.
 
 ### Remaining blocking evidence
 
-The following remain unresolved and blocking:
-
-- canonical `ENT-SESSION` promotion from PROPOSED to VERIFIED;
-- exact installed Payload 3.87.1 dependency/runtime evidence;
-- actual D1 `sessions` schema inspection and proof of physical authority;
-- versioned migration artifact and applied migration execution evidence;
-- verified device-record persistence target for the `device_id` relationship;
-- executable `authLogin` handler binding;
-- executable `authLogout` handler binding;
-- account-state enforcement evidence at runtime;
-- token invalidation / refresh rotation evidence;
+- actual LuckRead D1 schema evidence;
+- concrete migration artifact and applied migration result;
+- chosen minimum integration implementation contract;
+- runtime implementation binding for canonical Session authority;
+- device-record authority and relationship evidence;
+- refresh rotation/replay protection tests;
+- revocation and expiry E2E tests;
+- account-state-driven invalidation tests;
 - anti-abuse executable evidence;
-- integration, concurrency and security-E2E evidence;
-- Evidence Registry records bound to executed verification results.
+- integration/concurrency/security evidence;
+- Evidence Registry execution records.
 
 ## Security boundary
 
@@ -81,7 +91,7 @@ The canonical field and persistence contracts forbid raw access/refresh token pe
 
 ## Fail-closed rule
 
-This reconciliation does not promote `AUTH-002` to GREEN. Contract existence, L5/L6 claims, or login DTO bindings do not substitute for verified schema, persistence, migration, runtime, security, lifecycle, test, and Evidence Registry execution evidence.
+This reconciliation does not promote `AUTH-002` to GREEN. Framework behavior, source inspection, contract existence, or L5/L6 claims do not substitute for executed LuckRead schema, migration, runtime, security, test and Evidence Registry evidence.
 
 Required chain:
 
@@ -89,4 +99,4 @@ Required chain:
 
 ## Next closure action
 
-Proceed from contract closure to **real version-pinned Payload 3.87.1 runtime + D1 schema/migration evidence**. The implementation may use only the frozen Session field, persistence, integration-boundary, and version-pinned evidence-gate contracts. Any discovered mismatch must produce a contract revision before implementation is accepted. Mapping 0 must remain fail-closed until the complete chain is evidenced.
+Create the **AUTH-002 Minimum Session Integration Contract v1.0**. It must define the exact single-authority model, synchronization boundary with Payload auth, and implementation semantics for the five proven native gaps before any migration or runtime code is authored.
