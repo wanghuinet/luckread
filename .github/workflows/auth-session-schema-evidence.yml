@@ -71,6 +71,7 @@ jobs:
           set -euo pipefail
           test "$EVIDENCE_ENVIRONMENT" = "CONTROLLED_REMOTE_D1"
           test -n "$DATABASE_NAME"
+          printf '%s' "$DATABASE_NAME" | grep -Eq '^[A-Za-z0-9_-]{1,64}$'
 
       - name: Capture remote D1 migration evidence
         if: ${{ github.event_name == 'workflow_dispatch' }}
