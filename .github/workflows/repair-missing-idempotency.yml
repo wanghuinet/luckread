@@ -1,0 +1,71 @@
+name: Repair Missing Idempotency Declarations
+
+on:
+  push:
+    branches: [fix/contract-idempotency-openapi]
+    paths:
+      - '.github/workflows/repair-missing-idempotency.yml'
+      - 'contracts/openapi/v1/openapi.yaml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Add only missing required idempotency declarations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('contracts/openapi/v1/openapi.yaml')
+          s = p.read_text()
+          targets = {'blockUser','unblockUser','muteUser','unmuteUser','createReport','createAppeal','createShare'}
+          lines = s.splitlines(True)
+          out=[]
+          i=0
+          while i < len(lines):
+              line=lines[i]
+              if line.startswith('      operationId: '):
+                  op=line.split(':',1)[1].strip()
+                  out.append(line); i+=1
+                  if op in targets:
+                      block=[]
+                      while i < len(lines):
+                          n=lines[i]
+                          if n.startswith('      operationId: '): break
+                          block.append(n); i+=1
+                      text=''.join(block)
+                      if 'IdempotencyKeyRequired' not in text:
+                          if '      parameters:\n' in text:
+                              text=text.replace('      parameters:\n','      parameters:\n        - $ref: \'#/components/parameters/IdempotencyKeyRequired\'\n',1)
+                          else:
+                              text='      parameters:\n        - $ref: \'#/components/parameters/IdempotencyKeyRequired\'\n'+text
+                      out.append(text)
+                      continue
+                  continue
+              out.append(line); i+=1
+          p.write_text(''.join(out))
+          PY
+      - name: Validate target declarations
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'); const yaml=require('yaml');
+          const doc=yaml.parse(fs.readFileSync('contracts/openapi/v1/openapi.yaml','utf8'));
+          const targets=new Set(['blockUser','unblockUser','muteUser','unmuteUser','createReport','createAppeal','createShare']);
+          const missing=[];
+          for(const [path,item] of Object.entries(doc.paths||{})) for(const [method,op] of Object.entries(item||{})) if(op&&typeof op==='object'&&targets.has(op.operationId)){ const refs=(op.parameters||[]).map(x=>x.$ref); if(!refs.includes('#/components/parameters/IdempotencyKeyRequired')) missing.push(op.operationId); }
+          if(missing.length) { console.error(missing.join('\n')); process.exit(1); }
+          console.log('All seven required declarations present.');
+          NODE
+      - name: Commit repair
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add contracts/openapi/v1/openapi.yaml
+          git diff --cached --quiet || git commit -m "fix(contract): restore remaining idempotency declarations"
+          git push

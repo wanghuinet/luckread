@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/notification-operation-policy.v1.json",
+  "title": "LuckRead Notification Operation Policy",
+  "version": "1.0.0",
+  "domain": "notification",
+  "operations": [
+    {
+      "operationId": "listNotifications",
+      "method": "GET",
+      "path": "/notifications",
+      "authorization": { "mode": "permission", "permission": "user.read.self", "scope": "self" },
+      "resource": { "classification": "BOUNDED_READ", "maxItems": 50 },
+      "cache": { "policy": "PRIVATE_NO_SHARED_CACHE" },
+      "retry": { "maxAttempts": 1 },
+      "event": { "mode": "NONE" },
+      "queue": { "mode": "NONE" },
+      "antiAbuse": { "required": true },
+      "idempotency": { "required": false },
+      "security": { "required": true },
+      "evidence": { "openapi": "PASS", "permission": "PASS", "state": "N/A", "resource": "MISSING", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+    },
+    {
+      "operationId": "batchUpdateNotifications",
+      "method": "PATCH",
+      "path": "/notifications",
+      "authorization": { "mode": "permission", "permission": "user.update.self", "scope": "self" },
+      "resource": { "classification": "BOUNDED_WRITE", "maxItems": 50 },
+      "cache": { "policy": "NO_STORE" },
+      "retry": { "maxAttempts": 1 },
+      "event": { "mode": "DOMAIN_EVENT" },
+      "queue": { "mode": "NONE" },
+      "antiAbuse": { "required": true },
+      "idempotency": { "required": false },
+      "security": { "required": true },
+      "evidence": { "openapi": "PASS", "permission": "PASS", "state": "N/A", "resource": "MISSING", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+    }
+  ],
+  "status": "CONTRACTED_PARTIAL"
+}

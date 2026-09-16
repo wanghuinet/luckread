@@ -1,39 +1,121 @@
 import fs from 'node:fs';
+import path from 'node:path';
 
+// Contract-only synchronizer: domain inventory is the source for membership;
+// runtime evidence is deliberately not synthesized by this script.
 const file = 'contracts/openapi/v1/openapi.yaml';
 const raw = fs.readFileSync(file, 'utf8');
+const inventoryDir = 'contracts/api';
 
-const operations = [
-`  /interactions/blocks:\n    post:\n      tags: [Interactions]\n      summary: Block a user\n      operationId: blockUser\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              required: [targetUserId]\n              properties:\n                targetUserId: { $ref: '#/components/schemas/ResourceId' }\n      responses:\n        '200': { description: Blocked (idempotent). }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /interactions/blocks/{targetUserId}:\n    parameters:\n      - name: targetUserId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n    delete:\n      tags: [Interactions]\n      summary: Unblock a user\n      operationId: unblockUser\n      responses:\n        '204': { description: Unblocked (idempotent). }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /interactions/mutes:\n    post:\n      tags: [Interactions]\n      summary: Mute a user\n      operationId: muteUser\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              required: [targetUserId]\n              properties:\n                targetUserId: { $ref: '#/components/schemas/ResourceId' }\n      responses:\n        '200': { description: Muted (idempotent). }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /interactions/mutes/{targetUserId}:\n    parameters:\n      - name: targetUserId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n    delete:\n      tags: [Interactions]\n      summary: Unmute a user\n      operationId: unmuteUser\n      responses:\n        '204': { description: Unmuted (idempotent). }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /reports:\n    post:\n      tags: [Admin]\n      summary: Create a moderation report\n      operationId: createReport\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              required: [targetType, targetId, reasonCode]\n              properties:\n                targetType: { enum: [content, comment, creator, media, profile] }\n                targetId: { $ref: '#/components/schemas/ResourceId' }\n                reasonCode: { type: string, maxLength: 128 }\n                description: { type: string, maxLength: 4000 }\n                evidenceRefs: { type: array, maxItems: 20, items: { type: string, maxLength: 512 } }\n      responses:\n        '201': { description: Report created (idempotent). }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /appeals:\n    post:\n      tags: [Admin]\n      summary: Create a moderation appeal\n      operationId: createAppeal\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              required: [moderationCaseId, reason]\n              properties:\n                moderationCaseId: { $ref: '#/components/schemas/ResourceId' }\n                reason: { type: string, minLength: 1, maxLength: 4000 }\n                evidenceRefs: { type: array, maxItems: 20, items: { type: string, maxLength: 512 } }\n      responses:\n        '201': { description: Appeal created (idempotent). }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /contents/{contentId}/revisions:\n    parameters:\n      - $ref: '#/components/parameters/ContentId'\n    get:\n      tags: [Contents]\n      summary: List immutable content revisions\n      operationId: listContentRevisions\n      parameters:\n        - $ref: '#/components/parameters/Cursor'\n        - $ref: '#/components/parameters/Limit'\n      responses:\n        '200': { description: Content revisions. }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /contents/{contentId}/revisions/{revisionId}:\n    parameters:\n      - $ref: '#/components/parameters/ContentId'\n      - name: revisionId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n    get:\n      tags: [Contents]\n      summary: Get an immutable content revision\n      operationId: getContentRevision\n      responses:\n        '200': { description: Content revision. }\n        '4XX': { $ref: '#/components/responses/ClientError' }\n    post:\n      tags: [Contents]\n      summary: Roll back content to a revision by creating a new revision\n      operationId: rollbackContentRevision\n      parameters:\n        - $ref: '#/components/parameters/IfMatchRequired'\n        - $ref: '#/components/parameters/IdempotencyKey'\n      requestBody:\n        required: false\n        content:\n          application/json:\n            schema:\n              type: object\n              properties:\n                reason: { type: string, maxLength: 2048 }\n      responses:\n        '200': { description: Rollback completed and a new revision was created. }\n        '412': { $ref: '#/components/responses/PreconditionFailed' }\n        '428': { $ref: '#/components/responses/PreconditionRequired' }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /content/{contentId}/shares:\n    post:\n      tags: [Contents]\n      summary: Create a share token for content\n      operationId: createShare\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              required: [contentId]\n              properties:\n                contentId: { $ref: '#/components/schemas/ResourceId' }\n      responses:\n        '201': { description: Share created. }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /shares/{shareId}:\n    parameters:\n      - name: shareId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n    get:\n      tags: [Contents]\n      summary: Resolve a share token\n      security: []\n      operationId: resolveShare\n      responses:\n        '200': { description: Share resolved. }\n        '404': { $ref: '#/components/responses/NotFound' }\n        '409': { $ref: '#/components/responses/InvalidState' }`,
-`  /memberships/subscriptions:\n    post:\n      tags: [Users]\n      summary: Create a subscription\n      operationId: createSubscription\n      parameters:\n        - $ref: '#/components/parameters/IdempotencyKey'\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              required: [planId]\n              properties:\n                planId: { $ref: '#/components/schemas/ResourceId' }\n      responses:\n        '201': { description: Subscription created. }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /memberships/subscriptions/{subscriptionId}:\n    parameters:\n      - name: subscriptionId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n    get:\n      tags: [Users]\n      summary: Get a subscription\n      operationId: getSubscription\n      responses:\n        '200': { description: Subscription. }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /memberships/subscriptions/{subscriptionId}/cancel:\n    parameters:\n      - name: subscriptionId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n    post:\n      tags: [Users]\n      summary: Cancel a subscription\n      operationId: cancelSubscription\n      parameters:\n        - $ref: '#/components/parameters/IfMatchRequired'\n      responses:\n        '200': { description: Subscription canceled. }\n        '412': { $ref: '#/components/responses/PreconditionFailed' }\n        '428': { $ref: '#/components/responses/PreconditionRequired' }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /entitlements/{subjectId}:\n    parameters:\n      - name: subjectId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n    get:\n      tags: [Users]\n      summary: Get effective entitlements\n      operationId: getEntitlements\n      responses:\n        '200': { description: Effective server-derived entitlements. }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /entitlements/check:\n    post:\n      tags: [Users]\n      summary: Check an entitlement\n      operationId: checkEntitlement\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              required: [subjectId, entitlement]\n              properties:\n                subjectId: { $ref: '#/components/schemas/ResourceId' }\n                entitlement: { type: string, minLength: 1, maxLength: 256 }\n      responses:\n        '200': { description: Entitlement decision. }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /organizations/{organizationId}/members:\n    parameters:\n      - name: organizationId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n    get:\n      tags: [Organizations]\n      summary: List organization members\n      operationId: listOrganizationMembers\n      parameters:\n        - $ref: '#/components/parameters/Cursor'\n        - $ref: '#/components/parameters/Limit'\n      responses:\n        '200': { description: Organization members. }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /organizations/{organizationId}/members/invitations:\n    parameters:\n      - name: organizationId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n    post:\n      tags: [Organizations]\n      summary: Invite an organization member\n      operationId: inviteOrganizationMember\n      parameters:\n        - $ref: '#/components/parameters/IdempotencyKey'\n      responses:\n        '201': { description: Organization invitation created. }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /organizations/{organizationId}/members/{memberId}:\n    parameters:\n      - name: organizationId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n      - name: memberId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n    delete:\n      tags: [Organizations]\n      summary: Remove an organization member\n      operationId: removeOrganizationMember\n      parameters:\n        - $ref: '#/components/parameters/IfMatchRequired'\n      responses:\n        '204': { description: Organization member removed. }\n        '412': { $ref: '#/components/responses/PreconditionFailed' }\n        '428': { $ref: '#/components/responses/PreconditionRequired' }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /organizations/{organizationId}/members/{memberId}/role:\n    parameters:\n      - name: organizationId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n      - name: memberId\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }\n    post:\n      tags: [Organizations]\n      summary: Change an organization member role\n      operationId: changeOrganizationMemberRole\n      parameters:\n        - $ref: '#/components/parameters/IfMatchRequired'\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              required: [role]\n              properties:\n                role: { type: string, minLength: 1, maxLength: 128 }\n      responses:\n        '200': { description: Organization member role changed. }\n        '412': { $ref: '#/components/responses/PreconditionFailed' }\n        '428': { $ref: '#/components/responses/PreconditionRequired' }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /ips/{ipId}/contents:\n    parameters:\n      - $ref: '#/components/parameters/IpId'\n    get:\n      tags: [IPs]\n      summary: List content belonging to an IP projection\n      operationId: listIpContents\n      parameters:\n        - $ref: '#/components/parameters/Cursor'\n        - $ref: '#/components/parameters/Limit'\n      responses:\n        '200': { description: IP content projection. }\n        '4XX': { $ref: '#/components/responses/ClientError' }`,
-`  /ips/{ipId}/contents/{contentId}:\n    parameters:\n      - $ref: '#/components/parameters/IpId'\n      - $ref: '#/components/parameters/ContentId'\n    get:\n      tags: [IPs]\n      summary: Get an IP content projection\n      operationId: getIpContent\n      responses:\n        '200': { description: IP content projection. }\n        '4XX': { $ref: '#/components/responses/ClientError' }`
-];
+function operationFiles() {
+  return fs.readdirSync(inventoryDir)
+    .filter((name) => name.endsWith('-operation-policy.v1.json'))
+    .sort();
+}
 
-const missing = operations.filter((block) => {
-  const match = block.match(/operationId:\s*([^\n]+)/);
-  return match && !raw.includes(`operationId: ${match[1].trim()}`);
-});
+const canonicalPathOverrides = new Map([
+  ['reportInteractionResource', '/interactions/reports'],
+]);
 
-if (missing.length === 0) {
-  console.log('canonical OpenAPI already contains all RC operations');
+function readOperations() {
+  const out = [];
+  for (const name of operationFiles()) {
+    const doc = JSON.parse(fs.readFileSync(path.join(inventoryDir, name), 'utf8'));
+    if (!Array.isArray(doc.operations)) continue;
+    for (const op of doc.operations) {
+      if (!op?.operationId || !op.method || !op.path) continue;
+      out.push({ ...op, path: canonicalPathOverrides.get(op.operationId) ?? op.path, source: name });
+    }
+  }
+  return out;
+}
+
+function existingOperations(text) {
+  const set = new Set();
+  for (const line of text.split(/\r?\n/)) {
+    const match = line.match(/^\s+operationId:\s*([^#\s]+)/);
+    if (match) set.add(match[1]);
+  }
+  return set;
+}
+
+function pathParameters(route) {
+  const names = [...route.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]);
+  if (!names.length) return '';
+  return `    parameters:\n${names.map((name) => `      - name: ${name}\n        in: path\n        required: true\n        schema: { $ref: '#/components/schemas/ResourceId' }`).join('\n')}\n`;
+}
+
+function block(op) {
+  const method = String(op.method).toLowerCase();
+  const status = method === 'delete' ? '204' : '200';
+  const response = method === 'delete' ? 'Deleted.' : 'Operation completed.';
+  const body = ['post', 'put', 'patch'].includes(method)
+    ? `      requestBody:\n        required: false\n        content:\n          application/json:\n            schema: { type: object, additionalProperties: true }\n`
+    : '';
+  return `  ${op.path}:\n${pathParameters(op.path)}    ${method}:\n      tags: [API]\n      summary: Canonical ${op.operationId}\n      operationId: ${op.operationId}\n${body}      responses:\n        '${status}': { description: ${response} }\n        '4XX': { $ref: '#/components/responses/ClientError' }`;
+}
+
+const interactionPolicyFile = path.join(inventoryDir, 'interaction-operation-policy.v1.json');
+if (fs.existsSync(interactionPolicyFile)) {
+  const interactionDoc = JSON.parse(fs.readFileSync(interactionPolicyFile, 'utf8'));
+  let changed = false;
+  for (const op of interactionDoc.operations ?? []) {
+    if (op.operationId === 'reportInteractionResource' && op.path !== '/interactions/reports') {
+      op.path = '/interactions/reports';
+      changed = true;
+    }
+  }
+  if (changed) {
+    fs.writeFileSync(interactionPolicyFile, JSON.stringify(interactionDoc, null, 2) + '\n');
+    console.log('normalized reportInteractionResource path to /interactions/reports');
+  }
+}
+
+function syncOperationPolicy() {
+  const policyFile = 'contracts/openapi/v1/operation-policy.json';
+  const policy = JSON.parse(fs.readFileSync(policyFile, 'utf8'));
+  const existing = new Map((policy.operations ?? []).map((op) => [op.operationId, op]));
+  const inventoryOps = readOperations();
+  let changed = false;
+  for (const op of inventoryOps) {
+    if (existing.has(op.operationId)) continue;
+    const required = op.authorization?.required === true;
+    const permission = op.authorization?.permission;
+    const stateMachineRequired = op.stateMachine?.required === true;
+    policy.operations.push({
+      operationId: op.operationId,
+      auth: { mode: stateMachineRequired ? 'state-machine' : required ? (permission ? 'permission' : 'authenticated') : 'public' },
+      permissions: permission ? [permission] : [],
+      stateMachine: stateMachineRequired ? (op.operationId.toLowerCase().includes('account') ? 'account' : 'content') : 'none',
+      idempotencyRequired: op.idempotency?.required === true,
+      optimisticLockRequired: op.retry?.requiresOptimisticConcurrency === true,
+      auditRequired: true
+    });
+    changed = true;
+  }
+  if (changed) {
+    fs.writeFileSync(policyFile, JSON.stringify(policy, null, 2) + '\n');
+    console.log(`synchronized ${policy.operations.length - existing.size} domain inventory operations into ${policyFile}`);
+  }
+}
+
+syncOperationPolicy();
+
+const ops = readOperations();
+const seenRoute = new Map();
+for (const op of ops) {
+  const key = `${String(op.method).toUpperCase()} ${op.path}`;
+  const prior = seenRoute.get(key);
+  if (prior && prior.operationId !== op.operationId) {
+    throw new Error(`AMBIGUOUS_CANONICAL_ROUTE ${key}: ${prior.operationId} vs ${op.operationId}`);
+  }
+  seenRoute.set(key, op);
+}
+
+const existing = existingOperations(raw);
+const missing = ops.filter((op) => !existing.has(op.operationId));
+if (!missing.length) {
+  console.log('canonical OpenAPI already contains all domain inventory operations');
   process.exit(0);
 }
 
@@ -41,7 +123,6 @@ const marker = '\ncomponents:\n';
 const index = raw.indexOf(marker);
 if (index < 0) throw new Error('canonical OpenAPI components marker not found');
 
-const insertion = `\n${missing.join('\n\n')}\n`;
-const next = raw.slice(0, index) + insertion + raw.slice(index);
-fs.writeFileSync(file, next);
-console.log(`added ${missing.length} RC operations to ${file}`);
+const insertion = `\n${missing.map(block).join('\n\n')}\n`;
+fs.writeFileSync(file, raw.slice(0, index) + insertion + raw.slice(index));
+console.log(`added ${missing.length} domain inventory operations to ${file}`);
