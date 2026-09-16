@@ -4,7 +4,7 @@
 BLOCKED_NOT_GREEN
 
 ## Scope
-This reconciliation uses the canonical Batch 09 Feature IDs from `docs/00-LUCKREAD-BLUEPRINT-ENHANCEMENT-BATCH-09-DEVELOPER-MINIAPP-OPENPLATFORM-GAME-v1.0.md` and the existing Open Platform L1-L4 admission contract. Batch 09 contains 54 feature IDs: DEV-001..021 (21), MINIAPP-001..012 (12), GAME-001..008 (8), MARKETPLACE-008..013 (6), for a total of 47? The canonical list must be treated literally; the explicit IDs total 47 (21+12+8+6). No additional IDs are invented here.
+This reconciliation uses the canonical Batch 09 Feature IDs from `docs/00-LUCKREAD-BLUEPRINT-ENHANCEMENT-BATCH-09-DEVELOPER-MINIAPP-OPENPLATFORM-GAME-v1.0.md` and the existing Open Platform L1-L4 admission contract. Batch 09 contains 47 canonical feature IDs: DEV-001..021 (21), MINIAPP-001..012 (12), GAME-001..008 (8), MARKETPLACE-008..013 (6). No additional IDs are invented here.
 
 ## Canonical feature inventory
 
@@ -20,27 +20,27 @@ GAME-001 Game registration; GAME-002 Game account / identity integration; GAME-0
 ### Marketplace — 6
 MARKETPLACE-008 App marketplace catalog; MARKETPLACE-009 App eligibility / review; MARKETPLACE-010 App publication / distribution; MARKETPLACE-011 App suspension / removal; MARKETPLACE-012 App discovery / search; MARKETPLACE-013 App ratings / reviews.
 
-The canonical Batch 09 document defines these IDs and states that implementation remains Feature ID -> Contract -> reuse/refactor -> code -> tests/CI -> SHA evidence. fileciteturn563file0
+The canonical Batch 09 document defines these IDs and states that implementation remains Feature ID -> Contract -> reuse/refactor -> code -> tests/CI -> SHA evidence.
 
 ## Evidence baseline
 
-The Open Platform traceability contract is `TRACEABILITY-COMPLETE / CONTRACT-ADMISSION-READY / IMPLEMENTATION PENDING`. Its required chain is `L1 → L2 → L3 → L4 → Data → API → Event → Permission/Security → Cost/Runtime → Test/Acceptance`. It explicitly states that implementation is blocked until corresponding Data/API/Event/Security/Cost/Test contracts exist for the specific capability. fileciteturn566file0
+The Open Platform traceability contract is `TRACEABILITY-COMPLETE / CONTRACT-ADMISSION-READY / IMPLEMENTATION PENDING`. Its required chain is `L1 → L2 → L3 → L4 → Data → API → Event → Permission/Security → Cost/Runtime → Test/Acceptance`. It explicitly states that implementation is blocked until corresponding Data/API/Event/Security/Cost/Test contracts exist for the specific capability.
 
 ## Per-feature gate result
 
 All 47 canonical features are **BLOCKED_NOT_GREEN**. The repository evidence establishes architecture/authority boundaries, but does not prove a complete current executable chain for each feature.
 
 ### DEV-001..021
-For each DEV feature, closure still requires the applicable canonical Data/API/Event/Permission/Security/Cost/Runtime/Test evidence. In particular, public APIs require stable `/v1` contract, owner, DTO, authentication, scope, privacy classification, rate/quota, idempotency where applicable, error model, pagination, version/deprecation policy and acceptance tests. Webhooks require event identity, schema version, timestamps, signed delivery, retry, replay protection and acknowledgment semantics. fileciteturn566file0
+For each DEV feature, closure still requires the applicable canonical Data/API/Event/Permission/Security/Cost/Runtime/Test evidence. In particular, public APIs require stable `/v1` contract, owner, DTO, authentication, scope, privacy classification, rate/quota, idempotency where applicable, error model, pagination, version/deprecation policy and acceptance tests. Webhooks require event identity, schema version, timestamps, signed delivery, retry, replay protection and acknowledgment semantics.
 
 ### MINIAPP-001..012
-Mini Apps are contractually sandboxed and public-API-only; they cannot obtain raw storage access, privileged arbitrary execution or payment/ledger bypass. Their lifecycle is `DRAFT -> REVIEWING -> APPROVED -> PUBLISHED -> UPDATED -> SUSPENDED -> REMOVED`. Each must declare manifest, capabilities, permissions, runtime requirements, data access and external domains, with review before publication and re-review for sensitive capability escalation. fileciteturn563file0turn566file0
+Mini Apps are contractually sandboxed and public-API-only; they cannot obtain raw storage access, privileged arbitrary execution or payment/ledger bypass. Their lifecycle is `DRAFT -> REVIEWING -> APPROVED -> PUBLISHED -> UPDATED -> SUSPENDED -> REMOVED`. Each must declare manifest, capabilities, permissions, runtime requirements, data access and external domains, with review before publication and re-review for sensitive capability escalation.
 
 ### GAME-001..008
-Games reuse platform identity/authentication, analytics, payment/entitlement and safety boundaries. Game-specific state remains game-owned and must not create alternate wallet/account/entitlement truth. Closure requires executable integration, lifecycle, authorization, event, safety and monetization evidence. fileciteturn563file0turn566file0
+Games reuse platform identity/authentication, analytics, payment/entitlement and safety boundaries. Game-specific state remains game-owned and must not create alternate wallet/account/entitlement truth. Closure requires executable integration, lifecycle, authorization, event, safety and monetization evidence.
 
 ### MARKETPLACE-008..013
-Marketplace is the publication authority for catalog, eligibility, review, publication/distribution, versioning/rollback, ratings/reviews, suspension/removal and discovery indexing. Publication cannot bypass safety, rights or review requirements. Closure requires executable lifecycle, search/discovery, review, authorization, rollback/removal and audit evidence. fileciteturn563file0
+Marketplace is the publication authority for catalog, eligibility, review, publication/distribution, versioning/rollback, ratings/reviews, suspension/removal and discovery indexing. Publication cannot bypass safety, rights or review requirements. Closure requires executable lifecycle, search/discovery, review, authorization, rollback/removal and audit evidence.
 
 ## Cross-system blockers
 
@@ -66,7 +66,7 @@ For every feature, applicable evidence must close:
 
 Open Platform's own admission chain additionally requires:
 
-`L1 → L2 → L3 → L4 → Data → API → Event → Permission/Security → Cost/Runtime → Test/Acceptance`. fileciteturn566file0
+`L1 → L2 → L3 → L4 → Data → API → Event → Permission/Security → Cost/Runtime → Test/Acceptance`.
 
 ## Gate decision
 
