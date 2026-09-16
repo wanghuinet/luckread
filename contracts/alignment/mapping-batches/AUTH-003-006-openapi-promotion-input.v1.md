@@ -55,6 +55,55 @@ The current feature contract uses **passkey assertion** terminology and paths, n
 
 Source: `contracts/api/AUTH-006-passkey-webauthn-contract.v1.json`.
 
+## Schema admission audit
+
+The four feature API contracts identify operation IDs, methods, paths, DTO IDs, authorization rules, and selected security invariants, but they do **not** provide complete OpenAPI request/response schemas for every referenced DTO.
+
+The current canonical OpenAPI document contains concrete inline schemas for the already-admitted Auth operations (`authRegister`, `authLogin`, `authLogout`) but no admitted operation/schema definition for AUTH-003～006.
+
+Therefore the following data is still **UNRESOLVED** and must not be inferred from entity fields, persistence mappings, implementation types, or DTO names alone:
+
+| Feature | Missing canonical inputs |
+|---|---|
+| AUTH-003 | list/add/replace/remove request and response schemas; `credentialId` parameter schema; exact status/error semantics |
+| AUTH-004 | change/reset-request/reset-confirm request and response schemas; exact recovery-token input shape; exact status/error semantics |
+| AUTH-005 | verification request/confirm/revoke request and response schemas; exact challenge/token representation; exact status/error semantics |
+| AUTH-006 | registration/assertion option and verification schemas; WebAuthn transport/credential representation; exact status/error semantics |
+
+### Non-inference rule
+
+The following are explicitly **not** sufficient to construct a canonical DTO/OpenAPI schema:
+
+- entity field contracts alone;
+- persistence mapping rows;
+- TypeScript types inferred from implementation;
+- Payload-generated types;
+- DTO identifier names;
+- historical/archived OpenAPI documents;
+- example payloads without an approved schema contract;
+- implementation behavior not yet bound to a canonical API contract.
+
+## Promotion gate
+
+AUTH-003～006 may enter the canonical OpenAPI/DTO authority chain only after the missing request/response/status/error schemas are explicitly contracted and then represented in OpenAPI.
+
+Required sequence:
+
+1. Freeze each operation's exact request/response contract.
+2. Add the exact route, parameters, security, request schema, success response, and canonical error responses to `contracts/openapi/v1/openapi.yaml`.
+3. Run OpenAPI structural validation.
+4. Update the canonical DTO registry from the validated OpenAPI document.
+5. Reconcile AUTH-003～006 persistence Mapping rows to the resulting canonical operation/DTO IDs.
+6. Run Mapping-0 and bind the result to the tested commit SHA.
+
+No step may be skipped by copying IDs between contracts.
+
+## Promotion decision for this batch
+
+`NO_OPENAPI_WRITE_YET`
+
+Reason: the authoritative feature contracts currently do not contain enough exact DTO schema material to safely write the missing OpenAPI paths without invention. The next contract-first batch must close DTO schema definitions before modifying the canonical OpenAPI document.
+
 ## Promotion blockers
 
 1. The current OpenAPI file has no exact route for these AUTH-003～006 operations.
