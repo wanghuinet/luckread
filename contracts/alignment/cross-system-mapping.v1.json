@@ -300,8 +300,13 @@
     {
       "featureId": "USER-001",
       "status": "UNRESOLVED",
-      "apiOperationIds": [],
-      "entityIds": [],
+      "apiOperationIds": [
+        "getMe",
+        "updateMe"
+      ],
+      "entityIds": [
+        "ENT-USER"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
@@ -370,7 +375,12 @@
     {
       "featureId": "USER-006",
       "status": "UNRESOLVED",
-      "apiOperationIds": [],
+      "apiOperationIds": [
+        "blockUser",
+        "unblockUser",
+        "muteUser",
+        "unmuteUser"
+      ],
       "entityIds": [],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
