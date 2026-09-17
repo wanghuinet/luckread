@@ -1,0 +1,68 @@
+name: Reconcile Canonical USER Mapping
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/reconcile-canonical-user-mapping.mjs'
+      - 'contracts/alignment/mapping-batches/USER-001-006-evidence-bound-mapping-delta-2026-09-17.v1.json'
+      - '.github/workflows/reconcile-canonical-user-mapping.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: canonical-user-mapping-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Reconcile explicitly verified USER edges
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+          node scripts/reconcile-canonical-user-mapping.mjs
+
+      - name: Commit and push reconciled mapping
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          for attempt in 1 2 3; do
+            if git diff --quiet -- contracts/alignment/cross-system-mapping.v1.json; then
+              echo 'No canonical USER mapping changes required.'
+              exit 0
+            fi
+
+            git add contracts/alignment/cross-system-mapping.v1.json
+            git commit -m 'chore(mapping): reconcile canonical USER mapping'
+
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+
+            echo "Push race detected on attempt ${attempt}; rebasing computation onto latest main."
+            git fetch origin main
+            git reset --hard origin/main
+            node scripts/reconcile-canonical-user-mapping.mjs
+          done
+
+          echo 'Unable to push canonical USER mapping after 3 attempts.'
+          exit 1
