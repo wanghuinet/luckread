@@ -9,10 +9,16 @@ on:
   workflow_run:
     workflows: ["Canonical OpenAPI RC Sync"]
     types: [completed]
+  workflow_call:
+    inputs:
+      checkout_ref:
+        description: 'Exact commit to validate'
+        required: false
+        type: string
   workflow_dispatch:
 
 env:
-  CHECKOUT_REF: ${{ github.event.workflow_run.head_sha || github.sha }}
+  CHECKOUT_REF: ${{ inputs.checkout_ref || github.event.workflow_run.head_sha || github.sha }}
   RUN_AFTER_SYNC: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
 
 permissions:
