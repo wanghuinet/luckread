@@ -46,7 +46,10 @@ for (const [name, expected] of Object.entries(required)) {
 const nodeMajor = Number(process.versions.node.split('.')[0])
 if (nodeMajor < 24) fail(`Node 24+ is required for W01; current Node is ${process.versions.node}`)
 
-const pnpmVersion = run('pnpm', ['--version'])
+// On Windows, pnpm is normally exposed as pnpm.cmd. PowerShell can resolve
+// the command interactively, while Node's execFileSync requires the .cmd shim.
+const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+const pnpmVersion = run(pnpmCommand, ['--version'])
 if (!pnpmVersion) fail('pnpm is not available; install a supported pnpm 9/10/11 toolchain before generating the lockfile')
 
 const pnpmMajor = Number(pnpmVersion.split('.')[0])
@@ -55,6 +58,7 @@ if (![9, 10, 11].includes(pnpmMajor)) fail(`pnpm 9/10/11 is required; current pn
 if (existsSync(lockPath)) {
   console.log('PASS: W01 pnpm-lock.yaml exists')
   console.log(`LOCKFILE=${lockPath}`)
+  console.log(`PNPM=${pnpmVersion}`)
   console.log('Next: run the W01 exact-resolution evidence probe and install verification.')
   process.exit(0)
 }
