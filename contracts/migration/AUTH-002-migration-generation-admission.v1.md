@@ -1,23 +1,32 @@
-# AUTH-002 — Migration Generation Admission Gate v1.0
+# AUTH-002 — Migration Generation Admission Gate v1.1
 
 ## Status
 
 `CONTRACTED / GENERATION_BLOCKED_UNTIL_INPUTS_CLOSED`
 
+## Runtime authority
+
+The active runtime authority for this contract is `workers/W01-payload/`.
+The active Payload baseline is the official `templates/with-cloudflare-d1` dependency family recorded by the W01 upstream manifest: Payload `3.82.1` and `@payloadcms/db-d1-sqlite` `3.82.1`.
+
+Historical AUTH-002 evidence that references Payload `3.87.1` is not current runtime evidence and must not satisfy this admission gate.
+
 ## Purpose
 
-Define the exact conditions under which a Payload 3.87.1 migration artifact for AUTH-002 may be generated and reviewed. This contract does not apply migrations and does not promote AUTH-002.
+Define the exact conditions under which an AUTH-002 migration artifact may be generated and reviewed. This contract does not apply migrations and does not promote AUTH-002.
 
 ## Required authority inputs
 
 1. `contracts/entity/AUTH-002-session-field-contract.v1.json`
 2. `contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json`
 3. `contracts/migration/AUTH-002-006-migration-manifest.v1.json`
-4. Payload 3.87.1 `Users` configuration and D1 adapter configuration on the exact tested commit.
+4. `workers/W01-payload/src/collections/Users.ts`
+5. `workers/W01-payload/src/payload.config.ts`
+6. W01 package contract and lockfile evidence for the exact tested commit.
 
 ## Native-session invariant
 
-Payload native `users.sessions[]` remains the only source of native session identity. Native fields `id`, `createdAt`, and `expiresAt` must remain owned by Payload. The AUTH-002 extension migration must not create a second full Session table or duplicate those native fields.
+Payload native `users.sessions[]` remains the only source of native session identity. Native fields `id`, `createdAt`, and `expiresAt` must remain owned by Payload when runtime/schema evidence proves those representations. The AUTH-002 extension migration must not create a second full Session table or duplicate native fields.
 
 ## Extension schema target
 
@@ -46,11 +55,12 @@ Forbidden columns:
 
 ## Generation rules
 
-- Migration must be generated from the frozen repository configuration/contract input, not improvised during DDL authoring.
+- Migration must be generated from the frozen W01 repository configuration and approved contract input, not improvised during DDL authoring.
 - Generation must be deterministic for the same repository state and migration input.
 - `push: false` must remain enabled.
 - Generated artifact must be reviewable before application.
 - No migration application occurs in the generation step.
+- Actual installed Payload/D1 schema evidence must precede any promotion of canonical field equivalence.
 
 ## Pre-application review
 
@@ -66,7 +76,7 @@ The artifact is rejected when it:
 
 ## Verification sequence
 
-`GENERATED` → `STATIC_REVIEWED` → `EMPTY_SCHEMA_TESTED` → `EXPECTED_PRE_SCHEMA_TESTED` → `EXECUTION_ADMITTED`.
+`DEPENDENCY_EVIDENCE` → `GENERATED` → `STATIC_REVIEWED` → `EMPTY_SCHEMA_TESTED` → `EXPECTED_PRE_SCHEMA_TESTED` → `EXECUTION_ADMITTED`.
 
 Failure at any stage blocks subsequent stages.
 
