@@ -1,0 +1,1142 @@
+# LuckRead Mapping 0 全绿收口——DeepSeek 批量执行指令
+
+你现在负责直接推进 GitHub 仓库：
+
+`wanghuinet/luckread`
+
+目标只有一个：
+
+> **在不降低任何 Contract / Gate / Evidence 标准、不虚构实现、不破坏现有架构的前提下，把 Mapping 0 从当前 NOT_GREEN 收口到真实 GREEN。**
+
+你不是来重新设计 LuckRead 的。
+
+你也不是来讨论架构的。
+
+你现在执行的是：
+
+> **Mapping → Contract → Evidence → Gate → GREEN 收口工程。**
+
+---
+
+# 一、最高优先级工程规则
+
+严格遵守以下规则，任何规则都不得自行放宽。
+
+## 1. Contract-First
+
+遵守：
+
+> Blueprint 定义 WHAT
+> Contract 定义 WHAT + RULE
+> Code 实现 HOW
+> Evidence 证明 DONE
+
+任何发现的问题，都按照：
+
+> GAP → Change Control → Contract/Blueprint 更新 → Reconciliation → Evidence → GREEN
+
+处理。
+
+禁止为了让 CI 通过而修改 Gate 逻辑、降低门槛、跳过检查、删除失败项。
+
+---
+
+## 2. Mapping 0 必须是真 GREEN
+
+禁止以下行为：
+
+* 把 `MISSING` 改成 `VERIFIED`
+* 把 `BLOCKED` 改成 `VERIFIED`
+* 用文档存在代替代码实现证据
+* 用代码文件存在代替运行证据
+* 用 Entity 名称猜 Persistence
+* 用 Payload 默认能力猜业务实现
+* 用 OpenAPI operation 猜后端实现
+* 删除未完成 Feature
+* 删除 canonical mapping record
+* 修改 Gate 让它忽略 unresolved records
+* 修改统计脚本让数字看起来变绿
+* 把历史 baseline 当作当前实现证据
+* 伪造 commit SHA、测试结果、migration result、table、index、foreign key
+* 为了减少工作量合并/删除 Feature
+* 把 D1-Fabric 的架构或代码重新引入 LuckRead Payload 项目
+
+如果没有真实证据，就保持：
+
+`MISSING / BLOCKED / DISCOVERY_DRAFT`
+
+不要伪造。
+
+---
+
+# 二、当前架构边界
+
+LuckRead Payload 项目与 D1-Fabric 完全分离。
+
+**严禁重新引入 D1-Fabric。**
+
+当前目标架构方向：
+
+> **12 Workers / 4 D1**
+
+Payload 位于：
+
+> **W01**
+
+采用 Cloudflare-compatible Payload 路线。
+
+不要重新切换成标准 Payload/Postgres 架构。
+
+不要重新设计 Worker 数量。
+
+不要重新设计 D1 数量。
+
+不要因为“行业标准”擅自增加架构能力。
+
+如果发现架构 GAP：
+
+1. 先检查现有 Blueprint / Contract；
+2. 如果已有定义，按现有定义实现；
+3. 如果确实没有定义，建立 GAP；
+4. 只有必要时才进行 Change Control；
+5. 不要直接自由发挥。
+
+---
+
+# 三、当前 Mapping 0 核心问题
+
+当前 Mapping 0 不是“文档有没有写完”的问题。
+
+主要问题集中在：
+
+## A. Canonical Mapping
+
+真实 source of truth：
+
+`contracts/alignment/cross-system-mapping.v1.json`
+
+必须以它为准。
+
+不要相信某个 README、报告或旧文档里写的 GREEN。
+
+---
+
+## B. Feature Inventory
+
+当前 Feature Inventory 大约：
+
+> 449 canonical features
+
+必须保证：
+
+* Feature 不丢
+* Feature ID 稳定
+* 不重复
+* 不擅自删除
+* 不擅自合并
+* 每个 canonical feature 都能够继续追踪到：
+
+  * Contract
+  * API / capability
+  * Entity
+  * Persistence
+  * Code
+  * Evidence
+  * Gate
+
+---
+
+## C. R4 Persistence
+
+这是当前最大阻塞之一。
+
+之前 Gate 暴露：
+
+> `449 missing-entity-binding`
+
+以及：
+
+> Feature Entity Persistence Registry 当前基本为空
+
+你的任务不是直接填 449 条。
+
+你的任务是：
+
+> **从现有 Contract / Blueprint / Entity Catalog / Code / Payload Inventory / Migration / Schema / Evidence 中反向建立真实映射。**
+
+建立：
+
+`Feature → Entity → Persistence → Evidence`
+
+只有找到真实证据才能关闭。
+
+---
+
+# 四、必须先读取的文件
+
+进入仓库后，不要先写代码。
+
+先读取并建立当前状态。
+
+至少检查：
+
+```text
+contracts/alignment/cross-system-mapping.v1.json
+contracts/alignment/feature-inventory.v1.json
+contracts/alignment/api-inventory.v1.json
+contracts/alignment/payload-inventory.v1.json
+contracts/alignment/code-evidence-inventory.v1.json
+contracts/alignment/five-way-reconciliation.v1.json
+
+contracts/openapi/v1/openapi.yaml
+contracts/openapi/v1/operation-policy.json
+
+contracts/api/api-inventory.v1.json
+contracts/api/*-operation-policy.v1.json
+
+contracts/capability/**
+contracts/entity/**
+contracts/persistence/**
+contracts/evidence/**
+
+docs/**
+scripts/mapping-0-*.mjs
+scripts/*alignment*.mjs
+scripts/*reconciliation*.mjs
+scripts/*evidence*.mjs
+scripts/*entity*.mjs
+scripts/*persistence*.mjs
+```
+
+同时检查：
+
+```text
+.github/workflows/contract-ci.yml
+.github/workflows/canonical-openapi-sync.yml
+```
+
+以及：
+
+```text
+package.json
+```
+
+---
+
+# 五、第一步：完整运行 Mapping 0 诊断
+
+不要猜。
+
+先执行现有官方 Gate / report。
+
+重点执行：
+
+```bash
+npm ci
+```
+
+然后运行：
+
+```bash
+npm run mapping:0:verify
+```
+
+以及 Contract CI 中对应的脚本：
+
+```bash
+node scripts/build-feature-inventory.mjs
+node scripts/consolidate-mapping-batches.mjs
+node scripts/alignment-ci.mjs
+
+node scripts/build-capability-contract-graph.mjs
+node scripts/capability-contract-graph-check.mjs
+
+node scripts/entity-catalog-check.mjs
+node scripts/entity-implementation-evidence-check.mjs
+node scripts/entity-field-contract-check.mjs
+node scripts/entity-field-schema-contract-check.mjs
+
+node scripts/mapping-0-r4-evidence-gap-report.mjs
+node scripts/feature-entity-persistence-registry-check.mjs
+
+node scripts/mapping-0-evidence-registry-final-check.mjs
+node scripts/mapping-0-status-report.mjs
+```
+
+如果某个脚本名称略有变化：
+
+> 从仓库实际存在的脚本中寻找对应实现。
+
+不要自己重新写一个“看起来类似”的 Gate。
+
+---
+
+# 六、建立真正的 Gap Matrix
+
+把当前所有失败项分成以下类别：
+
+```text
+MAPPING
+FEATURE_INVENTORY
+ENTITY
+PERSISTENCE
+API
+OPENAPI
+CAPABILITY
+CODE_EVIDENCE
+RUNTIME_EVIDENCE
+EVIDENCE_REGISTRY
+FIVE_WAY_ALIGNMENT
+CI
+```
+
+每条记录至少包含：
+
+```text
+featureId
+domain
+currentStatus
+blockingGate
+requiredEvidence
+existingEvidence
+missingEvidence
+sourceFiles
+nextAction
+```
+
+然后按照：
+
+> 自动可修复 → 可从现有代码/合同推导 → 需要新增代码 → 需要真实运行证据 → 必须人工/外部环境
+
+排序。
+
+---
+
+# 七、最重要：批量关闭 Entity / Persistence
+
+不要逐条人工分析 449 次。
+
+要建立**批处理规则**。
+
+例如：
+
+如果 Feature 明确属于：
+
+```text
+Content
+User
+Media
+Comment
+Like
+Follow
+Notification
+Subscription
+Entitlement
+Organization
+IP
+Creator
+Revision
+Report
+Appeal
+Share
+```
+
+先从现有 Entity Catalog 中寻找对应 Entity。
+
+然后验证：
+
+1. Entity 是否已经在 Contract 中定义；
+2. Entity 是否存在 Payload collection / schema；
+3. Entity 是否存在字段 Contract；
+4. Entity 是否存在数据库持久化定义；
+5. 是否有 migration/schema/index/foreign-key 证据；
+6. 是否有 implementation evidence；
+7. 是否有对应 feature mapping。
+
+只有全部满足要求，才能把对应 record 关闭。
+
+---
+
+# 八、绝对不要创造不存在的 Entity
+
+例如：
+
+Feature：
+
+```text
+feature-content-create
+```
+
+不能仅仅因为看到：
+
+```text
+POST /contents
+```
+
+就写：
+
+```text
+entity = Content
+persistence = verified
+```
+
+必须继续检查：
+
+```text
+Content Entity Contract
+Payload collection
+schema
+fields
+migration
+runtime evidence
+```
+
+如果只有 API：
+
+> API evidence ≠ persistence evidence
+
+必须保持未闭合。
+
+---
+
+# 九、API / OpenAPI 当前已经有一个重要状态
+
+Canonical API surface 已经完成结构同步：
+
+> OpenAPI operations = 151
+> API Inventory operations = 151
+> consolidated operation policy = 151
+> Inventory without OpenAPI = 0
+
+因此：
+
+**不要重新大规模设计 API。**
+
+现在重点是：
+
+> API surface reconciliation ≠ implementation evidence
+
+新增/补齐的 operation 很多仍然是：
+
+`DRAFT`
+
+不能因为 operation 已经进入 OpenAPI 就标记为 implemented。
+
+---
+
+# 十、Operation Policy 处理规则
+
+如果 operation 已经存在：
+
+```text
+contracts/api/*-operation-policy.v1.json
+```
+
+优先使用已有定义。
+
+不要创建重复 operation。
+
+不要改变 operationId。
+
+不要改变 path。
+
+不要改变 HTTP method。
+
+如果确实缺 policy：
+
+> 创建最小必要 policy，并保持 DRAFT。
+
+不要假装已经实现。
+
+---
+
+# 十一、Mapping Batch 批量处理
+
+如果仓库存在类似：
+
+```text
+mapping-batch-*.json
+mapping-batch-*.md
+```
+
+必须：
+
+1. 扫描全部 batch；
+2. 找出未进入 canonical mapping 的记录；
+3. 找出 duplicate；
+4. 找出 orphan；
+5. 找出 canonical feature 没有 batch 来源的情况；
+6. 找出 batch 与 Feature Inventory 不一致；
+7. 自动生成 reconciliation；
+8. 修复能够由已有证据支持的记录；
+9. 保留真正 unresolved。
+
+禁止简单删除 unresolved。
+
+---
+
+# 十二、Canonical Mapping 的状态机
+
+必须保持状态语义。
+
+建议严格区分：
+
+```text
+VERIFIED
+PARTIAL
+MISSING
+BLOCKED
+DISCOVERY_DRAFT
+```
+
+如果没有实现证据：
+
+不要使用：
+
+`VERIFIED`
+
+如果只有 Contract：
+
+可以：
+
+`CONTRACTED`
+
+或仓库已经定义的对应状态。
+
+如果只有 OpenAPI：
+
+不要当成实现。
+
+如果只有代码：
+
+不要当成完整 Contract alignment。
+
+如果只有 migration：
+
+不要当成完整 Feature implementation。
+
+---
+
+# 十三、Evidence Registry
+
+重点处理：
+
+```text
+contracts/alignment/**
+contracts/evidence/**
+artifacts/mapping-0/**
+```
+
+以及所有 Evidence Registry。
+
+每条 Evidence 至少应该能回答：
+
+> 谁证明的？
+
+> 证明什么？
+
+> 来源在哪里？
+
+> 哪个 commit？
+
+> 哪个文件？
+
+> 哪个测试？
+
+> 哪个 Gate？
+
+> 哪个 Feature？
+
+---
+
+# 十四、Evidence 引用必须真实
+
+允许：
+
+```text
+source_file
+line_range
+commit_sha
+test_name
+workflow_run
+artifact
+migration
+schema
+runtime_test
+```
+
+禁止：
+
+```text
+"verified": true
+```
+
+但没有证据。
+
+禁止：
+
+```text
+"evidence": "implementation exists"
+```
+
+这种没有可验证来源的文字。
+
+---
+
+# 十五、代码证据与运行证据必须区分
+
+例如：
+
+```text
+src/collections/Content.ts
+```
+
+只能证明：
+
+> Code implementation exists
+
+不能自动证明：
+
+> Runtime works
+
+更不能自动证明：
+
+> Production persistence verified
+
+因此必须保持 Evidence Dimension 的独立性。
+
+---
+
+# 十六、Payload 原生能力处理
+
+必须区分：
+
+> Payload Native Capability
+
+和：
+
+> LuckRead Business Capability
+
+不要把 Payload 默认 CRUD 当成 LuckRead 所有业务 Feature 的实现。
+
+必须检查：
+
+```text
+payload-native-inventory.v1.json
+payload-contract-reconciliation-check.mjs
+```
+
+如果 Payload 原生能力已经满足 Contract：
+
+可以建立真实映射。
+
+如果需要业务逻辑：
+
+必须检查真实 implementation。
+
+---
+
+# 十七、Five-Way Alignment
+
+最终必须让以下五个维度真正一致：
+
+```text
+Blueprint / Feature
+API
+Payload / Entity
+Code
+Evidence
+```
+
+目标：
+
+```text
+Feature
+  ↓
+API
+  ↓
+Entity / Capability
+  ↓
+Persistence
+  ↓
+Code
+  ↓
+Evidence
+  ↓
+Gate
+```
+
+任何断点都必须被明确处理。
+
+---
+
+# 十八、不要为了 GREEN 修改 Gate
+
+特别禁止修改：
+
+```text
+scripts/alignment-ci.mjs
+scripts/mapping-0-*.mjs
+scripts/feature-entity-persistence-registry-check.mjs
+scripts/mapping-0-evidence-registry-final-check.mjs
+```
+
+来降低标准。
+
+只有以下情况可以修改 Gate：
+
+> Gate 本身与已经批准的 Contract 明显不一致。
+
+这种情况下：
+
+1. 证明 GAP；
+2. 修改 Contract；
+3. 修改 Gate；
+4. 增加测试；
+5. 重新跑全部 Gate。
+
+否则不要碰。
+
+---
+
+# 十九、如果发现旧文档写 GREEN
+
+不要相信。
+
+真实状态以：
+
+```text
+canonical mapping
+CI
+evidence registry
+feature inventory
+reconciliation
+```
+
+为准。
+
+特别注意：
+
+> README / status report / 人工文档里的 GREEN 不能覆盖 canonical source。
+
+---
+
+# 二十、批量执行，而不是一条一条问我
+
+执行策略：
+
+## Batch 1
+
+处理：
+
+```text
+Feature Inventory
+Canonical Mapping
+Mapping Batch
+duplicate
+orphan
+missing feature
+```
+
+## Batch 2
+
+处理：
+
+```text
+Entity Catalog
+Entity Implementation Evidence
+Entity Field Contract
+Entity Schema
+```
+
+## Batch 3
+
+处理：
+
+```text
+Feature → Entity
+Feature → Persistence
+```
+
+## Batch 4
+
+处理：
+
+```text
+Evidence Registry
+Code Evidence
+Migration Evidence
+Schema Evidence
+```
+
+## Batch 5
+
+处理：
+
+```text
+Five-Way Alignment
+Capability Graph
+R4
+R5
+```
+
+## Batch 6
+
+处理：
+
+```text
+Contract CI
+Mapping 0 Final
+Full Contract
+OpenAPI lint
+```
+
+不要每完成一条就停下来。
+
+---
+
+# 二十一、每个 Batch 完成后立即验证
+
+例如 Batch 2 完成：
+
+```bash
+node scripts/entity-catalog-check.mjs
+node scripts/entity-implementation-evidence-check.mjs
+node scripts/entity-field-contract-check.mjs
+node scripts/entity-field-schema-contract-check.mjs
+```
+
+Batch 3：
+
+```bash
+node scripts/mapping-0-r4-evidence-gap-report.mjs
+node scripts/feature-entity-persistence-registry-check.mjs
+```
+
+Batch 4：
+
+```bash
+node scripts/mapping-0-evidence-registry-final-check.mjs
+```
+
+Batch 5：
+
+```bash
+node scripts/alignment-ci.mjs
+node scripts/capability-contract-graph-check.mjs
+```
+
+最终：
+
+```bash
+npm run mapping:0:verify
+```
+
+---
+
+# 二十二、最终 CI 必须真实跑完
+
+最终必须验证：
+
+```text
+Contract Admission Gate
+Semantic Cross-Contract Gate
+Blueprint Feature Inventory Gate
+Payload Contract Reconciliation Gate
+Capability Contract Graph Gate
+Five-Way Alignment Admission Gate
+Mapping 0 Final Admission Gate
+Contract Admission Gate (full)
+OpenAPI Lint
+```
+
+不能只运行其中几个。
+
+---
+
+# 二十三、GitHub 工作方式
+
+GitHub 是 Source of Truth。
+
+所有完成工作必须：
+
+```text
+修改文件
+→ git diff
+→ 本地/CI验证
+→ commit
+→ push
+→ GitHub Actions
+→ Evidence
+```
+
+不要只告诉我“应该可以”。
+
+必须真正落盘。
+
+---
+
+# 二十四、Commit 要求
+
+每个逻辑 Batch 使用清晰 commit，例如：
+
+```text
+mapping: reconcile canonical feature inventory
+mapping: close entity capability evidence
+mapping: close r4 persistence evidence
+mapping: reconcile five-way alignment
+mapping: close evidence registry
+ci: validate mapping zero closure
+```
+
+不要生成大量无意义 commit。
+
+---
+
+# 二十五、备份要求
+
+在大规模修改前：
+
+检查：
+
+```text
+main
+backup/*
+```
+
+如果没有当前 Mapping 0 收口前的安全备份：
+
+创建：
+
+```text
+backup/mapping0-pre-final-YYYY-MM-DD
+```
+
+然后再修改。
+
+不要覆盖历史备份。
+
+---
+
+# 二十六、严禁重新做已经完成的工作
+
+以下内容如果已经真实 GREEN：
+
+不要重写：
+
+* Common Schema
+* OpenAPI 基础框架
+* Auth 基础 Contract
+* State Machine
+* RBAC
+* Payload baseline
+* API sync mechanism
+
+现在目标是：
+
+> **Closure，不是重构。**
+
+---
+
+# 二十七、真正遇到无法自动完成的项目
+
+只有以下情况可以停下来：
+
+### A. 必须使用用户 Secret
+
+例如：
+
+```text
+CLOUDFLARE_API_TOKEN
+CLOUDFLARE_ACCOUNT_ID
+```
+
+而 GitHub Actions 没有 Secret。
+
+### B. 必须访问真实 Cloudflare D1
+
+且当前环境没有凭证。
+
+### C. 必须进行真实部署
+
+但当前 CI 没有 deployment permission。
+
+### D. Contract 本身互相矛盾
+
+且无法根据已有 Contract 判定。
+
+### E. 真正需要用户业务决策
+
+而仓库没有任何既有定义。
+
+除此之外：
+
+> **不要停。继续批量处理。**
+
+---
+
+# 二十八、如果必须停，输出精确阻塞表
+
+不要说：
+
+> “还有一些问题。”
+
+必须输出：
+
+```text
+BLOCKER ID
+FEATURE IDS
+CURRENT STATUS
+EXPECTED STATUS
+EXACT MISSING EVIDENCE
+EXACT FILE
+EXACT COMMAND
+EXACT SECRET / PERMISSION
+WHY AUTOMATION CANNOT COMPLETE
+```
+
+并且：
+
+> 能自动完成的部分必须先全部完成。
+
+---
+
+# 二十九、最终 GREEN 判定
+
+只有以下全部满足，才能宣布：
+
+> Mapping 0 GREEN
+
+```text
+canonical mapping = GREEN
+feature inventory = GREEN
+API reconciliation = GREEN
+Entity reconciliation = GREEN
+Persistence R4 = GREEN
+Evidence Registry = GREEN
+Five-Way Alignment = GREEN
+Capability Graph = GREEN
+Mapping 0 Final Gate = GREEN
+Contract Full = GREEN
+OpenAPI lint = GREEN
+working tree = clean
+```
+
+如果其中任何一个失败：
+
+> 不得宣布 GREEN。
+
+---
+
+# 三十、最终输出格式
+
+全部完成后，只输出以下结构：
+
+```text
+MAPPING 0 CLOSURE RESULT
+
+Status:
+GREEN / NOT_GREEN
+
+Canonical Features:
+449 / 449
+
+Canonical Mapping:
+GREEN / NOT_GREEN
+
+Feature Inventory:
+GREEN / NOT_GREEN
+
+Entity:
+GREEN / NOT_GREEN
+
+Persistence R4:
+GREEN / NOT_GREEN
+
+Evidence Registry:
+GREEN / NOT_GREEN
+
+Five-Way Alignment:
+GREEN / NOT_GREEN
+
+Capability Graph:
+GREEN / NOT_GREEN
+
+Contract CI:
+GREEN / NOT_GREEN
+
+OpenAPI:
+151 / 151
+
+Remaining Blockers:
+0
+
+Commits:
+<sha list>
+
+Evidence:
+<workflow runs / artifact paths>
+
+Final Verification:
+<exact command>
+```
+
+如果不是 GREEN：
+
+```text
+Status: NOT_GREEN
+
+Remaining Blockers:
+<精确列表>
+
+Completed Automatically:
+<已经完成的内容>
+
+Required External Action:
+<真正需要用户提供的内容>
+
+Next Exact Commands:
+<命令>
+```
+
+---
+
+# 三十一、执行原则
+
+整个任务始终遵守：
+
+> **不猜。**
+>
+> **不伪造。**
+>
+> **不降 Gate。**
+>
+> **不重构已经完成的 Contract。**
+>
+> **不重新设计架构。**
+>
+> **不引入 D1-Fabric。**
+>
+> **不把 DRAFT 当 VERIFIED。**
+>
+> **不把 API 当 Persistence。**
+>
+> **不把 Code 当 Runtime Evidence。**
+>
+> **不把文档 GREEN 当实际 GREEN。**
+>
+> **以 GitHub canonical source + CI + Evidence 为最终事实。**
+
+现在立即开始。
+
+**不要先写计划给我。**
+
+**直接进入仓库、读取现状、运行诊断、建立 Gap Matrix，然后按 Batch 1 → Batch 6 连续执行。**
+
+能自动完成的全部完成。
+
+每个 Batch 完成后立即验证并提交。
+
+最终目标：
+
+> **让 `npm run mapping:0:verify` 真实通过，并让 GitHub Contract CI 的 Mapping 0 Final Gate 真实 GREEN。**
