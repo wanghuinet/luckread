@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import yaml from 'yaml';
 
 const root = process.cwd();
 const openapiPath = 'contracts/openapi/v1/openapi.yaml';
@@ -14,12 +13,39 @@ const fail = (message) => {
 if (!fs.existsSync(openapiPath)) fail(`missing ${openapiPath}`);
 if (!fs.existsSync(apiInventoryPath)) fail(`missing ${apiInventoryPath}`);
 
-const openapi = yaml.parse(fs.readFileSync(openapiPath, 'utf8'));
+const openapiRaw = fs.readFileSync(openapiPath, 'utf8');
 const inventory = JSON.parse(fs.readFileSync(apiInventoryPath, 'utf8'));
-const paths = openapi?.paths;
-if (!paths || typeof paths !== 'object') fail('canonical OpenAPI paths are missing');
 
-const serverUrl = String(openapi?.servers?.[0]?.url ?? '').replace(/\/$/, '');
+// Lightweight OpenAPI path/operation extraction with no `yaml` runtime
+// dependency. Mirrors scripts/sync-rc-openapi.mjs, which already removed the
+// undeclared `yaml` import for the same contract-first document.
+const serverUrlMatch = openapiRaw.match(/^servers:\s*\n\s*-\s*url:\s*([^\s#]+)/m);
+const serverUrl = String(serverUrlMatch?.[1] ?? '').replace(/\/$/, '');
+
+const operations = [];
+{
+  const lines = openapiRaw.split(/\r?\n/);
+  let currentPath = null;
+  let currentMethod = null;
+  let currentOperationId = null;
+  const flush = () => {
+    if (currentPath && currentMethod && currentOperationId) {
+      operations.push({ operationId: currentOperationId, method: currentMethod, rawPath: currentPath });
+    }
+    currentOperationId = null;
+  };
+  for (const line of lines) {
+    const pathMatch = line.match(/^  (\/[^:#]+):\s*$/);
+    if (pathMatch) { flush(); currentPath = pathMatch[1].trim(); currentMethod = null; continue; }
+    const methodMatch = line.match(/^    (get|post|put|patch|delete|head|options|trace):\s*$/i);
+    if (methodMatch && currentPath) { flush(); currentMethod = methodMatch[1].toUpperCase(); continue; }
+    if (!currentPath || !currentMethod) continue;
+    const operationMatch = line.match(/^(\s+)operationId:\s*([^#\s]+)/);
+    if (operationMatch) currentOperationId = operationMatch[2].trim();
+  }
+  flush();
+}
+
 const versionPrefix = '/v1';
 const canonicalizePath = (rawPath) => {
   const path = String(rawPath);
@@ -44,35 +70,31 @@ for (const [domain, group] of Object.entries(groups)) {
 const records = [];
 const seenCanonical = new Set();
 const missingFromInventory = [];
-for (const [rawPath, pathItem] of Object.entries(paths)) {
-  const canonicalPath = canonicalizePath(rawPath);
+for (const op of operations) {
+  const canonicalPath = canonicalizePath(op.rawPath);
   if (!canonicalPath.startsWith('/v1/')) continue;
-  for (const [method, operation] of Object.entries(pathItem ?? {})) {
-    if (!['get','post','put','patch','delete','head','options'].includes(method)) continue;
-    const upper = method.toUpperCase();
-    const key = `${upper} ${canonicalPath}`;
-    if (seenCanonical.has(key)) fail(`duplicate canonical OpenAPI endpoint '${key}'`);
-    seenCanonical.add(key);
-    const declaration = declared.get(key);
-    const operationId = operation?.operationId;
-    if (!operationId) fail(`OpenAPI operationId missing for ${key}`);
-    if (!declaration) {
-      missingFromInventory.push(key);
-      continue;
-    }
-    records.push({
-      operationId,
-      method: upper,
-      path: canonicalPath,
-      openapiPath: rawPath,
-      domain: declaration.domain,
-      status: 'DISCOVERED',
-      featureIds: [],
-      schemaRef: '',
-      openapiRef: `${openapiPath}#${method}:${rawPath}`,
-      sourceRefs: [openapiPath, apiInventoryPath],
-    });
+  const upper = op.method.toUpperCase();
+  if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].includes(upper)) continue;
+  const key = `${upper} ${canonicalPath}`;
+  if (seenCanonical.has(key)) fail(`duplicate canonical OpenAPI endpoint '${key}'`);
+  seenCanonical.add(key);
+  const declaration = declared.get(key);
+  if (!declaration) {
+    missingFromInventory.push(key);
+    continue;
   }
+  records.push({
+    operationId: op.operationId,
+    method: upper,
+    path: canonicalPath,
+    openapiPath: op.rawPath,
+    domain: declaration.domain,
+    status: 'DISCOVERED',
+    featureIds: [],
+    schemaRef: '',
+    openapiRef: `${openapiPath}#${op.method.toLowerCase()}:${op.rawPath}`,
+    sourceRefs: [openapiPath, apiInventoryPath],
+  });
 }
 
 const missingFromOpenAPI = [];

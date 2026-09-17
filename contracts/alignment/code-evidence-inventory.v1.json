@@ -1,0 +1,3222 @@
+{
+  "version": "1.0.0",
+  "status": "DISCOVERED",
+  "sourceOfTruth": "contracts/entity/entity-catalog.v1.json + contracts/entity/entity-implementation-evidence.v1.json + contracts/entity/entity-field-contract.v1.json + contracts/alignment/payload-inventory.v1.json + contracts/alignment/api-inventory.v1.json",
+  "generatedBy": "scripts/build-code-evidence-inventory.mjs",
+  "records": [
+    {
+      "evidenceId": "API_OPERATION:authLogin",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authLogin",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:authLogout",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authLogout",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:authRefresh",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authRefresh",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:authRegister",
+      "subjectType": "API_OPERATION",
+      "subjectId": "authRegister",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:batchUpdateNotifications",
+      "subjectType": "API_OPERATION",
+      "subjectId": "batchUpdateNotifications",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:blockUser",
+      "subjectType": "API_OPERATION",
+      "subjectId": "blockUser",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:cancelSubscription",
+      "subjectType": "API_OPERATION",
+      "subjectId": "cancelSubscription",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:changeOrganizationMemberRole",
+      "subjectType": "API_OPERATION",
+      "subjectId": "changeOrganizationMemberRole",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:checkEntitlement",
+      "subjectType": "API_OPERATION",
+      "subjectId": "checkEntitlement",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:completeUpload",
+      "subjectType": "API_OPERATION",
+      "subjectId": "completeUpload",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:createAppeal",
+      "subjectType": "API_OPERATION",
+      "subjectId": "createAppeal",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:createComment",
+      "subjectType": "API_OPERATION",
+      "subjectId": "createComment",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:createContent",
+      "subjectType": "API_OPERATION",
+      "subjectId": "createContent",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:createIp",
+      "subjectType": "API_OPERATION",
+      "subjectId": "createIp",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:createMedia",
+      "subjectType": "API_OPERATION",
+      "subjectId": "createMedia",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:createOrganization",
+      "subjectType": "API_OPERATION",
+      "subjectId": "createOrganization",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:createReport",
+      "subjectType": "API_OPERATION",
+      "subjectId": "createReport",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:createShare",
+      "subjectType": "API_OPERATION",
+      "subjectId": "createShare",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:createSubscription",
+      "subjectType": "API_OPERATION",
+      "subjectId": "createSubscription",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:deleteAccountSessionsSessionId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "deleteAccountSessionsSessionId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:deleteCommentsCommentId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "deleteCommentsCommentId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:deleteCommentsCommentIdLikes",
+      "subjectType": "API_OPERATION",
+      "subjectId": "deleteCommentsCommentIdLikes",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:deleteContent",
+      "subjectType": "API_OPERATION",
+      "subjectId": "deleteContent",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:deleteContentContentId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "deleteContentContentId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:deleteContentContentIdFavorites",
+      "subjectType": "API_OPERATION",
+      "subjectId": "deleteContentContentIdFavorites",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:deleteContentContentIdLikes",
+      "subjectType": "API_OPERATION",
+      "subjectId": "deleteContentContentIdLikes",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:deleteDeveloperApiKeysKeyId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "deleteDeveloperApiKeysKeyId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:deleteDeveloperWebhooksWebhookId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "deleteDeveloperWebhooksWebhookId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:deleteMcnOrganizationsOrgIdMembersUserId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "deleteMcnOrganizationsOrgIdMembersUserId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:deleteMedia",
+      "subjectType": "API_OPERATION",
+      "subjectId": "deleteMedia",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:deleteSubscriptionsSubscriptionId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "deleteSubscriptionsSubscriptionId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:deleteUsersUserIdFollow",
+      "subjectType": "API_OPERATION",
+      "subjectId": "deleteUsersUserIdFollow",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:exportMyAccountData",
+      "subjectType": "API_OPERATION",
+      "subjectId": "exportMyAccountData",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:follow",
+      "subjectType": "API_OPERATION",
+      "subjectId": "follow",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getAccountDataExport",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getAccountDataExport",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getAccountsAccountId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getAccountsAccountId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getAccountSessions",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getAccountSessions",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getArticlesArticleId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getArticlesArticleId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getAuditEvents",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getAuditEvents",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getContent",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getContent",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getContentContentId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getContentContentId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getContentContentIdComments",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getContentContentIdComments",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getContentContentIdRelated",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getContentContentIdRelated",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getContentRevision",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getContentRevision",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getCreatorAnalytics",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getCreatorAnalytics",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getCreatorProfile",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getCreatorProfile",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getDeveloperApps",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getDeveloperApps",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getDeveloperUsage",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getDeveloperUsage",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getDeveloperWebhooks",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getDeveloperWebhooks",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getDiscoveryCreators",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getDiscoveryCreators",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getDiscoveryTopics",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getDiscoveryTopics",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getEntitlements",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getEntitlements",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getEntitlements",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getEntitlements",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getFeed",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getFeed",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getFeedRecommended",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getFeedRecommended",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getFeedUserUserId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getFeedUserUserId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getFollowingFeed",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getFollowingFeed",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getGalleriesGalleryId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getGalleriesGalleryId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getIpAssets",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getIpAssets",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getIpContent",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getIpContent",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getMcnOrganizations",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getMcnOrganizations",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getMcnOrganizationsOrgId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getMcnOrganizationsOrgId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getMe",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getMe",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getMedia",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getMedia",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getMediaMediaIdPlayback",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getMediaMediaIdPlayback",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getMediaMediaIdProcessing",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getMediaMediaIdProcessing",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getMyCreator",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getMyCreator",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getNotificationPreferences",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getNotificationPreferences",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getPaymentsPaymentId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getPaymentsPaymentId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getPlans",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getPlans",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getPostsPostId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getPostsPostId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getRealtimeSession",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getRealtimeSession",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getRecommendationContext",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getRecommendationContext",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getSearchSuggestions",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getSearchSuggestions",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getSearchTrending",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getSearchTrending",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getSubscription",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getSubscription",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getSubscriptions",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getSubscriptions",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getUserProfile",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getUserProfile",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getUsersUserIdFollowers",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getUsersUserIdFollowers",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getUsersUserIdFollowing",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getUsersUserIdFollowing",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:getUsersUserIdProfile",
+      "subjectType": "API_OPERATION",
+      "subjectId": "getUsersUserIdProfile",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:inviteIpMember",
+      "subjectType": "API_OPERATION",
+      "subjectId": "inviteIpMember",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:inviteOrganizationMember",
+      "subjectType": "API_OPERATION",
+      "subjectId": "inviteOrganizationMember",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:like",
+      "subjectType": "API_OPERATION",
+      "subjectId": "like",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:listComments",
+      "subjectType": "API_OPERATION",
+      "subjectId": "listComments",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:listContentRevisions",
+      "subjectType": "API_OPERATION",
+      "subjectId": "listContentRevisions",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:listContents",
+      "subjectType": "API_OPERATION",
+      "subjectId": "listContents",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:listIpContents",
+      "subjectType": "API_OPERATION",
+      "subjectId": "listIpContents",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:listMediaVariants",
+      "subjectType": "API_OPERATION",
+      "subjectId": "listMediaVariants",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:listModerationCases",
+      "subjectType": "API_OPERATION",
+      "subjectId": "listModerationCases",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:listNotifications",
+      "subjectType": "API_OPERATION",
+      "subjectId": "listNotifications",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:listOrganizationMembers",
+      "subjectType": "API_OPERATION",
+      "subjectId": "listOrganizationMembers",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:muteUser",
+      "subjectType": "API_OPERATION",
+      "subjectId": "muteUser",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:patchAccountsAccountId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "patchAccountsAccountId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:patchArticlesArticleId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "patchArticlesArticleId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:patchCommentsCommentId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "patchCommentsCommentId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:patchContentContentId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "patchContentContentId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:patchCreatorProfile",
+      "subjectType": "API_OPERATION",
+      "subjectId": "patchCreatorProfile",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:patchDeveloperAppsAppId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "patchDeveloperAppsAppId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:patchGalleriesGalleryId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "patchGalleriesGalleryId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:patchIpAssetsAssetId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "patchIpAssetsAssetId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:patchNotificationPreferences",
+      "subjectType": "API_OPERATION",
+      "subjectId": "patchNotificationPreferences",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:patchPostsPostId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "patchPostsPostId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:patchUsersUserId",
+      "subjectType": "API_OPERATION",
+      "subjectId": "patchUsersUserId",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postAccountDeletionRequest",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postAccountDeletionRequest",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postAccountPasswordChange",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postAccountPasswordChange",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postAccountRecovery",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postAccountRecovery",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postAccountsAccountIdRestore",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postAccountsAccountIdRestore",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postAccountsAccountIdSuspend",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postAccountsAccountIdSuspend",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postAnalyticsBatch",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postAnalyticsBatch",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postAnalyticsEvents",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postAnalyticsEvents",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postArticles",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postArticles",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postAuthRevoke",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postAuthRevoke",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postCommentsCommentIdLikes",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postCommentsCommentIdLikes",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postContent",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postContent",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postContentContentIdComments",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postContentContentIdComments",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postContentContentIdFavorites",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postContentContentIdFavorites",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postContentContentIdLikes",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postContentContentIdLikes",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postContentContentIdPublish",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postContentContentIdPublish",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postContentContentIdUnpublish",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postContentContentIdUnpublish",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postDeveloperApiKeys",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postDeveloperApiKeys",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postDeveloperApps",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postDeveloperApps",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postDeveloperOauthAuthorize",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postDeveloperOauthAuthorize",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postDeveloperWebhooks",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postDeveloperWebhooks",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postGalleries",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postGalleries",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postIpAssets",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postIpAssets",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postMcnOrganizations",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postMcnOrganizations",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postMcnOrganizationsOrgIdMembers",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postMcnOrganizationsOrgIdMembers",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postMediaMediaIdProcess",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postMediaMediaIdProcess",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postMediaUploads",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postMediaUploads",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postNotificationsNotificationIdRead",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postNotificationsNotificationIdRead",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postNotificationsReadAll",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postNotificationsReadAll",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postPaymentsIntents",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postPaymentsIntents",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postPosts",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postPosts",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postRealtimePresence",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postRealtimePresence",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postRecommendationFeedback",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postRecommendationFeedback",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postSubscriptions",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postSubscriptions",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:postUsersUserIdFollow",
+      "subjectType": "API_OPERATION",
+      "subjectId": "postUsersUserIdFollow",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:removeIpMember",
+      "subjectType": "API_OPERATION",
+      "subjectId": "removeIpMember",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:removeOrganizationMember",
+      "subjectType": "API_OPERATION",
+      "subjectId": "removeOrganizationMember",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:resolveShare",
+      "subjectType": "API_OPERATION",
+      "subjectId": "resolveShare",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:rollbackContentRevision",
+      "subjectType": "API_OPERATION",
+      "subjectId": "rollbackContentRevision",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:search",
+      "subjectType": "API_OPERATION",
+      "subjectId": "search",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:transitionAccountState",
+      "subjectType": "API_OPERATION",
+      "subjectId": "transitionAccountState",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:transitionContentState",
+      "subjectType": "API_OPERATION",
+      "subjectId": "transitionContentState",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:unblockUser",
+      "subjectType": "API_OPERATION",
+      "subjectId": "unblockUser",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:unfollow",
+      "subjectType": "API_OPERATION",
+      "subjectId": "unfollow",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:unlike",
+      "subjectType": "API_OPERATION",
+      "subjectId": "unlike",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:unmuteUser",
+      "subjectType": "API_OPERATION",
+      "subjectId": "unmuteUser",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:updateContent",
+      "subjectType": "API_OPERATION",
+      "subjectId": "updateContent",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:updateMe",
+      "subjectType": "API_OPERATION",
+      "subjectId": "updateMe",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-CREDENTIAL",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-CREDENTIAL",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-DEVICE-RECORD",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-DEVICE-RECORD",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-ENTITLEMENT-GRANT",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-ENTITLEMENT-GRANT",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-IDENTITY",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-IDENTITY",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-ORG-MEMBERSHIP",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-ORG-MEMBERSHIP",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-ROLE-ASSIGNMENT",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-ROLE-ASSIGNMENT",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-SESSION",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-SESSION",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-SUBSCRIPTION",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-SUBSCRIPTION",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-USER",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-USER",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts",
+        "src/payload.config.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "Migration execution evidence is not yet independently recorded."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-VERIFICATION",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-VERIFICATION",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-ACTIVE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-ACTIVE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-CREATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-CREATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-IDENTITY-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-IDENTITY-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-KIND",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-KIND",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-NORMALIZED-VALUE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-NORMALIZED-VALUE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-UPDATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-UPDATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-VALUE-HASH",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-VALUE-HASH",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-VERIFIED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-VERIFIED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-EMAIL",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-EMAIL",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-EMAIL-NORMALIZED",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-EMAIL-NORMALIZED",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-NORMALIZATION-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-NORMALIZATION-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-PHONE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-PHONE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-PHONE-NORMALIZED",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-PHONE-NORMALIZED",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-USER-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-USER-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-USERNAME",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-USERNAME",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-USERNAME-NORMALIZED",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-USERNAME-NORMALIZED",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-CREATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-CREATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-DEVICE-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-DEVICE-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-EXPIRES-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-EXPIRES-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-LAST-SEEN-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-LAST-SEEN-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-REFRESH-CREDENTIAL-HASH",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-REFRESH-CREDENTIAL-HASH",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-REVOKED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-REVOKED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-TOKEN-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-TOKEN-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-USER-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-USER-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-AVATAR",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-AVATAR",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-BIO",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-BIO",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-DISPLAY-NAME",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-DISPLAY-NAME",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-LOCALE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-LOCALE",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-TIMEZONE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-TIMEZONE",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-USERNAME",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-USERNAME",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "PAYLOAD_COLLECTION:users",
+      "subjectType": "PAYLOAD_COLLECTION",
+      "subjectId": "users",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts:Users"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts:Users"
+      ],
+      "sourceRefs": [
+        "contracts/alignment/payload-inventory.v1.json",
+        "src/collections/Users.ts:Users"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "PAYLOAD_FIELD:users:avatar",
+      "subjectType": "PAYLOAD_FIELD",
+      "subjectId": "users.avatar",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts:field:avatar"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts:field:avatar"
+      ],
+      "sourceRefs": [
+        "contracts/alignment/payload-inventory.v1.json",
+        "src/collections/Users.ts:field:avatar"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "PAYLOAD_FIELD:users:bio",
+      "subjectType": "PAYLOAD_FIELD",
+      "subjectId": "users.bio",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts:field:bio"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts:field:bio"
+      ],
+      "sourceRefs": [
+        "contracts/alignment/payload-inventory.v1.json",
+        "src/collections/Users.ts:field:bio"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "PAYLOAD_FIELD:users:displayName",
+      "subjectType": "PAYLOAD_FIELD",
+      "subjectId": "users.displayName",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts:field:displayName"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts:field:displayName"
+      ],
+      "sourceRefs": [
+        "contracts/alignment/payload-inventory.v1.json",
+        "src/collections/Users.ts:field:displayName"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "PAYLOAD_FIELD:users:locale",
+      "subjectType": "PAYLOAD_FIELD",
+      "subjectId": "users.locale",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts:field:locale"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts:field:locale"
+      ],
+      "sourceRefs": [
+        "contracts/alignment/payload-inventory.v1.json",
+        "src/collections/Users.ts:field:locale"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "PAYLOAD_FIELD:users:timezone",
+      "subjectType": "PAYLOAD_FIELD",
+      "subjectId": "users.timezone",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts:field:timezone"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts:field:timezone"
+      ],
+      "sourceRefs": [
+        "contracts/alignment/payload-inventory.v1.json",
+        "src/collections/Users.ts:field:timezone"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "PAYLOAD_FIELD:users:username",
+      "subjectType": "PAYLOAD_FIELD",
+      "subjectId": "users.username",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "src/collections/Users.ts:field:username"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "src/collections/Users.ts:field:username"
+      ],
+      "sourceRefs": [
+        "contracts/alignment/payload-inventory.v1.json",
+        "src/collections/Users.ts:field:username"
+      ],
+      "blockers": []
+    }
+  ]
+}
