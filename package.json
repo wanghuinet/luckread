@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "contract:ci": "node scripts/contract-ci.mjs",
     "api:contract:ci": "node scripts/api-contract-ci.mjs",
+    "mapping:0:verify": "node scripts/mapping-0-verify.mjs",
     "payload:admission": "node scripts/payload-implementation-admission-check.mjs",
     "payload:native:inventory": "node scripts/payload-native-inventory.mjs",
     "payload:native:verify": "node scripts/payload-native-inventory.mjs && git diff --exit-code -- contracts/payload/payload-native-inventory.v1.json",
