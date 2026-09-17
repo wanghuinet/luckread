@@ -6,7 +6,14 @@ on:
     paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-ci.yml']
   pull_request:
     paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-ci.yml']
+  workflow_run:
+    workflows: ["Canonical OpenAPI RC Sync"]
+    types: [completed]
   workflow_dispatch:
+
+env:
+  CHECKOUT_REF: ${{ github.event.workflow_run.head_sha || github.sha }}
+  RUN_AFTER_SYNC: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
 
 permissions:
   contents: read
@@ -14,6 +21,7 @@ permissions:
 jobs:
   contract:
     name: Contract Admission Gate
+    if: ${{ env.RUN_AFTER_SYNC == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -21,6 +29,7 @@ jobs:
         domain: [common, enums, state-machines, authz, openapi]
     steps:
       - uses: actions/checkout@v4
+        with: {ref: ${{ env.CHECKOUT_REF }} }
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -28,9 +37,11 @@ jobs:
 
   contract-semantic:
     name: Semantic Cross-Contract Gate
+    if: ${{ env.RUN_AFTER_SYNC == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: {ref: ${{ env.CHECKOUT_REF }} }
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -38,9 +49,11 @@ jobs:
 
   feature-inventory:
     name: Blueprint Feature Inventory Gate
+    if: ${{ env.RUN_AFTER_SYNC == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: {ref: ${{ env.CHECKOUT_REF }} }
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -51,9 +64,11 @@ jobs:
 
   payload-reconciliation:
     name: Payload Contract Reconciliation Gate
+    if: ${{ env.RUN_AFTER_SYNC == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: {ref: ${{ env.CHECKOUT_REF }} }
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -63,10 +78,12 @@ jobs:
 
   capability-graph:
     name: Capability Contract Graph Gate
+    if: ${{ env.RUN_AFTER_SYNC == 'true' }}
     runs-on: ubuntu-latest
     needs: [contract, contract-semantic, feature-inventory, payload-reconciliation]
     steps:
       - uses: actions/checkout@v4
+        with: {ref: ${{ env.CHECKOUT_REF }} }
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -97,10 +114,12 @@ jobs:
 
   alignment:
     name: Five-Way Alignment Admission Gate
+    if: ${{ env.RUN_AFTER_SYNC == 'true' }}
     runs-on: ubuntu-latest
     needs: [contract, contract-semantic, feature-inventory, payload-reconciliation]
     steps:
       - uses: actions/checkout@v4
+        with: {ref: ${{ env.CHECKOUT_REF }} }
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -110,10 +129,12 @@ jobs:
 
   mapping-zero-final:
     name: Mapping 0 Final Admission Gate
+    if: ${{ env.RUN_AFTER_SYNC == 'true' }}
     runs-on: ubuntu-latest
     needs: [capability-graph, alignment]
     steps:
       - uses: actions/checkout@v4
+        with: {ref: ${{ env.CHECKOUT_REF }} }
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -132,10 +153,12 @@ jobs:
 
   contract-full:
     name: Contract Admission Gate (full)
+    if: ${{ env.RUN_AFTER_SYNC == 'true' }}
     runs-on: ubuntu-latest
     needs: [contract, contract-semantic, capability-graph, alignment, mapping-zero-final]
     steps:
       - uses: actions/checkout@v4
+        with: {ref: ${{ env.CHECKOUT_REF }} }
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -143,10 +166,12 @@ jobs:
 
   openapi-lint:
     name: OpenAPI Lint
+    if: ${{ env.RUN_AFTER_SYNC == 'true' }}
     runs-on: ubuntu-latest
     needs: contract-full
     steps:
       - uses: actions/checkout@v4
+        with: {ref: ${{ env.CHECKOUT_REF }} }
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
