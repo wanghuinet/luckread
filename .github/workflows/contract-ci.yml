@@ -84,7 +84,17 @@ jobs:
       - run: node scripts/entity-implementation-evidence-check.mjs
       - run: node scripts/entity-field-contract-check.mjs
       - run: node scripts/entity-field-schema-contract-check.mjs
+      - name: Generate R4 evidence gap report
+        run: node scripts/mapping-0-r4-evidence-gap-report.mjs
       - run: node scripts/feature-entity-persistence-registry-check.mjs
+      - name: Upload R4 evidence gap report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mapping-0-r4-evidence-gap-${{ github.run_id }}
+          path: artifacts/mapping-0/r4-evidence-gap-report.json
+          if-no-files-found: error
+          retention-days: 14
       - run: node scripts/r5-foundation-contract-check.mjs
 
   alignment:
