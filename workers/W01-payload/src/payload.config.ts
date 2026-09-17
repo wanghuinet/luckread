@@ -15,11 +15,16 @@ const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 const realpath = (value: string) => (fs.existsSync(value) ? fs.realpathSync(value) : undefined)
 
-const isCLI = process.argv.some((value) => {
+const isPayloadCLI = process.argv.some((value) => {
   const resolved = realpath(value)
   return resolved !== undefined && resolved.endsWith(path.join('payload', 'bin.js'))
 })
 const isProduction = process.env.NODE_ENV === 'production'
+// ADR-B001 (docs/312-BUILD-BASELINE-AND-BINDING-SEMANTICS-v1.0.md, D-03):
+// runtime detection is the only signal stable across all process shapes;
+// `process.argv`-based detection fails in Next.js page-data collection workers.
+const isWorkerRuntime =
+  typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers'
 
 const createLog =
   (level: string, fn: typeof console.log) => (objOrMsg: object | string, msg?: string) => {
@@ -41,10 +46,9 @@ const cloudflareLogger = {
   silent: () => {},
 } as any
 
-const cloudflare =
-  isCLI || !isProduction
-    ? await getCloudflareContextFromWrangler()
-    : await getCloudflareContext({ async: true })
+const cloudflare = isWorkerRuntime
+  ? await getCloudflareContext({ async: true })
+  : await getCloudflareContextFromWrangler()
 
 export default buildConfig({
   admin: {
@@ -65,7 +69,7 @@ export default buildConfig({
     migrationDir: path.resolve(dirname, 'migrations'),
   }),
   logger: isProduction ? cloudflareLogger : undefined,
-  storage: [
+  plugins: [
     r2Storage({
       bucket: cloudflare.env.R2,
       collections: { media: true },
@@ -78,7 +82,15 @@ function getCloudflareContextFromWrangler(): Promise<CloudflareContext> {
     ({ getPlatformProxy }) =>
       getPlatformProxy({
         environment: process.env.CLOUDFLARE_ENV,
-        remoteBindings: isProduction,
+        // D-02: only the Payload CLI in production must hit the real remote D1.
+        // `next build` / `next dev` stay on the local miniflare proxy so the
+        // build never opens a remote Cloudflare session (INV-BUILD-001).
+        remoteBindings: isProduction && isPayloadCLI,
+        // During `next build` the page-data phase forks parallel workers, each
+        // of which loads the config and starts its own workerd against the same
+        // local D1 persistence file, crashing with SQLITE_BUSY. Production
+        // (non-CLI) evaluation is the build; keep it in-memory and offline.
+        persist: isProduction ? false : undefined,
       } satisfies GetPlatformProxyOptions),
   )
 }
