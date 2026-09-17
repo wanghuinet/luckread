@@ -2,6 +2,7 @@
 /**
  * Reconcile only explicitly verified USER mapping edges into the canonical
  * Mapping registry. No status promotion or runtime evidence is performed.
+ * Trigger note: deterministic, non-functional verification rerun.
  */
 import fs from 'node:fs'
 import path from 'node:path'
