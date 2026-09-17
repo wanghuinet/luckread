@@ -1,0 +1,84 @@
+{
+  "environmentClass": "LOCAL_MINIFLARE_D1",
+  "purpose": "Local (offline) execution evidence for the W01 Payload migration against a miniflare-proxied local D1. This is NOT remote D1 evidence; remote schema inspection remains blocked on Cloudflare credentials.",
+  "capturedAt": "2026-09-17T12:55:20.000Z",
+  "worktreeCommitSha": "62aecc7a9343b9b4b6e374bacbd68381c46baa1c",
+  "payloadVersion": "3.87.1",
+  "d1AdapterVersion": "@payloadcms/db-d1-sqlite 3.87.1",
+  "nodeVersion": "v24.1.0",
+  "migrationCommand": "PAYLOAD_SECRET=ignore pnpm exec payload migrate (dev mode, no NODE_ENV=production -> getPlatformProxy without remoteBindings -> local miniflare D1, persist default)",
+  "migrationExecuted": [
+    {
+      "name": "20250929_111647",
+      "status": "APPLIED",
+      "batch": 1,
+      "appliedAt": "2026-09-17T12:55:19.934Z",
+      "source": "workers/W01-payload/src/migrations/20250929_111647.ts",
+      "evidenceFile": "payload-migrations.txt"
+    }
+  ],
+  "schemaSnapshot": {
+    "tables": [
+      "_cf_METADATA",
+      "media",
+      "payload_locked_documents",
+      "payload_locked_documents_rels",
+      "payload_migrations",
+      "payload_preferences",
+      "payload_preferences_rels",
+      "users",
+      "users_sessions"
+    ],
+    "users_columns": [
+      "id INTEGER PK NOT NULL",
+      "updated_at TEXT NOT NULL DEFAULT strftime",
+      "created_at TEXT NOT NULL DEFAULT strftime",
+      "email TEXT NOT NULL",
+      "reset_password_token TEXT",
+      "reset_password_expiration TEXT",
+      "salt TEXT",
+      "hash TEXT",
+      "login_attempts numeric DEFAULT 0",
+      "lock_until TEXT"
+    ],
+    "users_indexes": [
+      "users_updated_at_idx",
+      "users_created_at_idx",
+      "users_email_idx UNIQUE"
+    ],
+    "users_sessions_columns": [
+      "_order INTEGER NOT NULL",
+      "_parent_id INTEGER NOT NULL",
+      "id TEXT PRIMARY KEY",
+      "created_at TEXT",
+      "expires_at TEXT NOT NULL"
+    ],
+    "users_sessions_indexes": [
+      "users_sessions_parent_id_idx",
+      "users_sessions_order_idx",
+      "sqlite_autoindex_users_sessions_1 (pk)"
+    ],
+    "users_sessions_foreign_keys": [
+      "_parent_id -> users(id) ON DELETE CASCADE"
+    ]
+  },
+  "driftCheck": {
+    "migrationSourceVsLocalSchema": "NO_DRIFT",
+    "note": "Every column/index/FK in the local D1 schema corresponds 1:1 to statements in workers/W01-payload/src/migrations/20250929_111647.ts"
+  },
+  "limits": [
+    "LOCAL_MINIFLARE_D1 only; remote D1 (luckread) not inspected (credentials missing)",
+    "auth_session_state extension table (AUTH-002 contract session-state entity) is ABSENT by design; W01 uses Payload native users_sessions. Absence is accepted by scripts/auth-session-schema-evidence-validate.mjs.",
+    "Does not promote AUTH-002 or Mapping-0; runtime session behavior evidence remains a separate gate (Batch 07)"
+  ],
+  "captureCommands": [
+    "PAYLOAD_SECRET=ignore pnpm exec payload migrate",
+    "sqlite3 <local-d1.sqlite> 'SELECT name, sql FROM sqlite_schema WHERE type IN (\"table\",\"index\",\"trigger\") ORDER BY type,name;' > catalog.txt",
+    "sqlite3 <local-d1.sqlite> 'SELECT * FROM payload_migrations;' > payload-migrations.txt",
+    "sqlite3 <local-d1.sqlite> 'PRAGMA table_info(users);' > users-schema.txt",
+    "sqlite3 <local-d1.sqlite> 'PRAGMA table_info(users_sessions);' > users-sessions-schema.txt",
+    "sqlite3 <local-d1.sqlite> 'PRAGMA index_list(users);' > users-indexes.txt",
+    "sqlite3 <local-d1.sqlite> 'PRAGMA index_list(users_sessions);' > users-sessions-indexes.txt",
+    "sqlite3 <local-d1.sqlite> 'PRAGMA foreign_key_list(users_sessions);' > users-sessions-foreign-keys.txt"
+  ]
+}

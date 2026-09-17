@@ -1,0 +1,3 @@
+0|users_email_idx|1|c|0
+1|users_created_at_idx|0|c|0
+2|users_updated_at_idx|0|c|0
