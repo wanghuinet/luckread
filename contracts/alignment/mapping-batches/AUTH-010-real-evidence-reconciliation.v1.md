@@ -32,7 +32,7 @@ Both operations remain `CONTRACTED_PARTIAL`.
 
 The canonical entity registry identifies `ENT-SESSION` as the session entity and references `contracts/entity/AUTH-002-session-field-contract.v1.json`. The entity/field contract remains `CONTRACTED_NOT_VERIFIED`; therefore AUTH-010 may **consume the canonical AUTH-002 session authority but may not independently redefine Session fields or create a second session authority**.
 
-The canonical Session field contract currently defines these nine fields:
+The canonical Session field contract defines nine fields:
 
 - `ENT-SESSION-F-ID` → `id`
 - `ENT-SESSION-F-USER-ID` → `userId`
@@ -50,11 +50,29 @@ This establishes the mapping direction for AUTH-010:
 
 It does **not** establish executable runtime or migration evidence.
 
-## 5. Newly confirmed persistence/code evidence
+## 5. Corrected persistence boundary
 
-Repository inspection confirms concrete session extension schema code exists in `src/db/auth-session-state.ts` and is registered in `src/payload.config.ts` as the `auth_session_state` raw table/schema.
+The prior reconciliation wording incorrectly treated `expiresAt` and `createdAt` as missing persistence fields. That is **not the canonical architecture** and must not be used as a blocker.
 
-Confirmed fields in that implementation are:
+The AUTH-002 native-session decision explicitly establishes that Payload v3.87.1 `UserSession` contains `id`, `createdAt`, and `expiresAt`, and that native `users.sessions[]` remains authoritative for those native dimensions. The AUTH-002 extension table is intentionally limited to dimensions not represented by the native Payload session shape. fileciteturn46file0
+
+Therefore the correct persistence boundary is:
+
+| Canonical field | Physical authority | Current evidence state |
+|---|---|---|
+| `id` | Payload native `users.sessions[].id` | Contract/source evidence; runtime correlation not executed |
+| `createdAt` | Payload native `users.sessions[].createdAt` | Contract/source evidence; runtime/schema capture not accepted |
+| `expiresAt` | Payload native `users.sessions[].expiresAt` | Contract/source evidence; runtime/schema capture not accepted |
+| `userId` | User/session relationship + AUTH-002 extension linkage | Static/schema evidence; runtime correlation not accepted |
+| `deviceId` | `auth_session_state.device_id` | Static/schema evidence; runtime binding not accepted |
+| `tokenVersion` | `auth_session_state.token_version` | Static/schema evidence; runtime binding not accepted |
+| `refreshCredentialHash` | `auth_session_state.refresh_credential_hash` | Static/schema evidence; runtime/security evidence not accepted |
+| `revokedAt` | `auth_session_state.revoked_at` | Static/schema evidence; authoritative lifecycle evidence not accepted |
+| `lastSeenAt` | `auth_session_state.last_seen_at` | Static/schema evidence; runtime update evidence not accepted |
+
+`auth_session_state` therefore must **not** add duplicate `created_at` or `expires_at` columns merely to satisfy the canonical field list. Its source code explicitly states that native Payload session identity, creation timestamp, and expiry remain canonical. fileciteturn43file0
+
+Confirmed extension implementation fields are:
 
 - `session_id` — primary key
 - `user_id`
@@ -66,23 +84,7 @@ Confirmed fields in that implementation are:
 
 Confirmed indexes exist for user, device, token version and revoked-at fields.
 
-The implementation therefore provides concrete persistence evidence for **7 of the 9 canonical Session fields** by semantic correspondence:
-
-| Canonical field | Persistence evidence | Decision |
-|---|---|---|
-| `id` | `session_id` | Bound by semantic identity, runtime binding still unverified |
-| `userId` | `user_id` | Bound by semantic owner relation, runtime binding still unverified |
-| `deviceId` | `device_id` | Bound by semantic device relation, runtime binding still unverified |
-| `tokenVersion` | `token_version` | Bound by semantic authorization state, runtime binding still unverified |
-| `refreshCredentialHash` | `refresh_credential_hash` | Bound by semantic secret-derived state, runtime/security evidence still unverified |
-| `expiresAt` | **no confirmed field** | BLOCKED — persistence mapping missing |
-| `revokedAt` | `revoked_at` | Bound by semantic revocation state, authoritative write evidence still unverified |
-| `createdAt` | **no confirmed field** | BLOCKED — persistence mapping missing |
-| `lastSeenAt` | `last_seen_at` | Bound by semantic observation state, runtime update evidence still unverified |
-
-This is an important closure result: the discovered table must **not** be treated as a complete implementation of `ENT-SESSION` until the missing `expiresAt` and `createdAt` persistence mappings are explicitly reconciled and migration evidence exists.
-
-The persistence contract `AUTH-002-minimum-session-extension-persistence-contract.v1.1.json` defines `ENT-SESSION`, the native Payload `users.sessions[]` relationship, the same extension fields, and fail-closed/session lifecycle rules. However, that contract is explicitly `CONTRACTED_NOT_VERIFIED`; migration/runtime/test/evidence readiness remains open.
+The persistence contract likewise identifies native `users.sessions[]` as the owner of `id`, `createdAt`, and `expiresAt`. fileciteturn45file1
 
 ## 6. Device authority boundary
 
@@ -96,18 +98,18 @@ A separate device contract is required before AUTH-010 can claim a fully reconci
 
 The discovered `auth_session_state` code is evidence of a persistence/schema implementation, but it is **not** evidence that AUTH-010 list/revoke endpoints are implemented.
 
-The source file comments identify this table as the minimal extension state for AUTH-002. Therefore AUTH-010 must consume that authority through an explicit runtime binding rather than claim ownership from name/field similarity.
+The source file comments identify this table as the minimal extension state for AUTH-002. Therefore AUTH-010 must consume that authority through an explicit runtime binding rather than claim ownership from name/field similarity. fileciteturn43file0
 
 Repository search still found no concrete handler implementing both `authSessionList` and `authSessionRevoke`, and no authoritative handler → DTO → authorization → persistence → lifecycle → response chain for AUTH-010.
 
 ## 8. Remaining blockers
 
 1. Bind `authSessionList` and `authSessionRevoke` to the canonical `ENT-SESSION` entity/field IDs without duplicating or overriding AUTH-002 authority.
-2. Reconcile the missing `expiresAt` and `createdAt` persistence mappings; do not infer them from Payload timestamps.
+2. Accept real Gate-1 schema evidence proving the native `createdAt` / `expiresAt` representation and extension schema against the tested commit; no duplicate extension columns should be introduced.
 3. Establish canonical DTO/OpenAPI request/response definitions for list/revoke.
 4. Establish concrete runtime handlers and self-scope authorization evidence.
 5. Establish authoritative lifecycle/event semantics for list/revoke, including revocation dominance over stale cache.
-6. Prove executable migration/application state for the session schema.
+6. Prove executable migration/application state for the extension schema and its relationship to native session persistence.
 7. Define and validate `ENT-DEVICE-RECORD` separately before claiming complete device-registry mapping.
 8. Add positive/negative integration/security tests and actual Evidence Registry execution references.
 
@@ -115,7 +117,7 @@ Repository search still found no concrete handler implementing both `authSession
 
 `AUTH-010 = BLOCKED_NOT_GREEN`.
 
-No promotion to GREEN is made in this pass. The AUTH-002 ↔ AUTH-010 boundary is now explicitly reconciled at the contract level, but the missing persistence fields, device entity authority, runtime handler, DTO/OpenAPI, security, lifecycle, migration and execution evidence prevent promotion.
+No promotion to GREEN is made in this pass. The AUTH-002 ↔ AUTH-010 boundary is now explicitly reconciled at the contract level. The previous false blocker concerning duplicate `createdAt` / `expiresAt` extension columns is removed; the remaining blockers are runtime, DTO/OpenAPI, authorization, lifecycle, migration, device-authority, tests and execution evidence.
 
 Required final chain:
 
@@ -125,7 +127,7 @@ Required final chain:
 
 Proceed in this order:
 
-1. close the `expiresAt` / `createdAt` persistence gap under AUTH-002 authority;
+1. execute/accept AUTH-002 Gate-1 schema evidence for the native + extension boundary;
 2. bind canonical AUTH-010 DTO/OpenAPI definitions;
 3. locate or implement the actual list/revoke runtime surface;
 4. bind self-scope authorization and revocation lifecycle;
