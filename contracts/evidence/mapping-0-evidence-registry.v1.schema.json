@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/evidence/mapping-0-evidence-registry.v1.schema.json",
+  "title": "LuckRead Mapping 0 Canonical Evidence Registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "status", "sourceOfTruth", "records"],
+  "properties": {
+    "version": {"const": "1.0"},
+    "status": {"enum": ["NOT_GREEN", "GREEN"]},
+    "sourceOfTruth": {"const": "docs/176-EVIDENCE-REGISTRY-ACCEPTANCE-TRACEABILITY-CONTRACT-v1.0.md"},
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["evidenceId", "type", "claimId", "subjectType", "subjectId", "source", "sourceRef", "commitSha", "timestamp", "producer", "result", "status"],
+        "properties": {
+          "evidenceId": {"type": "string", "minLength": 1},
+          "type": {"enum": ["DOCUMENT", "CODE", "UNIT_TEST", "INTEGRATION_TEST", "CL", "CI", "SMOKE", "DEPLOYMENT", "OBSERVABILITY", "PERFORMANCE", "SECURITY", "USER_ACCEPTANCE"]},
+          "claimId": {"type": "string", "minLength": 1},
+          "subjectType": {"type": "string", "minLength": 1},
+          "subjectId": {"type": "string", "pattern": "^[A-Z][A-Z0-9]+-\\d+$"},
+          "source": {"type": "string", "minLength": 1},
+          "sourceRef": {"type": "string", "minLength": 1},
+          "commitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+          "timestamp": {"type": "string", "format": "date-time"},
+          "producer": {"type": "string", "minLength": 1},
+          "result": {"enum": ["PASS", "FAIL", "BLOCKED", "NOT_APPLICABLE"]},
+          "status": {"enum": ["CREATED", "VERIFIED", "ACTIVE", "SUPERSEDED", "EXPIRED", "INVALIDATED"]},
+          "validUntil": {"type": "string", "format": "date-time"},
+          "checkId": {"type": "string", "minLength": 1},
+          "workflowRef": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}
