@@ -15,7 +15,8 @@
     {
       "binding": "D1",
       "database_id": "2f80471e-3756-49f9-8db1-7707a433ad64",
-      "database_name": "luckread"
+      "database_name": "luckread",
+      "remote": true
     }
   ],
   "r2_buckets": [
