@@ -8,9 +8,20 @@ Locked boundary:
 - Payload D1 adapter integration
 - Payload migration/runtime integration
 
-Current source-of-truth remains under `src/` until Mapping is GREEN. Do not duplicate or independently implement Payload runtime here before the migration gate is approved.
+Baseline:
+- Runtime baseline is the official Payload `templates/with-cloudflare-d1` structure.
+- The verified baseline source has now been physically materialized under `workers/W01-payload/src/`.
+- LuckRead remains on the currently locked Payload 3.87.1 dependency line; the upstream template's observed 3.82.1 package versions are reference-only and must not trigger a downgrade.
 
-Post-Mapping-GREEN transition:
-1. Move the verified Payload runtime files into W01.
-2. Reconcile all scripts, tsconfig aliases, CI, tests, and contract evidence paths in one change-controlled batch.
-3. Preserve `payload.config.ts`, D1 adapter semantics, `push: false`, and migrationDir behavior.
+Governance:
+- Physical materialization does not by itself make Mapping 0 GREEN.
+- Contract / Mapping / Runtime / Evidence gates remain independently verifiable.
+- Existing LuckRead contracts and business rules must not be overwritten by upstream template content.
+- `payload.config.ts`, D1 adapter semantics, migrationDir behavior, and the locked runtime constraints require explicit reconciliation before implementation is considered closed.
+
+Next gate:
+1. Reconcile root runtime configuration and scripts against the upstream Cloudflare D1 template.
+2. Reconcile Payload app routes, admin runtime, collections, migrations, and generated types.
+3. Run lint/type/build/test validation where dependencies and environment permit.
+4. Record evidence and perform the Mapping 0 reverse-coverage check.
+5. Only then can the relevant gate be marked GREEN.
