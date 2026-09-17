@@ -30,3 +30,6 @@ jobs:
       # a non-recursive GITHUB_TOKEN-triggered workflow.
       - name: Verify Mapping 0
         run: node scripts/mapping-0-verify.mjs
+
+      - name: Report canonical closure edge metrics
+        run: node scripts/mapping-closure-metrics.mjs
