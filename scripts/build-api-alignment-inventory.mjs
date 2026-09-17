@@ -43,6 +43,7 @@ for (const [domain, group] of Object.entries(groups)) {
 
 const records = [];
 const seenCanonical = new Set();
+const missingFromInventory = [];
 for (const [rawPath, pathItem] of Object.entries(paths)) {
   const canonicalPath = canonicalizePath(rawPath);
   if (!canonicalPath.startsWith('/v1/')) continue;
@@ -55,7 +56,10 @@ for (const [rawPath, pathItem] of Object.entries(paths)) {
     const declaration = declared.get(key);
     const operationId = operation?.operationId;
     if (!operationId) fail(`OpenAPI operationId missing for ${key}`);
-    if (!declaration) fail(`OpenAPI endpoint not declared by contracts/api/api-inventory.v1.json: ${key}`);
+    if (!declaration) {
+      missingFromInventory.push(key);
+      continue;
+    }
     records.push({
       operationId,
       method: upper,
@@ -71,12 +75,20 @@ for (const [rawPath, pathItem] of Object.entries(paths)) {
   }
 }
 
+const missingFromOpenAPI = [];
 for (const [key] of declared) {
   const separator = key.indexOf(' ');
   const method = key.slice(0, separator);
   const canonicalPath = key.slice(separator + 1);
   const matchingRecord = records.find((record) => record.method === method && record.path === canonicalPath);
-  if (!matchingRecord) fail(`API inventory endpoint missing from canonical OpenAPI: ${key}`);
+  if (!matchingRecord) missingFromOpenAPI.push(key);
+}
+
+if (missingFromInventory.length || missingFromOpenAPI.length) {
+  console.error(`API alignment inventory blocked: missingFromInventory=${missingFromInventory.length}; missingFromOpenAPI=${missingFromOpenAPI.length}`);
+  for (const key of missingFromInventory) console.error(`  OPENAPI_NOT_DECLARED: ${key}`);
+  for (const key of missingFromOpenAPI) console.error(`  INVENTORY_NOT_IN_OPENAPI: ${key}`);
+  process.exit(1);
 }
 
 records.sort((a, b) => `${a.method} ${a.path}`.localeCompare(`${b.method} ${b.path}`));
