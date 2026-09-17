@@ -23,6 +23,7 @@ The repository contains the following evidence-bound mapping batches from the cu
 | B13-B15 | Creator/Membership/Payments-Commerce subject areas | NOT_GREEN | Verified CREATOR/MON/PAY IDs; commerce-specific IDs are not invented |
 | B16-B18 subject areas | Live/Advertising/Recommendation/Growth/Analytics | NOT_GREEN | Verified Feature-ID families; not a Contract closure |
 | B19-B20 | Rights/Safety/Governance/Admin/Support/Data subject areas | NOT_GREEN | Evidence-only; formal-domain alignment remains subject to reconciliation |
+| USER-001/006 delta | Profile + Block/Mute | PARTIAL / NOT_GREEN | Verified API/entity/policy edges added as evidence; canonical mapping remains blocking |
 
 ## 3. Non-negotiable consolidation rules
 
@@ -61,6 +62,8 @@ Target graph:
 ## 6. Current completion statement
 
 **Mapping inventory phase: substantially traversed, but not closed.**
+
+The latest verified repository snapshot remains `NOT_GREEN`. A new evidence-bound delta was committed at `dc4486e3cd36d032a143a84b3a1c89da4dce34b7` for USER-001 and USER-006. This adds verified evidence edges but does not promote either feature to GREEN.
 
 There is intentionally no percentage claim here: the batch groupings do not map one-to-one to the formal B01-B20 closure domains, and percentage-by-batch would falsely imply contract completion.
 
