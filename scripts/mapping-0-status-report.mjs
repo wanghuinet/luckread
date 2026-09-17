@@ -32,7 +32,10 @@ const evidenceRecords = Array.isArray(evidence.records) ? evidence.records : []
 
 const blockingStatuses = new Set(['UNRESOLVED', 'MISSING', 'CONFLICT', 'DUPLICATE', 'DRIFT', 'EXTRA', 'BLOCKED', 'PARTIAL', 'NOT_GREEN'])
 const statusCounts = (records) => records.reduce((acc, record) => {
-  const status = record?.status ?? 'MISSING_STATUS'
+  // Feature inventory uses alignmentState, while mapping/persistence/evidence
+  // registries use status. Treat both as first-class status fields so the
+  // report does not create false MISSING_STATUS blockers for discovered features.
+  const status = record?.status ?? record?.alignmentState ?? 'MISSING_STATUS'
   acc[status] = (acc[status] ?? 0) + 1
   return acc
 }, {})
