@@ -1,0 +1,27 @@
+name: Mapping 0 Structural Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mapping-0-structural:
+    name: Mapping 0 structural/contract verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify Mapping 0
+        run: node scripts/mapping-0-verify.mjs
