@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 
-const root = resolve(new URL('..', import.meta.url).pathname)
+const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const worker = join(root, 'workers', 'W01-payload')
 const pkgPath = join(worker, 'package.json')
 const lockPath = join(worker, 'pnpm-lock.yaml')
