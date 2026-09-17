@@ -19,11 +19,19 @@ W01 follows Payload's Cloudflare-specific `with-cloudflare-d1` template boundary
 
 ## Version baseline
 
-The W01 version baseline is the dependency set declared by the official `templates/with-cloudflare-d1` template at the pinned upstream observation recorded in `PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md`.
+The repository's currently locked W01 dependency baseline is the dependency set declared in `workers/W01-payload/package.json`.
 
-For the current locked observation, the Payload package family is `3.82.1`, with `@opennextjs/cloudflare` `^1.11.0`, Next.js `16.3.3`, React / React DOM `19.2.6`, and Node `>=24.15.0`.
+Current W01 lock:
 
-W01 MUST NOT describe the standard Payload release line as the Cloudflare-template baseline. Any future upstream template change requires a new observation and reconciliation before the version baseline changes.
+- Payload package family: `3.87.1`
+- `@opennextjs/cloudflare`: `1.20.1`
+- Next.js: `16.2.6`
+- React / React DOM: `19.2.6`
+- Node engine: `>=24.15.0`
+
+This repository lock is distinct from the previously observed upstream Cloudflare-template manifest. The upstream manifest is evidence of an upstream observation; it is not permission to claim that the current W01 package is still on that older observation.
+
+Any future upstream template change requires a new observation and reconciliation before the W01 baseline is changed.
 
 ## Binding boundary
 
@@ -41,7 +49,7 @@ Database and bucket identifiers remain deployment/environment values and are not
 Until Mapping is GREEN:
 
 1. Do not duplicate the existing Payload runtime into W01.
-2. Do not independently rewrite `src/payload.config.ts`.
+2. Do not independently rewrite `src/payload.config.ts` beyond a directly evidenced compatibility fix.
 3. Do not regenerate or replace existing migrations merely to fit the new directory.
 4. Do not move contract evidence paths without a reconciliation change.
 
@@ -50,7 +58,7 @@ After Mapping is GREEN, migrate the verified runtime as one controlled batch and
 ## Verification checklist
 
 - [ ] Cloudflare template shape retained
-- [ ] Official Cloudflare template dependency baseline pinned and reconciled
+- [ ] Current W01 dependency baseline reconciled with the authoritative package manifest
 - [ ] D1 adapter remains `push: false`
 - [ ] Existing migration directory remains authoritative until migration gate
 - [ ] R2 integration is present without moving media business ownership from W06
