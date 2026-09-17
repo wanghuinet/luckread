@@ -14,6 +14,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/B19-AUTH-001-real-evidence-reconciliation.v1.md",
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
@@ -39,8 +40,11 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json"
+        "contracts/alignment/mapping-batches/AUTH-002-003-batch-closure-gate.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-002-real-evidence-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-002-session-real-evidence-reconciliation.v1.md",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "session DTO/entity mappings incomplete",
@@ -63,9 +67,13 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
-        "contracts/api/AUTH-003-credential-management-contract.v1.json"
+        "contracts/alignment/mapping-batches/AUTH-003-006-dto-schema-closure-gate.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-003-006-openapi-operation-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-003-list-response-closure-gate.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md",
+        "contracts/api/AUTH-003-credential-management-contract.v1.json",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "canonical API IDs not established in current inventory",
@@ -88,9 +96,12 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
-        "contracts/api/AUTH-004-password-recovery-contract.v1.json"
+        "contracts/alignment/mapping-batches/AUTH-003-006-dto-schema-closure-gate.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-003-006-openapi-operation-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-004-real-evidence-reconciliation.v1.md",
+        "contracts/api/AUTH-004-password-recovery-contract.v1.json",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "canonical recovery/change API mapping missing",
@@ -113,9 +124,12 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
-        "contracts/api/AUTH-005-identity-verification-contract.v1.json"
+        "contracts/alignment/mapping-batches/AUTH-003-006-dto-schema-closure-gate.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-003-006-openapi-operation-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-005-real-evidence-reconciliation.v1.md",
+        "contracts/api/AUTH-005-identity-verification-contract.v1.json",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "verification API and event IDs missing",
@@ -140,9 +154,12 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
-        "contracts/api/AUTH-006-passkey-webauthn-contract.v1.json"
+        "contracts/alignment/mapping-batches/AUTH-003-006-dto-schema-closure-gate.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-003-006-openapi-operation-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-006-real-evidence-reconciliation.v1.md",
+        "contracts/api/AUTH-006-passkey-webauthn-contract.v1.json",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "canonical API/DTO/data/security contracts not established"
@@ -156,8 +173,8 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md"
+        "contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "canonical MFA contracts not established"
@@ -171,8 +188,9 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/alignment/mapping-batches/AUTH-008-real-evidence-reconciliation.v1.md"
+        "contracts/alignment/mapping-batches/AUTH-008-real-evidence-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-008-reconciliation.v1.md",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "provider integration and linked-identity contract mapping missing"
@@ -186,8 +204,8 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/alignment/mapping-batches/AUTH-009-reconciliation.v1.md"
+        "contracts/alignment/mapping-batches/AUTH-009-reconciliation.v1.md",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "canonical linked-identity entity/API mapping missing"
@@ -210,8 +228,11 @@
         "user.session.revoke"
       ],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/alignment/mapping-batches/AUTH-010-session-field-binding.v1.md"
+        "contracts/alignment/mapping-batches/AUTH-010-permission-scope-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-010-real-evidence-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-010-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-010-session-field-binding.v1.md",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "Page/DTO/Entity/Field/Event/Worker/D1/Test/Evidence IDs not fully reconciled"
@@ -232,8 +253,10 @@
         "user.session.refresh"
       ],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/alignment/mapping-batches/AUTH-011-runtime-gate.v1.md"
+        "contracts/alignment/mapping-batches/AUTH-011-real-evidence-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-011-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-011-runtime-gate.v1.md",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "refresh OpenAPI/DTO/state/security E2E evidence missing"
@@ -249,8 +272,9 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/alignment/mapping-batches/AUTH-012-risk-contract-closure-gate.v1.md"
+        "contracts/alignment/mapping-batches/AUTH-012-real-evidence-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-012-risk-contract-closure-gate.v1.md",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "risk contract remains open"
@@ -264,8 +288,9 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/alignment/mapping-batches/AUTH-013-real-evidence-reconciliation.v1.md"
+        "contracts/alignment/mapping-batches/AUTH-013-real-evidence-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-013-reconciliation.v1.md",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "account-state enforcement mapping incomplete"
@@ -279,8 +304,9 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/alignment/mapping-batches/AUTH-014-real-evidence-reconciliation.v1.md"
+        "contracts/alignment/mapping-batches/AUTH-014-real-evidence-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-014-reconciliation.v1.md",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "recovery API/DTO/entity/security mapping incomplete"
@@ -294,8 +320,9 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/alignment/mapping-batches/AUTH-015-real-evidence-reconciliation.v1.md"
+        "contracts/alignment/mapping-batches/AUTH-015-real-evidence-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-015-reconciliation.v1.md",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "deletion/restoration contract mapping incomplete"
@@ -309,8 +336,8 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/alignment/mapping-batches/AUTH-016-real-evidence-reconciliation.v1.md"
+        "contracts/alignment/mapping-batches/AUTH-016-real-evidence-reconciliation.v1.md",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
         "verification API/DTO/entity/security mapping incomplete"
@@ -474,6 +501,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/B15-security-authorization-lifecycle-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -488,6 +516,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/B15-security-authorization-lifecycle-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -502,6 +531,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/B15-security-authorization-lifecycle-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -516,6 +546,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/B15-security-authorization-lifecycle-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -530,6 +561,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/B15-security-authorization-lifecycle-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -544,6 +576,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/B15-security-authorization-lifecycle-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -558,6 +591,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/B15-security-authorization-lifecycle-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -572,6 +606,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/B15-security-authorization-lifecycle-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -586,6 +621,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/B15-security-authorization-lifecycle-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -600,6 +636,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/B15-security-authorization-lifecycle-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -1062,6 +1099,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/ANALYTICS-001-020-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -1076,6 +1114,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/ANALYTICS-001-020-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -1090,6 +1129,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/ANALYTICS-001-020-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -1104,6 +1144,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/ANALYTICS-001-020-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -1118,6 +1159,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/ANALYTICS-001-020-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -1132,6 +1174,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/ANALYTICS-001-020-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -1146,6 +1189,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/ANALYTICS-001-020-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -1160,6 +1204,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/ANALYTICS-001-020-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -1174,6 +1219,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/ANALYTICS-001-020-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -1188,6 +1234,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/ANALYTICS-001-020-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -1202,6 +1249,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/ANALYTICS-001-020-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -2756,6 +2804,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/EXTCONTENT-001-006-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -2770,6 +2819,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/EXTCONTENT-001-006-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -2784,6 +2834,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/EXTCONTENT-001-006-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -2798,6 +2849,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/EXTCONTENT-001-006-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -2812,6 +2864,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/EXTCONTENT-001-006-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -2826,6 +2879,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/EXTCONTENT-001-006-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3162,6 +3216,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/GROWTH-001-014-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3176,6 +3231,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/GROWTH-001-014-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3190,6 +3246,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/GROWTH-001-014-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3204,6 +3261,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/GROWTH-001-014-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3218,6 +3276,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/GROWTH-001-014-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3232,6 +3291,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/GROWTH-001-014-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3246,6 +3306,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/GROWTH-001-014-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3260,6 +3321,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/GROWTH-001-014-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3274,6 +3336,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/GROWTH-001-014-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3288,6 +3351,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/GROWTH-001-014-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3680,6 +3744,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3694,6 +3759,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3708,6 +3774,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3722,6 +3789,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3736,6 +3804,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3750,6 +3819,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3764,6 +3834,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3778,6 +3849,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3792,6 +3864,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3806,6 +3879,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3820,6 +3894,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3834,6 +3909,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3848,6 +3924,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3862,6 +3939,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3876,6 +3954,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MEDIA-001-015-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3890,6 +3969,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3904,6 +3984,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3918,6 +3999,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3932,6 +4014,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3946,6 +4029,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3960,6 +4044,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3974,6 +4059,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -3988,6 +4074,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4002,6 +4089,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4016,6 +4104,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4030,6 +4119,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4548,6 +4638,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4562,6 +4653,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4576,6 +4668,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4590,6 +4683,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4604,6 +4698,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4618,6 +4713,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4632,6 +4728,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4646,6 +4743,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4660,6 +4758,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4674,6 +4773,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4688,6 +4788,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4702,6 +4803,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4716,6 +4818,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4968,6 +5071,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REC-001-009-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4982,6 +5086,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REC-001-009-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -4996,6 +5101,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REC-001-009-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5010,6 +5116,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REC-001-009-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5024,6 +5131,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REC-001-009-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5038,6 +5146,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REC-001-009-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5052,6 +5161,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REC-001-009-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5066,6 +5176,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REC-001-009-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5080,6 +5191,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REC-001-009-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
