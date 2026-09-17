@@ -70,13 +70,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
-      # Build a deterministic coverage bridge from the already-authoritative
-      # Feature Inventory + mapping batches. This does not fabricate downstream
-      # evidence: generated records remain PROPOSED/NOT_GREEN until contracted.
       - run: node scripts/build-capability-contract-graph.mjs
       - run: node scripts/capability-contract-graph-check.mjs
-      # Historical L1-L4 recovery is evidence-only and non-authoritative.
-      # It remains visible for audit, but cannot block canonical contract admission.
       - name: Audit historical L1-L4 reconciliation (non-blocking)
         continue-on-error: true
         run: node scripts/l1-l4-reconciliation-baseline-check.mjs
@@ -113,10 +108,21 @@ jobs:
       - run: node scripts/alignment-ci.mjs
       - run: git diff --exit-code -- contracts/alignment/feature-inventory.v1.json contracts/alignment/api-inventory.v1.json contracts/alignment/payload-inventory.v1.json contracts/alignment/code-evidence-inventory.v1.json contracts/alignment/five-way-reconciliation.v1.json contracts/alignment/change-impact.v1.json
 
+  mapping-zero-final:
+    name: Mapping 0 Final Admission Gate
+    runs-on: ubuntu-latest
+    needs: [capability-graph, alignment]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - run: npm run mapping:0:verify
+
   contract-full:
     name: Contract Admission Gate (full)
     runs-on: ubuntu-latest
-    needs: [contract, contract-semantic, capability-graph, alignment]
+    needs: [contract, contract-semantic, capability-graph, alignment, mapping-zero-final]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
