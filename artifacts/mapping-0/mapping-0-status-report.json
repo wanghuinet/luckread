@@ -1,0 +1,104 @@
+{
+  "generatedAt": "2026-09-17T13:13:33.198Z",
+  "currentCommit": "caaa95584f0cdc441a25d28da6d458b98a2c4fec",
+  "canonicalMappingStatus": "NOT_GREEN",
+  "canonicalFeatureCount": 449,
+  "canonicalMappingRecordCount": 43,
+  "canonicalMappingStatusCounts": {
+    "PARTIAL": 14,
+    "MISSING": 2,
+    "UNRESOLVED": 27
+  },
+  "canonicalBlockingRecordCount": 43,
+  "featureInventoryStatusCounts": {
+    "MISSING_STATUS": 449
+  },
+  "persistenceRegistryStatus": "NOT_GREEN",
+  "persistenceRegistryRecordCount": 0,
+  "persistenceRegistryStatusCounts": {},
+  "evidenceRegistryStatus": "NOT_GREEN",
+  "evidenceRegistryRecordCount": 11,
+  "evidenceByFeatureCount": 9,
+  "topBlockerReasons": [
+    {
+      "blocker": "DTO mapping missing",
+      "count": 1
+    },
+    {
+      "blocker": "Entity/Field mapping missing",
+      "count": 1
+    },
+    {
+      "blocker": "Page mapping missing",
+      "count": 1
+    },
+    {
+      "blocker": "Worker/D1 canonical mapping missing",
+      "count": 1
+    },
+    {
+      "blocker": "security and integration evidence incomplete",
+      "count": 1
+    },
+    {
+      "blocker": "session DTO/entity mappings incomplete",
+      "count": 1
+    },
+    {
+      "blocker": "state/security E2E evidence missing",
+      "count": 1
+    },
+    {
+      "blocker": "canonical API IDs not established in current inventory",
+      "count": 1
+    },
+    {
+      "blocker": "Entity/Field contract not fully bound",
+      "count": 1
+    },
+    {
+      "blocker": "canonical recovery/change API mapping missing",
+      "count": 1
+    },
+    {
+      "blocker": "single-use token evidence missing",
+      "count": 1
+    },
+    {
+      "blocker": "verification API and event IDs missing",
+      "count": 1
+    },
+    {
+      "blocker": "security E2E evidence missing",
+      "count": 1
+    },
+    {
+      "blocker": "canonical API/DTO/data/security contracts not established",
+      "count": 1
+    },
+    {
+      "blocker": "canonical MFA contracts not established",
+      "count": 1
+    },
+    {
+      "blocker": "provider integration and linked-identity contract mapping missing",
+      "count": 1
+    },
+    {
+      "blocker": "canonical linked-identity entity/API mapping missing",
+      "count": 1
+    },
+    {
+      "blocker": "Page/DTO/Entity/Field/Event/Worker/D1/Test/Evidence IDs not fully reconciled",
+      "count": 1
+    },
+    {
+      "blocker": "refresh OpenAPI/DTO/state/security E2E evidence missing",
+      "count": 1
+    },
+    {
+      "blocker": "risk contract remains open",
+      "count": 1
+    }
+  ]
+}
