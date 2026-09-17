@@ -23,185 +23,235 @@
     "examples",
     "integration_e2e"
   ],
-  "endpoint_status": ["DRAFT", "CONTRACTED", "IMPLEMENTED", "INTEGRATED", "STABLE", "DEPRECATED", "REMOVED"],
+  "endpoint_status": [
+    "DRAFT",
+    "CONTRACTED",
+    "IMPLEMENTED",
+    "INTEGRATED",
+    "STABLE",
+    "DEPRECATED",
+    "REMOVED"
+  ],
   "domains": {
     "auth_identity": {
       "required": true,
       "endpoint_groups": [
-        "POST /v1/auth/register",
+        "DELETE /v1/account/sessions/{sessionId}",
+        "GET /v1/account/sessions",
+        "GET /v1/users/me",
+        "PATCH /v1/users/me",
+        "POST /v1/account/password/change",
+        "POST /v1/account/recovery",
         "POST /v1/auth/login",
         "POST /v1/auth/logout",
         "POST /v1/auth/refresh",
-        "POST /v1/auth/revoke",
-        "GET /v1/users/me",
-        "PATCH /v1/users/me",
-        "POST /v1/account/recovery",
-        "POST /v1/account/password/change",
-        "GET /v1/account/sessions",
-        "DELETE /v1/account/sessions/{sessionId}"
+        "POST /v1/auth/register",
+        "POST /v1/auth/revoke"
       ]
     },
     "users_accounts": {
       "required": true,
       "endpoint_groups": [
+        "GET /v1/accounts/{accountId}",
         "GET /v1/users/{userId}",
-        "PATCH /v1/users/{userId}",
-        "POST /v1/users/{userId}/account-state",
-        "GET /v1/users/{userId}/profile",
         "GET /v1/users/{userId}/followers",
         "GET /v1/users/{userId}/following",
-        "GET /v1/accounts/{accountId}",
+        "GET /v1/users/{userId}/profile",
         "PATCH /v1/accounts/{accountId}",
+        "PATCH /v1/users/{userId}",
+        "POST /v1/accounts/{accountId}/restore",
         "POST /v1/accounts/{accountId}/suspend",
-        "POST /v1/accounts/{accountId}/restore"
+        "POST /v1/users/{userId}/account-state"
       ]
     },
     "content": {
       "required": true,
       "endpoint_groups": [
-        "GET /v1/content/{contentId}",
-        "POST /v1/content",
-        "PATCH /v1/content/{contentId}",
         "DELETE /v1/content/{contentId}",
-        "POST /v1/content/{contentId}/publish",
-        "POST /v1/content/{contentId}/unpublish",
+        "DELETE /v1/contents/{contentId}",
         "GET /v1/articles/{articleId}",
-        "POST /v1/articles",
-        "PATCH /v1/articles/{articleId}",
-        "GET /v1/posts/{postId}",
-        "POST /v1/posts",
-        "PATCH /v1/posts/{postId}",
+        "GET /v1/content/{contentId}",
+        "GET /v1/contents",
+        "GET /v1/contents/{contentId}",
+        "GET /v1/contents/{contentId}/revisions",
+        "GET /v1/contents/{contentId}/revisions/{revisionId}",
         "GET /v1/galleries/{galleryId}",
+        "GET /v1/posts/{postId}",
+        "GET /v1/shares/{shareId}",
+        "PATCH /v1/articles/{articleId}",
+        "PATCH /v1/content/{contentId}",
+        "PATCH /v1/contents/{contentId}",
+        "PATCH /v1/galleries/{galleryId}",
+        "PATCH /v1/posts/{postId}",
+        "POST /v1/articles",
+        "POST /v1/content",
+        "POST /v1/content/{contentId}/publish",
+        "POST /v1/content/{contentId}/shares",
+        "POST /v1/content/{contentId}/unpublish",
+        "POST /v1/contents",
+        "POST /v1/contents/{contentId}/revisions/{revisionId}",
+        "POST /v1/contents/{contentId}/state",
         "POST /v1/galleries",
-        "PATCH /v1/galleries/{galleryId}"
+        "POST /v1/posts"
       ]
     },
     "media": {
       "required": true,
       "endpoint_groups": [
+        "DELETE /v1/media/{mediaId}",
+        "GET /v1/media/{mediaId}",
+        "GET /v1/media/{mediaId}/playback",
+        "GET /v1/media/{mediaId}/processing",
+        "GET /v1/media/{mediaId}/variants",
+        "POST /v1/media",
         "POST /v1/media/uploads",
         "POST /v1/media/uploads/{uploadId}/complete",
-        "GET /v1/media/{mediaId}",
-        "DELETE /v1/media/{mediaId}",
-        "POST /v1/media/{mediaId}/process",
-        "GET /v1/media/{mediaId}/processing",
-        "GET /v1/media/{mediaId}/playback",
-        "GET /v1/media/{mediaId}/variants"
+        "POST /v1/media/{mediaId}/process"
       ]
     },
     "feed": {
       "required": true,
       "endpoint_groups": [
+        "GET /v1/content/{contentId}/related",
         "GET /v1/feed",
         "GET /v1/feed/following",
         "GET /v1/feed/recommended",
-        "GET /v1/feed/user/{userId}",
-        "GET /v1/content/{contentId}/related"
+        "GET /v1/feed/user/{userId}"
       ]
     },
     "interaction": {
       "required": true,
       "endpoint_groups": [
-        "POST /v1/content/{contentId}/likes",
-        "DELETE /v1/content/{contentId}/likes",
-        "POST /v1/content/{contentId}/favorites",
+        "DELETE /v1/comments/{commentId}",
+        "DELETE /v1/comments/{commentId}/likes",
         "DELETE /v1/content/{contentId}/favorites",
-        "POST /v1/users/{userId}/follow",
+        "DELETE /v1/content/{contentId}/likes",
+        "DELETE /v1/interactions/blocks/{targetUserId}",
+        "DELETE /v1/interactions/likes",
+        "DELETE /v1/interactions/mutes/{targetUserId}",
+        "DELETE /v1/social/follows",
         "DELETE /v1/users/{userId}/follow",
         "GET /v1/content/{contentId}/comments",
-        "POST /v1/content/{contentId}/comments",
+        "GET /v1/contents/{contentId}/comments",
         "PATCH /v1/comments/{commentId}",
-        "DELETE /v1/comments/{commentId}",
         "POST /v1/comments/{commentId}/likes",
-        "DELETE /v1/comments/{commentId}/likes"
+        "POST /v1/content/{contentId}/comments",
+        "POST /v1/content/{contentId}/favorites",
+        "POST /v1/content/{contentId}/likes",
+        "POST /v1/contents/{contentId}/comments",
+        "POST /v1/interactions/blocks",
+        "POST /v1/interactions/likes",
+        "POST /v1/interactions/mutes",
+        "POST /v1/social/follows",
+        "POST /v1/users/{userId}/follow"
       ]
     },
     "notification": {
       "required": true,
       "endpoint_groups": [
-        "GET /v1/notifications",
-        "POST /v1/notifications/{notificationId}/read",
-        "POST /v1/notifications/read-all",
         "GET /v1/notification-preferences",
-        "PATCH /v1/notification-preferences"
+        "GET /v1/notifications",
+        "PATCH /v1/notification-preferences",
+        "PATCH /v1/notifications",
+        "POST /v1/notifications/read-all",
+        "POST /v1/notifications/{notificationId}/read"
       ]
     },
     "search_discovery": {
       "required": true,
       "endpoint_groups": [
+        "GET /v1/discovery/creators",
+        "GET /v1/discovery/topics",
         "GET /v1/search",
         "GET /v1/search/suggestions",
-        "GET /v1/search/trending",
-        "GET /v1/discovery/topics",
-        "GET /v1/discovery/creators"
+        "GET /v1/search/trending"
       ]
     },
     "creator_ip_mcn": {
       "required": true,
       "endpoint_groups": [
+        "DELETE /v1/ips/{ipId}/members",
+        "DELETE /v1/mcn/organizations/{orgId}/members/{userId}",
+        "DELETE /v1/organizations/{organizationId}/members/{memberId}",
         "GET /v1/creator/profile",
-        "PATCH /v1/creator/profile",
+        "GET /v1/creators/me",
         "GET /v1/ip/assets",
-        "POST /v1/ip/assets",
-        "PATCH /v1/ip/assets/{assetId}",
+        "GET /v1/ips/{ipId}/contents",
+        "GET /v1/ips/{ipId}/contents/{contentId}",
         "GET /v1/mcn/organizations",
-        "POST /v1/mcn/organizations",
         "GET /v1/mcn/organizations/{orgId}",
+        "GET /v1/organizations/{organizationId}/members",
+        "PATCH /v1/creator/profile",
+        "PATCH /v1/ip/assets/{assetId}",
+        "POST /v1/ip/assets",
+        "POST /v1/ips",
+        "POST /v1/ips/{ipId}/members",
+        "POST /v1/mcn/organizations",
         "POST /v1/mcn/organizations/{orgId}/members",
-        "DELETE /v1/mcn/organizations/{orgId}/members/{userId}"
+        "POST /v1/organizations",
+        "POST /v1/organizations/{organizationId}/members/invitations",
+        "POST /v1/organizations/{organizationId}/members/{memberId}/role"
       ]
     },
     "subscription_entitlement_payment": {
       "required": true,
       "endpoint_groups": [
-        "GET /v1/subscriptions",
-        "POST /v1/subscriptions",
         "DELETE /v1/subscriptions/{subscriptionId}",
         "GET /v1/entitlements",
+        "GET /v1/entitlements/{subjectId}",
+        "GET /v1/memberships/subscriptions/{subscriptionId}",
+        "GET /v1/payments/{paymentId}",
         "GET /v1/plans",
+        "GET /v1/subscriptions",
+        "POST /v1/entitlements/check",
+        "POST /v1/memberships/subscriptions",
+        "POST /v1/memberships/subscriptions/{subscriptionId}/cancel",
         "POST /v1/payments/intents",
-        "GET /v1/payments/{paymentId}"
+        "POST /v1/subscriptions"
       ]
     },
     "audit_compliance": {
       "required": true,
       "endpoint_groups": [
-        "GET /v1/audit/events",
         "GET /v1/account/data-export",
+        "GET /v1/admin/moderation",
+        "GET /v1/audit/events",
         "POST /v1/account/data-export",
-        "POST /v1/account/deletion-request"
+        "POST /v1/account/deletion-request",
+        "POST /v1/appeals",
+        "POST /v1/reports"
       ]
     },
     "analytics": {
       "required": true,
       "endpoint_groups": [
-        "POST /v1/analytics/events",
+        "GET /v1/creator/analytics",
         "POST /v1/analytics/batch",
-        "GET /v1/creator/analytics"
+        "POST /v1/analytics/events"
       ]
     },
     "recommendation_realtime": {
       "required": true,
       "endpoint_groups": [
-        "POST /v1/recommendation/feedback",
-        "GET /v1/recommendation/context",
         "GET /v1/realtime/session",
-        "POST /v1/realtime/presence"
+        "GET /v1/recommendation/context",
+        "POST /v1/realtime/presence",
+        "POST /v1/recommendation/feedback"
       ]
     },
     "open_platform": {
       "required": true,
       "endpoint_groups": [
-        "POST /v1/developer/apps",
-        "GET /v1/developer/apps",
-        "PATCH /v1/developer/apps/{appId}",
-        "POST /v1/developer/oauth/authorize",
-        "POST /v1/developer/api-keys",
         "DELETE /v1/developer/api-keys/{keyId}",
-        "GET /v1/developer/webhooks",
-        "POST /v1/developer/webhooks",
         "DELETE /v1/developer/webhooks/{webhookId}",
-        "GET /v1/developer/usage"
+        "GET /v1/developer/apps",
+        "GET /v1/developer/usage",
+        "GET /v1/developer/webhooks",
+        "PATCH /v1/developer/apps/{appId}",
+        "POST /v1/developer/api-keys",
+        "POST /v1/developer/apps",
+        "POST /v1/developer/oauth/authorize",
+        "POST /v1/developer/webhooks"
       ]
     }
   },
