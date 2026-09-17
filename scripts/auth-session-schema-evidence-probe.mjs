@@ -2,11 +2,12 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const root = resolve(process.cwd())
+const payloadRoot = join(root, 'workers', 'W01-payload')
 const gate1Only = process.argv.includes('--gate1')
-const packageJsonPath = join(root, 'package.json')
-const payloadConfigPath = join(root, 'src', 'payload.config.ts')
-const usersPath = join(root, 'src', 'collections', 'Users.ts')
-const migrationsDir = join(root, 'src', 'migrations')
+const packageJsonPath = join(payloadRoot, 'package.json')
+const payloadConfigPath = join(payloadRoot, 'src', 'payload.config.ts')
+const usersPath = join(payloadRoot, 'src', 'collections', 'Users.ts')
+const migrationsDir = join(payloadRoot, 'src', 'migrations')
 
 let blocked = false
 const fail = (message) => {
@@ -15,7 +16,7 @@ const fail = (message) => {
 }
 
 for (const path of [packageJsonPath, payloadConfigPath, usersPath]) {
-  if (!existsSync(path)) fail(`required file missing: ${path.replace(`${root}/`, '')}`)
+  if (!existsSync(path)) fail(`required W01 file missing: ${path.replace(`${root}/`, '')}`)
 }
 
 if (blocked) process.exit(1)
@@ -24,22 +25,22 @@ const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
 const config = readFileSync(payloadConfigPath, 'utf8')
 const users = readFileSync(usersPath, 'utf8')
 
-if (pkg.dependencies?.payload !== '3.87.1') {
-  fail(`payload dependency must be exactly 3.87.1, found ${pkg.dependencies?.payload ?? 'missing'}`)
+if (pkg.dependencies?.payload !== '3.82.1') {
+  fail(`W01 payload dependency must be exactly 3.82.1, found ${pkg.dependencies?.payload ?? 'missing'}`)
 }
-if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.87.1') {
-  fail(`@payloadcms/db-d1-sqlite dependency must be exactly 3.87.1, found ${pkg.dependencies?.['@payloadcms/db-d1-sqlite'] ?? 'missing'}`)
+if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.82.1') {
+  fail(`W01 @payloadcms/db-d1-sqlite dependency must be exactly 3.82.1, found ${pkg.dependencies?.['@payloadcms/db-d1-sqlite'] ?? 'missing'}`)
 }
-if (!users.includes('auth: true')) fail('Users collection does not enable native auth')
-if (!config.includes('sqliteD1Adapter')) fail('Payload D1 adapter is not configured')
-if (!config.includes('push: false')) fail('Payload migration safety requires push: false')
-if (!config.includes('migrationDir')) fail('Payload migrationDir is not configured')
+if (!users.includes('auth: true')) fail('W01 Users collection does not enable native auth')
+if (!config.includes('sqliteD1Adapter')) fail('W01 Payload D1 adapter is not configured')
+if (!config.includes('push: false')) fail('W01 Payload migration safety requires push: false')
+if (!config.includes('migrationDir')) fail('W01 Payload migrationDir is not configured')
 
 if (!existsSync(migrationsDir)) {
   if (!gate1Only) {
-    fail('src/migrations is absent; runtime/migration evidence cannot be captured yet')
+    fail('W01 src/migrations is absent; runtime/migration evidence cannot be captured yet')
   } else {
-    console.log('Gate-1 mode: src/migrations is absent; this is allowed because Gate-1 is capture-only.')
+    console.log('Gate-1 mode: W01 src/migrations is absent; this is allowed because Gate-1 is capture-only.')
   }
 } else {
   const migrationFiles = []
@@ -52,10 +53,10 @@ if (!existsSync(migrationsDir)) {
   }
   collect(migrationsDir)
   if (migrationFiles.length === 0) {
-    if (!gate1Only) fail('src/migrations exists but contains no migration artifact; runtime/migration evidence cannot be captured yet')
-    else console.log('Gate-1 mode: no local migration artifact; remote migration state will be captured independently.')
+    if (!gate1Only) fail('W01 src/migrations exists but contains no migration artifact; runtime/migration evidence cannot be captured yet')
+    else console.log('Gate-1 mode: W01 has no local migration artifact; remote migration state will be captured independently.')
   } else {
-    console.log(`Migration artifacts discovered: ${migrationFiles.length}`)
+    console.log(`W01 migration artifacts discovered: ${migrationFiles.length}`)
   }
 }
 
@@ -65,6 +66,6 @@ if (blocked) {
 }
 
 console.log(`AUTH-002 schema evidence preconditions: PASS (${gate1Only ? 'GATE1_CAPTURE_ONLY' : 'FULL'})`)
-console.log(`Payload: ${pkg.dependencies.payload}`)
-console.log(`D1 adapter: ${pkg.dependencies['@payloadcms/db-d1-sqlite']}`)
+console.log(`W01 Payload: ${pkg.dependencies.payload}`)
+console.log(`W01 D1 adapter: ${pkg.dependencies['@payloadcms/db-d1-sqlite']}`)
 console.log('NOTE: preconditions passing does not itself prove D1 schema or promote AUTH-002.')
