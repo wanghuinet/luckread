@@ -1,12 +1,19 @@
-# AUTH-002 — Migration Generation Runbook v1.0
+# AUTH-002 — Migration Generation Runbook v1.1
 
 ## Status
 
 `CONTRACTED_NOT_EXECUTED / NOT_GREEN`
 
+## Runtime authority
+
+The active runtime authority is `workers/W01-payload/`.
+The active dependency baseline is the official `templates/with-cloudflare-d1` baseline recorded by the W01 upstream manifest: Payload `3.82.1` and `@payloadcms/db-d1-sqlite` `3.82.1`.
+
+The older Payload `3.87.1` references are historical and are not valid current W01 runtime evidence.
+
 ## Purpose
 
-Generate the first Payload migration artifact for AUTH-002 from the frozen repository configuration and contracts without applying it to any remote D1 database.
+Generate the first Payload migration artifact for AUTH-002 from the frozen W01 configuration and contracts without applying it to any remote D1 database.
 
 ## Authority
 
@@ -14,24 +21,28 @@ Generate the first Payload migration artifact for AUTH-002 from the frozen repos
 - `contracts/migration/AUTH-002-006-migration-manifest.v1.json`
 - `contracts/entity/AUTH-002-session-field-contract.v1.json`
 - `contracts/migration/AUTH-002-006-migration-gate.v1.md`
+- `workers/W01-payload/src/payload.config.ts`
+- `workers/W01-payload/src/collections/Users.ts`
+- `workers/W01-payload/src/migrations/`
 
 ## Preconditions
 
-1. Payload dependency is exactly `3.87.1`.
-2. `@payloadcms/db-d1-sqlite` dependency is exactly `3.87.1`.
+1. W01 Payload dependency is exactly `3.82.1`.
+2. W01 `@payloadcms/db-d1-sqlite` dependency is exactly `3.82.1`.
 3. `Users` has native Payload authentication enabled.
 4. D1 adapter uses `push: false`.
-5. D1 adapter has an explicit `migrationDir`.
-6. The working tree is clean except for intentionally staged migration-generation changes.
-7. No production or controlled remote D1 mutation is permitted during generation.
+5. D1 adapter has an explicit `migrationDir` pointing to W01 migrations.
+6. Dependency resolution is captured for the exact tested commit, including a reproducible lockfile reference.
+7. The working tree is clean except for intentionally staged migration-generation changes.
+8. No production or controlled remote D1 mutation is permitted during generation.
 
 ## Generation command
 
-Use the repository Payload CLI:
+Use the W01 Payload CLI:
 
-`npm run payload -- migrate:create MIG-AUTH-002-SESSION-V1`
+`pnpm payload migrate:create MIG-AUTH-002-SESSION-V1`
 
-Payload documents `migrate:create` as the command that generates a migration file in the configured migrations directory; generation does not itself execute the migration. citeturn267405search0
+The official Cloudflare template documents `payload migrate:create` for generating migrations and `payload migrate` for applying them. Generation alone does not execute a migration. citeturn0search0
 
 ## Immediate static review
 
@@ -48,12 +59,12 @@ After generation, the artifact MUST:
 
 ## Required checks before commit acceptance
 
-1. Run `npm run auth:session:migration:admission`.
-2. Run `node scripts/auth-002-migration-static-audit.mjs`.
+1. Run the W01 migration admission validator.
+2. Run the migration static audit.
 3. Inspect the generated migration manually against the frozen contract.
 4. Confirm no unrelated collection/table/index changes are included.
 5. Confirm `up` and `down` are deterministic and scoped to the migration.
-6. Do not run `payload migrate`, `d1 migrations apply`, or any D1 mutating SQL in this generation step.
+6. Do not run `payload migrate`, `wrangler d1 migrations apply`, or any other D1-mutating SQL in this generation step.
 
 ## Promotion rule
 
