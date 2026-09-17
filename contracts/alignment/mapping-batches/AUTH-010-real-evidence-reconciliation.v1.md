@@ -2,7 +2,6 @@
 
 - Feature: `AUTH-010`
 - Name: session/device management
-- Audit baseline: `61cc62200f63ff81ebccf03e430505722eda7e85`
 - Reconciliation status: `BLOCKED_NOT_GREEN`
 - Implementation authorization: `false`
 
@@ -29,78 +28,52 @@ Both operations remain `CONTRACTED_PARTIAL`.
 
 `authSessionRevoke` requires self-only scope, must reject cross-account session access, and revocation must dominate cache state.
 
-The B01 governance contract also forbids cross-account session/resource access, auth/authorization bypass, direct authoritative state mutation, duplicate business results from replay/retry, and unregistered API fields/permissions/events/features.
+## 4. Newly confirmed persistence/code evidence
 
-## 4. Entity and persistence evidence
+Repository inspection now confirms concrete session extension schema code exists in `src/db/auth-session-state.ts` and is registered in `src/payload.config.ts` as the `auth_session_state` raw table/schema.
 
-Current entity catalog evidence shows `ENT-USER` as the only verified identity entity implementation. `ENT-SESSION` and `ENT-DEVICE-RECORD` remain proposed rather than verified.
+Confirmed fields are:
 
-The entity-field contract currently has no canonical fields for `ENT-SESSION` or `ENT-DEVICE-RECORD`.
+- `session_id` — primary key
+- `user_id`
+- `device_id`
+- `token_version`
+- `refresh_credential_hash`
+- `revoked_at`
+- `last_seen_at`
 
-The entity implementation-evidence registry marks these entities as contract-only / not implemented, and the database entity-persistence inventory does not provide verified persistence for them.
+Confirmed indexes exist for user, device, token version and revoked-at fields.
 
-Therefore the following are **not established and must not be inferred**:
+The persistence contract `AUTH-002-minimum-session-extension-persistence-contract.v1.1.json` defines `ENT-SESSION`, the native Payload `users.sessions[]` relationship, the same extension fields, and fail-closed/session lifecycle rules. However, that contract is explicitly `CONTRACTED_NOT_VERIFIED`; migration/runtime/test/evidence readiness remains open.
 
-- Session canonical field IDs
-- Device record canonical field IDs
-- Session-to-user relation fields
-- Session secret/hash persistence fields
-- Refresh-token/rotation persistence fields
-- Device identity/fingerprint fields
-- Session status/revocation fields
-- Expiration/created/last-seen fields
-- Concrete D1 table/column names
-- Payload adapter generated table names
+## 5. Important boundary
 
-## 5. Runtime/code evidence
+The discovered `auth_session_state` code is evidence of a persistence/schema implementation, but it is **not** evidence that AUTH-010 list/revoke endpoints are implemented.
 
-Repository searches on the audit baseline did not locate a concrete session-management runtime implementation that can be promoted into Mapping 0 evidence for `authSessionList` or `authSessionRevoke`.
+The source file comments identify this table as the minimal extension state for AUTH-002. Therefore AUTH-010 must not claim ownership of this table merely from name/field similarity. Cross-feature authority must be explicitly reconciled before promotion.
 
-No authoritative handler → DTO → authorization → entity → persistence → lifecycle → event → response chain was found for either operation.
+Repository search still found no concrete handler implementing both `authSessionList` and `authSessionRevoke`, and no authoritative handler → DTO → authorization → persistence → lifecycle → response chain for AUTH-010.
 
-No runtime evidence was found establishing that Payload's internal authentication/session behavior is the canonical implementation of the frozen AUTH-010 contract. Therefore Payload internals are not accepted as evidence by inference.
+## 6. Remaining blockers
 
-## 6. Test and evidence gaps
-
-Required production-green evidence is missing for:
-
-- OpenAPI operation definitions for the two session endpoints
-- Request/response DTO IDs and schemas
-- Entity IDs bound to session/device operations
-- Field IDs and persistence mappings
-- Session/device lifecycle/state IDs
-- Session-related event IDs
-- Worker/runtime implementation evidence
-- D1 persistence evidence and executed migration evidence
-- Self-scope positive/negative authorization tests
-- Cross-account access denial tests
-- Revocation idempotency tests
-- Stale-cache versus authoritative-revocation tests
-- Session-list consistency after revocation
-- Executed integration/E2E evidence
-- Canonical Evidence Registry IDs bound to executed results
-
-The auth operation policy itself records missing OpenAPI, permission, state, cache, anti-abuse, integration and security-E2E evidence for both operations.
+1. Bind canonical Session/Device entity and field IDs to AUTH-010 without duplicating or overriding AUTH-002 authority.
+2. Prove whether AUTH-010 consumes the existing AUTH-002 session state contract or requires a distinct contract extension.
+3. Establish canonical DTO/OpenAPI definitions for list/revoke.
+4. Establish runtime handler and self-scope authorization evidence.
+5. Establish lifecycle/event semantics for list/revoke and authoritative revocation.
+6. Prove executable migration/application state; schema source code alone is insufficient.
+7. Add positive/negative integration/security tests and actual Evidence Registry references.
 
 ## 7. GREEN decision
 
 `AUTH-010 = BLOCKED_NOT_GREEN`.
 
-No code implementation should be authorized from this reconciliation alone.
+No promotion to GREEN is made in this pass. The new persistence evidence reduces an evidence gap but does not close the five-way/runtime/security/test chain.
 
-The feature can only transition to GREEN after the canonical mapping is closed bidirectionally across:
+Required final chain:
 
 `Feature → Capability → API → DTO → Entity → Field/Persistence → Payload → Code/Worker → Security → Lifecycle → Test → Evidence`.
 
-## 8. Next closure work
+## 8. Next closure action
 
-Closure must establish, without inventing identifiers:
-
-1. Canonical Session and Device entities and their field contracts.
-2. Exact persistence/D1 mapping and executable migration evidence.
-3. Canonical DTO/OpenAPI definitions for list and revoke.
-4. Runtime handler and security-scope implementation evidence.
-5. Session/device lifecycle and event bindings.
-6. Positive/negative integration and security E2E tests.
-7. Non-empty Evidence Registry entries tied to actual execution and commit SHA.
-8. Cross-system mapping update from `PARTIAL` to `GREEN` only after every required gate passes.
+Continue with the canonical AUTH-002 ↔ AUTH-010 boundary reconciliation first, then bind the actual list/revoke API/runtime surface. Only after executed evidence exists should the cross-system mapping status change.
