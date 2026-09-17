@@ -2,9 +2,10 @@
 /**
  * Read-only evidence freshness metrics.
  *
- * This reports evidence-record freshness without changing evidence status,
- * canonical mapping status, or any contract. Missing/expired evidence is a
- * downstream closure signal, not a Mapping 0 structural failure by itself.
+ * This reports evidence-record freshness and feature-level freshness coverage
+ * without changing evidence status, canonical mapping status, or any contract.
+ * Missing/expired evidence is a downstream closure signal, not a Mapping 0
+ * structural failure by itself.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -69,6 +70,30 @@ for (const record of records) {
 expired.sort((a, b) => a.validUntil.localeCompare(b.validUntil))
 fresh.sort((a, b) => b.validUntil.localeCompare(a.validUntil))
 
+const featureState = new Map()
+for (const record of records) {
+  if (typeof record.subjectId !== 'string' || !record.subjectId) continue
+  const state = featureState.get(record.subjectId) ?? { fresh: 0, expired: 0, invalid: 0 }
+  const until = new Date(record.validUntil)
+  if (Number.isNaN(until.getTime())) state.invalid += 1
+  else if (until < now) state.expired += 1
+  else state.fresh += 1
+  featureState.set(record.subjectId, state)
+}
+
+const featureIdsWithFreshEvidence = [...featureState.entries()]
+  .filter(([, state]) => state.fresh > 0)
+  .map(([subjectId]) => subjectId)
+  .sort()
+const featureIdsWithOnlyExpiredEvidence = [...featureState.entries()]
+  .filter(([, state]) => state.fresh === 0 && state.expired > 0 && state.invalid === 0)
+  .map(([subjectId]) => subjectId)
+  .sort()
+const featureIdsWithInvalidEvidenceDate = [...featureState.entries()]
+  .filter(([, state]) => state.invalid > 0)
+  .map(([subjectId]) => subjectId)
+  .sort()
+
 console.log(JSON.stringify({
   evaluatedAt: now.toISOString(),
   evidenceJsonFileCount: jsonFiles.length,
@@ -76,6 +101,15 @@ console.log(JSON.stringify({
   freshCount: fresh.length,
   expiredCount: expired.length,
   invalidDateCount: invalid.length,
+  featureLevelFreshness: {
+    featureCountWithEvidenceRecords: featureState.size,
+    featureCountWithFreshEvidence: featureIdsWithFreshEvidence.length,
+    featureCountWithOnlyExpiredEvidence: featureIdsWithOnlyExpiredEvidence.length,
+    featureCountWithInvalidEvidenceDate: featureIdsWithInvalidEvidenceDate.length,
+    featureIdsWithFreshEvidence,
+    featureIdsWithOnlyExpiredEvidence,
+    featureIdsWithInvalidEvidenceDate,
+  },
   expiredClaimIds: expired.slice(0, 25).map((record) => ({
     evidenceId: record.evidenceId,
     claimId: record.claimId,
