@@ -8,7 +8,7 @@ Runtime baseline: official Payload `templates/with-cloudflare-d1`, package famil
 
 Close the W01 dependency reproducibility prerequisite without fabricating or copying a lockfile from another project or historical Payload release.
 
-The official Cloudflare D1 template is the runtime source baseline for W01. Payload documents Cloudflare deployment as Workers + R2 + D1, and the Cloudflare template has its own build/runtime constraints. citeturn0search3turn0search6
+The official Cloudflare D1 template is the runtime source baseline for W01. Cloudflare deployment support is documented as Workers + R2 + D1, and the template has its own build/runtime constraints.
 
 ## Preconditions
 
@@ -52,7 +52,7 @@ After `pnpm-lock.yaml` exists:
 
 ## Important runtime gate
 
-A reproducible lockfile does not prove that Payload D1 runtime behavior is correct. The known `@payloadcms/db-d1-sqlite` 3.82.1 upsert defect must remain an explicit E4.5 runtime regression gate; the project must not silently introduce an unapproved Payload-core workaround. citeturn0search4
+A reproducible lockfile does not prove that Payload D1 runtime behavior is correct. The known `@payloadcms/db-d1-sqlite` 3.82.1 upsert defect must remain an explicit E4.5 runtime regression gate; the project must not silently introduce an unapproved Payload-core workaround.
 
 ## Current state
 
