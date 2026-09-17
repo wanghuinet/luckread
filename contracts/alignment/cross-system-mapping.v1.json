@@ -10,13 +10,16 @@
       "apiOperationIds": [
         "authRegister"
       ],
-      "entityIds": [],
+      "entityIds": [
+        "ENT-USER"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
         "contracts/alignment/mapping-batches/B19-AUTH-001-real-evidence-reconciliation.v1.md",
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/dto/auth-dto-contract.v1.json"
       ],
       "blockers": [
         "DTO mapping missing",
@@ -46,7 +49,8 @@
         "contracts/alignment/mapping-batches/AUTH-002-real-evidence-reconciliation.v1.md",
         "contracts/alignment/mapping-batches/AUTH-002-session-real-evidence-reconciliation.v1.md",
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/dto/auth-dto-contract.v1.json"
       ],
       "blockers": [
         "session DTO/entity mappings incomplete",
@@ -242,7 +246,8 @@
         "contracts/alignment/mapping-batches/AUTH-010-reconciliation.v1.md",
         "contracts/alignment/mapping-batches/AUTH-010-session-field-binding.v1.md",
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/dto/auth-dto-contract.v1.json"
       ],
       "blockers": [
         "Page/DTO/Entity/Field/Event/Worker/D1/Test/Evidence IDs not fully reconciled"
