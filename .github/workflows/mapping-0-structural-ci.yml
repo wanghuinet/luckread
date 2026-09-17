@@ -33,3 +33,6 @@ jobs:
 
       - name: Report canonical closure edge metrics
         run: node scripts/mapping-closure-metrics.mjs
+
+      - name: Report evidence freshness metrics
+        run: node scripts/evidence-freshness-metrics.mjs
