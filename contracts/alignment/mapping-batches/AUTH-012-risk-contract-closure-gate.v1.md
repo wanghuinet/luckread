@@ -1,4 +1,4 @@
-# AUTH-012 Risk Contract Closure Gate v1.0
+# AUTH-012 Risk Contract Closure Gate v1.1
 
 Status: BLOCKED_NOT_GREEN
 Implementation authorization: false
@@ -13,8 +13,8 @@ The feature is not considered implemented merely because `authLogin` exists in A
 ## Authority boundary
 
 - Identity / Account authority remains in the Identity / Account domain.
-- Session authority remains in Identity / Auth.
-- Risk decision authority remains in the Risk domain.
+- Session authority remains in Identity / Auth and canonical `ENT-SESSION`.
+- Risk decision authority remains in the Risk domain, mapped to T20/W06/D1-03 at the frozen topology layer.
 - Notification delivery remains in the Notification domain.
 - Security Center is an experience surface and must not create a second Risk authority.
 
@@ -34,9 +34,11 @@ No undocumented client-provided risk score, trust score, or detection-rule resul
 
 The Risk domain must produce an explicit decision state sufficient for the auth pipeline to choose an allowed protection action. Internal risk scores and detection rules are not public API fields.
 
+The current Risk contract defines the required decision vocabulary as `allow`, `monitor`, `challenge`, `rate_limit`, `degrade`, `hold`, `block`, and `review`. These values are contract vocabulary only; they are not yet a verified persisted state enum for a runtime entity.
+
 ### Protection actions
 
-Depending on the canonical risk decision, the system may require verification/step-up, reject or restrict authentication, revoke affected session state, or continue while generating an alert. Exact action values must be frozen before implementation.
+Depending on the canonical risk decision, the system may require verification/step-up, reject or restrict authentication, revoke affected session state, or continue while generating an alert. Exact runtime state/action persistence semantics remain unverified.
 
 ### User-facing security data
 
@@ -45,6 +47,54 @@ Security Center may expose facts, risk notices, and recommended actions, but mus
 ### Audit
 
 A suspicious-login decision that causes a security mutation must be attributable to a server-side request/correlation context and an audit record. Audit evidence must be execution-backed before GREEN.
+
+## Repository reconciliation result
+
+The repository has an explicit canonical Risk/Trust instance registry with the following L5/L6 responsibilities relevant to AUTH-012:
+
+- `fraud-login-detect-01` — detect suspicious login;
+- `risk-case-id-01` — generate risk case ID;
+- `risk-subject-resolve-01` — resolve risk subject;
+- `risk-policy-resolve-01` — resolve risk policy;
+- `risk-score-01` — calculate risk score;
+- `risk-level-classify-01` — classify risk level;
+- `risk-action-01` — apply risk action;
+- `trust-decision-create-01` — create trust decision;
+- `trust-state-update-01` — update trust state;
+- `risk-decision-expire-01` — expire risk decision.
+
+The separate Identity/Session registry also contains the login-risk and protection boundaries:
+
+- `login-event-01`;
+- `known-device-compare-01`;
+- `login-risk-aggregate-01`;
+- `impossible-travel-boundary-01`;
+- `login-challenge-01`;
+- `takeover-escalation-01`;
+- `compromised-session-revoke-01`.
+
+These are authoritative L5/L6 contract surfaces, but their implementation state is `IMPLEMENTATION-PENDING / CL-CI-NOT-RUN`; therefore they do not constitute runtime evidence.
+
+## Entity / field / persistence reconciliation
+
+Search of current repository contracts found a fully defined and verified Risk entity schema, concrete Risk persistence collection/table, Risk DTO binding, and executable Risk runtime handler **not established** for AUTH-012.
+
+The repository does contain canonical `ENT-SESSION` field contract material, but that is the Session authority and must not be repurposed as the Risk decision entity. Its contract explicitly rejects speculative risk score/IP/geolocation/fingerprint fields until separately contracted.
+
+Therefore the following identifiers remain intentionally unresolved:
+
+```text
+Risk entity ID             = UNRESOLVED
+Risk field IDs             = UNRESOLVED
+Risk state enum persistence = UNRESOLVED
+Risk D1-03 table/collection = UNRESOLVED
+Risk migration owner       = UNRESOLVED
+Risk DTO IDs               = UNRESOLVED
+Risk API/event operation ID= UNRESOLVED
+Runtime handler/code ref   = UNRESOLVED
+```
+
+No new Risk entity, duplicate session entity, or ad-hoc persistence table is authorized merely to fill these gaps.
 
 ## Required cross-system mapping
 
@@ -71,15 +121,10 @@ Before implementation authorization:
 - Duplicate security mutation is idempotent or safely rejected according to the canonical mutation contract.
 - Audit evidence is generated for risk-triggered security mutation.
 
-## Current blockers
+## Current gate
 
-- Canonical Risk entity/state/action contract is not yet mapped.
-- Canonical API/event surface for suspicious-login detection is not yet closed.
-- DTO bindings are not yet closed.
-- Persistence and migration authority are not yet closed.
-- Executable security E2E evidence is absent.
-- Evidence Registry execution evidence is absent.
+AUTH-012 remains `BLOCKED_NOT_GREEN`.
 
-## Gate
+Next closure stage is to freeze the executable Risk decision/state contract using the existing `fraud-login-detect-01` / `risk-action-01` / `trust-decision-create-01` authority, then bind its API/event, DTO, persistence/migration, lifecycle, security tests, and Evidence Registry records.
 
-AUTH-012 remains `BLOCKED_NOT_GREEN` until the above blockers are closed and execution-backed evidence exists. No runtime implementation should be promoted to canonical merely because a planning document or API inventory entry exists.
+Implementation must not begin from this gate alone.
