@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import yaml from 'yaml';
 
 const root = process.cwd();
 const openapiPath = 'contracts/openapi/v1/openapi.yaml';
@@ -87,24 +86,51 @@ function loadDomainPolicies() {
   return result;
 }
 
-function parseOpenApi() {
-  const doc = yaml.parse(fs.readFileSync(`${root}/${openapiPath}`, 'utf8'));
+function parseOpenApi(raw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8')) {
+  const lines = raw.split(/\r?\n/);
   const operations = [];
-  for (const [path, item] of Object.entries(doc.paths ?? {})) {
-    for (const [method, op] of Object.entries(item ?? {})) {
-      if (!['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(String(method).toLowerCase())) continue;
-      if (!op?.operationId) continue;
+  let currentPath = null;
+  let currentMethod = null;
+  let currentOperationId = null;
+  let currentTags = [];
+
+  const flush = () => {
+    if (currentPath && currentMethod && currentOperationId) {
       operations.push({
-        operationId: op.operationId,
-        method: String(method).toUpperCase(),
-        path: normalizePath(path),
-        openapiPath: path,
-        tags: Array.isArray(op.tags) ? op.tags : [],
-        domain: inferDomain(path, Array.isArray(op.tags) ? op.tags : []),
+        operationId: currentOperationId,
+        method: currentMethod,
+        path: normalizePath(currentPath),
+        openapiPath: currentPath,
+        tags: currentTags,
+        domain: inferDomain(currentPath, currentTags),
       });
     }
+    currentOperationId = null;
+    currentTags = [];
+  };
+
+  for (const line of lines) {
+    const pathMatch = line.match(/^  (\/[^:#]+):\s*$/);
+    if (pathMatch) {
+      flush();
+      currentPath = pathMatch[1].trim();
+      currentMethod = null;
+      continue;
+    }
+    const methodMatch = line.match(/^    (get|post|put|patch|delete|head|options|trace):\s*$/i);
+    if (methodMatch && currentPath) {
+      flush();
+      currentMethod = methodMatch[1].toUpperCase();
+      continue;
+    }
+    if (!currentPath || !currentMethod) continue;
+    const operationMatch = line.match(/^\s+operationId:\s*([^#\s]+)\s*(?:#.*)?$/);
+    if (operationMatch) currentOperationId = operationMatch[1].trim();
+    const tagsMatch = line.match(/^\s+tags:\s*\[([^\]]*)\]\s*$/);
+    if (tagsMatch) currentTags = tagsMatch[1].split(',').map((x) => x.trim()).filter(Boolean);
   }
-  return { doc, operations };
+  flush();
+  return operations;
 }
 
 function buildOpenApiOperation({ operationId, method, canonicalPath, domain }) {
@@ -147,22 +173,19 @@ function buildOpenApiOperation({ operationId, method, canonicalPath, domain }) {
   return lines.join('\n');
 }
 
-function insertIntoExistingPath(raw, rawPath, methodBlock) {
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
   const lines = raw.split('\n');
   const header = `  ${rawPath}:`;
   const start = lines.findIndex((line) => line === header);
   if (start < 0) return null;
   let end = lines.length;
   for (let i = start + 1; i < lines.length; i += 1) {
-    if (/^  \/.*:\s*$/.test(lines[i])) { end = i; break; }
-    if (lines[i] === 'components:') { end = i; break; }
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
   }
-  const blockLines = methodBlock.split('\n');
   const before = lines.slice(0, end);
   const after = lines.slice(end);
   if (before.length && before[before.length - 1] !== '') before.push('');
-  const next = [...before, ...blockLines, ...after].join('\n');
-  return next;
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
 }
 
 function addOpenApiOperations(raw, missing) {
@@ -170,13 +193,14 @@ function addOpenApiOperations(raw, missing) {
   let next = raw;
   let added = 0;
   const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
-  const existingPathMethods = new Set();
-  for (const item of parseOpenApi().operations) existingPathMethods.add(operationKey(item.method, item.path));
-
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
   const grouped = new Map();
+
   for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
     const rawPath = openapiPathFromCanonical(op.path);
-    if (existingPathMethods.has(operationKey(op.method, op.path))) continue;
     if (!grouped.has(rawPath)) grouped.set(rawPath, []);
     grouped.get(rawPath).push(op);
   }
@@ -184,17 +208,16 @@ function addOpenApiOperations(raw, missing) {
   const newPathBlocks = [];
   for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     ops.sort((a, b) => a.method.localeCompare(b.method));
-    const methods = ops.map((op) => buildOpenApiOperation(op)).join('\n\n');
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
     if (existingPathNames.has(rawPath)) {
-      const changed = insertIntoExistingPath(next, rawPath, methods);
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
       if (changed !== null) {
         next = changed;
         added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
       }
     } else {
-      const pathHeader = `  ${rawPath}:`;
-      const block = `${pathHeader}\n${methods}`;
-      newPathBlocks.push(block);
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
       added += ops.length;
     }
   }
@@ -210,7 +233,8 @@ function addOpenApiOperations(raw, missing) {
 
 const inventory = readJson(inventoryPath);
 const domainPolicies = loadDomainPolicies();
-const { operations: openapiOperations } = parseOpenApi();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
 
 const inventoryRecords = [];
 for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
@@ -234,38 +258,28 @@ for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path)
   inventoryMap.set(key, { method: op.method, path: op.path, domain });
   addedToInventory += 1;
 }
-for (const group of Object.values(inventory.domains ?? {})) {
-  group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
-}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
 
 const missingOpenApi = [];
 for (const [key, record] of inventoryMap) {
   if (openapiMap.has(key)) continue;
-  const [method, ...pathParts] = key.split(' ');
-  const path = pathParts.join(' ');
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
   const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
   const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
-  missingOpenApi.push({
-    operationId,
-    method,
-    path,
-    domain: record.domain,
-  });
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
 }
 
-const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
 const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
 if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
 
-// Re-read the effective OpenAPI surface after additions so the consolidated policy is exactly aligned.
-const effectiveOpenApi = parseOpenApi().operations;
+const effectiveOpenApi = parseOpenApi(openapiNext);
 const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
 
 const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
 const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
-const policyByMethodPath = new Map();
-for (const p of domainPolicies) policyByMethodPath.set(operationKey(p.method, p.path), p);
-
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
 const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
 const usedIds = new Set();
 const consolidatedOperations = [];
@@ -275,7 +289,6 @@ for (const op of targetOperations) {
   const source = policyByMethodPath.get(key);
   const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
   let operationId = op.operationId;
-  if (usedIds.has(operationId)) operationId = generatedOperationId(op.method, op.path);
   while (usedIds.has(operationId)) operationId = `${operationId}Op`;
   usedIds.add(operationId);
 
@@ -289,7 +302,7 @@ for (const op of targetOperations) {
   const idempotency = source?.idempotency;
   const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
   let stateMachine = 'none';
-  if (operationId === 'transitionAccountState' || inferDomain(op.path, op.tags) === 'auth_identity' && /account-state/i.test(op.path)) stateMachine = 'account';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
   else if (stateful) stateMachine = 'content';
 
   const method = String(op.method).toUpperCase();
@@ -308,13 +321,8 @@ for (const op of targetOperations) {
   });
 }
 
-const nextPolicy = {
-  ...existingPolicy,
-  version: existingPolicy.version ?? '1.0.0',
-  operations: consolidatedOperations,
-};
 writeJson(inventoryPath, inventory);
-writeJson(consolidatedPolicyPath, nextPolicy);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
 
 console.log(JSON.stringify({
   status: 'SYNCHRONIZED_DRAFT',
