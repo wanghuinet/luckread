@@ -7,7 +7,7 @@ const gates = [
   ['entity-field-contract', 'scripts/entity-field-contract-check.mjs'],
   ['entity-field-schema', 'scripts/entity-field-schema-contract-check.mjs'],
   ['feature-entity-persistence', 'scripts/feature-entity-persistence-registry-check.mjs'],
-  ['canonical-evidence-registry', 'scripts/mapping-0-evidence-registry-check.mjs'],
+  ['canonical-evidence-registry', 'scripts/mapping-0-evidence-registry-final-check.mjs'],
 ]
 
 const failures = []
