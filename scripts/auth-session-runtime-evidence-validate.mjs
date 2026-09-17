@@ -56,8 +56,9 @@ if (manifest.testedCommitSha !== expectedCommit) fail('manifest testedCommitSha 
 
 if (dependency.repository !== 'wanghuinet/luckread') fail('dependency repository mismatch')
 if (dependency.testedCommitSha !== manifest.testedCommitSha) fail('dependency commit mismatch')
-if (dependency.payloadVersion !== '3.87.1') fail('Payload version mismatch')
-if (dependency.d1AdapterVersion !== '3.87.1') fail('D1 adapter version mismatch')
+if (dependency.workerPath !== 'workers/W01-payload') fail('dependency workerPath must be workers/W01-payload')
+if (dependency.payloadVersion !== '3.82.1') fail('Payload version mismatch: W01 official Cloudflare template baseline is 3.82.1')
+if (dependency.d1AdapterVersion !== '3.82.1') fail('D1 adapter version mismatch: W01 official Cloudflare template baseline is 3.82.1')
 if (!String(dependency.nodeVersion ?? '').startsWith('v24.')) fail('Node version is not Node 24')
 if (!dependency.lockfileReference) fail('lockfileReference missing')
 
@@ -124,5 +125,5 @@ for (const file of required.filter((name) => name !== 'runtime-manifest.json')) 
 }
 
 console.log('AUTH-002_RUNTIME_EVIDENCE_VALIDATION_PASS')
-console.log('Validated commit binding, dependency pinning, native sid lifecycle correlation, expiry/logout denial, extension-key identity, negative security evidence, concurrency invariant, secret redaction, and artifact hashes.')
+console.log('Validated W01 commit binding, official Cloudflare-template dependency pinning, native sid lifecycle correlation, expiry/logout denial, extension-key identity, negative security evidence, concurrency invariant, secret redaction, and artifact hashes.')
 console.log('This validator does not apply migrations or alter runtime state; promotion remains subject to Gate-1 acceptance and Mapping-0 validation.')
