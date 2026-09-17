@@ -1,6 +1,6 @@
 name: Canonical OpenAPI RC Sync
 
-# Contract CI runs from the exact canonical ref produced by this workflow.
+# Contract CI is dispatched against the exact canonical ref produced by this workflow.
 on:
   push:
     paths:
@@ -11,12 +11,11 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-    outputs:
-      validated_ref: ${{ steps.resolve-ref.outputs.validated_ref }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,23 +35,18 @@ jobs:
           files="contracts/api/api-inventory.v1.json contracts/openapi/v1/openapi.yaml contracts/openapi/v1/operation-policy.json"
           if git diff --quiet -- $files; then
             echo "No canonical API surface change required."
-            exit 0
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add $files
+            git commit -m "chore(api): synchronize canonical API surface"
+            git push
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add $files
-          git commit -m "chore(api): synchronize canonical API surface"
-          git push
 
-      - name: Resolve canonical validation ref
-        id: resolve-ref
-        run: echo "validated_ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-  contract-validation:
-    name: Contract Validation on Canonical Ref
-    needs: sync
-    uses: ./.github/workflows/contract-ci.yml
-    with:
-      checkout_ref: ${{ needs.sync.outputs.validated_ref }}
-    permissions:
-      contents: read
+      - name: Dispatch Contract CI on canonical ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          validated_ref="$(git rev-parse HEAD)"
+          echo "Dispatching Contract CI for ${validated_ref}"
+          gh workflow run contract-ci.yml --ref "${validated_ref}"
