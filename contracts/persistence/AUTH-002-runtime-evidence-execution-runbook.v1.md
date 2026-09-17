@@ -9,26 +9,29 @@
 This runbook operationalizes `contracts/persistence/AUTH-002-runtime-session-evidence-gate.v1.json`.
 It does not authorize production migration application or promote `AUTH-002` by itself.
 
+The current runtime authority is `workers/W01-payload/`, using the official Payload `templates/with-cloudflare-d1` package baseline. The current W01 baseline is Payload `3.82.1` with `@payloadcms/db-d1-sqlite` `3.82.1`.
+
 ## Preconditions
 
 All preconditions below are mandatory and fail closed:
 
 1. Gate-1 controlled remote D1 schema evidence is accepted for the same commit under test.
-2. `payload` resolves to exactly `3.87.1`.
-3. `@payloadcms/db-d1-sqlite` resolves to exactly `3.87.1`.
-4. Node 24 is used, matching CI.
+2. W01 `workers/W01-payload/package.json` resolves `payload` exactly to `3.82.1`.
+3. W01 resolves `@payloadcms/db-d1-sqlite` exactly to `3.82.1`.
+4. Node 24 is used, matching the official W01 template engine requirement.
 5. The runtime target is an explicitly named controlled evidence environment.
 6. A disposable isolated test identity is used; no production account is permitted.
 7. The evidence runner can invoke the real Payload authentication runtime against the controlled target.
-8. No evidence command prints authorization headers, cookies, passwords, raw access tokens, raw refresh credentials, or credential hashes.
+8. The W01 lockfile/reference used for the test is captured; absence of a lockfile blocks promotion until dependency resolution is reproducibly evidenced.
+9. No evidence command prints authorization headers, cookies, passwords, raw access tokens, raw refresh credentials, or credential hashes.
 
 ## Execution sequence
 
 ### Gate A — Identity and dependency lock
 
-Capture the repository SHA, workflow/run identity, Node version, Payload version, D1 adapter version, and lockfile reference.
+Capture the repository SHA, workflow/run identity, Node version, Payload version, D1 adapter version, W01 worker path, and lockfile reference.
 
-Reject the run if any value does not match the pinned baseline or the checked-out commit.
+Reject the run if any value does not match the W01 official Cloudflare-template baseline or the checked-out commit.
 
 ### Gate B — Login/session creation
 
