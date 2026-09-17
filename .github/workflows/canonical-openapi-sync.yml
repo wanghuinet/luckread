@@ -1,5 +1,6 @@
 name: Canonical OpenAPI RC Sync
 
+# Contract CI follows successful canonical synchronization via workflow_run.
 on:
   push:
     paths:
