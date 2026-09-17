@@ -18,6 +18,7 @@
     "api:contract:ci": "node scripts/api-contract-ci.mjs",
     "mapping:0:verify": "node scripts/mapping-0-verify.mjs",
     "mapping:0:r4:report": "node scripts/mapping-0-r4-evidence-gap-report.mjs",
+    "mapping:0:evidence:verify": "node scripts/mapping-0-evidence-registry-check.mjs",
     "payload:admission": "node scripts/payload-implementation-admission-check.mjs",
     "payload:native:inventory": "node scripts/payload-native-inventory.mjs",
     "payload:native:verify": "node scripts/payload-native-inventory.mjs && git diff --exit-code -- contracts/payload/payload-native-inventory.v1.json",
