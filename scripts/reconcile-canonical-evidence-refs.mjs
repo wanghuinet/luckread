@@ -50,6 +50,7 @@ const explicitFeaturePattern = /(?:Feature|feature):\s*`([A-Z][A-Z0-9]*-\d+)`/g
 
 const refsByFeature = new Map()
 const scannedFiles = []
+const ignoredNonCanonical = []
 
 for (const absolute of walk(evidenceRoot)) {
   const rel = path.relative(root, absolute).replaceAll(path.sep, '/')
@@ -60,11 +61,12 @@ for (const absolute of walk(evidenceRoot)) {
   for (const match of text.matchAll(explicitFeaturePattern)) ids.add(match[1])
 
   if (ids.size === 0) continue
-  scannedFiles.push({ file: rel, featureCount: ids.size })
+  scannedFiles.push({ file: rel, extractedFeatureCount: ids.size })
 
   for (const featureId of [...ids].sort()) {
     if (!mappingById.has(featureId)) {
-      throw new Error(`${rel}: extracted featureId is not present in canonical mapping: ${featureId}`)
+      ignoredNonCanonical.push({ file: rel, featureId })
+      continue
     }
     const refs = refsByFeature.get(featureId) ?? []
     refs.push(rel)
@@ -92,11 +94,14 @@ console.log(JSON.stringify({
   scannedFileCount: scannedFiles.length,
   featureCountWithEvidenceSources: refsByFeature.size,
   changedFeatureCount: changes.length,
+  ignoredNonCanonicalCount: ignoredNonCanonical.length,
   changes,
   scannedFiles,
+  ignoredNonCanonical,
   rules: {
     explicitFeatureIdsOnly: true,
     noFilenameRangeInference: true,
+    nonCanonicalIdsIgnoredAndReported: true,
     evidenceFieldOnly: true,
     apiEntityPersistenceWorkerD1CodeTestUntouched: true,
     statusUntouched: true,
