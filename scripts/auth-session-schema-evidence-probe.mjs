@@ -5,6 +5,7 @@ const root = resolve(process.cwd())
 const payloadRoot = join(root, 'workers', 'W01-payload')
 const gate1Only = process.argv.includes('--gate1')
 const packageJsonPath = join(payloadRoot, 'package.json')
+const lockfilePath = join(payloadRoot, 'pnpm-lock.yaml')
 const payloadConfigPath = join(payloadRoot, 'src', 'payload.config.ts')
 const usersPath = join(payloadRoot, 'src', 'collections', 'Users.ts')
 const migrationsDir = join(payloadRoot, 'src', 'migrations')
@@ -35,6 +36,12 @@ if (!users.includes('auth: true')) fail('W01 Users collection does not enable na
 if (!config.includes('sqliteD1Adapter')) fail('W01 Payload D1 adapter is not configured')
 if (!config.includes('push: false')) fail('W01 Payload migration safety requires push: false')
 if (!config.includes('migrationDir')) fail('W01 Payload migrationDir is not configured')
+
+if (!existsSync(lockfilePath)) {
+  fail('W01 pnpm-lock.yaml is missing; dependency resolution is not reproducible and E1 cannot be admitted')
+} else {
+  console.log('W01 pnpm-lock.yaml present: dependency-resolution gate may proceed to exact-resolution verification.')
+}
 
 if (!existsSync(migrationsDir)) {
   if (!gate1Only) {
