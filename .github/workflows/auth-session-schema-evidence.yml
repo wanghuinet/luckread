@@ -25,6 +25,7 @@ on:
       - 'scripts/auth-session-schema-evidence-probe.mjs'
       - 'scripts/auth-session-schema-evidence-validate.mjs'
       - '.github/workflows/auth-session-schema-evidence.yml'
+      - 'workers/W01-payload/wrangler.jsonc'
   pull_request:
     paths:
       - 'package.json'
@@ -35,12 +36,14 @@ on:
       - 'scripts/auth-session-schema-evidence-probe.mjs'
       - 'scripts/auth-session-schema-evidence-validate.mjs'
       - '.github/workflows/auth-session-schema-evidence.yml'
+      - 'workers/W01-payload/wrangler.jsonc'
 
 permissions:
   contents: read
 
 env:
   WRANGLER_VERSION: 4.33.1
+  W01_WRANGLER_CONFIG: workers/W01-payload/wrangler.jsonc
 
 jobs:
   schema-evidence:
@@ -84,9 +87,10 @@ jobs:
           mkdir -p artifacts/evidence/auth-002
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -f "$W01_WRANGLER_CONFIG"
 
           set +e
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 migrations list "$DATABASE_NAME" --remote > artifacts/evidence/auth-002/migration-status.txt 2>&1
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 migrations list "$DATABASE_NAME" --remote --config "$W01_WRANGLER_CONFIG" > artifacts/evidence/auth-002/migration-status.txt 2>&1
           migration_exit=$?
           set -e
 
@@ -97,7 +101,7 @@ jobs:
               "artifacts/evidence/auth-002/migration-status.json",
               JSON.stringify({
                 databaseName: process.env.DATABASE_NAME,
-                command: `wrangler@${process.env.WRANGLER_VERSION} d1 migrations list <database> --remote`,
+                command: `wrangler@${process.env.WRANGLER_VERSION} d1 migrations list <database> --remote --config workers/W01-payload/wrangler.jsonc`,
                 exitCode: Number(process.env.MIGRATION_EXIT_CODE),
                 output
               }, null, 2) + "\n"
@@ -117,27 +121,28 @@ jobs:
           mkdir -p artifacts/evidence/auth-002
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -f "$W01_WRANGLER_CONFIG"
 
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 info "$DATABASE_NAME" --json > artifacts/evidence/auth-002/d1-info.json
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 info "$DATABASE_NAME" --json --config "$W01_WRANGLER_CONFIG" > artifacts/evidence/auth-002/d1-info.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
             --command 'SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE type IN ("table","index","trigger") ORDER BY type,name;' \
             > artifacts/evidence/auth-002/catalog.json
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
             --command 'PRAGMA table_info("users");' \
             > artifacts/evidence/auth-002/users-schema.json
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
             --command 'PRAGMA index_list("users");' \
             > artifacts/evidence/auth-002/users-indexes.json
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
             --command 'PRAGMA foreign_key_list("users");' \
             > artifacts/evidence/auth-002/users-foreign-keys.json
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
             --command 'PRAGMA table_info("auth_session_state");' \
             > artifacts/evidence/auth-002/auth-session-state-schema.json
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
             --command 'PRAGMA index_list("auth_session_state");' \
             > artifacts/evidence/auth-002/auth-session-state-indexes.json
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json \
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
             --command 'PRAGMA foreign_key_list("auth_session_state");' \
             > artifacts/evidence/auth-002/auth-session-state-foreign-keys.json
 
