@@ -19,6 +19,7 @@ const mappingPath = path.join(root, 'contracts/alignment/cross-system-mapping.v1
 const jsonBindingPath = path.join(root, 'contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json')
 const auth010BindingPath = path.join(root, 'contracts/alignment/mapping-batches/AUTH-010-session-field-binding.v1.md')
 const auth011GatePath = path.join(root, 'contracts/alignment/mapping-batches/AUTH-011-runtime-gate.v1.md')
+const authDtoContractPath = path.join(root, 'contracts/dto/auth-dto-contract.v1.json')
 
 const apiContractPaths = {
   'AUTH-003': path.join(root, 'contracts/api/AUTH-003-credential-management-contract.v1.json'),
@@ -42,9 +43,11 @@ const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'))
 const readText = (file) => fs.readFileSync(file, 'utf8')
 const mapping = readJson(mappingPath)
 const jsonBinding = readJson(jsonBindingPath)
+const authDtoContract = readJson(authDtoContractPath)
 
 if (!Array.isArray(mapping.records)) throw new Error('canonical mapping records must be an array')
 if (!Array.isArray(jsonBinding.bindings)) throw new Error('AUTH-002..006 binding records must be an array')
+if (!Array.isArray(authDtoContract.records)) throw new Error('AUTH DTO contract records must be an array')
 
 const entityRefsByFeature = new Map()
 const apiOperationIdsByFeature = new Map()
@@ -81,6 +84,37 @@ for (const record of jsonBinding.bindings) {
     addEntityBinding(record.featureId, record.entityRefs, 'AUTH-002..006 persistence/API/entity/field contract')
     addEvidenceRef(record.featureId, 'contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json')
   }
+}
+
+const dtoRecordsByFeature = new Map()
+for (const record of authDtoContract.records) {
+  if (!record?.featureId) continue
+  const current = dtoRecordsByFeature.get(record.featureId) ?? []
+  current.push(record)
+  dtoRecordsByFeature.set(record.featureId, current)
+}
+
+for (const featureId of ['AUTH-001', 'AUTH-002', 'AUTH-010']) {
+  const records = dtoRecordsByFeature.get(featureId) ?? []
+  if (records.length === 0) throw new Error(`${featureId}: AUTH DTO contract exposes no records`)
+
+  const dtoOperationIds = records
+    .map((record) => record.operationId)
+    .filter((value) => typeof value === 'string' && value.length > 0)
+  if (dtoOperationIds.length !== new Set(dtoOperationIds).size) {
+    throw new Error(`${featureId}: AUTH DTO contract contains duplicate operationId bindings`)
+  }
+
+  const entityRefs = [...new Set(records.flatMap((record) => Array.isArray(record.entityIds) ? record.entityIds : []))]
+  if (featureId === 'AUTH-001') {
+    addEntityBinding(featureId, entityRefs, 'AUTH DTO contract')
+  }
+
+  for (const operationId of dtoOperationIds) {
+    if (apiOperationIdsByFeature.has(featureId)) continue
+    apiOperationIdsByFeature.set(featureId, dtoOperationIds)
+  }
+  addEvidenceRef(featureId, 'contracts/dto/auth-dto-contract.v1.json')
 }
 
 const addApiContractBinding = (featureId, file) => {
@@ -120,6 +154,21 @@ for (const record of mapping.records) {
   if (!record?.featureId) continue
   if (mappingById.has(record.featureId)) throw new Error(`duplicate canonical mapping record: ${record.featureId}`)
   mappingById.set(record.featureId, record)
+}
+
+for (const [featureId, dtoRecords] of dtoRecordsByFeature) {
+  if (!['AUTH-001', 'AUTH-002', 'AUTH-010'].includes(featureId)) continue
+  const mappingRecord = mappingById.get(featureId)
+  if (!mappingRecord) throw new Error(`missing canonical mapping record: ${featureId}`)
+  const dtoOperationIds = dtoRecords.map((record) => record.operationId).filter((value) => typeof value === 'string' && value.length > 0)
+  const current = Array.isArray(mappingRecord.apiOperationIds) ? mappingRecord.apiOperationIds : []
+  const expected = new Set(current)
+  for (const operationId of dtoOperationIds) expected.add(operationId)
+  const invalidMissingFromDto = current.filter((value) => !dtoOperationIds.includes(value))
+  if (invalidMissingFromDto.length > 0 && featureId === 'AUTH-001') {
+    throw new Error(`${featureId}: canonical API operation IDs are not represented by the DTO contract: ${invalidMissingFromDto.join(', ')}`)
+  }
+  mappingRecord.apiOperationIds = [...expected]
 }
 
 const changes = []
@@ -176,12 +225,14 @@ console.log(JSON.stringify({
   status: changes.length ? 'ENRICHED_CONTRACT_MAPPING' : 'NO_CHANGE',
   entityBindingFeatureCount: entityRefsByFeature.size,
   apiContractBindingFeatureCount: apiOperationIdsByFeature.size,
+  dtoContractBindingFeatureCount: 3,
   evidenceBindingFeatureCount: evidenceRefsByFeature.size,
   enrichedChangeCount: changes.length,
   changes,
   rules: {
     canonicalApiIdsFromFeatureSpecificContracts: true,
     stalePersistenceOnlyApiIdsRejected: true,
+    dtoBindingsMustMatchCanonicalSurface: true,
     featureEvidenceSourcesOnly: true,
     contractEvidenceSourcesOnly: true,
     physicalPersistenceNamesUntouched: true,
