@@ -27,6 +27,17 @@ const apiContractPaths = {
   'AUTH-006': path.join(root, 'contracts/api/AUTH-006-passkey-webauthn-contract.v1.json'),
 }
 
+const featureEvidencePaths = {
+  'AUTH-007': 'contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md',
+  'AUTH-008': 'contracts/alignment/mapping-batches/AUTH-008-real-evidence-reconciliation.v1.md',
+  'AUTH-009': 'contracts/alignment/mapping-batches/AUTH-009-reconciliation.v1.md',
+  'AUTH-012': 'contracts/alignment/mapping-batches/AUTH-012-risk-contract-closure-gate.v1.md',
+  'AUTH-013': 'contracts/alignment/mapping-batches/AUTH-013-real-evidence-reconciliation.v1.md',
+  'AUTH-014': 'contracts/alignment/mapping-batches/AUTH-014-real-evidence-reconciliation.v1.md',
+  'AUTH-015': 'contracts/alignment/mapping-batches/AUTH-015-real-evidence-reconciliation.v1.md',
+  'AUTH-016': 'contracts/alignment/mapping-batches/AUTH-016-real-evidence-reconciliation.v1.md',
+}
+
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'))
 const readText = (file) => fs.readFileSync(file, 'utf8')
 const mapping = readJson(mappingPath)
@@ -46,6 +57,12 @@ const addEvidenceRef = (featureId, ref) => {
   const current = evidenceRefsByFeature.get(featureId) ?? []
   if (!current.includes(ref)) current.push(ref)
   evidenceRefsByFeature.set(featureId, current)
+}
+
+for (const [featureId, ref] of Object.entries(featureEvidencePaths)) {
+  const absolute = path.join(root, ref)
+  if (!fs.existsSync(absolute)) throw new Error(`${featureId}: expected Feature evidence source is missing: ${ref}`)
+  addEvidenceRef(featureId, ref)
 }
 
 const addEntityBinding = (featureId, entityRefs, source) => {
@@ -165,6 +182,7 @@ console.log(JSON.stringify({
   rules: {
     canonicalApiIdsFromFeatureSpecificContracts: true,
     stalePersistenceOnlyApiIdsRejected: true,
+    featureEvidenceSourcesOnly: true,
     contractEvidenceSourcesOnly: true,
     physicalPersistenceNamesUntouched: true,
     runtimeEvidenceUntouched: true,
