@@ -31,7 +31,11 @@
         "authLogin",
         "authLogout"
       ],
-      "entityIds": [],
+      "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-IDENTITY",
+        "ENT-SESSION"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
@@ -46,7 +50,10 @@
       "featureId": "AUTH-003",
       "status": "PARTIAL",
       "apiOperationIds": [],
-      "entityIds": [],
+      "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-IDENTITY"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
@@ -61,7 +68,11 @@
       "featureId": "AUTH-004",
       "status": "PARTIAL",
       "apiOperationIds": [],
-      "entityIds": [],
+      "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-SESSION",
+        "ENT-VERIFICATION"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
@@ -76,7 +87,11 @@
       "featureId": "AUTH-005",
       "status": "PARTIAL",
       "apiOperationIds": [],
-      "entityIds": [],
+      "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-IDENTITY",
+        "ENT-VERIFICATION"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
@@ -91,7 +106,11 @@
       "featureId": "AUTH-006",
       "status": "MISSING",
       "apiOperationIds": [],
-      "entityIds": [],
+      "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-IDENTITY",
+        "ENT-VERIFICATION"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
