@@ -87,6 +87,9 @@ jobs:
       - name: Generate R4 evidence gap report
         run: node scripts/mapping-0-r4-evidence-gap-report.mjs
       - run: node scripts/feature-entity-persistence-registry-check.mjs
+      - name: Validate canonical Mapping 0 Evidence Registry
+        if: ${{ always() }}
+        run: node scripts/mapping-0-evidence-registry-check.mjs
       - name: Upload R4 evidence gap report
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
