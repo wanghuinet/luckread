@@ -8,8 +8,8 @@ Purpose: close the remaining runtime/evidence gap for Mapping-0 without promotin
 
 - Runtime: `workers/W01-payload/`
 - Package contract: `workers/W01-payload/package.json`
-- Payload version: `3.87.1`
-- D1 adapter: `@payloadcms/db-d1-sqlite@3.87.1`
+- Official Cloudflare template baseline: Payload `3.82.1` package family as recorded in `PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md`
+- D1 adapter: `@payloadcms/db-d1-sqlite@3.82.1`
 - Database binding: `D1`
 - Migration directory: `workers/W01-payload/src/migrations/`
 - Mapping gate: `contracts/alignment/mapping-batches/`
@@ -20,9 +20,10 @@ Purpose: close the remaining runtime/evidence gap for Mapping-0 without promotin
 1. The W01 source tree now contains the physical Cloudflare D1 Payload baseline.
 2. `Users.ts` uses Payload authentication (`auth: true`).
 3. `payload.config.ts` uses the D1 SQLite adapter with migration directory configured and `push: false`.
-4. W01 is pinned to Payload `3.87.1`; no downgrade to the currently observed upstream template version is permitted.
+4. W01 is pinned to the official Cloudflare D1 template dependency baseline recorded by the upstream manifest; the current Payload package family is `3.82.1`.
 5. No `pnpm-lock.yaml` is currently present in W01; dependency resolution therefore remains an evidence gate.
 6. Physical source materialization is not runtime verification and does not make Mapping-0 GREEN.
+7. Payload issue evidence reports an `upsert` behavior defect for `@payloadcms/db-d1-sqlite@3.82.1`; W01 must explicitly test the affected persistence path before the D1 runtime gate can pass. This is a test requirement, not an assumption that the defect remains present after installation.
 
 ## Required evidence batch
 
@@ -37,11 +38,11 @@ Capture, from the actual W01 working tree:
 - package integrity metadata where available;
 - lockfile status.
 
-Pass condition: every Payload runtime package resolves to the contract-pinned version and the evidence is reproducible.
+Pass condition: every Payload runtime package resolves to the official Cloudflare-template contract-pinned version and the evidence is reproducible.
 
 ### E2 — Build
 
-Run the W01 webpack build using the repository script.
+Run the W01 build using the official Cloudflare template's current build command after the package set is installed.
 
 Pass condition: build completes without changing package versions, configuration contracts, or source authority.
 
@@ -63,6 +64,14 @@ Against the controlled D1 database, capture read-only metadata for:
 - migration status.
 
 Pass condition: schema evidence comes from the actual controlled D1 database, not from Payload source assumptions.
+
+### E4.5 — D1 adapter regression probe
+
+Explicitly exercise D1 persistence operations affected by adapter query semantics, including the Payload preferences/upsert path where applicable to the installed runtime.
+
+Pass condition: the installed `@payloadcms/db-d1-sqlite` runtime demonstrates correct persistence semantics on the controlled D1 database, or a documented upstream/runtime workaround is proven without modifying Payload core outside an approved change-control path.
+
+Fail condition: silent no-op persistence, schema/runtime mismatch, or an unverified workaround.
 
 ### E5 — Migration
 
@@ -87,7 +96,7 @@ Pass condition: each probe has an observable result tied to the actual installed
 
 ## AUTH-002 fail-closed rule
 
-The canonical Session fields remain unpromoted until E1–E6 are satisfied:
+The canonical Session fields remain unpromoted until E1–E6 and E4.5 are satisfied:
 
 `id`, `userId`, `deviceId`, `tokenVersion`, `refreshCredentialHash`, `expiresAt`, `revokedAt`, `createdAt`, `lastSeenAt`.
 
@@ -106,7 +115,7 @@ This queue may contribute evidence to Mapping-0, but it cannot by itself mark Ma
 
 ## Execution order
 
-`E1 dependency → E2 build → E3 generated artifacts → E4 D1 schema → E5 migration → E6 session probes → Evidence Registry → Mapping-0 verification → GREEN`
+`E1 dependency → E2 build → E3 generated artifacts → E4 D1 schema → E4.5 adapter regression → E5 migration → E6 session probes → Evidence Registry → Mapping-0 verification → GREEN`
 
 ## Non-goals
 
