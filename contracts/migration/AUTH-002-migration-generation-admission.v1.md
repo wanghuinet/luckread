@@ -7,9 +7,9 @@
 ## Runtime authority
 
 The active runtime authority for this contract is `workers/W01-payload/`.
-The active Payload baseline is the official `templates/with-cloudflare-d1` dependency family recorded by the W01 upstream manifest: Payload `3.82.1` and `@payloadcms/db-d1-sqlite` `3.82.1`.
+The active Payload baseline is the official `templates/with-cloudflare-d1` structure with the current W01 lock: Payload `3.87.1` and `@payloadcms/db-d1-sqlite` `3.87.1`. The `3.82.1` family is the historical upstream template observation recorded by the W01 upstream manifest and is not the current W01 lock.
 
-Historical AUTH-002 evidence that references Payload `3.87.1` is not current runtime evidence and must not satisfy this admission gate.
+Historical AUTH-002 evidence that references the `3.82.1` upstream observation is not current runtime evidence and must not satisfy this admission gate.
 
 ## Purpose
 

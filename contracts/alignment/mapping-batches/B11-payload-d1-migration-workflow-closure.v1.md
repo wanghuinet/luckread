@@ -12,14 +12,14 @@ This batch establishes the authoritative workflow only. It does **not** invent t
 
 The current runtime authority is `workers/W01-payload/`, sourced from the official Payload `templates/with-cloudflare-d1` template.
 
-Current W01 package baseline:
+Current W01 package baseline (current lock; `3.82.1` remains the historical upstream template observation):
 
-- `payload = 3.82.1`
-- `@payloadcms/db-d1-sqlite = 3.82.1`
+- `payload = 3.87.1`
+- `@payloadcms/db-d1-sqlite = 3.87.1`
 - migration directory: `workers/W01-payload/src/migrations`
 - `push: false`
 
-The repository root Payload scaffold is not the W01 Cloudflare runtime authority. Historical root 3.87.1 material MUST NOT be used as current W01 runtime evidence.
+The repository root Payload scaffold is not the W01 Cloudflare runtime authority. Historical upstream 3.82.1 material MUST NOT be used as current W01 runtime evidence.
 
 ## 3. Official workflow mapping
 
@@ -84,7 +84,7 @@ The following are explicitly **not** sufficient evidence:
 - historical migration files from an earlier commit;
 - a claimed D1 dashboard state without repository/CI evidence;
 - a manually guessed table or column name;
-- root 3.87.1 package metadata as proof of W01 runtime behavior.
+- historical upstream 3.82.1 package metadata as proof of W01 runtime behavior.
 
 ## 6. Current gate result
 
@@ -102,7 +102,7 @@ The next batch MUST acquire, in order:
 2. W01 build evidence;
 3. generated artifact evidence;
 4. controlled D1 schema evidence;
-5. D1 adapter regression evidence, including the known 3.82.1 `upsert` behavior;
+5. D1 adapter regression evidence, including the `upsert` behavior observed on the upstream 3.82.1 family, tested against the installed 3.87.1 runtime;
 6. migration execution/status evidence;
 7. native session runtime evidence;
 8. Mapping 0 reconciliation and GREEN decision.

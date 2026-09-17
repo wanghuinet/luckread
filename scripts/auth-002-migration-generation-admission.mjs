@@ -11,8 +11,10 @@ const pkg = JSON.parse(readFileSync(join(payloadRoot, 'package.json'), 'utf8'))
 const config = readFileSync(join(payloadRoot, 'src', 'payload.config.ts'), 'utf8')
 const users = readFileSync(join(payloadRoot, 'src', 'collections', 'Users.ts'), 'utf8')
 
-if (pkg.dependencies?.payload !== '3.82.1') fail('W01 Payload dependency is not exactly 3.82.1')
-if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.82.1') fail('W01 D1 adapter dependency is not exactly 3.82.1')
+// Current W01 lock is Payload 3.87.1; 3.82.1 remains only the upstream
+// Cloudflare-template observation (see PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md).
+if (pkg.dependencies?.payload !== '3.87.1') fail('W01 Payload dependency is not exactly 3.87.1')
+if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.87.1') fail('W01 D1 adapter dependency is not exactly 3.87.1')
 if (!config.includes('sqliteD1Adapter')) fail('W01 sqliteD1Adapter is not configured')
 if (!config.includes('push: false')) fail('W01 push:false is required')
 if (!config.includes('migrationDir')) fail('W01 migrationDir is not configured')

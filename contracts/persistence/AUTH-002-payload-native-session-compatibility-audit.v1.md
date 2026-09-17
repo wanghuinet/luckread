@@ -12,7 +12,7 @@ This audit does not promote `ENT-SESSION`, does not create a migration, and does
 
 1. Runtime authority is `workers/W01-payload/`.
 2. W01 follows the official Payload `templates/with-cloudflare-d1` baseline.
-3. W01 pins `payload` and `@payloadcms/db-d1-sqlite` to `3.82.1`.
+3. W01 locks `payload` and `@payloadcms/db-d1-sqlite` to `3.87.1` (current W01 package lock; `3.82.1` remains only the historical upstream template observation).
 4. `workers/W01-payload/src/collections/Users.ts` enables `auth: true`.
 5. `workers/W01-payload/src/payload.config.ts` configures the D1 adapter, binds the W01 D1 environment, sets `push: false`, and configures `workers/W01-payload/src/migrations` as the migration directory.
 6. The repository currently has no verified applied Session migration evidence and no verified runtime equivalence evidence.
@@ -22,13 +22,13 @@ This audit does not promote `ENT-SESSION`, does not create a migration, and does
 
 The ordinary Payload release line is not the W01 Cloudflare runtime authority. The current W01 authority is the exact dependency manifest of the official Cloudflare D1 template adopted by `workers/W01-payload`.
 
-Payload release history separately records later releases, including v3.87.1; those releases must not be substituted for the W01 runtime baseline without a new Change Control decision and evidence pass. citeturn0search0
+Payload release history separately records earlier releases, including the 3.82.1 family observed in the upstream Cloudflare template; that upstream observation must not be substituted for the current W01 runtime baseline (3.87.1) without a new Change Control decision and evidence pass.
 
 ## 4. Framework capability evidence
 
 Payload authentication-enabled collections provide native authentication/session operations. Native session capability is therefore a candidate for the single session authority, but framework capability does not prove physical D1 persistence equivalence to the LuckRead canonical nine-field contract.
 
-The W01 D1 adapter also has a documented 3.82.1 `upsert` defect affecting preference persistence; this is an explicit runtime regression gate and must be tested rather than silently worked around by modifying Payload core. citeturn0search5
+The W01 D1 adapter also has a documented `upsert` defect observed on the upstream 3.82.1 family affecting preference persistence; with W01 locked to 3.87.1 this remains an explicit runtime regression gate and must be tested on the installed runtime rather than silently worked around by modifying Payload core.
 
 ## 5. Canonical compatibility matrix
 
@@ -59,7 +59,7 @@ If evidence proves that a required canonical dimension is unsupported, the unsup
 
 ## 7. Required evidence for admission
 
-The W01 `3.82.1` implementation must produce evidence for:
+The W01 `3.87.1` implementation must produce evidence for:
 
 1. actual persisted session representation in D1;
 2. session identifier and user association;
@@ -83,7 +83,7 @@ Configuration, documented CLI commands, source materialization, or historical fi
 ## 9. Current gate
 
 ```text
-W01 Cloudflare baseline        = 3.82.1
+W01 Cloudflare baseline        = 3.87.1 (current lock; upstream observation 3.82.1)
 Native session capability      = CANDIDATE / RUNTIME PROOF REQUIRED
 Canonical field equivalence    = NOT PROVEN
 Actual D1 session schema       = NOT VERIFIED

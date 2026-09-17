@@ -7,9 +7,9 @@
 ## Runtime authority
 
 The active runtime authority is `workers/W01-payload/`.
-The active dependency baseline is the official `templates/with-cloudflare-d1` baseline recorded by the W01 upstream manifest: Payload `3.82.1` and `@payloadcms/db-d1-sqlite` `3.82.1`.
+The active dependency baseline is the official `templates/with-cloudflare-d1` structure with the current W01 lock: Payload `3.87.1` and `@payloadcms/db-d1-sqlite` `3.87.1`. The `3.82.1` family is the historical upstream template observation recorded by the W01 upstream manifest.
 
-The older Payload `3.87.1` references are historical and are not valid current W01 runtime evidence.
+The older `3.82.1` references are historical upstream observations and are not valid current W01 runtime evidence.
 
 ## Purpose
 
@@ -27,8 +27,8 @@ Generate the first Payload migration artifact for AUTH-002 from the frozen W01 c
 
 ## Preconditions
 
-1. W01 Payload dependency is exactly `3.82.1`.
-2. W01 `@payloadcms/db-d1-sqlite` dependency is exactly `3.82.1`.
+1. W01 Payload dependency is exactly `3.87.1`.
+2. W01 `@payloadcms/db-d1-sqlite` dependency is exactly `3.87.1`.
 3. `Users` has native Payload authentication enabled.
 4. D1 adapter uses `push: false`.
 5. D1 adapter has an explicit `migrationDir` pointing to W01 migrations.

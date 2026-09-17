@@ -2,7 +2,7 @@
 
 Status: BLOCKED_UNTIL_LOCAL_GENERATION
 Authority: `workers/W01-payload/`
-Runtime baseline: official Payload `templates/with-cloudflare-d1`, package family `3.82.1`
+Runtime baseline: official Payload `templates/with-cloudflare-d1` structure; current W01 lock `3.87.1` (`3.82.1` remains the historical upstream template observation)
 
 ## Finding
 

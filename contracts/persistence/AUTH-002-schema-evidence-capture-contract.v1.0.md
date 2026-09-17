@@ -14,12 +14,12 @@ The evidence run MUST use the W01 Cloudflare runtime authority:
 
 - worker: `workers/W01-payload`
 - source template: official Payload `templates/with-cloudflare-d1`
-- `payload = 3.82.1`
-- `@payloadcms/db-d1-sqlite = 3.82.1`
+- `payload = 3.87.1` (current W01 lock)
+- `@payloadcms/db-d1-sqlite = 3.87.1`
 - Node 24
 - migration directory: `workers/W01-payload/src/migrations`
 
-The ordinary Payload release line MUST NOT be substituted for the Cloudflare template baseline. Historical 3.87.1 artifacts may be retained as historical evidence, but MUST NOT be treated as current W01 runtime evidence.
+The ordinary Payload release line MUST NOT be substituted for the Cloudflare template baseline. The 3.82.1 family is the historical upstream template observation only and MUST NOT be treated as the current W01 runtime evidence.
 
 The run MUST use the dependency lockfile once the W01 lockfile admission gate is satisfied and MUST identify the exact tested commit SHA.
 
@@ -143,7 +143,7 @@ Schema evidence is accepted only when all of the following are independently pre
 - the session representation is correlated to an actual W01 Payload login session;
 - the evidence files are reproducibly generated;
 - no redaction violation is detected;
-- the evidence does not rely on a historical 3.87.1 runtime assumption.
+- the evidence does not rely on a historical 3.82.1 upstream template runtime assumption.
 
 A source-code assertion such as `auth: true`, generated types, documentation, or a remembered Payload schema is insufficient.
 

@@ -44,8 +44,10 @@ const d1Info = readJson('d1-info.json')
 
 if (manifest.environmentClass !== 'CONTROLLED_REMOTE_D1') fail('manifest environmentClass is not CONTROLLED_REMOTE_D1')
 if (!manifest.databaseName || !manifest.testedCommitSha || !manifest.executedAt) fail('manifest missing required execution identity')
-if (manifest.payloadVersion !== '3.82.1' || manifest.payloadLockedVersion !== '3.82.1') fail('manifest Payload version mismatch: W01 Cloudflare D1 baseline is 3.82.1')
-if (manifest.d1AdapterVersion !== '3.82.1' || manifest.d1AdapterLockedVersion !== '3.82.1') fail('manifest D1 adapter version mismatch: W01 Cloudflare D1 baseline is 3.82.1')
+// Current W01 lock is Payload 3.87.1; 3.82.1 remains only the upstream
+// Cloudflare-template observation (see PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md).
+if (manifest.payloadVersion !== '3.87.1' || manifest.payloadLockedVersion !== '3.87.1') fail('manifest Payload version mismatch: current W01 lock is 3.87.1')
+if (manifest.d1AdapterVersion !== '3.87.1' || manifest.d1AdapterLockedVersion !== '3.87.1') fail('manifest D1 adapter version mismatch: current W01 lock is 3.87.1')
 
 if (provenance.repository !== 'wanghuinet/luckread') fail('provenance repository mismatch')
 if (provenance.workflow !== 'AUTH-002 Session Schema Evidence') fail('provenance workflow mismatch')

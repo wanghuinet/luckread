@@ -57,8 +57,10 @@ if (manifest.testedCommitSha !== expectedCommit) fail('manifest testedCommitSha 
 if (dependency.repository !== 'wanghuinet/luckread') fail('dependency repository mismatch')
 if (dependency.testedCommitSha !== manifest.testedCommitSha) fail('dependency commit mismatch')
 if (dependency.workerPath !== 'workers/W01-payload') fail('dependency workerPath must be workers/W01-payload')
-if (dependency.payloadVersion !== '3.82.1') fail('Payload version mismatch: W01 official Cloudflare template baseline is 3.82.1')
-if (dependency.d1AdapterVersion !== '3.82.1') fail('D1 adapter version mismatch: W01 official Cloudflare template baseline is 3.82.1')
+// Current W01 lock is Payload 3.87.1; 3.82.1 remains only the upstream
+// Cloudflare-template observation (see PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md).
+if (dependency.payloadVersion !== '3.87.1') fail('Payload version mismatch: current W01 lock is 3.87.1')
+if (dependency.d1AdapterVersion !== '3.87.1') fail('D1 adapter version mismatch: current W01 lock is 3.87.1')
 if (!String(dependency.nodeVersion ?? '').startsWith('v24.')) fail('Node version is not Node 24')
 if (!dependency.lockfileReference) fail('lockfileReference missing')
 

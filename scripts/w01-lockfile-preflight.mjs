@@ -25,17 +25,20 @@ function run(command, args) {
 if (!existsSync(pkgPath)) fail('workers/W01-payload/package.json is missing')
 
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+// Current W01 lock per workers/W01-payload/package.json (authoritative).
+// The upstream Cloudflare-template observation (3.82.1 family) is recorded
+// separately in workers/W01-payload/PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md.
 const required = {
-  payload: '3.82.1',
-  '@payloadcms/db-d1-sqlite': '3.82.1',
-  '@payloadcms/next': '3.82.1',
-  '@payloadcms/richtext-lexical': '3.82.1',
-  '@payloadcms/storage-r2': '3.82.1',
-  '@payloadcms/ui': '3.82.1',
-  next: '16.3.3',
+  payload: '3.87.1',
+  '@payloadcms/db-d1-sqlite': '3.87.1',
+  '@payloadcms/next': '3.87.1',
+  '@payloadcms/richtext-lexical': '3.87.1',
+  '@payloadcms/storage-r2': '3.87.1',
+  '@payloadcms/ui': '3.87.1',
+  next: '16.2.6',
   react: '19.2.6',
   'react-dom': '19.2.6',
-  '@opennextjs/cloudflare': '^1.11.0',
+  '@opennextjs/cloudflare': '1.20.1',
 }
 
 for (const [name, expected] of Object.entries(required)) {

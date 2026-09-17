@@ -9,15 +9,15 @@
 This runbook operationalizes `contracts/persistence/AUTH-002-runtime-session-evidence-gate.v1.json`.
 It does not authorize production migration application or promote `AUTH-002` by itself.
 
-The current runtime authority is `workers/W01-payload/`, using the official Payload `templates/with-cloudflare-d1` package baseline. The current W01 baseline is Payload `3.82.1` with `@payloadcms/db-d1-sqlite` `3.82.1`.
+The current runtime authority is `workers/W01-payload/`, using the official Payload `templates/with-cloudflare-d1` package baseline. The current W01 lock is Payload `3.87.1` with `@payloadcms/db-d1-sqlite` `3.87.1` (`3.82.1` remains only the historical upstream template observation).
 
 ## Preconditions
 
 All preconditions below are mandatory and fail closed:
 
 1. Gate-1 controlled remote D1 schema evidence is accepted for the same commit under test.
-2. W01 `workers/W01-payload/package.json` resolves `payload` exactly to `3.82.1`.
-3. W01 resolves `@payloadcms/db-d1-sqlite` exactly to `3.82.1`.
+2. W01 `workers/W01-payload/package.json` resolves `payload` exactly to `3.87.1`.
+3. W01 resolves `@payloadcms/db-d1-sqlite` exactly to `3.87.1`.
 4. Node 24 is used, matching the official W01 template engine requirement.
 5. The runtime target is an explicitly named controlled evidence environment.
 6. A disposable isolated test identity is used; no production account is permitted.

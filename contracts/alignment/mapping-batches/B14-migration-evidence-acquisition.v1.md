@@ -8,12 +8,12 @@
 
 - Repository source of truth: `wanghuinet/luckread`
 - Active runtime: `workers/W01-payload/`
-- Active Payload baseline: official `templates/with-cloudflare-d1` baseline recorded by W01 upstream manifest
-- Payload version: `3.82.1`
-- D1 adapter version: `3.82.1`
+- Active Payload baseline: official `templates/with-cloudflare-d1` structure; current W01 lock recorded by W01 package manifest
+- Payload version: `3.87.1`
+- D1 adapter version: `3.87.1`
 - Payload migration directory: `workers/W01-payload/src/migrations`
 
-Historical evidence referring to Payload `3.87.1` or root `src/migrations` is not current W01 runtime evidence and must not satisfy this gate.
+Historical evidence referring to the 3.82.1 upstream template observation or root `src/migrations` is not current W01 runtime evidence and must not satisfy this gate.
 
 ## Purpose
 
@@ -44,7 +44,7 @@ Convert the remaining persistence blocker into a deterministic evidence-acquisit
 - Do not include credentials, tokens, cookies, passwords or refresh-token material in evidence artifacts.
 - Do not introduce `auth_session_state` merely to satisfy the validator; its presence must be backed by an authoritative contract and actual migration evidence.
 - Keep Payload-native authentication persistence distinct from contract-owned extension fields.
-- Do not use historical 3.87.1 evidence as proof for the current 3.82.1 W01 runtime.
+- Do not use the historical 3.82.1 upstream template observation as proof for the current 3.87.1 W01 runtime.
 
 ## ENT-USER closure matrix
 

@@ -26,11 +26,13 @@ const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
 const config = readFileSync(payloadConfigPath, 'utf8')
 const users = readFileSync(usersPath, 'utf8')
 
-if (pkg.dependencies?.payload !== '3.82.1') {
-  fail(`W01 payload dependency must be exactly 3.82.1, found ${pkg.dependencies?.payload ?? 'missing'}`)
+// Current W01 lock is Payload 3.87.1; 3.82.1 remains only the upstream
+// Cloudflare-template observation (see PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md).
+if (pkg.dependencies?.payload !== '3.87.1') {
+  fail(`W01 payload dependency must be exactly 3.87.1, found ${pkg.dependencies?.payload ?? 'missing'}`)
 }
-if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.82.1') {
-  fail(`W01 @payloadcms/db-d1-sqlite dependency must be exactly 3.82.1, found ${pkg.dependencies?.['@payloadcms/db-d1-sqlite'] ?? 'missing'}`)
+if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.87.1') {
+  fail(`W01 @payloadcms/db-d1-sqlite dependency must be exactly 3.87.1, found ${pkg.dependencies?.['@payloadcms/db-d1-sqlite'] ?? 'missing'}`)
 }
 if (!users.includes('auth: true')) fail('W01 Users collection does not enable native auth')
 if (!config.includes('sqliteD1Adapter')) fail('W01 Payload D1 adapter is not configured')

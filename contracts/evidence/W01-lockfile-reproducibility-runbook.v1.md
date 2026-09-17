@@ -2,7 +2,7 @@
 
 Status: BLOCKED_UNTIL_LOCKFILE
 Authority: `workers/W01-payload/`
-Runtime baseline: official Payload `templates/with-cloudflare-d1`, package family `3.82.1`
+Runtime baseline: official Payload `templates/with-cloudflare-d1` structure; current W01 lock `3.87.1` (`3.82.1` remains the historical upstream template observation)
 
 ## Purpose
 
@@ -13,8 +13,8 @@ The official Cloudflare D1 template is the runtime source baseline for W01. Clou
 ## Preconditions
 
 1. `workers/W01-payload/package.json` is the active dependency manifest.
-2. Payload packages are exactly `3.82.1` for the W01 Cloudflare baseline.
-3. Next is `16.3.3`; React and React DOM are `19.2.6`.
+2. Payload packages are exactly `3.87.1` for the W01 Cloudflare baseline.
+3. Next is `16.2.6`; React and React DOM are `19.2.6`.
 4. Node 24+ is used.
 5. pnpm 9, 10, or 11 is used.
 6. Installation is isolated from the repository root workspace.
@@ -52,7 +52,7 @@ After `pnpm-lock.yaml` exists:
 
 ## Important runtime gate
 
-A reproducible lockfile does not prove that Payload D1 runtime behavior is correct. The known `@payloadcms/db-d1-sqlite` 3.82.1 upsert defect must remain an explicit E4.5 runtime regression gate; the project must not silently introduce an unapproved Payload-core workaround.
+A reproducible lockfile does not prove that Payload D1 runtime behavior is correct. The known `@payloadcms/db-d1-sqlite` `upsert` defect observed on the upstream 3.82.1 family must remain an explicit E4.5 runtime regression gate against the installed 3.87.1 runtime; the project must not silently introduce an unapproved Payload-core workaround.
 
 ## Current state
 
