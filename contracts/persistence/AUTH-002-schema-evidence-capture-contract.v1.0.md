@@ -1,4 +1,4 @@
-# AUTH-002 — Payload/D1 Native Session Schema Evidence Capture Contract v1.0
+# AUTH-002 — Payload/D1 Native Session Schema Evidence Capture Contract v1.1
 
 **Status: `CONTRACTED_NOT_EXECUTED`**
 
@@ -8,25 +8,31 @@ Define the exact, repeatable evidence procedure required before AUTH-002 may aut
 
 This contract records procedure, not schema facts. It MUST NOT be treated as evidence that a schema exists or that a migration has executed.
 
-## 2. Pinned implementation baseline
+## 2. Authoritative runtime baseline
 
-The evidence run MUST use the repository lockfile and the pinned Payload versions:
+The evidence run MUST use the W01 Cloudflare runtime authority:
 
-- `payload = 3.87.1`
-- `@payloadcms/db-d1-sqlite = 3.87.1`
+- worker: `workers/W01-payload`
+- source template: official Payload `templates/with-cloudflare-d1`
+- `payload = 3.82.1`
+- `@payloadcms/db-d1-sqlite = 3.82.1`
 - Node 24
+- migration directory: `workers/W01-payload/src/migrations`
 
-The run MUST execute against the same dependency resolution used by CI.
+The ordinary Payload release line MUST NOT be substituted for the Cloudflare template baseline. Historical 3.87.1 artifacts may be retained as historical evidence, but MUST NOT be treated as current W01 runtime evidence.
+
+The run MUST use the dependency lockfile once the W01 lockfile admission gate is satisfied and MUST identify the exact tested commit SHA.
 
 ## 3. Preconditions
 
 All of the following MUST be true before a schema evidence run:
 
-1. `package-lock.json` is committed and `npm ci` succeeds.
-2. `src/payload.config.ts` resolves `sqliteD1Adapter` and `migrationDir` without modifying production configuration.
-3. A real D1 binding or a controlled D1-compatible test database is available to the evidence runner.
+1. W01 dependency reproducibility is established and the committed lockfile/reference is captured.
+2. `workers/W01-payload/src/payload.config.ts` resolves `sqliteD1Adapter` and `migrationDir` without modifying production configuration.
+3. A real controlled D1 binding/database is available to the evidence runner.
 4. The target database is explicitly identified as an evidence environment.
 5. No production migration is implicitly applied by the evidence probe.
+6. The tested commit SHA, worker path, Payload version, D1 adapter version, and environment class are recorded.
 
 If any precondition fails, the result is `BLOCKED`, not `GREEN`.
 
@@ -37,19 +43,23 @@ If any precondition fails, the result is `BLOCKED`, not `GREEN`.
 Capture:
 
 - `node --version`
-- `npm --version`
+- package-manager version
 - resolved Payload package version
 - resolved D1 adapter version
-- lockfile integrity reference
+- lockfile integrity/reference
+- W01 package manifest hash
+- tested commit SHA
 
 ### Step B — Migration inventory
 
-Run the repository's Payload migration status command and capture:
+Run the W01 Payload migration status command and capture:
 
 - migration directory path
 - migration filenames
 - migration execution status
 - currently applied migration version(s)
+
+The command MUST execute against `workers/W01-payload`, not the historical root Payload scaffold.
 
 ### Step C — Native Users schema
 
@@ -70,7 +80,7 @@ No secrets or user credential values may be captured.
 
 ### Step D — Native session representation
 
-Create a disposable test user/session through Payload's actual authentication runtime.
+Create a disposable test user/session through the actual W01 Payload authentication runtime.
 
 Capture only structural evidence sufficient to prove how `users.sessions[]` is physically represented, including:
 
@@ -104,7 +114,7 @@ Required files:
 - `runtime-lifecycle.json`
 - `manifest.json`
 
-The manifest MUST include the tested commit SHA, environment class, dependency versions, execution timestamp, and hashes of the evidence files.
+The manifest MUST include the tested commit SHA, worker path, environment class, dependency versions, execution timestamp, and hashes of the evidence files.
 
 ## 5. Redaction rules
 
@@ -126,13 +136,14 @@ Where an example value is required, use deterministic placeholders.
 
 Schema evidence is accepted only when all of the following are independently present:
 
-- the actual database catalog was queried;
+- the actual D1 catalog was queried;
 - the query target is identified;
-- the tested dependency versions are pinned;
+- the tested W01 dependency versions are pinned;
 - the captured schema corresponds to the same code commit;
-- the session representation is correlated to an actual Payload login session;
+- the session representation is correlated to an actual W01 Payload login session;
 - the evidence files are reproducibly generated;
-- no redaction violation is detected.
+- no redaction violation is detected;
+- the evidence does not rely on a historical 3.87.1 runtime assumption.
 
 A source-code assertion such as `auth: true`, generated types, documentation, or a remembered Payload schema is insufficient.
 
@@ -144,6 +155,8 @@ Only after this evidence contract is executed may the project finalize the physi
 
 The extension migration MUST then be reconciled against the captured native schema. The extension MUST NOT duplicate native `id`, `createdAt`, or `expiresAt` storage.
 
+No migration SQL, physical table name, or native session representation may be invented before evidence is captured.
+
 ## 8. Fail-closed rules
 
 The evidence run MUST fail closed when:
@@ -153,9 +166,10 @@ The evidence run MUST fail closed when:
 - migration state cannot be observed;
 - native session representation cannot be correlated to a real session;
 - evidence contains secret material;
-- dependency versions differ from the pinned baseline;
+- dependency versions differ from the W01 pinned baseline;
 - schema output is synthesized rather than queried;
-- the result cannot be tied to a commit SHA.
+- the result cannot be tied to a commit SHA;
+- the evidence runner accidentally uses the historical root Payload scaffold instead of W01.
 
 ## 9. Current state
 
@@ -165,5 +179,6 @@ Execution               = NOT_EXECUTED
 Actual D1 schema        = NOT_VERIFIED
 Native session shape    = NOT_VERIFIED
 Migration               = NOT_AUTHORED
+W01 runtime evidence   = NOT_VERIFIED
 AUTH-002                = BLOCKED_NOT_GREEN
 ```
