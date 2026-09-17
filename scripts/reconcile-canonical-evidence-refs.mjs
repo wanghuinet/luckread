@@ -29,10 +29,12 @@ for (const record of mapping.records) {
   mappingById.set(record.featureId, record)
 }
 
-const shouldScan = (name) => {
+const shouldScanMarkdown = (name) => {
   if (!name.endsWith('.md')) return false
   return /(?:real-evidence-reconciliation|reconciliation\.v1|closure-gate\.v1|field-binding\.v1)/i.test(name)
 }
+
+const shouldScanBatchJson = (name) => /^B\d+.*\.json$/i.test(name)
 
 const walk = (dir) => {
   const files = []
@@ -40,7 +42,7 @@ const walk = (dir) => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const absolute = path.join(dir, entry.name)
     if (entry.isDirectory()) files.push(...walk(absolute))
-    else if (entry.isFile() && shouldScan(entry.name)) files.push(absolute)
+    else if (entry.isFile()) files.push(absolute)
   }
   return files.sort()
 }
@@ -49,28 +51,44 @@ const featureIdPattern = /(?:^|\n)\s*(?:[-*]|\|)\s*([A-Z][A-Z0-9]*-\d+)\b/g
 const explicitFeaturePattern = /(?:Feature|feature):\s*`([A-Z][A-Z0-9]*-\d+)`/g
 
 const refsByFeature = new Map()
-const scannedFiles = []
+const scannedSources = []
 const ignoredNonCanonical = []
+
+const addRef = (featureId, rel) => {
+  if (!mappingById.has(featureId)) {
+    ignoredNonCanonical.push({ file: rel, featureId })
+    return
+  }
+  const refs = refsByFeature.get(featureId) ?? []
+  refs.push(rel)
+  refsByFeature.set(featureId, refs)
+}
 
 for (const absolute of walk(evidenceRoot)) {
   const rel = path.relative(root, absolute).replaceAll(path.sep, '/')
-  const text = fs.readFileSync(absolute, 'utf8')
-  const ids = new Set()
+  const name = path.basename(absolute)
 
-  for (const match of text.matchAll(featureIdPattern)) ids.add(match[1])
-  for (const match of text.matchAll(explicitFeaturePattern)) ids.add(match[1])
+  if (shouldScanMarkdown(name)) {
+    const text = fs.readFileSync(absolute, 'utf8')
+    const ids = new Set()
+    for (const match of text.matchAll(featureIdPattern)) ids.add(match[1])
+    for (const match of text.matchAll(explicitFeaturePattern)) ids.add(match[1])
+    if (ids.size === 0) continue
+    scannedSources.push({ file: rel, type: 'markdown', extractedFeatureCount: ids.size })
+    for (const featureId of [...ids].sort()) addRef(featureId, rel)
+    continue
+  }
 
-  if (ids.size === 0) continue
-  scannedFiles.push({ file: rel, extractedFeatureCount: ids.size })
-
-  for (const featureId of [...ids].sort()) {
-    if (!mappingById.has(featureId)) {
-      ignoredNonCanonical.push({ file: rel, featureId })
-      continue
+  if (shouldScanBatchJson(name)) {
+    const doc = readJson(absolute)
+    if (!Array.isArray(doc.records)) continue
+    const ids = new Set()
+    for (const record of doc.records) {
+      if (typeof record?.featureId === 'string' && record.featureId.length > 0) ids.add(record.featureId)
     }
-    const refs = refsByFeature.get(featureId) ?? []
-    refs.push(rel)
-    refsByFeature.set(featureId, refs)
+    if (ids.size === 0) continue
+    scannedSources.push({ file: rel, type: 'batch-json', extractedFeatureCount: ids.size })
+    for (const featureId of [...ids].sort()) addRef(featureId, rel)
   }
 }
 
@@ -91,15 +109,18 @@ if (changes.length > 0) fs.writeFileSync(mappingPath, `${JSON.stringify(mapping,
 
 console.log(JSON.stringify({
   status: changes.length ? 'ENRICHED_FEATURE_EVIDENCE_REFS' : 'NO_CHANGE',
-  scannedFileCount: scannedFiles.length,
+  scannedSourceCount: scannedSources.length,
+  scannedMarkdownCount: scannedSources.filter((item) => item.type === 'markdown').length,
+  scannedBatchJsonCount: scannedSources.filter((item) => item.type === 'batch-json').length,
   featureCountWithEvidenceSources: refsByFeature.size,
   changedFeatureCount: changes.length,
   ignoredNonCanonicalCount: ignoredNonCanonical.length,
   changes,
-  scannedFiles,
+  scannedSources,
   ignoredNonCanonical,
   rules: {
     explicitFeatureIdsOnly: true,
+    batchJsonUsesExplicitRecordFeatureIdsOnly: true,
     noFilenameRangeInference: true,
     nonCanonicalIdsIgnoredAndReported: true,
     evidenceFieldOnly: true,
