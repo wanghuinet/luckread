@@ -15,14 +15,13 @@
     {
       "binding": "D1",
       "database_id": "2f80471e-3756-49f9-8db1-7707a433ad64",
-      "database_name": "luckread",
-      "remote": true
+      "database_name": "luckread"
     }
   ],
   "r2_buckets": [
     {
       "binding": "R2",
-      "bucket_name": "REPLACE_WITH_W01_R2_BUCKET"
+      "bucket_name": "luckread-w01-assets-placeholder"
     }
   ]
 }
