@@ -19,7 +19,11 @@ W01 follows Payload's Cloudflare-specific `with-cloudflare-d1` template boundary
 
 ## Version baseline
 
-Payload packages are pinned to 3.87.1 for this repository baseline. The official Cloudflare template on the 3.x branch is the reference shape; the repository baseline uses the 3.87.1 Payload release line because that release includes the Cloudflare D1 template fix.
+The W01 version baseline is the dependency set declared by the official `templates/with-cloudflare-d1` template at the pinned upstream observation recorded in `PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md`.
+
+For the current locked observation, the Payload package family is `3.82.1`, with `@opennextjs/cloudflare` `^1.11.0`, Next.js `16.3.3`, React / React DOM `19.2.6`, and Node `>=24.15.0`.
+
+W01 MUST NOT describe the standard Payload release line as the Cloudflare-template baseline. Any future upstream template change requires a new observation and reconciliation before the version baseline changes.
 
 ## Binding boundary
 
@@ -46,7 +50,7 @@ After Mapping is GREEN, migrate the verified runtime as one controlled batch and
 ## Verification checklist
 
 - [ ] Cloudflare template shape retained
-- [ ] Payload 3.87.1 dependency alignment verified
+- [ ] Official Cloudflare template dependency baseline pinned and reconciled
 - [ ] D1 adapter remains `push: false`
 - [ ] Existing migration directory remains authoritative until migration gate
 - [ ] R2 integration is present without moving media business ownership from W06
