@@ -39,7 +39,8 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json"
       ],
       "blockers": [
         "session DTO/entity mappings incomplete",
@@ -62,7 +63,9 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
+        "contracts/api/AUTH-003-credential-management-contract.v1.json"
       ],
       "blockers": [
         "canonical API IDs not established in current inventory",
@@ -85,7 +88,9 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
+        "contracts/api/AUTH-004-password-recovery-contract.v1.json"
       ],
       "blockers": [
         "canonical recovery/change API mapping missing",
@@ -108,7 +113,9 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
+        "contracts/api/AUTH-005-identity-verification-contract.v1.json"
       ],
       "blockers": [
         "verification API and event IDs missing",
@@ -133,7 +140,9 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
+        "contracts/api/AUTH-006-passkey-webauthn-contract.v1.json"
       ],
       "blockers": [
         "canonical API/DTO/data/security contracts not established"
@@ -198,7 +207,8 @@
         "user.session.revoke"
       ],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-010-session-field-binding.v1.md"
       ],
       "blockers": [
         "Page/DTO/Entity/Field/Event/Worker/D1/Test/Evidence IDs not fully reconciled"
@@ -219,7 +229,8 @@
         "user.session.refresh"
       ],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-011-runtime-gate.v1.md"
       ],
       "blockers": [
         "refresh OpenAPI/DTO/state/security E2E evidence missing"
