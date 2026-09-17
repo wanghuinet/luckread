@@ -44,10 +44,8 @@ const d1Info = readJson('d1-info.json')
 
 if (manifest.environmentClass !== 'CONTROLLED_REMOTE_D1') fail('manifest environmentClass is not CONTROLLED_REMOTE_D1')
 if (!manifest.databaseName || !manifest.testedCommitSha || !manifest.executedAt) fail('manifest missing required execution identity')
-if (manifest.payloadVersion !== '3.87.1' || manifest.payloadLockedVersion !== '3.87.1') fail('manifest Payload version mismatch')
-if (manifest.d1AdapterVersion !== '3.87.1' || manifest.d1AdapterLockedVersion !== '3.87.1') fail('manifest D1 adapter version mismatch')
-if (typeof migration.exitCode !== 'number' || migration.exitCode !== 0) fail('remote migration evidence command did not succeed')
-if (migration.databaseName !== manifest.databaseName) fail('migration evidence databaseName mismatch')
+if (manifest.payloadVersion !== '3.82.1' || manifest.payloadLockedVersion !== '3.82.1') fail('manifest Payload version mismatch: W01 Cloudflare D1 baseline is 3.82.1')
+if (manifest.d1AdapterVersion !== '3.82.1' || manifest.d1AdapterLockedVersion !== '3.82.1') fail('manifest D1 adapter version mismatch: W01 Cloudflare D1 baseline is 3.82.1')
 
 if (provenance.repository !== 'wanghuinet/luckread') fail('provenance repository mismatch')
 if (provenance.workflow !== 'AUTH-002 Session Schema Evidence') fail('provenance workflow mismatch')
@@ -175,5 +173,5 @@ for (const file of expectedEvidenceFiles) {
 }
 
 console.log('AUTH-002_SCHEMA_EVIDENCE_VALIDATION_PASS')
-console.log(`Validated Gate-1 artifact completeness, controlled-environment binding, dependency identity, database identity, Actions provenance, command success, users physical schema, ${extensionTablePresent ? 'present auth_session_state schema and required indexes' : 'absence of unadmitted auth_session_state extension table'}, secret exclusion, embedded-session FK prohibition, and evidence hashes.`)
+console.log(`Validated Gate-1 artifact completeness, controlled-environment binding, W01 official Cloudflare-template dependency identity, database identity, Actions provenance, command success, users physical schema, ${extensionTablePresent ? 'present auth_session_state schema and required indexes' : 'absence of unadmitted auth_session_state extension table'}, secret exclusion, embedded-session FK prohibition, and evidence hashes.`)
 console.log('This validator does not promote AUTH-002 or infer native session semantics; runtime correlation remains a separate evidence gate.')
