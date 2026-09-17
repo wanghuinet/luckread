@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process'
 
+// Mapping 0 is a pre-development structural/contract stage. Runtime and
+// executable-evidence admission remain downstream gates and must not be used
+// to manufacture a false Mapping 0 GREEN.
 const gates = [
-  ['canonical-mapping-consolidation', 'scripts/consolidate-mapping-batches.mjs'],
+  ['mapping-0-structural', 'scripts/mapping-0-structural-gate.mjs'],
   ['entity-catalog', 'scripts/entity-catalog-check.mjs'],
   ['entity-field-contract', 'scripts/entity-field-contract-check.mjs'],
   ['entity-field-schema', 'scripts/entity-field-schema-contract-check.mjs'],
-  ['feature-entity-persistence', 'scripts/feature-entity-persistence-registry-check.mjs'],
-  ['canonical-evidence-registry', 'scripts/mapping-0-evidence-registry-final-check.mjs'],
 ]
 
 const failures = []
@@ -28,3 +29,4 @@ if (failures.length) {
 }
 
 console.log('\nMAPPING_0_GREEN')
+console.log('Downstream implementation/runtime/evidence gates remain authoritative for later stages.')
