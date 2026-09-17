@@ -52,6 +52,26 @@
       "requestDtoId": null,
       "responseDtoId": null,
       "status": "UNRESOLVED_NO_CANONICAL_OPERATION_EVIDENCE"
+    },
+    {
+      "featureId": "AUTH-010",
+      "operationId": "authSessionList",
+      "requestDtoId": null,
+      "responseDtoId": "DTO-AUTH-SESSION-LIST-RESPONSE",
+      "requestSchemaRef": null,
+      "responseSchemaRef": "#/paths/~1auth~1sessions/get/responses/200/content/application~1json/schema",
+      "entityIds": ["ENT-SESSION"],
+      "status": "RESERVED_PENDING_OPENAPI_PATH"
+    },
+    {
+      "featureId": "AUTH-010",
+      "operationId": "authSessionRevoke",
+      "requestDtoId": "DTO-AUTH-SESSION-REVOKE-PATH",
+      "responseDtoId": "DTO-AUTH-SESSION-REVOKE-RESPONSE",
+      "requestSchemaRef": "#/paths/~1auth~1sessions~1{sessionId}/parameters/0/schema",
+      "responseSchemaRef": null,
+      "entityIds": ["ENT-SESSION"],
+      "status": "RESERVED_PENDING_OPENAPI_PATH"
     }
   ],
   "bindingRules": {
@@ -61,6 +81,7 @@
     "no_runtime_claim": true,
     "no_persistence_claim": true,
     "no_security_evidence_claim": true,
-    "implementationGateRemainsClosedUntilEvidence": true
+    "implementationGateRemainsClosedUntilEvidence": true,
+    "reservedBindingsMustNotBeTreatedAsCanonicalUntilOpenApiPathExists": true
   }
 }
