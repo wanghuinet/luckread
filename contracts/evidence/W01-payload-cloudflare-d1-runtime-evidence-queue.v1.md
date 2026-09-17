@@ -24,6 +24,20 @@ Purpose: close the remaining runtime/evidence gap for Mapping-0 without promotin
 5. No `pnpm-lock.yaml` is currently present in W01; dependency resolution therefore remains an evidence gate.
 6. Physical source materialization is not runtime verification and does not make Mapping-0 GREEN.
 7. Payload issue evidence reports an `upsert` behavior defect for `@payloadcms/db-d1-sqlite@3.82.1`; W01 must explicitly test the affected persistence path before the D1 runtime gate can pass. This is a test requirement, not an assumption that the defect remains present after installation.
+8. The active AUTH-002 schema evidence validator and runtime evidence validator are now bound to W01 and the 3.82.1 Cloudflare-template baseline.
+9. Older AUTH-002 artifacts that explicitly pin Payload 3.87.1 are not current W01 runtime authority. They must remain identifiable as historical evidence/baseline until each artifact is reconciled or archived; no global search-and-replace is authorized.
+
+## Historical baseline handling
+
+The following 3.87.1-named AUTH-002 artifacts are retained for traceability and must not be silently rewritten as if they were executed against W01 3.82.1:
+
+- `contracts/persistence/AUTH-002-payload-3.87.1-session-runtime-evidence-gate.v1.md`
+- `contracts/persistence/AUTH-002-runtime-session-evidence-gate.v1.json` prior revisions
+- `contracts/migration/AUTH-002-migration-generation-runbook.v1.md` prior revisions
+- `contracts/migration/AUTH-002-migration-generation-admission.v1.md` prior revisions
+- `contracts/persistence/AUTH-002-payload-native-session-compatibility-audit.v1.md` prior revisions
+
+The current W01 runtime authority is the files explicitly updated to the 3.82.1 baseline plus `workers/W01-payload/*`. Historical artifacts may be archived through normal Change Control after their replacement relationships are recorded.
 
 ## Required evidence batch
 
