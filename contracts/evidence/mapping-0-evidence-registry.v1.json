@@ -3,5 +3,54 @@
   "version": "1.0",
   "status": "NOT_GREEN",
   "sourceOfTruth": "docs/176-EVIDENCE-REGISTRY-ACCEPTANCE-TRACEABILITY-CONTRACT-v1.0.md",
-  "records": []
+  "records": [
+    {
+      "evidenceId": "EVD-AUTH002-B05-SCHEMA-LOCAL-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-002::D1-SCHEMA",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "Payload migration execution + sqlite3 schema snapshot against local miniflare D1",
+      "sourceRef": "artifacts/evidence/auth-002-local/manifest.json",
+      "commitSha": "b69937b7a0a982f1c82e0a8d06d2ddeb2d15f8d4",
+      "timestamp": "2026-09-17T12:55:20.000Z",
+      "producer": "payload migrate (local) + sqlite3 PRAGMA snapshot",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "validUntil": "2026-09-17T00:00:00.000Z",
+      "note": "Migration 20250929_111647 applied against local miniflare D1; users/users_sessions schema, indexes and FKs match migration source (no drift). Evidence artifacts committed at 75fe380; W01 source identical between 75fe380 and b69937b (git diff confirms only evidence files differ). LOCAL_MINIFLARE_D1 only; remote D1 (luckread) not inspected - Cloudflare credentials missing."
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B06-MIGRATION-LOCAL-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-002::MIGRATION",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "payload migrate execution result recorded in payload_migrations",
+      "sourceRef": "artifacts/evidence/auth-002-local/payload-migrations.txt",
+      "commitSha": "b69937b7a0a982f1c82e0a8d06d2ddeb2d15f8d4",
+      "timestamp": "2026-09-17T12:55:19.934Z",
+      "producer": "payload migrate (local)",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "validUntil": "2026-09-17T00:00:00.000Z",
+      "note": "payload_migrations row batch=1 for 20250929_111647; migration history recorded and reapplied across passes without failure. Evidence artifacts committed at 75fe380; W01 source identical between 75fe380 and b69937b. LOCAL_MINIFLARE_D1 only."
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B07-RUNTIME-LOCAL-001",
+      "type": "SECURITY",
+      "claimId": "AUTH-002::SESSION-RUNTIME",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "HTTP session lifecycle against local Payload 3.87.1 dev runtime",
+      "sourceRef": "artifacts/evidence/auth-002-local/runtime-manifest.json",
+      "commitSha": "b69937b7a0a982f1c82e0a8d06d2ddeb2d15f8d4",
+      "timestamp": "2026-09-17T13:00:20.000Z",
+      "producer": "curl against next dev (payload-token cookie)",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "validUntil": "2026-09-17T00:00:00.000Z",
+      "note": "Native users_sessions lifecycle verified locally: login creates session row + JWT, me validates, logout removes row, expired-JWT denied, wrong-password denied. Contract gaps recorded (idempotent second logout, single-winner concurrency, extension correlation) - not silently resolved. LOCAL_MINIFLARE_D1 only; CONTROLLED_REMOTE_D1 runtime evidence pending credentials."
+    }
+  ]
 }
