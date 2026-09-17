@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'contracts/api/**'
+      - 'contracts/openapi/v1/operation-policy.json'
       - 'scripts/sync-rc-openapi.mjs'
       - '.github/workflows/canonical-openapi-sync.yml'
 
@@ -24,17 +25,18 @@ jobs:
         with:
           node-version: 24
 
-      - name: Synchronize canonical OpenAPI
+      - name: Synchronize canonical API surface
         run: node scripts/sync-rc-openapi.mjs
 
-      - name: Commit canonical OpenAPI when changed
+      - name: Commit canonical API surface when changed
         run: |
-          if git diff --quiet -- contracts/openapi/v1/openapi.yaml; then
-            echo "No canonical OpenAPI change required."
+          files="contracts/api/api-inventory.v1.json contracts/openapi/v1/openapi.yaml contracts/openapi/v1/operation-policy.json"
+          if git diff --quiet -- $files; then
+            echo "No canonical API surface change required."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add contracts/openapi/v1/openapi.yaml
-          git commit -m "chore(api): synchronize RC operations into canonical OpenAPI"
+          git add $files
+          git commit -m "chore(api): synchronize canonical API surface"
           git push
