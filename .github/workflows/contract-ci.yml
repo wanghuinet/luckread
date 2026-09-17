@@ -117,6 +117,17 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
+      - name: Generate Mapping 0 closure status snapshot
+        if: ${{ always() }}
+        run: node scripts/mapping-0-status-report.mjs
+      - name: Publish Mapping 0 closure status snapshot
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mapping-0-status-${{ github.run_id }}
+          path: artifacts/mapping-0/mapping-0-status-report.json
+          if-no-files-found: error
+          retention-days: 14
       - run: npm run mapping:0:verify
 
   contract-full:
