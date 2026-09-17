@@ -2,53 +2,31 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/persistence/AUTH-002-runtime-session-evidence-gate.v1.json",
   "title": "AUTH-002 Native Session Runtime Evidence Gate",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "CONTRACTED_NOT_EXECUTED",
   "featureId": "AUTH-002",
   "entityId": "ENT-SESSION",
   "failClosed": true,
-  "purpose": "Define the minimum executable evidence required to prove that Payload 3.87.1 native session identity and lifecycle correlate with the canonical AUTH-002 session contract before runtime promotion.",
+  "authority": "workers/W01-payload",
+  "runtimeBaseline": "official Payload templates/with-cloudflare-d1 dependency family 3.82.1",
+  "purpose": "Define the minimum executable evidence required to prove that the W01 official Cloudflare D1 template Payload 3.82.1 native session identity and lifecycle correlate with the canonical AUTH-002 session contract before runtime promotion.",
   "preconditions": [
     "Gate-1 controlled remote D1 schema evidence is accepted for the same tested commit.",
-    "Payload dependency is exactly 3.87.1 in package.json and package-lock.json.",
-    "@payloadcms/db-d1-sqlite is exactly 3.87.1 in package.json and package-lock.json.",
-    "Node runtime is the CI-pinned Node 24 line.",
+    "W01 dependency set is exactly the contract-pinned official Cloudflare D1 template baseline.",
+    "Payload and @payloadcms/db-d1-sqlite are exactly 3.82.1 in workers/W01-payload/package.json and the W01 pnpm lockfile once generated.",
+    "Node runtime is the template-compatible Node 24 line.",
     "The runtime test uses a disposable isolated test account/session and never production credentials.",
     "No independent custom session identifier is minted by the evidence harness."
   ],
   "requiredArtifacts": [
-    {
-      "file": "runtime-dependency.json",
-      "mustContain": ["repository", "testedCommitSha", "payloadVersion", "d1AdapterVersion", "nodeVersion", "lockfileReference"]
-    },
-    {
-      "file": "runtime-session-creation.json",
-      "mustContain": ["testId", "operation", "nativeSidObserved", "userBindingObserved", "createdAtObserved", "expiresAtObserved", "credentialRedacted", "testedCommitSha"]
-    },
-    {
-      "file": "runtime-validation.json",
-      "mustContain": ["testId", "nativeSidValidation", "userBindingValidation", "expiryDecision", "authorizationDecision", "testedCommitSha"]
-    },
-    {
-      "file": "runtime-logout.json",
-      "mustContain": ["testId", "logoutInvocation", "nativeSessionRemovalOrRevocation", "postLogoutValidation", "idempotentSecondLogout", "testedCommitSha"]
-    },
-    {
-      "file": "extension-correlation.json",
-      "mustContain": ["nativeSid", "extensionLookupKey", "singleSessionIdentity", "unsupportedDimensionsObserved", "failClosedOnMismatch", "testedCommitSha"]
-    },
-    {
-      "file": "runtime-negative-security.json",
-      "mustContain": ["testId", "case", "expected", "actual", "passed", "testedCommitSha"]
-    },
-    {
-      "file": "runtime-concurrency.json",
-      "mustContain": ["testId", "concurrencyLevel", "operation", "singleWinnerInvariant", "actualResult", "testedCommitSha"]
-    },
-    {
-      "file": "runtime-manifest.json",
-      "mustContain": ["testedCommitSha", "environmentClass", "databaseName", "workflow", "runId", "runAttempt", "executedAt", "artifactHashes"]
-    }
+    {"file":"runtime-dependency.json","mustContain":["repository","testedCommitSha","workerPath","payloadVersion","d1AdapterVersion","nodeVersion","lockfileReference"]},
+    {"file":"runtime-session-creation.json","mustContain":["testId","operation","nativeSidObserved","userBindingObserved","createdAtObserved","expiresAtObserved","credentialRedacted","testedCommitSha"]},
+    {"file":"runtime-validation.json","mustContain":["testId","nativeSidValidation","userBindingValidation","expiryDecision","authorizationDecision","testedCommitSha"]},
+    {"file":"runtime-logout.json","mustContain":["testId","logoutInvocation","nativeSessionRemovalOrRevocation","postLogoutValidation","idempotentSecondLogout","testedCommitSha"]},
+    {"file":"extension-correlation.json","mustContain":["nativeSid","extensionLookupKey","singleSessionIdentity","unsupportedDimensionsObserved","failClosedOnMismatch","testedCommitSha"]},
+    {"file":"runtime-negative-security.json","mustContain":["testId","case","expected","actual","passed","testedCommitSha"]},
+    {"file":"runtime-concurrency.json","mustContain":["testId","concurrencyLevel","operation","singleWinnerInvariant","actualResult","testedCommitSha"]},
+    {"file":"runtime-manifest.json","mustContain":["testedCommitSha","environmentClass","databaseName","workflow","runId","runAttempt","executedAt","artifactHashes"]}
   ],
   "mandatoryCorrelations": {
     "loginToSid": "The same disposable login operation MUST produce the native Payload sid later used by validation and logout evidence.",
@@ -59,77 +37,10 @@
     "extensionKey": "auth_session_state.session_id MUST equal the native Payload sid when extension state exists.",
     "singleAuthority": "Authorization MUST fail closed when native session state and canonical extension state disagree."
   },
-  "negativeCases": [
-    "expired native session is denied",
-    "post-logout native session is denied",
-    "canonical revoked state is denied even when stale native authorization material exists",
-    "wrong user binding is denied",
-    "wrong device binding is denied when device binding is present",
-    "stale tokenVersion is denied",
-    "missing extension state is denied when extension state is required for the tested operation",
-    "raw credential material is never persisted, logged, or emitted in evidence"
-  ],
-  "concurrencyRequirements": [
-    "Two or more concurrent refresh attempts using one predecessor may produce at most one successful successor.",
-    "Concurrent logout is idempotent and may not resurrect authorization state.",
-    "Concurrent validation must never authorize a revoked canonical session."
-  ],
-  "redactionRules": {
-    "forbiddenFields": [
-      "authorization",
-      "cookie",
-      "password",
-      "accessToken",
-      "rawAccessToken",
-      "refreshToken",
-      "rawRefreshToken",
-      "refreshCredentialHash",
-      "apiSecret",
-      "CLOUDFLARE_API_TOKEN",
-      "CLOUDFLARE_ACCOUNT_ID"
-    ],
-    "forbiddenValues": [
-      "bearer token material",
-      "session cookie values",
-      "raw refresh credentials",
-      "password values",
-      "Cloudflare credentials"
-    ]
-  },
-  "promotionRules": {
-    "requiredArtifactsAllPresent": true,
-    "allRequiredArtifactsMustMatchCommit": true,
-    "artifactHashesMustVerify": true,
-    "nativeSidMustBeObserved": true,
-    "nativeLifecycleMustBeObserved": true,
-    "extensionCorrelationMustBeObserved": true,
-    "negativeSecurityCasesMustPass": true,
-    "concurrencyEvidenceMustPass": true,
-    "noSecretPersistence": true,
-    "emptyEvidenceRegistryCannotPass": true,
-    "documentationOnlyCannotPass": true,
-    "staleCommitEvidenceCannotPass": true,
-    "promotionRequiresGate1Acceptance": true
-  },
-  "stopConditions": [
-    "The native sid cannot be observed and correlated across lifecycle steps.",
-    "createdAt or expiresAt is synthesized rather than observed from native Payload state.",
-    "A second independent session identifier is introduced.",
-    "Extension state is treated as a replacement for native session identity.",
-    "A revoked or expired session can still authorize.",
-    "Concurrent refresh produces more than one valid successor.",
-    "Logout reports success without required durable revocation state.",
-    "Any secret or credential material appears in evidence.",
-    "Evidence cannot be tied to the exact tested commit.",
-    "Gate-1 evidence is missing, stale, or unaccepted."
-  ],
-  "requiredPromotionState": {
-    "gate1SchemaEvidence": "ACCEPTED",
-    "runtimeEvidence": "ACCEPTED",
-    "migrationExecution": "NOT_YET_PROMOTED",
-    "securityEvidence": "ACCEPTED",
-    "concurrencyEvidence": "ACCEPTED",
-    "mapping0Validation": "REQUIRED",
-    "auth002": "BLOCKED_UNTIL_ALL_GATES_ACCEPTED"
-  }
+  "negativeCases": ["expired native session is denied","post-logout native session is denied","canonical revoked state is denied even when stale native authorization material exists","wrong user binding is denied","wrong device binding is denied when device binding is present","stale tokenVersion is denied","missing extension state is denied when extension state is required for the tested operation","raw credential material is never persisted, logged, or emitted in evidence"],
+  "concurrencyRequirements": ["Two or more concurrent refresh attempts using one predecessor may produce at most one successful successor.","Concurrent logout is idempotent and may not resurrect authorization state.","Concurrent validation must never authorize a revoked canonical session."],
+  "redactionRules": {"forbiddenFields":["authorization","cookie","password","accessToken","rawAccessToken","refreshToken","rawRefreshToken","refreshCredentialHash","apiSecret","CLOUDFLARE_API_TOKEN","CLOUDFLARE_ACCOUNT_ID"],"forbiddenValues":["bearer token material","session cookie values","raw refresh credentials","password values","Cloudflare credentials"]},
+  "promotionRules": {"requiredArtifactsAllPresent":true,"allRequiredArtifactsMustMatchCommit":true,"artifactHashesMustVerify":true,"nativeSidMustBeObserved":true,"nativeLifecycleMustBeObserved":true,"extensionCorrelationMustBeObserved":true,"negativeSecurityCasesMustPass":true,"concurrencyEvidenceMustPass":true,"noSecretPersistence":true,"emptyEvidenceRegistryCannotPass":true,"documentationOnlyCannotPass":true,"staleCommitEvidenceCannotPass":true,"promotionRequiresGate1Acceptance":true},
+  "stopConditions": ["The native sid cannot be observed and correlated across lifecycle steps.","createdAt or expiresAt is synthesized rather than observed from native Payload state.","A second independent session identifier is introduced.","Extension state is treated as a replacement for native session identity.","A revoked or expired session can still authorize.","Concurrent refresh produces more than one valid successor.","Logout reports success without required durable revocation state.","Any secret or credential material appears in evidence.","Evidence cannot be tied to the exact tested commit.","Gate-1 evidence is missing, stale, or unaccepted."],
+  "requiredPromotionState": {"gate1SchemaEvidence":"ACCEPTED","runtimeEvidence":"ACCEPTED","migrationExecution":"NOT_YET_PROMOTED","securityEvidence":"ACCEPTED","concurrencyEvidence":"ACCEPTED","mapping0Validation":"REQUIRED","auth002":"BLOCKED_UNTIL_ALL_GATES_ACCEPTED"}
 }
