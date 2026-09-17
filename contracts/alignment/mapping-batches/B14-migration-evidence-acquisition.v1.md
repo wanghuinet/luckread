@@ -1,37 +1,39 @@
-# B14 — Migration Evidence Acquisition Gate v1.0
+# B14 — Migration Evidence Acquisition Gate v1.1
 
 ## Status
-READY / NOT GREEN
+
+`READY / NOT GREEN`
+
+## Runtime authority
+
+- Repository source of truth: `wanghuinet/luckread`
+- Active runtime: `workers/W01-payload/`
+- Active Payload baseline: official `templates/with-cloudflare-d1` baseline recorded by W01 upstream manifest
+- Payload version: `3.82.1`
+- D1 adapter version: `3.82.1`
+- Payload migration directory: `workers/W01-payload/src/migrations`
+
+Historical evidence referring to Payload `3.87.1` or root `src/migrations` is not current W01 runtime evidence and must not satisfy this gate.
 
 ## Purpose
-Convert the remaining B12/B13 persistence blocker into a deterministic evidence-acquisition procedure without inventing schema, SQL, migration identifiers, execution results, or remote database facts.
 
-## Authority
-- Repository source of truth: `wanghuinet/luckread`
-- Payload version: `3.87.1`
-- D1 adapter version: `3.87.1`
-- Payload migration directory: `src/migrations`
-- Migration generation command: `npm run payload migrate:create <name>`
-- Migration execution command: `npm run payload migrate`
-- Migration status command: `npm run payload migrate:status`
-
-Payload documents `migrate:create` as the command that creates a migration file from the current schema state, `migrate` as the command that runs unapplied migrations, and `migrate:status` as the command that reports applied/pending migrations. This repository must use those commands rather than hand-authoring DDL for the initial evidence acquisition.
+Convert the remaining persistence blocker into a deterministic evidence-acquisition procedure without inventing schema, SQL, migration identifiers, execution results, or remote database facts.
 
 ## Required sequence
 
-1. Run the existing admission check:
-   `npm run auth:session:migration:admission`
-2. Generate the repository migration with the Payload CLI:
-   `npm run payload migrate:create mapping-0-ent-user`
-3. Review the generated artifact against the current Payload configuration and contract.
-4. Record the exact migration filename and immutable commit SHA.
-5. Execute against the controlled D1 environment:
-   `npm run payload migrate`
-6. Record `migrate:status` output and execution result.
-7. Capture physical schema evidence for the `users` table, including columns, storage types, nullability, defaults, uniqueness, indexes and foreign keys.
-8. Correlate every canonical ENT-USER field to the physical schema.
-9. Run the validator suite and retain all evidence under `artifacts/evidence/auth-002/`.
-10. Only after all evidence passes may B12 be promoted to GREEN and B13 be advanced.
+1. Run the W01 migration admission check.
+2. Capture dependency evidence for the exact tested commit and lockfile.
+3. Generate the W01 migration with the Payload CLI:
+   `pnpm payload migrate:create <name>`
+4. Review the generated artifact against the current W01 configuration and contract.
+5. Record the exact migration filename and immutable commit SHA.
+6. Execute only in the explicitly controlled D1 environment after execution admission:
+   `pnpm payload migrate`
+7. Record migration status and execution result.
+8. Capture physical D1 schema evidence for the affected tables, including columns, storage types, nullability, defaults, uniqueness, indexes and foreign keys.
+9. Correlate canonical fields to physical schema.
+10. Run the validator suite and retain evidence under `artifacts/evidence/auth-002/`.
+11. Only after all evidence passes may the relevant mapping batch advance.
 
 ## Fail-closed rules
 
@@ -42,28 +44,29 @@ Payload documents `migrate:create` as the command that creates a migration file 
 - Do not include credentials, tokens, cookies, passwords or refresh-token material in evidence artifacts.
 - Do not introduce `auth_session_state` merely to satisfy the validator; its presence must be backed by an authoritative contract and actual migration evidence.
 - Keep Payload-native authentication persistence distinct from contract-owned extension fields.
+- Do not use historical 3.87.1 evidence as proof for the current 3.82.1 W01 runtime.
 
 ## ENT-USER closure matrix
 
 | Field | Payload source | Migration | D1 table | D1 column | Type | Nullability | Default | Unique | Index | Execution evidence | Validator |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| username | `src/collections/Users.ts:fields.username` | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE |
-| displayName | `src/collections/Users.ts:fields.displayName` | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE |
-| bio | `src/collections/Users.ts:fields.bio` | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE |
-| avatar | `src/collections/Users.ts:fields.avatar` | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE |
-| locale | `src/collections/Users.ts:fields.locale` | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE |
-| timezone | `src/collections/Users.ts:fields.timezone` | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE |
+| username | `workers/W01-payload/src/collections/Users.ts:fields.username` | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE |
+| displayName | `workers/W01-payload/src/collections/Users.ts:fields.displayName` | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE |
+| bio | `workers/W01-payload/src/collections/Users.ts:fields.bio` | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE |
+| avatar | `workers/W01-payload/src/collections/Users.ts:fields.avatar` | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE |
+| locale | `workers/W01-payload/src/collections/Users.ts:fields.locale` | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE |
+| timezone | `workers/W01-payload/src/collections/Users.ts:fields.timezone` | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE | PENDING_EVIDENCE |
 
 ## Required evidence bundle
 
 The controlled execution must produce, at minimum:
 
-- migration artifact generated by the Payload CLI;
+- migration artifact generated by the W01 Payload CLI;
 - migration execution result with exit code and database identity;
 - migration status result;
-- physical `users` schema rows;
-- `users` indexes;
-- `users` foreign keys;
+- physical D1 schema rows;
+- relevant indexes;
+- relevant foreign keys;
 - catalog/table inventory;
 - provenance identifying repository, commit SHA, run identity, environment class and database name;
 - manifest with SHA-256 hashes for the evidence files;
@@ -71,14 +74,14 @@ The controlled execution must produce, at minimum:
 
 ## Exit criteria
 
-B14 becomes GREEN only when B12 has all six ENT-USER fields reconciled through:
+B14 becomes GREEN only when its applicable entity fields are reconciled through:
 
-`Entity → Field → Payload source → generated Migration → executed Migration → D1 table/column → constraints → validator evidence`
+`Entity → Field → W01 source → generated Migration → executed Migration → D1 table/column → constraints → validator evidence`
 
 B14 does not itself authorize feature implementation.
 
 ## Relationship to Mapping 0
 
-`B12 GREEN → B13 persistence closure → B14 evidence acquisition PASS → Mapping 0 final reconciliation`
+`Persistence closure → B14 evidence acquisition PASS → Mapping 0 final reconciliation`
 
 No document-only status may promote Mapping 0.
