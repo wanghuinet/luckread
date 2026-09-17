@@ -6,6 +6,12 @@ on:
     paths:
       - 'scripts/reconcile-canonical-auth-mapping.mjs'
       - 'contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json'
+      - 'contracts/alignment/mapping-batches/AUTH-010-session-field-binding.v1.md'
+      - 'contracts/alignment/mapping-batches/AUTH-011-runtime-gate.v1.md'
+      - 'contracts/api/AUTH-003-credential-management-contract.v1.json'
+      - 'contracts/api/AUTH-004-password-recovery-contract.v1.json'
+      - 'contracts/api/AUTH-005-identity-verification-contract.v1.json'
+      - 'contracts/api/AUTH-006-passkey-webauthn-contract.v1.json'
       - '.github/workflows/reconcile-canonical-auth-mapping.yml'
   workflow_dispatch:
 
@@ -32,7 +38,7 @@ jobs:
         with:
           node-version: 24
 
-      - name: Reconcile AUTH-002..006 contract entity bindings
+      - name: Reconcile canonical AUTH contract mappings
         run: |
           set -euo pipefail
           git fetch origin main
@@ -52,7 +58,7 @@ jobs:
             fi
 
             git add contracts/alignment/cross-system-mapping.v1.json
-            git commit -m 'chore(mapping): reconcile AUTH contract entity bindings'
+            git commit -m 'chore(mapping): reconcile canonical AUTH contract mappings'
 
             if git push origin HEAD:main; then
               exit 0
