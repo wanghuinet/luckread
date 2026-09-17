@@ -10,6 +10,7 @@ import path from 'node:path'
 const root = process.cwd()
 const mappingPath = path.join(root, 'contracts/alignment/cross-system-mapping.v1.json')
 const deltaPath = path.join(root, 'contracts/alignment/mapping-batches/USER-001-006-evidence-bound-mapping-delta-2026-09-17.v1.json')
+const deltaRelativePath = 'contracts/alignment/mapping-batches/USER-001-006-evidence-bound-mapping-delta-2026-09-17.v1.json'
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'))
 const mapping = readJson(mappingPath)
@@ -46,6 +47,7 @@ for (const [featureId, verified] of verifiedByFeature) {
   if (!record) throw new Error(`missing canonical mapping record: ${featureId}`)
   if (!Array.isArray(record.apiOperationIds)) throw new Error(`${featureId}: apiOperationIds must be an array`)
   if (!Array.isArray(record.entityIds)) throw new Error(`${featureId}: entityIds must be an array`)
+  if (!Array.isArray(record.evidence)) throw new Error(`${featureId}: evidence must be an array`)
 
   const beforeApis = [...record.apiOperationIds]
   const afterApis = [...new Set([...beforeApis, ...verified.apiOperationIds])]
@@ -60,6 +62,12 @@ for (const [featureId, verified] of verifiedByFeature) {
     record.entityIds = afterEntities
     changes.push({ featureId, field: 'entityIds', before: beforeEntities, after: afterEntities })
   }
+
+  if (!record.evidence.includes(deltaRelativePath)) {
+    const beforeEvidence = [...record.evidence]
+    record.evidence = [...new Set([...beforeEvidence, deltaRelativePath])]
+    changes.push({ featureId, field: 'evidence', before: beforeEvidence, after: record.evidence })
+  }
 }
 
 if (changes.length > 0) fs.writeFileSync(mappingPath, `${JSON.stringify(mapping, null, 2)}\n`)
@@ -71,6 +79,7 @@ console.log(JSON.stringify({
   changes,
   rules: {
     onlyEvidenceDeltaVerifiedEdges: true,
+    evidenceDeltaRetainedAsCanonicalSource: true,
     statusUntouched: true,
     dtoPersistenceCodeRuntimeEvidenceUntouched: true,
     noInference: true,
