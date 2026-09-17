@@ -46,10 +46,13 @@ for (const [name, expected] of Object.entries(required)) {
 const nodeMajor = Number(process.versions.node.split('.')[0])
 if (nodeMajor < 24) fail(`Node 24+ is required for W01; current Node is ${process.versions.node}`)
 
-// On Windows, pnpm is normally exposed as pnpm.cmd. PowerShell can resolve
-// the command interactively, while Node's execFileSync requires the .cmd shim.
-const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
-const pnpmVersion = run(pnpmCommand, ['--version'])
+// Windows exposes Corepack-managed pnpm through pnpm.ps1/pnpm.cmd.
+// execFileSync cannot directly execute .cmd files on Windows, so invoke
+// the command through the Windows command shell. On POSIX, execute pnpm directly.
+const pnpmVersion = process.platform === 'win32'
+  ? run(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', 'pnpm --version'])
+  : run('pnpm', ['--version'])
+
 if (!pnpmVersion) fail('pnpm is not available; install a supported pnpm 9/10/11 toolchain before generating the lockfile')
 
 const pnpmMajor = Number(pnpmVersion.split('.')[0])
