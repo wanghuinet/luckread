@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-09-17T13:13:33.198Z",
-  "currentCommit": "caaa95584f0cdc441a25d28da6d458b98a2c4fec",
+  "generatedAt": "2026-09-17T22:41:07.980Z",
+  "currentCommit": "b5840503a8db54fc89745e664f5d54c9c4f9024f",
   "canonicalMappingStatus": "NOT_GREEN",
   "canonicalFeatureCount": 449,
-  "canonicalMappingRecordCount": 43,
+  "canonicalMappingRecordCount": 449,
   "canonicalMappingStatusCounts": {
     "PARTIAL": 14,
     "MISSING": 2,
-    "UNRESOLVED": 27
+    "UNRESOLVED": 433
   },
-  "canonicalBlockingRecordCount": 43,
+  "canonicalBlockingRecordCount": 449,
   "featureInventoryStatusCounts": {
     "MISSING_STATUS": 449
   },
@@ -18,8 +18,12 @@
   "persistenceRegistryStatusCounts": {},
   "evidenceRegistryStatus": "NOT_GREEN",
   "evidenceRegistryRecordCount": 11,
-  "evidenceByFeatureCount": 9,
+  "evidenceByFeatureCount": 449,
   "topBlockerReasons": [
+    {
+      "blocker": "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation.",
+      "count": 406
+    },
     {
       "blocker": "DTO mapping missing",
       "count": 1
@@ -99,6 +103,31 @@
     {
       "blocker": "risk contract remains open",
       "count": 1
+    },
+    {
+      "blocker": "account-state enforcement mapping incomplete",
+      "count": 1
+    },
+    {
+      "blocker": "recovery API/DTO/entity/security mapping incomplete",
+      "count": 1
+    },
+    {
+      "blocker": "deletion/restoration contract mapping incomplete",
+      "count": 1
+    },
+    {
+      "blocker": "verification API/DTO/entity/security mapping incomplete",
+      "count": 1
     }
-  ]
+  ],
+  "mappingMetrics": {
+    "apiOperationEdgeCount": 11,
+    "entityEdgeCount": 9,
+    "payloadCollectionEdgeCount": 0,
+    "codeEvidenceEdgeCount": 0,
+    "evidenceReferenceFeatureCount": 449,
+    "completeTechnicalClosureCount": 0
+  },
+  "note": "Generated from current main canonical mapping. Mapping 0 Structural GREEN remains a structural gate; downstream implementation/runtime/test evidence is not implied."
 }
