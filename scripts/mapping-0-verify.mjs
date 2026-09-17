@@ -16,11 +16,8 @@ for (const [name, script] of gates) {
   const result = spawnSync(process.execPath, [script], { stdio: 'inherit' })
   if (result.error) {
     failures.push(`${name}: ${result.error.message}`)
-    break
-  }
-  if (result.status !== 0) {
+  } else if (result.status !== 0) {
     failures.push(`${name}: exit ${result.status}`)
-    break
   }
 }
 
