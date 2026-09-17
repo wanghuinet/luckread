@@ -37,6 +37,16 @@ if (!Array.isArray(jsonBinding.bindings)) throw new Error('AUTH-002..006 binding
 
 const entityRefsByFeature = new Map()
 const apiOperationIdsByFeature = new Map()
+const evidenceRefsByFeature = new Map()
+
+const addEvidenceRef = (featureId, ref) => {
+  if (typeof featureId !== 'string' || typeof ref !== 'string' || ref.length === 0) {
+    throw new Error('evidence binding requires non-empty featureId and ref')
+  }
+  const current = evidenceRefsByFeature.get(featureId) ?? []
+  if (!current.includes(ref)) current.push(ref)
+  evidenceRefsByFeature.set(featureId, current)
+}
 
 const addEntityBinding = (featureId, entityRefs, source) => {
   if (!Array.isArray(entityRefs) || entityRefs.length === 0) {
@@ -52,6 +62,7 @@ const addEntityBinding = (featureId, entityRefs, source) => {
 for (const record of jsonBinding.bindings) {
   if (['AUTH-002', 'AUTH-003', 'AUTH-004', 'AUTH-005', 'AUTH-006'].includes(record?.featureId)) {
     addEntityBinding(record.featureId, record.entityRefs, 'AUTH-002..006 persistence/API/entity/field contract')
+    addEvidenceRef(record.featureId, 'contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json')
   }
 }
 
@@ -69,6 +80,7 @@ const addApiContractBinding = (featureId, file) => {
     throw new Error(`${featureId}: API contract contains duplicate operationId`)
   }
   apiOperationIdsByFeature.set(featureId, operationIds)
+  addEvidenceRef(featureId, path.relative(root, file).replaceAll(path.sep, '/'))
 }
 
 for (const [featureId, file] of Object.entries(apiContractPaths)) addApiContractBinding(featureId, file)
@@ -77,12 +89,14 @@ const auth010Text = readText(auth010BindingPath)
 const auth010Entity = auth010Text.match(/- Entity:\s+`(ENT-[A-Z0-9-]+)`/)
 if (!auth010Entity) throw new Error('AUTH-010 field binding did not expose an Entity reference')
 addEntityBinding('AUTH-010', [auth010Entity[1]], 'AUTH-010 session field binding')
+addEvidenceRef('AUTH-010', 'contracts/alignment/mapping-batches/AUTH-010-session-field-binding.v1.md')
 
 const auth011Text = readText(auth011GatePath)
 const requiredChain = auth011Text.match(/## Required contract chain\n\n([^\n]+)/)?.[1] ?? ''
 const auth011Entities = [...new Set(requiredChain.match(/ENT-[A-Z0-9-]+/g) ?? [])]
 if (auth011Entities.length === 0) throw new Error('AUTH-011 runtime gate did not expose entity references in the required contract chain')
 addEntityBinding('AUTH-011', auth011Entities, 'AUTH-011 runtime gate required contract chain')
+addEvidenceRef('AUTH-011', 'contracts/alignment/mapping-batches/AUTH-011-runtime-gate.v1.md')
 
 const mappingById = new Map()
 for (const record of mapping.records) {
@@ -124,6 +138,19 @@ for (const [featureId, canonicalOperationIds] of apiOperationIdsByFeature) {
   }
 }
 
+for (const [featureId, refs] of evidenceRefsByFeature) {
+  const mappingRecord = mappingById.get(featureId)
+  if (!mappingRecord) throw new Error(`missing canonical mapping record: ${featureId}`)
+  if (!Array.isArray(mappingRecord.evidence)) throw new Error(`${featureId}: evidence must be an array`)
+
+  const before = [...mappingRecord.evidence]
+  const after = [...new Set([...before, ...refs])]
+  if (JSON.stringify(before) !== JSON.stringify(after)) {
+    mappingRecord.evidence = after
+    changes.push({ featureId, field: 'evidence', before, after })
+  }
+}
+
 if (changes.length > 0) {
   fs.writeFileSync(mappingPath, `${JSON.stringify(mapping, null, 2)}\n`)
 }
@@ -132,11 +159,13 @@ console.log(JSON.stringify({
   status: changes.length ? 'ENRICHED_CONTRACT_MAPPING' : 'NO_CHANGE',
   entityBindingFeatureCount: entityRefsByFeature.size,
   apiContractBindingFeatureCount: apiOperationIdsByFeature.size,
+  evidenceBindingFeatureCount: evidenceRefsByFeature.size,
   enrichedChangeCount: changes.length,
   changes,
   rules: {
     canonicalApiIdsFromFeatureSpecificContracts: true,
     stalePersistenceOnlyApiIdsRejected: true,
+    contractEvidenceSourcesOnly: true,
     physicalPersistenceNamesUntouched: true,
     runtimeEvidenceUntouched: true,
     statusUntouched: true,
