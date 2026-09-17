@@ -156,7 +156,8 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md"
       ],
       "blockers": [
         "canonical MFA contracts not established"
@@ -170,7 +171,8 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-008-real-evidence-reconciliation.v1.md"
       ],
       "blockers": [
         "provider integration and linked-identity contract mapping missing"
@@ -184,7 +186,8 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-009-reconciliation.v1.md"
       ],
       "blockers": [
         "canonical linked-identity entity/API mapping missing"
@@ -246,7 +249,8 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-012-risk-contract-closure-gate.v1.md"
       ],
       "blockers": [
         "risk contract remains open"
@@ -260,7 +264,8 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-013-real-evidence-reconciliation.v1.md"
       ],
       "blockers": [
         "account-state enforcement mapping incomplete"
@@ -274,7 +279,8 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-014-real-evidence-reconciliation.v1.md"
       ],
       "blockers": [
         "recovery API/DTO/entity/security mapping incomplete"
@@ -288,7 +294,8 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-015-real-evidence-reconciliation.v1.md"
       ],
       "blockers": [
         "deletion/restoration contract mapping incomplete"
@@ -302,7 +309,8 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-016-real-evidence-reconciliation.v1.md"
       ],
       "blockers": [
         "verification API/DTO/entity/security mapping incomplete"
