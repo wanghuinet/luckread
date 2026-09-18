@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Current reviewed main head: `97bf8c2b90525f9ed83d57a0bca5a21cad3f50c2`
+Current reviewed main head: `5d3bdeccedd1d5a6f760b75012f82a81d2faef6f`
 
 ## Current governance closure
 
@@ -107,4 +107,4 @@ Governance closure is substantially complete. The remaining gap is no longer orp
 - Records with Code evidence edges: 0
 - Complete API+Entity+Payload+Code closure: 0/449
 
-The latest reconciliation commits corrected stale AUTH-006 OpenAPI terminology, attached canonical AUTH field-authority references to AUTH-002..006 evidence arrays, and aligned Payload discovery to the declared W01 runtime authority. These are governance/evidence-source corrections only; no record was promoted and technical status remains fail-closed.
+The latest reconciliation commits corrected stale AUTH-006 OpenAPI terminology, attached canonical AUTH field-authority references to AUTH-002..006 evidence arrays, aligned Payload/Code discovery to the declared W01 runtime authority, and attached the current W01 source files as evidence references for AUTH-001 and USER-001. These are governance/evidence-source corrections only; no record was promoted and technical status remains fail-closed.
