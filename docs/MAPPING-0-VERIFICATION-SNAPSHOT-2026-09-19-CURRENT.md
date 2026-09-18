@@ -176,3 +176,18 @@ The machine-readable cluster artifact `artifacts/mapping-0/five-way-explicit-blo
 
 No canonical status was promoted by this clustering. The artifact is an execution queue for reconciliation, not a substitute for API/DTO/Entity/Persistence/Runtime evidence.
 
+
+
+## 15. Entity/Persistence inventory semantic correction
+
+A Change Control correction was applied to the existing Entity/Persistence inventory:
+
+- `ENT-IDENTITY`: `NOT_VERIFIED`
+- `ENT-CREDENTIAL`: `NOT_VERIFIED`
+- `ENT-VERIFICATION`: `NOT_VERIFIED`
+
+These entities have explicit AUTH-002..006 persistence obligations but no verified execution/schema evidence. They are therefore applicable but unverified, not `NOT_APPLICABLE`.
+
+The inventory schema was also aligned with the actual existing artifact shape. It now permits an empty `implementationRef` for `PROPOSED` entities, requires a non-empty implementation reference for `VERIFIED` entities, and declares the already-used `featureInventoryRef`, `rules`, `blockers`, `domainId`, and `persistenceContractRef` fields.
+
+This correction does not promote any Entity or Persistence record to GREEN and does not alter physical D1 schema or migrations.
