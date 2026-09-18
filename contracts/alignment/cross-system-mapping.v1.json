@@ -28,7 +28,9 @@
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
         "contracts/alignment/mapping-batches/B19-AUTH-001-real-evidence-reconciliation.v1.md",
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/dto/auth-dto-contract.v1.json"
+        "contracts/dto/auth-dto-contract.v1.json",
+        "workers/W01-payload/src/collections/Users.ts",
+        "workers/W01-payload/src/payload.config.ts"
       ],
       "blockers": [
         "DTO mapping missing",
@@ -405,7 +407,9 @@
       "evidence": [
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
         "contracts/alignment/mapping-batches/USER-001-006-evidence-bound-mapping-delta-2026-09-17.v1.json",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "workers/W01-payload/src/collections/Users.ts",
+        "workers/W01-payload/src/payload.config.ts"
       ],
       "blockers": [
         "B02 mapping not yet evidence-bound beyond Blueprint"
