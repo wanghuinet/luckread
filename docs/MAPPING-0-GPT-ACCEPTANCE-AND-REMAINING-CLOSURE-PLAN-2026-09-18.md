@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Reviewed head: `e0b413230cd1e2bffcfcaf204aaae33c8864cb31`
+Reviewed head: `0f8bcf508553b96989f5400f89441ed6991bdf6b`
 Basis: current GitHub main, Batch G final sweep, orphan disposition register, canonical mapping, Feature Inventory, and Evidence Registry.
 
 ## 1. Acceptance boundary
@@ -129,7 +129,7 @@ The current five-way reconciliation file contains 457 blocker entries across 449
 2. Refresh only evidence that is actually re-executed; bind each result to the exact commit SHA.
 3. Close the empty persistence registry through existing authoritative contracts and evidence; do not invent mappings.
 4. Resolve the explicit AUTH-006/007/008/009/013..016 authority gaps under change control.
-5. Reconcile the 450 five-way blockers.
+5. Reconcile the current 457 five-way blocker entries.
 6. Do not begin broad business-feature implementation merely because structural Mapping-0 is green.
 
 ## 6. Non-negotiable guardrails
