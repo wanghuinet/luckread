@@ -387,8 +387,8 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-        "contracts/alignment/mapping-batches/USER-001-006-evidence-bound-mapping-delta-2026-09-17.v1.json"
+        "contracts/alignment/mapping-batches/USER-001-006-evidence-bound-mapping-delta-2026-09-17.v1.json",
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
         "B02 mapping not yet evidence-bound beyond Blueprint"
@@ -468,8 +468,8 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-        "contracts/alignment/mapping-batches/USER-001-006-evidence-bound-mapping-delta-2026-09-17.v1.json"
+        "contracts/alignment/mapping-batches/USER-001-006-evidence-bound-mapping-delta-2026-09-17.v1.json",
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
         "block/mute authority and interaction mapping missing"
