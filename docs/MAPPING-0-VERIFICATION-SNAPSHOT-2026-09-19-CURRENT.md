@@ -212,3 +212,14 @@ A direct audit of the current authorization authorities found that the repositor
 Those existing authorities do **not** establish Feature-bound API/DTO/Entity/Field/Persistence/Enforcement mappings for AUTHZ-001..010 or ORG-001..007. The new machine-readable artifact `artifacts/mapping-0/authz-org-authority-coverage-2026-09-19.json` records the distinction explicitly.
 
 No canonical Feature status, Entity status, API binding, or implementation admission was changed from this audit.
+
+
+## 18. AUTH-006 status classification
+
+AUTH-006 currently has explicit API and Entity edges in canonical Mapping but remains `MISSING`. The repository does not provide a normative predicate distinguishing `MISSING` from `PARTIAL` for partially populated records.
+
+A Change Control record now tracks this ambiguity:
+
+`docs/change-control/CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19.md`
+
+No status change was applied. This preserves the existing fail-closed state until a deterministic classification rule is established.
