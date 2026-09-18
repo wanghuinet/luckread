@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-18T08:50:21.546Z",
-  "currentCommit": "05c03b03c4d32f50f89df316267e9f58019d7e7b",
+  "generatedAt": "2026-09-18T10:20:37.082Z",
+  "currentCommit": "66d216df4816c13c90edf3131517a987ab9a5436",
   "canonicalMappingStatus": "NOT_GREEN",
   "canonicalFeatureCount": 449,
   "canonicalMappingRecordCount": 449,
@@ -118,7 +118,7 @@
   "mappingMetrics": {
     "apiOperationEdgeCount": 11,
     "entityEdgeCount": 9,
-    "payloadCollectionEdgeCount": 0,
+    "payloadCollectionEdgeCount": 1,
     "codeEvidenceEdgeCount": 0,
     "evidenceReferenceFeatureCount": 449,
     "completeTechnicalClosureCount": 0
