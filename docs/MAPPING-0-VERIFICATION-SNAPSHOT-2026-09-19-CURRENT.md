@@ -191,3 +191,15 @@ These entities have explicit AUTH-002..006 persistence obligations but no verifi
 The inventory schema was also aligned with the actual existing artifact shape. It now permits an empty `implementationRef` for `PROPOSED` entities, requires a non-empty implementation reference for `VERIFIED` entities, and declares the already-used `featureInventoryRef`, `rules`, `blockers`, `domainId`, and `persistenceContractRef` fields.
 
 This correction does not promote any Entity or Persistence record to GREEN and does not alter physical D1 schema or migrations.
+
+
+## 16. AUTH-002 persistence-mode correction
+
+The explicit AUTH-002 Feature → Entity → Persistence registry record was corrected under Change Control:
+
+- previous mode: `LUCKREAD_EXTENSION`
+- current mode: `MIXED`
+
+Reason: the authoritative persistence contract gives Payload native `users.sessions[]` authority over native session fields while `auth_session_state` owns the contracted extension dimensions. The registry's own mode semantics define this combined ownership as `MIXED`.
+
+The record remains `BLOCKED`; this is a semantic correction only and does not constitute persistence execution or verification.
