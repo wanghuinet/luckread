@@ -146,3 +146,7 @@ The 58 orphan batch files have already been row-by-row dispositioned by
 `docs/change-control/MAPPING-0-ORPHAN-BATCH-DISPOSITION-REGISTER-2026-09-18.md`:
 58/58 explicitly classified as `RETAIN_NON_CANONICAL`, with 0
 `PENDING_CHANGE_CONTROL`. The orphan governance gate is therefore **CLOSED**.
+
+## Current five-way count reconciliation
+
+The current canonical five-way reconciliation file contains 457 blocker entries across 449 records. The previously recorded 450-blocker figure in this handoff is a stale snapshot and must not be used for current progress accounting. This correction does not change the 449-record structural Mapping-0 result or promote any technical edge.
