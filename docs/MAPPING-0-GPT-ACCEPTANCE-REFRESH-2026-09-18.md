@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Current reviewed main head at time of record: `65559d8a45a0b5f6335eee52520491f37d2f153b`
+Current reviewed main head: `09fde9a424607cd0d94a5794459c2110fe8a572f`
 
 ## Current governance closure
 
@@ -19,14 +19,14 @@ The repository now contains explicit governance records for the residual governa
 
 The Canonical Feature Inventory remains 449 records and the Canonical Mapping remains 449 records. Governance cleanup above does not add feature IDs or invent technical edges.
 
-The repository's latest handoff material still describes the Mapping-0 structural layer as GREEN, while technical/runtime closure remains fail-closed and NOT_GREEN.
+The canonical mapping artifact remains `status: NOT_GREEN`; the structural handoff remains distinct from technical/runtime closure.
 
 ## Independent acceptance status
 
 | Gate | Current status |
 |---|---|
 | Canonical inventory ↔ canonical mapping cardinality | ACCEPTED structural basis |
-| Mapping-0 structural gate | ACCEPTED as reported gate result |
+| Mapping-0 structural gate | ACCEPTED as previously reported gate result |
 | Evidence-reference integrity | ACCEPTED for reference integrity only |
 | Scope governance | CLOSED |
 | 58-file orphan disposition | CLOSED |
@@ -41,7 +41,7 @@ The repository's latest handoff material still describes the Mapping-0 structura
 
 Repository inspection confirms `contracts/api/AUTH-006-passkey-webauthn-contract.v1.json` exists and is explicitly marked `CONTRACTED_NOT_VERIFIED`.
 
-Its own evidenceStatus records:
+Its evidenceStatus records:
 - API: CONTRACTED_NOT_VERIFIED
 - DTO: CONTRACTED_NOT_VERIFIED
 - Entity: CONTRACTED_NOT_VERIFIED
@@ -52,25 +52,36 @@ Its own evidenceStatus records:
 
 Therefore AUTH-006 is still not closed; the precise blocker is downstream verification and complete evidence binding, not absence of every API contract artifact.
 
-## AUTH-007 and remaining AUTH
+## AUTH-007 / AUTH-008 / AUTH-009
 
-AUTH-007 remains MISSING because the canonical MFA API/DTO/entity/security lifecycle contract surface is not established.
+AUTH-007 remains `MISSING`: current repository material defines capability/security requirements but does not establish a frozen canonical MFA API/DTO/entity/security lifecycle contract surface.
 
-AUTH-008, AUTH-009, AUTH-013, AUTH-014, AUTH-015 and AUTH-016 remain PARTIAL because the repository records unresolved provider, linked-identity, account-state, security, or validation mappings.
+AUTH-008 remains `PARTIAL`: current repository material establishes capability and security requirements, but canonical social-login API/DTO/entity/linking/persistence/runtime evidence remains incomplete.
+
+AUTH-009 remains `PARTIAL`: linked-identity reconciliation explicitly identifies missing canonical entity/field and link/unlink/list DTO/API evidence.
+
+## AUTH-013..016
+
+AUTH-013, AUTH-014, AUTH-015 and AUTH-016 remain `PARTIAL`. Their current reconciliation artifacts identify account-state, recovery, deletion/restoration, and identity/verification mappings that require authoritative API/DTO/entity/security bindings and executable evidence before promotion.
 
 ## Verification boundary
 
-The current head `65559d8a45a0b5f6335eee52520491f37d2f153b` has no attached commit status in the GitHub connection. The repository does contain a Mapping-0 structural CI workflow, but this review has not observed a fresh successful workflow result for the current head.
+No fresh successful Mapping-0 CI status is attached to reviewed head `09fde9a` in the GitHub connection. The repository does contain a structural CI workflow, but this review has not observed a current-head successful run result.
 
-Therefore this document does not claim a newly executed validator run against `65559d8a`.
+Accordingly, this document does not claim a newly executed validator result for `09fde9a`.
+
+## Next technical closure queue
+
+The next admissible work is to close authoritative contracts and mappings in dependency order without inventing missing design:
+
+1. AUTH-006 downstream binding: DTO/entity/field/persistence/security/runtime/test evidence against the existing contract.
+2. AUTH-007 canonical contract establishment from approved authority, followed by mapping.
+3. AUTH-008 canonical social-login API/DTO/entity/linking/security contract reconciliation.
+4. AUTH-009 canonical linked-identity API/entity/security reconciliation.
+5. AUTH-013..016 contract and state/security mapping reconciliation.
+6. Re-run existing deterministic validators after each accepted contract/mapping batch, then bind runtime/test evidence to the resulting commit.
+7. Recompute five-way reconciliation only from repository artifacts; never edit the result merely to obtain GREEN.
 
 ## Result
 
-The previously identified governance ambiguity is substantially closed:
-
-- scope disposition: CLOSED;
-- orphan disposition: CLOSED;
-- AUTH-001 draft disposition: CLOSED;
-- AUTH residual traceability: RECORDED.
-
-The remaining work is technical Contract closure and subsequently executable Runtime/Evidence closure. Those phases require authoritative contracts, deterministic validation, executable implementation where applicable, tests, and commit-bound evidence. Documentation alone must not promote the records to GREEN.
+Governance closure is substantially complete. The remaining gap is no longer orphan/scope bookkeeping; it is authoritative Contract -> Mapping -> Runtime -> Evidence closure. Documentation alone must not promote the records to GREEN.
