@@ -149,3 +149,17 @@ As of GitHub main `584346f195d341c67e911212cf3cfcede76f4fe7`:
 **Mapping 0 full technical/runtime/evidence closure: NOT_GREEN.**
 
 The recent registry and evidence corrections improve factual accuracy and governance integrity; they do not constitute implementation or runtime verification.
+
+
+## 13. Five-Way blocker clustering
+
+A direct read of `contracts/alignment/five-way-reconciliation.v1.json` at the verified baseline shows:
+
+- 449 reconciliation records.
+- 433 records are `UNRESOLVED`, 14 are `PARTIAL`, and 2 are `MISSING`.
+- 406 records carry the same generic downstream blocker stating that API/Entity/Field/Persistence/Runtime mapping remains unresolved.
+- The remaining 43 records include explicit AUTH-001..016 residual blockers and other non-generic distinctions.
+- The top-level blocker list also contains `db:NOT_GREEN`, which is a database-inventory state and must not be confused with a Feature-ID count.
+
+This clustering means the remaining work should be executed by authoritative blocker family, not by blindly editing 449 Feature records. The generic blocker is a downstream technical-closure state; it is not evidence that each Feature individually needs a new contract.
+
