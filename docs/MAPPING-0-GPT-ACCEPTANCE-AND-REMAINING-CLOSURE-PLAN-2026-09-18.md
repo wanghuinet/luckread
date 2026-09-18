@@ -60,7 +60,7 @@ This corrects the evidence path. It does **not** prove runtime or persistence cl
 
 ### 2.7 Five-way blocker count refresh — CLOSED
 
-Current five-way file statistics were directly recomputed from `contracts/alignment/five-way-reconciliation.v1.json` on the current main head: 449 records and 457 blocker entries. The earlier 450 figure in older Batch G narrative snapshots is stale. The five-way gate remains `NOT_GREEN`.
+Current five-way statistics were directly recomputed from `contracts/alignment/five-way-reconciliation.v1.json`: 449 records, 450 top-level blocker IDs, and 457 record-level blocker entries. The 450 and 457 figures are different aggregation levels, not conflicting progress values. The five-way gate remains `NOT_GREEN`.
 
 
 The G01.01 Identity/Account blocker audit was corrected so its current Payload configuration and Users collection references point to the declared W01 runtime authority. Its findings remain `NOT_GREEN`; this changes evidence-path accuracy only and does not promote implementation or security closure.
@@ -106,7 +106,7 @@ These must remain fail-closed. No API/DTO/entity/persistence edges may be invent
 
 ### 3.4 Five-way reconciliation
 
-The current five-way reconciliation file contains 457 blocker entries across 449 records; the older Batch G narrative contained 450 and is stale. This is a separate closure gate and remains `NOT_GREEN`.
+The current five-way reconciliation file contains 450 top-level blocker IDs and 457 record-level blocker entries across 449 records. This is a separate closure gate and remains `NOT_GREEN`.
 
 ## 4. Gate decisions
 
@@ -129,7 +129,7 @@ The current five-way reconciliation file contains 457 blocker entries across 449
 2. Refresh only evidence that is actually re-executed; bind each result to the exact commit SHA.
 3. Close the empty persistence registry through existing authoritative contracts and evidence; do not invent mappings.
 4. Resolve the explicit AUTH-006/007/008/009/013..016 authority gaps under change control.
-5. Reconcile the current 457 five-way blocker entries.
+5. Reconcile the current five-way blockers at both aggregation levels: 450 top-level blocker IDs / 457 record-level blocker entries.
 6. Do not begin broad business-feature implementation merely because structural Mapping-0 is green.
 
 ## 6. Non-negotiable guardrails
