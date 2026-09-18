@@ -4,22 +4,6 @@
   "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
   "records": [
     {
-      "featureId": "AUTH-001",
-      "domainId": "D1-01",
-      "entityIds": [
-        "ENT-USER"
-      ],
-      "persistenceMode": "PAYLOAD_NATIVE",
-      "owner": "workers/W01-payload",
-      "status": "BLOCKED",
-      "evidenceRefs": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/alignment/mapping-batches/B19-AUTH-001-real-evidence-reconciliation.v1.md",
-        "workers/W01-payload/src/collections/Users.ts",
-        "workers/W01-payload/src/payload.config.ts"
-      ]
-    },
-    {
       "featureId": "AUTH-002",
       "domainId": "D1-01",
       "entityIds": [
