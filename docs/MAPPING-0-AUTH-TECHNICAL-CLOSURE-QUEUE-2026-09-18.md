@@ -93,6 +93,12 @@ Freeze the canonical linked-identity API/entity/security contract through Change
 
 Remain PARTIAL. Existing B01 and per-feature reconciliation materials describe account-state, recovery, deletion/restoration, and verification requirements, but authoritative end-to-end API/DTO/entity/security bindings and executable evidence are incomplete.
 
+## W01 runtime-source finding
+
+The active W01 tree currently contains the migration source `workers/W01-payload/src/migrations/20250929_111647.ts` and `src/migrations/index.ts`, plus a committed `workers/W01-payload/pnpm-lock.yaml`. These facts reduce the earlier source-presence uncertainty but do not prove controlled remote-D1 execution, schema equivalence, or runtime security evidence.
+
+A separate blocking GAP records that `workers/W01-payload/src/payload.config.ts` imports `./db/auth-session-state`, while no corresponding current-main W01 source file has been located. This is a source/build-consistency blocker and must not be papered over by contract changes.
+
 ## Global fail-closed rule
 
 Documentation, reconciliation notes, historical artifacts, or generic contracts are not runtime evidence. A feature may be promoted only after authoritative contract binding, executable implementation where applicable, deterministic tests/validation, commit-bound evidence, and final Mapping-0 reconciliation.
