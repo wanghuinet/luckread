@@ -1,7 +1,7 @@
 # LuckRead Mapping 0 — GPT / DeepSeek Closure Split
 Date: 2026-09-18
 Repository: wanghuinet/luckread
-Main at review: ca93ca0aec5e4625031c0f712b4ff42a2b0226df
+Main at review: 66d216df4816c13c90edf3131517a987ab9a5436
 
 ## 1. Current verified baseline
 
@@ -14,7 +14,7 @@ Main at review: ca93ca0aec5e4625031c0f712b4ff42a2b0226df
 - Records with API technical edge: 11
 - Records with Entity technical edge: 9
 - Records with any technical edge (API/Entity/Payload/Code): 11
-- Payload collection edges: 0
+- Payload collection edges: 1
 - Code evidence edges: 0
 - Complete technical closure: 0/449
 
