@@ -12,8 +12,8 @@
 
 - Workflow: `.github/workflows/contract-ci.yml`
 - Workflow ID: `356952132`
-- Latest failing run: `35366402762`
-- Latest failing head SHA: `fcb8042c3343403bee199cdc5447c346ce02912e`
+- Latest failing run observed: `35366755025`
+- Latest failing head SHA: `dfa9af34546fe357c3b83d2b076b9852a04e5542`
 - Run conclusion: `failure`
 - GitHub `fetch_workflow_run_jobs` response: `jobs = []`
 
@@ -27,12 +27,14 @@ Recent Contract CI workflow runs also show the same pattern:
 | 35364026533 | 64d196a4c0d4b139c040cf49d06bbbcb72fcc248 | failure | 0 |
 | 35363143282 | c4a2f52a64cf485efe2a8a806348dd515f600282 | failure | 0 |
 | 35366402762 | fcb8042c3343403bee199cdc5447c346ce02912e | failure | 0 |
+| 35366755025 | dfa9af34546fe357c3b83d2b076b9852a04e5542 | failure | 0 |
 
 At the same heads, the Mapping 0 Structural Gate and Feature Inventory workflows have completed successfully.
 
 ## Static review boundary
 
 The workflow file was inspected from GitHub. No obvious YAML structure defect was established by inspection alone.
+The latest observed Contract CI run `35366755025` was queried directly and returned an empty job list (`jobs = []`), so the zero-job pattern is still reproducible at the workflow-run level.
 The current execution environment does not provide `actionlint`, so no claim of formal workflow-linter success is made.
 
 ## Fail-closed interpretation
