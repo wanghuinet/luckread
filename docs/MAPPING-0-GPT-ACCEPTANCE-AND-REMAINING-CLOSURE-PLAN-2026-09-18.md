@@ -1,86 +1,119 @@
 # Mapping-0 GPT Acceptance Findings & Residual Closure Plan
 
-Date: 2026-09-18  
-Repository: `wanghuinet/luckread`  
-Reviewed head: `2176675f4262fd87718f4ee63746d949119bfdea`  
-Basis: Batch G final sweep/handoff and its deterministic artifact as reported by the commit.
+Date: 2026-09-18
+Repository: `wanghuinet/luckread`
+Reviewed head: `051b5209aa63935e6f8c0b81623ce71f23f669cc`
+Basis: current GitHub main, Batch G final sweep, orphan disposition register, canonical mapping, Feature Inventory, and Evidence Registry.
 
 ## 1. Acceptance boundary
 
 **Accepted as a structural handoff only; not accepted as full technical/runtime closure.**
 
-The Batch G report states:
+Current repository evidence establishes:
 
-- Canonical Feature Inventory: 449 across 46 prefixes.
-- Canonical Mapping records: 449; exact 1:1 alignment; missing=0, extra=0, orphan=0, duplicate=0 at the *record* level.
-- Evidence references: 449/449 records have at least one reference; 84 distinct refs; 0 broken refs.
-- Structural gate: `MAPPING_0_STRUCTURAL_GREEN`.
-- Technical edges: 11 API, 9 Entity, 0 Payload, 0 Code; 11 records have any of these edges; complete four-edge technical closure is 0/449.
-- Status distribution: 433 `UNRESOLVED`, 14 `PARTIAL`, 2 `MISSING`.
-- Five-way reconciliation: `NOT_GREEN`, 450 blockers.
+- Canonical Feature Inventory: 449 records.
+- Canonical Mapping records: 449; exact 1:1 record alignment.
+- Structural Mapping-0 gate: designed to pass when inventory and mapping cardinality are structurally valid.
+- Evidence-reference coverage was previously recorded as 449/449 records with at least one reference and 0 broken references.
+- Technical edge closure remains **0/449 complete** in the Batch G snapshot: 11 records with API edges, 9 with Entity edges, 0 Payload edges, 0 Code edges.
+- Status distribution in the Batch G snapshot: 433 `UNRESOLVED`, 14 `PARTIAL`, 2 `MISSING`.
+- Five-way reconciliation remains `NOT_GREEN`.
+- The persistence registry currently has **0 records**, so persistence ownership is not technically closed.
 
-Therefore the valid handoff claim is narrowly: **Mapping-0 structural layer is GREEN.** Do not describe all Mapping, implementation, runtime, or product readiness as GREEN.
+Therefore the valid handoff claim remains narrowly: **Mapping-0 structural layer is GREEN at the record/topology level; downstream technical/runtime closure is NOT_GREEN.**
 
-## 2. Material residual findings
+## 2. Closure work completed in this cycle
 
-### 2.1 Orphan batch documents
+### 2.1 Orphan governance — CLOSED
 
-Batch G reports 135 files in `contracts/alignment/mapping-batches/`, 77 referenced, and 58 unreferenced. These do not break the canonical record-count gate, but their disposition is unresolved. Do not delete or wire them automatically. Classify each under change control as one of:
+The repository now contains a dedicated disposition register covering all 58 files reported as unreferenced by Batch G.
 
-- superseded/historical (archive disposition);
-- valid canonical evidence that should be referenced (requires evidence/authority review);
-- non-canonical/out-of-scope draft (retain as explicitly non-canonical or archive);
-- duplicate version (select authority only through documented decision).
+Verified disposition:
 
-### 2.2 Non-canonical / over-scoped feature claims
+- orphan files: **58**
+- explicitly dispositioned: **58/58**
+- `PENDING_CHANGE_CONTROL`: **0**
+- applied disposition: `RETAIN_NON_CANONICAL` for all 58
+- no orphan was promoted into canonical Mapping-0 evidence
+- no locked v1.0 Contract or B01-B20 Mapping document was deleted or rewritten
 
-Batch G reports:
+This is a governance closure only. Retention does not make the artifacts canonical evidence.
 
-- `AI-001-015-real-evidence-reconciliation.v1.md`: canonical count 0, claimed 15.
-- `ANALYTICS-001-020-real-evidence-reconciliation.v1.md`: canonical count 11, claimed 20 (9 extra).
-- `GROWTH-001-014-real-evidence-reconciliation.v1.md`: canonical count 10, claimed 14 (4 extra).
+### 2.2 Canonical scope protection — CLOSED for the current Batch G sweep
 
-These are a Feature Inventory / Blueprint scope-authority discrepancy, not grounds to silently add mapping records. Required decision: (a) formally change the canonical inventory through change control, (b) formally establish that the enhancement blueprint supersedes/extends the baseline and rematerialize inventory, or (c) explicitly exclude/archive the extra claims from Mapping-0. Until a decision is recorded, retain fail-closed status.
+The repository explicitly keeps these out of the canonical 449 until change control resolves scope authority:
 
-### 2.3 Duplicate AUTH-001 DTO draft cluster
+- `AI-001..015`
+- `ANALYTICS-012..020`
+- `GROWTH-011..014`
 
-The sweep identifies an AUTH-001 DTO closure cluster with eight version/cleanup members. The report says these are not canonical mapping evidence and are not referenced. Keep them out of canonical evidence; choose/archive versions only through a documented cleanup decision. Do not delete locked v1.0 contracts or B01-B20 documents as part of this cleanup.
+These IDs arise from the enhancement blueprint and are not silently merged into the current Feature Inventory.
 
-### 2.4 Explicit AUTH residuals
+### 2.3 AUTH-002 W01 path alignment — CLOSED as a documentation/path correction
 
-The report calls out:
+The AUTH-002 session integration evidence boundary now points to:
 
-- `AUTH-006`: `MISSING`, with existing 5 API / 3 Entity edges but blocked because canonical API/DTO/data/security contracts are not established.
+- `workers/W01-payload/src/collections/Users.ts`
+- `workers/W01-payload/src/payload.config.ts`
+
+This corrects the evidence path. It does **not** prove runtime or persistence closure.
+
+## 3. Residual blocking findings
+
+### 3.1 Evidence freshness
+
+Existing AUTH-002 evidence records include `validUntil` timestamps of **2026-09-17**, while the current review date is **2026-09-18**. Those records therefore cannot be treated as fresh evidence for the current head without re-execution or an explicit validity rule supported by the evidence contract.
+
+Do not change `validUntil` manually to create a green result.
+
+### 3.2 Persistence registry
+
+`contracts/capability/feature-entity-persistence-registry.v1.json` currently contains zero records and is `NOT_GREEN`.
+
+This prevents a claim of completed Feature → Entity → Persistence ownership closure.
+
+### 3.3 AUTH residuals
+
+The existing canonical evidence still records:
+
+- `AUTH-006`: `MISSING`, canonical API/DTO/data/security authority not established.
 - `AUTH-007`: `MISSING`, canonical MFA contracts not established.
-- `AUTH-008/009/013..016`: `PARTIAL`, no technical edges, provider / linked-identity / account-state mapping gaps.
+- `AUTH-008/009/013..016`: `PARTIAL`, provider / linked-identity / account-state mapping gaps.
 
-These are not eligible for status promotion without authoritative source and validation.
+These must remain fail-closed. No API/DTO/entity/persistence edges may be invented to increase the percentage.
 
-## 3. Required next actions (ordered)
+### 3.4 Five-way reconciliation
 
-1. **Preserve the current structural-green snapshot** at reviewed head; do not rewrite the baseline to hide residuals.
-2. Resolve the three non-canonical/over-scoped families via explicit change-control decision before changing Feature Inventory or mapping cardinality.
-3. Produce a row-by-row orphan disposition register for all 58 files; no bulk deletion and no automatic evidence wiring.
-4. Record the AUTH-006/007 missing-authority blockers and AUTH-008/009/013..016 partial blockers in the canonical blocker/evidence process, without inventing APIs, DTOs, entities, or persistence.
-5. Re-run the repository's existing deterministic Mapping-0 verification, structural gate, and reconciliation commands on the resulting commit; preserve raw outputs and commit provenance.
-6. Only then issue a refreshed structural handoff snapshot. Runtime evidence remains a separate phase and must stay `NOT_GREEN` until executable implementation, tests, and commit-bound evidence exist.
+The Batch G handoff records 450 blockers in downstream reconciliation. This is a separate closure gate and remains `NOT_GREEN`.
 
-## 4. GPT acceptance decision
+## 4. Gate decisions
 
-| Gate | Decision | Reason |
+| Gate | Decision | Basis |
 |---|---|---|
-| Canonical inventory ↔ mapping cardinality | ACCEPT | Reported exact 449:449 alignment |
-| Structural Mapping-0 gate | ACCEPT | Reported `MAPPING_0_STRUCTURAL_GREEN` |
-| Evidence-reference integrity | ACCEPT for reference integrity only | 449/449 refs, 0 broken; this does not establish implementation evidence |
-| Orphan / duplicate / scope governance | OPEN | 58 orphan docs, duplicate draft cluster, 3 scope discrepancies need disposition |
-| Five-way reconciliation | NOT ACCEPTED | Reported 450 blockers |
-| Technical/runtime closure | NOT ACCEPTED / NOT_GREEN | 0/449 complete technical closure; 0 Payload and 0 Code edges |
-| Implementation authorization | NOT GRANTED by this review | Per-feature Mapping → Contract → Runtime → Evidence gate remains required |
+| Feature Inventory ↔ Mapping cardinality | ACCEPT | 449 ↔ 449 structural alignment |
+| Mapping-0 structural topology | ACCEPT | structural handoff evidence |
+| Evidence reference integrity | ACCEPT for reference integrity only | prior sweep reported 449/449 refs and 0 broken refs |
+| Orphan governance | ACCEPT / CLOSED | 58/58 explicitly dispositioned |
+| Canonical scope governance | ACCEPT / CONTROLLED | out-of-scope IDs kept outside canonical inventory |
+| Persistence ownership closure | NOT_ACCEPTED | persistence registry has 0 records |
+| Evidence freshness | NOT_ACCEPTED | existing evidence contains expired validity dates |
+| Five-way reconciliation | NOT_ACCEPTED | 450 blockers remain |
+| Technical/runtime closure | NOT_ACCEPTED | 0/449 complete technical edge closure in Batch G snapshot |
+| Implementation authorization | NOT_GRANTED | per-feature Mapping → Contract → Runtime → Evidence gates remain mandatory |
 
-## 5. Guardrails
+## 5. Required next batch
 
-- No business code, Payload Collection, D1 schema/migration, or Worker architecture changes in this closure task.
-- Do not import D1-Fabric into LuckRead.
-- Do not infer API/Entity/Field/Payload/Code edges from feature names, plans, or prose.
-- Do not promote status to GREEN solely because a contract or evidence-reference file exists.
-- Any inventory scope change, contract authority change, deletion, or canonical evidence promotion requires explicit change control.
+1. Re-run the repository's deterministic Mapping-0 status/structural/reconciliation validators on the current GitHub head and preserve raw outputs.
+2. Refresh only evidence that is actually re-executed; bind each result to the exact commit SHA.
+3. Close the empty persistence registry through existing authoritative contracts and evidence; do not invent mappings.
+4. Resolve the explicit AUTH-006/007/008/009/013..016 authority gaps under change control.
+5. Reconcile the 450 five-way blockers.
+6. Do not begin broad business-feature implementation merely because structural Mapping-0 is green.
+
+## 6. Non-negotiable guardrails
+
+- No D1-Fabric.
+- No deletion or rewriting of locked v1.0 Contracts/B01-B20 blueprints merely to make gates green.
+- No inferred API, DTO, Entity, Field, Payload, Worker, D1, Security, Lifecycle, Test or Evidence edges.
+- Documentation-only claims do not substitute for executable evidence.
+- Structural GREEN is not technical/runtime GREEN.
