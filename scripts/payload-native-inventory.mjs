@@ -3,8 +3,9 @@ import path from 'node:path'
 import ts from 'typescript'
 
 const root = process.cwd()
-const configPath = path.join(root, 'src', 'payload.config.ts')
-const collectionsDir = path.join(root, 'src', 'collections')
+const runtimeRoot = path.join(root, 'workers', 'W01-payload')
+const configPath = path.join(runtimeRoot, 'src', 'payload.config.ts')
+const collectionsDir = path.join(runtimeRoot, 'src', 'collections')
 const outputPath = path.join(root, 'contracts', 'payload', 'payload-native-inventory.v1.json')
 
 const blocked = (message) => {
@@ -97,18 +98,18 @@ for (const statement of configFile.statements) {
   if (!bindings || !ts.isNamedImports(bindings)) blocked(`collection import ${moduleName} must use a named import`)
   for (const element of bindings.elements) imports.push({ exportName: element.name.text, moduleName: moduleName.slice('./collections/'.length) })
 }
-if (!imports.length) blocked('no statically discoverable collection imports in src/payload.config.ts')
+if (!imports.length) blocked('no statically discoverable collection imports in workers/W01-payload/src/payload.config.ts')
 
 const collections = imports.map(({ exportName, moduleName }) => {
   const sourceFile = path.join(collectionsDir, `${moduleName}.ts`)
-  if (!fs.existsSync(sourceFile)) blocked(`missing collection source ${sourceFile}`)
+  if (!fs.existsSync(sourceFile)) blocked(`missing current W01 collection source ${sourceFile}`)
   return parseCollection(sourceFile, exportName)
 })
 
 const inventory = {
   version: '1.0.0',
   status: 'DISCOVERED',
-  source: 'TypeScript AST of src/payload.config.ts + statically imported collection configs',
+  source: 'TypeScript AST of workers/W01-payload/src/payload.config.ts + statically imported collection configs',
   generatedBy: 'scripts/payload-native-inventory.mjs',
   collections,
 }
