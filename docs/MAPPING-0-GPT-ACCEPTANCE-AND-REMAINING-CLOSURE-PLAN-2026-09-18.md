@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Reviewed head: `cd9d9e0a4db42150e7f6536161eb168f9dc62961`
+Reviewed head: `66d216df4816c13c90edf3131517a987ab9a5436`
 Basis: current GitHub main, Batch G final sweep, orphan disposition register, canonical mapping, Feature Inventory, and Evidence Registry.
 
 ## 1. Acceptance boundary
@@ -15,7 +15,7 @@ Current repository evidence establishes:
 - Canonical Mapping records: 449; exact 1:1 record alignment.
 - Structural Mapping-0 gate: designed to pass when inventory and mapping cardinality are structurally valid.
 - Evidence-reference coverage was previously recorded as 449/449 records with at least one reference and 0 broken references.
-- Technical edge closure remains **0/449 complete** in the Batch G snapshot: 11 records with API edges, 9 with Entity edges, 0 Payload edges, 0 Code edges.
+- Technical edge closure remains **0/449 complete** in the Batch G snapshot: 11 records with API edges, 9 with Entity edges, 1 Payload edge, 0 Code edges.
 - Status distribution in the Batch G snapshot: 433 `UNRESOLVED`, 14 `PARTIAL`, 2 `MISSING`.
 - Five-way reconciliation remains `NOT_GREEN`.
 - The persistence registry currently has **0 records**, so persistence ownership is not technically closed.
