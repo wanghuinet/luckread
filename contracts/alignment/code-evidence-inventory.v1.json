@@ -3093,128 +3093,56 @@
       "blockers": []
     },
     {
+      "evidenceId": "PAYLOAD_COLLECTION:media",
+      "subjectType": "PAYLOAD_COLLECTION",
+      "subjectId": "media",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Media.ts:Media"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Media.ts:Media"
+      ],
+      "sourceRefs": [
+        "contracts/alignment/payload-inventory.v1.json",
+        "workers/W01-payload/src/collections/Media.ts:Media"
+      ],
+      "blockers": []
+    },
+    {
       "evidenceId": "PAYLOAD_COLLECTION:users",
       "subjectType": "PAYLOAD_COLLECTION",
       "subjectId": "users",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "src/collections/Users.ts:Users"
+        "workers/W01-payload/src/collections/Users.ts:Users"
       ],
       "testRefs": [],
       "schemaEvidenceRefs": [
-        "src/collections/Users.ts:Users"
+        "workers/W01-payload/src/collections/Users.ts:Users"
       ],
       "sourceRefs": [
         "contracts/alignment/payload-inventory.v1.json",
-        "src/collections/Users.ts:Users"
+        "workers/W01-payload/src/collections/Users.ts:Users"
       ],
       "blockers": []
     },
     {
-      "evidenceId": "PAYLOAD_FIELD:users:avatar",
+      "evidenceId": "PAYLOAD_FIELD:media:alt",
       "subjectType": "PAYLOAD_FIELD",
-      "subjectId": "users.avatar",
+      "subjectId": "media.alt",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "src/collections/Users.ts:field:avatar"
+        "workers/W01-payload/src/collections/Media.ts:field:alt"
       ],
       "testRefs": [],
       "schemaEvidenceRefs": [
-        "src/collections/Users.ts:field:avatar"
+        "workers/W01-payload/src/collections/Media.ts:field:alt"
       ],
       "sourceRefs": [
         "contracts/alignment/payload-inventory.v1.json",
-        "src/collections/Users.ts:field:avatar"
-      ],
-      "blockers": []
-    },
-    {
-      "evidenceId": "PAYLOAD_FIELD:users:bio",
-      "subjectType": "PAYLOAD_FIELD",
-      "subjectId": "users.bio",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "src/collections/Users.ts:field:bio"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "src/collections/Users.ts:field:bio"
-      ],
-      "sourceRefs": [
-        "contracts/alignment/payload-inventory.v1.json",
-        "src/collections/Users.ts:field:bio"
-      ],
-      "blockers": []
-    },
-    {
-      "evidenceId": "PAYLOAD_FIELD:users:displayName",
-      "subjectType": "PAYLOAD_FIELD",
-      "subjectId": "users.displayName",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "src/collections/Users.ts:field:displayName"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "src/collections/Users.ts:field:displayName"
-      ],
-      "sourceRefs": [
-        "contracts/alignment/payload-inventory.v1.json",
-        "src/collections/Users.ts:field:displayName"
-      ],
-      "blockers": []
-    },
-    {
-      "evidenceId": "PAYLOAD_FIELD:users:locale",
-      "subjectType": "PAYLOAD_FIELD",
-      "subjectId": "users.locale",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "src/collections/Users.ts:field:locale"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "src/collections/Users.ts:field:locale"
-      ],
-      "sourceRefs": [
-        "contracts/alignment/payload-inventory.v1.json",
-        "src/collections/Users.ts:field:locale"
-      ],
-      "blockers": []
-    },
-    {
-      "evidenceId": "PAYLOAD_FIELD:users:timezone",
-      "subjectType": "PAYLOAD_FIELD",
-      "subjectId": "users.timezone",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "src/collections/Users.ts:field:timezone"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "src/collections/Users.ts:field:timezone"
-      ],
-      "sourceRefs": [
-        "contracts/alignment/payload-inventory.v1.json",
-        "src/collections/Users.ts:field:timezone"
-      ],
-      "blockers": []
-    },
-    {
-      "evidenceId": "PAYLOAD_FIELD:users:username",
-      "subjectType": "PAYLOAD_FIELD",
-      "subjectId": "users.username",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "src/collections/Users.ts:field:username"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "src/collections/Users.ts:field:username"
-      ],
-      "sourceRefs": [
-        "contracts/alignment/payload-inventory.v1.json",
-        "src/collections/Users.ts:field:username"
+        "workers/W01-payload/src/collections/Media.ts:field:alt"
       ],
       "blockers": []
     }
