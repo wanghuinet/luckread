@@ -21,10 +21,10 @@ Purpose: close the remaining runtime/evidence gap for Mapping-0 without promotin
 2. `Users.ts` uses Payload authentication (`auth: true`).
 3. `payload.config.ts` uses the D1 SQLite adapter with migration directory configured and `push: false`.
 4. W01 is locked to the current Cloudflare D1 template-aligned dependency baseline recorded by `workers/W01-payload/package.json`; the current Payload lock is `3.87.1` (`3.82.1` remains only the historical upstream template observation).
-5. No `pnpm-lock.yaml` is currently present in W01; dependency resolution therefore remains an evidence gate.
+5. W01 contains a committed `pnpm-lock.yaml`; dependency installation/resolution against the exact lock remains an evidence gate.
 6. Physical source materialization is not runtime verification and does not make Mapping-0 GREEN.
 7. Payload issue evidence reports an `upsert` behavior defect for `@payloadcms/db-d1-sqlite@3.82.1`; W01 must explicitly test the affected persistence path before the D1 runtime gate can pass. This is a test requirement, not an assumption that the defect remains present after installation.
-8. The active AUTH-002 schema evidence validator and runtime evidence validator are now bound to W01 and the current 3.87.1 Cloudflare-template-aligned lock.
+8. The active AUTH-002 schema evidence validator and runtime evidence validator are bound to W01 and the current 3.87.1 Cloudflare-template-aligned lock.
 9. Older AUTH-002 artifacts that explicitly pin the 3.82.1 upstream template observation are not current W01 runtime authority; they are the historical baseline until each artifact is reconciled or archived. The current W01 lock is 3.87.1; no global search-and-replace is authorized.
 
 ## Historical baseline handling
