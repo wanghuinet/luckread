@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Reviewed head: `ca93ca0aec5e4625031c0f712b4ff42a2b0226df`
+Reviewed head: `cd9d9e0a4db42150e7f6536161eb168f9dc62961`
 Basis: current GitHub main, Batch G final sweep, orphan disposition register, canonical mapping, Feature Inventory, and Evidence Registry.
 
 ## 1. Acceptance boundary
@@ -110,6 +110,10 @@ The historical Contract CI run `35322358307` for commit `0f8bcf508553b96989f5400
 ### 3.4 Five-way reconciliation
 
 The current five-way reconciliation file contains 450 top-level blocker IDs and 457 record-level blocker entries across 449 records. This is a separate closure gate and remains `NOT_GREEN`.
+
+### 3.6 Evidence record coverage clarification
+
+The current Evidence Registry contains 11 records covering 9 Feature IDs. The separate structural evidence-reference metric remains 449/449 because canonical Mapping records all retain at least one reference. These metrics must not be conflated: reference presence is not equivalent to executable evidence coverage.
 
 ## 4. Gate decisions
 
