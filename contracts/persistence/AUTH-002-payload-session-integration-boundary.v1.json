@@ -8,8 +8,8 @@
     "contracts/payload/payload-native-inventory.v1.json",
     "contracts/entity/AUTH-002-session-field-contract.v1.json",
     "contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json",
-    "src/collections/Users.ts",
-    "src/payload.config.ts"
+    "workers/W01-payload/src/collections/Users.ts",
+    "workers/W01-payload/src/payload.config.ts"
   ],
   "observedPayloadState": {
     "usersCollection": "users",
