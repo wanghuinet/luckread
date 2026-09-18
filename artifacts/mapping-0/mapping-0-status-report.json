@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-17T22:41:07.980Z",
-  "currentCommit": "3cdab70cfdc59ed79c5c127229ebf4d9ecc839b0",
+  "generatedAt": "2026-09-18T08:50:21.546Z",
+  "currentCommit": "05c03b03c4d32f50f89df316267e9f58019d7e7b",
   "canonicalMappingStatus": "NOT_GREEN",
   "canonicalFeatureCount": 449,
   "canonicalMappingRecordCount": 449,
@@ -11,14 +11,28 @@
   },
   "canonicalBlockingRecordCount": 449,
   "featureInventoryStatusCounts": {
-    "MISSING_STATUS": 449
+    "DISCOVERED": 449
   },
   "persistenceRegistryStatus": "NOT_GREEN",
   "persistenceRegistryRecordCount": 0,
   "persistenceRegistryStatusCounts": {},
   "evidenceRegistryStatus": "NOT_GREEN",
   "evidenceRegistryRecordCount": 11,
-  "evidenceByFeatureCount": 449,
+  "evidenceByFeatureCount": 9,
+  "staleEvidenceRecordCount": 11,
+  "staleEvidenceIds": [
+    "EVD-AUTH002-B05-SCHEMA-LOCAL-001",
+    "EVD-AUTH002-B06-MIGRATION-LOCAL-001",
+    "EVD-AUTH002-B07-RUNTIME-LOCAL-001",
+    "EVD-AUTH003-B08-RUNTIME-LOCAL-001",
+    "EVD-AUTH004-B08-RUNTIME-LOCAL-001",
+    "EVD-AUTH005-B08-RUNTIME-LOCAL-001",
+    "EVD-AUTH006-B08-RUNTIME-LOCAL-001",
+    "EVD-AUTH007-B08-RUNTIME-LOCAL-001",
+    "EVD-AUTH008-B08-RUNTIME-LOCAL-001",
+    "EVD-AUTH009-B08-RUNTIME-LOCAL-001",
+    "EVD-AUTH010-B08-RUNTIME-LOCAL-001"
+  ],
   "topBlockerReasons": [
     {
       "blocker": "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation.",
@@ -53,15 +67,11 @@
       "count": 1
     },
     {
-      "blocker": "canonical API IDs not established in current inventory",
+      "blocker": "DTO registry and Entity/Field binding remain unverified",
       "count": 1
     },
     {
-      "blocker": "Entity/Field contract not fully bound",
-      "count": 1
-    },
-    {
-      "blocker": "canonical recovery/change API mapping missing",
+      "blocker": "DTO/entity/field binding remains incomplete",
       "count": 1
     },
     {
@@ -69,7 +79,7 @@
       "count": 1
     },
     {
-      "blocker": "verification API and event IDs missing",
+      "blocker": "verification event IDs remain unresolved",
       "count": 1
     },
     {
@@ -77,7 +87,11 @@
       "count": 1
     },
     {
-      "blocker": "canonical API/DTO/data/security contracts not established",
+      "blocker": "API and Entity contract bindings exist",
+      "count": 1
+    },
+    {
+      "blocker": "canonical DTO registry, persistence schema, security E2E, runtime evidence and Mapping-0 validation remain unverified",
       "count": 1
     },
     {
@@ -98,26 +112,6 @@
     },
     {
       "blocker": "refresh OpenAPI/DTO/state/security E2E evidence missing",
-      "count": 1
-    },
-    {
-      "blocker": "risk contract remains open",
-      "count": 1
-    },
-    {
-      "blocker": "account-state enforcement mapping incomplete",
-      "count": 1
-    },
-    {
-      "blocker": "recovery API/DTO/entity/security mapping incomplete",
-      "count": 1
-    },
-    {
-      "blocker": "deletion/restoration contract mapping incomplete",
-      "count": 1
-    },
-    {
-      "blocker": "verification API/DTO/entity/security mapping incomplete",
       "count": 1
     }
   ],
