@@ -203,3 +203,12 @@ The explicit AUTH-002 Feature → Entity → Persistence registry record was cor
 Reason: the authoritative persistence contract gives Payload native `users.sessions[]` authority over native session fields while `auth_session_state` owns the contracted extension dimensions. The registry's own mode semantics define this combined ownership as `MIXED`.
 
 The record remains `BLOCKED`; this is a semantic correction only and does not constitute persistence execution or verification.
+
+
+## 17. AUTHZ / ORG authority coverage refresh
+
+A direct audit of the current authorization authorities found that the repository already contains canonical permission and layer definitions, including organization/member, role-management, subscription, entitlement and audit permission concepts.
+
+Those existing authorities do **not** establish Feature-bound API/DTO/Entity/Field/Persistence/Enforcement mappings for AUTHZ-001..010 or ORG-001..007. The new machine-readable artifact `artifacts/mapping-0/authz-org-authority-coverage-2026-09-19.json` records the distinction explicitly.
+
+No canonical Feature status, Entity status, API binding, or implementation admission was changed from this audit.
