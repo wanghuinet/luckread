@@ -39,10 +39,6 @@ for (const record of mapping.records) {
 }
 
 const missing = expectedIds.filter((id) => !existingIds.has(id))
-if (missing.length === 0) {
-  console.log(JSON.stringify({ status: 'NO_CHANGE', canonicalFeatureCount: expectedSet.size, mappingRecordCount: mapping.records.length, missingRecordCount: 0 }, null, 2))
-  process.exit(0)
-}
 
 const unresolvedRecord = (featureId) => ({
   featureId,
@@ -58,17 +54,35 @@ const unresolvedRecord = (featureId) => ({
 })
 
 mapping.records.push(...missing.map(unresolvedRecord))
-mapping.status = 'NOT_GREEN'
-mapping.generatedBy = 'scripts/materialize-canonical-mapping.mjs'
-mapping.sourceOfTruth = 'docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md + contracts/alignment/feature-inventory.v1.json'
 
-fs.writeFileSync(mappingPath, `${JSON.stringify(mapping, null, 2)}\n`, 'utf8')
+// Derive top-level metadata deterministically. Existing records (including any
+// evidence references attached by downstream reconciliation) are preserved
+// byte-for-byte at the object level; this script never invents API/entity/
+// field/persistence/payload/code evidence.
+const BLOCKING_STATUS = new Set(['MISSING', 'EXTRA', 'DRIFT', 'CONFLICT', 'DUPLICATE', 'UNRESOLVED', 'BLOCKED', 'PARTIAL'])
+const blockingCount = mapping.records.filter((record) => BLOCKING_STATUS.has(record.status) || (record.blockers ?? []).length > 0).length
+
+const output = {
+  version: mapping.version ?? '1.0.0',
+  status: blockingCount === 0 ? 'GREEN' : 'NOT_GREEN',
+  sourceOfTruth: 'docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md + contracts/alignment/feature-inventory.v1.json',
+  generatedBy: 'scripts/materialize-canonical-mapping.mjs',
+  generatedDeterministically: true,
+  recordCount: mapping.records.length,
+  blockers: Array.isArray(mapping.blockers) && mapping.blockers.length
+    ? mapping.blockers
+    : (blockingCount ? [`Canonical mapping is NOT_GREEN: ${blockingCount} Feature IDs retain blocking status or explicit blockers.`] : []),
+  records: mapping.records,
+}
+
+fs.writeFileSync(mappingPath, `${JSON.stringify(output, null, 2)}\n`, 'utf8')
 
 console.log(JSON.stringify({
-  status: 'MATERIALIZED',
+  status: missing.length ? 'MATERIALIZED' : 'NO_CHANGE',
   canonicalFeatureCount: expectedSet.size,
   previousMappingRecordCount: existingIds.size,
   addedUnresolvedRecordCount: missing.length,
   mappingRecordCount: mapping.records.length,
-  remainingCanonicalMissingCount: 0
+  remainingCanonicalMissingCount: 0,
+  blockingRecordCount: blockingCount
 }, null, 2))

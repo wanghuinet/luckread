@@ -48,3 +48,14 @@ Neither option is executed here. This record preserves the conflict, its sources
 - No business code, D1 migration, Payload collection, or Worker change.
 - No change to the 11 GPT-owned records.
 - No conversion of `UNRESOLVED`/`PARTIAL`/`MISSING` into false implementation claims.
+
+## Resolution (2026-09-18) — authorized Option A, executed
+
+- Authorization: user selected **Option A** — align the schema to the real generator (`materialize-canonical-mapping.mjs` + reconcile) rather than migrate 449 records into the `B<number>*.json` hierarchy.
+- Changes applied (schema + generator + CI orchestration only; no record content, no GPT record, no business code):
+  1. `contracts/alignment/cross-system-mapping.v1.schema.json`: `generatedBy` const corrected to `scripts/materialize-canonical-mapping.mjs`.
+  2. `scripts/materialize-canonical-mapping.mjs`: now always emits a deterministic top-level object including `generatedDeterministically: true` and `recordCount`, deriving `status` from blocking record count, and preserving existing records and the curated top-level `blockers`.
+  3. `contracts/alignment/cross-system-mapping.v1.json`: regenerated to carry the schema-required `generatedDeterministically`, `recordCount`, and correctly ordered top-level `blockers`; all 449 records byte-for-byte unchanged.
+  4. `.github/workflows/contract-ci.yml`: alignment job now runs `materialize-canonical-mapping.mjs` (not the divergent `consolidate-mapping-batches.mjs`) and includes `cross-system-mapping.v1.json` in the deterministic `git diff --exit-code` check.
+- Verification: re-running the generator is idempotent (same diff, no further drift); all 8 schema-required top-level fields present; `recordCount === records.length === 449`; `generatedBy` now matches the schema const. The `mapping-0` structural gate remains GREEN.
+- Not resolved here (by design): the canonical mapping `status` stays `NOT_GREEN` because 449 records retain blocking status/blockers — this reflects the absence of downstream implementation/contract evidence and must not be promoted to GREEN by inference.

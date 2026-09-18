@@ -11,7 +11,7 @@
     "sourceOfTruth": {
       "const": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md + contracts/alignment/feature-inventory.v1.json"
     },
-    "generatedBy": { "const": "scripts/consolidate-mapping-batches.mjs" },
+    "generatedBy": { "const": "scripts/materialize-canonical-mapping.mjs" },
     "generatedDeterministically": { "const": true },
     "recordCount": { "type": "integer", "minimum": 0 },
     "blockers": {

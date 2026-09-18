@@ -3,6 +3,15 @@
   "status": "NOT_GREEN",
   "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md + contracts/alignment/feature-inventory.v1.json",
   "generatedBy": "scripts/materialize-canonical-mapping.mjs",
+  "generatedDeterministically": true,
+  "recordCount": 449,
+  "blockers": [
+    "B01 mapping is evidence-bound but not contract-complete",
+    "B02 User/Profile/Social Graph mapping is now inventoried but not evidence-complete",
+    "B03 Role/Permission/Entitlement/Organization mapping is now inventoried but not evidence-complete",
+    "Remaining Blueprint features have not yet been mapped",
+    "Mapping cannot be marked GREEN by inference"
+  ],
   "records": [
     {
       "featureId": "AUTH-001",
@@ -6770,12 +6779,5 @@
         "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
       ]
     }
-  ],
-  "blockers": [
-    "B01 mapping is evidence-bound but not contract-complete",
-    "B02 User/Profile/Social Graph mapping is now inventoried but not evidence-complete",
-    "B03 Role/Permission/Entitlement/Organization mapping is now inventoried but not evidence-complete",
-    "Remaining Blueprint features have not yet been mapped",
-    "Mapping cannot be marked GREEN by inference"
   ]
 }

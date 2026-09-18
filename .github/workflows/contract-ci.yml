@@ -118,9 +118,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
-      - run: node scripts/consolidate-mapping-batches.mjs
+      - run: node scripts/materialize-canonical-mapping.mjs
       - run: node scripts/alignment-ci.mjs
-      - run: git diff --exit-code -- contracts/alignment/feature-inventory.v1.json contracts/alignment/api-inventory.v1.json contracts/alignment/payload-inventory.v1.json contracts/alignment/code-evidence-inventory.v1.json contracts/alignment/five-way-reconciliation.v1.json contracts/alignment/change-impact.v1.json
+      - run: git diff --exit-code -- contracts/alignment/cross-system-mapping.v1.json contracts/alignment/feature-inventory.v1.json contracts/alignment/api-inventory.v1.json contracts/alignment/payload-inventory.v1.json contracts/alignment/code-evidence-inventory.v1.json contracts/alignment/five-way-reconciliation.v1.json contracts/alignment/change-impact.v1.json
 
   mapping-zero-final:
     name: Mapping 0 Structural/Contract Gate
