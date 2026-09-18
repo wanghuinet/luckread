@@ -16,12 +16,12 @@ Canonical API operation established by current repository contracts: `authRegist
 2. `contracts/api/auth-operation-policy.v1.json` defines `authRegister` as public registration with Idempotency-Key, bounded D1 budget, one authoritative write, anti-abuse requirements, and `same-request-replay-must-not-create-second-account` semantics.
 3. `contracts/dto/auth-dto-contract.v1.json` now canonically binds `AUTH-001` to `DTO-AUTH-REGISTER-REQUEST` and `DTO-AUTH-REGISTER-RESPONSE`, using the current OpenAPI request and 201 response schemas.
 4. `contracts/dto/auth-dto-records.v1.json` records both AUTH-001 DTOs with the same OpenAPI schema references. No runtime implementation claim is made.
-5. `contracts/entity/entity-catalog.v1.json` establishes `ENT-USER` as the currently VERIFIED authoritative User entity and points to `src/collections/Users.ts`.
+5. `contracts/entity/entity-catalog.v1.json` establishes `ENT-USER` as the currently VERIFIED authoritative User entity and points to the legacy root `src/collections/Users.ts`; this is not the active W01 runtime authority.
 6. `contracts/entity/entity-field-contract.v1.json` establishes the currently VERIFIED User fields: `username`, `displayName`, `bio`, `avatar`, `locale`, and `timezone`. All currently remain `migrationVersion: PENDING_EVIDENCE`.
-7. `contracts/payload/payload-native-inventory.v1.json` discovers the Payload `users` collection and the six current fields from `src/collections/Users.ts`.
-8. `src/collections/Users.ts` is concrete Payload collection implementation evidence. It defines `slug: users`, `auth: true`, `username` as required+unique, and the other current profile/preference fields. Its access policy is self-only for read/update and disables delete.
-9. `src/payload.config.ts` configures `@payloadcms/db-d1-sqlite`, binds `cloudflare.env.D1`, sets `push: false`, and resolves `migrationDir` to `src/migrations`.
-10. Repository evidence does **not** establish a concrete current-main `src/migrations` directory, migration file, authoritative D1 table/column mapping, or migration execution result. Therefore no D1 persistence claim is made.
+7. `contracts/payload/payload-native-inventory.v1.json` now discovers the active W01 Payload `users` collection from `workers/W01-payload/src/collections/Users.ts`, where `fields: []`. The six canonical ENT-USER business fields remain contract evidence sourced from the legacy root and are therefore not yet proven implemented in W01.
+8. The legacy root `src/collections/Users.ts` is concrete historical scaffold evidence for the six previously documented fields, but it is not the active W01 implementation. Current W01 `workers/W01-payload/src/collections/Users.ts` has `slug: users`, `auth: true`, and `fields: []`.
+9. `workers/W01-payload/src/payload.config.ts` configures `@payloadcms/db-d1-sqlite`, `push: false`, and `migrationDir` under W01.
+10. W01 contains a migration source artifact, but repository evidence does **not** establish a controlled-D1 execution result or a complete current W01 field mapping for the canonical ENT-USER contract. Therefore no D1 persistence or six-field implementation claim is made.
 11. Repository search does **not** establish a concrete runtime handler bound to `authRegister`. Therefore no handler/runtime claim is made.
 
 ## Evidence-supported links
