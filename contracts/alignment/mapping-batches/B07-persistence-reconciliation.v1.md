@@ -8,11 +8,11 @@ Close the Entity → Field → Persistence → Migration → Authority portion o
 ## Current verified facts
 
 1. `ENT-USER` is the only currently verified entity in the persistence inventory.
-2. `ENT-USER` implementation is `src/collections/Users.ts`.
+2. The declared active W01 runtime implementation source is `workers/W01-payload/src/collections/Users.ts`; the legacy root `src/collections/Users.ts` is not the W01 runtime authority.
 3. Payload is configured with `@payloadcms/db-d1-sqlite` and `push: false`.
-4. Payload configuration points `migrationDir` to `src/migrations`.
-5. The current `main` source tree does not expose a `src/migrations` directory, so migration evidence cannot currently be promoted to GREEN.
-6. The canonical persistence inventory therefore correctly keeps `ENT-USER.persistenceStatus = NOT_VERIFIED` and `migrationRefs = []`.
+4. W01 Payload configuration points `migrationDir` to `workers/W01-payload/src/migrations`.
+5. The current W01 source tree contains `workers/W01-payload/src/migrations/index.ts` and `20250929_111647.ts`. Their presence is source evidence only; current controlled-D1 execution evidence remains missing.
+6. The canonical persistence inventory therefore correctly keeps `ENT-USER.persistenceStatus = NOT_VERIFIED`; migration execution remains unadmitted until current W01 execution evidence exists.
 
 ## Required closure chain
 
