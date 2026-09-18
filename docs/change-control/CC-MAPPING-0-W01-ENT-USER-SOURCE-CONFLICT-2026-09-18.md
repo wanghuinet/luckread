@@ -24,7 +24,7 @@ Record the verified semantic conflict between the active W01 Payload Users colle
    - `locale`
    - `timezone`
 4. `contracts/entity/entity-field-contract.v1.json` currently treats those six ENT-USER fields as VERIFIED contract fields and points their source references at the legacy root scaffold.
-5. `contracts/entity/entity-catalog.v1.json` currently marks ENT-USER as VERIFIED and points its implementation reference at the legacy root scaffold.
+5. `contracts/entity/entity-catalog.v1.json` currently marks ENT-USER as VERIFIED and points its implementation reference at the declared W01 runtime authority; the six field source references remain a separate unresolved contract-source issue.
 6. `contracts/payload/payload-native-inventory.v1.json` has already been regenerated from W01 and therefore correctly observes zero W01 User business fields.
 7. The existing W01 migration contains the Payload-native Users schema generated from the W01 collection state; source presence is not evidence that the six canonical business fields are implemented in W01.
 
