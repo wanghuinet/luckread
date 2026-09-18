@@ -12,19 +12,17 @@ The check is evidence-first and fail-closed. It does not create or infer a D1 ta
 
 ### 1. Payload implementation
 
-`src/collections/Users.ts` is the implementation reference for `ENT-USER` and therefore establishes that the Payload Users collection exists as code.
+`workers/W01-payload/src/collections/Users.ts` is the active implementation reference for `ENT-USER` and establishes that the W01 Payload Users collection exists as code.
 
 ### 2. D1 adapter configuration
 
-`src/payload.config.ts` configures `@payloadcms/db-d1-sqlite`, binds `cloudflare.env.D1`, sets `push: false`, and resolves `migrationDir` to `src/migrations`.
+`workers/W01-payload/src/payload.config.ts` configures `@payloadcms/db-d1-sqlite`, binds the W01 D1 environment, sets `push: false`, and resolves `migrationDir` to `workers/W01-payload/src/migrations`.
 
-This proves the intended adapter/migration configuration only. It does **not** prove that a migration file exists or has been applied.
+This proves the intended adapter/migration configuration only. The W01 repository does contain a migration file, but file existence does **not** prove that it has been applied to the controlled D1 environment.
 
 ### 3. Migration path verification
 
-A direct repository fetch of `src/migrations/index.ts` on `main` returned `404 Not Found` during this reconciliation. Repository search also did not produce a current concrete migration file that establishes the Users table schema.
-
-Therefore no migration identifier/version/path is admitted as evidence in this batch.
+Current `main` contains `workers/W01-payload/src/migrations/index.ts` and `workers/W01-payload/src/migrations/20250929_111647.ts`. The migration source contains concrete Payload `users` / `users_sessions` DDL. This is source-level evidence only; no remote execution or schema-state claim is made.
 
 ### 4. Persistence inventory
 
@@ -34,7 +32,7 @@ Therefore no migration identifier/version/path is admitted as evidence in this b
 - `ENT-USER.persistenceStatus = NOT_VERIFIED`
 - `ENT-USER.migrationRefs = []`
 
-The inventory therefore remains consistent with the evidence found in this batch.
+The inventory therefore remains correctly fail-closed because source-level migration presence does not establish target-D1 execution.
 
 ## Field-level reconciliation result
 
@@ -63,7 +61,7 @@ No canonical persistence status was changed. No invented schema or migration evi
 
 ## Required next closure batch
 
-The next implementation/evidence batch must first establish the real Payload migration/schema artifact for the current Users collection, then capture the exact generated D1 schema and migration execution evidence. Only after that evidence exists should the Entity Field Contract and persistence inventory be updated field-by-field.
+The next evidence batch must validate the existing W01 migration/schema artifact against the current Users collection, then capture the exact controlled-D1 schema and migration execution evidence. Only after that evidence exists should the Entity Field Contract and persistence inventory be updated field-by-field.
 
 After `ENT-USER` persistence is verified, the same evidence chain must be repeated for each entity that is actually promoted from `PROPOSED` to implemented.
 
