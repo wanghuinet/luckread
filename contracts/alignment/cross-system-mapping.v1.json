@@ -2000,6 +2000,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/COMMUNITY-001-008-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -2015,6 +2016,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/COMMUNITY-001-008-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -2030,6 +2032,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/COMMUNITY-001-008-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -2045,6 +2048,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/COMMUNITY-001-008-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -2060,6 +2064,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/COMMUNITY-001-008-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -2075,6 +2080,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/COMMUNITY-001-008-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -2090,6 +2096,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/COMMUNITY-001-008-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -2105,6 +2112,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/COMMUNITY-001-008-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5482,6 +5490,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5496,6 +5505,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5510,6 +5520,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5524,6 +5535,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5538,6 +5550,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5552,6 +5565,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5566,6 +5580,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5580,6 +5595,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5594,6 +5610,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -5608,6 +5625,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "contracts/alignment/mapping-batches/REL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -6378,6 +6396,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -6393,6 +6412,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -6408,6 +6428,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -6423,6 +6444,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -6438,6 +6460,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -6453,6 +6476,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -6468,6 +6492,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -6483,6 +6508,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -6498,6 +6524,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
@@ -6513,6 +6540,7 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
