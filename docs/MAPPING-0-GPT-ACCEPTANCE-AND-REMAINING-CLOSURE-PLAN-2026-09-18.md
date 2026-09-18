@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Reviewed head: `6e7836062a0c2292c04af458f01dc6d8a4ec34a2`
+Reviewed head: `e296a3d61a277a662976db7328b0259b24646efc`
 Basis: current GitHub main, Batch G final sweep, orphan disposition register, canonical mapping, Feature Inventory, and Evidence Registry.
 
 ## 1. Acceptance boundary
@@ -57,6 +57,10 @@ The AUTH-002 session integration evidence boundary now points to:
 - `workers/W01-payload/src/payload.config.ts`
 
 This corrects the evidence path. It does **not** prove runtime or persistence closure.
+
+### 2.6 G01.01 current-path alignment — CLOSED
+
+The G01.01 Identity/Account blocker audit was corrected so its current Payload configuration and Users collection references point to the declared W01 runtime authority. Its findings remain `NOT_GREEN`; this changes evidence-path accuracy only and does not promote implementation or security closure.
 
 ### 2.5 USER/code evidence path alignment — CLOSED
 
