@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Current reviewed main head: `262dab07ab3f2982ec9d9b2ac429a779d4a8f445`
+Current reviewed main head: `97bf8c2b90525f9ed83d57a0bca5a21cad3f50c2`
 
 ## Current governance closure
 
@@ -64,6 +64,14 @@ AUTH-009 remains `PARTIAL`: linked-identity reconciliation explicitly identifies
 
 AUTH-013, AUTH-014, AUTH-015 and AUTH-016 remain `PARTIAL`. Their current reconciliation artifacts identify account-state, recovery, deletion/restoration, and identity/verification mappings that require authoritative API/DTO/entity/security bindings and executable evidence before promotion.
 
+## W01 runtime-authority drift correction
+
+A repository-level source drift was independently verified: the active Payload runtime authority is `workers/W01-payload/`, while the prior Payload native inventory generator read the legacy root `src/` scaffold. The current W01 `Users.ts` declares `auth: true` and `fields: []`; the legacy root `Users.ts` contains six profile/preference fields and is not the W01 runtime authority.
+
+Change Control `CC-MAPPING-0-W01-RUNTIME-AUTHORITY-PATH-DRIFT-2026-09-18` records this gap. The discovery generator has now been corrected to read W01, and the derived Payload/Code inventories were regenerated from that authority. No legacy fields were copied into W01, no Mapping status was promoted, and no D1 schema was inferred.
+
+The existing local-miniflare AUTH-002 evidence is explicitly local-only and its recorded validity window has expired. It therefore remains historical evidence and cannot satisfy current remote/runtime admission.
+
 ## Verification boundary
 
 For the current review window, GitHub Actions produced successful `Mapping 0 Structural Gate` and `Ensure Feature Inventory` runs for the preceding closure commits, including the canonical mapping blocker-correction commit. The latest observed `Mapping 0 Structural Gate` run completed successfully.
@@ -86,7 +94,7 @@ The next admissible work is to close authoritative contracts and mappings in dep
 
 ## Result
 
-Governance closure is substantially complete. The remaining gap is no longer orphan/scope bookkeeping; it is authoritative Contract -> Mapping -> Runtime -> Evidence closure. The latest audit correction also retires stale AUTH-006 singular `passkey` / `authentication` terminology in favor of the current `passkeys` / `assertion` contract. Documentation alone must not promote the records to GREEN.
+Governance closure is substantially complete. The remaining gap is no longer orphan/scope bookkeeping; it is authoritative Contract -> Mapping -> Runtime -> Evidence closure. The W01 runtime-source drift is now explicitly recorded and the Payload discovery chain has been aligned to W01. The latest audit correction also retires stale AUTH-006 singular `passkey` / `authentication` terminology in favor of the current `passkeys` / `assertion` contract. Documentation alone must not promote the records to GREEN.
 
 
 ## Current structural metrics rechecked
@@ -99,4 +107,4 @@ Governance closure is substantially complete. The remaining gap is no longer orp
 - Records with Code evidence edges: 0
 - Complete API+Entity+Payload+Code closure: 0/449
 
-The latest reconciliation commits corrected stale AUTH-006 OpenAPI terminology and attached the canonical AUTH field-authority references to AUTH-002..006 evidence arrays. These are governance/evidence-reference corrections only; no record was promoted and technical status remains fail-closed.
+The latest reconciliation commits corrected stale AUTH-006 OpenAPI terminology, attached canonical AUTH field-authority references to AUTH-002..006 evidence arrays, and aligned Payload discovery to the declared W01 runtime authority. These are governance/evidence-source corrections only; no record was promoted and technical status remains fail-closed.
