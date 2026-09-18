@@ -29,3 +29,13 @@ Separately, the inventory schema requires every record to contain a non-empty `i
 ## Non-goals
 
 This change does not promote any entity to VERIFIED, does not alter physical D1 schema, and does not close AUTH-002..006 persistence verification.
+
+
+## Amendment — schema coverage
+
+Static reconciliation against the current inventory also found schema coverage gaps for fields already present in the repository artifact:
+
+- top-level: `featureInventoryRef`, `rules`, `blockers`
+- record-level: `domainId`, `persistenceContractRef`
+
+These existing fields are now represented in the schema. No new field is introduced into the inventory data itself, and no persistence/runtime meaning is inferred from these schema-only corrections.
