@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-09-18T15:30:26.713Z",
-  "currentCommit": "912b3b276fa386e38dcb07689cbb1e553e2cd627",
+  "currentCommit": "c4a2f52a64cf485efe2a8a806348dd515f600282",
   "canonicalMappingStatus": "NOT_GREEN",
   "canonicalFeatureCount": 449,
   "canonicalMappingRecordCount": 449,
@@ -116,12 +116,22 @@
     }
   ],
   "mappingMetrics": {
-    "apiOperationEdgeCount": 28,
-    "entityEdgeCount": 18,
-    "payloadCollectionEdgeCount": 1,
-    "codeEvidenceEdgeCount": 0,
+    "apiOperationEdgeCoverageRecordCount": 11,
+    "apiOperationEdgeCoveragePercent": 2.45,
+    "entityEdgeCoverageRecordCount": 9,
+    "entityEdgeCoveragePercent": 2,
+    "payloadCollectionEdgeCoverageRecordCount": 1,
+    "payloadCollectionEdgeCoveragePercent": 0.22,
+    "codeEvidenceEdgeCoverageRecordCount": 0,
+    "codeEvidenceEdgeCoveragePercent": 0,
+    "totalApiOperationIdBindings": 28,
+    "totalEntityIdBindings": 18,
+    "totalPayloadCollectionBindings": 1,
+    "totalCodeEvidenceBindings": 0,
     "evidenceReferenceFeatureCount": 449,
-    "completeTechnicalClosureCount": 0
+    "completeTechnicalClosureCount": 0,
+    "completeTechnicalClosurePercent": 0,
+    "metricDefinition": "Coverage counts Feature records with a non-empty technical-edge array. total*Bindings are separate ID-reference totals."
   },
   "note": "Generated from current main canonical mapping. Structural Mapping 0 GREEN is distinct from downstream technical/runtime closure."
 }
