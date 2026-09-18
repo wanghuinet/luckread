@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Current reviewed main head: `5d3bdeccedd1d5a6f760b75012f82a81d2faef6f`
+Current reviewed main head: `357daa6c6faac8550f1e8e7bae32ea6b7a77a88f`
 
 ## Current governance closure
 
@@ -76,7 +76,7 @@ The existing local-miniflare AUTH-002 evidence is explicitly local-only and its 
 
 For the current review window, GitHub Actions produced successful `Mapping 0 Structural Gate` and `Ensure Feature Inventory` runs for the preceding closure commits, including the canonical mapping blocker-correction commit. The latest observed `Mapping 0 Structural Gate` run completed successfully.
 
-The repository also reports a `contract-ci.yml` workflow failure on the latest push, but the GitHub connection exposes zero jobs/check-runs for that workflow run. No failure step can therefore be truthfully attributed from the available evidence.
+The repository previously reported a `contract-ci.yml` workflow failure with zero exposed jobs/check-runs; no failure step was safely attributable from that evidence. The current W01-specific migration audit workflow has now been corrected to target the active W01 tree, but its new execution result is not yet independently observed here.
 
 Accordingly, this document accepts the structural validator result only where an actual successful run is observed and keeps full Contract CI / technical acceptance fail-closed.
 
@@ -94,7 +94,7 @@ The next admissible work is to close authoritative contracts and mappings in dep
 
 ## Result
 
-Governance closure is substantially complete. The remaining gap is no longer orphan/scope bookkeeping; it is authoritative Contract -> Mapping -> Runtime -> Evidence closure. The W01 runtime-source drift is now explicitly recorded and the Payload discovery chain has been aligned to W01. The latest audit correction also retires stale AUTH-006 singular `passkey` / `authentication` terminology in favor of the current `passkeys` / `assertion` contract. Documentation alone must not promote the records to GREEN.
+Governance closure is substantially complete. The remaining gap is no longer orphan/scope bookkeeping; it is authoritative Contract -> Mapping -> Runtime -> Evidence closure. The W01 runtime-source drift is now explicitly recorded and the Payload discovery chain has been aligned to W01. The AUTH-002 migration audit workflow has also been redirected from the legacy root `src/` to `workers/W01-payload/`, so future migration-source checks no longer target the wrong runtime. The latest audit correction also retires stale AUTH-006 singular `passkey` / `authentication` terminology in favor of the current `passkeys` / `assertion` contract. Documentation alone must not promote the records to GREEN.
 
 
 ## Current structural metrics rechecked
@@ -107,4 +107,4 @@ Governance closure is substantially complete. The remaining gap is no longer orp
 - Records with Code evidence edges: 0
 - Complete API+Entity+Payload+Code closure: 0/449
 
-The latest reconciliation commits corrected stale AUTH-006 OpenAPI terminology, attached canonical AUTH field-authority references to AUTH-002..006 evidence arrays, aligned Payload/Code discovery to the declared W01 runtime authority, and attached the current W01 source files as evidence references for AUTH-001 and USER-001. These are governance/evidence-source corrections only; no record was promoted and technical status remains fail-closed.
+The latest reconciliation commits corrected stale AUTH-006 OpenAPI terminology, attached canonical AUTH field-authority references to AUTH-002..006 evidence arrays, aligned Payload/Code discovery to the declared W01 runtime authority, attached current W01 source files as evidence references for AUTH-001 and USER-001, and redirected the AUTH-002 migration audit to the W01 source tree. These are governance/evidence-source corrections only; no record was promoted and technical status remains fail-closed.
