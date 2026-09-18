@@ -1039,14 +1039,10 @@
       "entityEvidence": [
         {
           "entityId": "ENT-USER",
-          "entityStatus": "VERIFIED",
-          "persistenceStatus": "NOT_VERIFIED",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json",
-            "workers/W01-payload/src/collections/Users.ts",
-            "workers/W01-payload/src/payload.config.ts"
-          ]
+          "evidenceRefs": []
         }
       ],
       "evidenceRefs": [
@@ -1079,32 +1075,24 @@
       "entityEvidence": [
         {
           "entityId": "ENT-CREDENTIAL",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "NOT_APPLICABLE",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json"
-          ]
+          "evidenceRefs": []
         },
         {
           "entityId": "ENT-IDENTITY",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "NOT_APPLICABLE",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json"
-          ]
+          "evidenceRefs": []
         },
         {
           "entityId": "ENT-SESSION",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json",
-            "contracts/entity/AUTH-002-session-field-contract.v1.json",
-            "contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json"
-          ]
+          "evidenceRefs": []
         }
       ],
       "evidenceRefs": [
@@ -1121,6 +1109,8 @@
       "blockers": [
         "MAPPING_BLOCKER:session DTO/entity mappings incomplete",
         "MAPPING_BLOCKER:state/security E2E evidence missing",
+        "MIGRATION_EVIDENCE_MISSING:ENT-CREDENTIAL",
+        "MIGRATION_EVIDENCE_MISSING:ENT-IDENTITY",
         "MIGRATION_EVIDENCE_MISSING:ENT-SESSION",
         "PERSISTENCE_NOT_VERIFIED:ENT-CREDENTIAL",
         "PERSISTENCE_NOT_VERIFIED:ENT-IDENTITY",
@@ -1138,21 +1128,17 @@
       "entityEvidence": [
         {
           "entityId": "ENT-CREDENTIAL",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "NOT_APPLICABLE",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json"
-          ]
+          "evidenceRefs": []
         },
         {
           "entityId": "ENT-IDENTITY",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "NOT_APPLICABLE",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json"
-          ]
+          "evidenceRefs": []
         }
       ],
       "evidenceRefs": [
@@ -1170,6 +1156,8 @@
       ],
       "blockers": [
         "MAPPING_BLOCKER:DTO registry and Entity/Field binding remain unverified",
+        "MIGRATION_EVIDENCE_MISSING:ENT-CREDENTIAL",
+        "MIGRATION_EVIDENCE_MISSING:ENT-IDENTITY",
         "PERSISTENCE_NOT_VERIFIED:ENT-CREDENTIAL",
         "PERSISTENCE_NOT_VERIFIED:ENT-IDENTITY"
       ],
@@ -1186,32 +1174,24 @@
       "entityEvidence": [
         {
           "entityId": "ENT-CREDENTIAL",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "NOT_APPLICABLE",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json"
-          ]
+          "evidenceRefs": []
         },
         {
           "entityId": "ENT-SESSION",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json",
-            "contracts/entity/AUTH-002-session-field-contract.v1.json",
-            "contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json"
-          ]
+          "evidenceRefs": []
         },
         {
           "entityId": "ENT-VERIFICATION",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "NOT_APPLICABLE",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json"
-          ]
+          "evidenceRefs": []
         }
       ],
       "evidenceRefs": [
@@ -1230,7 +1210,9 @@
       "blockers": [
         "MAPPING_BLOCKER:DTO/entity/field binding remains incomplete",
         "MAPPING_BLOCKER:single-use token evidence missing",
+        "MIGRATION_EVIDENCE_MISSING:ENT-CREDENTIAL",
         "MIGRATION_EVIDENCE_MISSING:ENT-SESSION",
+        "MIGRATION_EVIDENCE_MISSING:ENT-VERIFICATION",
         "PERSISTENCE_NOT_VERIFIED:ENT-CREDENTIAL",
         "PERSISTENCE_NOT_VERIFIED:ENT-SESSION",
         "PERSISTENCE_NOT_VERIFIED:ENT-VERIFICATION"
@@ -1248,30 +1230,24 @@
       "entityEvidence": [
         {
           "entityId": "ENT-CREDENTIAL",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "NOT_APPLICABLE",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json"
-          ]
+          "evidenceRefs": []
         },
         {
           "entityId": "ENT-IDENTITY",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "NOT_APPLICABLE",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json"
-          ]
+          "evidenceRefs": []
         },
         {
           "entityId": "ENT-VERIFICATION",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "NOT_APPLICABLE",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json"
-          ]
+          "evidenceRefs": []
         }
       ],
       "evidenceRefs": [
@@ -1290,6 +1266,9 @@
       "blockers": [
         "MAPPING_BLOCKER:security E2E evidence missing",
         "MAPPING_BLOCKER:verification event IDs remain unresolved",
+        "MIGRATION_EVIDENCE_MISSING:ENT-CREDENTIAL",
+        "MIGRATION_EVIDENCE_MISSING:ENT-IDENTITY",
+        "MIGRATION_EVIDENCE_MISSING:ENT-VERIFICATION",
         "PERSISTENCE_NOT_VERIFIED:ENT-CREDENTIAL",
         "PERSISTENCE_NOT_VERIFIED:ENT-IDENTITY",
         "PERSISTENCE_NOT_VERIFIED:ENT-VERIFICATION"
@@ -1307,30 +1286,24 @@
       "entityEvidence": [
         {
           "entityId": "ENT-CREDENTIAL",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "NOT_APPLICABLE",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json"
-          ]
+          "evidenceRefs": []
         },
         {
           "entityId": "ENT-IDENTITY",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "NOT_APPLICABLE",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json"
-          ]
+          "evidenceRefs": []
         },
         {
           "entityId": "ENT-VERIFICATION",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "NOT_APPLICABLE",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json"
-          ]
+          "evidenceRefs": []
         }
       ],
       "evidenceRefs": [
@@ -1349,6 +1322,9 @@
       "blockers": [
         "MAPPING_BLOCKER:API and Entity contract bindings exist",
         "MAPPING_BLOCKER:canonical DTO registry, persistence schema, security E2E, runtime evidence and Mapping-0 validation remain unverified",
+        "MIGRATION_EVIDENCE_MISSING:ENT-CREDENTIAL",
+        "MIGRATION_EVIDENCE_MISSING:ENT-IDENTITY",
+        "MIGRATION_EVIDENCE_MISSING:ENT-VERIFICATION",
         "PERSISTENCE_NOT_VERIFIED:ENT-CREDENTIAL",
         "PERSISTENCE_NOT_VERIFIED:ENT-IDENTITY",
         "PERSISTENCE_NOT_VERIFIED:ENT-VERIFICATION"
@@ -1413,14 +1389,10 @@
       "entityEvidence": [
         {
           "entityId": "ENT-SESSION",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json",
-            "contracts/entity/AUTH-002-session-field-contract.v1.json",
-            "contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json"
-          ]
+          "evidenceRefs": []
         }
       ],
       "evidenceRefs": [
@@ -1448,14 +1420,10 @@
       "entityEvidence": [
         {
           "entityId": "ENT-SESSION",
-          "entityStatus": "PROPOSED",
-          "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json",
-            "contracts/entity/AUTH-002-session-field-contract.v1.json",
-            "contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json"
-          ]
+          "evidenceRefs": []
         }
       ],
       "evidenceRefs": [
@@ -7502,14 +7470,10 @@
       "entityEvidence": [
         {
           "entityId": "ENT-USER",
-          "entityStatus": "VERIFIED",
-          "persistenceStatus": "NOT_VERIFIED",
+          "entityStatus": "UNRESOLVED_ENTITY_REFERENCE",
+          "persistenceStatus": "UNRESOLVED_ENTITY_REFERENCE",
           "migrationRefs": [],
-          "evidenceRefs": [
-            "contracts/entity/entity-catalog.v1.json",
-            "workers/W01-payload/src/collections/Users.ts",
-            "workers/W01-payload/src/payload.config.ts"
-          ]
+          "evidenceRefs": []
         }
       ],
       "evidenceRefs": [
