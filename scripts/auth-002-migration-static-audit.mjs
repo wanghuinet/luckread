@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const migrationsDir = 'src/migrations'
+const migrationsDir = 'workers/W01-payload/src/migrations'
 const fail = (message) => {
   console.error(`AUTH-002_MIGRATION_STATIC_AUDIT_REJECTED: ${message}`)
   process.exit(1)
