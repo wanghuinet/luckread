@@ -134,3 +134,23 @@ Not accepted as complete:
 - No deletion or rewriting of locked v1.0 contracts or B01-B20 blueprints to make gates green.
 - No D1-Fabric.
 - No broad business-feature implementation while required Mapping → Contract → Runtime → Evidence gates remain open.
+
+## 10. Code Evidence Transitive-Inference Boundary
+
+The repository contains a generated Code Evidence Inventory at `contracts/alignment/code-evidence-inventory.v1.json`. It records implemented lower-level evidence such as:
+
+- `PAYLOAD_COLLECTION:users` → `workers/W01-payload/src/collections/Users.ts:Users`
+- `PAYLOAD_COLLECTION:media` → `workers/W01-payload/src/collections/Media.ts:Media`
+- the six legacy `ENT-USER` field evidence records under `src/collections/Users.ts`
+
+These records do **not** by themselves establish Feature → Code Evidence bindings. No explicit authoritative Feature-ID-to-Code-Evidence registry entry was found for the currently open Feature records.
+
+Therefore:
+
+- canonical `codeEvidenceRefs` remains `0/449`;
+- Entity → Code and Payload → Code evidence must not be transitively promoted to Feature → Code;
+- the legacy `src/collections/Users.ts` evidence remains non-authoritative for W01 runtime because the active W01 collection source declares `fields: []`;
+- no Mapping status is promoted from these lower-level inventory records.
+
+This boundary is intentional and fail-closed.
+
