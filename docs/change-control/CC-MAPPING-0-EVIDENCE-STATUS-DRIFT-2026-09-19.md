@@ -30,8 +30,8 @@ The registry keeps the original commitSha/timestamp/validUntil and historical re
 
 Only explicit mappings already supported by existing contracts are registered:
 
-- `AUTH-001 → ENT-USER → PAYLOAD_NATIVE → workers/W01-payload`, status `BLOCKED`; persistence execution/schema evidence remains unverified.
 - `AUTH-002 → ENT-IDENTITY/ENT-CREDENTIAL/ENT-SESSION → LUCKREAD_EXTENSION → D1-01`, status `BLOCKED`; promotion gates remain unmet.
+- `AUTH-001` is intentionally not registered here because the current B01 reconciliation still marks its D1 domain unresolved and the repository does not yet prove its persistence mapping. No D1 owner is inferred.
 
 No new entity, field, table, runtime implementation, or migration is introduced.
 
