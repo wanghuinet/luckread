@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-18T10:20:37.082Z",
-  "currentCommit": "66d216df4816c13c90edf3131517a987ab9a5436",
+  "generatedAt": "2026-09-18T15:30:26.713Z",
+  "currentCommit": "912b3b276fa386e38dcb07689cbb1e553e2cd627",
   "canonicalMappingStatus": "NOT_GREEN",
   "canonicalFeatureCount": 449,
   "canonicalMappingRecordCount": 449,
@@ -116,12 +116,12 @@
     }
   ],
   "mappingMetrics": {
-    "apiOperationEdgeCount": 11,
-    "entityEdgeCount": 9,
+    "apiOperationEdgeCount": 28,
+    "entityEdgeCount": 18,
     "payloadCollectionEdgeCount": 1,
     "codeEvidenceEdgeCount": 0,
     "evidenceReferenceFeatureCount": 449,
     "completeTechnicalClosureCount": 0
   },
-  "note": "Generated from current main canonical mapping. Mapping 0 Structural GREEN remains a structural gate; downstream implementation/runtime/test evidence is not implied."
+  "note": "Generated from current main canonical mapping. Structural Mapping 0 GREEN is distinct from downstream technical/runtime closure."
 }
