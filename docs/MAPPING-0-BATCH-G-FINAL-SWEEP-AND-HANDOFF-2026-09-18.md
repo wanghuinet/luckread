@@ -34,7 +34,7 @@ Technique edge inventory in `cross-system-mapping.v1.json`:
 
 - API technical edges: 11 records
 - Entity technical edges: 9 records
-- Payload collection edges: 0
+- Payload collection edges: 1/449 Feature records (0.22% coverage)
 - Code evidence edges: 0
 - Records with any API/Entity/Payload/Code edge: 11
 - Complete technical closure (all four edges): **0/449**
