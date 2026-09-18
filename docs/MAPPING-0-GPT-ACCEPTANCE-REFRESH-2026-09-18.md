@@ -99,4 +99,4 @@ Governance closure is substantially complete. The remaining gap is no longer orp
 - Records with Code evidence edges: 0
 - Complete API+Entity+Payload+Code closure: 0/449
 
-The latest reconciliation commit corrects stale AUTH-006 OpenAPI terminology in an audit artifact; it does not promote any record, change canonical Mapping edges, or alter technical status.
+The latest reconciliation commits corrected stale AUTH-006 OpenAPI terminology and attached the canonical AUTH field-authority references to AUTH-002..006 evidence arrays. These are governance/evidence-reference corrections only; no record was promoted and technical status remains fail-closed.
