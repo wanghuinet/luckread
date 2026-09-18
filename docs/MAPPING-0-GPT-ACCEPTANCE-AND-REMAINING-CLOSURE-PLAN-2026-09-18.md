@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Reviewed head: `e296a3d61a277a662976db7328b0259b24646efc`
+Reviewed head: `e0b413230cd1e2bffcfcaf204aaae33c8864cb31`
 Basis: current GitHub main, Batch G final sweep, orphan disposition register, canonical mapping, Feature Inventory, and Evidence Registry.
 
 ## 1. Acceptance boundary
@@ -58,7 +58,10 @@ The AUTH-002 session integration evidence boundary now points to:
 
 This corrects the evidence path. It does **not** prove runtime or persistence closure.
 
-### 2.6 G01.01 current-path alignment — CLOSED
+### 2.7 Five-way blocker count refresh — CLOSED
+
+Current five-way file statistics were directly recomputed from `contracts/alignment/five-way-reconciliation.v1.json` on the current main head: 449 records and 457 blocker entries. The earlier 450 figure in older Batch G narrative snapshots is stale. The five-way gate remains `NOT_GREEN`.
+
 
 The G01.01 Identity/Account blocker audit was corrected so its current Payload configuration and Users collection references point to the declared W01 runtime authority. Its findings remain `NOT_GREEN`; this changes evidence-path accuracy only and does not promote implementation or security closure.
 
@@ -103,7 +106,7 @@ These must remain fail-closed. No API/DTO/entity/persistence edges may be invent
 
 ### 3.4 Five-way reconciliation
 
-The Batch G handoff records 450 blockers in downstream reconciliation. This is a separate closure gate and remains `NOT_GREEN`.
+The current five-way reconciliation file contains 457 blocker entries across 449 records; the older Batch G narrative contained 450 and is stale. This is a separate closure gate and remains `NOT_GREEN`.
 
 ## 4. Gate decisions
 
@@ -116,7 +119,7 @@ The Batch G handoff records 450 blockers in downstream reconciliation. This is a
 | Canonical scope governance | ACCEPT / CONTROLLED | out-of-scope IDs kept outside canonical inventory |
 | Persistence ownership closure | NOT_ACCEPTED | persistence registry has 0 records |
 | Evidence freshness | NOT_ACCEPTED | existing evidence contains expired validity dates |
-| Five-way reconciliation | NOT_ACCEPTED | 450 blockers remain in the current downstream snapshot |
+| Five-way reconciliation | NOT_ACCEPTED | 457 blocker entries remain in the current five-way snapshot |
 | Technical/runtime closure | NOT_ACCEPTED | 0/449 complete technical edge closure in current structural-gate run |
 | Implementation authorization | NOT_GRANTED | per-feature Mapping → Contract → Runtime → Evidence gates remain mandatory |
 
