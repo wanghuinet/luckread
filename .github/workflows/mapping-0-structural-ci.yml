@@ -36,3 +36,6 @@ jobs:
 
       - name: Report evidence freshness metrics
         run: node scripts/evidence-freshness-metrics.mjs
+
+      - name: Report Batch G orphan/duplicate sweep
+        run: node scripts/mapping-0-batch-g-final-sweep.mjs
