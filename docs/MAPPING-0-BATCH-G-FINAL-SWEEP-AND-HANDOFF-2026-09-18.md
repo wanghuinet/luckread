@@ -149,4 +149,4 @@ The 58 orphan batch files have already been row-by-row dispositioned by
 
 ## Current five-way count reconciliation
 
-The current canonical five-way reconciliation file contains 457 blocker entries across 449 records. The previously recorded 450-blocker figure in this handoff is a stale snapshot and must not be used for current progress accounting. This correction does not change the 449-record structural Mapping-0 result or promote any technical edge.
+The current canonical five-way reconciliation file contains 450 top-level blocker IDs and 457 record-level blocker entries across 449 records. These are different aggregation levels and must be reported separately. This does not change the 449-record structural Mapping-0 result or promote any technical edge.
