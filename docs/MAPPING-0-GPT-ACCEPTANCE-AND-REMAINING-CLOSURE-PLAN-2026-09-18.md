@@ -104,6 +104,9 @@ The existing canonical evidence still records:
 
 These must remain fail-closed. No API/DTO/entity/persistence edges may be invented to increase the percentage.
 
+### 3.5 Contract CI execution observation
+
+The historical Contract CI run `35322358307` for commit `0f8bcf508553b96989f5400f89441ed6991bdf6b` finished with conclusion `failure` but GitHub reported **0 jobs** for that run. On the current reviewed head, the available check-runs are the Feature Inventory gate and Mapping-0 structural verification; no Contract CI check-run is present. Therefore the repository evidence does not currently establish the underlying Contract CI failure cause. This item is recorded as an infrastructure/workflow verification blocker only; no Contract CI workflow change is admitted without a reproducible failure signal.
 ### 3.4 Five-way reconciliation
 
 The current five-way reconciliation file contains 450 top-level blocker IDs and 457 record-level blocker entries across 449 records. This is a separate closure gate and remains `NOT_GREEN`.
