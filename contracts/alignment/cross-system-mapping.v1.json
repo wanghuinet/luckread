@@ -95,8 +95,8 @@
         "contracts/api/AUTH-003-credential-management-contract.v1.json",
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/entity/AUTH-002-006-canonical-field-authority.v1.json",
-        "contracts/entity/AUTH-003-identity-field-contract.v1.json",
-        "contracts/entity/AUTH-003-credential-field-contract.v1.json"
+        "contracts/entity/AUTH-003-credential-field-contract.v1.json",
+        "contracts/entity/AUTH-003-identity-field-contract.v1.json"
       ],
       "blockers": [
         "DTO registry and Entity/Field binding remain unverified"
@@ -126,9 +126,9 @@
         "contracts/api/AUTH-004-password-recovery-contract.v1.json",
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/entity/AUTH-002-006-canonical-field-authority.v1.json",
+        "contracts/entity/AUTH-002-session-field-contract.v1.json",
         "contracts/entity/AUTH-003-credential-field-contract.v1.json",
-        "contracts/entity/AUTH-004-password-recovery-field-contract.v1.json",
-        "contracts/entity/AUTH-002-session-field-contract.v1.json"
+        "contracts/entity/AUTH-004-password-recovery-field-contract.v1.json"
       ],
       "blockers": [
         "DTO/entity/field binding remains incomplete",
@@ -159,9 +159,9 @@
         "contracts/api/AUTH-005-identity-verification-contract.v1.json",
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/entity/AUTH-002-006-canonical-field-authority.v1.json",
-        "contracts/entity/AUTH-005-verification-field-contract.v1.json",
         "contracts/entity/AUTH-003-credential-field-contract.v1.json",
-        "contracts/entity/AUTH-003-identity-field-contract.v1.json"
+        "contracts/entity/AUTH-003-identity-field-contract.v1.json",
+        "contracts/entity/AUTH-005-verification-field-contract.v1.json"
       ],
       "blockers": [
         "verification event IDs remain unresolved",
@@ -194,9 +194,9 @@
         "contracts/api/AUTH-006-passkey-webauthn-contract.v1.json",
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/entity/AUTH-002-006-canonical-field-authority.v1.json",
-        "contracts/entity/AUTH-006-passkey-field-contract.v1.json",
+        "contracts/entity/AUTH-003-identity-field-contract.v1.json",
         "contracts/entity/AUTH-005-verification-field-contract.v1.json",
-        "contracts/entity/AUTH-003-identity-field-contract.v1.json"
+        "contracts/entity/AUTH-006-passkey-field-contract.v1.json"
       ],
       "blockers": [
         "API and Entity contract bindings exist",
