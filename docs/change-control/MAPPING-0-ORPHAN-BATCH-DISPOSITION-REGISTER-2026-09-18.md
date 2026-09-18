@@ -25,14 +25,14 @@ Allowed dispositions:
 |---:|---|---|---|
 | 1 | `AI-001-015-real-evidence-reconciliation.v1.md` | Non-canonical scope family; claimed AI-001..015 while canonical AI count is 0 | PENDING_CHANGE_CONTROL |
 | 2 | `AUTH-001-005-evidence-closure-summary.v1.md` | AUTH evidence summary; unreferenced | PENDING_CHANGE_CONTROL |
-| 3 | `AUTH-001-dto-contract-closure-CLEANUP.md` | AUTH-001 DTO duplicate/cleanup cluster | PENDING_CHANGE_CONTROL |
-| 4 | `AUTH-001-dto-contract-closure.v1.1.md` | AUTH-001 DTO duplicate version cluster | PENDING_CHANGE_CONTROL |
-| 5 | `AUTH-001-dto-contract-closure.v1.2.md` | AUTH-001 DTO duplicate version cluster | PENDING_CHANGE_CONTROL |
-| 6 | `AUTH-001-dto-contract-closure.v1.3.md` | AUTH-001 DTO duplicate version cluster | PENDING_CHANGE_CONTROL |
-| 7 | `AUTH-001-dto-contract-closure.v1.4.md` | AUTH-001 DTO duplicate version cluster | PENDING_CHANGE_CONTROL |
-| 8 | `AUTH-001-dto-contract-closure.v1.5.md` | AUTH-001 DTO duplicate version cluster | PENDING_CHANGE_CONTROL |
-| 9 | `AUTH-001-dto-contract-closure.v1.md` | AUTH-001 DTO duplicate version cluster | PENDING_CHANGE_CONTROL |
-| 10 | `AUTH-001-dto-contract-closure.v2.md` | AUTH-001 DTO duplicate version cluster | PENDING_CHANGE_CONTROL |
+| 3 | `AUTH-001-dto-contract-closure-CLEANUP.md` | Explicitly states the draft is a non-canonical audit artifact | RETAIN_NON_CANONICAL |
+| 4 | `AUTH-001-dto-contract-closure.v1.1.md` | Explicitly requires canonical DTO registry verification and does not promote AUTH-001 | RETAIN_NON_CANONICAL |
+| 5 | `AUTH-001-dto-contract-closure.v1.2.md` | Explicitly states no canonical DTO registry was found and placeholders must not be canonized | RETAIN_NON_CANONICAL |
+| 6 | `AUTH-001-dto-contract-closure.v1.3.md` | Explicitly identifies itself as an audit note and earlier drafts as non-canonical | RETAIN_NON_CANONICAL |
+| 7 | `AUTH-001-dto-contract-closure.v1.4.md` | Explicitly states no DTO evidence is canonicalized by the file | RETAIN_NON_CANONICAL |
+| 8 | `AUTH-001-dto-contract-closure.v1.5.md` | Explicitly states it introduces no canonical mapping evidence | RETAIN_NON_CANONICAL |
+| 9 | `AUTH-001-dto-contract-closure.v1.md` | Closure task only; explicitly blocked until OpenAPI schema and evidence verification | RETAIN_NON_CANONICAL |
+| 10 | `AUTH-001-dto-contract-closure.v2.md` | Proposed DTO identifiers explicitly remain placeholders until canonical registry verification | RETAIN_NON_CANONICAL |
 | 11 | `AUTH-002-006-d1-schema-evidence-checklist.v1.md` | AUTH-002/006 persistence evidence artifact | PENDING_CHANGE_CONTROL |
 | 12 | `AUTH-002-006-d1-schema-mapping.v1.json` | AUTH-002/006 persistence mapping artifact | PENDING_CHANGE_CONTROL |
 | 13 | `AUTH-002-006-evidence-admission-checklist.v1.md` | AUTH-002/006 evidence admission artifact | PENDING_CHANGE_CONTROL |
@@ -81,6 +81,10 @@ Allowed dispositions:
 | 56 | `CLEANUP-AUTH-DTO-PLACEHOLDERS.md` | AUTH DTO cleanup artifact | PENDING_CHANGE_CONTROL |
 | 57 | `USER-001-010-real-evidence-reconciliation.v1.md` | USER reconciliation artifact | PENDING_CHANGE_CONTROL |
 | 58 | `USER-002-003-evidence-bound-delta.v1.md` | USER evidence-bound delta artifact | PENDING_CHANGE_CONTROL |
+
+## Reviewed AUTH-001 duplicate cluster
+
+Repository content review confirms all eight AUTH-001 DTO cluster files are working/audit artifacts rather than canonical Mapping-0 evidence. Their own text requires additional authority verification or explicitly labels the content non-canonical. Therefore their disposition is `RETAIN_NON_CANONICAL`; no one is selected as a canonical DTO authority by this register.
 
 ## Current state
 
