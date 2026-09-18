@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Current reviewed main head: `c4105bd8e303574e60f1d19e606731e15006e472`
+Current reviewed main head: `6f3c28b0c56980ca8de05213d1536f22f636e251`
 
 ## Current governance closure
 
@@ -66,9 +66,11 @@ AUTH-013, AUTH-014, AUTH-015 and AUTH-016 remain `PARTIAL`. Their current reconc
 
 ## Verification boundary
 
-No fresh successful Mapping-0 CI status is attached to reviewed head `c4105bd` in the GitHub connection. The repository does contain a structural CI workflow, but this review has not observed a current-head successful run result.
+For the current review window, GitHub Actions produced successful `Mapping 0 Structural Gate` and `Ensure Feature Inventory` runs for the preceding closure commits, including the canonical mapping blocker-correction commit. The latest observed `Mapping 0 Structural Gate` run completed successfully.
 
-Accordingly, this document does not claim a newly executed validator result for `c4105bd`.
+The repository also reports a `contract-ci.yml` workflow failure on the latest push, but the GitHub connection exposes zero jobs/check-runs for that workflow run. No failure step can therefore be truthfully attributed from the available evidence.
+
+Accordingly, this document accepts the structural validator result only where an actual successful run is observed and keeps full Contract CI / technical acceptance fail-closed.
 
 ## Next technical closure queue
 
@@ -85,3 +87,16 @@ The next admissible work is to close authoritative contracts and mappings in dep
 ## Result
 
 Governance closure is substantially complete. The remaining gap is no longer orphan/scope bookkeeping; it is authoritative Contract -> Mapping -> Runtime -> Evidence closure. Documentation alone must not promote the records to GREEN.
+
+
+## Current structural metrics rechecked
+
+- Canonical records: 449
+- Status: PARTIAL 14 / MISSING 2 / UNRESOLVED 433
+- Records with API edges: 11
+- Records with Entity edges: 9
+- Records with Payload edges: 0
+- Records with Code evidence edges: 0
+- Complete API+Entity+Payload+Code closure: 0/449
+
+The blocker correction in this commit changes only stale AUTH blocker wording; it does not promote any record or alter technical status.
