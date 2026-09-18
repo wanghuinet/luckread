@@ -11,7 +11,7 @@
         "ENT-CREDENTIAL",
         "ENT-SESSION"
       ],
-      "persistenceMode": "LUCKREAD_EXTENSION",
+      "persistenceMode": "MIXED",
       "owner": "D1-01",
       "status": "BLOCKED",
       "evidenceRefs": [
