@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Reviewed head: `051b5209aa63935e6f8c0b81623ce71f23f669cc`
+Reviewed head: `5a4c50ebd6aab7af3ec021c020ba833ae15699c1`
 Basis: current GitHub main, Batch G final sweep, orphan disposition register, canonical mapping, Feature Inventory, and Evidence Registry.
 
 ## 1. Acceptance boundary
@@ -58,6 +58,17 @@ The AUTH-002 session integration evidence boundary now points to:
 
 This corrects the evidence path. It does **not** prove runtime or persistence closure.
 
+### 2.4 Batch G orphan-report consistency — CLOSED
+
+The Batch G generator was corrected to consume the existing orphan disposition register. GitHub Actions run `35320581638` verified:
+
+- orphan disposition register present: `true`
+- `PENDING_CHANGE_CONTROL`: `0`
+- orphan governance: `closed: true`
+- no canonical Mapping record/status was changed by the sweep
+
+The structural gate still reports 449 canonical features and 449 mapping records, with 449 downstream gaps. Evidence freshness remains 0 fresh / 11 expired.
+
 ## 3. Residual blocking findings
 
 ### 3.1 Evidence freshness
@@ -97,8 +108,8 @@ The Batch G handoff records 450 blockers in downstream reconciliation. This is a
 | Canonical scope governance | ACCEPT / CONTROLLED | out-of-scope IDs kept outside canonical inventory |
 | Persistence ownership closure | NOT_ACCEPTED | persistence registry has 0 records |
 | Evidence freshness | NOT_ACCEPTED | existing evidence contains expired validity dates |
-| Five-way reconciliation | NOT_ACCEPTED | 450 blockers remain |
-| Technical/runtime closure | NOT_ACCEPTED | 0/449 complete technical edge closure in Batch G snapshot |
+| Five-way reconciliation | NOT_ACCEPTED | 450 blockers remain in the current downstream snapshot |
+| Technical/runtime closure | NOT_ACCEPTED | 0/449 complete technical edge closure in current structural-gate run |
 | Implementation authorization | NOT_GRANTED | per-feature Mapping → Contract → Runtime → Evidence gates remain mandatory |
 
 ## 5. Required next batch
