@@ -17,22 +17,22 @@ on:
   push:
     branches: [main]
     paths:
-      - 'package.json'
-      - 'package-lock.json'
-      - 'src/collections/Users.ts'
-      - 'src/payload.config.ts'
-      - 'src/migrations/**'
+      - 'workers/W01-payload/package.json'
+      - 'workers/W01-payload/pnpm-lock.yaml'
+      - 'workers/W01-payload/src/collections/Users.ts'
+      - 'workers/W01-payload/src/payload.config.ts'
+      - 'workers/W01-payload/src/migrations/**'
       - 'scripts/auth-session-schema-evidence-probe.mjs'
       - 'scripts/auth-session-schema-evidence-validate.mjs'
       - '.github/workflows/auth-session-schema-evidence.yml'
       - 'workers/W01-payload/wrangler.jsonc'
   pull_request:
     paths:
-      - 'package.json'
-      - 'package-lock.json'
-      - 'src/collections/Users.ts'
-      - 'src/payload.config.ts'
-      - 'src/migrations/**'
+      - 'workers/W01-payload/package.json'
+      - 'workers/W01-payload/pnpm-lock.yaml'
+      - 'workers/W01-payload/src/collections/Users.ts'
+      - 'workers/W01-payload/src/payload.config.ts'
+      - 'workers/W01-payload/src/migrations/**'
       - 'scripts/auth-session-schema-evidence-probe.mjs'
       - 'scripts/auth-session-schema-evidence-validate.mjs'
       - '.github/workflows/auth-session-schema-evidence.yml'
@@ -59,8 +59,12 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Install locked dependencies
-        run: npm ci --no-audit --no-fund
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.34.5 --activate
+
+      - name: Install W01 locked dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-workspace
 
       - name: Validate Gate-1 capture preconditions
         run: node scripts/auth-session-schema-evidence-probe.mjs --gate1
@@ -196,17 +200,17 @@ jobs:
             'provenance.json',
           ];
           const sha256 = (file) => crypto.createHash('sha256').update(fs.readFileSync(`${dir}/${file}`)).digest('hex');
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const pkg = JSON.parse(fs.readFileSync('workers/W01-payload/package.json', 'utf8'));
+          const lockText = fs.readFileSync('workers/W01-payload/pnpm-lock.yaml', 'utf8');
           const provenance = JSON.parse(fs.readFileSync(`${dir}/provenance.json`, 'utf8'));
           const manifest = {
             testedCommitSha: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
             environmentClass: process.env.EVIDENCE_ENVIRONMENT,
             databaseName: process.env.DATABASE_NAME,
             payloadVersion: pkg.dependencies?.payload ?? null,
-            payloadLockedVersion: lock.packages?.['node_modules/payload']?.version ?? null,
+            payloadLockedVersion: /(?:^|\n)\s{2}payload:\s*\n\s{4}specifier:\s*[^\n]+\n\s{4}version:\s*([^\n]+)/m.exec(lockText)?.[1] ?? null,
             d1AdapterVersion: pkg.dependencies?.['@payloadcms/db-d1-sqlite'] ?? null,
-            d1AdapterLockedVersion: lock.packages?.['node_modules/@payloadcms/db-d1-sqlite']?.version ?? null,
+            d1AdapterLockedVersion: /(?:^|\n)\s{2}['"]?@payloadcms\/db-d1-sqlite['"]?:\s*\n\s{4}specifier:\s*[^\n]+\n\s{4}version:\s*([^\n]+)/m.exec(lockText)?.[1] ?? null,
             nodeVersion: process.version,
             wranglerVersion: process.env.WRANGLER_VERSION,
             executedAt: new Date().toISOString(),
