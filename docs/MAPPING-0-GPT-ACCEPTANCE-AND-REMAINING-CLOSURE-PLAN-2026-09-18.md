@@ -2,7 +2,8 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Reviewed head: `48827c2f3bbd61529d3ecf14b9b442cdd2784d57`
+Verified technical/configuration baseline head: `dfa9af34546fe357c3b83d2b076b9852a04e5542`
+Current GitHub `main` additionally contains documentation-only verification commits after that baseline.
 Basis: current GitHub main, Batch G final sweep, orphan disposition register, canonical mapping, Feature Inventory, and Evidence Registry.
 
 ## 1. Acceptance boundary
@@ -15,8 +16,8 @@ Current repository evidence establishes:
 - Canonical Mapping records: 449; exact 1:1 record alignment.
 - Structural Mapping-0 gate: designed to pass when inventory and mapping cardinality are structurally valid.
 - Evidence-reference coverage was previously recorded as 449/449 records with at least one reference and 0 broken references.
-- Technical edge closure remains **0/449 complete** in the Batch G snapshot: 11 API-edge records, 9 Entity-edge records, 1 Payload-edge record, 0 Code-edge records.
-- Status distribution in the Batch G snapshot: 433 `UNRESOLVED`, 14 `PARTIAL`, 2 `MISSING`.
+- Technical edge closure remains **0/449 complete** in the verified baseline: 11 API-edge records, 9 Entity-edge records, 1 Payload-edge record, 0 Code-edge records.
+- Status distribution in the verified baseline: 433 `UNRESOLVED`, 14 `PARTIAL`, 2 `MISSING`.
 - Five-way reconciliation remains `NOT_GREEN`.
 - The persistence registry currently has **0 records**, so persistence ownership is not technically closed.
 
@@ -106,7 +107,7 @@ These must remain fail-closed. No API/DTO/entity/persistence edges may be invent
 
 ### 3.5 Contract CI execution observation
 
-The historical Contract CI run `35322358307` for commit `0f8bcf508553b96989f5400f89441ed6991bdf6b` finished with conclusion `failure` but GitHub reported **0 jobs** for that run. On the current reviewed head, the available check-runs are the Feature Inventory gate and Mapping-0 structural verification; no Contract CI check-run is present. Therefore the repository evidence does not currently establish the underlying Contract CI failure cause. This item is recorded as an infrastructure/workflow verification blocker only; no Contract CI workflow change is admitted without a reproducible failure signal.
+The latest observed Contract CI run `35366755025` for verified baseline `dfa9af34546fe357c3b83d2b076b9852a04e5542` finished with conclusion `failure`, and a direct GitHub job query returned **0 jobs**. The repository evidence therefore still does not establish the underlying Contract CI failure cause. This item is recorded as an infrastructure/workflow verification blocker only; no Contract CI workflow change is admitted without a reproducible job-level or platform-level failure signal.
 ### 3.4 Five-way reconciliation
 
 The current five-way reconciliation file contains 450 top-level blocker IDs and 457 record-level blocker entries across 449 records. This is a separate closure gate and remains `NOT_GREEN`.
@@ -146,3 +147,8 @@ The current Evidence Registry contains 11 records covering 9 Feature IDs. The se
 - No inferred API, DTO, Entity, Field, Payload, Worker, D1, Security, Lifecycle, Test or Evidence edges.
 - Documentation-only claims do not substitute for executable evidence.
 - Structural GREEN is not technical/runtime GREEN.
+
+
+## 7. Current verification record
+
+The current verified evidence is consolidated in `docs/MAPPING-0-VERIFICATION-SNAPSHOT-2026-09-19.md`. The snapshot records the exact structural-gate run/job, current edge-coverage semantics, evidence freshness, persistence status, five-way blocker counts, and the Contract CI zero-job diagnostic.
