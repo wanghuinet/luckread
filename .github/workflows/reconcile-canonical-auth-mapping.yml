@@ -13,6 +13,7 @@ on:
       - 'contracts/api/AUTH-005-identity-verification-contract.v1.json'
       - 'contracts/api/AUTH-006-passkey-webauthn-contract.v1.json'
       - 'contracts/dto/auth-dto-contract.v1.json'
+      - 'docs/MAPPING-0-AUTH-TECHNICAL-CLOSURE-QUEUE-2026-09-18.md'
       - '.github/workflows/reconcile-canonical-auth-mapping.yml'
   workflow_dispatch:
 
