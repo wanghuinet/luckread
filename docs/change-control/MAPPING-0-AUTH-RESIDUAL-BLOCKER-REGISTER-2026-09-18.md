@@ -2,7 +2,7 @@
 
 Date: 2026-09-18  
 Repository: `wanghuinet/luckread`  
-Baseline: Batch G final sweep reported at reviewed head `2176675f4262fd8777f18f4ee63746d949119bfdea`
+Baseline: Batch G final sweep reported at reviewed head `2176675f4262fd8778777f18f4ee63746d949119bfdea`
 
 ## Purpose
 
