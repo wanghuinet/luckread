@@ -1,0 +1,68 @@
+# CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18
+
+## Status
+
+BLOCKED — requires explicit authority decision before implementation or contract promotion.
+
+## Purpose
+
+Record the verified semantic conflict between the active W01 Payload Users collection source and the existing canonical ENT-USER contract evidence. This record is governance/control evidence only; it does not authorize implementation.
+
+## Verified facts
+
+1. The active runtime authority is `workers/W01-payload/`.
+2. Current W01 `workers/W01-payload/src/collections/Users.ts` declares:
+   - `slug: users`
+   - `auth: true`
+   - `fields: []`
+   - `versions: false`
+3. The legacy root `src/collections/Users.ts` contains the six previously documented profile/preference fields:
+   - `username`
+   - `displayName`
+   - `bio`
+   - `avatar`
+   - `locale`
+   - `timezone`
+4. `contracts/entity/entity-field-contract.v1.json` currently treats those six ENT-USER fields as VERIFIED contract fields and points their source references at the legacy root scaffold.
+5. `contracts/entity/entity-catalog.v1.json` currently marks ENT-USER as VERIFIED and points its implementation reference at the legacy root scaffold.
+6. `contracts/payload/payload-native-inventory.v1.json` has already been regenerated from W01 and therefore correctly observes zero W01 User business fields.
+7. The existing W01 migration contains the Payload-native Users schema generated from the W01 collection state; source presence is not evidence that the six canonical business fields are implemented in W01.
+
+## Conflict
+
+The canonical ENT-USER field contract and the active W01 implementation source currently describe different field sets.
+
+This cannot be resolved by:
+- copying the six legacy fields into W01 without Change Control;
+- changing the canonical field contract to zero fields merely to match W01;
+- changing status to GREEN based on documentation;
+- treating the legacy root scaffold as the W01 runtime implementation;
+- inferring that generated migration columns prove current contract field implementation.
+
+## Required decision
+
+One explicit Change Control decision must choose the authoritative direction:
+
+A. Promote the six canonical ENT-USER fields into W01 implementation and regenerate/review migration evidence; or
+
+B. Reconcile and formally change the ENT-USER field contract/blueprint to match the intended W01 contract state.
+
+Either choice requires:
+- contract/blueprint reconciliation;
+- deterministic evidence regeneration;
+- persistence reconciliation;
+- Mapping 0 re-validation.
+
+No implementation is authorized by this record.
+
+## Gate impact
+
+- ENT-USER entity status: remains as currently contracted.
+- ENT-USER persistence status: remains NOT_VERIFIED.
+- Mapping 0: remains NOT_GREEN.
+- W01 Payload inventory: remains the authoritative observed source for W01.
+- Legacy root source: remains historical/non-authoritative for W01.
+
+## Acceptance
+
+This GAP is correctly recorded when the above conflict remains visible and no unsupported status promotion is made.
