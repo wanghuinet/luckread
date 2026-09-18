@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Reviewed head: `66d216df4816c13c90edf3131517a987ab9a5436`
+Reviewed head: `e37b860b1221cea41011ebc37e20446c6877fea7`
 Basis: current GitHub main, Batch G final sweep, orphan disposition register, canonical mapping, Feature Inventory, and Evidence Registry.
 
 ## 1. Acceptance boundary
