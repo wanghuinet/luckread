@@ -3,30 +3,26 @@ name: Payload Foundation CI
 on:
   push:
     paths:
-      - 'package.json'
-      - 'package-lock.json'
-      - 'next.config.mjs'
-      - 'tsconfig.json'
-      - 'next-env.d.ts'
-      - 'src/**'
-      - 'tests/**'
+      - 'workers/W01-payload/**'
+      - 'contracts/payload/**'
+      - 'scripts/payload-native-inventory.mjs'
+      - 'scripts/payload-contract-reconciliation-check.mjs'
+      - 'scripts/payload-implementation-admission-check.mjs'
       - '.github/workflows/payload-foundation-ci.yml'
   pull_request:
     paths:
-      - 'package.json'
-      - 'package-lock.json'
-      - 'next.config.mjs'
-      - 'tsconfig.json'
-      - 'next-env.d.ts'
-      - 'src/**'
-      - 'tests/**'
+      - 'workers/W01-payload/**'
+      - 'contracts/payload/**'
+      - 'scripts/payload-native-inventory.mjs'
+      - 'scripts/payload-contract-reconciliation-check.mjs'
+      - 'scripts/payload-implementation-admission-check.mjs'
       - '.github/workflows/payload-foundation-ci.yml'
   workflow_dispatch:
 
 jobs:
   foundation:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,19 +31,29 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
 
-      - name: Install dependencies from committed lockfile
-        run: npm ci --no-audit --no-fund
+      - name: Enable Corepack
+        run: corepack enable
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Install W01 dependencies from committed lockfile
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Typecheck W01
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit
 
       - name: Security unit tests
-        run: npm test
+        working-directory: workers/W01-payload
+        run: pnpm run test:int
 
-      - name: Payload admission gate
-        run: npm run payload:admission
+      - name: W01 lint
+        working-directory: workers/W01-payload
+        run: pnpm run lint
 
-      - name: Production build
-        run: npm run build
+      - name: W01 production build
+        working-directory: workers/W01-payload
+        run: pnpm run build
+
+      - name: Payload implementation admission gate
+        run: node scripts/payload-implementation-admission-check.mjs

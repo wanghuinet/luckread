@@ -4,13 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'src/**'
-      - 'app/**'
-      - 'collections/**'
-      - 'payload/**'
-      - 'lib/**'
-      - 'server/**'
-      - 'routes/**'
+      - 'workers/W01-payload/**'
       - 'docs/16-P0-PAYLOAD-AUTHORIZATION-BOUNDARY-CONTRACT-v1.0.md'
       - 'docs/17-P0-AUTHORIZATION-IMPLEMENTATION-AUDIT-v1.0.md'
       - 'docs/18-P0-PAYLOAD-IMPLEMENTATION-ADMISSION-GATE-v1.0.md'
@@ -19,13 +13,7 @@ on:
       - '.github/workflows/payload-implementation-admission.yml'
   pull_request:
     paths:
-      - 'src/**'
-      - 'app/**'
-      - 'collections/**'
-      - 'payload/**'
-      - 'lib/**'
-      - 'server/**'
-      - 'routes/**'
+      - 'workers/W01-payload/**'
       - 'docs/16-P0-PAYLOAD-AUTHORIZATION-BOUNDARY-CONTRACT-v1.0.md'
       - 'docs/17-P0-AUTHORIZATION-IMPLEMENTATION-AUDIT-v1.0.md'
       - 'docs/18-P0-PAYLOAD-IMPLEMENTATION-ADMISSION-GATE-v1.0.md'
