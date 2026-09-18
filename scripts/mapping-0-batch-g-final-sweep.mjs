@@ -101,7 +101,7 @@ const duplicateClusters = [...clusters.entries()]
   .map(([base, members]) => ({ base, members: members.sort() }))
   .sort((a, b) => a.base.localeCompare(b.base))
 
-const pendingDispositionCountMatch = orphanDispositionText.match(/`PENDING_CHANGE_CONTROL` remaining:\s*([0-9]+)/)
+const pendingDispositionCountMatch = orphanDispositionText.match(/`PENDING_CHANGE_CONTROL` remaining:\s*\*\*?\s*([0-9]+)\s*\*\*?/)
 const pendingDispositionCount = pendingDispositionCountMatch ? Number.parseInt(pendingDispositionCountMatch[1], 10) : null
 const orphanGovernanceClosed = orphanFiles.length === 0
   ? true
