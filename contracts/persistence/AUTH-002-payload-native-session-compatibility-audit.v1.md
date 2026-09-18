@@ -15,7 +15,7 @@ This audit does not promote `ENT-SESSION`, does not create a migration, and does
 3. W01 locks `payload` and `@payloadcms/db-d1-sqlite` to `3.87.1` (current W01 package lock; `3.82.1` remains only the historical upstream template observation).
 4. `workers/W01-payload/src/collections/Users.ts` enables `auth: true`.
 5. `workers/W01-payload/src/payload.config.ts` configures the D1 adapter, binds the W01 D1 environment, sets `push: false`, and configures `workers/W01-payload/src/migrations` as the migration directory.
-6. The repository currently has no verified applied Session migration evidence and no verified runtime equivalence evidence.
+6. The W01 source tree contains a concrete Payload migration artifact and migration index, but the repository currently has no current commit-bound proof of that migration being applied to the controlled remote D1, and no verified runtime equivalence evidence.
 7. The canonical Session contract contains nine fields and explicit security/lifecycle invariants.
 
 ## 3. Version authority rule
@@ -76,7 +76,7 @@ The W01 `3.87.1` implementation must produce evidence for:
 
 ## 8. Migration gate
 
-The migration gate remains `BLOCKED` until an actual W01 Payload migration artifact exists under `workers/W01-payload/src/migrations` and its applied execution status is evidenced.
+The migration gate remains `BLOCKED` until the existing W01 Payload migration artifact under `workers/W01-payload/src/migrations` is validated against the current configuration and its applied execution status is evidenced against the controlled D1.
 
 Configuration, documented CLI commands, source materialization, or historical files are not execution evidence.
 
@@ -87,8 +87,8 @@ W01 Cloudflare baseline        = 3.87.1 (current lock; upstream observation 3.82
 Native session capability      = CANDIDATE / RUNTIME PROOF REQUIRED
 Canonical field equivalence    = NOT PROVEN
 Actual D1 session schema       = NOT VERIFIED
-Migration artifact             = NOT VERIFIED
-Applied migration              = NOT VERIFIED
+Migration source artifact       = PRESENT / NOT YET ADMITTED
+Applied migration               = NOT VERIFIED
 Runtime equivalence            = NOT VERIFIED
 Device binding                = BLOCKING
 Token-version mapping         = BLOCKING
