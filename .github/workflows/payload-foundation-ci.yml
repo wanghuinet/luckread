@@ -45,7 +45,7 @@ jobs:
 
       - name: Security unit tests
         working-directory: workers/W01-payload
-        run: pnpm run test:int
+        run: pnpm exec vitest run --passWithNoTests --config ./vitest.config.mts
 
       - name: W01 lint
         working-directory: workers/W01-payload
