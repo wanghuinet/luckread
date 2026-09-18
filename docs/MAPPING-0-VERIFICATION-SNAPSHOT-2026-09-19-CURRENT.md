@@ -2,7 +2,8 @@
 
 Repository: `wanghuinet/luckread`
 Verification source of truth: GitHub `main`
-Current verified head: `584346f195d341c67e911212cf3cfcede76f4fe7`
+Verified baseline head: `584346f195d341c67e911212cf3cfcede76f4fe7`
+Snapshot commit: `a39a09f936a25c6dbd869059dcda1ceeede425df` (documentation-only)
 
 ## 1. Current acceptance boundary
 
@@ -16,7 +17,7 @@ No implementation admission is granted by this snapshot.
 
 ## 2. Structural Mapping 0
 
-The latest observed GitHub Actions Mapping 0 structural/contract verification for the current mainline completed successfully.
+The latest observed GitHub Actions Mapping 0 structural/contract verification for the verified baseline head completed successfully.
 
 Observed structural facts:
 
