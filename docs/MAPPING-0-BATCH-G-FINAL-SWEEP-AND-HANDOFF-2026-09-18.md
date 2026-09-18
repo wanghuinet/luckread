@@ -137,6 +137,12 @@ Required before any feature is claimed DONE:
 
 1. Reconcile the Batch-08 blueprint (GROWTH/ANALYTICS/AI) against the canonical
    Feature Inventory; resolve AI-001..015, ANALYTICS-012..020, GROWTH-011..014.
-2. Archive or formally retire the 58 orphan draft files.
-3. De-duplicate the AUTH-001 DTO closure cluster (8 files) into a single canonical
-   reference or remove the drafts.
+2. De-duplicate the AUTH-001 DTO closure cluster (8 files) through explicit authority
+   selection/archive decision; keep all non-canonical drafts out of canonical evidence.
+
+### 6.1 Completed governance item
+
+The 58 orphan batch files have already been row-by-row dispositioned by
+`docs/change-control/MAPPING-0-ORPHAN-BATCH-DISPOSITION-REGISTER-2026-09-18.md`:
+58/58 explicitly classified as `RETAIN_NON_CANONICAL`, with 0
+`PENDING_CHANGE_CONTROL`. The orphan governance gate is therefore **CLOSED**.
