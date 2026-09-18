@@ -1,23 +1,164 @@
 {
-  "version":"1.0.0",
-  "status":"NOT_GREEN",
-  "sourceOfTruth":"docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-  "featureInventoryRef":"contracts/alignment/feature-inventory.v1.json",
-  "generatedBy":"manual-baseline-step-03",
-  "records":[
-    {"entityId":"ENT-USER","entityName":"User","entityStatus":"VERIFIED","implementationRef":"workers/W01-payload/src/collections/Users.ts","persistenceStatus":"NOT_VERIFIED","adapter":"@payloadcms/db-d1-sqlite","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json","workers/W01-payload/src/collections/Users.ts","workers/W01-payload/src/payload.config.ts"]},
-    {"entityId":"ENT-IDENTITY","entityName":"Identity","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-CREDENTIAL","entityName":"Credential","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-SESSION","entityName":"Session","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"CONTRACTED_NOT_VERIFIED","adapter":"D1 / @payloadcms/db-d1-sqlite boundary TBD","migrationRefs":[],"fieldContractRef":"contracts/entity/AUTH-002-session-field-contract.v1.json","persistenceContractRef":"contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json","contracts/entity/AUTH-002-session-field-contract.v1.json","contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json"]},
-    {"entityId":"ENT-VERIFICATION","entityName":"Verification","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-DEVICE-RECORD","entityName":"DeviceRecord","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-ROLE-ASSIGNMENT","entityName":"RoleAssignment","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-ENTITLEMENT-GRANT","entityName":"EntitlementGrant","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-SUBSCRIPTION","entityName":"Subscription","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]},
-    {"entityId":"ENT-ORG-MEMBERSHIP","entityName":"OrgMembership","domainId":"D1-01","entityStatus":"PROPOSED","implementationRef":"","persistenceStatus":"NOT_APPLICABLE","adapter":"","migrationRefs":[],"fieldContractRef":"contracts/entity/entity-field-contract.v1.json","evidenceRefs":["contracts/entity/entity-catalog.v1.json"]}
+  "version": "1.0.0",
+  "status": "NOT_GREEN",
+  "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "featureInventoryRef": "contracts/alignment/feature-inventory.v1.json",
+  "generatedBy": "manual-baseline-step-03",
+  "records": [
+    {
+      "entityId": "ENT-USER",
+      "entityName": "User",
+      "entityStatus": "VERIFIED",
+      "implementationRef": "workers/W01-payload/src/collections/Users.ts",
+      "persistenceStatus": "NOT_VERIFIED",
+      "adapter": "@payloadcms/db-d1-sqlite",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "workers/W01-payload/src/collections/Users.ts",
+        "workers/W01-payload/src/payload.config.ts"
+      ]
+    },
+    {
+      "entityId": "ENT-IDENTITY",
+      "entityName": "Identity",
+      "domainId": "D1-01",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "NOT_VERIFIED",
+      "adapter": "",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json"
+      ]
+    },
+    {
+      "entityId": "ENT-CREDENTIAL",
+      "entityName": "Credential",
+      "domainId": "D1-01",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "NOT_VERIFIED",
+      "adapter": "",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json"
+      ]
+    },
+    {
+      "entityId": "ENT-SESSION",
+      "entityName": "Session",
+      "domainId": "D1-01",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+      "adapter": "D1 / @payloadcms/db-d1-sqlite boundary TBD",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/AUTH-002-session-field-contract.v1.json",
+      "persistenceContractRef": "contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/AUTH-002-session-field-contract.v1.json",
+        "contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json"
+      ]
+    },
+    {
+      "entityId": "ENT-VERIFICATION",
+      "entityName": "Verification",
+      "domainId": "D1-01",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "NOT_VERIFIED",
+      "adapter": "",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json"
+      ]
+    },
+    {
+      "entityId": "ENT-DEVICE-RECORD",
+      "entityName": "DeviceRecord",
+      "domainId": "D1-01",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "NOT_APPLICABLE",
+      "adapter": "",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json"
+      ]
+    },
+    {
+      "entityId": "ENT-ROLE-ASSIGNMENT",
+      "entityName": "RoleAssignment",
+      "domainId": "D1-01",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "NOT_APPLICABLE",
+      "adapter": "",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json"
+      ]
+    },
+    {
+      "entityId": "ENT-ENTITLEMENT-GRANT",
+      "entityName": "EntitlementGrant",
+      "domainId": "D1-01",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "NOT_APPLICABLE",
+      "adapter": "",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json"
+      ]
+    },
+    {
+      "entityId": "ENT-SUBSCRIPTION",
+      "entityName": "Subscription",
+      "domainId": "D1-01",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "NOT_APPLICABLE",
+      "adapter": "",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json"
+      ]
+    },
+    {
+      "entityId": "ENT-ORG-MEMBERSHIP",
+      "entityName": "OrgMembership",
+      "domainId": "D1-01",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "NOT_APPLICABLE",
+      "adapter": "",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json"
+      ]
+    }
   ],
-  "rules":{"noInference":true,"persistenceRequiresImplementationEvidence":true,"migrationEvidenceRequiredForSchemaChanges":true,"authorityMustResolveToMapping":true,"featureInventoryMustExist":true,"contractedSessionPersistenceMustNotBeMarkedVerified":true},
-  "blockers":[
+  "rules": {
+    "noInference": true,
+    "persistenceRequiresImplementationEvidence": true,
+    "migrationEvidenceRequiredForSchemaChanges": true,
+    "authorityMustResolveToMapping": true,
+    "featureInventoryMustExist": true,
+    "contractedSessionPersistenceMustNotBeMarkedVerified": true
+  },
+  "blockers": [
     "Feature Inventory is present and deterministic.",
     "User persistence is configured through @payloadcms/db-d1-sqlite but migration evidence is not yet verified in the repository.",
     "AUTH-002 Session persistence and migration are now contract-defined but remain unverified until actual schema, migration and runtime evidence exists.",
