@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Baseline reviewed head: `c4105bd8e303574e60f1d19e606731e15006e472`
+Baseline reviewed head: `021877e5f3828f5cec3b7d066be8b086213b28a3`
 
 ## Purpose
 
@@ -23,7 +23,9 @@ This queue converts the current AUTH residual state into executable verification
 
 The API contract is `CONTRACTED_NOT_VERIFIED`. Its evidence status records API/DTO/entity as `CONTRACTED_NOT_VERIFIED`, and persistence/runtime/security-E2E/Mapping-0 as missing.
 
-The field contract is `CONTRACTED_NOT_VERIFIED`. Physical D1 table/column/index evidence is still pending actual schema evidence. No executable implementation or security E2E evidence is admitted by the reconciliation record.
+The field contract is `CONTRACTED_NOT_VERIFIED`. Physical D1 table/column/index evidence is still pending actual schema evidence.
+
+The shared persistence mapping currently carries AUTH-006 DTO aliases `DTO-AUTH-006-PASSKEY-REGISTRATION-OPTIONS`, `DTO-AUTH-006-PASSKEY-REGISTRATION-VERIFY`, `DTO-AUTH-006-PASSKEY-ASSERTION-OPTIONS`, `DTO-AUTH-006-PASSKEY-ASSERTION-VERIFY`, and `DTO-AUTH-006-PASSKEY-REMOVE`, while the feature API contract uses `DTO-AUTH-006-REGISTRATION-OPTIONS`, `DTO-AUTH-006-REGISTRATION-VERIFY`, `DTO-AUTH-006-ASSERTION-OPTIONS`, `DTO-AUTH-006-ASSERTION-VERIFY`, and `DTO-AUTH-006-REMOVE`. This remains an unresolved authority mismatch; no rename or promotion is permitted without explicit OpenAPI/DTO authority resolution. No executable implementation or security E2E evidence is admitted by the reconciliation record.
 
 ### Admissible next work
 
