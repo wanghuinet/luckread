@@ -8,8 +8,8 @@ This batch closes the evidence-gate definition for Entity → Field → Payload 
 
 ## Current verified facts
 
-1. `ENT-USER` has implementation evidence at `src/collections/Users.ts`.
-2. `src/payload.config.ts` configures `@payloadcms/db-d1-sqlite`, binds `cloudflare.env.D1`, sets `push: false`, and points `migrationDir` to `src/migrations`.
+1. The declared active W01 implementation source is `workers/W01-payload/src/collections/Users.ts`.
+2. `workers/W01-payload/src/payload.config.ts` configures `@payloadcms/db-d1-sqlite`, binds the W01 D1 environment, sets `push: false`, and points `migrationDir` to `workers/W01-payload/src/migrations`.
 3. The canonical persistence inventory still records `ENT-USER.persistenceStatus = NOT_VERIFIED` and has no migration references.
 4. No current repository evidence was found that proves the concrete D1 table/column mapping or migration execution for `ENT-USER`.
 
