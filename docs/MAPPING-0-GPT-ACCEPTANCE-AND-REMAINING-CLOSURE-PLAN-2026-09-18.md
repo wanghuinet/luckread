@@ -15,7 +15,7 @@ Current repository evidence establishes:
 - Canonical Mapping records: 449; exact 1:1 record alignment.
 - Structural Mapping-0 gate: designed to pass when inventory and mapping cardinality are structurally valid.
 - Evidence-reference coverage was previously recorded as 449/449 records with at least one reference and 0 broken references.
-- Technical edge closure remains **0/449 complete** in the Batch G snapshot: 28 API edges, 18 Entity edges, 1 Payload edge, 0 Code edges.
+- Technical edge closure remains **0/449 complete** in the Batch G snapshot: 11 API-edge records, 9 Entity-edge records, 1 Payload-edge record, 0 Code-edge records.
 - Status distribution in the Batch G snapshot: 433 `UNRESOLVED`, 14 `PARTIAL`, 2 `MISSING`.
 - Five-way reconciliation remains `NOT_GREEN`.
 - The persistence registry currently has **0 records**, so persistence ownership is not technically closed.
