@@ -30,9 +30,11 @@ Status: **NOT_GREEN / discovery baseline**
 
 ### Current baseline
 
-`ENT-USER` 是当前唯一 VERIFIED 实体实现入口，对应 `src/collections/Users.ts`；当前项目使用 `@payloadcms/db-d1-sqlite`。但本步骤故意不宣称已经证明最终 D1 schema，因为尚未完成可重复的实际 schema/migration discovery。
+`ENT-USER` remains the only domain entity currently classified `VERIFIED` in the Entity Catalog. However, the declared active Payload runtime authority is `workers/W01-payload/`, and the current W01 `Users.ts` contains `auth: true` with `fields: []`. The older root `src/collections/Users.ts` contains six profile/preference fields but is not the declared W01 runtime authority. Therefore the root source must not be used as current W01 implementation evidence.
 
-其他身份、权限、订阅、组织相关实体当前保持 PROPOSED，不得提前生成数据库事实。
+The active W01 project uses `@payloadcms/db-d1-sqlite`. A dedicated Change Control record captures the source-path drift: `docs/change-control/CC-MAPPING-0-W01-RUNTIME-AUTHORITY-PATH-DRIFT-2026-09-18.md`.
+
+Other identity, permission, subscription, and organization entities remain PROPOSED and must not be converted into database facts by inference.
 
 ### Exit criteria
 
