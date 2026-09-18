@@ -10,10 +10,10 @@ Close the first concrete Entity → Field → Payload → D1 persistence reconci
 
 1. `ENT-USER` is the only currently VERIFIED entity in the entity-field contract; its six canonical fields are `username`, `displayName`, `bio`, `avatar`, `locale`, and `timezone`.
 2. All six fields currently carry `migrationVersion: PENDING_EVIDENCE`.
-3. The Payload collection implementation is `src/collections/Users.ts`.
-4. The Payload D1 adapter is configured with `push: false` and `migrationDir: ./migrations` in `src/payload.config.ts`.
-5. The current `src` directory does not expose a `migrations` directory through the repository contents listing.
-6. Repository search did not produce authoritative current-main evidence of a concrete `CREATE TABLE users` migration or field-by-field D1 column mapping.
+3. The active Payload collection implementation source is `workers/W01-payload/src/collections/Users.ts`; the legacy root collection is not the active W01 runtime authority.
+4. The active W01 Payload D1 adapter is configured with `push: false` and `migrationDir: ./migrations` in `workers/W01-payload/src/payload.config.ts`.
+5. The W01 source tree contains `src/migrations/index.ts` and `src/migrations/20250929_111647.ts`.
+6. The migration source contains a concrete `CREATE TABLE users` definition, but this source fact is not equivalent to current controlled-D1 execution/schema evidence.
 
 ## Mandatory evidence required to close B12
 
