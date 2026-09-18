@@ -92,8 +92,7 @@
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
-        "canonical API IDs not established in current inventory",
-        "Entity/Field contract not fully bound"
+        "DTO registry and Entity/Field binding remain unverified"
       ]
     },
     {
@@ -121,7 +120,7 @@
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
-        "canonical recovery/change API mapping missing",
+        "DTO/entity/field binding remains incomplete",
         "single-use token evidence missing"
       ]
     },
@@ -150,7 +149,7 @@
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
-        "verification API and event IDs missing",
+        "verification event IDs remain unresolved",
         "security E2E evidence missing"
       ]
     },
@@ -181,7 +180,8 @@
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
-        "canonical API/DTO/data/security contracts not established"
+        "API and Entity contract bindings exist",
+        "canonical DTO registry, persistence schema, security E2E, runtime evidence and Mapping-0 validation remain unverified"
       ]
     },
     {
