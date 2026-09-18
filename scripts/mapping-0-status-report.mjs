@@ -30,6 +30,13 @@ const mappingRecords = Array.isArray(mapping.records) ? mapping.records : []
 const persistenceRecords = Array.isArray(persistence.records) ? persistence.records : []
 const evidenceRecords = Array.isArray(evidence.records) ? evidence.records : []
 
+const nowMs = Date.now()
+const staleEvidenceRecords = evidenceRecords.filter((record) => {
+  if (!record?.validUntil) return false
+  const validUntilMs = Date.parse(record.validUntil)
+  return Number.isFinite(validUntilMs) && validUntilMs < nowMs
+})
+
 const blockingStatuses = new Set(['UNRESOLVED', 'MISSING', 'CONFLICT', 'DUPLICATE', 'DRIFT', 'EXTRA', 'BLOCKED', 'PARTIAL', 'NOT_GREEN'])
 const statusCounts = (records) => records.reduce((acc, record) => {
   // Feature inventory uses alignmentState, while mapping/persistence/evidence
@@ -67,6 +74,8 @@ const report = {
   evidenceRegistryStatus: evidence.status ?? 'MISSING',
   evidenceRegistryRecordCount: evidenceRecords.length,
   evidenceByFeatureCount: new Set(evidenceRecords.map((record) => record?.subjectId).filter(Boolean)).size,
+  staleEvidenceRecordCount: staleEvidenceRecords.length,
+  staleEvidenceIds: staleEvidenceRecords.map((record) => record?.evidenceId).filter(Boolean),
   topBlockerReasons: Object.entries(blockerCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 20)
