@@ -16,7 +16,7 @@
           "contracts/openapi/v1/openapi.yaml"
         ],
         "entityIds": ["ENT-USER"],
-        "entityEvidence": ["src/collections/Users.ts"],
+        "entityEvidence": ["workers/W01-payload/src/collections/Users.ts"],
         "verifiedFields": ["username", "displayName", "bio", "avatar", "locale", "timezone"]
       },
       "notEstablished": {
