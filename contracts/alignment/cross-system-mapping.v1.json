@@ -22,7 +22,9 @@
       "entityIds": [
         "ENT-USER"
       ],
-      "payloadCollections": [],
+      "payloadCollections": [
+        "users"
+      ],
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
