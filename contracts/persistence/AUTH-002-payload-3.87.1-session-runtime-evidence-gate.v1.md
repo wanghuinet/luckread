@@ -10,7 +10,7 @@ It does not infer the physical schema from generic Payload documentation or from
 
 ## 2. Repository baseline
 
-The LuckRead repository pins `payload` and `@payloadcms/db-d1-sqlite` to `3.87.1`. `src/collections/Users.ts` enables `auth: true`, and `src/payload.config.ts` uses `sqliteD1Adapter` with `push: false` and `migrationDir: src/migrations`.
+The LuckRead repository pins `payload` and `@payloadcms/db-d1-sqlite` to `3.87.1`. `workers/W01-payload/src/collections/Users.ts` enables `auth: true`, and `workers/W01-payload/src/payload.config.ts` uses `sqliteD1Adapter` with `push: false` and `migrationDir` under W01.
 
 The repository's current evidence inventory records the Payload collection as discovered configuration, but does not establish an executed Session migration or runtime Session evidence.
 
