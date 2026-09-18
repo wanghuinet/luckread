@@ -13,6 +13,8 @@ on:
       - 'contracts/api/AUTH-005-identity-verification-contract.v1.json'
       - 'contracts/api/AUTH-006-passkey-webauthn-contract.v1.json'
       - 'contracts/dto/auth-dto-contract.v1.json'
+      - 'contracts/entity/AUTH-002-006-canonical-field-authority.v1.json'
+      - 'scripts/reconcile-auth-field-authority-mapping.mjs'
       - 'docs/MAPPING-0-AUTH-TECHNICAL-CLOSURE-QUEUE-2026-09-18.md'
       - '.github/workflows/reconcile-canonical-auth-mapping.yml'
   workflow_dispatch:
@@ -46,6 +48,11 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
           node scripts/reconcile-canonical-auth-mapping.mjs
+
+      - name: Reconcile canonical AUTH field-authority evidence links
+        run: |
+          set -euo pipefail
+          node scripts/reconcile-auth-field-authority-mapping.mjs
 
       - name: Commit and push reconciled mapping
         run: |
