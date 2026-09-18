@@ -1,24 +1,114 @@
 {
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "title":"Luckread Database Entity Persistence Inventory v1",
-  "type":"object",
-  "required":["version","status","sourceOfTruth","records"],
-  "properties":{
-    "version":{"const":"1.0.0"},
-    "status":{"enum":["DISCOVERED","NOT_GREEN","BLOCKED"]},
-    "sourceOfTruth":{"type":"string","minLength":1},
-    "generatedBy":{"type":"string","minLength":1},
-    "records":{"type":"array","items":{"type":"object","required":["entityId","entityName","entityStatus","implementationRef","persistenceStatus","evidenceRefs"],"properties":{
-      "entityId":{"type":"string","minLength":1},
-      "entityName":{"type":"string","minLength":1},
-      "entityStatus":{"type":"string","enum":["VERIFIED","PROPOSED"]},
-      "implementationRef":{"type":"string","minLength":1},
-      "persistenceStatus":{"enum":["VERIFIED","NOT_VERIFIED","NOT_APPLICABLE"]},
-      "adapter":{"type":"string"},
-      "migrationRefs":{"type":"array","items":{"type":"string"}},
-      "fieldContractRef":{"type":"string"},
-      "evidenceRefs":{"type":"array","items":{"type":"string"}}
-    }}}
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Luckread Database Entity Persistence Inventory v1",
+  "type": "object",
+  "required": [
+    "version",
+    "status",
+    "sourceOfTruth",
+    "records"
+  ],
+  "properties": {
+    "version": {
+      "const": "1.0.0"
+    },
+    "status": {
+      "enum": [
+        "DISCOVERED",
+        "NOT_GREEN",
+        "BLOCKED"
+      ]
+    },
+    "sourceOfTruth": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generatedBy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "entityId",
+          "entityName",
+          "entityStatus",
+          "implementationRef",
+          "persistenceStatus",
+          "evidenceRefs"
+        ],
+        "properties": {
+          "entityId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "entityName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "entityStatus": {
+            "type": "string",
+            "enum": [
+              "VERIFIED",
+              "PROPOSED"
+            ]
+          },
+          "implementationRef": {
+            "type": "string",
+            "minLength": 0
+          },
+          "persistenceStatus": {
+            "enum": [
+              "VERIFIED",
+              "NOT_VERIFIED",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "adapter": {
+            "type": "string"
+          },
+          "migrationRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fieldContractRef": {
+            "type": "string"
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "entityStatus": {
+                  "const": "VERIFIED"
+                }
+              },
+              "required": [
+                "entityStatus"
+              ]
+            },
+            "then": {
+              "properties": {
+                "implementationRef": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
   },
-  "additionalProperties":false
+  "additionalProperties": false
 }
