@@ -12,7 +12,7 @@ Scope: Batch G — full prefix review + orphan/duplicate scan + final handoff (r
 | Mapping-0 STRUCTURAL closure | **GREEN** | 449 canonical = 449 mapping records, 1:1, 0 missing / 0 extra / 0 orphan / 0 duplicate records |
 | Evidence reference coverage | **GREEN** | 449/449 records carry >= 1 evidence ref; 84 distinct refs; 0 broken refs |
 | Mapping-0 TECHNICAL / RUNTIME evidence closure | **NOT_GREEN** (fail-closed by design) | 0/449 complete technical edge closure; 433 UNRESOLVED + 14 PARTIAL + 2 MISSING |
-| Five-way reconciliation | **NOT_GREEN** (450 blockers) | downstream reconciliation remains explicit |
+| Five-way reconciliation | **NOT_GREEN** (457 blocker entries) | downstream reconciliation remains explicit |
 
 Mapping-0 structural closure is GREEN and is the correct terminal state for the *mapping layer*.
 Technical / runtime / business evidence is honestly NOT_GREEN and belongs to the next
