@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Reviewed head: `5a4c50ebd6aab7af3ec021c020ba833ae15699c1`
+Reviewed head: `6e7836062a0c2292c04af458f01dc6d8a4ec34a2`
 Basis: current GitHub main, Batch G final sweep, orphan disposition register, canonical mapping, Feature Inventory, and Evidence Registry.
 
 ## 1. Acceptance boundary
@@ -57,6 +57,10 @@ The AUTH-002 session integration evidence boundary now points to:
 - `workers/W01-payload/src/payload.config.ts`
 
 This corrects the evidence path. It does **not** prove runtime or persistence closure.
+
+### 2.5 USER/code evidence path alignment — CLOSED
+
+The referenced USER evidence delta and the canonical code-evidence inventory now use the declared W01 runtime authority for ENT-USER (`workers/W01-payload/src/collections/Users.ts` and `workers/W01-payload/src/payload.config.ts`). This is a source-path correction only; it does not promote runtime, persistence, or field implementation evidence.
 
 ### 2.4 Batch G orphan-report consistency — CLOSED
 
