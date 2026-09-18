@@ -2,7 +2,7 @@
 
 Date: 2026-09-18  
 Repository: `wanghuinet/luckread`  
-Baseline sweep: `2176675f4262fd8777f18f4ee63746d949119bfdea`  
+Baseline sweep: `2176675f4262fd87718f4ee63746d949119bfdea`  
 Decision basis: Mapping-0 scope governance Decision A
 
 ## Governance decision
