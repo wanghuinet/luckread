@@ -16,9 +16,9 @@
       "timestamp": "2026-09-17T12:55:20.000Z",
       "producer": "payload migrate (local) + sqlite3 PRAGMA snapshot",
       "result": "PASS",
-      "status": "VERIFIED",
+      "status": "EXPIRED",
       "validUntil": "2026-09-17T00:00:00.000Z",
-      "note": "Migration 20250929_111647 applied against local miniflare D1; users/users_sessions schema, indexes and FKs match migration source (no drift). Evidence artifacts committed at 75fe380; W01 source byte-identical from 75fe380 through caaa955 (git diff confirms only evidence/registry files differ; commitSha re-pointed per freshness rule). LOCAL_MINIFLARE_D1 only; remote D1 (luckread) not inspected - Cloudflare credentials missing."
+      "note": "Migration 20250929_111647 applied against local miniflare D1; users/users_sessions schema, indexes and FKs match migration source (no drift). Evidence artifacts committed at 75fe380; W01 source byte-identical from 75fe380 through caaa955 (git diff confirms only evidence/registry files differ; commitSha re-pointed per freshness rule). LOCAL_MINIFLARE_D1 only; remote D1 (luckread) not inspected - Cloudflare credentials missing. Status corrected by Change Control because validUntil=2026-09-17T00:00:00.000Z is past the 2026-09-19 review date. Historical result/provenance are preserved; no execution result or validUntil was rewritten."
     },
     {
       "evidenceId": "EVD-AUTH002-B06-MIGRATION-LOCAL-001",
@@ -32,9 +32,9 @@
       "timestamp": "2026-09-17T12:55:19.934Z",
       "producer": "payload migrate (local)",
       "result": "PASS",
-      "status": "VERIFIED",
+      "status": "EXPIRED",
       "validUntil": "2026-09-17T00:00:00.000Z",
-      "note": "payload_migrations row batch=1 for 20250929_111647; migration history recorded and reapplied across passes without failure. Evidence artifacts committed at 75fe380; W01 source byte-identical from 75fe380 through caaa955 (registry-only commits). LOCAL_MINIFLARE_D1 only."
+      "note": "payload_migrations row batch=1 for 20250929_111647; migration history recorded and reapplied across passes without failure. Evidence artifacts committed at 75fe380; W01 source byte-identical from 75fe380 through caaa955 (registry-only commits). LOCAL_MINIFLARE_D1 only. Status corrected by Change Control because validUntil=2026-09-17T00:00:00.000Z is past the 2026-09-19 review date. Historical result/provenance are preserved; no execution result or validUntil was rewritten."
     },
     {
       "evidenceId": "EVD-AUTH002-B07-RUNTIME-LOCAL-001",
@@ -48,9 +48,9 @@
       "timestamp": "2026-09-17T13:00:20.000Z",
       "producer": "curl against next dev (payload-token cookie)",
       "result": "PASS",
-      "status": "VERIFIED",
+      "status": "EXPIRED",
       "validUntil": "2026-09-17T00:00:00.000Z",
-      "note": "Native users_sessions lifecycle verified locally: login creates session row + JWT, me validates, logout removes row, expired-JWT denied, wrong-password denied. Contract gaps recorded (idempotent second logout, single-winner concurrency, extension correlation) - not silently resolved. LOCAL_MINIFLARE_D1 only; CONTROLLED_REMOTE_D1 runtime evidence pending credentials."
+      "note": "Native users_sessions lifecycle verified locally: login creates session row + JWT, me validates, logout removes row, expired-JWT denied, wrong-password denied. Contract gaps recorded (idempotent second logout, single-winner concurrency, extension correlation) - not silently resolved. LOCAL_MINIFLARE_D1 only; CONTROLLED_REMOTE_D1 runtime evidence pending credentials. Status corrected by Change Control because validUntil=2026-09-17T00:00:00.000Z is past the 2026-09-19 review date. Historical result/provenance are preserved; no execution result or validUntil was rewritten."
     },
     {
       "evidenceId": "EVD-AUTH003-B08-RUNTIME-LOCAL-001",
