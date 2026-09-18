@@ -163,3 +163,16 @@ A direct read of `contracts/alignment/five-way-reconciliation.v1.json` at the ve
 
 This clustering means the remaining work should be executed by authoritative blocker family, not by blindly editing 449 Feature records. The generic blocker is a downstream technical-closure state; it is not evidence that each Feature individually needs a new contract.
 
+
+
+## 14. Batchable explicit blockers
+
+The machine-readable cluster artifact `artifacts/mapping-0/five-way-explicit-blocker-clusters-2026-09-19.json` records the 43 non-generic blocker records as:
+
+- AUTH: 16
+- AUTHZ: 10
+- ORG: 7
+- USER: 10
+
+No canonical status was promoted by this clustering. The artifact is an execution queue for reconciliation, not a substitute for API/DTO/Entity/Persistence/Runtime evidence.
+
