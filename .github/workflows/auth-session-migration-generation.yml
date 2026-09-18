@@ -1,34 +1,25 @@
-name: AUTH-002 Migration Generation
+name: AUTH-002 W01 Migration Source Audit
 
 on:
-  workflow_dispatch:
-    inputs:
-      migration_name:
-        description: 'Stable AUTH-002 migration name'
-        required: true
-        default: MIG-AUTH-002-SESSION-V1
-        type: string
   push:
     branches: [main]
     paths:
-      - 'package.json'
-      - 'package-lock.json'
-      - 'src/payload.config.ts'
-      - 'src/collections/Users.ts'
-      - 'src/db/auth-session-state.ts'
+      - 'workers/W01-payload/package.json'
+      - 'workers/W01-payload/pnpm-lock.yaml'
+      - 'workers/W01-payload/src/payload.config.ts'
+      - 'workers/W01-payload/src/collections/Users.ts'
+      - 'workers/W01-payload/src/db/**'
+      - 'workers/W01-payload/src/migrations/**'
       - 'scripts/auth-002-migration-generation-admission.mjs'
       - 'scripts/auth-002-migration-static-audit.mjs'
       - '.github/workflows/auth-session-migration-generation.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-env:
-  DEFAULT_MIGRATION_NAME: MIG-AUTH-002-SESSION-V1
-
 jobs:
-  generate:
-    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
+  audit:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -39,66 +30,28 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
 
-      - name: Install locked dependencies
-        run: npm ci --no-audit --no-fund
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.34.5 --activate
 
-      - name: Typecheck schema registration
-        run: npm run typecheck
+      - name: Install W01 locked dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-workspace
 
-      - name: Validate migration generation prerequisites
-        id: admission
-        run: |
-          set +e
-          node scripts/auth-002-migration-generation-admission.mjs
-          status=$?
-          set -e
-          if [ "$status" -eq 0 ]; then
-            echo 'artifact_present=true' >> "$GITHUB_OUTPUT"
-          elif [ "$status" -eq 2 ]; then
-            echo 'artifact_present=false' >> "$GITHUB_OUTPUT"
-            echo 'Pre-artifact admission is expected; continuing to generator.'
-          else
-            exit "$status"
-          fi
+      - name: Typecheck W01 source
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit
 
-      - name: Select stable migration name
-        id: migration-name
-        env:
-          INPUT_MIGRATION_NAME: ${{ inputs.migration_name }}
-          DEFAULT_MIGRATION_NAME: ${{ env.DEFAULT_MIGRATION_NAME }}
-        run: |
-          set -euo pipefail
-          migration_name="${INPUT_MIGRATION_NAME:-$DEFAULT_MIGRATION_NAME}"
-          test "$migration_name" = "$DEFAULT_MIGRATION_NAME"
-          printf 'migration_name=%s\n' "$migration_name" >> "$GITHUB_OUTPUT"
+      - name: Validate W01 migration admission
+        run: node scripts/auth-002-migration-generation-admission.mjs
 
-      - name: Generate Payload migration only
-        env:
-          MIGRATION_NAME: ${{ steps.migration-name.outputs.migration_name }}
-        run: |
-          set -euo pipefail
-          test ! -d src/migrations
-          npm run payload -- migrate:create "$MIGRATION_NAME"
-
-      - name: Audit generated migration
+      - name: Audit existing W01 migration sources
         run: node scripts/auth-002-migration-static-audit.mjs
 
-      - name: Enforce generation-only change boundary
-        run: |
-          set -euo pipefail
-          changed=$(git status --short)
-          printf '%s\n' "$changed"
-          printf '%s\n' "$changed" | grep -Eq '^\?\? src/migrations/'
-          unexpected=$(printf '%s\n' "$changed" | grep -Ev '^\?\? src/migrations/' || true)
-          test -z "$unexpected"
-          test "$(find src/migrations -maxdepth 1 -type f \\( -name '*.ts' -o -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \\) | wc -l)" -ge 1
-
-      - name: Upload generated migration for review
+      - name: Upload W01 migration audit sources
         uses: actions/upload-artifact@v4
         with:
-          name: auth-002-migration-${{ github.run_id }}
-          path: src/migrations/
+          name: auth-002-w01-migration-sources-${{ github.run_id }}
+          path: workers/W01-payload/src/migrations/
           if-no-files-found: error
           retention-days: 14
