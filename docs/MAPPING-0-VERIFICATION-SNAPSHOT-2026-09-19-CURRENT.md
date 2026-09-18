@@ -54,10 +54,12 @@ Current state:
 - records: 1
 - explicit record: `AUTH-002`
 - AUTH-002 status: `BLOCKED`
-- AUTH-002 persistence mode: `LUCKREAD_EXTENSION`
+- AUTH-002 persistence mode: `MIXED`
 - AUTH-001 is intentionally absent because its D1/persistence ownership remains unresolved in the authoritative reconciliation boundary.
 
 The previous condition "registry is empty" is therefore closed as a historical finding. The registry is still not green because a complete, verified Feature-wide registry does not yet exist.
+
+The older `artifacts/mapping-0/mapping-0-status-report.json` is a generated snapshot from 2026-09-18 and is therefore not authoritative for the current registry record count; it still reports `persistenceRegistryRecordCount=0`. It must not be used as current-state evidence until regenerated from the current GitHub head.
 
 ## 5. Evidence freshness and provenance
 
@@ -223,3 +225,7 @@ A Change Control record now tracks this ambiguity:
 `docs/change-control/CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19.md`
 
 No status change was applied. This preserves the existing fail-closed state until a deterministic classification rule is established.
+
+## 19. Historical verification persistence audit
+
+The durable audit `docs/MAPPING-0-HISTORICAL-VERIFICATION-PERSISTENCE-AUDIT-2026-09-19.md` now records which historical Mapping 0 validation activities have identifiable GitHub evidence, which persisted records are stale, and which conversational re-checks are not independently proven as evidence. Future verification should consult that audit before re-executing an existing check.
