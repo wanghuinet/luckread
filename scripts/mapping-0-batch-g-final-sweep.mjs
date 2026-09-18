@@ -18,10 +18,14 @@ const root = process.cwd()
 const featurePath = path.join(root, 'contracts/alignment/feature-inventory.v1.json')
 const mappingPath = path.join(root, 'contracts/alignment/cross-system-mapping.v1.json')
 const batchesDir = path.join(root, 'contracts/alignment/mapping-batches')
+const orphanDispositionPath = path.join(root, 'docs/change-control/MAPPING-0-ORPHAN-BATCH-DISPOSITION-REGISTER-2026-09-18.md')
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'))
 const featureInventory = readJson(featurePath)
 const mapping = readJson(mappingPath)
+const orphanDispositionText = fs.existsSync(orphanDispositionPath)
+  ? fs.readFileSync(orphanDispositionPath, 'utf8')
+  : ''
 
 const featureRecords = Array.isArray(featureInventory.features)
   ? featureInventory.features
@@ -97,6 +101,12 @@ const duplicateClusters = [...clusters.entries()]
   .map(([base, members]) => ({ base, members: members.sort() }))
   .sort((a, b) => a.base.localeCompare(b.base))
 
+const pendingDispositionCountMatch = orphanDispositionText.match(/`PENDING_CHANGE_CONTROL` remaining:\s*([0-9]+)/)
+const pendingDispositionCount = pendingDispositionCountMatch ? Number.parseInt(pendingDispositionCountMatch[1], 10) : null
+const orphanGovernanceClosed = orphanFiles.length === 0
+  ? true
+  : pendingDispositionCount === 0 && /The orphan governance gate is \*\*CLOSED\*\*/i.test(orphanDispositionText)
+
 const report = {
   generatedBys: 'scripts/mapping-0-batch-g-final-sweep.mjs',
   generatedAt: new Date().toISOString(),
@@ -114,7 +124,14 @@ const report = {
   nonCanonicalScopeCount: scopeFindings.length,
   duplicateClusters,
   duplicateClusterCount: duplicateClusters.length,
-  disposition: 'INFORMATIONAL_READ_ONLY — orphan files and over-scoped drafts require a change-control decision; canonical mapping remains fail-closed.',
+  orphanGovernance: {
+    dispositionRegisterPresent: fs.existsSync(orphanDispositionPath),
+    pendingChangeControlCount: pendingDispositionCount,
+    closed: orphanGovernanceClosed,
+  },
+  disposition: orphanGovernanceClosed
+    ? 'INFORMATIONAL_READ_ONLY — orphan files are governed by the closed disposition register; canonical mapping remains fail-closed.'
+    : 'INFORMATIONAL_READ_ONLY — orphan files and over-scoped drafts require a change-control decision; canonical mapping remains fail-closed.',
 }
 
 const outDir = path.join(root, 'artifacts/mapping-0')
