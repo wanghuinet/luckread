@@ -2,7 +2,7 @@
 
 Date: 2026-09-18
 Repository: `wanghuinet/luckread`
-Current reviewed main head: `6f3c28b0c56980ca8de05213d1536f22f636e251`
+Current reviewed main head: `262dab07ab3f2982ec9d9b2ac429a779d4a8f445`
 
 ## Current governance closure
 
@@ -86,7 +86,7 @@ The next admissible work is to close authoritative contracts and mappings in dep
 
 ## Result
 
-Governance closure is substantially complete. The remaining gap is no longer orphan/scope bookkeeping; it is authoritative Contract -> Mapping -> Runtime -> Evidence closure. Documentation alone must not promote the records to GREEN.
+Governance closure is substantially complete. The remaining gap is no longer orphan/scope bookkeeping; it is authoritative Contract -> Mapping -> Runtime -> Evidence closure. The latest audit correction also retires stale AUTH-006 singular `passkey` / `authentication` terminology in favor of the current `passkeys` / `assertion` contract. Documentation alone must not promote the records to GREEN.
 
 
 ## Current structural metrics rechecked
@@ -99,4 +99,4 @@ Governance closure is substantially complete. The remaining gap is no longer orp
 - Records with Code evidence edges: 0
 - Complete API+Entity+Payload+Code closure: 0/449
 
-The blocker correction in this commit changes only stale AUTH blocker wording; it does not promote any record or alter technical status.
+The latest reconciliation commit corrects stale AUTH-006 OpenAPI terminology in an audit artifact; it does not promote any record, change canonical Mapping edges, or alter technical status.
