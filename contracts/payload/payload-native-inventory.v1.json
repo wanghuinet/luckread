@@ -1,53 +1,26 @@
 {
   "version": "1.0.0",
   "status": "DISCOVERED",
-  "source": "TypeScript AST of src/payload.config.ts + statically imported collection configs",
+  "source": "TypeScript AST of workers/W01-payload/src/payload.config.ts + statically imported collection configs",
   "generatedBy": "scripts/payload-native-inventory.mjs",
   "collections": [
     {
       "slug": "users",
-      "sourceRef": "src/collections/Users.ts:Users",
+      "sourceRef": "workers/W01-payload/src/collections/Users.ts:Users",
       "auth": true,
+      "fields": []
+    },
+    {
+      "slug": "media",
+      "sourceRef": "workers/W01-payload/src/collections/Media.ts:Media",
+      "auth": false,
       "fields": [
         {
-          "name": "username",
+          "name": "alt",
           "type": "text",
-          "sourceRef": "src/collections/Users.ts:field:username",
+          "sourceRef": "workers/W01-payload/src/collections/Media.ts:field:alt",
           "classification": "PAYLOAD_CONFIG_DISCOVERED",
-          "required": true,
-          "unique": true
-        },
-        {
-          "name": "displayName",
-          "type": "text",
-          "sourceRef": "src/collections/Users.ts:field:displayName",
-          "classification": "PAYLOAD_CONFIG_DISCOVERED"
-        },
-        {
-          "name": "bio",
-          "type": "textarea",
-          "sourceRef": "src/collections/Users.ts:field:bio",
-          "classification": "PAYLOAD_CONFIG_DISCOVERED"
-        },
-        {
-          "name": "avatar",
-          "type": "text",
-          "sourceRef": "src/collections/Users.ts:field:avatar",
-          "classification": "PAYLOAD_CONFIG_DISCOVERED"
-        },
-        {
-          "name": "locale",
-          "type": "text",
-          "sourceRef": "src/collections/Users.ts:field:locale",
-          "classification": "PAYLOAD_CONFIG_DISCOVERED",
-          "defaultValue": "en-US"
-        },
-        {
-          "name": "timezone",
-          "type": "text",
-          "sourceRef": "src/collections/Users.ts:field:timezone",
-          "classification": "PAYLOAD_CONFIG_DISCOVERED",
-          "defaultValue": "UTC"
+          "required": true
         }
       ]
     }
