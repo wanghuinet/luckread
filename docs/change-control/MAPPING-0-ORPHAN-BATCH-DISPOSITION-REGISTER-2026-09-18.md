@@ -76,11 +76,11 @@ Allowed dispositions:
 | 51 | `B14-migration-evidence-acquisition.v1.md` | Evidence-acquisition procedure with PENDING_EVIDENCE placeholders | RETAIN_NON_CANONICAL |
 | 52 | `B17-test-evidence-ci-validator-closure.v1.md` | Explicitly defines evidence gate and remains BLOCKED_UNTIL_EVIDENCE | RETAIN_NON_CANONICAL |
 | 53 | `B18-mapping-0-final-consolidation-audit.v1.md` | Explicitly says batch files are source evidence only and B18 remains blocked | RETAIN_NON_CANONICAL |
-| 54 | `BATCH09-DEV-MINIAPP-GAME-MARKETPLACE-real-evidence-reconciliation.v1.md` | Batch feature reconciliation artifact | PENDING_CHANGE_CONTROL |
-| 55 | `BATCH10-GLOBAL-SAFETY-COPYRIGHT-PRIVACY-real-evidence-reconciliation.v1.md` | Global safety/copyright/privacy reconciliation artifact | PENDING_CHANGE_CONTROL |
+| 54 | `BATCH09-DEV-MINIAPP-GAME-MARKETPLACE-real-evidence-reconciliation.v1.md` | Canonical Batch 09 reconciliation document, but its own gate keeps all 47 features BLOCKED_NOT_GREEN and implementation pending | RETAIN_NON_CANONICAL |
+| 55 | `BATCH10-GLOBAL-SAFETY-COPYRIGHT-PRIVACY-real-evidence-reconciliation.v1.md` | Canonical Batch 10 reconciliation document, but its own gate keeps all 47 features BLOCKED_NOT_GREEN and implementation pending | RETAIN_NON_CANONICAL |
 | 56 | `CLEANUP-AUTH-DTO-PLACEHOLDERS.md` | Explicitly labels placeholder DTO drafts as non-canonical evidence | RETAIN_NON_CANONICAL |
-| 57 | `USER-001-010-real-evidence-reconciliation.v1.md` | USER reconciliation artifact | PENDING_CHANGE_CONTROL |
-| 58 | `USER-002-003-evidence-bound-delta.v1.md` | USER evidence-bound delta artifact | PENDING_CHANGE_CONTROL |
+| 57 | `USER-001-010-real-evidence-reconciliation.v1.md` | USER feature reconciliation document; every feature remains BLOCKED_NOT_GREEN and it does not promote mappings | RETAIN_NON_CANONICAL |
+| 58 | `USER-002-003-evidence-bound-delta.v1.md` | USER evidence-bound delta; explicitly remains PARTIAL_NOT_GREEN and says no API/DTO/etc. identifiers are invented | RETAIN_NON_CANONICAL |
 
 ## Reviewed AUTH-001 duplicate cluster
 
@@ -97,6 +97,12 @@ This disposition does not mean the underlying facts are false. Where a file late
 Rows 11–41 were reviewed at file-content level. The reviewed documents consistently define evidence gates, authority reconciliation, execution workplans, OpenAPI promotion inputs, DTO projection decisions, runtime readiness or risk discovery. Their contents explicitly retain fail-closed or pre-execution states and do not constitute independent Mapping-0 GREEN evidence.
 
 They are therefore retained as non-canonical supporting artifacts. This does not erase their contract facts and does not prevent later evidence-bound references when the relevant authority and execution evidence are actually verified.
+
+## Reviewed final four orphan artifacts
+
+Rows 54, 55, 57 and 58 were reviewed. They are canonical-family reconciliation/delta documents, but their own gates remain BLOCKED_NOT_GREEN or PARTIAL_NOT_GREEN and they explicitly do not authorize promotion. Their role is therefore retained as supporting, non-canonical audit/reconciliation material.
+
+No canonical mapping edge is added by this disposition.
 
 ## Current state
 
