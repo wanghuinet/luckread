@@ -5,55 +5,33 @@
   "generatedBy": "scripts/build-payload-alignment-inventory.mjs",
   "records": [
     {
-      "collection": "users",
-      "collectionSourceRef": "src/collections/Users.ts:Users",
+      "collection": "media",
+      "collectionSourceRef": "workers/W01-payload/src/collections/Media.ts:Media",
       "origin": "PAYLOAD_CONFIG_DISCOVERED",
-      "auth": true,
+      "auth": false,
       "fields": [
         {
-          "name": "username",
+          "name": "alt",
           "type": "text",
-          "sourceRef": "src/collections/Users.ts:field:username",
+          "sourceRef": "workers/W01-payload/src/collections/Media.ts:field:alt",
           "origin": "PAYLOAD_CONFIG_DISCOVERED",
-          "required": true,
-          "unique": true
-        },
-        {
-          "name": "displayName",
-          "type": "text",
-          "sourceRef": "src/collections/Users.ts:field:displayName",
-          "origin": "PAYLOAD_CONFIG_DISCOVERED"
-        },
-        {
-          "name": "bio",
-          "type": "textarea",
-          "sourceRef": "src/collections/Users.ts:field:bio",
-          "origin": "PAYLOAD_CONFIG_DISCOVERED"
-        },
-        {
-          "name": "avatar",
-          "type": "text",
-          "sourceRef": "src/collections/Users.ts:field:avatar",
-          "origin": "PAYLOAD_CONFIG_DISCOVERED"
-        },
-        {
-          "name": "locale",
-          "type": "text",
-          "sourceRef": "src/collections/Users.ts:field:locale",
-          "origin": "PAYLOAD_CONFIG_DISCOVERED",
-          "defaultValue": "en-US"
-        },
-        {
-          "name": "timezone",
-          "type": "text",
-          "sourceRef": "src/collections/Users.ts:field:timezone",
-          "origin": "PAYLOAD_CONFIG_DISCOVERED",
-          "defaultValue": "UTC"
+          "required": true
         }
       ],
       "sourceRefs": [
         "contracts/payload/payload-native-inventory.v1.json",
-        "src/collections/Users.ts:Users"
+        "workers/W01-payload/src/collections/Media.ts:Media"
+      ]
+    },
+    {
+      "collection": "users",
+      "collectionSourceRef": "workers/W01-payload/src/collections/Users.ts:Users",
+      "origin": "PAYLOAD_CONFIG_DISCOVERED",
+      "auth": true,
+      "fields": [],
+      "sourceRefs": [
+        "contracts/payload/payload-native-inventory.v1.json",
+        "workers/W01-payload/src/collections/Users.ts:Users"
       ]
     }
   ]
