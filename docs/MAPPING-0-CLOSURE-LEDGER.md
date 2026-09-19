@@ -168,3 +168,12 @@ The migration static-audit guard against later recreation of baseline Payload ta
 
 NEXT_ITEM_ID: `W01-MIGRATION-BASELINE-AUTHORITY-001`
 NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
+
+
+## Remote migration execution safety — 2026-09-20
+
+- `scripts/w01-remote-migration-admission.mjs` now requires the migration Change Control to state exactly `Status: GREEN — EXECUTION ADMITTED` before remote `deploy:database` can proceed.
+- `workers/W01-payload/package.json` invokes this guard as `predeploy:database`, so the existing remote migration path is mechanically blocked while the baseline Change Control remains unadmitted.
+- `Payload Foundation CI` now executes the same guard continuously.
+- This is a safety guard only; it does not grant migration authority and does not execute D1 operations.
+- Latest guard integration commit: `d6ac07eb446946310825e6457dc2ab54e51a630f`.
