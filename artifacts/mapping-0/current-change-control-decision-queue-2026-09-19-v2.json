@@ -1,7 +1,7 @@
 {
-  "version": "1.4",
+  "version": "1.5",
   "generatedAt": "2026-09-19",
-  "testedHead": "2ae3fa7eba248b229c4419733f3fd726e9fc9477",
+  "testedHead": "2275065c27efa98af7852d37934a4ac06d5bc24d",
   "purpose": "Current Mapping 0 Change-Control decision queue, refreshed after current-head re-observation to prevent repeated rediscovery.",
   "noInference": true,
   "openControls": [
@@ -19,7 +19,8 @@
     "CC-MAPPING-0-EVIDENCE-STATUS-DRIFT-2026-09-19",
     "CC-MAPPING-0-SEMANTIC-DRAFT-SCOPE-2026-09-19",
     "CC-MAPPING-0-AUTH-002-PREFLIGHT-DTO-SOURCE-DRIFT-2026-09-19",
-    "CC-MAPPING-0-CONTRACT-CI-STAGE-COMPOSITION-2026-09-19"
+    "CC-MAPPING-0-CONTRACT-CI-STAGE-COMPOSITION-2026-09-19",
+    "CC-MAPPING-0-ENTITY-FIELD-CONTRACT-VERSION-DRIFT-2026-09-19"
   ],
   "rules": [
     "OPEN means authority decision required, not implementation authorization.",
@@ -28,6 +29,6 @@
     "Do not create a duplicate change-control finding when an existing OPEN control already governs the same conflict."
   ],
   "supersedes": "artifacts/mapping-0/current-change-control-decision-queue-2026-09-19.json",
-  "testedHeadRationale": "Queue refreshed after current-head CI re-observation. This is audit metadata only; it does not promote technical status.",
-  "note": "8 OPEN authority controls remain. No Feature status was promoted; Mapping 0 remains fail-closed."
+  "testedHeadRationale": "Queue refreshed after closing the Entity Field Contract Schema version drift control.",
+  "note": "8 OPEN authority controls remain. Schema compatibility drift is closed; no Feature status or technical closure was promoted."
 }
