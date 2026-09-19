@@ -170,3 +170,9 @@ It records that DTO authority already exists for AUTH-001 and AUTH-002 login, wh
 The global API/OpenAPI set audit found no set-membership drift: both sources contain 151 operation rows / 150 unique IDs. The single duplicate is `getEntitlements`, appearing for both `/entitlements/{subjectId}` and the `/entitlements` discovery-draft declaration.
 
 This is already registered under `docs/change-control/CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19.md`. Do not rediscover it as a new gap and do not auto-rename/delete either operation without Change Control.
+
+## 14. AUTH-003 operationId source conflict registered
+
+AUTH-003 is now explicitly registered as an operationId reconciliation conflict: Canonical Mapping/feature-contract operations use `authCredentialList/add/replace/remove`, while the shared persistence mapping uses `authUsernameCreate/Change`, `authEmailAdd/Change`, and `authPhoneAdd/Change`. Existing AUTH-003 reconciliation documents already classify the latter as stale/unreconciled pending authoritative API admission.
+
+See `docs/change-control/CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19.md`. Do not choose a preferred operation vocabulary outside Change Control.
