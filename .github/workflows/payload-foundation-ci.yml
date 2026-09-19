@@ -57,9 +57,9 @@ jobs:
         run: pnpm run build
 
 
-      - name: Remote migration admission guard
+      - name: Verify remote migration admission state
         working-directory: workers/W01-payload
-        run: node ../../scripts/w01-remote-migration-admission.mjs
+        run: node ../../scripts/w01-remote-migration-admission.mjs --check-state
 
       - name: Payload implementation admission gate
         run: node scripts/payload-implementation-admission-check.mjs
