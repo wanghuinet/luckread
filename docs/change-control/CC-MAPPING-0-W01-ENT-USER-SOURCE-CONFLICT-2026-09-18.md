@@ -66,3 +66,13 @@ No implementation is authorized by this record.
 ## Acceptance
 
 This GAP is correctly recorded when the above conflict remains visible and no unsupported status promotion is made.
+
+## Source-existence refinement — 2026-09-19
+
+A direct repository probe found that the current W01 Users source exists at `workers/W01-payload/src/collections/Users.ts` and declares `fields: []`. The legacy path `src/collections/Users.ts` could not be resolved on the current tested commit, nor on the previously recorded queue-head `0dcba65c5475f99ee2d6692259488194813d14a3`.
+
+This means the six ENT-USER field contract records currently reference a historical/nonexistent repository-relative path from the perspective of the inspected commits. Existing historical documents describing that path are not treated as current implementation evidence.
+
+Evidence: `artifacts/mapping-0/w01-ent-user-source-existence-audit-2026-09-19.json`.
+
+The authority decision remains unchanged: do not copy fields into W01 or rewrite the field contract until the existing Change Control decision selects the canonical direction.
