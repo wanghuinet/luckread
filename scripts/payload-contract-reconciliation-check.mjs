@@ -7,6 +7,7 @@ const read = (p) => JSON.parse(fs.readFileSync(path.join(root, p), 'utf8'))
 const inventory = read('contracts/payload/payload-native-inventory.v1.json')
 const catalog = read('contracts/entity/entity-catalog.v1.json')
 const fieldContract = read('contracts/entity/entity-field-contract.v1.json')
+const supportExemptions = read('contracts/payload/payload-support-collection-exemptions.v1.json')
 const outputPath = path.join(root, 'contracts/payload/payload-contract-reconciliation.v1.json')
 
 const failures = []
@@ -16,7 +17,27 @@ for (const entity of catalog.records) {
   if (entity.implementationRef) catalogBySource.set(entity.implementationRef, entity)
 }
 
+const supportExemptionBySource = new Map(
+  (supportExemptions.collections ?? []).map((item) => [item.sourceRef, item]),
+)
+
 for (const collection of inventory.collections) {
+  const exemption = supportExemptionBySource.get(collection.sourceRef)
+  if (exemption) {
+    results.push({
+      entityId: 'EXEMPT',
+      collection: collection.slug,
+      status: 'EXEMPT',
+      classification: exemption.classification,
+      fields: collection.fields.map((f) => ({
+        name: f.name,
+        status: 'EXEMPT',
+        details: [exemption.reason],
+      })),
+    })
+    continue
+  }
+
   const entity = catalogBySource.get(collection.sourceRef.split(':').slice(0, -1).join(':'))
   if (!entity) {
     results.push({ entityId: 'UNKNOWN', collection: collection.slug, status: 'UNKNOWN', fields: collection.fields.map((f) => ({ name: f.name, status: 'UNKNOWN', details: ['collection source has no exact Entity implementationRef mapping'] })) })
