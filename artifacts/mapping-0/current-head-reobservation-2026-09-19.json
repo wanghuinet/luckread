@@ -1,10 +1,10 @@
 {
-  "auditId": "M0-CURRENT-HEAD-REOBSERVATION-2026-09-19-02",
+  "auditId": "M0-CURRENT-HEAD-REOBSERVATION-2026-09-19-03",
   "auditDate": "2026-09-19",
   "testedRef": "main",
-  "testedCommit": "5a6acfd425d69907a697c4dc6972d90bec7d8d1b",
+  "testedCommit": "8ffe8e9ec0a3a504c81fcf1f98d50b681b6024c2",
   "noInference": true,
-  "scope": "Current-head Mapping 0 re-observation after CI stage-separation closure; no technical status promotion",
+  "scope": "Current-head Mapping 0 re-observation after Entity Field Contract schema-version compatibility repair.",
   "canonicalMapping": {
     "recordCount": 449,
     "status": "NOT_GREEN",
@@ -104,5 +104,13 @@
     "CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18",
     "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19"
   ],
-  "disposition": "Current-head evidence refresh only. Structural Mapping 0 Gate passed on this commit; Contract CI remains fail-closed due to known semantic and Payload reconciliation blockers. No contract or Feature status changes."
+  "disposition": "Audit refresh plus schema compatibility repair. Mapping 0 remains fail-closed; no Feature, Entity, Field, Payload, DTO, operationId, persistence, runtime or Evidence status was promoted.",
+  "entityFieldSchemaCompatibility": {
+    "contractVersion": "1.2",
+    "schemaVersionPolicy": "^1.x",
+    "repaired": true,
+    "contractContentChanged": false,
+    "businessStatusChanged": false,
+    "evidence": "CC-MAPPING-0-ENTITY-FIELD-CONTRACT-VERSION-DRIFT-2026-09-19"
+  }
 }
