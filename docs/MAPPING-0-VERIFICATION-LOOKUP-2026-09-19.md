@@ -111,3 +111,17 @@ The correct behavior is selective:
 - keep unresolved technical mappings fail-closed;
 - never count conversational repetition as verification;
 - never promote a historical PASS merely because a record exists.
+
+## 8. Latest referential-integrity audit
+
+A read-only audit was persisted at `artifacts/mapping-0/technical-edge-reference-audit-2026-09-19.json`.
+
+It confirms the currently materialized technical edges can be separated into:
+
+- API bindings: existing canonical inventory/OpenAPI references for AUTH-001, AUTH-002, AUTH-012, USER-001 and USER-006;
+- API IDs still absent from canonical API inventory/OpenAPI: AUTH-003..006 and AUTH-010;
+- AUTH-011 `authRefresh`: present in the API/OpenAPI sources but still tagged `DISCOVERY_DRAFT`, so it is not treated as admitted canonical API evidence;
+- Entity IDs: all currently materialized entity IDs resolve to Entity Catalog IDs, but several remain PROPOSED/CONTRACTED_NOT_VERIFIED and therefore do not prove implementation/persistence;
+- AUTH-001 Payload edge: resolves to active W01 `users` collection, whose observed fields are empty.
+
+This audit is reference-integrity evidence only. It does not promote any Feature status and does not replace the full Mapping → Contract → Runtime → Evidence gate.
