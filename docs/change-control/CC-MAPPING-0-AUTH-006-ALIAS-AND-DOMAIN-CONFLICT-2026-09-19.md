@@ -2,7 +2,7 @@
 
 ## Status
 
-OPEN — AUTHORITY RECONCILIATION REQUIRED / NO AUTO-REPAIR
+DECIDED — RECONCILIATION PENDING
 
 ## Verified facts
 
@@ -60,3 +60,7 @@ Dependent artifacts must then be reconciled together.
 - `contracts/api/AUTH-006-passkey-webauthn-contract.v1.json`
 
 No canonical mapping or implementation status is changed by this record.
+
+## Decision accepted — 2026-09-20
+
+Decision 5 accepted: canonical AUTH-006 DTO names are the non-PASSKEY identifiers; logical domain follows D01 Core.
