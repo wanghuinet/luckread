@@ -214,3 +214,15 @@ The evidence-bound USER delta is present on current `main`. USER-001 already has
 ## 22. W01 Media collection/entity authority GAP
 
 Current Payload Contract Reconciliation reports `workers/W01-payload/src/collections/Media.ts:Media` as unmapped because the current Entity Catalog has no matching canonical Entity implementationRef. This is registered at `docs/change-control/CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19.md`. Do not create/delete/remap the collection without authority resolution.
+
+## 23. Current-HEAD closure re-observation — 2026-09-19
+
+`artifacts/mapping-0/current-head-reobservation-2026-09-19.json` records a fresh read of `main` at `cd5ed7d39f0aadb5ca93fcc862aec7dc026152c7`.
+
+Observed baseline remains **449/449** Feature Inventory ↔ Canonical Mapping, with UNRESOLVED=433, PARTIAL=14, MISSING=2; structural orphan count is `0`. Five-way reconciliation remains `NOT_GREEN` with the same 449-record distribution.
+
+The 11 Evidence Registry records are all past their `validUntil` at this review date; no stale evidence was promoted. The feature↔entity↔persistence registry still has one `BLOCKED` record (AUTH-002). Current W01 Payload discovery remains `users(fields=0)` plus `media(alt)`, so the existing W01 ENT-USER source conflict and Media Entity authority GAP remain governing controls.
+
+The latest directly observed Contract CI run is still run `35421384870` against earlier commit `09176edcc5033d68fc0f4bbc090036615fbeaa27`, not the current `main` commit. Its structural/contract admission matrix and Feature Inventory passed; Semantic and Payload reconciliation failed on the already-registered `getEntitlements` / `getEntitlementsOp` and W01 field/Media authority blockers. This is **not** treated as a current-head technical certificate.
+
+No Canonical Mapping, Feature Inventory, Entity Catalog, Payload collection, DTO authority, operationId authority, persistence status, runtime evidence or Feature status changed in this re-observation.
