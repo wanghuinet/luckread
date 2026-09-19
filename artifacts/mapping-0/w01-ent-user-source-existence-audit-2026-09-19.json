@@ -1,0 +1,32 @@
+{
+  "auditId": "M0-W01-ENT-USER-SOURCE-EXISTENCE-2026-09-19",
+  "testedCommit": "521c42773748b8a3102910f6715548fc7be0ea29",
+  "noInference": true,
+  "currentW01": {
+    "path": "workers/W01-payload/src/collections/Users.ts",
+    "exists": true,
+    "observed": "Collection slug users, auth true, fields [], versions false"
+  },
+  "legacyPath": {
+    "path": "src/collections/Users.ts",
+    "exists": false,
+    "checkedRefs": [
+      "521c42773748b8a3102910f6715548fc7be0ea29",
+      "0dcba65c5475f99ee2d6692259488194813d14a3"
+    ],
+    "interpretation": "No current or inspected historical file object was returned at this repository-relative path. Existing contract references are therefore not current implementation evidence."
+  },
+  "contractRefs": {
+    "entityFieldContractPath": "contracts/entity/entity-field-contract.v1.json",
+    "observedCanonicalFields": [
+      "username",
+      "displayName",
+      "bio",
+      "avatar",
+      "locale",
+      "timezone"
+    ],
+    "observedSourceRef": "src/collections/Users.ts"
+  },
+  "disposition": "Reference-existence clarification only. The six fields are not promoted or removed. Existing W01 source conflict Change Control remains OPEN/BLOCKED."
+}
