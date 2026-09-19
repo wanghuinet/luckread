@@ -279,4 +279,10 @@ The queue's previous tested HEAD `f7114a3d3c7846f6745247a9f3238856f2b39962` was 
 The currently governed OPEN controls are nine items, including the W01 Media collection/entity authority GAP already registered on 2026-09-19. CLOSED controls remain closed under their recorded scopes.
 
 The refresh exists to keep the anti-duplication lookup boundary accurate. It is not a technical GREEN certificate.
+## 25. CI Stage Composition closure — 2026-09-19
 
+`CC-MAPPING-0-CONTRACT-CI-STAGE-COMPOSITION-2026-09-19` is CLOSED after execution.
+`capability-graph` now owns structural capability/entity/field checks; strict R4, Evidence Registry final validation and R5 remain in `capability-graph-strict-downstream`.
+`contract-full` depends on both capability jobs, so overall Contract CI remains fail-closed on strict downstream validation while the Mapping 0 structural gate remains independently executable.
+
+The current decision queue now has 8 OPEN authority controls and 5 scoped CLOSED controls. This does not change the Canonical Mapping status or any Feature status.
