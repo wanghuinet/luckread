@@ -1,0 +1,37 @@
+{
+  "evidenceType": "MAPPING_0_CURRENT_HEAD_STATUS_OBSERVATION",
+  "observedAt": "2026-09-20",
+  "repository": "wanghuinet/luckread",
+  "testedHead": "8a36b82005d308de65de302e2c6a29b30b7bda21",
+  "canonicalMapping": {
+    "status": "NOT_GREEN",
+    "recordCount": 449,
+    "statusCounts": {
+      "UNRESOLVED": 433,
+      "PARTIAL": 14,
+      "MISSING": 2
+    },
+    "structuralCardinality": "449/449",
+    "completeTechnicalClosure": "0/449"
+  },
+  "featureInventory": {
+    "recordCount": 449,
+    "status": "DISCOVERED"
+  },
+  "codeEvidenceInventory": {
+    "status": "DISCOVERED",
+    "fieldRecordsPromotedToImplemented": 0
+  },
+  "evidenceRegistry": {
+    "status": "NOT_GREEN",
+    "recordCount": 11,
+    "allObservedRecordsStaleRelativeTo2026_09_19": true
+  },
+  "changeControlQueue": {
+    "version": "1.7",
+    "open": 8,
+    "closed": 7,
+    "testedHead": "babb05c53731c53fb5730897b9dc1933ace2c463"
+  },
+  "note": "Observation only. This artifact does not promote any Feature, Entity, Field, Persistence, Payload, DTO, operationId, runtime, or evidence status."
+}
