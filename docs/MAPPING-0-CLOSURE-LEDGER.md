@@ -139,3 +139,10 @@ Checkpoint artifact:
 
 NEXT_ITEM_ID remains `W01-MIGRATION-BASELINE-AUTHORITY-001`.
 NEXT_ITEM_STATE remains `BLOCKED_EXTERNAL`.
+
+
+### AUTH-002 evidence inheritance audit — 2026-09-20
+- Historical local schema manifest was captured at `62aecc7a9343b9b4b6e374bacbd68381c46baa1c`; historical local runtime evidence was captured at `75fe380951ffbd7e5e045e7157df5cf6b58ef669`.
+- The approved W01 Users field implementation was added later at `5a3e138c9cab8f10878ac29b8ee5066c59a7dda4`.
+- Therefore the historical local AUTH-002 schema/runtime evidence is retained for provenance but is `INVALID_FOR_CURRENT_SCHEMA` and cannot satisfy current-head inheritance or remote D1 baseline proof.
+- Supporting reconciliation artifact: `artifacts/mapping-0/current-auth-002-local-evidence-reconciliation-2026-09-20.json`.
