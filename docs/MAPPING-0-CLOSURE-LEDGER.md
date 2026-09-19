@@ -146,3 +146,25 @@ NEXT_ITEM_STATE remains `BLOCKED_EXTERNAL`.
 - The approved W01 Users field implementation was added later at `5a3e138c9cab8f10878ac29b8ee5066c59a7dda4`.
 - Therefore the historical local AUTH-002 schema/runtime evidence is retained for provenance but is `INVALID_FOR_CURRENT_SCHEMA` and cannot satisfy current-head inheritance or remote D1 baseline proof.
 - Supporting reconciliation artifact: `artifacts/mapping-0/current-auth-002-local-evidence-reconciliation-2026-09-20.json`.
+
+
+## Current-head gate audit — 2026-09-20 (HEAD 0107e274)
+
+Latest verified runs:
+- Mapping 0 Structural Gate run `35460618379` = SUCCESS.
+- Feature Inventory run `35460618377` = SUCCESS.
+- AUTH-002 W01 Migration Source Audit run `35460618389` = SUCCESS.
+- Contract CI run `35460618395` = FAILURE only at downstream Five-Way / Strict R4-Evidence-R5.
+- Contract CI core gates in run `35460618395` all passed: Structural/Contract, OpenAPI, Semantic, Common, State Machines, AuthZ, Feature Inventory, Payload Reconciliation, Enums, Capability Contract Graph.
+- Five-Way failure remains implementation/evidence alignment, not a new contract-definition conflict.
+- Strict R4-Evidence-R5 failure remains missing current executable Evidence for downstream features and AUTH runtime claims.
+
+Remote AUTH-002 status:
+- No `AUTH-002 Session Schema Evidence` workflow run exists in the current main workflow history.
+- The existing manual-dispatch workflow remains the required controlled remote evidence path.
+- No remote D1 migration has been executed.
+
+The migration static-audit guard against later recreation of baseline Payload tables is now verified GREEN. No migration is promoted.
+
+NEXT_ITEM_ID: `W01-MIGRATION-BASELINE-AUTHORITY-001`
+NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
