@@ -158,3 +158,9 @@ No implementation or mapping status was changed by this audit.
 - `authRefresh` remains `DISCOVERY_DRAFT` and therefore is not treated as admitted canonical API evidence.
 
 This cross-check validates authority references only. It does not establish runtime implementation, persistence, security E2E, or GREEN status.
+
+## 12. DTO representation GAP registered
+
+A model-level GAP is now persisted at `docs/change-control/CC-MAPPING-0-DTO-REPRESENTATION-GAP-2026-09-19.md`.
+
+It records that DTO authority already exists for AUTH-001 and AUTH-002 login, while Canonical Mapping schema has no DTO edge property. This is a governance/model decision point, not a missing-contract discovery. No Mapping Schema change or status promotion has been made.
