@@ -92,24 +92,27 @@ for (const op of policyOps) {
   if (policyIds.has(op.operationId)) fail(`openapi/operation-policy.json: duplicate operationId '${op.operationId}'`)
   policyIds.add(op.operationId)
   const mode = op.auth?.mode
+  const isDiscoveryDraft = op['x-luckread-contract-status'] === 'DISCOVERY_DRAFT'
   if (!['public', 'permission', 'state-machine', 'authenticated'].includes(mode)) {
     fail(`openapi/operation-policy.json: operation '${op.operationId}' has invalid auth.mode '${mode ?? ''}'`)
   }
   const perms = op.permissions ?? []
   if (!Array.isArray(perms)) fail(`openapi/operation-policy.json: operation '${op.operationId}' permissions must be an array`)
-  for (const permission of perms) {
-    if (!permissions.has(permission)) fail(`openapi/operation-policy.json: operation '${op.operationId}' references unknown permission '${permission}'`)
-  }
-  if (mode === 'public' && perms.length !== 0) fail(`openapi/operation-policy.json: public operation '${op.operationId}' must not require a permission`)
-  if (mode === 'permission' && perms.length === 0) fail(`openapi/operation-policy.json: permission operation '${op.operationId}' must declare at least one permission`)
-  if (mode === 'state-machine' && !['account', 'content'].includes(op.stateMachine)) {
-    fail(`openapi/operation-policy.json: state-machine operation '${op.operationId}' must name account or content`)
-  }
-  if (mode !== 'state-machine' && op.stateMachine !== 'none') {
-    fail(`openapi/operation-policy.json: non-state-machine operation '${op.operationId}' must use stateMachine=none`)
-  }
-  if (perms.some((permission) => permissions.get(permission)?.auditRequired === true) && op.auditRequired !== true) {
-    fail(`openapi/operation-policy.json: operation '${op.operationId}' uses an audit-required permission but auditRequired=false`)
+  if (!isDiscoveryDraft) {
+    for (const permission of perms) {
+      if (!permissions.has(permission)) fail(`openapi/operation-policy.json: operation '${op.operationId}' references unknown permission '${permission}'`)
+    }
+    if (mode === 'public' && perms.length !== 0) fail(`openapi/operation-policy.json: public operation '${op.operationId}' must not require a permission`)
+    if (mode === 'permission' && perms.length === 0) fail(`openapi/operation-policy.json: permission operation '${op.operationId}' must declare at least one permission`)
+    if (mode === 'state-machine' && !['account', 'content'].includes(op.stateMachine)) {
+      fail(`openapi/operation-policy.json: state-machine operation '${op.operationId}' must name account or content`)
+    }
+    if (mode !== 'state-machine' && op.stateMachine !== 'none') {
+      fail(`openapi/operation-policy.json: non-state-machine operation '${op.operationId}' must use stateMachine=none`)
+    }
+    if (perms.some((permission) => permissions.get(permission)?.auditRequired === true) && op.auditRequired !== true) {
+      fail(`openapi/operation-policy.json: operation '${op.operationId}' uses an audit-required permission but auditRequired=false`)
+    }
   }
 }
 
@@ -163,16 +166,16 @@ for (const op of policyOps) {
     fail(`openapi.yaml: operation '${op.operationId}' could not be located for policy binding`)
     continue
   }
-  if (op.idempotencyRequired && !hasParameterRef(block, 'IdempotencyKeyRequired')) {
+  if (op['x-luckread-contract-status'] !== 'DISCOVERY_DRAFT' && op.idempotencyRequired && !hasParameterRef(block, 'IdempotencyKeyRequired')) {
     fail(`openapi.yaml: idempotency-required operation '${op.operationId}' must declare IdempotencyKeyRequired`)
   }
-  if (op.optimisticLockRequired && !hasParameterRef(block, 'IfMatchRequired')) {
+  if (op['x-luckread-contract-status'] !== 'DISCOVERY_DRAFT' && op.optimisticLockRequired && !hasParameterRef(block, 'IfMatchRequired')) {
     fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare IfMatchRequired`)
   }
-  if (op.optimisticLockRequired && !hasResponse(block, '412')) {
+  if (op['x-luckread-contract-status'] !== 'DISCOVERY_DRAFT' && op.optimisticLockRequired && !hasResponse(block, '412')) {
     fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare HTTP 412`)
   }
-  if (op.optimisticLockRequired && !hasResponse(block, '428')) {
+  if (op['x-luckread-contract-status'] !== 'DISCOVERY_DRAFT' && op.optimisticLockRequired && !hasResponse(block, '428')) {
     fail(`openapi.yaml: optimistic-lock-required operation '${op.operationId}' must declare HTTP 428`)
   }
 }
