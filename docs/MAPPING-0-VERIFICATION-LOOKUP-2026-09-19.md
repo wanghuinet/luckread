@@ -234,3 +234,13 @@ No Canonical Mapping, Feature Inventory, Entity Catalog, Payload collection, DTO
 Current governed OPEN controls: 9, including the W01 Media collection/entity-authority GAP. Scoped CLOSED controls: 4, including Semantic Draft Scope and AUTH-002 preflight DTO source drift. CLOSED here refers only to the recorded governance/tooling scope; underlying technical/runtime gaps remain governed separately.
 
 This queue is now the preferred lookup before opening another Mapping 0 Change Control. It does not authorize implementation or status promotion.
+
+## 25. Current-HEAD Contract CI failure evidence — 2026-09-19
+
+`artifacts/mapping-0/current-head-contract-ci-failure-evidence-2026-09-19.json` records the direct executable result for `Contract CI` run `35424118681` at the then-current HEAD `ab561ea128deef12c0157a7c227564285580004f`.
+
+Observed failing gates were exactly: Semantic Cross-Contract Gate and Payload Contract Reconciliation Gate. Observed passing gates included the Mapping 0 Structural/Contract Gate, Feature Inventory Gate, and all five domain admission matrix jobs.
+
+Semantic failures remain the already-governed `getEntitlements` duplicate plus `getEntitlementsOp` OpenAPI/policy mismatch. Payload failures remain the six ENT-USER fields absent from W01 Users discovery and the unmapped W01 Media collection. No automatic repair, status promotion, Entity creation, operationId rename, or business implementation was applied.
+
+Because this evidence was captured before the evidence-recording commit itself, it is a historical executable observation of the exact tested HEAD, not a certificate for later commits.
