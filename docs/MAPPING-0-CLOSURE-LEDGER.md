@@ -96,16 +96,28 @@ Evidence:
 
 The intervening commits after the tested source head are reconciliation/evidence/governance changes; unchanged structural results are inherited rather than rerun.
 
-NEXT_ITEM_ID: `W01-MIGRATION-GENERATION-001`
-NEXT_ITEM_STATE: `TODO_VERIFY`
+NEXT_ITEM_ID: `W01-MIGRATION-BASELINE-AUTHORITY-001`
+NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
 Objective: generate and statically audit the exact Payload migration required by the approved ENT-USER schema in active W01. Do not execute remote D1 migrations. Do not hand-author DDL.
 
 Generation evidence:
 - First attempt run `35459726942` failed because the W01 production CLI path triggered Wrangler remote proxy without `CLOUDFLARE_API_TOKEN`.
 - The workflow was corrected in `8f5df6646dda757e5dd9f7b5847a2efbc1cb93e4` to use the local proxy for migration generation.
 - Second attempt run `35459760432` is the current generation evidence source.
-- A successful generation must pass `scripts/auth-002-migration-static-audit.mjs` and produce an artifact before any migration source is committed.
+- Generation run 35459850548 succeeded and static audit passed. The generated artifact is not admitted as a second migration because it is a full schema snapshot; see CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20.
 
 
 ## Completion gate
 Mapping 0 is not GREEN until the authoritative mapping state, open authority controls, required reconciliations, and current-head CI/evidence gates all satisfy their contracts. A historical "100%" report does not override current GitHub evidence.
+
+## W01 downstream implementation checkpoint — 2026-09-20
+
+- Payload Implementation Admission run at current W01 code = success.
+- W01 Users contract test added in commit 5a3e138c9cab8f10878ac29b8ee5066c59a7dda4.
+- W01 Payload Migration Generation run 35459850548 = success; generated artifact static audit = success.
+- The generated migration is NOT promoted to repository source because it contains a full Payload schema snapshot and would be unsafe to treat as an additive second migration without baseline authority.
+- No remote D1 migration has been executed.
+
+NEXT_ITEM_ID: `W01-MIGRATION-BASELINE-AUTHORITY-001`
+NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
+Objective: obtain controlled target migration-state evidence and establish whether the existing baseline migration is deployable as-is before any new migration is promoted.
