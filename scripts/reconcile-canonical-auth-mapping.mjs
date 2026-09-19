@@ -241,3 +241,4 @@ console.log(JSON.stringify({
     noInference: true,
   },
 }, null, 2))
+// Current-head reconciliation trigger: 2026-09-20
