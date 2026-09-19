@@ -96,7 +96,7 @@ The latest persisted Mapping 0 observation on restored `main` reports:
 These figures are explicitly historical until a new mapping-status snapshot is generated at a source-input-changing head. They are not re-counted as new work.
 
 ## Continuation cursor
-Cursor synchronization baseline: `b9718cce9bf23f85b7c79714ff4d0ffbf5a0d0d4`. The containing ledger commit advances `main` by one documentation-only commit; this does not alter the verified Contract/Blueprint/Code inputs.
+Cursor synchronization baseline: `8aa68ea260a8a6eaaf2fccd294fb17631438f0e1`. The containing ledger commit may advance `main` by one documentation-only commit; this does not alter the verified Contract/Blueprint/Code inputs.
 Last completed primary task:
 - `AUDIT-REPEAT-AND-DRIFT-01` = `PASS_VERIFIED`.
 - `M0-CURRENT-HEAD-VERIFICATION-01` = `PASS_VERIFIED` at `b4f15f7...`, then `PASS_INHERITED` to `cf53ec6...` because the intervening commit was evidence-only.
