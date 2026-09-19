@@ -29,6 +29,15 @@ if (!existsSync(migrationsDir)) {
 
 const entries = readdirSync(migrationsDir)
 const artifacts = entries.filter((name) => /\.(ts|js|mjs|cjs)$/.test(name))
+const baselineMigrations = artifacts.filter((name) => name !== 'index.ts')
+const baselineSnapshots = entries.filter((name) => name.endsWith('.json'))
+
+if (baselineMigrations.length > 0 && baselineSnapshots.length === 0) {
+  console.warn('AUTH-002_MIGRATION_GENERATION_BASELINE_WARNING: committed migration sources have no JSON schema snapshot')
+  console.warn('Observed: 20250929_111647.ts exists; no migration JSON snapshot exists in W01 src/migrations/')
+  console.warn('Impact: do not accept migrate:create output as an additive migration until the authoritative baseline/snapshot state is established')
+  console.warn('Reference: docs/change-control/CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20.md')
+}
 if (artifacts.length === 0) {
   console.error('AUTH-002_MIGRATION_GENERATION_READY: W01 src/migrations exists but contains no migration artifact')
   process.exit(2)
