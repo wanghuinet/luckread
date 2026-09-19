@@ -621,7 +621,7 @@
       ]
     },
     {
-      "operationId": "getEntitlements",
+      "operationId": "listEntitlements",
       "method": "GET",
       "path": "/v1/entitlements",
       "openapiPath": "/entitlements",
