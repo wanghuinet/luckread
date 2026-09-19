@@ -2,7 +2,7 @@
 
 ## Status
 
-OPEN — CROSS-FEATURE AUTHORITY DECISION REQUIRED / NO AUTO-RENAME
+DECIDED — RECONCILIATION PENDING
 
 ## Scope
 
@@ -60,3 +60,7 @@ The decision must preserve existing domain ownership and must not introduce a ne
 ## Acceptance
 
 Future conversations must treat this as one already-registered cross-feature naming conflict, not rediscover it separately for each AUTH feature.
+
+## Decision accepted — 2026-09-20
+
+Decision 6 accepted: D01 Core is the canonical logical domain label for AUTH-006/AUTH-013/AUTH-015 reconciliation; no physical D1 schema is inferred.
