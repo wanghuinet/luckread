@@ -264,3 +264,9 @@ Therefore the six ENT-USER field contract source references should be treated as
 No active code or workflow reference to D1-Fabric was identified. Active W01 runtime/workflow references remain under `workers/W01-payload/`. Legacy-root references remain historical/governance references and are not treated as current implementation.
 
 The W01 Users source still has zero business fields, while the six ENT-USER field references point to the unresolved legacy source path. No contract, field, Entity, migration or Feature status was changed.
+
+## 29. W01 legacy Payload archive-location correction
+
+The legacy Users collection was verified at `archive/legacy-payload-root/src/collections/Users.ts`; its six historical fields are `username`, `displayName`, `bio`, `avatar`, `locale`, and `timezone`. `archive/legacy-payload-root/README.md` explicitly marks this tree as historical and names `workers/W01-payload/` as the active runtime authority.
+
+This corrects the earlier shorthand that the legacy file did not exist; the precise fact is that it no longer exists at the old repository-root path because it was archived. It remains non-authoritative for active W01 implementation. See `artifacts/mapping-0/w01-ent-user-source-existence-audit-2026-09-19.json` and the existing W01 ENT-USER Change Control.
