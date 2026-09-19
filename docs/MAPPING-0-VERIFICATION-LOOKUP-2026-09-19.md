@@ -286,3 +286,15 @@ The refresh exists to keep the anti-duplication lookup boundary accurate. It is 
 `contract-full` depends on both capability jobs, so overall Contract CI remains fail-closed on strict downstream validation while the Mapping 0 structural gate remains independently executable.
 
 The current decision queue now has 8 OPEN authority controls and 5 scoped CLOSED controls. This does not change the Canonical Mapping status or any Feature status.
+
+## 30. Superseding current-head queue and code-evidence correction — 2026-09-19
+
+The current authoritative Change-Control queue is
+`artifacts/mapping-0/current-change-control-decision-queue-2026-09-19-v2.json`, version `1.7`, tested against `babb05c53731c53fb5730897b9dc1933ace2c463`.
+
+Current queue state is **8 OPEN / 7 CLOSED**. Earlier sections of this lookup that report 9 OPEN or 4/5 CLOSED are historical snapshots and must not override the superseding queue artifact.
+
+`CC-MAPPING-0-CODE-EVIDENCE-FIELD-IMPLEMENTATION-STATUS-2026-09-19` is CLOSED. Its generator correction requires an existing active repository source before FIELD evidence can be promoted to `IMPLEMENTED`. Re-observation shows the six ENT-USER field evidence records remain `UNRESOLVED` and there are currently zero FIELD records promoted to `IMPLEMENTED` in the generated Code Evidence Inventory.
+
+This correction does not alter the canonical ENT-USER field contract, W01 Users implementation, Payload reconciliation result, Canonical Mapping status, or any authority decision.
+\n
