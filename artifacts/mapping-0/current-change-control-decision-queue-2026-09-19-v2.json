@@ -1,7 +1,7 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "generatedAt": "2026-09-19",
-  "testedHead": "23afbc4a4c7a41bd1e45647f742083deed267b18",
+  "testedHead": "babb05c53731c53fb5730897b9dc1933ace2c463",
   "purpose": "Current Mapping 0 Change-Control decision queue, refreshed after current-head re-observation to prevent repeated rediscovery.",
   "noInference": true,
   "openControls": [
@@ -30,6 +30,6 @@
     "Do not create a duplicate change-control finding when an existing OPEN control already governs the same conflict."
   ],
   "supersedes": "artifacts/mapping-0/current-change-control-decision-queue-2026-09-19.json",
-  "testedHeadRationale": "Queue refreshed after closing the code-evidence field implementation-status false-promotion control.",
-  "note": "8 OPEN authority controls remain. Tooling-only code-evidence field status correction is closed; it does not promote Feature, Entity, Persistence, Payload or Mapping status."
+  "testedHeadRationale": "Queue refreshed after current-head re-observation of the code-evidence field status correction.",
+  "note": "8 OPEN authority controls remain. Two tooling/schema-only controls are closed; no Feature/Entity/Persistence/Payload/DTO/operationId/runtime status has been promoted."
 }
