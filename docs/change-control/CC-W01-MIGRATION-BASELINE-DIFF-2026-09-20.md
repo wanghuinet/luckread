@@ -30,3 +30,29 @@ The generated artifact is diagnostic evidence that the current Payload/W01 gener
 5. Run migration static audit and, separately, controlled execution evidence.
 
 No remote D1 mutation is authorized by this control.
+
+
+## Current source-to-baseline delta audit — 2026-09-20
+
+Compared without executing or authoring SQL:
+
+### Current W01 collection authority
+`workers/W01-payload/src/collections/Users.ts` defines six active fields:
+- `username` — required, unique, indexed
+- `displayName`
+- `bio`
+- `avatar`
+- `locale` — default `en-US`
+- `timezone` — default `UTC`
+
+### Existing committed migration baseline
+`20250929_111647` creates the Payload `users` table with the native authentication columns and indexes, but does not contain the six approved profile fields above.
+
+Therefore the current source/config and the existing migration baseline are **schema-different**.
+
+The previously generated artifact from run `35459850548` confirms that Payload generation sees the six approved fields, but it also regenerates the full existing schema. That artifact is retained only as diagnostic evidence and is not an accepted additive migration.
+
+### Closure consequence
+The logical delta is now known at the contract/config level, but the **safe physical migration** remains unadmitted. A hand-written `ALTER TABLE`, inferred baseline, or remote-state assumption would violate the migration Change Control.
+
+Required next evidence remains the controlled remote D1 migration state for database `luckread`.
