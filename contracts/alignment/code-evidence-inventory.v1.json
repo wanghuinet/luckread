@@ -2994,103 +2994,91 @@
       "evidenceId": "FIELD:ENT-USER-F-AVATAR",
       "subjectType": "FIELD",
       "subjectId": "ENT-USER-F-AVATAR",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "src/collections/Users.ts"
-      ],
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
       "testRefs": [],
-      "schemaEvidenceRefs": [
-        "src/collections/Users.ts"
-      ],
+      "schemaEvidenceRefs": [],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
-      "blockers": []
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
     },
     {
       "evidenceId": "FIELD:ENT-USER-F-BIO",
       "subjectType": "FIELD",
       "subjectId": "ENT-USER-F-BIO",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "src/collections/Users.ts"
-      ],
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
       "testRefs": [],
-      "schemaEvidenceRefs": [
-        "src/collections/Users.ts"
-      ],
+      "schemaEvidenceRefs": [],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
-      "blockers": []
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
     },
     {
       "evidenceId": "FIELD:ENT-USER-F-DISPLAY-NAME",
       "subjectType": "FIELD",
       "subjectId": "ENT-USER-F-DISPLAY-NAME",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "src/collections/Users.ts"
-      ],
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
       "testRefs": [],
-      "schemaEvidenceRefs": [
-        "src/collections/Users.ts"
-      ],
+      "schemaEvidenceRefs": [],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
-      "blockers": []
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
     },
     {
       "evidenceId": "FIELD:ENT-USER-F-LOCALE",
       "subjectType": "FIELD",
       "subjectId": "ENT-USER-F-LOCALE",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "src/collections/Users.ts"
-      ],
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
       "testRefs": [],
-      "schemaEvidenceRefs": [
-        "src/collections/Users.ts"
-      ],
+      "schemaEvidenceRefs": [],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
-      "blockers": []
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
     },
     {
       "evidenceId": "FIELD:ENT-USER-F-TIMEZONE",
       "subjectType": "FIELD",
       "subjectId": "ENT-USER-F-TIMEZONE",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "src/collections/Users.ts"
-      ],
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
       "testRefs": [],
-      "schemaEvidenceRefs": [
-        "src/collections/Users.ts"
-      ],
+      "schemaEvidenceRefs": [],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
-      "blockers": []
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
     },
     {
       "evidenceId": "FIELD:ENT-USER-F-USERNAME",
       "subjectType": "FIELD",
       "subjectId": "ENT-USER-F-USERNAME",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "src/collections/Users.ts"
-      ],
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
       "testRefs": [],
-      "schemaEvidenceRefs": [
-        "src/collections/Users.ts"
-      ],
+      "schemaEvidenceRefs": [],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
-      "blockers": []
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
     },
     {
       "evidenceId": "PAYLOAD_COLLECTION:media",
