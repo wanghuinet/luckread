@@ -304,3 +304,14 @@ Acceptance decision:
 NEXT_ITEM_ID remains: `W01-MIGRATION-BASELINE-AUTHORITY-001`.
 NEXT_ITEM_STATE remains: `BLOCKED_EXTERNAL`.
 NEXT required external evidence: execute the existing `AUTH-002 Session Schema Evidence` workflow against the explicitly controlled D1 target, then review the resulting migration-status and schema/catalog artifacts before any migration promotion decision.
+
+
+## Legacy Payload root authority check — 2026-09-20
+
+Exact current-main file checks returned 404 for:
+- `src/payload.config.ts`
+- `src/collections/Users.ts`
+
+Therefore the legacy root Payload scaffold is not an active source path on current `main`. Current W01 runtime authority remains `workers/W01-payload/`; archived legacy material remains under `archive/legacy-payload-root/` and is not treated as active implementation evidence.
+
+This is an authority-path verification only. It does not change Mapping-0 status or promote runtime/persistence evidence.
