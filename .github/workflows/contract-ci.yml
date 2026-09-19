@@ -97,6 +97,17 @@ jobs:
       - run: node scripts/entity-implementation-evidence-check.mjs
       - run: node scripts/entity-field-contract-check.mjs
       - run: node scripts/entity-field-schema-contract-check.mjs
+  capability-graph-strict-downstream:
+    name: Strict Downstream R4/Evidence/R5 Gate
+    runs-on: ubuntu-latest
+    needs: [capability-graph]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
       - name: Generate R4 evidence gap report
         run: node scripts/mapping-0-r4-evidence-gap-report.mjs
       - run: node scripts/feature-entity-persistence-registry-check.mjs
@@ -112,7 +123,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - run: node scripts/r5-foundation-contract-check.mjs
-
   alignment:
     name: Five-Way Alignment Admission Gate
     runs-on: ubuntu-latest
@@ -154,7 +164,7 @@ jobs:
   contract-full:
     name: Contract Admission Gate (full)
     runs-on: ubuntu-latest
-    needs: [contract, contract-semantic, capability-graph, alignment, mapping-zero-final]
+    needs: [contract, contract-semantic, capability-graph, capability-graph-strict-downstream, alignment, mapping-zero-final]
     steps:
       - uses: actions/checkout@v4
         with:
