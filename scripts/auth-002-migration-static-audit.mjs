@@ -24,6 +24,24 @@ if (files.length === 0) {
 const sources = files.map((file) => ({ file, source: readFileSync(file, 'utf8') }))
 const source = sources.map(({ source }) => source).join('\n')
 
+const baselineFile = files.find((file) => /20250929_111647\.(ts|js|mjs|cjs)$/.test(file))
+const laterMigrationFiles = files.filter((file) => file !== baselineFile && !/index\.(ts|js|mjs|cjs)$/.test(file))
+const baselineTables = ['users', 'users_sessions', 'media', 'payload_locked_documents', 'payload_locked_documents_rels', 'payload_preferences', 'payload_preferences_rels', 'payload_migrations']
+
+for (const file of laterMigrationFiles) {
+  const laterSource = readFileSync(file, 'utf8')
+  for (const table of baselineTables) {
+    const escapedTable = table.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\const sources = files.map((file) => ({ file, source: readFileSync(file, 'utf8') }))
+const source = sources.map(({ source }) => source).join('\n')
+
+')
+    const recreate = new RegExp('CREATE\\\\s+TABLE[\\\\s\\\\S]{0,120}\\\\b' + escapedTable + '\\\\b', 'i')
+    if (recreate.test(laterSource)) {
+      fail(`later migration ${file} attempts to recreate baseline Payload table ${table}`)
+    }
+  }
+}
+
 if (!/export\s+(?:async\s+)?function\s+up\b/.test(source)) fail('migration artifact set has no exported up function')
 if (!/export\s+(?:async\s+)?function\s+down\b/.test(source)) fail('migration artifact set has no exported down function')
 
