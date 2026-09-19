@@ -2,7 +2,7 @@
 
 ## Status
 
-OPEN — DECISION REQUIRED / NO AUTO-REPAIR
+DECIDED — RECONCILIATION PENDING
 
 ## Purpose
 
@@ -71,3 +71,7 @@ Current-HEAD source inspection found that `scripts/sync-rc-openapi.mjs` contains
 Evidence: `artifacts/mapping-0/get-entitlements-operationid-root-cause-2026-09-19.json`.
 
 This narrows the technical cause but does not authorize deletion/renaming. The canonical treatment of the two entitlement routes still requires the existing Change Control decision, after which the generator/policy/OpenAPI sources must be reconciled together.
+
+## Decision accepted — 2026-09-20
+
+Decision 2 accepted: GET /v1/entitlements uses listEntitlements; GET /v1/entitlements/{subjectId} retains getEntitlements; getEntitlementsOp is non-canonical.
