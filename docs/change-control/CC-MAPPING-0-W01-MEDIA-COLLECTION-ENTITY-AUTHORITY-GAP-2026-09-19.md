@@ -2,7 +2,7 @@
 
 ## Status
 
-OPEN — ENTITY AUTHORITY DECISION REQUIRED / NO AUTO-ENTITY
+DECIDED — RECONCILIATION PENDING
 
 ## Finding
 
@@ -53,3 +53,7 @@ After the decision, reconcile Payload Inventory, Entity Catalog, Entity Field Co
 - GitHub Actions Payload Reconciliation job `105839624984` / subsequent current-run equivalent
 
 No implementation authorization is granted by this record.
+
+## Decision accepted — 2026-09-20
+
+Decision 8 accepted: W01 media remains a Payload support collection with an exact source exemption; no ENT-MEDIA is created.
