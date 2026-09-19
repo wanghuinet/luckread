@@ -31,13 +31,9 @@ const baselineTables = ['users', 'users_sessions', 'media', 'payload_locked_docu
 for (const file of laterMigrationFiles) {
   const laterSource = readFileSync(file, 'utf8')
   for (const table of baselineTables) {
-    const escapedTable = table.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\const sources = files.map((file) => ({ file, source: readFileSync(file, 'utf8') }))
-const source = sources.map(({ source }) => source).join('\n')
-
-')
-    const recreate = new RegExp('CREATE\\\\s+TABLE[\\\\s\\\\S]{0,120}\\\\b' + escapedTable + '\\\\b', 'i')
+    const recreate = new RegExp('CREATE\\s+TABLE[\\s\\S]{0,120}\\b' + table + '\\b', 'i')
     if (recreate.test(laterSource)) {
-      fail(`later migration ${file} attempts to recreate baseline Payload table ${table}`)
+      fail('later migration ' + file + ' attempts to recreate baseline Payload table ' + table)
     }
   }
 }
