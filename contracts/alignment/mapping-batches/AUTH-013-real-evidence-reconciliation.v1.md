@@ -23,7 +23,7 @@ The B01 capability contract requires that only valid account-state transitions a
 
 ## 2. Confirmed canonical state-machine evidence
 
-`contracts/state-machines/account.json` defines the authoritative User account state machine in D1-01 with:
+`contracts/state-machines/account.json` defines the authoritative User account state machine in D01 Core with:
 
 - state field: `account_state`
 - version field: `account_state_version`
@@ -100,9 +100,9 @@ The existence of these IDs is confirmed at contract level; current executable en
 
 The B01 AUTH-013 record currently declares:
 
-`d1Domain = CONFLICT: existing state contract uses legacy D1-01; frozen baseline requires D01 Core`.
+`d1Domain = D01 Core`.
 
-This is a blocking Mapping conflict. It must be resolved through the canonical Worker × D1 / Data Mapping or approved Change Control. It must not be silently normalized during implementation.
+The logical domain naming decision is now reconciled to `D01 Core` under Change Control; this does not constitute physical D1 schema or runtime evidence.
 
 ### 6.2 Worker ownership conflict
 
