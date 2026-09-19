@@ -642,7 +642,7 @@
       "stateMachine": "none"
     },
     {
-      "operationId": "getEntitlementsOp",
+      "operationId": "listEntitlements",
       "auth": {
         "mode": "permission"
       },
