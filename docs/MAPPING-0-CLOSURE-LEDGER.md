@@ -369,3 +369,16 @@ Continuation boundaries remain unchanged:
 - `W01-MIGRATION-BASELINE-AUTHORITY-001 = BLOCKED_EXTERNAL`.
 - AUTH-003 wire projection = `WAIT_FOR_EXPLICIT_PUBLIC_WIRE_SCHEMA_AUTHORITY`.
 
+## AUTH-002 external evidence dispatch handoff — 2026-09-20
+
+Current source head when prepared: `185dad73de1ccad5548599f98aee4ac1bf3c8d8a`.
+
+A machine-readable dispatch manifest was added at:
+`artifacts/mapping-0/current-auth-002-remote-evidence-dispatch-manifest-2026-09-20.json`.
+
+It freezes the existing read-only workflow, controlled target input, required secret names, expected evidence files, same-SHA provenance requirement, and fail-closed migration rules. It does not execute or authorize a remote migration.
+
+Acceptance:
+- `M0-AUTH-002-REMOTE-EVIDENCE-DISPATCH-2026-09-20 = PASS_VERIFIED` as an execution-handoff artifact.
+- `W01-MIGRATION-BASELINE-AUTHORITY-001` remains `BLOCKED_EXTERNAL` until the actual workflow evidence exists and is reviewed.
+
