@@ -145,3 +145,16 @@ This is an authority/reference cross-check, not technical closure.
 - `contracts/alignment/code-evidence-inventory.v1.json`: six historical FIELD evidence records reference the legacy root; they are explicitly non-authoritative for W01 and must not be promoted.
 
 No implementation or mapping status was changed by this audit.
+
+## 11. Latest API → OpenAPI → Policy → DTO cross-check
+
+`artifacts/mapping-0/api-dto-four-layer-crosscheck-2026-09-19.json` checked the 10 API operation references from explicit blocker features that are already present in the canonical API Inventory:
+
+- 10/10 exist in API Inventory.
+- 10/10 have exactly one `operationId` line in canonical OpenAPI.
+- 4/10 have a corresponding AUTH operation-policy entry.
+- 2/10 have `CONTRACT_BOUND` DTO records (AUTH-001 register and AUTH-002 login).
+- 1/10 is explicitly `NO_BODY_DTO` (AUTH-002 logout).
+- `authRefresh` remains `DISCOVERY_DRAFT` and therefore is not treated as admitted canonical API evidence.
+
+This cross-check validates authority references only. It does not establish runtime implementation, persistence, security E2E, or GREEN status.
