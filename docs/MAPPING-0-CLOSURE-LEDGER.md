@@ -121,3 +121,21 @@ Mapping 0 is not GREEN until the authoritative mapping state, open authority con
 NEXT_ITEM_ID: `W01-MIGRATION-BASELINE-AUTHORITY-001`
 NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
 Objective: obtain controlled target migration-state evidence and establish whether the existing baseline migration is deployable as-is before any new migration is promoted.
+
+
+## Current-head continuation audit — 2026-09-20
+
+Source head: `36acc86f02a50d549ee19680406ffd7489f9890b`.
+
+- `Payload Foundation CI` run `35459936366` = `success` at W01 source head `5a3e138c...`.
+- `Payload Implementation Admission` run `35459936208` = `success` at the same W01 source head.
+- Generated migration run `35459850548` = `success` with static audit = `success`; artifact remains `GENERATED_PENDING_BASELINE_AUTHORITY` and is not promoted.
+- Current remote D1 evidence workflow remains the only required external execution for `W01-MIGRATION-BASELINE-AUTHORITY-001`.
+- The repository does not expose a safe in-session workflow-dispatch operation; therefore no remote D1 evidence run is claimed or simulated here.
+- GitHub Issues are disabled for this repository, so the continuation request is recorded in this ledger and the checkpoint artifact instead of an Issue.
+
+Checkpoint artifact:
+`artifacts/mapping-0/current-w01-downstream-checkpoint-2026-09-20.json`.
+
+NEXT_ITEM_ID remains `W01-MIGRATION-BASELINE-AUTHORITY-001`.
+NEXT_ITEM_STATE remains `BLOCKED_EXTERNAL`.
