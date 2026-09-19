@@ -197,3 +197,8 @@ Current OPEN governance decisions are consolidated in `artifacts/mapping-0/curre
 ## 18. USER-001/USER-006 blocker precision audit
 
 The evidence-bound USER delta is present on current `main`. USER-001 already has explicit API/Entity edges, so its historical B02 blocker wording is stale and is tracked by `docs/change-control/CC-MAPPING-0-USER-001-006-BLOCKER-PRECISION-2026-09-19.md`. USER-006 has explicit API/policy evidence but still lacks feature-bound Entity/Field and downstream executable closure. See `artifacts/mapping-0/user-001-006-blocker-precision-audit-2026-09-19.json`. No Feature status was promoted.
+
+## 19. Current-HEAD API/Entity edge freshness audits
+
+- `artifacts/mapping-0/current-head-api-edge-audit-2026-09-19.json`: 449 mapping records, 28 API edge refs, 11 admitted in API Inventory/OpenAPI, 17 unresolved admissions; one pre-existing OpenAPI duplicate operationId `getEntitlements`. Reference-integrity audit only.
+- `artifacts/mapping-0/current-head-entity-edge-audit-2026-09-19.json`: 18 Entity edge refs across 5 unique Entity IDs; 18/18 resolve to Entity Catalog; no unresolved Entity identifier refs. Entity implementation/persistence status remains separate.
