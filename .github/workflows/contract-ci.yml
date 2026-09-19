@@ -29,7 +29,8 @@ jobs:
         domain: [common, enums, state-machines, authz, openapi]
     steps:
       - uses: actions/checkout@v4
-        with: {ref: ${{ env.CHECKOUT_REF }} }
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -40,7 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: {ref: ${{ env.CHECKOUT_REF }} }
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -51,7 +53,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: {ref: ${{ env.CHECKOUT_REF }} }
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -65,7 +68,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: {ref: ${{ env.CHECKOUT_REF }} }
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -79,7 +83,8 @@ jobs:
     needs: [contract, contract-semantic, feature-inventory, payload-reconciliation]
     steps:
       - uses: actions/checkout@v4
-        with: {ref: ${{ env.CHECKOUT_REF }} }
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -114,7 +119,8 @@ jobs:
     needs: [contract, contract-semantic, feature-inventory, payload-reconciliation]
     steps:
       - uses: actions/checkout@v4
-        with: {ref: ${{ env.CHECKOUT_REF }} }
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -127,7 +133,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: {ref: ${{ env.CHECKOUT_REF }} }
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -150,7 +157,8 @@ jobs:
     needs: [contract, contract-semantic, capability-graph, alignment, mapping-zero-final]
     steps:
       - uses: actions/checkout@v4
-        with: {ref: ${{ env.CHECKOUT_REF }} }
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
@@ -162,7 +170,8 @@ jobs:
     needs: contract-full
     steps:
       - uses: actions/checkout@v4
-        with: {ref: ${{ env.CHECKOUT_REF }} }
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
       - uses: actions/setup-node@v4
         with: {node-version: 24, cache: npm}
       - run: npm ci
