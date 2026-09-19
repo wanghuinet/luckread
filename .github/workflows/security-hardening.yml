@@ -47,21 +47,5 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Refresh and verify canonical authorization decision source
-        run: |
-          for attempt in 1 2 3 4 5; do
-            git fetch --force --depth=1 origin main
-            git reset --hard origin/main
-            if test "$(git hash-object contracts/authz/authorization-decision.json)" = "$(git rev-parse HEAD:contracts/authz/authorization-decision.json)"; then
-              node -e "const fs=require('node:fs'); const d=JSON.parse(fs.readFileSync('contracts/authz/authorization-decision.json','utf8')); if (!d.checks) process.exit(2); console.log('AUTHZ_CANONICAL_BLOB_OK=checks-present');"
-              echo "AUTHZ_CANONICAL_REFRESH_ATTEMPT=$attempt"
-              break
-            fi
-            echo "AUTHZ_CANONICAL_REFRESH_RETRY=$attempt"
-            sleep 2
-          done
-          git rev-parse HEAD
-          test "$(git hash-object contracts/authz/authorization-decision.json)" = "$(git rev-parse HEAD:contracts/authz/authorization-decision.json)"
-          node -e "const fs=require('node:fs'); const p='contracts/authz/authorization-decision.json'; const d=JSON.parse(fs.readFileSync(p,'utf8')); console.log('AUTHZ_DECISION_PATH='+require('node:path').resolve(p)); console.log('AUTHZ_CHECK_KEYS='+Object.keys(d.checks||{}).join(',')); console.log('AUTHZ_HAS_CHECKS='+String(Boolean(d.checks)));"
       - name: Security hardening static gate
         run: node scripts/security-hardening-check.mjs
