@@ -16,6 +16,7 @@ on:
       - 'payload/**'
       - 'lib/**'
       - 'routes/**'
+      - '.github/workflows/security-hardening.yml'
   pull_request:
     paths:
       - 'contracts/authz/**'
@@ -30,6 +31,7 @@ on:
       - 'payload/**'
       - 'lib/**'
       - 'routes/**'
+      - '.github/workflows/security-hardening.yml'
   workflow_dispatch:
 
 permissions:
