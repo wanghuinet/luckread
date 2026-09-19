@@ -189,3 +189,7 @@ Do not rediscover or independently rename the domain per Feature. One authority 
 - `CC-MAPPING-0-EVIDENCE-STATUS-DRIFT-2026-09-19`: CLOSED for its narrow evidence-label correction scope; underlying AUTH-002 runtime gaps remain OPEN and require fresh evidence.
 
 Do not reopen either finding unless the underlying authoritative inputs change.
+
+## 17. Current Change-Control decision queue
+
+Current OPEN governance decisions are consolidated in `artifacts/mapping-0/current-change-control-decision-queue-2026-09-19.json`. The queue currently contains 8 OPEN controls and 2 scoped CLOSED controls. Consult this queue before creating a new Mapping 0 finding.
