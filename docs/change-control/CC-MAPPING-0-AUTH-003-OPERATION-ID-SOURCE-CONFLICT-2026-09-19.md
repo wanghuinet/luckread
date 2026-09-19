@@ -2,7 +2,7 @@
 
 ## Status
 
-OPEN — AUTHORITY RECONCILIATION REQUIRED / NO AUTO-RENAME
+DECIDED — RECONCILIATION PENDING
 
 ## Purpose
 
@@ -64,3 +64,7 @@ No operationId is renamed, deleted, or promoted by this record.
 ## Acceptance
 
 Future Mapping 0 conversations must classify this as an already-detected AUTH-003 operationId conflict and must not independently invent a preferred operation set.
+
+## Decision accepted — 2026-09-20
+
+Decision 4 accepted: AUTH-003 canonical operation set is authCredentialList/authCredentialAdd/authCredentialReplace/authCredentialRemove; persistence-side identifiers remain downstream stale aliases pending admission.
