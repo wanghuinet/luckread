@@ -1609,7 +1609,7 @@ paths:
     get:
       tags: [Users]
       summary: Discovery draft for GET undefined
-      operationId: getEntitlements
+      operationId: listEntitlements
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
