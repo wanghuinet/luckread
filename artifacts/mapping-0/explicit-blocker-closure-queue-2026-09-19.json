@@ -1,16 +1,17 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "generatedAt": "2026-09-19",
   "sourceRefs": {
     "explicitBlockers": "artifacts/mapping-0/five-way-explicit-blocker-clusters-2026-09-19.json",
     "crossSystemMapping": "contracts/alignment/cross-system-mapping.v1.json",
     "apiInventory": "contracts/alignment/api-inventory.v1.json",
+    "openapi": "contracts/openapi/v1/openapi.yaml",
     "entityCatalog": "contracts/entity/entity-catalog.v1.json",
     "payloadInventory": "contracts/payload/payload-native-inventory.v1.json",
     "authzOrgCoverage": "artifacts/mapping-0/authz-org-authority-coverage-2026-09-19.json"
   },
   "noInference": true,
-  "purpose": "Batch triage of the 43 explicit Mapping-0 downstream blockers. This artifact classifies already-existing authority/reference conditions without adding mappings or promoting status.",
+  "purpose": "Corrected batch triage of the 43 explicit Mapping-0 downstream blockers.",
   "summary": {
     "featureCount": 43,
     "groups": {
@@ -19,17 +20,18 @@
       "ORG": 7,
       "USER": 10
     },
+    "canonicalApiInventoryCount": 150,
     "nextActionCounts": {
-      "CANONICAL_API_ADMISSION_RECONCILIATION_REQUIRED": 11,
-      "DOWNSTREAM_DTO_FIELD_PERSISTENCE_RUNTIME_EVIDENCE_RECONCILIATION_REQUIRED": 15,
-      "FEATURE_BINDING_RECONCILIATION_ONLY; no inference": 17
+      "DOWNSTREAM_DTO_FIELD_PERSISTENCE_RUNTIME_EVIDENCE_RECONCILIATION_REQUIRED": 20,
+      "CANONICAL_API_ADMISSION_RECONCILIATION_REQUIRED": 6,
+      "FEATURE_BINDING_RECONCILIATION_ONLY": 17
     }
   },
   "rules": [
+    "API Inventory is read from its actual records/operations schema, never by assuming one property name.",
     "Existing authority assets do not equal Feature-bound canonical mappings.",
-    "Operation IDs absent from API Inventory remain non-admitted.",
+    "OpenAPI DISCOVERY_DRAFT is not admitted canonical API evidence.",
     "Entity Catalog presence does not prove implementation or persistence.",
-    "Payload inventory presence does not prove Feature-to-Payload binding.",
     "No status promotion is performed by this triage."
   ],
   "features": [
@@ -59,20 +61,24 @@
         "api": [
           {
             "id": "authRegister",
-            "apiInventory": false
+            "apiInventory": true,
+            "openapi": {
+              "openapi": true,
+              "admission": "NOT_DECLARED"
+            }
           }
         ],
         "entity": [
           {
             "id": "ENT-USER",
-            "catalogExists": true,
-            "catalogStatus": "VERIFIED"
+            "exists": true,
+            "status": "VERIFIED"
           }
         ],
         "payload": []
       },
       "authorityCoverage": null,
-      "nextAction": "CANONICAL_API_ADMISSION_RECONCILIATION_REQUIRED"
+      "nextAction": "DOWNSTREAM_DTO_FIELD_PERSISTENCE_RUNTIME_EVIDENCE_RECONCILIATION_REQUIRED"
     },
     {
       "featureId": "AUTH-002",
@@ -98,34 +104,42 @@
         "api": [
           {
             "id": "authLogin",
-            "apiInventory": false
+            "apiInventory": true,
+            "openapi": {
+              "openapi": true,
+              "admission": "NOT_DECLARED"
+            }
           },
           {
             "id": "authLogout",
-            "apiInventory": false
+            "apiInventory": true,
+            "openapi": {
+              "openapi": true,
+              "admission": "NOT_DECLARED"
+            }
           }
         ],
         "entity": [
           {
             "id": "ENT-CREDENTIAL",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           },
           {
             "id": "ENT-IDENTITY",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           },
           {
             "id": "ENT-SESSION",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           }
         ],
         "payload": []
       },
       "authorityCoverage": null,
-      "nextAction": "CANONICAL_API_ADMISSION_RECONCILIATION_REQUIRED"
+      "nextAction": "DOWNSTREAM_DTO_FIELD_PERSISTENCE_RUNTIME_EVIDENCE_RECONCILIATION_REQUIRED"
     },
     {
       "featureId": "AUTH-003",
@@ -151,31 +165,47 @@
         "api": [
           {
             "id": "authCredentialList",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           },
           {
             "id": "authCredentialAdd",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           },
           {
             "id": "authCredentialReplace",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           },
           {
             "id": "authCredentialRemove",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           }
         ],
         "entity": [
           {
             "id": "ENT-CREDENTIAL",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           },
           {
             "id": "ENT-IDENTITY",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           }
         ],
         "payload": []
@@ -208,32 +238,44 @@
         "api": [
           {
             "id": "authPasswordChange",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           },
           {
             "id": "authPasswordResetRequest",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           },
           {
             "id": "authPasswordResetConfirm",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           }
         ],
         "entity": [
           {
             "id": "ENT-CREDENTIAL",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           },
           {
             "id": "ENT-SESSION",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           },
           {
             "id": "ENT-VERIFICATION",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           }
         ],
         "payload": []
@@ -266,32 +308,44 @@
         "api": [
           {
             "id": "authVerificationRequest",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           },
           {
             "id": "authVerificationConfirm",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           },
           {
             "id": "authVerificationRevoke",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           }
         ],
         "entity": [
           {
             "id": "ENT-CREDENTIAL",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           },
           {
             "id": "ENT-IDENTITY",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           },
           {
             "id": "ENT-VERIFICATION",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           }
         ],
         "payload": []
@@ -326,40 +380,60 @@
         "api": [
           {
             "id": "authPasskeyRegistrationOptions",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           },
           {
             "id": "authPasskeyRegistrationVerify",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           },
           {
             "id": "authPasskeyAssertionOptions",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           },
           {
             "id": "authPasskeyAssertionVerify",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           },
           {
             "id": "authPasskeyRemove",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           }
         ],
         "entity": [
           {
             "id": "ENT-CREDENTIAL",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           },
           {
             "id": "ENT-IDENTITY",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           },
           {
             "id": "ENT-VERIFICATION",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           }
         ],
         "payload": []
@@ -448,18 +522,26 @@
         "api": [
           {
             "id": "authSessionList",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           },
           {
             "id": "authSessionRevoke",
-            "apiInventory": false
+            "apiInventory": false,
+            "openapi": {
+              "openapi": false,
+              "admission": "ABSENT"
+            }
           }
         ],
         "entity": [
           {
             "id": "ENT-SESSION",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           }
         ],
         "payload": []
@@ -487,14 +569,18 @@
         "api": [
           {
             "id": "authRefresh",
-            "apiInventory": false
+            "apiInventory": true,
+            "openapi": {
+              "openapi": true,
+              "admission": "DISCOVERY_DRAFT"
+            }
           }
         ],
         "entity": [
           {
             "id": "ENT-SESSION",
-            "catalogExists": true,
-            "catalogStatus": "PROPOSED"
+            "exists": true,
+            "status": "PROPOSED"
           }
         ],
         "payload": []
@@ -520,14 +606,18 @@
         "api": [
           {
             "id": "authLogin",
-            "apiInventory": false
+            "apiInventory": true,
+            "openapi": {
+              "openapi": true,
+              "admission": "NOT_DECLARED"
+            }
           }
         ],
         "entity": [],
         "payload": []
       },
       "authorityCoverage": null,
-      "nextAction": "CANONICAL_API_ADMISSION_RECONCILIATION_REQUIRED"
+      "nextAction": "DOWNSTREAM_DTO_FIELD_PERSISTENCE_RUNTIME_EVIDENCE_RECONCILIATION_REQUIRED"
     },
     {
       "featureId": "AUTH-013",
@@ -634,7 +724,7 @@
         ],
         "reason": "Role/permission catalogs exist; Feature→API→Entity→enforcement binding is not evidence-bound."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "AUTHZ-002",
@@ -661,7 +751,7 @@
         ],
         "reason": "Permission catalog and authorization rules exist; Feature-specific API enforcement binding is not established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "AUTHZ-003",
@@ -688,7 +778,7 @@
         ],
         "reason": "Entitlement-related permissions/layer resolution exist; canonical entitlement persistence/entity binding is not established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "AUTHZ-004",
@@ -715,7 +805,7 @@
         ],
         "reason": "Subscription/entitlement authority concepts exist; Feature-specific derived-access mapping is not established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "AUTHZ-005",
@@ -742,7 +832,7 @@
         ],
         "reason": "Resource ownership is a canonical authorization dimension; no Feature-bound entity/API/ownership enforcement evidence is established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "AUTHZ-006",
@@ -769,7 +859,7 @@
         ],
         "reason": "Organization-scoped permissions exist; Feature-specific organization/team entity and API mapping remains open."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "AUTHZ-007",
@@ -795,7 +885,7 @@
         ],
         "reason": "OAuth/API scope is named as a capability, but no canonical operation/DTO/security binding is established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "AUTHZ-008",
@@ -822,7 +912,7 @@
         ],
         "reason": "Temporary/delegated ordering is defined conceptually; no feature-bound lifecycle/persistence mapping is established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "AUTHZ-009",
@@ -848,7 +938,7 @@
         ],
         "reason": "Service-account/API-key capability is inventoried; canonical entity/persistence/security mapping is not established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "AUTHZ-010",
@@ -875,7 +965,7 @@
         ],
         "reason": "Audit permission and auditability rules exist; Feature-bound audit event/storage mapping is not established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "ORG-001",
@@ -902,7 +992,7 @@
         ],
         "reason": "org.create and organization membership permission concepts exist, but organization entity/API binding is not established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "ORG-002",
@@ -928,7 +1018,7 @@
         ],
         "reason": "MCN is inventoried but no canonical MCN entity/field/creator-binding contract is established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "ORG-003",
@@ -955,7 +1045,7 @@
         ],
         "reason": "Organization member/role permissions exist, but team/member entity and lifecycle mapping is not established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "ORG-004",
@@ -982,7 +1072,7 @@
         ],
         "reason": "Identity/organization separation is authoritative, but creator-binding entity/lifecycle mapping is not established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "ORG-005",
@@ -1008,7 +1098,7 @@
         ],
         "reason": "Authorization catalog exists, but creator contract/revenue-split data authority and financial mapping are not established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "ORG-006",
@@ -1034,7 +1124,7 @@
         ],
         "reason": "Organization analytics/settlement entity and source-of-truth mapping is not established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "ORG-007",
@@ -1061,7 +1151,7 @@
         ],
         "reason": "Organization management permissions/lifecycle principles exist, but approval/audit/transfer mapping is not established."
       },
-      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY; no inference"
+      "nextAction": "FEATURE_BINDING_RECONCILIATION_ONLY"
     },
     {
       "featureId": "USER-001",
@@ -1084,24 +1174,32 @@
         "api": [
           {
             "id": "getMe",
-            "apiInventory": false
+            "apiInventory": true,
+            "openapi": {
+              "openapi": true,
+              "admission": "NOT_DECLARED"
+            }
           },
           {
             "id": "updateMe",
-            "apiInventory": false
+            "apiInventory": true,
+            "openapi": {
+              "openapi": true,
+              "admission": "NOT_DECLARED"
+            }
           }
         ],
         "entity": [
           {
             "id": "ENT-USER",
-            "catalogExists": true,
-            "catalogStatus": "VERIFIED"
+            "exists": true,
+            "status": "VERIFIED"
           }
         ],
         "payload": []
       },
       "authorityCoverage": null,
-      "nextAction": "CANONICAL_API_ADMISSION_RECONCILIATION_REQUIRED"
+      "nextAction": "DOWNSTREAM_DTO_FIELD_PERSISTENCE_RUNTIME_EVIDENCE_RECONCILIATION_REQUIRED"
     },
     {
       "featureId": "USER-002",
@@ -1204,26 +1302,42 @@
         "api": [
           {
             "id": "blockUser",
-            "apiInventory": false
+            "apiInventory": true,
+            "openapi": {
+              "openapi": true,
+              "admission": "NOT_DECLARED"
+            }
           },
           {
             "id": "unblockUser",
-            "apiInventory": false
+            "apiInventory": true,
+            "openapi": {
+              "openapi": true,
+              "admission": "NOT_DECLARED"
+            }
           },
           {
             "id": "muteUser",
-            "apiInventory": false
+            "apiInventory": true,
+            "openapi": {
+              "openapi": true,
+              "admission": "NOT_DECLARED"
+            }
           },
           {
             "id": "unmuteUser",
-            "apiInventory": false
+            "apiInventory": true,
+            "openapi": {
+              "openapi": true,
+              "admission": "NOT_DECLARED"
+            }
           }
         ],
         "entity": [],
         "payload": []
       },
       "authorityCoverage": null,
-      "nextAction": "CANONICAL_API_ADMISSION_RECONCILIATION_REQUIRED"
+      "nextAction": "DOWNSTREAM_DTO_FIELD_PERSISTENCE_RUNTIME_EVIDENCE_RECONCILIATION_REQUIRED"
     },
     {
       "featureId": "USER-007",
