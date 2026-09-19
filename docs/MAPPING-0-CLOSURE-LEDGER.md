@@ -96,9 +96,16 @@ Evidence:
 
 The intervening commits after the tested source head are reconciliation/evidence/governance changes; unchanged structural results are inherited rather than rerun.
 
-NEXT_ITEM_ID: `M0-STRUCTURAL-HANDOFF-FINAL-ACCEPTANCE-01`
-NEXT_ITEM_STATE: `PASS_VERIFIED`
-Objective: Mapping 0 structural/contract handoff is accepted. Subsequent implementation/runtime/evidence work belongs to the downstream Contract → Runtime → Evidence stages. Maintain fail-closed behavior for the remaining AUTH-003 API admission prerequisite.
+NEXT_ITEM_ID: `W01-MIGRATION-GENERATION-001`
+NEXT_ITEM_STATE: `TODO_VERIFY`
+Objective: generate and statically audit the exact Payload migration required by the approved ENT-USER schema in active W01. Do not execute remote D1 migrations. Do not hand-author DDL.
+
+Generation evidence:
+- First attempt run `35459726942` failed because the W01 production CLI path triggered Wrangler remote proxy without `CLOUDFLARE_API_TOKEN`.
+- The workflow was corrected in `8f5df6646dda757e5dd9f7b5847a2efbc1cb93e4` to use the local proxy for migration generation.
+- Second attempt run `35459760432` is the current generation evidence source.
+- A successful generation must pass `scripts/auth-002-migration-static-audit.mjs` and produce an artifact before any migration source is committed.
+
 
 ## Completion gate
 Mapping 0 is not GREEN until the authoritative mapping state, open authority controls, required reconciliations, and current-head CI/evidence gates all satisfy their contracts. A historical "100%" report does not override current GitHub evidence.
