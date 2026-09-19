@@ -3,7 +3,8 @@
 - ID: CC-MAPPING-0-CANONICAL-MAPPING-GENERATOR-DRIFT-2026-09-17
 - Date: 2026-09-17
 - Scope: Mapping 0 canonical mapping artifact + its schema (no code/schema change in this record)
-- Decision: Record the conflict as GAP; do not modify the schema or the artifact now. Await Change Control authorization before altering either authoritative source.
+- Status: CLOSED — resolution executed and verified (2026-09-18)
+- Initial decision (historical): Record the conflict as GAP; do not modify the schema or the artifact until explicit Change Control authorization.
 
 ## Problem
 
