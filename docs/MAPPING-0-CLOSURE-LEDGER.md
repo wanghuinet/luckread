@@ -177,3 +177,39 @@ NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
 - `Payload Foundation CI` now executes the same guard continuously.
 - This is a safety guard only; it does not grant migration authority and does not execute D1 operations.
 - Latest guard integration commit: `d6ac07eb446946310825e6457dc2ab54e51a630f`.
+
+## Current verification checkpoint — 2026-09-20
+
+Latest main verification source:
+- HEAD: `44b303ba1b939fa05bc605490fa818d1661b647e`
+- Mapping 0 Structural Gate run `35461501025` = SUCCESS.
+- Feature Inventory run `35461500971` = SUCCESS.
+- Security Hardening Gate run `35461500981` = SUCCESS.
+- Payload Implementation Admission at the immediately preceding source head `a1de61753354ea7380bdaf806c77d41e27a6c074` = SUCCESS.
+- Payload Foundation CI at `a1de61753354ea7380bdaf806c77d41e27a6c074` = SUCCESS.
+- AUTH-002 W01 Migration Source Audit at `a1de61753354ea7380bdaf806c77d41e27a6c074` = SUCCESS.
+- AUTH-002 Session Schema Evidence Gate-1 at `a1de61753354ea7380bdaf806c77d41e27a6c074` = SUCCESS.
+
+Contract CI verification:
+- Run `35461495486` tested source head `5aab443cd93dbbc2d053798fb17d07caed56eebe` and completed with failure only in downstream alignment/evidence gates.
+- Core Contract/Structural, OpenAPI, Semantic, Common, State Machines, AuthZ, Feature Inventory, Payload Reconciliation, Enums and Capability Contract Graph all = SUCCESS.
+- Five-Way Alignment = FAILURE with `450 blocker(s)`; this is downstream implementation/evidence alignment and does not invalidate the structural Mapping 0 handoff.
+- Strict Downstream R4/Evidence/R5 = FAILURE, remaining a downstream executable-evidence closure gate.
+- No new contract-definition conflict was introduced by the Security Hardening correction.
+
+Security hardening correction:
+- The repository file `contracts/authz/authorization-decision.json` is a JSON Schema/contract definition; `checks` is correctly defined under `properties.checks`.
+- `scripts/security-hardening-check.mjs` now validates the contract/schema shape rather than treating the schema file as a runtime decision instance.
+- Security Hardening is now verified GREEN at HEAD `44b303ba1b939fa05bc605490fa818d1661b647e`.
+
+AUTH-003 boundary:
+- The existing authority gate remains `BLOCKED_NOT_GREEN`.
+- The operationId decision is already accepted: `authCredentialList/authCredentialAdd/authCredentialReplace/authCredentialRemove`.
+- Remaining blocker is exact public wire-schema authority (request/response fields, status/error semantics, list item projection/order, path parameter schema), not an unresolved operationId naming choice.
+- Therefore no OpenAPI write, DTO promotion, persistence promotion, or runtime implementation is admitted by inference.
+
+W01 migration boundary:
+- `W01-MIGRATION-BASELINE-AUTHORITY-001` remains `BLOCKED_EXTERNAL`.
+- Generated full-schema migration remains unpromoted.
+- Remote D1 migration remains mechanically blocked until explicit `GREEN — EXECUTION ADMITTED` Change Control.
+
