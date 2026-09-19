@@ -52,7 +52,7 @@ for (const entity of fieldRecords) {
     const sourceIsActive = Boolean(
       sourceRef &&
       fs.existsSync(`${root}/${sourceRef}`) &&
-      !sourceRef.replaceAll('\\\\', '/').startsWith('archive/'),
+      !sourceRef.replaceAll('\\', '/').startsWith('archive/'),
     );
     const implementationStatus = field.status === 'VERIFIED' && sourceIsActive
       ? 'IMPLEMENTED'
