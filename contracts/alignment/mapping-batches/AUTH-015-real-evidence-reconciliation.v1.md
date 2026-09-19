@@ -58,10 +58,10 @@ The B01 AUTH-015 record currently contains:
 - `workerRefs: []`
 - `testRefs: []`
 - `evidenceRefs: []`
-- `d1Domain: CONFLICT: legacy state contract names D1-01; frozen baseline requires D01 Core`
-- `reconciliationState: CONFLICT`
+- `d1Domain: D01 Core`
+- `reconciliationState: PARTIAL`
 
-The cross-system mapping separately records AUTH-015 as `PARTIAL` with blocker `deletion/restoration contract mapping incomplete`. These two statuses are source-specific evidence and are not silently normalized here.
+The cross-system mapping separately records AUTH-015 as `PARTIAL` with blocker `deletion/restoration contract mapping incomplete`. The logical domain naming conflict is resolved by Change Control to `D01 Core`; the remaining PARTIAL state is retained because deletion/restoration API, persistence, runtime and evidence closure are still incomplete.
 
 ## 4. API reconciliation
 
