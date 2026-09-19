@@ -1,7 +1,7 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "generatedAt": "2026-09-19",
-  "testedHead": "f7114a3d3c7846f6745247a9f3238856f2b39962",
+  "testedHead": "e576b0d629f95173570b624da24fe4cc10c3dd1a",
   "purpose": "Current Mapping 0 Change-Control decision queue, refreshed after current-head re-observation to prevent repeated rediscovery.",
   "noInference": true,
   "openControls": [
@@ -27,5 +27,6 @@
     "Do not reopen closed controls unless authoritative inputs change.",
     "Do not create a duplicate change-control finding when an existing OPEN control already governs the same conflict."
   ],
-  "supersedes": "artifacts/mapping-0/current-change-control-decision-queue-2026-09-19.json"
+  "supersedes": "artifacts/mapping-0/current-change-control-decision-queue-2026-09-19.json",
+  "testedHeadRationale": "Queue refreshed against the current GitHub main content baseline before this audit-only commit; subsequent commit is audit metadata only."
 }
