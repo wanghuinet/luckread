@@ -1,34 +1,33 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "generatedAt": "2026-09-19",
-  "purpose": "Current-HEAD Persistence and Code-Evidence inventory referential audit; no promotion.",
+  "purpose": "Corrected current-HEAD Persistence and Code-Evidence inventory referential audit; sourceOfTruth strings may contain multiple paths separated by punctuation.",
+  "sourceRefs": [
+    "contracts/alignment/database-entity-persistence-inventory.v1.json",
+    "contracts/alignment/code-evidence-inventory.v1.json"
+  ],
   "noInference": true,
   "counts": {
-    "repositoryBlobs": 867,
+    "repositoryBlobs": 868,
     "persistenceRecords": 10,
     "persistencePathRefs": 28,
     "persistenceMissingRefs": 0,
     "codeEvidenceRecords": 197,
-    "codePathRefs": 372,
-    "codeMissingRefs": 1,
+    "codePathRefs": 376,
+    "codeMissingRefs": 0,
     "verifiedEntities": 1,
     "verifiedEntitiesMissingImplementationRef": 0,
     "apiEvidenceRecords": 151,
     "apiEvidenceVerified": 0
   },
   "persistenceMissingRefs": [],
-  "codeMissingRefs": [
-    {
-      "path": "contracts/entity/entity-catalog.v1.json + contracts/entity/entity-implementation-evidence.v1.json + contracts/entity/entity-field-contract.v1.json + contracts/alignment/payload-inventory.v1.json + contracts/alignment/api-inventory.v1.json",
-      "at": "sourceOfTruth"
-    }
-  ],
+  "codeMissingRefs": [],
   "verifiedEntityImplementationIssues": [],
   "observations": [
-    "ENT-USER is entityStatus VERIFIED but persistenceStatus remains NOT_VERIFIED; this is a valid fail-closed distinction and is not an implementation contradiction.",
-    "ENT-IDENTITY, ENT-CREDENTIAL, ENT-VERIFICATION remain PROPOSED with empty implementationRef; no implementation is inferred.",
-    "API_OPERATION evidence records currently remain UNRESOLVED; source refs establish contract provenance, not runtime implementation.",
-    "No missing repository path reference was found in either inventory."
+    "ENT-USER is VERIFIED at entity level but persistenceStatus is NOT_VERIFIED; this is fail-closed and not a contradiction.",
+    "ENT-IDENTITY, ENT-CREDENTIAL and ENT-VERIFICATION remain PROPOSED with empty implementation references; no implementation is inferred.",
+    "API_OPERATION evidence records remain UNRESOLVED; sourceRefs establish provenance only.",
+    "All path-like repository references in both inventories resolve on current main."
   ],
-  "status": "REFERENCE_BLOCKED"
+  "status": "REFERENCE_GREEN"
 }
