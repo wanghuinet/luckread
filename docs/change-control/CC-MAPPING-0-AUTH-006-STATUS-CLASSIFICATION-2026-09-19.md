@@ -3,7 +3,7 @@
 - ID: CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19
 - Date: 2026-09-19
 - Scope: Canonical Mapping status semantics
-- Status: OPEN / NO STATUS CHANGE
+- Status: DECIDED — RECONCILIATION PENDING
 
 ## Finding
 
@@ -28,3 +28,7 @@ A future status-classification decision must explicitly define the canonical pre
 - No D1 changes.
 - No runtime execution.
 - No evidence freshness manipulation.
+
+## Decision accepted — 2026-09-20
+
+Decision 1 accepted: MISSING means zero valid mapping-bearing edges; PARTIAL means one or more valid mapping-bearing edges exist while downstream closure remains incomplete.
