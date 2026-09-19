@@ -256,3 +256,11 @@ This explains how `getEntitlementsOp` can arise from the existing `getEntitlemen
 `artifacts/mapping-0/w01-ent-user-source-existence-audit-2026-09-19.json` records a direct path probe: active W01 `workers/W01-payload/src/collections/Users.ts` exists and currently has `fields: []`; legacy repository-relative `src/collections/Users.ts` could not be resolved on the tested current commit or the previously recorded queue-head.
 
 Therefore the six ENT-USER field contract source references should be treated as historical/non-current references, not implementation evidence. The existing `CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18` remains OPEN/BLOCKED; no fields or contract statuses were changed.
+
+## 28. Active runtime boundary sweep
+
+`artifacts/mapping-0/active-runtime-boundary-sweep-2026-09-19.json` records a repository search at `7fe476a8d02bd0163ad21ae4c28d8921876891c8`.
+
+No active code or workflow reference to D1-Fabric was identified. Active W01 runtime/workflow references remain under `workers/W01-payload/`. Legacy-root references remain historical/governance references and are not treated as current implementation.
+
+The W01 Users source still has zero business fields, while the six ENT-USER field references point to the unresolved legacy source path. No contract, field, Entity, migration or Feature status was changed.
