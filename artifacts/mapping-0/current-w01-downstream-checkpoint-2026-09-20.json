@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "fdc08ac19f2b1672ed85f8a04aed869a1c76076b",
+  "sourceHead": "68aedc29fd7fac02080341c23c305c82be58fd0d",
   "checkpointDate": "2026-09-20",
   "checks": {
     "Payload Implementation Admission": {
@@ -38,5 +38,14 @@
     "executionMode": "read-only evidence capture; no migration apply command"
   },
   "currentState": "BLOCKED_EXTERNAL",
-  "nextAction": "Run the existing AUTH-002 Session Schema Evidence workflow manually with the controlled D1 target; then review migration status and schema catalog before any migration promotion."
+  "nextAction": "Execute the existing AUTH-002 Session Schema Evidence workflow manually against the explicitly controlled D1 target, then review migration-status and schema/catalog artifacts before any migration promotion decision.",
+  "currentHeadAudit": {
+    "migrationGenerationAdmission": "PASS_VERIFIED",
+    "migrationStaticAudit": "PASS_VERIFIED",
+    "remoteD1BaselineAuthority": "BLOCKED_EXTERNAL",
+    "remoteEvidenceWorkflowDispatchAvailableInSession": false,
+    "duplicateMappingReexecution": "SKIPPED_BY_INHERITANCE",
+    "generatedFullSchemaMigrationPromoted": false,
+    "remoteD1MigrationExecuted": false
+  }
 }
