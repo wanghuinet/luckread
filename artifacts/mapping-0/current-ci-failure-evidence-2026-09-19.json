@@ -1,0 +1,75 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-09-19",
+  "testedCommit": "2389cf7403d55391aedea4248bde22b7d3ee1d7f",
+  "purpose": "Current CI failure evidence after repairing Contract CI workflow YAML.",
+  "noInference": true,
+  "runs": {
+    "contractCI": {
+      "runId": 35420763890,
+      "conclusion": "failure"
+    },
+    "mapping0Structural": {
+      "runId": 35420763940,
+      "conclusion": "success"
+    },
+    "featureInventory": {
+      "runId": 35420763828,
+      "conclusion": "success"
+    }
+  },
+  "jobs": {
+    "payloadReconciliation": {
+      "jobId": 105837899234,
+      "conclusion": "failure",
+      "step": "node scripts/payload-contract-reconciliation-check.mjs",
+      "failures": [
+        "MISSING Payload field: ENT-USER.username",
+        "MISSING Payload field: ENT-USER.displayName",
+        "MISSING Payload field: ENT-USER.bio",
+        "MISSING Payload field: ENT-USER.avatar",
+        "MISSING Payload field: ENT-USER.locale",
+        "MISSING Payload field: ENT-USER.timezone",
+        "unmapped Payload collection: workers/W01-payload/src/collections/Media.ts:Media"
+      ],
+      "interpretation": "Matches the already-registered W01 ENT-USER source conflict; Media has no canonical Entity binding in the current Entity Catalog/mapping and must not be invented."
+    },
+    "semanticCrossContract": {
+      "jobId": 105837899293,
+      "conclusion": "failure",
+      "majorFailureClasses": {
+        "missingPermissionDeclarations": "many permission-mode operations lack permissions arrays",
+        "unknownPermissions": [
+          "media.delete.own",
+          "feed.read",
+          "user.read.public",
+          "account.export.self"
+        ],
+        "duplicateOperationId": [
+          "getEntitlements"
+        ],
+        "policyOnlyOperation": [
+          "getEntitlementsOp"
+        ],
+        "missingOpenApiIdempotencyHeaders": [
+          "deleteMedia",
+          "exportMyAccountData",
+          "completeUpload"
+        ]
+      },
+      "interpretation": "These are contract reconciliation failures. No permissions, operationId, or header semantics are auto-invented."
+    }
+  },
+  "gateConclusion": {
+    "mapping0Structural": "GREEN on the dedicated structural workflow run",
+    "canonicalTechnicalClosure": "NOT_GREEN",
+    "implementationAuthorization": false
+  },
+  "sourceRefs": [
+    "scripts/payload-contract-reconciliation-check.mjs",
+    "scripts/contract-semantic-ci.mjs",
+    "contracts/openapi/v1/openapi.yaml",
+    "contracts/openapi/v1/operation-policy.json",
+    "contracts/entity/entity-field-contract.v1.json"
+  ]
+}
