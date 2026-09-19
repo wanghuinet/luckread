@@ -56,3 +56,25 @@ The previously generated artifact from run `35459850548` confirms that Payload g
 The logical delta is now known at the contract/config level, but the **safe physical migration** remains unadmitted. A hand-written `ALTER TABLE`, inferred baseline, or remote-state assumption would violate the migration Change Control.
 
 Required next evidence remains the controlled remote D1 migration state for database `luckread`.
+
+
+## Migration snapshot finding — 2026-09-20
+
+The committed baseline directory currently contains:
+- `20250929_111647.ts`
+- `index.ts`
+- no `20250929_111647.json` migration snapshot.
+
+This is relevant to the observed full-schema regeneration. Payload's migration documentation states that `migrate:create` generates SQL changes from the prior migration state to the current Payload Config. Payload's documented migration model also uses per-migration JSON schema snapshot files; a Payload maintainer/community report specifically notes that when a manual migration lacks its corresponding JSON snapshot, the next `migrate:create` can try to recreate the same schema changes.
+
+Reference:
+- https://payloadcms.com/docs/database/migrations
+- https://github.com/payloadcms/payload/issues/14941
+
+This finding explains the observed behavior as a strong candidate root cause, but it is **not** promoted as a definitive 3.87.1 adapter-specific diagnosis until reproduced against the exact W01 baseline and Payload 3.87.1.
+
+Safety rule remains unchanged:
+- do not hand-author or infer the missing baseline snapshot;
+- do not promote the generated full-schema artifact;
+- do not execute a remote migration;
+- establish the authoritative baseline first, then regenerate under the supported migration workflow.
