@@ -2,7 +2,7 @@
 
 ## Status
 
-OPEN
+CLOSED — TOOLING CORRECTION EXECUTED AND REOBSERVED
 
 ## Scope
 
@@ -62,3 +62,26 @@ After the generator change, regenerate `contracts/alignment/code-evidence-invent
 ## Closure criterion
 
 Close this control only after the generator and generated artifact agree with the rule above and the resulting repository state is re-observed from the new commit.
+
+
+## Closure evidence
+
+- Control opened at commit `bca5ceffbea598d83f7d4e9b2be221d08da4ac3a`.
+- Generator correction committed at `def9fc1c7adb4fe4c9106a272e3f33a171900272`.
+- Regenerated evidence artifact committed at `0c1d1b311a6ecf2418eafb7d994763e889d2a875`.
+- Re-observation confirms all six ENT-USER FIELD records are `UNRESOLVED` with empty implementation/schema evidence refs.
+- Re-observation confirms there are zero FIELD records currently promoted to `IMPLEMENTED` by the generated inventory.
+- ENT-USER field contract remains unchanged at version `1.2`, with its six canonical fields still contractually `VERIFIED` and persistence evidence still pending.
+- No Mapping 0 status promotion is made by this control.
+
+## Remaining blockers
+
+The following remain governed by separate open controls and are unaffected:
+
+- W01 ENT-USER source authority conflict.
+- W01 Media collection/entity authority gap.
+- AUTH-006 status classification.
+- duplicate `getEntitlements` operationId and related AUTH-003 source conflict.
+- DTO representation gap.
+- D1 domain naming conflict.
+
