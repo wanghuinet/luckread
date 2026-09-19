@@ -1,5 +1,5 @@
 {
-  "version": "1.8",
+  "version": "1.9",
   "generatedAt": "2026-09-20",
   "decisionBasisHead": "c843344737ff84937cc8e1146a590402dd9d0a48",
   "decisionRecord": "docs/change-control/MAPPING-0-AUTHORITY-DECISIONS-2026-09-20.md",
@@ -48,11 +48,59 @@
       "decision": "W01 media remains a Payload support collection with exact source exemption; no canonical Media Entity is created."
     }
   ],
-  "nextItemId": "M0-DETERMINISTIC-RECONCILIATION-01",
-  "nextItemState": "TODO_FIX",
+  "nextItemId": "M0-STRUCTURAL-HANDOFF-FINAL-ACCEPTANCE-01",
+  "nextItemState": "PASS_VERIFIED",
   "rules": [
-    "A decision is not technical closure.",
-    "No Feature/Entity/Field/Payload/Runtime status is promoted by decision alone.",
-    "Unchanged verification is inherited rather than rerun."
-  ]
+    "Decision acceptance does not equal runtime evidence.",
+    "Only AUTH-003 remains technically pending from the eight original authority conflicts because canonical API admission prerequisites are not yet satisfied.",
+    "No business implementation is inferred from Mapping 0 structural acceptance.",
+    "Unchanged validation results are inherited across evidence-only documentation commits."
+  ],
+  "currentHeadBaseline": "9cdc9d4fb81d929dbd1911ac00be0c3c3769184d",
+  "reconciledControls": [
+    {
+      "id": "CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19",
+      "state": "PASS_VERIFIED",
+      "note": "Rule selected and AUTH-006 applied as PARTIAL in canonical mapping batch."
+    },
+    {
+      "id": "CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19",
+      "state": "PASS_VERIFIED",
+      "note": "listEntitlements/getEntitlements treatment reconciled across OpenAPI, API Inventory and operation policy; semantic gate passes."
+    },
+    {
+      "id": "CC-MAPPING-0-DTO-REPRESENTATION-GAP-2026-09-19",
+      "state": "PASS_VERIFIED",
+      "note": "Decision B recorded; no Canonical Mapping schema extension added."
+    },
+    {
+      "id": "CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19",
+      "state": "TODO_FIX",
+      "note": "Canonical operation set selected, but canonical API/OpenAPI admission remains blocked by existing DTO/schema preconditions."
+    },
+    {
+      "id": "CC-MAPPING-0-AUTH-006-ALIAS-AND-DOMAIN-CONFLICT-2026-09-19",
+      "state": "PASS_VERIFIED",
+      "note": "Canonical DTO aliases and D01 Core logical domain references reconciled."
+    },
+    {
+      "id": "CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19",
+      "state": "PASS_VERIFIED",
+      "note": "Affected logical domain references reconciled to D01 Core; physical D1 schema not inferred."
+    },
+    {
+      "id": "CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18",
+      "state": "PASS_VERIFIED",
+      "note": "Six approved fields are present in active W01 Users.ts and Payload reconciliation passes; migration/runtime execution remains downstream evidence."
+    },
+    {
+      "id": "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19",
+      "state": "PASS_VERIFIED",
+      "note": "Exact support-collection exemption is active and Payload reconciliation passes; no canonical Media Entity created."
+    }
+  ],
+  "reconciliationPendingControls": [
+    "CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19"
+  ],
+  "nextObjective": "Structural Mapping 0 handoff is accepted. Keep downstream technical/runtime/evidence closure fail-closed; next project work is separately governed implementation/admission."
 }
