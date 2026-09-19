@@ -226,3 +226,11 @@ The 11 Evidence Registry records are all past their `validUntil` at this review 
 The latest directly observed Contract CI run is still run `35421384870` against earlier commit `09176edcc5033d68fc0f4bbc090036615fbeaa27`, not the current `main` commit. Its structural/contract admission matrix and Feature Inventory passed; Semantic and Payload reconciliation failed on the already-registered `getEntitlements` / `getEntitlementsOp` and W01 field/Media authority blockers. This is **not** treated as a current-head technical certificate.
 
 No Canonical Mapping, Feature Inventory, Entity Catalog, Payload collection, DTO authority, operationId authority, persistence status, runtime evidence or Feature status changed in this re-observation.
+
+## 24. Current Change-Control queue refresh
+
+`artifacts/mapping-0/current-change-control-decision-queue-2026-09-19-v2.json` supersedes the earlier queue snapshot.
+
+Current governed OPEN controls: 9, including the W01 Media collection/entity-authority GAP. Scoped CLOSED controls: 4, including Semantic Draft Scope and AUTH-002 preflight DTO source drift. CLOSED here refers only to the recorded governance/tooling scope; underlying technical/runtime gaps remain governed separately.
+
+This queue is now the preferred lookup before opening another Mapping 0 Change Control. It does not authorize implementation or status promotion.
