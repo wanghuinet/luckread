@@ -346,3 +346,26 @@ Verified after correction:
 - This correction is provenance reconciliation under the previously accepted W01 source-authority decision; it is not new feature implementation.
 
 Acceptance: `ENT-USER provenance = PASS_VERIFIED`.
+
+## AUTH-003 active W01 runtime-surface audit — 2026-09-20
+
+Source head: `8be538d9208a3c182661f82a951064528b96b761`.
+
+Verified without implementing or promoting AUTH-003:
+- Active W01 collections are currently `Users.ts` and `Media.ts` only.
+- The active Payload API surface is the existing `src/app/(payload)/api/[...slug]` catch-all; no dedicated AUTH-003 credential route was identified in the inspected active W01 source tree.
+- No active W01 credential collection was identified.
+- Repository search for the canonical AUTH-003 operation set returned contract/alignment artifacts but no active W01 implementation artifact.
+
+Acceptance:
+- `M0-AUTH-003-RUNTIME-SURFACE-AUDIT-2026-09-20 = PASS_VERIFIED`.
+- This is a negative-surface / anti-drift audit only. It does not promote API wire schema, DTO, Mapping, persistence, migration, runtime GREEN, or security evidence.
+- Dedicated AUTH-003 implementation remains prohibited until the public wire-schema authority gate is explicitly closed.
+
+Evidence artifact:
+`artifacts/mapping-0/current-auth-003-runtime-surface-audit-2026-09-20.json`.
+
+Continuation boundaries remain unchanged:
+- `W01-MIGRATION-BASELINE-AUTHORITY-001 = BLOCKED_EXTERNAL`.
+- AUTH-003 wire projection = `WAIT_FOR_EXPLICIT_PUBLIC_WIRE_SCHEMA_AUTHORITY`.
+
