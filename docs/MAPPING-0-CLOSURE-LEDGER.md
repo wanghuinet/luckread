@@ -333,3 +333,16 @@ Acceptance:
 - No Mapping-0 status promotion.
 - No migration, API, DTO, Entity, persistence, runtime, or security status promotion.
 - Main continuation cursor remains `W01-MIGRATION-BASELINE-AUTHORITY-001 / BLOCKED_EXTERNAL`.
+
+
+## ENT-USER Payload-native provenance correction — 2026-09-20
+
+Change Control: `docs/change-control/CC-MAPPING-0-W01-ENT-USER-FIELD-PROVENANCE-2026-09-20.md`.
+
+Verified after correction:
+- All six canonical ENT-USER fields in `contracts/entity/entity-field-contract.v1.json` are `payloadNative:true` and reference active W01 `Users.ts` field paths.
+- Entity-level ENT-USER evidence references now point to active W01 sources rather than the archived root `src/` scaffold.
+- No field semantics, API exposure, migration state, runtime behavior, or Mapping status was promoted.
+- This correction is provenance reconciliation under the previously accepted W01 source-authority decision; it is not new feature implementation.
+
+Acceptance: `ENT-USER provenance = PASS_VERIFIED`.
