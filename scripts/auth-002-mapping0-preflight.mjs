@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 
 const mappingPath = 'contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json'
-const dtoPath = 'contracts/dto/auth-dto-records.v1.json'
+const dtoPath = 'contracts/dto/auth-dto-contract.v1.json'
 const entityPath = 'contracts/entity/entity-field-contract.v1.json'
 
 const fail = (message) => {
@@ -30,9 +30,32 @@ if (!mapping || !dtoRegistry || !entityContract) process.exit(1)
 const auth002 = mapping.bindings?.find((binding) => binding.featureId === 'AUTH-002')
 if (!auth002) fail('AUTH-002 binding is missing')
 
-const dtoIds = new Set((dtoRegistry.records ?? []).map((record) => record.dtoId).filter(Boolean))
-for (const dtoRef of auth002?.dtoRefs ?? []) {
-  if (!dtoIds.has(dtoRef)) fail(`AUTH-002 DTO reference is unresolved: ${dtoRef}`)
+const dtoRecords = (dtoRegistry.records ?? []).filter((record) => record.featureId === 'AUTH-002')
+const dtoByOperation = new Map(dtoRecords.map((record) => [record.operationId, record]))
+
+const loginDto = dtoByOperation.get('authLogin')
+if (!loginDto) {
+  fail('AUTH-002 canonical DTO registry is missing authLogin')
+} else {
+  for (const dtoRef of ['requestDtoId', 'responseDtoId']) {
+    if (!loginDto[dtoRef]) fail(`AUTH-002 authLogin ${dtoRef} is missing`)
+  }
+  if (loginDto.status !== 'CONTRACT_BOUND') fail(`AUTH-002 authLogin DTO status must be CONTRACT_BOUND, found ${loginDto.status}`)
+}
+
+const logoutDto = dtoByOperation.get('authLogout')
+if (!logoutDto) {
+  fail('AUTH-002 canonical DTO registry is missing authLogout')
+} else {
+  if (logoutDto.status !== 'NO_BODY_DTO') fail(`AUTH-002 authLogout DTO status must be NO_BODY_DTO, found ${logoutDto.status}`)
+  if (logoutDto.requestDtoId !== null || logoutDto.responseDtoId !== null) {
+    fail('AUTH-002 authLogout must not declare request/response body DTO IDs')
+  }
+}
+
+const expectedAuth002Refs = ['DTO-AUTH-LOGIN-REQUEST', 'DTO-AUTH-LOGIN-RESPONSE']
+if (JSON.stringify(auth002?.dtoRefs ?? []) !== JSON.stringify(expectedAuth002Refs)) {
+  fail(`AUTH-002 persistence binding DTO references drifted: expected ${JSON.stringify(expectedAuth002Refs)}, found ${JSON.stringify(auth002?.dtoRefs ?? [])}`)
 }
 
 const entitiesById = new Map((entityContract.records ?? []).map((record) => [record.entityId, record]))
