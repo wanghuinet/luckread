@@ -1,0 +1,57 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-09-19",
+  "purpose": "Machine-readable audit of legacy root Payload Users references that could be mistaken for active W01 evidence.",
+  "sourceCommit": "main at audit time",
+  "noInference": true,
+  "activeAuthority": "workers/W01-payload/",
+  "findings": [
+    {
+      "artifact": "contracts/entity/entity-field-contract.v1.json",
+      "severity": "BLOCKING_GOVERNANCE_CONFLICT",
+      "legacyReferenceCount": 6,
+      "references": [
+        "src/collections/Users.ts",
+        "src/payload.config.ts"
+      ],
+      "interpretation": "Six ENT-USER fields are still contractually VERIFIED against the legacy root scaffold, while active W01 Users.ts has fields: []. Existing Change Control requires an explicit authority decision A or B.",
+      "disposition": "DO_NOT_AUTO_FIX; follow CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18"
+    },
+    {
+      "artifact": "contracts/alignment/code-evidence-inventory.v1.json",
+      "severity": "NON_AUTHORITATIVE_HISTORICAL_REFERENCE",
+      "legacyReferenceCount": 6,
+      "evidenceIds": [
+        "FIELD:ENT-USER-F-AVATAR",
+        "FIELD:ENT-USER-F-BIO",
+        "FIELD:ENT-USER-F-DISPLAY-NAME",
+        "FIELD:ENT-USER-F-LOCALE",
+        "FIELD:ENT-USER-F-TIMEZONE",
+        "FIELD:ENT-USER-F-USERNAME"
+      ],
+      "interpretation": "These field evidence records point to the legacy root scaffold and must not be promoted as W01 implementation evidence. ENTITY:ENT-USER separately points to W01.",
+      "disposition": "RETAIN_AS_HISTORICAL_UNTIL_CHANGE_CONTROL_RESOLUTION"
+    },
+    {
+      "artifact": ".github/workflows/auth-session-migration-generation.yml",
+      "severity": "CLEAR",
+      "legacyReferenceCount": 0,
+      "interpretation": "Workflow watches and processes workers/W01-payload paths for the AUTH-002 migration generation flow.",
+      "disposition": "NO_CHANGE"
+    },
+    {
+      "artifact": ".github/workflows/auth-session-schema-evidence.yml",
+      "severity": "CLEAR",
+      "legacyReferenceCount": 0,
+      "interpretation": "Workflow watches and processes workers/W01-payload paths for schema evidence capture.",
+      "disposition": "NO_CHANGE"
+    }
+  ],
+  "invariants": [
+    "Active W01 is the runtime authority.",
+    "Legacy root sources are non-authoritative for W01 runtime.",
+    "No field is promoted from legacy evidence into W01 without Change Control.",
+    "Generated Payload inventory is authoritative for observed W01 collection fields; users currently observes fields: []."
+  ],
+  "status": "NOT_GREEN"
+}
