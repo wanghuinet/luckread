@@ -25,10 +25,15 @@ const revocation = json('contracts/authz/revocation-policy.json');
 const fields = json('contracts/authz/field-policy.json');
 
 if (decision) {
-  const checks = decision.checks;
+  const requiredDecisionFields = ['decision','subject','action','resource','checks','policyVersion'];
+  const decisionRequired = new Set(decision.required ?? []);
+  for (const key of requiredDecisionFields) if (!decisionRequired.has(key)) fail(`authorization decision contract missing required field: ${key}`);
+  const checks = decision.properties?.checks;
   const requiredChecks = ['authentication','accountState','permission','scope','resource','policy'];
-  if (!checks || typeof checks !== 'object') fail('authorization decision must expose checks object');
-  for (const key of requiredChecks) if (!checks || !Object.hasOwn(checks, key)) fail(`decision check missing: ${key}`);
+  if (!checks || typeof checks !== 'object') fail('authorization decision contract must define checks schema');
+  const checksRequired = new Set(checks?.required ?? []);
+  for (const key of requiredChecks) if (!checksRequired.has(key)) fail(`decision checks schema missing required field: ${key}`);
+  if (checks?.type !== 'object') fail('authorization decision checks schema must be an object');
   const order = decision['x-resolution-order'] ?? [];
   if (order[0] !== 'ACCOUNT_SECURITY_DENY' || order[1] !== 'CREDENTIAL_DENY') fail('security deny precedence must start with account and credential deny');
   const invariants = decision['x-hard-invariants'] ?? [];
