@@ -51,37 +51,23 @@ Important evidence traceability finding:
 - Those artifacts remain historical and are not used as current-head proof.
 
 ## Current known Mapping 0 authority queue
-As of the restored queue artifact (version 1.7), these controls remain open; do not auto-close:
-1. `CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19`
-2. `CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19`
-3. `CC-MAPPING-0-DTO-REPRESENTATION-GAP-2026-09-19`
-4. `CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19`
-5. `CC-MAPPING-0-AUTH-006-ALIAS-AND-DOMAIN-CONFLICT-2026-09-19`
-6. `CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19`
-7. `CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18`
-8. `CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19`
 
-All eight require authority-owner decision before deterministic reconciliation; no operationId rename/delete, no Entity creation/remap, no Blueprint/Contract rule change, no Payload field mutation, and no evidence freshness extension by inference.
+The original 8 authority controls have now been decided. Current queue state is persisted in:
+`artifacts/mapping-0/current-change-control-decision-queue-2026-09-20-v3.json`
 
-## Current-head verification — 2026-09-20
-Primary task: `M0-CURRENT-HEAD-VERIFICATION-01`
-Status at tested head `b4f15f7db8c6926553bae5b2ef6eeb9c4457c5a9`: `PASS_VERIFIED`.
+Reconciled and verified at current scope:
+- AUTH-006 status classification
+- getEntitlements/listEntitlements operation treatment
+- DTO representation decision
+- AUTH-006 DTO aliases
+- D01 Core logical domain naming
+- W01 ENT-USER active field source/implementation
+- W01 Media support-collection exemption
 
-GitHub Actions evidence:
-- Mapping 0 Structural Gate: run `35456317596` = success.
-- Feature Inventory: run `35456317672` = success.
-- Contract CI: run `35456317578` = failure.
-- Semantic failure: duplicate `getEntitlements` operationId; policy references `getEntitlementsOp` not found in OpenAPI.
-- Payload reconciliation failure: six ENT-USER fields missing from discovered W01 Payload configuration; W01 Media collection has no Entity implementationRef mapping.
-- The failures are already governed by the existing authority controls listed above; no new control was created.
+One original control remains technically pending:
+- `CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19` — canonical operation set is selected, but canonical API/OpenAPI admission remains blocked by existing DTO/schema preconditions.
 
-Evidence file:
-- `artifacts/mapping-0/current-head-contract-ci-observation-2026-09-20-b4f15f7.json`
-
-Post-verification evidence-only delta:
-- `cf53ec6d72a7fe82f658bd671192b711c3121633` adds only the above CI evidence file.
-- Comparison `b4f15f7... -> cf53ec6...` shows exactly one added file and no Contract/Blueprint/Code/Mapping/authority-input changes.
-- Therefore the CI result is inherited to current `main` under the same-input de-duplication rule: `PASS_INHERITED`, not a rerun.
+No operationId, Entity, Payload, Blueprint/Contract or D1 rule is changed by inference.
 
 ## Current historical Mapping 0 observation
 The latest persisted Mapping 0 observation on restored `main` reports:
@@ -96,14 +82,23 @@ The latest persisted Mapping 0 observation on restored `main` reports:
 These figures are explicitly historical until a new mapping-status snapshot is generated at a source-input-changing head. They are not re-counted as new work.
 
 ## Continuation cursor
-Cursor synchronization baseline: `8aa68ea260a8a6eaaf2fccd294fb17631438f0e1`. The containing ledger commit may advance `main` by one documentation-only commit; this does not alter the verified Contract/Blueprint/Code inputs.
-Last completed primary task:
-- `AUDIT-REPEAT-AND-DRIFT-01` = `PASS_VERIFIED`.
-- `M0-CURRENT-HEAD-VERIFICATION-01` = `PASS_VERIFIED` at `b4f15f7...`, then `PASS_INHERITED` to `cf53ec6...` because the intervening commit was evidence-only.
 
-NEXT_ITEM_ID: `M0-AUTHORITY-DECISION-QUEUE-01`
-NEXT_ITEM_STATE: `WAIT_AUTHORITY_DECISION`
-Decision surface prepared at `docs/change-control/MAPPING-0-AUTHORITY-DECISION-PACKET-2026-09-20.md`. Objective: obtain/apply explicit authority-owner decisions for the 8 existing Mapping 0 controls; until decisions exist, do not mutate operationIds, Entities, Payload fields, Blueprint/Contract rules, DTOs, or D1 domain names.
+Current structural handoff baseline: `9cdc9d4fb81d929dbd1911ac00be0c3c3769184d`.
+Primary task:
+- `M0-STRUCTURAL-HANDOFF-FINAL-ACCEPTANCE-01` = `PASS_VERIFIED`
+
+Evidence:
+- `artifacts/mapping-0/current-head-structural-handoff-2026-09-20-6e4612c.json`
+- Mapping 0 Structural Gate run `35458363120` = success at tested source head `6e4612cb...`.
+- Feature Inventory Gate run `35458363107` = success.
+- Contract core gates through Capability Graph = success.
+- Five-Way and Strict R4/Evidence/R5 = downstream failures; they do not invalidate the structural handoff under `CC-MAPPING-0-STAGE-SEPARATION-2026-09-18`.
+
+The intervening commits after the tested source head are reconciliation/evidence/governance changes; unchanged structural results are inherited rather than rerun.
+
+NEXT_ITEM_ID: `M0-STRUCTURAL-HANDOFF-FINAL-ACCEPTANCE-01`
+NEXT_ITEM_STATE: `PASS_VERIFIED`
+Objective: Mapping 0 structural/contract handoff is accepted. Subsequent implementation/runtime/evidence work belongs to the downstream Contract → Runtime → Evidence stages. Maintain fail-closed behavior for the remaining AUTH-003 API admission prerequisite.
 
 ## Completion gate
 Mapping 0 is not GREEN until the authoritative mapping state, open authority controls, required reconciliations, and current-head CI/evidence gates all satisfy their contracts. A historical "100%" report does not override current GitHub evidence.
