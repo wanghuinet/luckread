@@ -5,7 +5,7 @@
   "additionalProperties":false,
   "required":["version","status","sourceOfTruth","records","rules"],
   "properties":{
-    "version":{"const":"1.0"},
+    "version":{"type":"string","pattern":"^1\\.\\d+$"},
     "status":{"enum":["NOT_GREEN","GREEN"]},
     "sourceOfTruth":{"const":"contracts/entity/entity-catalog.v1.json"},
     "records":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["entityId","status","fields","evidenceRefs"],"properties":{
