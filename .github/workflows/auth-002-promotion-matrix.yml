@@ -12,7 +12,6 @@ on:
       - 'contracts/evidence/AUTH-002-006-persistence-evidence-contract.v1.json'
       - 'contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json'
       - 'contracts/dto/auth-dto-contract.v1.json'
-      - 'contracts/dto/auth-dto-records.v1.json'
       - 'contracts/entity/entity-field-contract.v1.json'
       - 'contracts/api/auth-operation-policy.v1.json'
       - '.github/workflows/auth-002-promotion-matrix.yml'
