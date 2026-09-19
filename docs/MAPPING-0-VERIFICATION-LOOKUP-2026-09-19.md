@@ -210,3 +210,7 @@ The evidence-bound USER delta is present on current `main`. USER-001 already has
 ## 21. AUTH-002 preflight DTO source drift — CLOSED
 
 `scripts/auth-002-mapping0-preflight.mjs` and `.github/workflows/auth-002-promotion-matrix.yml` previously referenced archived `contracts/dto/auth-dto-records.v1.json`. They now use the current canonical `contracts/dto/auth-dto-contract.v1.json` shape. The validator checks AUTH-002 login `CONTRACT_BOUND`, logout `NO_BODY_DTO`, and stable persistence DTO refs. See `docs/change-control/CC-MAPPING-0-AUTH-002-PREFLIGHT-DTO-SOURCE-DRIFT-2026-09-19.md`. Underlying AUTH-002 technical/runtime gates remain open.
+
+## 22. W01 Media collection/entity authority GAP
+
+Current Payload Contract Reconciliation reports `workers/W01-payload/src/collections/Media.ts:Media` as unmapped because the current Entity Catalog has no matching canonical Entity implementationRef. This is registered at `docs/change-control/CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19.md`. Do not create/delete/remap the collection without authority resolution.
