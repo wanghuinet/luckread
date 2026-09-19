@@ -202,3 +202,7 @@ The evidence-bound USER delta is present on current `main`. USER-001 already has
 
 - `artifacts/mapping-0/current-head-api-edge-audit-2026-09-19.json`: 449 mapping records, 28 API edge refs, 11 admitted in API Inventory/OpenAPI, 17 unresolved admissions; one pre-existing OpenAPI duplicate operationId `getEntitlements`. Reference-integrity audit only.
 - `artifacts/mapping-0/current-head-entity-edge-audit-2026-09-19.json`: 18 Entity edge refs across 5 unique Entity IDs; 18/18 resolve to Entity Catalog; no unresolved Entity identifier refs. Entity implementation/persistence status remains separate.
+
+## 20. Current-HEAD Persistence / Code Evidence reference audit
+
+`artifacts/mapping-0/current-head-persistence-code-evidence-audit-2026-09-19.json` is the corrected current-HEAD audit. Persistence inventory: 28/28 path-like references resolve. Code Evidence Inventory: 376/376 path-like references resolve. Initial apparent missing reference was an audit-parser false positive caused by a multi-path `sourceOfTruth` string; the parser was corrected and rerun. No Entity status, persistence status, runtime evidence or Feature status was promoted.
