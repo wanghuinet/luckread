@@ -1,8 +1,8 @@
 {
-  "auditId": "M0-CURRENT-HEAD-REOBSERVATION-2026-09-19-03",
+  "auditId": "M0-CURRENT-HEAD-REOBSERVATION-2026-09-19-04",
   "auditDate": "2026-09-19",
   "testedRef": "main",
-  "testedCommit": "8ffe8e9ec0a3a504c81fcf1f98d50b681b6024c2",
+  "testedCommit": "744cd3d0981875c7e22c29a4b742546cb5e82437",
   "noInference": true,
   "scope": "Current-head Mapping 0 re-observation after Entity Field Contract schema-version compatibility repair.",
   "canonicalMapping": {
@@ -104,7 +104,7 @@
     "CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18",
     "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19"
   ],
-  "disposition": "Audit refresh plus schema compatibility repair. Mapping 0 remains fail-closed; no Feature, Entity, Field, Payload, DTO, operationId, persistence, runtime or Evidence status was promoted.",
+  "disposition": "Current-head audit refresh after schema compatibility closure. Mapping 0 structural gate is GREEN for structural integrity on this HEAD; Canonical Mapping itself remains NOT_GREEN with all downstream blockers preserved. No Feature status, Entity authority, Payload field, DTO, operationId, persistence, runtime or Evidence promotion occurred.",
   "entityFieldSchemaCompatibility": {
     "contractVersion": "1.2",
     "schemaVersionPolicy": "^1.x",
