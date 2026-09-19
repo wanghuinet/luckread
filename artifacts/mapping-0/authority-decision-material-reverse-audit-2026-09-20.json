@@ -1,0 +1,79 @@
+{
+  "evidenceType": "MAPPING_0_AUTHORITY_DECISION_MATERIAL_REVERSE_AUDIT",
+  "auditDate": "2026-09-20",
+  "repository": "wanghuinet/luckread",
+  "testedHead": "9df2cb58ca1a293c77acdd1491e5342835d3d37a",
+  "purpose": "Reverse-check all current OPEN Mapping 0 Change Controls for newly committed authoritative decision material before any closure or implementation action.",
+  "result": "NO_SAFE_CLOSURE_FOUND",
+  "controls": [
+    {
+      "id": "CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "authoritativeFinding": "No normative machine-readable MISSING vs PARTIAL predicate located.",
+      "keySource": "docs/change-control/CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19.md"
+    },
+    {
+      "id": "CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "authoritativeFinding": "Two canonical routes share getEntitlements; canonical treatment is not decided.",
+      "keySource": "docs/change-control/CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19.md"
+    },
+    {
+      "id": "CC-MAPPING-0-DTO-REPRESENTATION-GAP-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "authoritativeFinding": "Schema has no DTO edge; controlled A/B directions are listed but no authority selection is recorded.",
+      "keySource": "docs/change-control/CC-MAPPING-0-DTO-REPRESENTATION-GAP-2026-09-19.md"
+    },
+    {
+      "id": "CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "authoritativeFinding": "Canonical Mapping and shared AUTH-003 persistence mapping use incompatible operationId sets; authoritative API source selection remains pending.",
+      "keySource": "docs/change-control/CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19.md"
+    },
+    {
+      "id": "CC-MAPPING-0-AUTH-006-ALIAS-AND-DOMAIN-CONFLICT-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "authoritativeFinding": "AUTH-006 DTO aliases and D1 domain naming remain unreconciled.",
+      "keySource": "docs/change-control/CC-MAPPING-0-AUTH-006-ALIAS-AND-DOMAIN-CONFLICT-2026-09-19.md"
+    },
+    {
+      "id": "CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "authoritativeFinding": "D1-01 versus D01 Core is explicitly a cross-feature authority decision; no approved selection found.",
+      "keySource": "docs/change-control/CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19.md"
+    },
+    {
+      "id": "CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18",
+      "result": "REMAIN_BLOCKED",
+      "authoritativeFinding": "Active W01 Users.ts has fields:[] while six contract fields exist only in archived legacy source; direction A/B remains undecided.",
+      "keySource": "docs/change-control/CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18.md"
+    },
+    {
+      "id": "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "authoritativeFinding": "Active W01 Media collection has no matching canonical Entity implementationRef and no approved exemption/entity mapping found.",
+      "keySource": "docs/change-control/CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19.md"
+    }
+  ],
+  "searchConclusions": [
+    "No newly committed approved decision for getEntitlements was found.",
+    "No newly committed AUTH-003 operationId authority selection was found.",
+    "No new canonical MISSING/PARTIAL predicate was found.",
+    "No newly approved AUTH-006 DTO alias/domain selection was found.",
+    "No newly approved D1 domain name selection was found.",
+    "No newly approved W01 ENT-USER direction was found.",
+    "No newly approved W01 Media Entity mapping/exemption was found.",
+    "No newly approved Canonical Mapping DTO-edge model selection was found."
+  ],
+  "invariantsPreserved": [
+    "No Feature status promotion",
+    "No Entity creation or remapping",
+    "No operationId rename/deletion",
+    "No Contract or Blueprint rule change",
+    "No Payload field mutation",
+    "No D1 migration or physical schema inference",
+    "No evidence freshness extension",
+    "No business implementation"
+  ],
+  "nextAction": "Require authority-owner decision for the eight existing controls; after an approved decision is committed, reconcile dependent artifacts and run current-head CI."
+}
