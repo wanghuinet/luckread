@@ -172,7 +172,7 @@
     },
     {
       "featureId": "AUTH-006",
-      "status": "MISSING",
+      "status": "PARTIAL",
       "apiOperationIds": [
         "authPasskeyRegistrationOptions",
         "authPasskeyRegistrationVerify",
@@ -396,7 +396,7 @@
     },
     {
       "featureId": "USER-001",
-      "status": "UNRESOLVED",
+      "status": "PARTIAL",
       "apiOperationIds": [
         "getMe",
         "updateMe"
@@ -479,7 +479,7 @@
     },
     {
       "featureId": "USER-006",
-      "status": "UNRESOLVED",
+      "status": "PARTIAL",
       "apiOperationIds": [
         "blockUser",
         "unblockUser",
