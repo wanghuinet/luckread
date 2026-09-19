@@ -181,7 +181,7 @@
       "name": "account freeze/suspension/ban",
       "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Account lifecycle", "l3": "Account enforcement", "l4": "Freeze/suspend/ban", "l5": "Restrict account access", "l6": "Apply an authorized account-state transition", "l7": "Only valid state-machine transitions are allowed; protected mutations and sessions must respect enforced states", "l8": "Mapped to existing authoritative account state machine"},
       "existingContracts": ["contracts/state-machines/account.json"],
-      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": ["user.restrict.limited", "user.freeze", "user.suspend", "user.ban"], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": ["identity.account_state_changed"], "workerRefs": [], "d1Domain": "CONFLICT: existing state contract uses legacy D1-01; frozen baseline requires D01 Core", "testRefs": [], "evidenceRefs": [],
+      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": ["user.restrict.limited", "user.freeze", "user.suspend", "user.ban"], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": ["identity.account_state_changed"], "workerRefs": [], "d1Domain": "D01 Core", "testRefs": [], "evidenceRefs": [],
       "reconciliationState": "CONFLICT",
       "blockers": ["D1 domain naming conflict requires Change Control", "worker ownership and evidence mapping incomplete"]
     },
@@ -199,7 +199,7 @@
       "name": "account deletion/restoration",
       "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Account lifecycle", "l3": "Deletion and restoration", "l4": "Delete/restore", "l5": "Request, cancel or restore account lifecycle", "l6": "Execute only valid deletion/restoration state transitions", "l7": "Deletion is state-machine controlled; legal hold and retention rules override normal deletion; direct resurrection is forbidden", "l8": "Mapped to existing account state machine and identity registry"},
       "existingContracts": ["contracts/state-machines/account.json", "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"],
-      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": ["user.reactivate", "user.restore"], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": ["identity.account_state_changed"], "workerRefs": [], "d1Domain": "CONFLICT: legacy state contract names D1-01; frozen baseline requires D01 Core", "testRefs": [], "evidenceRefs": [],
+      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": ["user.reactivate", "user.restore"], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": ["identity.account_state_changed"], "workerRefs": [], "d1Domain": "D01 Core", "testRefs": [], "evidenceRefs": [],
       "reconciliationState": "CONFLICT",
       "blockers": ["D1 naming conflict requires Change Control", "deletion/anonymization migration evidence missing"]
     },
