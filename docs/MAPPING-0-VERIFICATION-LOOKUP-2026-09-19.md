@@ -193,3 +193,7 @@ Do not reopen either finding unless the underlying authoritative inputs change.
 ## 17. Current Change-Control decision queue
 
 Current OPEN governance decisions are consolidated in `artifacts/mapping-0/current-change-control-decision-queue-2026-09-19.json`. The queue currently contains 8 OPEN controls and 2 scoped CLOSED controls. Consult this queue before creating a new Mapping 0 finding.
+
+## 18. USER-001/USER-006 blocker precision audit
+
+The evidence-bound USER delta is present on current `main`. USER-001 already has explicit API/Entity edges, so its historical B02 blocker wording is stale and is tracked by `docs/change-control/CC-MAPPING-0-USER-001-006-BLOCKER-PRECISION-2026-09-19.md`. USER-006 has explicit API/policy evidence but still lacks feature-bound Entity/Field and downstream executable closure. See `artifacts/mapping-0/user-001-006-blocker-precision-audit-2026-09-19.json`. No Feature status was promoted.
