@@ -47,10 +47,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Verify authorization decision source before gate
+      - name: Normalize and verify canonical authorization decision source
         run: |
+          git restore --source=HEAD --worktree -- contracts/authz/authorization-decision.json
           pwd
           git rev-parse HEAD
+          test "$(git hash-object contracts/authz/authorization-decision.json)" = "$(git rev-parse HEAD:contracts/authz/authorization-decision.json)"
           node -e "const fs=require('node:fs'); const p='contracts/authz/authorization-decision.json'; const d=JSON.parse(fs.readFileSync(p,'utf8')); console.log('AUTHZ_DECISION_PATH='+require('node:path').resolve(p)); console.log('AUTHZ_CHECK_KEYS='+Object.keys(d.checks||{}).join(',')); console.log('AUTHZ_HAS_CHECKS='+String(Boolean(d.checks)));"
       - name: Security hardening static gate
         run: node scripts/security-hardening-check.mjs
