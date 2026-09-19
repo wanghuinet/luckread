@@ -1,10 +1,10 @@
 {
-  "auditId": "M0-CURRENT-HEAD-REOBSERVATION-2026-09-19-01",
+  "auditId": "M0-CURRENT-HEAD-REOBSERVATION-2026-09-19-02",
   "auditDate": "2026-09-19",
   "testedRef": "main",
-  "testedCommit": "cd5ed7d39f0aadb5ca93fcc862aec7dc026152c7",
+  "testedCommit": "5a6acfd425d69907a697c4dc6972d90bec7d8d1b",
   "noInference": true,
-  "scope": "Current-head Mapping 0 re-observation before any technical status promotion",
+  "scope": "Current-head Mapping 0 re-observation after CI stage-separation closure; no technical status promotion",
   "canonicalMapping": {
     "recordCount": 449,
     "status": "NOT_GREEN",
@@ -62,34 +62,39 @@
     "freshRuntimeEvidenceClaimed": false
   },
   "contractCi": {
-    "latestObservedRunHeadCommit": "09176edcc5033d68fc0f4bbc090036615fbeaa27",
-    "latestObservedRunId": 35421384870,
-    "currentMainCommitIsNewerThanObservedRun": true,
-    "observedJobs": {
-      "contractAdmissionMatrix": "success",
-      "featureInventory": "success",
-      "mapping0StructuralContractGate": "success",
-      "semanticCrossContractGate": "failure",
-      "payloadContractReconciliationGate": "failure"
-    },
+    "latestObservedRunHeadCommit": "5a6acfd425d69907a697c4dc6972d90bec7d8d1b",
+    "latestObservedRunId": 35435849834,
+    "overallStatus": "failure",
+    "successfulPrerequisites": [
+      "Blueprint Feature Inventory Gate",
+      "Mapping 0 Structural/Contract Gate",
+      "Contract Admission Gate (common)",
+      "Contract Admission Gate (enums)",
+      "Contract Admission Gate (state-machines)",
+      "Contract Admission Gate (authz)",
+      "Contract Admission Gate (openapi)"
+    ],
+    "failedBlockingJobs": [
+      "Semantic Cross-Contract Gate",
+      "Payload Contract Reconciliation Gate"
+    ],
     "knownSemanticFailures": [
-      "duplicate operationId: getEntitlements",
-      "operationId getEntitlementsOp absent from OpenAPI",
-      "policy binding for getEntitlementsOp cannot locate an OpenAPI operation"
+      "openapi.yaml: duplicate operationId detected",
+      "operation-policy.json: operationId 'getEntitlementsOp' is not present in openapi.yaml",
+      "openapi.yaml: operation 'getEntitlementsOp' could not be located for policy binding"
     ],
     "knownPayloadFailures": [
-      "ENT-USER.username missing",
-      "ENT-USER.displayName missing",
-      "ENT-USER.bio missing",
-      "ENT-USER.avatar missing",
-      "ENT-USER.locale missing",
-      "ENT-USER.timezone missing",
+      "MISSING Payload field: ENT-USER.username",
+      "MISSING Payload field: ENT-USER.displayName",
+      "MISSING Payload field: ENT-USER.bio",
+      "MISSING Payload field: ENT-USER.avatar",
+      "MISSING Payload field: ENT-USER.locale",
+      "MISSING Payload field: ENT-USER.timezone",
       "unmapped Payload collection: workers/W01-payload/src/collections/Media.ts:Media"
     ],
-    "interpretation": "The latest directly observed Contract CI result is not a current-head certificate because it tested an earlier commit. No technical GREEN status is inferred."
+    "interpretation": "Current-head CI is fail-closed. Structural Mapping 0 and Feature Inventory gates pass; semantic and Payload reconciliation remain blocking. No Feature/Entity/Field/Payload/DTO/operationId/persistence/runtime/evidence status is promoted."
   },
   "openChangeControlsAlreadyGoverning": [
-    "CC-MAPPING-0-CONTRACT-CI-STAGE-COMPOSITION-2026-09-19",
     "CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19",
     "CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19",
     "CC-MAPPING-0-DTO-REPRESENTATION-GAP-2026-09-19",
@@ -99,5 +104,5 @@
     "CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18",
     "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19"
   ],
-  "disposition": "Reference-integrity and current-head re-observation only. No Canonical Mapping, Feature Inventory, Entity Catalog, Payload collection, DTO authority, operationId authority, persistence status, runtime evidence or Feature status was changed."
+  "disposition": "Current-head evidence refresh only. Structural Mapping 0 Gate passed on this commit; Contract CI remains fail-closed due to known semantic and Payload reconciliation blockers. No contract or Feature status changes."
 }
