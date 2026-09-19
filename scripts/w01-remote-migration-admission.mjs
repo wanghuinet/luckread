@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
-const root = resolve(process.cwd())
+const root = resolve(process.cwd(), '..', '..')
 const changeControlPath = join(
   root,
   'docs',
