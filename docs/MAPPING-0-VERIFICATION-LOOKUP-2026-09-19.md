@@ -244,3 +244,9 @@ Observed failing gates were exactly: Semantic Cross-Contract Gate and Payload Co
 Semantic failures remain the already-governed `getEntitlements` duplicate plus `getEntitlementsOp` OpenAPI/policy mismatch. Payload failures remain the six ENT-USER fields absent from W01 Users discovery and the unmapped W01 Media collection. No automatic repair, status promotion, Entity creation, operationId rename, or business implementation was applied.
 
 Because this evidence was captured before the evidence-recording commit itself, it is a historical executable observation of the exact tested HEAD, not a certificate for later commits.
+
+## 26. getEntitlements operationId root-cause refinement
+
+`artifacts/mapping-0/get-entitlements-operationid-root-cause-2026-09-19.json` records a current-head source inspection showing that `scripts/sync-rc-openapi.mjs` appends `Op` when a generated operationId collides inside its consolidated policy set.
+
+This explains how `getEntitlementsOp` can arise from the existing `getEntitlements` collision. It is root-cause evidence only; the existing `CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19` remains OPEN and authoritative. No operation was deleted or renamed.
