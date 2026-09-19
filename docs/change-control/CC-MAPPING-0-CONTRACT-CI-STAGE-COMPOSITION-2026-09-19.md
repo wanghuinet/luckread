@@ -3,7 +3,7 @@
 - ID: CC-MAPPING-0-CONTRACT-CI-STAGE-COMPOSITION-2026-09-19
 - Date: 2026-09-19
 - Scope: CI gate composition only
-- Status: OPEN / NO IMPLEMENTATION CHANGE
+- Status: CLOSED / DECISION EXECUTED
 
 ## Finding
 
@@ -40,21 +40,25 @@ Current stage-separation authority:
 
 states that executable implementation/runtime/evidence admission is downstream from Mapping 0 structural closure.
 
+## Decision
+
+The existing stage-separation authority is adopted as the explicit resolution for this CI composition gap:
+
+1. The `capability-graph` job remains the structural capability/entity/field validation stage and does not own strict R4/Evidence/R5 admission.
+2. R4 (`feature-entity-persistence-registry-check.mjs`), final Evidence Registry validation, R4 gap reporting and R5 validation move to a dedicated `capability-graph-strict-downstream` job.
+3. `contract-full` depends on both capability stages, so overall Contract CI remains fail-closed on strict downstream checks.
+4. `mapping-zero-final` remains independently executable and authoritative for the Mapping 0 structural/contract stage.
+
+This is a gate-composition change only. No business implementation, D1 migration, API/DTO/entity creation, evidence-date manipulation, or Feature status promotion is authorized.
+
+## Verification invariant
+
+- Strict R4 validator is unchanged.
+- Strict Evidence Registry validator is unchanged.
+- R5 validator is unchanged.
+- No strict validator is marked `continue-on-error`.
+- Mapping 0 structural gate remains independent from strict downstream admission.
+
 ## Disposition
 
-This is a governance/tooling composition discrepancy, not a reason to weaken either strict downstream validator.
-
-No workflow modification is made in this change-control record.
-
-The strict validators remain authoritative for their downstream stages. The dedicated Mapping 0 structural verifier remains authoritative for the Mapping 0 structural handoff.
-
-## Required future resolution
-
-Before claiming overall Contract CI GREEN, reconcile workflow composition through an explicit change-control decision that preserves:
-
-1. fail-closed strict R4 validation;
-2. fail-closed executable Evidence Registry validation;
-3. independent Mapping 0 structural GREEN semantics;
-4. no status promotion by inference.
-
-No business implementation, D1 migration, or evidence-date manipulation is part of this change control.
+CLOSED — decision executed in `.github/workflows/contract-ci.yml`. The change preserves fail-closed downstream validation while removing the stage-composition ambiguity. Historical finding and boundary remain recorded; reopen only if stage authority changes.
