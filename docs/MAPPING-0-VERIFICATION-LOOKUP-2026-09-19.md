@@ -164,3 +164,9 @@ This cross-check validates authority references only. It does not establish runt
 A model-level GAP is now persisted at `docs/change-control/CC-MAPPING-0-DTO-REPRESENTATION-GAP-2026-09-19.md`.
 
 It records that DTO authority already exists for AUTH-001 and AUTH-002 login, while Canonical Mapping schema has no DTO edge property. This is a governance/model decision point, not a missing-contract discovery. No Mapping Schema change or status promotion has been made.
+
+## 13. Canonical API operationId collision registered
+
+The global API/OpenAPI set audit found no set-membership drift: both sources contain 151 operation rows / 150 unique IDs. The single duplicate is `getEntitlements`, appearing for both `/entitlements/{subjectId}` and the `/entitlements` discovery-draft declaration.
+
+This is already registered under `docs/change-control/CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19.md`. Do not rediscover it as a new gap and do not auto-rename/delete either operation without Change Control.
