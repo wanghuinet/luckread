@@ -76,3 +76,11 @@ This means the six ENT-USER field contract records currently reference a histori
 Evidence: `artifacts/mapping-0/w01-ent-user-source-existence-audit-2026-09-19.json`.
 
 The authority decision remains unchanged: do not copy fields into W01 or rewrite the field contract until the existing Change Control decision selects the canonical direction.
+
+## Archive-location correction — 2026-09-19
+
+Follow-up repository-tree inspection corrected the earlier path-existence wording: the legacy Users collection is preserved at `archive/legacy-payload-root/src/collections/Users.ts`, not at the old repository-root path `src/collections/Users.ts`. Its six fields were directly verified in the archive.
+
+`archive/legacy-payload-root/README.md` explicitly identifies the archive as historical reference material and names `workers/W01-payload/` as the active Payload runtime authority.
+
+Therefore the substantive conflict is unchanged: the six canonical ENT-USER fields exist in the archived legacy source but are absent from active W01 Users discovery. The archive must not be treated as current implementation evidence.
