@@ -1,0 +1,42 @@
+{
+  "repository": "wanghuinet/luckread",
+  "sourceHead": "fdc08ac19f2b1672ed85f8a04aed869a1c76076b",
+  "checkpointDate": "2026-09-20",
+  "checks": {
+    "Payload Implementation Admission": {
+      "runId": 35459936208,
+      "conclusion": "success"
+    },
+    "Payload Foundation CI": {
+      "runId": 35459936366,
+      "conclusion": "success"
+    },
+    "W01 Payload Migration Generation": {
+      "runId": 35459850548,
+      "conclusion": "success",
+      "staticAudit": "success",
+      "promoted": false
+    }
+  },
+  "migrationGeneration": {
+    "acceptedStatus": "GENERATED_PENDING_BASELINE_AUTHORITY",
+    "reason": "Generated artifact is a full Payload schema snapshot rather than a safely proven additive second migration.",
+    "changeControl": "docs/change-control/CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20.md"
+  },
+  "remoteEvidenceTarget": {
+    "databaseName": "luckread",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "workflow": ".github/workflows/auth-session-schema-evidence.yml",
+    "requiredInputs": [
+      "database_name",
+      "environment_class=CONTROLLED_REMOTE_D1"
+    ],
+    "requiredSecrets": [
+      "CLOUDFLARE_API_TOKEN",
+      "CLOUDFLARE_ACCOUNT_ID"
+    ],
+    "executionMode": "read-only evidence capture; no migration apply command"
+  },
+  "currentState": "BLOCKED_EXTERNAL",
+  "nextAction": "Run the existing AUTH-002 Session Schema Evidence workflow manually with the controlled D1 target; then review migration status and schema catalog before any migration promotion."
+}
