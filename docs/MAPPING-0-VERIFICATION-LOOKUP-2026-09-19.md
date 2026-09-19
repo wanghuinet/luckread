@@ -182,3 +182,10 @@ See `docs/change-control/CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026
 The already-detected logical domain naming conflict `D1-01` vs `D01 Core` affects AUTH-006, AUTH-013 and AUTH-015. It is consolidated at `artifacts/mapping-0/auth-d1-domain-conflict-register-2026-09-19.json` and governed by `docs/change-control/CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19.md`.
 
 Do not rediscover or independently rename the domain per Feature. One authority decision must be applied consistently after Change Control.
+
+## 16. Resolved Change Controls — metadata closure
+
+- `CC-MAPPING-0-CANONICAL-MAPPING-GENERATOR-DRIFT-2026-09-17`: CLOSED after the authorized Option A resolution was executed and verified; historical finding retained, no need to rediscover.
+- `CC-MAPPING-0-EVIDENCE-STATUS-DRIFT-2026-09-19`: CLOSED for its narrow evidence-label correction scope; underlying AUTH-002 runtime gaps remain OPEN and require fresh evidence.
+
+Do not reopen either finding unless the underlying authoritative inputs change.
