@@ -1,10 +1,10 @@
 {
-  "auditId": "M0-CURRENT-HEAD-REOBSERVATION-2026-09-19-04",
+  "auditId": "M0-CURRENT-HEAD-REOBSERVATION-2026-09-19-05",
   "auditDate": "2026-09-19",
   "testedRef": "main",
-  "testedCommit": "744cd3d0981875c7e22c29a4b742546cb5e82437",
+  "testedCommit": "9d0a4929103ecc23b2a8533f3ed71e9da1698df8",
   "noInference": true,
-  "scope": "Current-head Mapping 0 re-observation after Entity Field Contract schema-version compatibility repair.",
+  "scope": "Current-head Mapping 0 re-observation after code-evidence field implementation-status tooling correction.",
   "canonicalMapping": {
     "recordCount": 449,
     "status": "NOT_GREEN",
@@ -104,7 +104,7 @@
     "CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18",
     "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19"
   ],
-  "disposition": "Current-head audit refresh after schema compatibility closure. Mapping 0 structural gate is GREEN for structural integrity on this HEAD; Canonical Mapping itself remains NOT_GREEN with all downstream blockers preserved. No Feature status, Entity authority, Payload field, DTO, operationId, persistence, runtime or Evidence promotion occurred.",
+  "disposition": "Current-head audit refresh after code-evidence false-promotion correction. Mapping 0 structural gate remains GREEN for structural integrity only; Canonical Mapping remains NOT_GREEN with 433 UNRESOLVED, 14 PARTIAL and 2 MISSING. No Feature/Entity/Field/Payload/DTO/operationId/persistence/runtime status was promoted.",
   "entityFieldSchemaCompatibility": {
     "contractVersion": "1.2",
     "schemaVersionPolicy": "^1.x",
@@ -112,5 +112,16 @@
     "contractContentChanged": false,
     "businessStatusChanged": false,
     "evidence": "CC-MAPPING-0-ENTITY-FIELD-CONTRACT-VERSION-DRIFT-2026-09-19"
-  }
+  },
+  "codeEvidence": {
+    "fieldImplementedCount": 0,
+    "entUserCanonicalFieldCount": 6,
+    "entUserFieldEvidenceStatus": "UNRESOLVED",
+    "staleImplementationRefs": 0,
+    "interpretation": "Code-evidence generator now requires an existing active repository source before promoting FIELD evidence to IMPLEMENTED. The six ENT-USER sourceRef values still do not resolve to active W01 code, so no field implementation evidence is promoted."
+  },
+  "closedChangeControlsObserved": [
+    "CC-MAPPING-0-ENTITY-FIELD-CONTRACT-VERSION-DRIFT-2026-09-19",
+    "CC-MAPPING-0-CODE-EVIDENCE-FIELD-IMPLEMENTATION-STATUS-2026-09-19"
+  ]
 }
