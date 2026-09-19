@@ -125,3 +125,14 @@ It confirms the currently materialized technical edges can be separated into:
 - AUTH-001 Payload edge: resolves to active W01 `users` collection, whose observed fields are empty.
 
 This audit is reference-integrity evidence only. It does not promote any Feature status and does not replace the full Mapping → Contract → Runtime → Evidence gate.
+
+## 9. Latest 43-blocker authority cross-check
+
+`artifacts/mapping-0/explicit-blocker-authority-crosscheck-2026-09-19.json` checked all 43 explicit blocker Features without changing canonical status:
+
+- 28 materialized API references checked; 11 exist in API Inventory and occur exactly once in OpenAPI.
+- 18 materialized Entity references checked; all 18 resolve to Entity Catalog IDs.
+- The remaining 17 API references are not admitted by the canonical API inventory/OpenAPI boundary, or are reserved/discovery-only; they remain fail-closed.
+- Entity Catalog resolution still does not prove implementation or persistence.
+
+This is an authority/reference cross-check, not technical closure.
