@@ -136,3 +136,12 @@ This audit is reference-integrity evidence only. It does not promote any Feature
 - Entity Catalog resolution still does not prove implementation or persistence.
 
 This is an authority/reference cross-check, not technical closure.
+
+## 10. Latest legacy Payload path audit
+
+`artifacts/mapping-0/legacy-payload-reference-audit-2026-09-19.json` confirms that the active AUTH-002 workflows use `workers/W01-payload/` and do not read the legacy root. The remaining legacy machine-readable references are:
+
+- `contracts/entity/entity-field-contract.v1.json`: six ENT-USER fields still reference legacy `src/collections/Users.ts`; existing Change Control blocks unilateral correction.
+- `contracts/alignment/code-evidence-inventory.v1.json`: six historical FIELD evidence records reference the legacy root; they are explicitly non-authoritative for W01 and must not be promoted.
+
+No implementation or mapping status was changed by this audit.
