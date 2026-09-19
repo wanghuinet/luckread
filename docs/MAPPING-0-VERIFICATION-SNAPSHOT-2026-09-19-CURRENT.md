@@ -1,13 +1,16 @@
-# Mapping 0 Current Verification Snapshot — 2026-09-19
+# Mapping 0 Verification Reference Snapshot — 2026-09-19
 
 Repository: `wanghuinet/luckread`
 Verification source of truth: GitHub `main`
-Verified baseline head: `584346f195d341c67e911212cf3cfcede76f4fe7`
-Snapshot commit: `a39a09f936a25c6dbd869059dcda1ceeede425df` (documentation-only)
+Historical verified baseline head: `584346f195d341c67e911212cf3cfcede76f4fe7`
+Current GitHub main head at last audit: `d6b289f52feeaa04b563e7793441c97a4419f3f5`
+Snapshot commit: `a39a09f936a25c6dbd869059dcda1ceeede425df` (documentation-only historical snapshot)
 
-## 1. Current acceptance boundary
+> This file is a reference snapshot, not a fresh current-HEAD certificate. For reuse/revalidation decisions, consult `docs/MAPPING-0-VERIFICATION-LOOKUP-2026-09-19.md` first.
 
-This snapshot supersedes neither historical audit records nor locked contracts. It records the current GitHub main state after the 2026-09-19 evidence-label and AUTH-001 persistence-boundary corrections.
+## 1. Acceptance boundary
+
+This snapshot supersedes neither historical audit records nor locked contracts. It preserves the 2026-09-19 evidence-label and AUTH-001 persistence-boundary findings as a historical reference; later commits must be checked against the verification lookup before reusing any result.
 
 Current acceptance remains:
 
@@ -144,7 +147,7 @@ The remaining legitimate blockers are:
 
 ## 12. Acceptance statement
 
-As of GitHub main `584346f195d341c67e911212cf3cfcede76f4fe7`:
+At the historical verified baseline `584346f195d341c67e911212cf3cfcede76f4fe7`:
 
 **Mapping 0 structural/topology layer: GREEN.**
 
