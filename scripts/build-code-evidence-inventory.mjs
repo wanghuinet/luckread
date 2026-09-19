@@ -48,16 +48,35 @@ for (const entity of entityRecords) {
 
 for (const entity of fieldRecords) {
   for (const field of entity.fields ?? []) {
+    const sourceRef = typeof field.sourceRef === 'string' ? field.sourceRef : '';
+    const sourceIsActive = Boolean(
+      sourceRef &&
+      fs.existsSync(`${root}/${sourceRef}`) &&
+      !sourceRef.replaceAll('\\\\', '/').startsWith('archive/'),
+    );
+    const implementationStatus = field.status === 'VERIFIED' && sourceIsActive
+      ? 'IMPLEMENTED'
+      : 'UNRESOLVED';
+    const implementationRefs = implementationStatus === 'IMPLEMENTED' ? [sourceRef] : [];
+    const schemaEvidenceRefs = implementationStatus === 'IMPLEMENTED' ? [sourceRef] : [];
+    const blockers = implementationStatus === 'IMPLEMENTED'
+      ? []
+      : [
+          sourceRef && !sourceIsActive
+            ? 'Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted'
+            : 'Field implementation evidence is incomplete',
+        ];
+
     records.push({
       evidenceId: `FIELD:${field.fieldId}`,
       subjectType: 'FIELD',
       subjectId: field.fieldId,
-      implementationStatus: field.status === 'VERIFIED' ? 'IMPLEMENTED' : 'UNRESOLVED',
-      implementationRefs: field.sourceRef ? [field.sourceRef] : [],
+      implementationStatus,
+      implementationRefs,
       testRefs: [],
-      schemaEvidenceRefs: field.sourceRef ? [field.sourceRef] : [],
+      schemaEvidenceRefs,
       sourceRefs: [fieldContractPath],
-      blockers: field.status === 'VERIFIED' && field.sourceRef ? [] : ['Field implementation evidence is incomplete'],
+      blockers,
     });
   }
 }
