@@ -8,6 +8,7 @@ on:
       - 'scripts/payload-native-inventory.mjs'
       - 'scripts/payload-contract-reconciliation-check.mjs'
       - 'scripts/payload-implementation-admission-check.mjs'
+      - 'scripts/w01-remote-migration-admission.mjs'
       - '.github/workflows/payload-foundation-ci.yml'
   pull_request:
     paths:
@@ -54,6 +55,11 @@ jobs:
       - name: W01 production build
         working-directory: workers/W01-payload
         run: pnpm run build
+
+
+      - name: Remote migration admission guard
+        working-directory: workers/W01-payload
+        run: node ../../scripts/w01-remote-migration-admission.mjs
 
       - name: Payload implementation admission gate
         run: node scripts/payload-implementation-admission-check.mjs
