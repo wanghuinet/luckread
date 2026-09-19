@@ -213,3 +213,26 @@ W01 migration boundary:
 - Generated full-schema migration remains unpromoted.
 - Remote D1 migration remains mechanically blocked until explicit `GREEN — EXECUTION ADMITTED` Change Control.
 
+## Mapping classification correction — 2026-09-20
+
+Source head: `bc2ae682d94e648b7f9dfecbba1e27bee3978223`.
+
+Applied under the already accepted AUTH-006 status-classification Change Control:
+- `AUTH-006`: `MISSING` → `PARTIAL` because valid API-operation and Entity mapping edges already exist.
+- `USER-001`: `UNRESOLVED` → `PARTIAL` because valid API-operation and Entity mapping edges already exist.
+- `USER-006`: `UNRESOLVED` → `PARTIAL` because valid API-operation mapping edges already exist.
+
+No API operation, DTO, Entity, Field, Payload collection, persistence rule, or runtime implementation was invented or changed by this correction.
+
+Current Canonical Mapping counts after correction:
+- `PARTIAL`: 17
+- `UNRESOLVED`: 431
+- `MISSING`: 1
+- total: 449
+
+The remaining `MISSING` record is `AUTH-007`; its API/Entity/Payload/Code mapping-bearing edge sets are all empty and its existing blocker states that canonical MFA contracts are not established.
+
+Verification:
+- Mapping 0 Structural Gate run `35461957177` = SUCCESS at `bc2ae682d94e648b7f9dfecbba1e27bee3978223`.
+- Contract CI run `35461957253` is the corresponding downstream verification run.
+
