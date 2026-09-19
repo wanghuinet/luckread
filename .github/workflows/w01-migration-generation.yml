@@ -38,10 +38,10 @@ jobs:
       - name: Verify generation preconditions
         run: node scripts/auth-002-migration-generation-admission.mjs
 
-      - name: Generate migration with Payload CLI
+      - name: Generate migration with Payload CLI (local proxy only)
         working-directory: workers/W01-payload
         env:
-          NODE_ENV: production
+          NODE_ENV: development
           PAYLOAD_SECRET: migration-generation-only
         run: pnpm run payload -- migrate:create MIG-ENT-USER-PROFILE-V1
 
