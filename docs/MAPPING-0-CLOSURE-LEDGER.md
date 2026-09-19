@@ -96,14 +96,14 @@ The latest persisted Mapping 0 observation on restored `main` reports:
 These figures are explicitly historical until a new mapping-status snapshot is generated at a source-input-changing head. They are not re-counted as new work.
 
 ## Continuation cursor
-Current `main` head: `cf53ec6d72a7fe82f658bd671192b711c3121633`.
+Current `main` head: `ebd1675196fcc6f946eac80f1b522ab40857ca68`.
 Last completed primary task:
 - `AUDIT-REPEAT-AND-DRIFT-01` = `PASS_VERIFIED`.
 - `M0-CURRENT-HEAD-VERIFICATION-01` = `PASS_VERIFIED` at `b4f15f7...`, then `PASS_INHERITED` to `cf53ec6...` because the intervening commit was evidence-only.
 
 NEXT_ITEM_ID: `M0-AUTHORITY-DECISION-QUEUE-01`
 NEXT_ITEM_STATE: `WAIT_AUTHORITY_DECISION`
-Objective: obtain/apply explicit authority-owner decisions for the 8 existing Mapping 0 controls; until decisions exist, do not mutate operationIds, Entities, Payload fields, Blueprint/Contract rules, DTOs, or D1 domain names.
+Decision surface prepared at `docs/change-control/MAPPING-0-AUTHORITY-DECISION-PACKET-2026-09-20.md`. Objective: obtain/apply explicit authority-owner decisions for the 8 existing Mapping 0 controls; until decisions exist, do not mutate operationIds, Entities, Payload fields, Blueprint/Contract rules, DTOs, or D1 domain names.
 
 ## Completion gate
 Mapping 0 is not GREEN until the authoritative mapping state, open authority controls, required reconciliations, and current-head CI/evidence gates all satisfy their contracts. A historical "100%" report does not override current GitHub evidence.
