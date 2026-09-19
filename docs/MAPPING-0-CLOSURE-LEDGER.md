@@ -282,3 +282,25 @@ Current continuation decision:
 - No further deterministic Canonical Mapping backfill is justified from existing batch sources.
 - NEXT_ITEM remains `W01-MIGRATION-BASELINE-AUTHORITY-001` / `BLOCKED_EXTERNAL`.
 - The required next evidence is controlled target D1 migration-state evidence; remote D1 mutation remains prohibited until the migration Change Control reaches explicit GREEN execution admission.
+
+
+## Continuation execution audit — 2026-09-20 (current main)
+
+Current GitHub main at audit time: `3f82bec0ba6dc3c8dd8218e313866d5b93ee8e56`.
+
+Verified without re-running historical Mapping rows:
+- `scripts/auth-002-migration-generation-admission.mjs` enforces the current W01 Payload/D1-adapter lock (`3.87.1`), `push: false`, explicit `migrationDir`, and native Users auth before migration generation review.
+- The admission script detects that the committed baseline migration has no JSON migration snapshot and emits a baseline warning instead of silently accepting generated output as additive.
+- `scripts/auth-002-migration-static-audit.mjs` rejects later migrations that recreate the eight known baseline Payload tables and rejects parallel `session`/`sessions` tables plus raw credential columns.
+- The controlled remote evidence workflow remains `.github/workflows/auth-session-schema-evidence.yml` and is `workflow_dispatch` driven for remote D1 capture.
+- The workflow is read-only for the remote target: migration status plus catalog/PRAGMA evidence are captured; no remote migration application is performed by the evidence workflow.
+- No new remote AUTH-002 evidence run was found after the prior checkpoint, and no safe in-session workflow-dispatch capability is available through the connected GitHub action set.
+
+Acceptance decision:
+- Existing in-repository migration safety controls: `PASS_VERIFIED`.
+- Remote D1 baseline authority: `BLOCKED_EXTERNAL`.
+- Do not synthesize a migration snapshot, hand-author an ALTER/DDL migration, or promote the generated full-schema snapshot.
+
+NEXT_ITEM_ID remains: `W01-MIGRATION-BASELINE-AUTHORITY-001`.
+NEXT_ITEM_STATE remains: `BLOCKED_EXTERNAL`.
+NEXT required external evidence: execute the existing `AUTH-002 Session Schema Evidence` workflow against the explicitly controlled D1 target, then review the resulting migration-status and schema/catalog artifacts before any migration promotion decision.
