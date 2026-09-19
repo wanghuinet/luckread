@@ -2,7 +2,8 @@
 
 Repository: `wanghuinet/luckread`
 Authority: GitHub `main`
-Current HEAD: `d6b289f52feeaa04b563e7793441c97a4419f3f5`
+Audit content baseline: `d6b289f52feeaa04b563e7793441c97a4419f3f5`
+Current main after this audit's documentation commits: `fae967636a2faff3f37a4374975c37ea96a95b38`
 
 ## Purpose
 
@@ -15,10 +16,11 @@ This is a governance/lookup record. It does not promote any Mapping 0 status.
 
 ## Current-head change relation
 
-The current HEAD is 38 commits ahead of the structural verification baseline:
+The audited content baseline is 38 commits ahead of the structural verification baseline:
 
 - structural verification baseline: `dfa9af34546fe357c3b83d2b076b9852a04e5542`
-- current HEAD: `d6b289f52feeaa04b563e7793441c97a4419f3f5`
+- audited content baseline: `d6b289f52feeaa04b563e7793441c97a4419f3f5`
+- later audit-only commits: `fae967636a2faff3f37a4374975c37ea96a95b38`
 
 The GitHub compare for this range shows changes in persistence inventory/registry, evidence registry, CI/workflow files, security-gate code, archived legacy Payload files, and Mapping 0 governance artifacts.
 
