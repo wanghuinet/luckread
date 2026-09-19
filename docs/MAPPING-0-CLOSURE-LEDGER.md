@@ -315,3 +315,21 @@ Exact current-main file checks returned 404 for:
 Therefore the legacy root Payload scaffold is not an active source path on current `main`. Current W01 runtime authority remains `workers/W01-payload/`; archived legacy material remains under `archive/legacy-payload-root/` and is not treated as active implementation evidence.
 
 This is an authority-path verification only. It does not change Mapping-0 status or promote runtime/persistence evidence.
+
+
+## Derived Payload inventory drift correction — 2026-09-20
+
+Source head for correction: `d36b120b6db6c44690fb39e9b3151c9c8bc57275`.
+
+Verified:
+- `contracts/payload/payload-native-inventory.v1.json` already reflected the active W01 `Users.ts` six-field configuration.
+- `contracts/alignment/payload-inventory.v1.json` was stale and reported `users.fields=[]`.
+- The derived alignment inventory was refreshed to match the generator's deterministic projection of the current W01 native inventory.
+- Reverse verification confirms the `users` collection, source reference, auth flag, field count, field names, types, required/unique flags, and default values now match.
+- No historical audit artifact was rewritten; historical source-path observations remain historical and are not current runtime evidence.
+
+Acceptance:
+- Payload-derived inventory drift: `PASS_VERIFIED`.
+- No Mapping-0 status promotion.
+- No migration, API, DTO, Entity, persistence, runtime, or security status promotion.
+- Main continuation cursor remains `W01-MIGRATION-BASELINE-AUTHORITY-001 / BLOCKED_EXTERNAL`.
