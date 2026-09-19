@@ -3,6 +3,7 @@
 - ID: CC-MAPPING-0-EVIDENCE-STATUS-DRIFT-2026-09-19
 - Date: 2026-09-19
 - Scope: Mapping 0 Evidence Registry status correction only; no runtime/schema/migration/business implementation
+- Status: CLOSED — scoped evidence-label correction executed and verified (2026-09-19)
 - Decision: Correct B05/B06/B07 historical local evidence status from VERIFIED to EXPIRED; preserve historical PASS results and provenance.
 
 ## B07 authority check
