@@ -8,7 +8,48 @@
       "slug": "users",
       "sourceRef": "workers/W01-payload/src/collections/Users.ts:Users",
       "auth": true,
-      "fields": []
+      "fields": [
+        {
+          "name": "username",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:username",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED",
+          "required": true,
+          "unique": true
+        },
+        {
+          "name": "displayName",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:displayName",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED"
+        },
+        {
+          "name": "bio",
+          "type": "textarea",
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:bio",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED"
+        },
+        {
+          "name": "avatar",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:avatar",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED"
+        },
+        {
+          "name": "locale",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:locale",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED",
+          "defaultValue": "en-US"
+        },
+        {
+          "name": "timezone",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:timezone",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED",
+          "defaultValue": "UTC"
+        }
+      ]
     },
     {
       "slug": "media",
