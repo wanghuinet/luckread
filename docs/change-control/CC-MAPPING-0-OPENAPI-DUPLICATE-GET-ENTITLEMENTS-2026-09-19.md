@@ -63,3 +63,11 @@ No automatic deletion, renaming, or status promotion is performed by this record
 ## Acceptance
 
 Future conversations must classify this as an already-detected operationId collision rather than rediscovering it.
+
+## Root-cause refinement — 2026-09-19
+
+Current-HEAD source inspection found that `scripts/sync-rc-openapi.mjs` contains a deterministic collision-suffix rule: when an operationId is already used, it appends `Op` until the ID is unique. Therefore `getEntitlementsOp` can be a generated collision suffix caused by the duplicate `getEntitlements` routes, rather than an independently authoritative public API operation.
+
+Evidence: `artifacts/mapping-0/get-entitlements-operationid-root-cause-2026-09-19.json`.
+
+This narrows the technical cause but does not authorize deletion/renaming. The canonical treatment of the two entitlement routes still requires the existing Change Control decision, after which the generator/policy/OpenAPI sources must be reconciled together.
