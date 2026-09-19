@@ -206,3 +206,7 @@ The evidence-bound USER delta is present on current `main`. USER-001 already has
 ## 20. Current-HEAD Persistence / Code Evidence reference audit
 
 `artifacts/mapping-0/current-head-persistence-code-evidence-audit-2026-09-19.json` is the corrected current-HEAD audit. Persistence inventory: 28/28 path-like references resolve. Code Evidence Inventory: 376/376 path-like references resolve. Initial apparent missing reference was an audit-parser false positive caused by a multi-path `sourceOfTruth` string; the parser was corrected and rerun. No Entity status, persistence status, runtime evidence or Feature status was promoted.
+
+## 21. AUTH-002 preflight DTO source drift — CLOSED
+
+`scripts/auth-002-mapping0-preflight.mjs` and `.github/workflows/auth-002-promotion-matrix.yml` previously referenced archived `contracts/dto/auth-dto-records.v1.json`. They now use the current canonical `contracts/dto/auth-dto-contract.v1.json` shape. The validator checks AUTH-002 login `CONTRACT_BOUND`, logout `NO_BODY_DTO`, and stable persistence DTO refs. See `docs/change-control/CC-MAPPING-0-AUTH-002-PREFLIGHT-DTO-SOURCE-DRIFT-2026-09-19.md`. Underlying AUTH-002 technical/runtime gates remain open.
