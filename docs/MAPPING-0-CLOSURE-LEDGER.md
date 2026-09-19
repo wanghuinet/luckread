@@ -236,3 +236,17 @@ Verification:
 - Mapping 0 Structural Gate run `35461957177` = SUCCESS at `bc2ae682d94e648b7f9dfecbba1e27bee3978223`.
 - Contract CI run `35461957253` is the corresponding downstream verification run.
 
+## R4 downstream gap clustering — 2026-09-20
+
+Source evidence:
+- Contract CI run `35462001907`, source head `2a328994b3588298c4879764404df7614322d096`.
+- R4 report: total 449; ready 0; blocked 449; missing entity binding 440; persistence not verified 9.
+- Cluster artifact: `artifacts/mapping-0/current-r4-gap-clusters-2026-09-20.json`.
+
+Persistence-not-verified feature set:
+`AUTH-001, AUTH-002, AUTH-003, AUTH-004, AUTH-005, AUTH-006, AUTH-010, AUTH-011, USER-001`.
+
+These persistence gaps are concentrated on the existing entities `ENT-USER`, `ENT-CREDENTIAL`, `ENT-IDENTITY`, `ENT-SESSION`, and `ENT-VERIFICATION`.
+
+This artifact is an audit/planning record only. It does not promote persistence, migration, runtime, security, or Evidence Registry status. W01 remote migration remains blocked until authoritative baseline evidence and explicit GREEN execution admission exist.
+
