@@ -96,7 +96,7 @@ The latest persisted Mapping 0 observation on restored `main` reports:
 These figures are explicitly historical until a new mapping-status snapshot is generated at a source-input-changing head. They are not re-counted as new work.
 
 ## Continuation cursor
-Current `main` head: `ebd1675196fcc6f946eac80f1b522ab40857ca68`.
+Current `main` head: `b9718cce9bf23f85b7c79714ff4d0ffbf5a0d0d4`.
 Last completed primary task:
 - `AUDIT-REPEAT-AND-DRIFT-01` = `PASS_VERIFIED`.
 - `M0-CURRENT-HEAD-VERIFICATION-01` = `PASS_VERIFIED` at `b4f15f7...`, then `PASS_INHERITED` to `cf53ec6...` because the intervening commit was evidence-only.
