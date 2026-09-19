@@ -1,0 +1,61 @@
+{
+  "evidenceType": "MAPPING_0_OPEN_CONTROL_CLOSURE_ELIGIBILITY",
+  "observedAt": "2026-09-20",
+  "repository": "wanghuinet/luckread",
+  "testedHead": "a0539040353c963ef3f97524d65a5a9393980ac9",
+  "queue": "artifacts/mapping-0/current-change-control-decision-queue-2026-09-19-v2.json",
+  "queueVersion": "1.7",
+  "openControls": 8,
+  "eligibleForSafeClosure": 0,
+  "disposition": [
+    {
+      "id": "CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "reason": "No authoritative predicate for MISSING vs PARTIAL; status must not change by inference."
+    },
+    {
+      "id": "CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "reason": "Canonical treatment of two routes still requires authority decision; no auto-rename/delete."
+    },
+    {
+      "id": "CC-MAPPING-0-DTO-REPRESENTATION-GAP-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "reason": "Requires decision between canonical Mapping dto edge extension and external DTO reconciliation."
+    },
+    {
+      "id": "CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "reason": "Two incompatible operationId vocabularies require authoritative API source selection."
+    },
+    {
+      "id": "CC-MAPPING-0-AUTH-006-ALIAS-AND-DOMAIN-CONFLICT-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "reason": "DTO aliases and persistence-domain naming remain unreconciled."
+    },
+    {
+      "id": "CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "reason": "Cross-feature D1 domain vocabulary conflict requires one authority decision; no physical schema inference."
+    },
+    {
+      "id": "CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18",
+      "result": "REMAIN_BLOCKED",
+      "reason": "Active W01 Users.ts has fields:[] while six contract fields exist in archived legacy source; explicit authority decision required."
+    },
+    {
+      "id": "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19",
+      "result": "REMAIN_OPEN",
+      "reason": "No canonical Entity implementationRef matches active W01 Media; requires Entity authority decision or explicit exemption."
+    }
+  ],
+  "invariants": [
+    "No operationId rename/delete",
+    "No Feature/Entity/Field/Persistence/Payload/DTO status promotion",
+    "No new Entity creation",
+    "No Blueprint or Contract rule change",
+    "No runtime/business implementation",
+    "No evidence freshness extension"
+  ],
+  "conclusion": "No OPEN authority control can be safely closed from current authoritative repository facts alone. The next action is decision-owner resolution of the listed conflicts, followed by deterministic reconciliation and current-head CI."
+}
