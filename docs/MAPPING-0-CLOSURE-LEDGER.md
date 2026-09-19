@@ -250,3 +250,35 @@ These persistence gaps are concentrated on the existing entities `ENT-USER`, `EN
 
 This artifact is an audit/planning record only. It does not promote persistence, migration, runtime, security, or Evidence Registry status. W01 remote migration remains blocked until authoritative baseline evidence and explicit GREEN execution admission exist.
 
+
+
+## Current continuation audit — 2026-09-20 (e2fb968)
+
+Source head: `e2fb968470624d252c049845a4b9ae18009fe753`.
+
+Verified current-head results:
+- Mapping 0 Structural Gate run `35462381961` = SUCCESS.
+- Ensure Feature Inventory run `35462381912` = SUCCESS.
+- Reconcile Canonical AUTH Mapping run `35462381930` = SUCCESS, but reconciliation result = `NO_CHANGE`; no new Canonical Mapping edge was created by this run.
+- Contract CI run `35462381911` = FAILURE only at Five-Way Alignment and Strict Downstream R4/Evidence/R5. All core Contract/Structural, Payload, Semantic, OpenAPI, Common, State Machines, AuthZ, Feature Inventory, Enums and Capability Graph gates = SUCCESS.
+
+Canonical Mapping current counts remain:
+- total = 449
+- PARTIAL = 17
+- UNRESOLVED = 431
+- MISSING = 1 (AUTH-007)
+- evidence-reference coverage = 449/449
+- API edge coverage = 11/449
+- Entity edge coverage = 9/449
+- Payload collection edge coverage = 1/449
+- Code evidence edge coverage = 0/449
+
+Additional batch audit:
+- B01-B03 contains five explicitly mapped API-edge records already represented in Canonical Mapping; no new safe edge was found.
+- B04-B06 (31 records), B07-B09 (34), B10-B12 (28), and B13-B15 (24) are all UNRESOLVED with zero explicit API/Entity/Payload/Code mapping-bearing edges in their canonical batch records.
+- No status promotion is authorized from prose/evidence references alone.
+
+Current continuation decision:
+- No further deterministic Canonical Mapping backfill is justified from existing batch sources.
+- NEXT_ITEM remains `W01-MIGRATION-BASELINE-AUTHORITY-001` / `BLOCKED_EXTERNAL`.
+- The required next evidence is controlled target D1 migration-state evidence; remote D1 mutation remains prohibited until the migration Change Control reaches explicit GREEN execution admission.
