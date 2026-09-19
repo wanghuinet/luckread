@@ -176,3 +176,9 @@ This is already registered under `docs/change-control/CC-MAPPING-0-OPENAPI-DUPLI
 AUTH-003 is now explicitly registered as an operationId reconciliation conflict: Canonical Mapping/feature-contract operations use `authCredentialList/add/replace/remove`, while the shared persistence mapping uses `authUsernameCreate/Change`, `authEmailAdd/Change`, and `authPhoneAdd/Change`. Existing AUTH-003 reconciliation documents already classify the latter as stale/unreconciled pending authoritative API admission.
 
 See `docs/change-control/CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19.md`. Do not choose a preferred operation vocabulary outside Change Control.
+
+## 15. Consolidated AUTH D1-domain conflict register
+
+The already-detected logical domain naming conflict `D1-01` vs `D01 Core` affects AUTH-006, AUTH-013 and AUTH-015. It is consolidated at `artifacts/mapping-0/auth-d1-domain-conflict-register-2026-09-19.json` and governed by `docs/change-control/CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19.md`.
+
+Do not rediscover or independently rename the domain per Feature. One authority decision must be applied consistently after Change Control.
