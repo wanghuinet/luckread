@@ -1,0 +1,60 @@
+{
+  "artifactId": "M0-AUTH-002-REMOTE-EVIDENCE-DISPATCH-2026-09-20",
+  "createdFromHead": "185dad73de1ccad5548599f98aee4ac1bf3c8d8a",
+  "purpose": "Machine-readable handoff for the one remaining external AUTH-002 baseline evidence action; no migration mutation.",
+  "workflow": {
+    "path": ".github/workflows/auth-session-schema-evidence.yml",
+    "event": "workflow_dispatch",
+    "database_name": "luckread",
+    "environment_class": "CONTROLLED_REMOTE_D1"
+  },
+  "requiredSecrets": [
+    "CLOUDFLARE_API_TOKEN",
+    "CLOUDFLARE_ACCOUNT_ID"
+  ],
+  "remoteOperations": [
+    "wrangler d1 migrations list <database> --remote",
+    "wrangler d1 info <database> --json",
+    "SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE type IN ('table','index','trigger') ORDER BY type,name",
+    "PRAGMA table_info('users')",
+    "PRAGMA index_list('users')",
+    "PRAGMA foreign_key_list('users')",
+    "PRAGMA table_info('auth_session_state')",
+    "PRAGMA index_list('auth_session_state')",
+    "PRAGMA foreign_key_list('auth_session_state')"
+  ],
+  "mutationPolicy": {
+    "migrationApply": false,
+    "ddl": false,
+    "insertUpdateDelete": false,
+    "promotion": false
+  },
+  "expectedEvidenceFiles": [
+    "d1-info.json",
+    "migration-status.json",
+    "catalog.json",
+    "users-schema.json",
+    "users-indexes.json",
+    "users-foreign-keys.json",
+    "auth-session-state-schema.json",
+    "auth-session-state-indexes.json",
+    "auth-session-state-foreign-keys.json",
+    "provenance.json",
+    "manifest.json"
+  ],
+  "acceptance": {
+    "testedCommitShaMustEqualWorkflowSha": true,
+    "payloadVersion": "3.87.1",
+    "d1AdapterVersion": "3.87.1",
+    "environmentClass": "CONTROLLED_REMOTE_D1",
+    "reviewBeforeMigrationPromotion": true
+  },
+  "failClosedRules": [
+    "Do not execute a remote migration before the baseline Change Control is explicitly GREEN — EXECUTION ADMITTED.",
+    "Do not hand-author or infer an ALTER/DDL migration.",
+    "Do not promote the generated full-schema migration.",
+    "Do not convert historical local evidence into current remote baseline evidence."
+  ],
+  "blockingStatus": "BLOCKED_EXTERNAL",
+  "nextHumanAction": "Manually dispatch the existing workflow with the exact controlled target and review the uploaded evidence package."
+}
