@@ -1,0 +1,31 @@
+{
+  "version": "1.1",
+  "generatedAt": "2026-09-19",
+  "testedHead": "f7114a3d3c7846f6745247a9f3238856f2b39962",
+  "purpose": "Current Mapping 0 Change-Control decision queue, refreshed after current-head re-observation to prevent repeated rediscovery.",
+  "noInference": true,
+  "openControls": [
+    "CC-MAPPING-0-CONTRACT-CI-STAGE-COMPOSITION-2026-09-19",
+    "CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19",
+    "CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19",
+    "CC-MAPPING-0-DTO-REPRESENTATION-GAP-2026-09-19",
+    "CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19",
+    "CC-MAPPING-0-AUTH-006-ALIAS-AND-DOMAIN-CONFLICT-2026-09-19",
+    "CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19",
+    "CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18",
+    "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19"
+  ],
+  "closedControls": [
+    "CC-MAPPING-0-CANONICAL-MAPPING-GENERATOR-DRIFT-2026-09-17",
+    "CC-MAPPING-0-EVIDENCE-STATUS-DRIFT-2026-09-19",
+    "CC-MAPPING-0-SEMANTIC-DRAFT-SCOPE-2026-09-19",
+    "CC-MAPPING-0-AUTH-002-PREFLIGHT-DTO-SOURCE-DRIFT-2026-09-19"
+  ],
+  "rules": [
+    "OPEN means authority decision required, not implementation authorization.",
+    "CLOSED means only the scoped governance issue is closed; underlying technical/runtime gaps may remain open.",
+    "Do not reopen closed controls unless authoritative inputs change.",
+    "Do not create a duplicate change-control finding when an existing OPEN control already governs the same conflict."
+  ],
+  "supersedes": "artifacts/mapping-0/current-change-control-decision-queue-2026-09-19.json"
+}
