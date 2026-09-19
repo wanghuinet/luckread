@@ -1,7 +1,7 @@
 {
-  "version": "1.3",
+  "version": "1.4",
   "generatedAt": "2026-09-19",
-  "testedHead": "30e82ced00b06625eb55381d9135afa791ae4fd1",
+  "testedHead": "2ae3fa7eba248b229c4419733f3fd726e9fc9477",
   "purpose": "Current Mapping 0 Change-Control decision queue, refreshed after current-head re-observation to prevent repeated rediscovery.",
   "noInference": true,
   "openControls": [
@@ -28,6 +28,6 @@
     "Do not create a duplicate change-control finding when an existing OPEN control already governs the same conflict."
   ],
   "supersedes": "artifacts/mapping-0/current-change-control-decision-queue-2026-09-19.json",
-  "testedHeadRationale": "Queue updated after executing and closing CC-MAPPING-0-CONTRACT-CI-STAGE-COMPOSITION-2026-09-19; the queue remains audit metadata and is not a technical GREEN certificate.",
+  "testedHeadRationale": "Queue refreshed after current-head CI re-observation. This is audit metadata only; it does not promote technical status.",
   "note": "8 OPEN authority controls remain. No Feature status was promoted; Mapping 0 remains fail-closed."
 }
