@@ -1,0 +1,103 @@
+{
+  "auditId": "M0-CURRENT-HEAD-REOBSERVATION-2026-09-19-01",
+  "auditDate": "2026-09-19",
+  "testedRef": "main",
+  "testedCommit": "cd5ed7d39f0aadb5ca93fcc862aec7dc026152c7",
+  "noInference": true,
+  "scope": "Current-head Mapping 0 re-observation before any technical status promotion",
+  "canonicalMapping": {
+    "recordCount": 449,
+    "status": "NOT_GREEN",
+    "statusCounts": {
+      "UNRESOLVED": 433,
+      "PARTIAL": 14,
+      "MISSING": 2
+    },
+    "recordsWithBlockers": 449
+  },
+  "featureInventory": {
+    "recordCount": 449,
+    "canonicalMappingCount": 449,
+    "structuralOrphanCount": 0
+  },
+  "fiveWayReconciliation": {
+    "recordCount": 449,
+    "status": "NOT_GREEN",
+    "statusCounts": {
+      "UNRESOLVED": 433,
+      "PARTIAL": 14,
+      "MISSING": 2
+    }
+  },
+  "payload": {
+    "collectionsDiscovered": 2,
+    "users": {
+      "fields": 0
+    },
+    "media": {
+      "fieldCount": 1,
+      "source": "workers/W01-payload/src/collections/Media.ts:Media"
+    },
+    "knownReconciliationBlocker": "W01 ENT-USER field source conflict + Media collection has no canonical Entity Catalog implementationRef"
+  },
+  "entity": {
+    "catalogEntityCount": 10,
+    "verifiedEntityCount": 1,
+    "entityFieldContractVerifiedUserFieldCount": 6
+  },
+  "persistence": {
+    "featureEntityPersistenceRegistryRecordCount": 1,
+    "status": "NOT_GREEN",
+    "observedStatusCounts": {
+      "BLOCKED": 1
+    }
+  },
+  "evidence": {
+    "registryRecordCount": 11,
+    "recordsPastValidUntilAtAudit": 11,
+    "statusCounts": {
+      "EXPIRED": 3,
+      "CREATED": 8
+    },
+    "freshRuntimeEvidenceClaimed": false
+  },
+  "contractCi": {
+    "latestObservedRunHeadCommit": "09176edcc5033d68fc0f4bbc090036615fbeaa27",
+    "latestObservedRunId": 35421384870,
+    "currentMainCommitIsNewerThanObservedRun": true,
+    "observedJobs": {
+      "contractAdmissionMatrix": "success",
+      "featureInventory": "success",
+      "mapping0StructuralContractGate": "success",
+      "semanticCrossContractGate": "failure",
+      "payloadContractReconciliationGate": "failure"
+    },
+    "knownSemanticFailures": [
+      "duplicate operationId: getEntitlements",
+      "operationId getEntitlementsOp absent from OpenAPI",
+      "policy binding for getEntitlementsOp cannot locate an OpenAPI operation"
+    ],
+    "knownPayloadFailures": [
+      "ENT-USER.username missing",
+      "ENT-USER.displayName missing",
+      "ENT-USER.bio missing",
+      "ENT-USER.avatar missing",
+      "ENT-USER.locale missing",
+      "ENT-USER.timezone missing",
+      "unmapped Payload collection: workers/W01-payload/src/collections/Media.ts:Media"
+    ],
+    "interpretation": "The latest directly observed Contract CI result is not a current-head certificate because it tested an earlier commit. No technical GREEN status is inferred."
+  },
+  "openChangeControlsAlreadyGoverning": [
+    "CC-MAPPING-0-CONTRACT-CI-STAGE-COMPOSITION-2026-09-19",
+    "CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19",
+    "CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19",
+    "CC-MAPPING-0-DTO-REPRESENTATION-GAP-2026-09-19",
+    "CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19",
+    "CC-MAPPING-0-AUTH-006-ALIAS-AND-DOMAIN-CONFLICT-2026-09-19",
+    "CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19",
+    "CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18",
+    "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19"
+  ],
+  "disposition": "Reference-integrity and current-head re-observation only. No Canonical Mapping, Feature Inventory, Entity Catalog, Payload collection, DTO authority, operationId authority, persistence status, runtime evidence or Feature status was changed."
+}
