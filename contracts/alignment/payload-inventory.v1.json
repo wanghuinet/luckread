@@ -28,7 +28,48 @@
       "collectionSourceRef": "workers/W01-payload/src/collections/Users.ts:Users",
       "origin": "PAYLOAD_CONFIG_DISCOVERED",
       "auth": true,
-      "fields": [],
+      "fields": [
+        {
+          "name": "username",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:username",
+          "origin": "PAYLOAD_CONFIG_DISCOVERED",
+          "required": true,
+          "unique": true
+        },
+        {
+          "name": "displayName",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:displayName",
+          "origin": "PAYLOAD_CONFIG_DISCOVERED"
+        },
+        {
+          "name": "bio",
+          "type": "textarea",
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:bio",
+          "origin": "PAYLOAD_CONFIG_DISCOVERED"
+        },
+        {
+          "name": "avatar",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:avatar",
+          "origin": "PAYLOAD_CONFIG_DISCOVERED"
+        },
+        {
+          "name": "locale",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:locale",
+          "origin": "PAYLOAD_CONFIG_DISCOVERED",
+          "defaultValue": "en-US"
+        },
+        {
+          "name": "timezone",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:timezone",
+          "origin": "PAYLOAD_CONFIG_DISCOVERED",
+          "defaultValue": "UTC"
+        }
+      ],
       "sourceRefs": [
         "contracts/payload/payload-native-inventory.v1.json",
         "workers/W01-payload/src/collections/Users.ts:Users"
