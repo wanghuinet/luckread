@@ -1,7 +1,7 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "generatedAt": "2026-09-19",
-  "purpose": "Four-layer authority cross-check for the 11 API operation references already materialized in Mapping 0. No mapping/status promotion.",
+  "purpose": "Corrected four-layer authority cross-check for the 10 API operation references among explicit blocker features that are present in canonical API Inventory. No mapping/status promotion.",
   "sourceRefs": {
     "apiInventory": "contracts/alignment/api-inventory.v1.json",
     "openapi": "contracts/openapi/v1/openapi.yaml",
@@ -12,21 +12,23 @@
   "summary": {
     "checkedOperations": 10,
     "apiInventoryPresent": 10,
-    "openapiExactlyOnce": 9,
+    "openapiExactlyOnce": 10,
+    "policyPresent": 4,
     "dtoContractBound": 2,
     "dtoNoBody": 1,
-    "dtoReservedOrUnresolved": 0
+    "dtoReservedOrUnresolved": 0,
+    "note": "AUTH-003..006 and AUTH-010 operation IDs are not in this checked set because their API Inventory admission is absent; authRefresh is present but OpenAPI contract status remains DISCOVERY_DRAFT."
   },
   "rules": [
-    "Exact operation identity is required.",
-    "OpenAPI occurrence does not by itself prove runtime.",
-    "DTO contract binding is contract evidence, not implementation evidence.",
+    "Exact operationId line matching is used for OpenAPI occurrence counts.",
+    "API Inventory membership does not imply runtime implementation.",
+    "DTO binding is contract evidence, not implementation evidence.",
     "No feature status promotion is performed."
   ],
   "rows": [
     {
       "operationId": "authRegister",
-      "apiInventory": true,
+      "inApiInventory": true,
       "apiRecord": {
         "operationId": "authRegister",
         "method": "POST",
@@ -42,7 +44,9 @@
           "contracts/api/api-inventory.v1.json"
         ]
       },
-      "openapiOccurrences": 1,
+      "openapiOperationIdLines": 1,
+      "openapiExactlyOnce": true,
+      "dtoStatus": "CONTRACT_BOUND",
       "dto": {
         "featureId": "AUTH-001",
         "operationId": "authRegister",
@@ -55,93 +59,11 @@
         ],
         "status": "CONTRACT_BOUND"
       },
-      "policy": {
-        "operationId": "authRegister",
-        "method": "POST",
-        "path": "/auth/register",
-        "visibility": "public",
-        "capability": "account_registration",
-        "contractStatus": "CONTRACTED_PARTIAL",
-        "auth": {
-          "mode": "public",
-          "subject": "anonymous"
-        },
-        "authorization": {
-          "required": false,
-          "accountState": "N/A",
-          "scope": "N/A"
-        },
-        "resource": {
-          "class": "SINGLE_AUTHORITATIVE_WRITE",
-          "d1ReadMax": 2,
-          "d1WriteMax": 1,
-          "d1ReadRowsMax": 8,
-          "d1WriteRowsMax": 4,
-          "rpcMax": 1,
-          "outboundMax": 0
-        },
-        "cache": {
-          "mode": "NO_STORE",
-          "shared": false,
-          "authorizationBoundary": false
-        },
-        "retry": {
-          "maxAttempts": 1,
-          "clientRetrySafe": true,
-          "requiresIdempotency": true
-        },
-        "event": {
-          "syncConsumersMax": 0,
-          "asyncEventsMax": 1,
-          "fanoutMax": 0
-        },
-        "queue": {
-          "enqueueMax": 1,
-          "taskType": "verification_or_welcome"
-        },
-        "antiAbuse": {
-          "required": true,
-          "scopes": [
-            "ip",
-            "identity",
-            "device",
-            "endpoint",
-            "global"
-          ],
-          "actions": [
-            "ALLOW",
-            "THROTTLE",
-            "CHALLENGE",
-            "BLOCK"
-          ]
-        },
-        "idempotency": {
-          "required": true,
-          "key": "Idempotency-Key",
-          "semantic": "same-request-replay-must-not-create-second-account"
-        },
-        "security": [
-          "no_account_enumeration",
-          "credential_never_returned",
-          "uniqueness_conflict_not_identity_disclosure",
-          "consent_required"
-        ],
-        "evidence": {
-          "openapi": "PASS",
-          "inventory": "PASS",
-          "permission": "PASS",
-          "state": "MISSING",
-          "resource": "PASS",
-          "cache": "PASS",
-          "antiAbuse": "MISSING",
-          "integration": "MISSING",
-          "securityE2E": "MISSING"
-        }
-      }
+      "policyPresent": true
     },
     {
       "operationId": "authLogin",
-      "apiInventory": true,
+      "inApiInventory": true,
       "apiRecord": {
         "operationId": "authLogin",
         "method": "POST",
@@ -157,7 +79,9 @@
           "contracts/api/api-inventory.v1.json"
         ]
       },
-      "openapiOccurrences": 1,
+      "openapiOperationIdLines": 1,
+      "openapiExactlyOnce": true,
+      "dtoStatus": "CONTRACT_BOUND",
       "dto": {
         "featureId": "AUTH-002",
         "operationId": "authLogin",
@@ -167,95 +91,11 @@
         "responseSchemaRef": "#/paths/~1auth~1login/post/responses/200/content/application~1json/schema",
         "status": "CONTRACT_BOUND"
       },
-      "policy": {
-        "operationId": "authLogin",
-        "method": "POST",
-        "path": "/auth/login",
-        "visibility": "public",
-        "capability": "credential_authentication",
-        "contractStatus": "CONTRACTED_PARTIAL",
-        "auth": {
-          "mode": "public",
-          "subject": "anonymous"
-        },
-        "authorization": {
-          "required": false,
-          "accountState": "evaluated_after_identity",
-          "scope": "N/A"
-        },
-        "resource": {
-          "class": "BOUNDED_COMPOSITION",
-          "d1ReadMax": 2,
-          "d1WriteMax": 1,
-          "d1ReadRowsMax": 8,
-          "d1WriteRowsMax": 4,
-          "rpcMax": 1,
-          "outboundMax": 0
-        },
-        "cache": {
-          "mode": "NO_STORE",
-          "shared": false,
-          "authorizationBoundary": false
-        },
-        "retry": {
-          "maxAttempts": 1,
-          "clientRetrySafe": false,
-          "requiresIdempotency": false
-        },
-        "event": {
-          "syncConsumersMax": 0,
-          "asyncEventsMax": 1,
-          "fanoutMax": 0
-        },
-        "queue": {
-          "enqueueMax": 1,
-          "taskType": "risk_or_security_audit"
-        },
-        "antiAbuse": {
-          "required": true,
-          "scopes": [
-            "ip",
-            "identity",
-            "device",
-            "account",
-            "endpoint",
-            "global"
-          ],
-          "actions": [
-            "ALLOW",
-            "THROTTLE",
-            "CHALLENGE",
-            "BLOCK"
-          ]
-        },
-        "idempotency": {
-          "required": false,
-          "semantic": "authentication-attempts-are-not-idempotent"
-        },
-        "security": [
-          "no_account_enumeration",
-          "credential_never_logged",
-          "credential_never_returned",
-          "constant_failure_semantics",
-          "risk_challenge_before_expensive_work",
-          "refresh_rotation_required"
-        ],
-        "evidence": {
-          "openapi": "PASS",
-          "inventory": "PASS",
-          "permission": "PASS",
-          "state": "MISSING",
-          "resource": "PASS",
-          "cache": "PASS",
-          "antiAbuse": "MISSING",
-          "integration": "MISSING",
-          "securityE2E": "MISSING"
-        }
-      }
+      "policyPresent": true
     },
     {
       "operationId": "authLogout",
-      "apiInventory": true,
+      "inApiInventory": true,
       "apiRecord": {
         "operationId": "authLogout",
         "method": "POST",
@@ -271,7 +111,9 @@
           "contracts/api/api-inventory.v1.json"
         ]
       },
-      "openapiOccurrences": 1,
+      "openapiOperationIdLines": 1,
+      "openapiExactlyOnce": true,
+      "dtoStatus": "NO_BODY_DTO",
       "dto": {
         "featureId": "AUTH-002",
         "operationId": "authLogout",
@@ -280,87 +122,11 @@
         "responseStatus": 204,
         "status": "NO_BODY_DTO"
       },
-      "policy": {
-        "operationId": "authLogout",
-        "method": "POST",
-        "path": "/auth/logout",
-        "visibility": "public_authenticated",
-        "capability": "session_revoke_current",
-        "contractStatus": "CONTRACTED_PARTIAL",
-        "auth": {
-          "mode": "authenticated",
-          "subject": "current_user"
-        },
-        "authorization": {
-          "required": true,
-          "permission": "user.session.revoke",
-          "scope": "self"
-        },
-        "resource": {
-          "class": "SINGLE_AUTHORITATIVE_WRITE",
-          "d1ReadMax": 0,
-          "d1WriteMax": 1,
-          "d1ReadRowsMax": 0,
-          "d1WriteRowsMax": 2,
-          "rpcMax": 0,
-          "outboundMax": 0
-        },
-        "cache": {
-          "mode": "NO_STORE",
-          "shared": false,
-          "authorizationBoundary": false
-        },
-        "retry": {
-          "maxAttempts": 1,
-          "clientRetrySafe": true,
-          "requiresIdempotency": true
-        },
-        "event": {
-          "syncConsumersMax": 0,
-          "asyncEventsMax": 1,
-          "fanoutMax": 0
-        },
-        "queue": {
-          "enqueueMax": 1,
-          "taskType": "session_revocation_projection"
-        },
-        "antiAbuse": {
-          "required": true,
-          "scopes": [
-            "account",
-            "session",
-            "endpoint"
-          ],
-          "actions": [
-            "ALLOW",
-            "BLOCK"
-          ]
-        },
-        "idempotency": {
-          "required": true,
-          "semantic": "repeated-revoke-is-successful-no-op"
-        },
-        "security": [
-          "revocation_cannot_be_overridden_by_cache",
-          "revocation_propagation_bounded",
-          "session_secret_not_returned"
-        ],
-        "evidence": {
-          "openapi": "PASS",
-          "inventory": "PASS",
-          "permission": "PASS",
-          "state": "N/A",
-          "resource": "PASS",
-          "cache": "PASS",
-          "antiAbuse": "MISSING",
-          "integration": "MISSING",
-          "securityE2E": "MISSING"
-        }
-      }
+      "policyPresent": true
     },
     {
       "operationId": "authRefresh",
-      "apiInventory": true,
+      "inApiInventory": true,
       "apiRecord": {
         "operationId": "authRefresh",
         "method": "POST",
@@ -376,90 +142,15 @@
           "contracts/api/api-inventory.v1.json"
         ]
       },
-      "openapiOccurrences": 1,
+      "openapiOperationIdLines": 1,
+      "openapiExactlyOnce": true,
+      "dtoStatus": null,
       "dto": null,
-      "policy": {
-        "operationId": "authRefresh",
-        "method": "POST",
-        "path": "/auth/refresh",
-        "visibility": "public_authenticated",
-        "capability": "token_refresh",
-        "contractStatus": "CONTRACTED_PARTIAL",
-        "auth": {
-          "mode": "refresh_credential",
-          "subject": "session"
-        },
-        "authorization": {
-          "required": true,
-          "permission": "user.session.refresh",
-          "scope": "self"
-        },
-        "resource": {
-          "class": "SINGLE_AUTHORITATIVE_WRITE",
-          "d1ReadMax": 1,
-          "d1WriteMax": 1,
-          "d1ReadRowsMax": 4,
-          "d1WriteRowsMax": 2,
-          "rpcMax": 0,
-          "outboundMax": 0
-        },
-        "cache": {
-          "mode": "NO_STORE",
-          "shared": false,
-          "authorizationBoundary": false
-        },
-        "retry": {
-          "maxAttempts": 1,
-          "clientRetrySafe": false,
-          "requiresIdempotency": false
-        },
-        "event": {
-          "syncConsumersMax": 0,
-          "asyncEventsMax": 0,
-          "fanoutMax": 0
-        },
-        "queue": {
-          "enqueueMax": 0
-        },
-        "antiAbuse": {
-          "required": true,
-          "scopes": [
-            "session",
-            "account",
-            "device",
-            "endpoint"
-          ],
-          "actions": [
-            "ALLOW",
-            "THROTTLE",
-            "BLOCK"
-          ]
-        },
-        "idempotency": {
-          "required": false
-        },
-        "security": [
-          "refresh_token_rotation",
-          "reuse_detection",
-          "revoked_session_denied",
-          "old_refresh_token_invalidated"
-        ],
-        "evidence": {
-          "openapi": "MISSING",
-          "inventory": "PASS",
-          "permission": "MISSING",
-          "state": "MISSING",
-          "resource": "PASS",
-          "cache": "PASS",
-          "antiAbuse": "MISSING",
-          "integration": "MISSING",
-          "securityE2E": "MISSING"
-        }
-      }
+      "policyPresent": true
     },
     {
       "operationId": "getMe",
-      "apiInventory": true,
+      "inApiInventory": true,
       "apiRecord": {
         "operationId": "getMe",
         "method": "GET",
@@ -475,13 +166,15 @@
           "contracts/api/api-inventory.v1.json"
         ]
       },
-      "openapiOccurrences": 4,
+      "openapiOperationIdLines": 1,
+      "openapiExactlyOnce": true,
+      "dtoStatus": null,
       "dto": null,
-      "policy": null
+      "policyPresent": false
     },
     {
       "operationId": "updateMe",
-      "apiInventory": true,
+      "inApiInventory": true,
       "apiRecord": {
         "operationId": "updateMe",
         "method": "PATCH",
@@ -497,13 +190,15 @@
           "contracts/api/api-inventory.v1.json"
         ]
       },
-      "openapiOccurrences": 1,
+      "openapiOperationIdLines": 1,
+      "openapiExactlyOnce": true,
+      "dtoStatus": null,
       "dto": null,
-      "policy": null
+      "policyPresent": false
     },
     {
       "operationId": "blockUser",
-      "apiInventory": true,
+      "inApiInventory": true,
       "apiRecord": {
         "operationId": "blockUser",
         "method": "POST",
@@ -519,13 +214,15 @@
           "contracts/api/api-inventory.v1.json"
         ]
       },
-      "openapiOccurrences": 1,
+      "openapiOperationIdLines": 1,
+      "openapiExactlyOnce": true,
+      "dtoStatus": null,
       "dto": null,
-      "policy": null
+      "policyPresent": false
     },
     {
       "operationId": "unblockUser",
-      "apiInventory": true,
+      "inApiInventory": true,
       "apiRecord": {
         "operationId": "unblockUser",
         "method": "DELETE",
@@ -541,13 +238,15 @@
           "contracts/api/api-inventory.v1.json"
         ]
       },
-      "openapiOccurrences": 1,
+      "openapiOperationIdLines": 1,
+      "openapiExactlyOnce": true,
+      "dtoStatus": null,
       "dto": null,
-      "policy": null
+      "policyPresent": false
     },
     {
       "operationId": "muteUser",
-      "apiInventory": true,
+      "inApiInventory": true,
       "apiRecord": {
         "operationId": "muteUser",
         "method": "POST",
@@ -563,13 +262,15 @@
           "contracts/api/api-inventory.v1.json"
         ]
       },
-      "openapiOccurrences": 1,
+      "openapiOperationIdLines": 1,
+      "openapiExactlyOnce": true,
+      "dtoStatus": null,
       "dto": null,
-      "policy": null
+      "policyPresent": false
     },
     {
       "operationId": "unmuteUser",
-      "apiInventory": true,
+      "inApiInventory": true,
       "apiRecord": {
         "operationId": "unmuteUser",
         "method": "DELETE",
@@ -585,9 +286,11 @@
           "contracts/api/api-inventory.v1.json"
         ]
       },
-      "openapiOccurrences": 1,
+      "openapiOperationIdLines": 1,
+      "openapiExactlyOnce": true,
+      "dtoStatus": null,
       "dto": null,
-      "policy": null
+      "policyPresent": false
     }
   ],
   "status": "NOT_GREEN"
