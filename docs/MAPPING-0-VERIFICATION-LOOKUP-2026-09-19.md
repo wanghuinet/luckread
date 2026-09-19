@@ -270,3 +270,13 @@ The W01 Users source still has zero business fields, while the six ENT-USER fiel
 The legacy Users collection was verified at `archive/legacy-payload-root/src/collections/Users.ts`; its six historical fields are `username`, `displayName`, `bio`, `avatar`, `locale`, and `timezone`. `archive/legacy-payload-root/README.md` explicitly marks this tree as historical and names `workers/W01-payload/` as the active runtime authority.
 
 This corrects the earlier shorthand that the legacy file did not exist; the precise fact is that it no longer exists at the old repository-root path because it was archived. It remains non-authoritative for active W01 implementation. See `artifacts/mapping-0/w01-ent-user-source-existence-audit-2026-09-19.json` and the existing W01 ENT-USER Change Control.
+## 24. Change-Control queue baseline refresh — 2026-09-19
+
+The superseding queue artifact is `artifacts/mapping-0/current-change-control-decision-queue-2026-09-19-v2.json`.
+
+The queue's previous tested HEAD `f7114a3d3c7846f6745247a9f3238856f2b39962` was behind the current audited `main` content baseline. The queue was refreshed against `e576b0d629f95173570b624da24fe4cc10c3dd1a`; this refresh is metadata-only and does not alter any Feature, Mapping, Entity, Payload, DTO, operationId, persistence, runtime, or evidence status.
+
+The currently governed OPEN controls are nine items, including the W01 Media collection/entity authority GAP already registered on 2026-09-19. CLOSED controls remain closed under their recorded scopes.
+
+The refresh exists to keep the anti-duplication lookup boundary accurate. It is not a technical GREEN certificate.
+
