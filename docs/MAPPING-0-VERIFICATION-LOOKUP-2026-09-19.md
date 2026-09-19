@@ -250,3 +250,9 @@ Because this evidence was captured before the evidence-recording commit itself, 
 `artifacts/mapping-0/get-entitlements-operationid-root-cause-2026-09-19.json` records a current-head source inspection showing that `scripts/sync-rc-openapi.mjs` appends `Op` when a generated operationId collides inside its consolidated policy set.
 
 This explains how `getEntitlementsOp` can arise from the existing `getEntitlements` collision. It is root-cause evidence only; the existing `CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19` remains OPEN and authoritative. No operation was deleted or renamed.
+
+## 27. W01 ENT-USER source-existence refinement
+
+`artifacts/mapping-0/w01-ent-user-source-existence-audit-2026-09-19.json` records a direct path probe: active W01 `workers/W01-payload/src/collections/Users.ts` exists and currently has `fields: []`; legacy repository-relative `src/collections/Users.ts` could not be resolved on the tested current commit or the previously recorded queue-head.
+
+Therefore the six ENT-USER field contract source references should be treated as historical/non-current references, not implementation evidence. The existing `CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18` remains OPEN/BLOCKED; no fields or contract statuses were changed.
