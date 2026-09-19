@@ -6,7 +6,7 @@
   "type": "object",
   "x-luckread": {
     "entity": "User",
-    "domain": "D1-01",
+    "domain": "D01 Core",
     "state-field": "account_state",
     "version-field": "account_state_version",
     "audit-required": true,
