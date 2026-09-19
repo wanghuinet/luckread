@@ -1,0 +1,58 @@
+{
+  "version": "1.8",
+  "generatedAt": "2026-09-20",
+  "decisionBasisHead": "c843344737ff84937cc8e1146a590402dd9d0a48",
+  "decisionRecord": "docs/change-control/MAPPING-0-AUTHORITY-DECISIONS-2026-09-20.md",
+  "purpose": "Current Mapping 0 Change-Control queue after explicit project authority decisions.",
+  "noInference": true,
+  "openControls": [],
+  "decidedControls": [
+    {
+      "id": "CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19",
+      "state": "DECIDED_RECONCILIATION_PENDING",
+      "decision": "MISSING means no valid mapping-bearing edge; PARTIAL means one or more valid mapping-bearing edges exist while required downstream closure remains incomplete."
+    },
+    {
+      "id": "CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19",
+      "state": "DECIDED_RECONCILIATION_PENDING",
+      "decision": "GET /v1/entitlements = listEntitlements; GET /v1/entitlements/{subjectId} = getEntitlements; getEntitlementsOp is non-canonical collision suffix."
+    },
+    {
+      "id": "CC-MAPPING-0-DTO-REPRESENTATION-GAP-2026-09-19",
+      "state": "DECIDED_RECONCILIATION_PENDING",
+      "decision": "Keep DTO authority external to Canonical Mapping; no dtoIds schema addition."
+    },
+    {
+      "id": "CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19",
+      "state": "DECIDED_RECONCILIATION_PENDING",
+      "decision": "Canonical AUTH-003 set is authCredentialList/authCredentialAdd/authCredentialReplace/authCredentialRemove."
+    },
+    {
+      "id": "CC-MAPPING-0-AUTH-006-ALIAS-AND-DOMAIN-CONFLICT-2026-09-19",
+      "state": "DECIDED_RECONCILIATION_PENDING",
+      "decision": "Canonical AUTH-006 DTO names use the non-PASSKEY identifiers; domain follows D01 Core."
+    },
+    {
+      "id": "CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19",
+      "state": "DECIDED_RECONCILIATION_PENDING",
+      "decision": "D01 Core is the canonical logical domain label for AUTH-006/AUTH-013/AUTH-015 reconciliation."
+    },
+    {
+      "id": "CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18",
+      "state": "DECIDED_RECONCILIATION_PENDING",
+      "decision": "Six canonical ENT-USER fields remain the target W01 Users contract; implementation stays behind GREEN→implement."
+    },
+    {
+      "id": "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19",
+      "state": "DECIDED_RECONCILIATION_PENDING",
+      "decision": "W01 media remains a Payload support collection with exact source exemption; no canonical Media Entity is created."
+    }
+  ],
+  "nextItemId": "M0-DETERMINISTIC-RECONCILIATION-01",
+  "nextItemState": "TODO_FIX",
+  "rules": [
+    "A decision is not technical closure.",
+    "No Feature/Entity/Field/Payload/Runtime status is promoted by decision alone.",
+    "Unchanged verification is inherited rather than rerun."
+  ]
+}
