@@ -2,7 +2,7 @@
 
 ## Status
 
-BLOCKED — requires explicit authority decision before implementation or contract promotion.
+DECIDED — RECONCILIATION PENDING
 
 ## Purpose
 
@@ -84,3 +84,7 @@ Follow-up repository-tree inspection corrected the earlier path-existence wordin
 `archive/legacy-payload-root/README.md` explicitly identifies the archive as historical reference material and names `workers/W01-payload/` as the active Payload runtime authority.
 
 Therefore the substantive conflict is unchanged: the six canonical ENT-USER fields exist in the archived legacy source but are absent from active W01 Users discovery. The archive must not be treated as current implementation evidence.
+
+## Decision accepted — 2026-09-20
+
+Decision 7 accepted: the six existing canonical ENT-USER fields remain the target W01 Users contract; implementation remains behind GREEN→implement.
