@@ -2,7 +2,7 @@
 
 ## Status
 
-OPEN — DECISION REQUIRED / NO IMPLEMENTATION
+DECIDED — RECONCILIATION PENDING
 
 ## Purpose
 
@@ -60,3 +60,7 @@ No decision is selected by this record.
 ## Acceptance
 
 The GAP is considered correctly registered when future verification consults this record first and does not re-open the same finding as a new discovery.
+
+## Decision accepted — 2026-09-20
+
+Decision 3 accepted: retain DTO authority outside Canonical Mapping; no dtoIds schema addition.
