@@ -52,174 +52,601 @@
     {
       "featureId": "AUTH-001",
       "name": "registration",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Authentication", "l3": "Registration", "l4": "Account creation", "l5": "Register account", "l6": "Create account from an accepted registration request", "l7": "Must create exactly one authoritative account outcome per accepted idempotent request and enter the existing account lifecycle", "l8": "Feature contract mapped to existing authRegister operation and account state machine"},
-      "existingContracts": ["contracts/api/auth-operation-policy.v1.json", "contracts/state-machines/account.json", "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"],
-      "apiRefs": ["authRegister"],
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Authentication",
+        "l3": "Registration",
+        "l4": "Account creation",
+        "l5": "Register account",
+        "l6": "Create account from an accepted registration request",
+        "l7": "Must create exactly one authoritative account outcome per accepted idempotent request and enter the existing account lifecycle",
+        "l8": "Feature contract mapped to existing authRegister operation and account state machine"
+      },
+      "existingContracts": [
+        "contracts/api/auth-operation-policy.v1.json",
+        "contracts/state-machines/account.json",
+        "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"
+      ],
+      "apiRefs": [
+        "authRegister"
+      ],
       "pageRefs": [],
       "dtoRefs": [],
       "dataRefs": [],
       "permissionRefs": [],
       "entitlementRefs": [],
-      "stateRefs": ["account"],
+      "stateRefs": [
+        "account"
+      ],
       "eventRefs": [],
       "workerRefs": [],
       "d1Domain": "UNRESOLVED: frozen 4-domain mapping must be reconciled; legacy account contract names D1-01",
       "testRefs": [],
       "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
-      "blockers": ["DTO mapping missing", "Entity/Field mapping missing", "Page mapping missing", "Worker/D1 canonical mapping missing", "security and integration evidence incomplete"]
+      "blockers": [
+        "DTO mapping missing",
+        "Entity/Field mapping missing",
+        "Page mapping missing",
+        "Worker/D1 canonical mapping missing",
+        "security and integration evidence incomplete"
+      ]
     },
     {
       "featureId": "AUTH-002",
       "name": "login/logout",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Authentication", "l3": "Session authentication", "l4": "Login and logout", "l5": "Sign in or sign out", "l6": "Authenticate credentials and revoke the current session", "l7": "Authentication must evaluate account state and session policy; logout must be idempotent and revocation-authoritative", "l8": "Feature contract mapped to existing authLogin/authLogout operations"},
-      "existingContracts": ["contracts/api/auth-operation-policy.v1.json", "contracts/state-machines/account.json"],
-      "apiRefs": ["authLogin", "authLogout"],
-      "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": [], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": [], "workerRefs": [],
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Authentication",
+        "l3": "Session authentication",
+        "l4": "Login and logout",
+        "l5": "Sign in or sign out",
+        "l6": "Authenticate credentials and revoke the current session",
+        "l7": "Authentication must evaluate account state and session policy; logout must be idempotent and revocation-authoritative",
+        "l8": "Feature contract mapped to existing authLogin/authLogout operations"
+      },
+      "existingContracts": [
+        "contracts/api/auth-operation-policy.v1.json",
+        "contracts/state-machines/account.json"
+      ],
+      "apiRefs": [
+        "authLogin",
+        "authLogout"
+      ],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [],
+      "entitlementRefs": [],
+      "stateRefs": [
+        "account"
+      ],
+      "eventRefs": [],
+      "workerRefs": [],
       "d1Domain": "UNRESOLVED",
-      "testRefs": [], "evidenceRefs": [],
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
-      "blockers": ["session DTO/entity mappings incomplete", "state/security E2E evidence missing"]
+      "blockers": [
+        "session DTO/entity mappings incomplete",
+        "state/security E2E evidence missing"
+      ]
     },
     {
       "featureId": "AUTH-003",
       "name": "username/email/phone credentials",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Identity credentials", "l3": "Credential identifiers", "l4": "Username/email/phone", "l5": "Manage login identifiers", "l6": "Normalize, validate and associate an accepted identifier with an identity", "l7": "Normalization and uniqueness must be deterministic and must not disclose protected account existence", "l8": "Existing identity registry coverage; detailed data/security mapping remains open"},
-      "existingContracts": ["docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"],
-      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": [], "entitlementRefs": [], "stateRefs": [], "eventRefs": [], "workerRefs": [],
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Identity credentials",
+        "l3": "Credential identifiers",
+        "l4": "Username/email/phone",
+        "l5": "Manage login identifiers",
+        "l6": "Normalize, validate and associate an accepted identifier with an identity",
+        "l7": "Normalization and uniqueness must be deterministic and must not disclose protected account existence",
+        "l8": "Existing identity registry coverage; detailed data/security mapping remains open"
+      },
+      "existingContracts": [
+        "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"
+      ],
+      "apiRefs": [],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [],
+      "entitlementRefs": [],
+      "stateRefs": [],
+      "eventRefs": [],
+      "workerRefs": [],
       "d1Domain": "UNRESOLVED",
-      "testRefs": [], "evidenceRefs": [],
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
-      "blockers": ["canonical API IDs not established in current inventory", "Entity/Field contract not fully bound"]
+      "blockers": [
+        "canonical API IDs not established in current inventory",
+        "Entity/Field contract not fully bound"
+      ]
     },
     {
       "featureId": "AUTH-004",
       "name": "password reset/change",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Credential lifecycle", "l3": "Password lifecycle", "l4": "Reset and change", "l5": "Change or recover password", "l6": "Validate authorized password lifecycle request and rotate credential state", "l7": "Recovery tokens are single-use and time-bounded; credential material is never exposed", "l8": "Existing identity registry coverage; API/DTO/security evidence incomplete"},
-      "existingContracts": ["docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"],
-      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": [], "entitlementRefs": [], "stateRefs": [], "eventRefs": [], "workerRefs": [], "d1Domain": "UNRESOLVED", "testRefs": [], "evidenceRefs": [],
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Credential lifecycle",
+        "l3": "Password lifecycle",
+        "l4": "Reset and change",
+        "l5": "Change or recover password",
+        "l6": "Validate authorized password lifecycle request and rotate credential state",
+        "l7": "Recovery tokens are single-use and time-bounded; credential material is never exposed",
+        "l8": "Existing identity registry coverage; API/DTO/security evidence incomplete"
+      },
+      "existingContracts": [
+        "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"
+      ],
+      "apiRefs": [],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [],
+      "entitlementRefs": [],
+      "stateRefs": [],
+      "eventRefs": [],
+      "workerRefs": [],
+      "d1Domain": "UNRESOLVED",
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
-      "blockers": ["canonical recovery/change API mapping missing", "single-use token evidence missing"]
+      "blockers": [
+        "canonical recovery/change API mapping missing",
+        "single-use token evidence missing"
+      ]
     },
     {
       "featureId": "AUTH-005",
       "name": "email/phone verification",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Verification", "l3": "Credential verification", "l4": "Email/phone verification", "l5": "Verify contact identity", "l6": "Consume a valid verification challenge and update the existing account lifecycle", "l7": "Verification token must be single-use, time-bounded and bound to its intended identity and purpose", "l8": "Existing registry and account-state references; complete API/event/evidence mapping open"},
-      "existingContracts": ["docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md", "contracts/state-machines/account.json"],
-      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": [], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": [], "workerRefs": [], "d1Domain": "UNRESOLVED", "testRefs": [], "evidenceRefs": [],
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Verification",
+        "l3": "Credential verification",
+        "l4": "Email/phone verification",
+        "l5": "Verify contact identity",
+        "l6": "Consume a valid verification challenge and update the existing account lifecycle",
+        "l7": "Verification token must be single-use, time-bounded and bound to its intended identity and purpose",
+        "l8": "Existing registry and account-state references; complete API/event/evidence mapping open"
+      },
+      "existingContracts": [
+        "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md",
+        "contracts/state-machines/account.json"
+      ],
+      "apiRefs": [],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [],
+      "entitlementRefs": [],
+      "stateRefs": [
+        "account"
+      ],
+      "eventRefs": [],
+      "workerRefs": [],
+      "d1Domain": "UNRESOLVED",
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
-      "blockers": ["verification API and event IDs missing", "security E2E evidence missing"]
+      "blockers": [
+        "verification API and event IDs missing",
+        "security E2E evidence missing"
+      ]
     },
     {
       "featureId": "AUTH-006",
       "name": "passkey/WebAuthn",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Authentication methods", "l3": "Passwordless authentication", "l4": "Passkey/WebAuthn", "l5": "Authenticate with a passkey", "l6": "Register and authenticate a bound passkey under the existing identity security model", "l7": "Credential binding, origin, replay and account-state checks are mandatory", "l8": "Blueprint capability exists; detailed canonical contracts are not yet established"},
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Authentication methods",
+        "l3": "Passwordless authentication",
+        "l4": "Passkey/WebAuthn",
+        "l5": "Authenticate with a passkey",
+        "l6": "Register and authenticate a bound passkey under the existing identity security model",
+        "l7": "Credential binding, origin, replay and account-state checks are mandatory",
+        "l8": "Blueprint capability exists; detailed canonical contracts are not yet established"
+      },
       "existingContracts": [],
-      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": [], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": [], "workerRefs": [], "d1Domain": "UNRESOLVED", "testRefs": [], "evidenceRefs": [],
+      "apiRefs": [],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [],
+      "entitlementRefs": [],
+      "stateRefs": [
+        "account"
+      ],
+      "eventRefs": [],
+      "workerRefs": [],
+      "d1Domain": "UNRESOLVED",
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "MISSING",
-      "blockers": ["canonical API/DTO/data/security contracts not established"]
+      "blockers": [
+        "canonical API/DTO/data/security contracts not established"
+      ]
     },
     {
       "featureId": "AUTH-007",
       "name": "MFA",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Authentication methods", "l3": "Multi-factor authentication", "l4": "MFA", "l5": "Use an additional authentication factor", "l6": "Enroll, challenge and verify a configured factor", "l7": "Factor enrollment and recovery must be scoped to the authenticated identity and protected against replay", "l8": "Blueprint capability exists; detailed canonical contracts are not yet established"},
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Authentication methods",
+        "l3": "Multi-factor authentication",
+        "l4": "MFA",
+        "l5": "Use an additional authentication factor",
+        "l6": "Enroll, challenge and verify a configured factor",
+        "l7": "Factor enrollment and recovery must be scoped to the authenticated identity and protected against replay",
+        "l8": "Blueprint capability exists; detailed canonical contracts are not yet established"
+      },
       "existingContracts": [],
-      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": [], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": [], "workerRefs": [], "d1Domain": "UNRESOLVED", "testRefs": [], "evidenceRefs": [],
+      "apiRefs": [],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [],
+      "entitlementRefs": [],
+      "stateRefs": [
+        "account"
+      ],
+      "eventRefs": [],
+      "workerRefs": [],
+      "d1Domain": "UNRESOLVED",
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "MISSING",
-      "blockers": ["canonical MFA contracts not established"]
+      "blockers": [
+        "canonical MFA contracts not established"
+      ]
     },
     {
       "featureId": "AUTH-008",
       "name": "OAuth/social login",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Authentication methods", "l3": "Federated identity", "l4": "OAuth/social login", "l5": "Sign in with an external identity provider", "l6": "Validate provider identity and safely associate or authenticate the local identity", "l7": "Provider assertions require verification, anti-account-takeover checks and deterministic linking policy", "l8": "Existing blueprint capability; provider/API/data contracts remain to be reconciled"},
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Authentication methods",
+        "l3": "Federated identity",
+        "l4": "OAuth/social login",
+        "l5": "Sign in with an external identity provider",
+        "l6": "Validate provider identity and safely associate or authenticate the local identity",
+        "l7": "Provider assertions require verification, anti-account-takeover checks and deterministic linking policy",
+        "l8": "Existing blueprint capability; provider/API/data contracts remain to be reconciled"
+      },
       "existingContracts": [],
-      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": [], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": [], "workerRefs": [], "d1Domain": "UNRESOLVED", "testRefs": [], "evidenceRefs": [],
+      "apiRefs": [],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [],
+      "entitlementRefs": [],
+      "stateRefs": [
+        "account"
+      ],
+      "eventRefs": [],
+      "workerRefs": [],
+      "d1Domain": "UNRESOLVED",
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
-      "blockers": ["provider integration and linked-identity contract mapping missing"]
+      "blockers": [
+        "provider integration and linked-identity contract mapping missing"
+      ]
     },
     {
       "featureId": "AUTH-009",
       "name": "linked identities",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Identity graph", "l3": "External identity links", "l4": "Linked identities", "l5": "Manage linked sign-in identities", "l6": "Add, verify, inspect and unlink an external identity within policy", "l7": "Unlinking cannot strand an account or remove its final viable recovery path without an explicit safety rule", "l8": "Blueprint capability exists; detailed identity-link contract remains open"},
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Identity graph",
+        "l3": "External identity links",
+        "l4": "Linked identities",
+        "l5": "Manage linked sign-in identities",
+        "l6": "Add, verify, inspect and unlink an external identity within policy",
+        "l7": "Unlinking cannot strand an account or remove its final viable recovery path without an explicit safety rule",
+        "l8": "Blueprint capability exists; detailed identity-link contract remains open"
+      },
       "existingContracts": [],
-      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": [], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": [], "workerRefs": [], "d1Domain": "UNRESOLVED", "testRefs": [], "evidenceRefs": [],
+      "apiRefs": [],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [],
+      "entitlementRefs": [],
+      "stateRefs": [
+        "account"
+      ],
+      "eventRefs": [],
+      "workerRefs": [],
+      "d1Domain": "UNRESOLVED",
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
-      "blockers": ["canonical linked-identity entity/API mapping missing"]
+      "blockers": [
+        "canonical linked-identity entity/API mapping missing"
+      ]
     },
     {
       "featureId": "AUTH-010",
       "name": "session/device management",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Session security", "l3": "Session and device registry", "l4": "Sessions/devices", "l5": "View and revoke sessions/devices", "l6": "List owned sessions/devices and revoke a selected session", "l7": "Scope is self-only unless a separately authorized administrative flow exists; revocation is authoritative and idempotent", "l8": "Mapped to existing authSessionList/authSessionRevoke and identity registry"},
-      "existingContracts": ["contracts/api/auth-operation-policy.v1.json", "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"],
-      "apiRefs": ["authSessionList", "authSessionRevoke"],
-      "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": ["user.session.read", "user.session.revoke"], "entitlementRefs": [], "stateRefs": [], "eventRefs": [], "workerRefs": [], "d1Domain": "UNRESOLVED", "testRefs": [], "evidenceRefs": [],
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Session security",
+        "l3": "Session and device registry",
+        "l4": "Sessions/devices",
+        "l5": "View and revoke sessions/devices",
+        "l6": "List owned sessions/devices and revoke a selected session",
+        "l7": "Scope is self-only unless a separately authorized administrative flow exists; revocation is authoritative and idempotent",
+        "l8": "Mapped to existing authSessionList/authSessionRevoke and identity registry"
+      },
+      "existingContracts": [
+        "contracts/api/auth-operation-policy.v1.json",
+        "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"
+      ],
+      "apiRefs": [
+        "authSessionList",
+        "authSessionRevoke"
+      ],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [
+        "user.session.read",
+        "user.session.revoke"
+      ],
+      "entitlementRefs": [],
+      "stateRefs": [],
+      "eventRefs": [],
+      "workerRefs": [],
+      "d1Domain": "UNRESOLVED",
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
-      "blockers": ["Page/DTO/Entity/Field/Event/Worker/D1/Test/Evidence IDs not fully reconciled"]
+      "blockers": [
+        "Page/DTO/Entity/Field/Event/Worker/D1/Test/Evidence IDs not fully reconciled"
+      ]
     },
     {
       "featureId": "AUTH-011",
       "name": "token lifecycle/rotation",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Token security", "l3": "Token lifecycle", "l4": "Issue/rotate/revoke", "l5": "Maintain a valid authenticated session", "l6": "Issue, rotate, revoke and reject invalid or reused session credentials", "l7": "Rotation and revocation must dominate stale credentials; replay and reuse must be detectable", "l8": "Refresh operation exists in auth policy but remains contract-partial"},
-      "existingContracts": ["contracts/api/auth-operation-policy.v1.json", "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"],
-      "apiRefs": ["authRefresh"],
-      "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": ["user.session.refresh"], "entitlementRefs": [], "stateRefs": [], "eventRefs": [], "workerRefs": [], "d1Domain": "UNRESOLVED", "testRefs": [], "evidenceRefs": [],
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Token security",
+        "l3": "Token lifecycle",
+        "l4": "Issue/rotate/revoke",
+        "l5": "Maintain a valid authenticated session",
+        "l6": "Issue, rotate, revoke and reject invalid or reused session credentials",
+        "l7": "Rotation and revocation must dominate stale credentials; replay and reuse must be detectable",
+        "l8": "Refresh operation exists in auth policy but remains contract-partial"
+      },
+      "existingContracts": [
+        "contracts/api/auth-operation-policy.v1.json",
+        "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"
+      ],
+      "apiRefs": [
+        "authRefresh"
+      ],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [
+        "user.session.refresh"
+      ],
+      "entitlementRefs": [],
+      "stateRefs": [],
+      "eventRefs": [],
+      "workerRefs": [],
+      "d1Domain": "UNRESOLVED",
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
-      "blockers": ["refresh OpenAPI/DTO/state/security E2E evidence missing"]
+      "blockers": [
+        "refresh OpenAPI/DTO/state/security E2E evidence missing"
+      ]
     },
     {
       "featureId": "AUTH-012",
       "name": "suspicious-login detection",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Risk-aware authentication", "l3": "Login risk", "l4": "Suspicious-login detection", "l5": "Respond to suspicious authentication", "l6": "Evaluate authentication risk and require the applicable challenge or denial", "l7": "Risk is a signal, not a final enforcement authority; decisions must remain auditable and policy-bound", "l8": "Referenced by existing auth login anti-abuse policy; detailed risk contract remains open"},
-      "existingContracts": ["contracts/api/auth-operation-policy.v1.json"],
-      "apiRefs": ["authLogin"],
-      "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": [], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": [], "workerRefs": [], "d1Domain": "UNRESOLVED", "testRefs": [], "evidenceRefs": [],
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Risk-aware authentication",
+        "l3": "Login risk",
+        "l4": "Suspicious-login detection",
+        "l5": "Respond to suspicious authentication",
+        "l6": "Evaluate authentication risk and require the applicable challenge or denial",
+        "l7": "Risk is a signal, not a final enforcement authority; decisions must remain auditable and policy-bound",
+        "l8": "Referenced by existing auth login anti-abuse policy; detailed risk contract remains open"
+      },
+      "existingContracts": [
+        "contracts/api/auth-operation-policy.v1.json"
+      ],
+      "apiRefs": [
+        "authLogin"
+      ],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [],
+      "entitlementRefs": [],
+      "stateRefs": [
+        "account"
+      ],
+      "eventRefs": [],
+      "workerRefs": [],
+      "d1Domain": "UNRESOLVED",
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
-      "blockers": ["risk signal/event/decision contracts and security evidence incomplete"]
+      "blockers": [
+        "risk signal/event/decision contracts and security evidence incomplete"
+      ]
     },
     {
       "featureId": "AUTH-013",
       "name": "account freeze/suspension/ban",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Account lifecycle", "l3": "Account enforcement", "l4": "Freeze/suspend/ban", "l5": "Restrict account access", "l6": "Apply an authorized account-state transition", "l7": "Only valid state-machine transitions are allowed; protected mutations and sessions must respect enforced states", "l8": "Mapped to existing authoritative account state machine"},
-      "existingContracts": ["contracts/state-machines/account.json"],
-      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": ["user.restrict.limited", "user.freeze", "user.suspend", "user.ban"], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": ["identity.account_state_changed"], "workerRefs": [], "d1Domain": "D01 Core", "testRefs": [], "evidenceRefs": [],
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Account lifecycle",
+        "l3": "Account enforcement",
+        "l4": "Freeze/suspend/ban",
+        "l5": "Restrict account access",
+        "l6": "Apply an authorized account-state transition",
+        "l7": "Only valid state-machine transitions are allowed; protected mutations and sessions must respect enforced states",
+        "l8": "Mapped to existing authoritative account state machine"
+      },
+      "existingContracts": [
+        "contracts/state-machines/account.json"
+      ],
+      "apiRefs": [],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [
+        "user.restrict.limited",
+        "user.freeze",
+        "user.suspend",
+        "user.ban"
+      ],
+      "entitlementRefs": [],
+      "stateRefs": [
+        "account"
+      ],
+      "eventRefs": [
+        "identity.account_state_changed"
+      ],
+      "workerRefs": [],
+      "d1Domain": "D01 Core",
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "CONFLICT",
-      "blockers": ["D1 domain naming conflict requires Change Control", "worker ownership and evidence mapping incomplete"]
+      "blockers": [
+        "D1 domain naming conflict requires Change Control",
+        "worker ownership and evidence mapping incomplete"
+      ]
     },
     {
       "featureId": "AUTH-014",
       "name": "account recovery",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Recovery", "l3": "Account recovery", "l4": "Recover access", "l5": "Recover an account", "l6": "Validate a time-bounded recovery challenge and restore permitted access", "l7": "Recovery must be single-use, time-bounded, identity-bound and must not bypass account enforcement policy", "l8": "Existing identity registry coverage; complete API/DTO/security mapping open"},
-      "existingContracts": ["docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md", "contracts/state-machines/account.json"],
-      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": [], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": [], "workerRefs": [], "d1Domain": "UNRESOLVED", "testRefs": [], "evidenceRefs": [],
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Recovery",
+        "l3": "Account recovery",
+        "l4": "Recover access",
+        "l5": "Recover an account",
+        "l6": "Validate a time-bounded recovery challenge and restore permitted access",
+        "l7": "Recovery must be single-use, time-bounded, identity-bound and must not bypass account enforcement policy",
+        "l8": "Existing identity registry coverage; complete API/DTO/security mapping open"
+      },
+      "existingContracts": [
+        "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md",
+        "contracts/state-machines/account.json"
+      ],
+      "apiRefs": [],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [],
+      "entitlementRefs": [],
+      "stateRefs": [
+        "account"
+      ],
+      "eventRefs": [],
+      "workerRefs": [],
+      "d1Domain": "UNRESOLVED",
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
-      "blockers": ["canonical recovery API/DTO and security evidence missing"]
+      "blockers": [
+        "canonical recovery API/DTO and security evidence missing"
+      ]
     },
     {
       "featureId": "AUTH-015",
       "name": "account deletion/restoration",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Account lifecycle", "l3": "Deletion and restoration", "l4": "Delete/restore", "l5": "Request, cancel or restore account lifecycle", "l6": "Execute only valid deletion/restoration state transitions", "l7": "Deletion is state-machine controlled; legal hold and retention rules override normal deletion; direct resurrection is forbidden", "l8": "Mapped to existing account state machine and identity registry"},
-      "existingContracts": ["contracts/state-machines/account.json", "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"],
-      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": ["user.reactivate", "user.restore"], "entitlementRefs": [], "stateRefs": ["account"], "eventRefs": ["identity.account_state_changed"], "workerRefs": [], "d1Domain": "D01 Core", "testRefs": [], "evidenceRefs": [],
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Account lifecycle",
+        "l3": "Deletion and restoration",
+        "l4": "Delete/restore",
+        "l5": "Request, cancel or restore account lifecycle",
+        "l6": "Execute only valid deletion/restoration state transitions",
+        "l7": "Deletion is state-machine controlled; legal hold and retention rules override normal deletion; direct resurrection is forbidden",
+        "l8": "Mapped to existing account state machine and identity registry"
+      },
+      "existingContracts": [
+        "contracts/state-machines/account.json",
+        "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"
+      ],
+      "apiRefs": [],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [
+        "user.reactivate",
+        "user.restore"
+      ],
+      "entitlementRefs": [],
+      "stateRefs": [
+        "account"
+      ],
+      "eventRefs": [
+        "identity.account_state_changed"
+      ],
+      "workerRefs": [],
+      "d1Domain": "D01 Core",
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "CONFLICT",
-      "blockers": ["D1 naming conflict requires Change Control", "deletion/anonymization migration evidence missing"]
+      "blockers": [
+        "D1 naming conflict requires Change Control",
+        "deletion/anonymization migration evidence missing"
+      ]
     },
     {
       "featureId": "AUTH-016",
       "name": "identity/age/creator/organization verification",
-      "hierarchy": {"l1": "Identity / Auth / Account", "l2": "Identity verification", "l3": "Trust attributes", "l4": "Identity/age/creator/organization verification", "l5": "Submit and use a verified identity attribute", "l6": "Verify an identity attribute under its applicable policy and expose only authorized verification state", "l7": "Verification status cannot itself grant unrelated permissions; role, permission and entitlement remain separate authorities", "l8": "Blueprint capability exists; cross-domain verification contracts must be reconciled with B03 and B13/B20"},
+      "hierarchy": {
+        "l1": "Identity / Auth / Account",
+        "l2": "Identity verification",
+        "l3": "Trust attributes",
+        "l4": "Identity/age/creator/organization verification",
+        "l5": "Submit and use a verified identity attribute",
+        "l6": "Verify an identity attribute under its applicable policy and expose only authorized verification state",
+        "l7": "Verification status cannot itself grant unrelated permissions; role, permission and entitlement remain separate authorities",
+        "l8": "Blueprint capability exists; cross-domain verification contracts must be reconciled with B03 and B13/B20"
+      },
       "existingContracts": [],
-      "apiRefs": [], "pageRefs": [], "dtoRefs": [], "dataRefs": [], "permissionRefs": [], "entitlementRefs": [], "stateRefs": [], "eventRefs": [], "workerRefs": [], "d1Domain": "UNRESOLVED", "testRefs": [], "evidenceRefs": [],
+      "apiRefs": [],
+      "pageRefs": [],
+      "dtoRefs": [],
+      "dataRefs": [],
+      "permissionRefs": [],
+      "entitlementRefs": [],
+      "stateRefs": [],
+      "eventRefs": [],
+      "workerRefs": [],
+      "d1Domain": "UNRESOLVED",
+      "testRefs": [],
+      "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
-      "blockers": ["cross-domain ownership/API/data/security mapping incomplete"]
+      "blockers": [
+        "cross-domain ownership/API/data/security mapping incomplete"
+      ]
     }
   ],
   "crossCuttingConflicts": [
     {
       "id": "B01-CONFLICT-001",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "type": "D1_DOMAIN_NAMING",
-      "description": "Existing account state contract uses legacy D1-01 while the frozen platform baseline requires D01 Core.",
-      "requiredAction": "Change Control; do not silently edit the existing state-machine authority."
+      "description": "Legacy D1-01 vs frozen D01 Core logical-domain naming conflict resolved by Change Control; D01 Core is canonical for AUTH-006/AUTH-013/AUTH-015 affected reconciliation surfaces.",
+      "requiredAction": "None — resolved by CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19; physical D1 schema or deployment must not be inferred.",
+      "resolution": "D01 Core",
+      "resolutionControl": "CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19",
+      "resolutionDate": "2026-09-20"
     },
     {
       "id": "B01-CONFLICT-002",
