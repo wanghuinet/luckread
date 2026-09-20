@@ -2,7 +2,7 @@
 
 ## Status
 
-DECIDED — RECONCILIATION PENDING
+CLOSED — RECONCILIATION VERIFIED
 
 ## Purpose
 
@@ -75,3 +75,14 @@ This narrows the technical cause but does not authorize deletion/renaming. The c
 ## Decision accepted — 2026-09-20
 
 Decision 2 accepted: GET /v1/entitlements uses listEntitlements; GET /v1/entitlements/{subjectId} retains getEntitlements; getEntitlementsOp is non-canonical.
+
+
+## Reconciliation verified — 2026-09-20
+
+Decision 2 is reflected consistently in current sources:
+- API Inventory: `GET /v1/entitlements` = `listEntitlements`.
+- API Inventory: `GET /v1/entitlements/{subjectId}` = `getEntitlements`.
+- Canonical OpenAPI uses the same IDs.
+- Operation Policy uses the same IDs.
+- No `getEntitlementsOp` record remains in the current operation-policy source.
+The generated root-cause artifact remains historical evidence only.
