@@ -97,6 +97,13 @@ const applicationCatalogRows = catalogRows.filter((row) => {
   const name = String(row?.name ?? '')
   return name.length > 0 && !name.startsWith('_cf_')
 })
+const usersRows = unwrapRows(users)
+const indexRows = unwrapRows(indexes)
+const foreignKeyRows = unwrapRows(foreignKeys)
+const extensionSchemaRows = unwrapRows(extensionSchema)
+const extensionIndexRows = unwrapRows(extensionIndexes)
+const extensionForeignKeyRows = unwrapRows(extensionForeignKeys)
+
 const baselineUninitialized = migration.status === 'TABLE_ABSENT' && applicationCatalogRows.length === 0
 
 if (baselineUninitialized) {
