@@ -3,19 +3,18 @@
   "evidenceType": "MAPPING_0_THIRD_LAYER_DOWNSTREAM_CLOSURE_CURSOR",
   "generatedAt": "2026-09-20",
   "repository": "wanghuinet/luckread",
-  "sourceHead": "df63dc777f7148d4079163ad55998b8d91632cb8",
+  "sourceHead": "e84860a343455421b71b8e6b1239f3730c7121a4",
   "previousCursor": "artifacts/mapping-0/current-third-layer-downstream-closure-cursor-2026-09-20-v2.json",
   "completedBatch": {
-    "id": "M0-AUTH-002-REMOTE-BASELINE-003",
-    "result": "REMOTE_BASELINE_EXECUTED_AND_SCHEMA_CAPTURED",
-    "workflowRunId": 35508571153,
-    "workflowJobId": 106072401909,
-    "executionCommit": "56926bab09951a8a0e15c820f1fb58dd8ba7090f",
-    "workflowHeadSha": "47896fc1671833b2c2afa5b3e0d8a3eae4a7d8a1",
-    "evidenceArtifact": "GitHub Actions artifact w01-baseline-migration-evidence-35508571153 (artifact 10604388551)",
-    "evidenceManifest": "artifacts/evidence/auth-002-remote-baseline/run-35508571153.json",
+    "id": "M0-AUTH-002-REMOTE-E45-001",
+    "result": "ADAPTER_REGRESSION_REPRODUCED_AND_REGISTERED",
+    "workflowRunId": 35509055040,
+    "workflowJobId": 106073661985,
+    "testedCommitSha": "3c1ed995477be05340f3941be9eaf14c10681948",
+    "evidenceArtifactId": 10604653629,
+    "evidenceManifest": "artifacts/evidence/auth-002/adapter-regression/run-35509055040.json",
     "mappingEvidenceBoundFeature": "AUTH-002",
-    "validationMarker": "AUTH-002_REMOTE_BASELINE_SCHEMA_CAPTURE_PASS"
+    "validationMarker": "AUTH-002_E4_5_REMOTE_ADAPTER_REGRESSION_FAIL"
   },
   "currentState": {
     "canonicalMapping": {
@@ -79,12 +78,12 @@
     "postMigrationEvidence": true,
     "baselineEvidenceValidation": "PASS",
     "migrationExecutionAdmission": "GREEN — EXECUTION ADMITTED",
-    "executionState": "COMPLETED_BASELINE_SCHEMA_CAPTURE",
-    "nextRequiredAction": "Run E4.5 controlled D1 adapter regression probe, then E6 session runtime probes; do not promote ENT-SESSION fields from baseline schema alone."
+    "executionState": "BLOCKED_ADAPTER_REGRESSION",
+    "nextRequiredAction": "Apply only an approved W01 configuration-level adapter correction or wait for a verified upstream package fix; then rerun E4.5 on a new exact commit. Do not alter Payload core or create duplicate persistence."
   },
   "closureProgress": {
     "deterministicMappingStatusPromotions": 0,
-    "newEvidenceBindings": 2,
+    "newEvidenceBindings": 3,
     "newCanonicalFeatureEdges": 0,
     "contractChanges": 0,
     "blueprintChanges": 0,
