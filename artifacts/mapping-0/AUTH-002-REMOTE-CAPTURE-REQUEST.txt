@@ -13,3 +13,4 @@ Current execution path: direct push event with exact commit message `evidence(au
 Re-armed after diagnostic-retention fix at commit 221ab6512c033aaf304a1d5c0486b323ddc1d555.
 Re-armed after Payload migration-history query correction at commit 7912b83c46688c97b2e2bfdbe50617892dad6da2.
 Re-armed after migration-history absence handling at commit 3baaffd09473eb1ec4b4ba41f7c23a0a75514b0e.
+Re-armed after evidence-manifest version normalization at commit 33ab758afde19f67c50db0d868e1eb07da6ba12f.
