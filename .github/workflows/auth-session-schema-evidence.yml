@@ -41,7 +41,7 @@ on:
       - 'workers/W01-payload/wrangler.jsonc'
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   WRANGLER_VERSION: 4.33.1
@@ -229,6 +229,19 @@ jobs:
       - name: Validate evidence package
         if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema') }}
         run: node scripts/auth-session-schema-evidence-validate.mjs
+
+      - name: Persist validated evidence package to repository
+        if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add artifacts/evidence/auth-002/
+          git rm -f artifacts/mapping-0/AUTH-002-REMOTE-CAPTURE-REQUEST.txt
+          git commit -m 'evidence(auth-002): persist validated remote D1 schema evidence'
+          git -c http.extraheader="AUTHORIZATION: bearer $GH_TOKEN" push origin HEAD:main
 
       - name: Upload schema evidence artifacts
         if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema')) }}
