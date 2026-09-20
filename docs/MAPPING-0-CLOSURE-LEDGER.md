@@ -864,3 +864,41 @@ Acceptance:
 Anti-loop:
 - Do not reopen this drift unless the workflow default, approved migration Blob, migration-index Blob, or execution target changes.
 - The next actionable step remains the external controlled W01 baseline execution; no duplicate Mapping-0 scan is justified.
+
+## Superpowers continuation — AUTH-002 controlled remote D1 baseline captured — 2026-09-20
+
+Source capture commit: `4db61fa914d66731fa0fdfc7241c8d6d1bf8ec06`.
+Workflow: `AUTH-002 Session Schema Evidence`, run `35498648527`.
+
+The existing controlled remote evidence workflow was triggered through its pre-existing exact push-event trigger. The workflow successfully reached the controlled D1 target and executed read-only remote queries using the repository's configured Cloudflare secrets. No migration was executed by this evidence workflow.
+
+Observed target:
+- Database: `luckread`
+- UUID: `2f80471e-3756-49f9-8db1-7707a433ad64`
+- Environment: `CONTROLLED_REMOTE_D1`
+- Cloudflare reports `num_tables = 0`.
+- Catalog contains only Cloudflare internal `_cf_KV`.
+- `payload_migrations` is absent.
+- `users` is absent.
+- `auth_session_state` is absent.
+- Remote evidence queries report zero writes.
+
+Validation correctly rejected the package for the post-migration schema claim because the physical `users` table does not yet exist. This is expected for an uninitialized target and is not evidence that the remote target is inaccessible.
+
+Evidence artifact:
+`artifacts/mapping-0/auth-002-remote-baseline-evidence-2026-09-20.json`
+
+Disposition:
+- Remote baseline target existence/reachability: `PASS_VERIFIED`
+- Pre-migration empty-target fact: `PASS_VERIFIED`
+- Post-migration W01 schema equivalence: `NOT_YET_PROVEN`
+- `W01-MIGRATION-BASELINE-AUTHORITY-001`: remains `BLOCKED_EXTERNAL`
+- Existing Change Control remains `GREEN — EXECUTION ADMITTED`; the remaining action is the explicitly confirmed migration execution workflow.
+- No Mapping feature status was promoted.
+- No Contract/Blueprint changed.
+- No generated full-schema migration was promoted.
+- No hand-written DDL was introduced.
+
+Anti-loop:
+Reuse this exact remote baseline evidence unless the controlled target, approved migration, or relevant W01 schema inputs change. Do not repeat the empty-target probe merely because documentation commits advance.
+
