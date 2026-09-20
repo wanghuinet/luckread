@@ -954,3 +954,48 @@ Execution authority:
 - reuse `contracts/persistence/AUTH-002-runtime-evidence-execution-runbook.v1.md`;
 - do not mint a second session identifier;
 - do not modify Payload core or D1 schema to satisfy E6.
+
+
+## Superpowers continuation — AUTH-002 E5 migration source authority audit — 2026-09-20
+
+After E4.5 was verified PASS, the continuation queue was checked against the existing AUTH-002 migration contracts.
+
+The approved migration identity is `MIG-AUTH-002-SESSION-V1`, whose target is the contracted `auth_session_state` extension. Current W01 committed migration source still contains only the Payload baseline migration `20250929_111647.ts`.
+
+A repository audit found:
+- no current committed additive migration source for `auth_session_state`;
+- the previously generated Payload migration artifact is a full-schema snapshot that recreates existing Payload tables and is explicitly rejected as an additive second migration under `CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20`;
+- current AUTH-002 migration governance explicitly rejects hand-authored DDL;
+- adding a duplicate Session collection/table merely to force Payload to generate SQL would violate the native-session single-authority boundary.
+
+Audit artifact:
+`artifacts/mapping-0/auth-002-e5-migration-source-authority-audit-2026-09-20.json`
+
+Change Control:
+`docs/change-control/CC-MAPPING-0-AUTH-002-E5-MIGRATION-SOURCE-AUTHORITY-2026-09-20.md`
+
+Disposition:
+- `E4.5 = PASS_VERIFIED`
+- `E5 = WAIT_AUTHORITY_DECISION`
+- `AUTH-002 = NOT_GREEN`
+- no Contract/Blueprint/architecture/D1 schema change was made;
+- no remote migration was executed;
+- no duplicate persistence authority was introduced.
+
+Important correction to the previous continuation cursor:
+E6 is **not** the immediate next item. E5 must first establish a legitimate generation path for the contracted extension migration.
+
+Current Canonical Mapping remains:
+- 449 total
+- PARTIAL 17
+- UNRESOLVED 431
+- MISSING 1 (`AUTH-007`)
+
+NEXT_ITEM_ID: `M0-AUTH-002-E5-MIGRATION-SOURCE-AUTHORITY-001`
+NEXT_ITEM_STATE: `WAIT_AUTHORITY_DECISION`
+
+Current cursor:
+`artifacts/mapping-0/current-third-layer-downstream-closure-cursor-2026-09-20-v5.json`
+
+Anti-loop:
+Do not repeat the E4.5 probe, the structural gate, or the migration-source search unless the relevant W01 source, migration contract, or approved generation mechanism changes.
