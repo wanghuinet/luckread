@@ -2,10 +2,13 @@
 
 - ID: CC-MAPPING-0-AUTH-002-E4-5-D1-ADAPTER-CORRECTION-2026-09-20
 - Date: 2026-09-20
-- Status: EXECUTION ADMITTED — MINIMAL W01 ADAPTER BOUNDARY
+- Status: CLOSED — REMEDIATION VERIFIED
 - Preceding defect evidence: EVD-AUTH002-B11-D1-ADAPTER-E45-REMOTE-001
 - Defect run: 35509055040
 - Defect tested commit: 3c1ed995477be05340f3941be9eaf14c10681948
+- Verification run: 35535570923
+- Verification job: 106143870080
+- Verification tested commit: cd2f5a79321806ec81b0c261b3f8deb40e809b0e
 
 ## Problem
 
@@ -56,10 +59,26 @@ A remediation commit is accepted only when the exact controlled E4.5 workflow:
 
 Then and only then may E4.5 advance from BLOCKED to PASS.
 
+## Verification closure
+
+The exact controlled E4.5 workflow was rerun on commit `cd2f5a79321806ec81b0c261b3f8deb40e809b0e`.
+
+Observed and independently validated by CI:
+- `adapterUpsertAliasesUpdateOne = false`
+- `upsertReturnedDocument = true`
+- `upsertError = null`
+- `storedRowPresent = true`
+- `storedValueMatches = true`
+- `persistedAfterUpsert = true`
+- `cleanedUp = true`
+- `E4_5_RESULT = PASS`
+
+The probe's host process later required the bounded timeout because Wrangler retained internal `workerd` processes; this did not invalidate the completed evidence object. The workflow validated the evidence object before cleanup and uploaded it as artifact `10612971115`.
+
 ## Current state
 
-`E4.5 = BLOCKED / REMEDIATION ADMITTED`
+`E4.5 = PASS`
 
-`AUTH-002 = NOT_GREEN`
+`AUTH-002 = NOT_GREEN` — E6 session-runtime gaps remain separate downstream blockers.
 
 `Mapping-0 = NOT_GREEN`
