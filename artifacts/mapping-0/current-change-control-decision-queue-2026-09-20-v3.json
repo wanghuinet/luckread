@@ -57,7 +57,7 @@
     "No business implementation is inferred from Mapping 0 structural acceptance.",
     "Unchanged validation results are inherited across evidence-only documentation commits."
   ],
-  "currentHeadBaseline": "65b2edc8162c10208919a711110bbf895bedb6e9",
+  "currentHeadBaseline": "ce7d092587a9e28578f156f0a6790793720148dd",
   "reconciledControls": [
     {
       "id": "CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19",
@@ -106,9 +106,10 @@
   "nextObjective": "Continue fail-closed technical closure. AUTH-002 remote baseline execution is deferred by user; AUTH-003 wire-schema authority remains unresolved. Already verified Change Controls are not to be re-opened.",
   "cursorUpdate": {
     "updatedAt": "2026-09-20",
-    "reason": "Synchronized the historical eight-control decision record with the current queue; no new authority decision or technical promotion.",
-    "latestGovernanceSync": "MAPPING-0-AUTHORITY-DECISIONS-2026-09-20",
-    "latestCommit": "ee498c4f13873951cc8d061a8c41e3e70363aee4",
-    "replayRule": "Treat the queue as current state; reuse completed-control evidence."
+    "reason": "Recorded verified Mapping 0 Structural Gate evidence without promoting feature closure.",
+    "latestEvidence": "M0-STRUCTURAL-GATE-EVIDENCE-2026-09-20",
+    "testedCommit": "7023892ecf1eeae9b66a10d20e946ec99622a172",
+    "workflowRunId": 35492168719,
+    "reuseRule": "Structural fact may be inherited across documentation-only commits unless structural inputs change."
   }
 }
