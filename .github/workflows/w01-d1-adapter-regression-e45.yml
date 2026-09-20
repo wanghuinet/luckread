@@ -53,14 +53,76 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -uo pipefail
-          mkdir -p artifacts/evidence/auth-002/adapter-regression
+          evidence_dir="artifacts/evidence/auth-002/adapter-regression"
+          evidence_file="$evidence_dir/adapter-regression.json"
+          mkdir -p "$evidence_dir"
+          rm -f "$evidence_file" "$evidence_dir/probe-stage.json"
+
           set +e
-          pnpm --dir workers/W01-payload exec tsx ../../scripts/w01-d1-adapter-regression-probe.mjs
+          timeout --signal=TERM --kill-after=15s 120s \
+            pnpm --dir workers/W01-payload exec tsx ../../scripts/w01-d1-adapter-regression-probe.mjs
           rc=$?
           set -e
-          echo "E4_5_EXIT_CODE=$rc"
-          exit $rc
 
+          pkill -TERM -x workerd 2>/dev/null || true
+          pkill -TERM -x esbuild 2>/dev/null || true
+          sleep 1
+          pkill -KILL -x workerd 2>/dev/null || true
+          pkill -KILL -x esbuild 2>/dev/null || true
+
+          echo "E4_5_PROCESS_EXIT_CODE=$rc"
+
+          if [ ! -f "$evidence_file" ]; then
+            echo "E4_5_EVIDENCE_MISSING=true"
+            exit 1
+          fi
+
+          set +e
+          E4_5_EVIDENCE_FILE="$evidence_file" E4_5_EXPECTED_SHA="$GITHUB_SHA" E4_5_RUN_ID="$GITHUB_RUN_ID" \
+            node - <<'NODE'
+          const fs = require("node:fs");
+          const file = process.env.E4_5_EVIDENCE_FILE;
+          const expectedSha = process.env.E4_5_EXPECTED_SHA;
+          const expectedRunId = Number(process.env.E4_5_RUN_ID);
+          const data = JSON.parse(fs.readFileSync(file, "utf8"));
+          const pass =
+            data.version === "1.0.0" &&
+            data.evidenceType === "AUTH_002_E4_5_D1_ADAPTER_REGRESSION" &&
+            data.testedCommitSha === expectedSha &&
+            Number(data.runId) === expectedRunId &&
+            data.payloadVersion === "3.87.1" &&
+            data.d1AdapterVersion === "3.87.1" &&
+            data.environmentClass === "CONTROLLED_REMOTE_D1" &&
+            data.databaseName === "luckread" &&
+            data.operation === "payload.db.upsert(payload-preferences)" &&
+            data.adapterUpsertAliasesUpdateOne === false &&
+            data.persistedAfterUpsert === true &&
+            data.cleanedUp === true &&
+            data.observed?.upsertReturnedDocument === true &&
+            data.observed?.upsertError === null &&
+            data.observed?.storedRowPresent === true &&
+            data.observed?.storedValueMatches === true &&
+            data.error === null;
+          console.log(JSON.stringify({
+            E4_5_EVIDENCE_VALID: pass,
+            testedCommitSha: data.testedCommitSha,
+            runId: data.runId,
+            adapterUpsertAliasesUpdateOne: data.adapterUpsertAliasesUpdateOne,
+            persistedAfterUpsert: data.persistedAfterUpsert,
+            cleanedUp: data.cleanedUp
+          }, null, 2));
+          process.exit(pass ? 0 : 1);
+          NODE
+          evidence_rc=$?
+          set -e
+
+          if [ "$evidence_rc" -eq 0 ]; then
+            echo "E4_5_RESULT=PASS"
+            exit 0
+          fi
+
+          echo "E4_5_RESULT=FAIL"
+          exit 1
       - name: Upload E4.5 evidence
         if: always()
         uses: actions/upload-artifact@v4
