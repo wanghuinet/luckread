@@ -2,7 +2,13 @@
 
 ## Status
 
-OPEN — BLOCKER TEXT RECONCILIATION / NO STATUS CHANGE
+CLOSED — RECONCILIATION VERIFIED
+
+Closure basis:
+- The authoritative B01-B03 source batch already contains the refined USER-001/USER-006 blocker wording in commit `42a98bb568adf0ebbe3410b19fef616019351a32`.
+- Current Canonical Mapping on `main` retains explicit USER-001 API/Entity edges and USER-006 API edges without promoting either feature status.
+- No DTO, Persistence, Payload, Code, Security, Lifecycle, Test, or Evidence Registry edge was inferred or promoted by this closure.
+- This closure changes only blocker-text reconciliation state; Feature status remains fail-closed.
 
 ## Finding
 
