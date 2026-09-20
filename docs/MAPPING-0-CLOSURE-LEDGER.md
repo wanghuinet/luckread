@@ -615,3 +615,24 @@ Safety boundary:
 - No runtime, persistence, security, test or Evidence Registry status was promoted.
 
 The global B04-B20 edge sweep remains `NO NEW EDGE`; AUTH-002 remains deferred by user as `BLOCKED_EXTERNAL`.
+
+
+## Superpowers continuation audit — authority-decision reconciliation closure — 2026-09-20
+
+Current completion source head: `20505da8a12f49d84306ce555c02182c3a5888c9`.
+
+Verified and closed against already accepted Change Control decisions:
+- AUTH-006 status classification: closed; current Canonical Mapping classifies AUTH-006 as `PARTIAL`.
+- Entitlements operationId conflict: closed; API Inventory, OpenAPI and Operation Policy now consistently use `listEntitlements` for `GET /v1/entitlements` and `getEntitlements` for `GET /v1/entitlements/{subjectId}`; `getEntitlementsOp` is not current canonical policy.
+- DTO representation gap: closed at the governance-model level; DTO authority remains external to Canonical Mapping and no `dtoIds` property was added.
+- AUTH-006 alias/domain decision: closed at authority level; canonical DTO vocabulary is the non-PASSKEY form and the logical domain is `D01 Core`; stale PASSKEY aliases remain downstream until canonical OpenAPI admission.
+- W01 ENT-USER source decision: closed for the selected direction; active W01 `Users.ts` contains the six target fields. Migration/runtime evidence remains downstream.
+- W01 Media collection authority: closed; exact support-collection exemption is present and consumed by the Payload reconciliation checker.
+- D1 domain naming decision: closed; `B01-CONFLICT-001` is `RESOLVED` and affected AUTH-006/AUTH-013/AUTH-015 logical-domain reconciliation uses `D01 Core`.
+
+The AUTH-003 operationId decision remains deliberately `TODO_FIX`: the operation vocabulary is fixed, but canonical OpenAPI/DTO admission still lacks the exact public wire-schema authority.
+
+No Mapping row was promoted to GREEN. No physical D1 schema, migration, Worker assignment or runtime evidence was inferred.
+
+Current Canonical Mapping remains: 449 total; `17 PARTIAL / 431 UNRESOLVED / 1 MISSING`.
+AUTH-002 remote baseline execution remains user-deferred and `BLOCKED_EXTERNAL`.
