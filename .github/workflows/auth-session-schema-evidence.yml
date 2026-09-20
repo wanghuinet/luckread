@@ -98,31 +98,75 @@ jobs:
 
           set +e
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
-            --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' \
-            > artifacts/evidence/auth-002/migration-status.txt 2>&1
-          migration_exit=$?
+            --command 'SELECT name FROM sqlite_schema WHERE type="table" AND name="payload_migrations";' \
+            > artifacts/evidence/auth-002/migration-table-presence.json 2>&1
+          presence_exit=$?
           set -e
 
-          MIGRATION_EXIT_CODE="$migration_exit" DATABASE_NAME="$DATABASE_NAME" WRANGLER_VERSION="$WRANGLER_VERSION" node -e '
-            const fs = require("node:fs");
-            const output = fs.readFileSync("artifacts/evidence/auth-002/migration-status.txt", "utf8");
-            fs.writeFileSync(
-              "artifacts/evidence/auth-002/migration-status.json",
-              JSON.stringify({
-                databaseName: process.env.DATABASE_NAME,
-                command: `wrangler@${process.env.WRANGLER_VERSION} d1 execute <database> --remote --json --config workers/W01-payload/wrangler.jsonc --command "SELECT id,name,batch FROM payload_migrations ORDER BY id;"`,
-                source: "Payload migration history table",
-                table: "payload_migrations",
-                exitCode: Number(process.env.MIGRATION_EXIT_CODE),
-                output
-              }, null, 2) + "\n"
-            );
-          '
-          if [ "$migration_exit" -eq 0 ]; then
-            rm -f artifacts/evidence/auth-002/migration-status.txt
+          if [ "$presence_exit" -ne 0 ]; then
+            PRESENCE_EXIT_CODE="$presence_exit" DATABASE_NAME="$DATABASE_NAME" WRANGLER_VERSION="$WRANGLER_VERSION" node -e '
+              const fs = require("node:fs");
+              const output = fs.readFileSync("artifacts/evidence/auth-002/migration-table-presence.json", "utf8");
+              fs.writeFileSync(
+                "artifacts/evidence/auth-002/migration-status.json",
+                JSON.stringify({
+                  databaseName: process.env.DATABASE_NAME,
+                  source: "Payload migration history table presence probe",
+                  table: "payload_migrations",
+                  status: "PROBE_FAILED",
+                  exitCode: Number(process.env.PRESENCE_EXIT_CODE),
+                  output
+                }, null, 2) + "\n"
+              );
+            '
+            exit "$presence_exit"
           fi
-          test "$migration_exit" -eq 0
 
+          if grep -Eq '"name"[[:space:]]*:[[:space:]]*"payload_migrations"' artifacts/evidence/auth-002/migration-table-presence.json; then
+            set +e
+            npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
+              --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' \
+              > artifacts/evidence/auth-002/migration-status.txt 2>&1
+            migration_exit=$?
+            set -e
+            MIGRATION_EXIT_CODE="$migration_exit" DATABASE_NAME="$DATABASE_NAME" WRANGLER_VERSION="$WRANGLER_VERSION" node -e '
+              const fs = require("node:fs");
+              const output = fs.readFileSync("artifacts/evidence/auth-002/migration-status.txt", "utf8");
+              fs.writeFileSync(
+                "artifacts/evidence/auth-002/migration-status.json",
+                JSON.stringify({
+                  databaseName: process.env.DATABASE_NAME,
+                  command: `wrangler@${process.env.WRANGLER_VERSION} d1 execute <database> --remote --json --config workers/W01-payload/wrangler.jsonc --command "SELECT id,name,batch FROM payload_migrations ORDER BY id;"`,
+                  source: "Payload migration history table",
+                  table: "payload_migrations",
+                  status: Number(process.env.MIGRATION_EXIT_CODE) === 0 ? "QUERY_SUCCESS" : "QUERY_FAILED",
+                  exitCode: Number(process.env.MIGRATION_EXIT_CODE),
+                  output
+                }, null, 2) + "\n"
+              );
+            '
+            if [ "$migration_exit" -eq 0 ]; then
+              rm -f artifacts/evidence/auth-002/migration-status.txt
+            fi
+            test "$migration_exit" -eq 0
+          else
+            node -e '
+              const fs = require("node:fs");
+              const raw = fs.readFileSync("artifacts/evidence/auth-002/migration-table-presence.json", "utf8");
+              fs.writeFileSync(
+                "artifacts/evidence/auth-002/migration-status.json",
+                JSON.stringify({
+                  databaseName: process.env.DATABASE_NAME || "luckread",
+                  source: "Payload migration history table presence probe",
+                  table: "payload_migrations",
+                  status: "TABLE_ABSENT",
+                  appliedMigrations: [],
+                  probeOutput: raw
+                }, null, 2) + "\n"
+              );
+            '
+          fi
+          rm -f artifacts/evidence/auth-002/migration-table-presence.json
       - name: Capture remote D1 catalog evidence
         if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema') }}"
         env:
