@@ -1,0 +1,28 @@
+name: AUTH-002 One-Shot Controlled Dispatch
+
+on:
+  workflow_run:
+    workflows:
+      - "Mapping 0 structural/contract verification"
+    types:
+      - completed
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch-auth-002:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_sha == 'e17a27793f8c4b139bcf9b6479ffb33aef827ce5' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch controlled AUTH-002 evidence workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run .github/workflows/auth-session-schema-evidence.yml \
+            --ref main \
+            -f database_name=luckread \
+            -f environment_class=CONTROLLED_REMOTE_D1
