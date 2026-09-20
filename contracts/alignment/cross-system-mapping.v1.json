@@ -57,6 +57,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "artifacts/mapping-0/auth-002-remote-baseline-evidence-2026-09-20.json",
         "contracts/alignment/mapping-batches/AUTH-002-003-batch-closure-gate.v1.md",
         "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
         "contracts/alignment/mapping-batches/AUTH-002-real-evidence-reconciliation.v1.md",
