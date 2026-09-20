@@ -690,3 +690,28 @@ Disposition:
 
 NEXT_ITEM_ID remains: `W01-MIGRATION-BASELINE-AUTHORITY-001`.
 NEXT_ITEM_STATE remains: `BLOCKED_EXTERNAL`.
+
+
+## Superpowers continuation audit — B01 API path representation reconciliation — 2026-09-20
+
+Source head at reconciliation: `6e0a3c284a31e3ccc56442698a81731c077a20a2`.
+
+`B01-CONFLICT-003 / API_CANONICAL_PATH` is now reconciled without changing API contracts:
+
+- Public/API Inventory representation: `/v1/...`.
+- OpenAPI representation: `server: /api/v1` plus operation-relative paths such as `/auth/*` and `/users/*`.
+- Auth Operation Policy follows the OpenAPI-relative operation representation.
+- `scripts/build-api-alignment-inventory.mjs` explicitly canonicalizes OpenAPI relative paths to the `/v1` inventory representation while retaining `openapiPath` separately.
+- `scripts/api-contract-ci.mjs` explicitly states that Canonical OpenAPI uses `/api/v1` as a server base and RC paths intentionally omit it.
+
+Acceptance:
+- `B01-CONFLICT-003 = RESOLVED` at representation/reconciliation level.
+- No API route was renamed, added or deleted.
+- No operationId was changed.
+- No Mapping-0 Feature status was promoted.
+- No implementation authorization was granted.
+
+Remaining B01 authority conflict: `B01-CONFLICT-002 / WORKER_OWNERSHIP`, because competing older/alternative Worker topology sources still require explicit authority classification before they can be downgraded or superseded.
+
+NEXT_ITEM_ID remains: `W01-MIGRATION-BASELINE-AUTHORITY-001`.
+NEXT_ITEM_STATE remains: `BLOCKED_EXTERNAL`.
