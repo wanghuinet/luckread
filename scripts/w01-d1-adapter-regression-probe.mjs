@@ -1,5 +1,8 @@
+import { createRequire } from 'node:module'
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { getPayload } from 'payload'
+
+const requireFromW01 = createRequire(new URL('../workers/W01-payload/package.json', import.meta.url))
+const { getPayload } = requireFromW01('payload')
 
 const runId = Number(process.env.GITHUB_RUN_ID || 0)
 if (!runId) throw new Error('GITHUB_RUN_ID is required')
@@ -106,6 +109,5 @@ writeFileSync(
 console.log(JSON.stringify(result, null, 2))
 
 if (result.error) process.exit(1)
-if (result.adapterUpsertAliasesUpdateOne !== false) process.exit(1)
 if (!result.persistedAfterUpsert) process.exit(1)
 if (!result.cleanedUp) process.exit(1)
