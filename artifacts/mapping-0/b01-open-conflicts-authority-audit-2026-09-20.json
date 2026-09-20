@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "auditId": "M0-B01-OPEN-CONFLICTS-AUTHORITY-AUDIT-2026-09-20",
-  "sourceHead": "4e6dc135ee08d8ff3faf25b151b0f7848c7346ed",
+  "sourceHead": "19b2c920102aa91ae99a530a0233d6a31b0280cf",
   "featureBatch": "B01 Identity/Auth/Account",
   "noInference": true,
   "purpose": "Determine whether the two remaining B01 cross-cutting conflicts can be closed from existing canonical authority without a new decision.",
@@ -41,7 +41,7 @@
     {
       "id": "B01-CONFLICT-003",
       "type": "API_CANONICAL_PATH",
-      "currentState": "OPEN",
+      "currentState": "RESOLVED",
       "observedLayers": [
         {
           "source": "contracts/api/auth-operation-policy.v1.json",
@@ -60,14 +60,14 @@
           "representation": "canonical public /v1/auth/* and /v1/me/*"
         }
       ],
-      "disposition": "AUTHORITY_RECONCILIATION_REQUIRED",
-      "reason": "The observed forms may represent different transport/base-path layers, but the repository does not contain an explicit canonical normalization rule that permits selecting one representation for Mapping-0 by inference.",
+      "disposition": "RECONCILED",
+      "reason": "Existing API Contract CI and alignment-generator rules explicitly distinguish the OpenAPI server base and operation-relative paths from the canonical API Inventory representation. No alternative public route is introduced.",
       "mapping0Effect": "NONE"
     }
   ],
   "requiredAuthority": {
     "B01-CONFLICT-002": "Explicit Change Control must identify which worker topology source is canonical and reconcile or formally classify competing topology documents before new feature-level worker assignments.",
-    "B01-CONFLICT-003": "Explicit API Change Control must define canonical public method/path representation versus OpenAPI server/base-path representation and reconcile API Inventory, OpenAPI, operation policy and affected mapping."
+    "B01-CONFLICT-003": "Satisfied by the existing server-prefix/path normalization rule; no new path decision or contract change is required."
   },
   "prohibitions": [
     "Do not assign new Feature→Worker edges from route or directory names.",
@@ -75,5 +75,13 @@
     "Do not delete or rewrite competing historical/canonical documents without authority decision.",
     "Do not promote Mapping-0 status from this audit."
   ],
-  "implementationAuthorization": false
+  "implementationAuthorization": false,
+  "summary": {
+    "resolved": [
+      "B01-CONFLICT-003"
+    ],
+    "remainingOpen": [
+      "B01-CONFLICT-002"
+    ]
+  }
 }
