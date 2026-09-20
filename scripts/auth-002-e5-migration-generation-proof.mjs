@@ -86,7 +86,7 @@ const diagnosticSource = [
   "  }",
   "}",
   "console.log(JSON.stringify({ schemaKeys: entries.map(([key]) => key), tables }, null, 2))",
-].join('\\n')
+].join('\n')
 fs.writeFileSync(diagnostic, diagnosticSource, 'utf8')
 const diagnosticOutput = run('pnpm', ['exec', 'node', diagnostic], root, { PAYLOAD_SECRET: 'e5-generation-only-not-production' })
 fs.writeFileSync(path.join(outDir, 'schema-diagnostic.json'), diagnosticOutput)
