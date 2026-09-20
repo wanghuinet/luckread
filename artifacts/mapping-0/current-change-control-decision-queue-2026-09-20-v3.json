@@ -57,7 +57,7 @@
     "No business implementation is inferred from Mapping 0 structural acceptance.",
     "Unchanged validation results are inherited across evidence-only documentation commits."
   ],
-  "currentHeadBaseline": "5abea0fa25a0a06f493a4e72967bccd54a942c7f",
+  "currentHeadBaseline": "6d438c27b299853d4cdba20efe9d803547ed696a",
   "reconciledControls": [
     {
       "id": "CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19",
@@ -106,10 +106,20 @@
   "nextObjective": "Continue fail-closed technical closure. AUTH-002 remote baseline execution is deferred by user; AUTH-003 wire-schema authority remains unresolved. Already verified Change Controls are not to be re-opened.",
   "cursorUpdate": {
     "updatedAt": "2026-09-20",
-    "reason": "Captured real downstream Contract CI boundary evidence; no feature promotion.",
-    "latestEvidence": "M0-CURRENT-DOWNSTREAM-GATE-EVIDENCE-2026-09-20",
-    "sourceCommit": "ce7d092587a9e28578f156f0a6790793720148dd",
-    "contractCiRunId": 35492243047,
-    "replayRule": "Reuse downstream gate result until Feature/Entity/Persistence/Evidence inputs change."
+    "reason": "Fresh current-main Structural Gate evidence recorded and synchronized into the closure ledger.",
+    "latestStructuralEvidence": {
+      "workflowRunId": 35492431437,
+      "testedCommit": "6dd714c5e26e4b6672d222355aacc9dd40d8b19b",
+      "status": "GREEN",
+      "canonicalFeatureCount": 449,
+      "mappingRecordCount": 449,
+      "canonicalMappingStatus": "NOT_GREEN",
+      "counts": {
+        "PARTIAL": 17,
+        "MISSING": 1,
+        "UNRESOLVED": 431
+      }
+    },
+    "replayRule": "Reuse exact structural evidence for documentation-only descendants; revalidate only when structural inputs change."
   }
 }
