@@ -533,3 +533,27 @@ NEXT ACTION:
 2. Re-capture remote D1 schema/migration evidence after execution.
 3. Only after baseline evidence is accepted, resolve the supported Payload migration-snapshot/delta workflow for the six current User profile fields.
 4. Do not hand-author/infer an additive ALTER/DDL migration and do not promote the prior full-schema generated artifact.
+
+
+## Baseline execution admission checkpoint — 2026-09-20
+
+Current main: `9ec383f2402e062e132c1ea1a478f89e69c79cf5`.
+
+The user-directed continuation has now converted the previously identified baseline execution gate into an explicit, narrowly scoped Change-Control admission. This is an authorization state, not execution evidence.
+
+Verified controls:
+- `CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20.md` now states `Status: GREEN — EXECUTION ADMITTED`.
+- Scope is limited to D1 `luckread` and migration `20250929_111647` only.
+- Approved migration blob: `21e4a9ce27c828da655e479e35eb44ea3daff0f3`.
+- Approved migration index blob: `e596aeb65381fd3bb2e0cfa7879c8f850bb77cbe`.
+- `scripts/w01-remote-migration-admission.mjs` now validates the explicit admission plus the exact approved migration/index blobs and rejects additional executable migration sources.
+- `.github/workflows/w01-baseline-migration-execution.yml` provides the controlled manual execution path, with exact source checkout, target validation, pre-execution empty-target proof, baseline-only migration-set checks, and mandatory post-execution evidence upload.
+- No remote D1 migration has been executed by this continuation.
+
+Therefore the Mapping 0 cursor remains on `W01-MIGRATION-BASELINE-AUTHORITY-001`, but its next step is now the external controlled workflow execution rather than another source/mapping audit.
+
+NEXT_ITEM_ID: `W01-MIGRATION-BASELINE-AUTHORITY-001`
+NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
+NEXT ACTION: manually dispatch `.github/workflows/w01-baseline-migration-execution.yml` with `confirm=EXECUTE_W01_BASELINE`, `database_name=luckread`, and source SHA `9ec383f2402e062e132c1ea1a478f89e69c79cf5`; then review the resulting post-migration evidence before any additive migration is generated.
+
+No Mapping row, Contract definition, or runtime status is promoted by the admission alone.
