@@ -6,7 +6,7 @@ on:
       source_sha:
         description: "Exact Git commit to execute; must contain only the approved baseline migration"
         required: true
-        default: "e90f49cbf4df3277cb4c3dd5f5b53edea1b13be6"
+        default: "eb9c00bc860eca66a23fdbd1f37a8f60cca7b468"
         type: string
       database_name:
         description: "Controlled D1 database name"
@@ -113,6 +113,7 @@ jobs:
           NODE_ENV: production
           PAYLOAD_SECRET: ignore
           CLOUDFLARE_ENV: production
+          PAYLOAD_MIGRATION_REMOTE: "true"
         working-directory: workers/W01-payload
         run: pnpm exec payload migrate
 
