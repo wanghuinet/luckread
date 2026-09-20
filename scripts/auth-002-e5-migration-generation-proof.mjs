@@ -67,6 +67,30 @@ const stage1Json = fs.readdirSync(path.join(stage1, 'migrations')).filter((f) =>
 if (stage1Json.length !== 1) throw new Error('Expected exactly one generated baseline snapshot; found ' + stage1Json.length)
 fs.copyFileSync(path.join(stage1, 'migrations', stage1Json[0]), path.join(stage2, 'migrations', 'baseline.json'))
 
+const diagnostic = path.join(stage2, 'diagnose-schema.mjs')
+const diagnosticSource = [
+  "import { is, getTableConfig, getTableName, SQLiteTable } from 'drizzle-orm/sqlite-core'",
+  "import payload from 'payload'",
+  "process.env.PAYLOAD_MIGRATING = 'true'",
+  `const mod = await import(${JSON.stringify(path.join(stage2, 'payload.config.ts'))})`,
+  "await payload.init({ config: mod.default, disableDBConnect: true, disableOnInit: true })",
+  "const entries = Object.entries(payload.db.schema)",
+  "const tables = []",
+  "for (const [key, value] of entries) {",
+  "  if (!is(value, SQLiteTable)) continue",
+  "  try {",
+  "    const config = getTableConfig(value)",
+  "    tables.push({ key, tableName: getTableName(value), columns: config.columns.map((c) => c.name), indexes: config.indexes.map((i) => i.config.name) })",
+  "  } catch (error) {",
+  "    tables.push({ key, tableName: null, error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error) })",
+  "  }",
+  "}",
+  "console.log(JSON.stringify({ schemaKeys: entries.map(([key]) => key), tables }, null, 2))",
+].join('\\n')
+fs.writeFileSync(diagnostic, diagnosticSource, 'utf8')
+const diagnosticOutput = run('pnpm', ['exec', 'node', diagnostic], root, { PAYLOAD_SECRET: 'e5-generation-only-not-production' })
+fs.writeFileSync(path.join(outDir, 'schema-diagnostic.json'), diagnosticOutput)
+
 runCreate(stage2, 'MIG-AUTH-002-SESSION-V1')
 const stage2Dir = path.join(stage2, 'migrations')
 const generated = fs.readdirSync(stage2Dir).filter((f) => f.endsWith('.ts') && f.includes('MIG-AUTH-002-SESSION-V1'))
