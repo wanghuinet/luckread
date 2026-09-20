@@ -33,5 +33,10 @@
     "UNRESOLVED": 431
   },
   "disposition": "ACCEPTED_AS_STRUCTURAL_EVIDENCE_NOT_FEATURE_GREEN",
-  "implementationAuthorization": false
+  "implementationAuthorization": false,
+  "verificationDownstream": {
+    "canonicalMappingRecordCount": 449,
+    "canonicalMappingStatus": "NOT_GREEN",
+    "unresolvedDownstreamGapCount": 449
+  }
 }
