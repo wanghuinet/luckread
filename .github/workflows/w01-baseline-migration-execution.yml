@@ -1,0 +1,150 @@
+name: W01 Baseline Migration Execution
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Exact Git commit to execute; must contain only the approved baseline migration"
+        required: true
+        default: "2b4b8de47da303ad33b9ec39d5e2b7a20c8c20be"
+        type: string
+      database_name:
+        description: "Controlled D1 database name"
+        required: true
+        default: "luckread"
+        type: string
+      confirm:
+        description: "Type EXECUTE_W01_BASELINE to permit the controlled migration step"
+        required: true
+        default: "EXECUTE_W01_BASELINE"
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.33.1
+  BASELINE_MIGRATION: 20250929_111647
+
+jobs:
+  execute-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Validate dispatch confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        run: |
+          set -euo pipefail
+          test "$CONFIRM" = "EXECUTE_W01_BASELINE"
+          test "$DATABASE_NAME" = "luckread"
+
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Validate exact source SHA
+        env:
+          REQUESTED_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$REQUESTED_SHA"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.34.5 --activate
+
+      - name: Install W01 locked dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-workspace
+
+      - name: Check migration execution admission
+        run: node scripts/w01-remote-migration-admission.mjs
+
+      - name: Require exact baseline migration source
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          test -f "src/migrations/${BASELINE_MIGRATION}.ts"
+          test -f "src/migrations/index.ts"
+          test "$(find src/migrations -maxdepth 1 -type f -name '*.ts' ! -name 'index.ts' | wc -l)" -eq 1
+          grep -Fq "name: '${BASELINE_MIGRATION}'" "src/migrations/index.ts"
+          test "$(grep -c "name: '${BASELINE_MIGRATION}'" "src/migrations/index.ts")" -eq 1
+
+      - name: Require approved baseline source unchanged from Git
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          git diff --exit-code -- "src/migrations/${BASELINE_MIGRATION}.ts" "src/migrations/index.ts"
+
+      - name: Configure Cloudflare access
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+      - name: Prove controlled target is still empty
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'SELECT name FROM sqlite_schema WHERE type="table" AND name NOT LIKE "_cf_%";' > /tmp/non_internal_tables.json
+          test "$(node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/non_internal_tables.json","utf8")); const rows=(x[0]?.results ?? x[0]?.result?.results ?? x.results ?? []); process.stdout.write(String(rows.length))')" = "0"
+
+      - name: Execute approved baseline migration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NODE_ENV: production
+          PAYLOAD_SECRET: ignore
+          CLOUDFLARE_ENV: production
+        working-directory: workers/W01-payload
+        run: pnpm exec payload migrate
+
+      - name: Capture post-migration evidence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/evidence/w01-baseline-migration
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;'             > ../../artifacts/evidence/w01-baseline-migration/migration-status.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE type IN ("table","index","trigger") ORDER BY type,name;'             > ../../artifacts/evidence/w01-baseline-migration/catalog.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'PRAGMA table_info("users");'             > ../../artifacts/evidence/w01-baseline-migration/users-schema.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 info "$DATABASE_NAME" --json --config wrangler.jsonc             > ../../artifacts/evidence/w01-baseline-migration/d1-info.json
+          cat > ../../artifacts/evidence/w01-baseline-migration/provenance.json <<EOF
+          {
+            "repository": "${GITHUB_REPOSITORY}",
+            "workflow": "${GITHUB_WORKFLOW}",
+            "runId": ${GITHUB_RUN_ID},
+            "sourceSha": "${GITHUB_SHA}",
+            "requestedSourceSha": "${{ inputs.source_sha }}",
+            "databaseName": "${DATABASE_NAME}",
+            "migration": "${BASELINE_MIGRATION}"
+          }
+          EOF
+
+      - name: Upload execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w01-baseline-migration-evidence-${{ github.run_id }}
+          path: artifacts/evidence/w01-baseline-migration/
+          if-no-files-found: error
+          retention-days: 14
