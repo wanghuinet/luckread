@@ -844,3 +844,23 @@ Anti-loop:
 - Do not reopen `B01-CONFLICT-002` unless the canonical Worker Master or canonical Worker × D1 Binding Mapping changes.
 - The remaining cross-cutting B01 authority issue is now empty; AUTH-003 wire-schema authority remains unresolved and AUTH-002 remains user-deferred / BLOCKED_EXTERNAL.
 \n
+
+## Superpowers continuation audit — W01 baseline workflow source-cursor drift closure — 2026-09-20
+
+Source head at closure: `c32c8d0b5f83ca1b0d5b21fc086360dfc8b7ba70`.
+
+A concrete workflow-input drift was found and corrected:
+- `.github/workflows/w01-baseline-migration-execution.yml` previously defaulted `source_sha` to `1797f015488ec75e26fed2ebc612ed89d83c5050`.
+- The workflow's approved migration and index Blob SHAs were identical at that commit, at the prior checkpoint head `f31e8bc691298995e2732cb1012c794a1e6897e2`, and at the then-current main.
+- The workflow default is now aligned to the pre-change current main head `e90f49cbf4df3277cb4c3dd5f5b53edea1b13be6`; this removes an operator-facing stale default without changing the approved migration, migration index, database target, or execution scope.
+- Post-change verification confirms the approved migration Blob remains `21e4a9ce27c828da655e479e35eb44ea3daff0f3` and the approved migration-index Blob remains `e596aeb65381fd3bb2e0cfa7879c8f850bb77cbe`.
+
+Acceptance:
+- Workflow source-cursor drift: CLOSED.
+- No Contract/Blueprint/Mapping status changed.
+- No remote D1 mutation was executed.
+- `W01-MIGRATION-BASELINE-AUTHORITY-001` remains `BLOCKED_EXTERNAL` pending the controlled manual execution and post-migration evidence review.
+
+Anti-loop:
+- Do not reopen this drift unless the workflow default, approved migration Blob, migration-index Blob, or execution target changes.
+- The next actionable step remains the external controlled W01 baseline execution; no duplicate Mapping-0 scan is justified.
