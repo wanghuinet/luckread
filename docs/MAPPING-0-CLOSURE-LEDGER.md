@@ -741,3 +741,16 @@ Anti-loop disposition: future continuation must reuse this blocker audit unless 
 
 NEXT_ITEM_ID remains: `W01-MIGRATION-BASELINE-AUTHORITY-001`.
 NEXT_ITEM_STATE remains: `BLOCKED_EXTERNAL`.
+
+
+## Superpowers continuation audit — authority decision-state synchronization — 2026-09-20
+
+The decision record `docs/change-control/MAPPING-0-AUTHORITY-DECISIONS-2026-09-20.md` previously contained a generic statement that all eight controls were `RECONCILIATION_PENDING`. That wording was stale relative to the current Change-Control queue.
+
+It is now synchronized to the current queue:
+- 7 of the 8 original authority controls are `PASS_VERIFIED`.
+- AUTH-003 remains the sole technically pending control because exact public Wire Schema authority is unresolved.
+- The separate B01 API path representation conflict is already `RESOLVED` by its dedicated audit and is not reopened.
+- No Mapping-0 status, OpenAPI route, DTO registry entry, persistence schema, or runtime evidence is promoted by this synchronization.
+
+Anti-loop disposition: future continuation must use the current Change-Control queue as the state source and treat the historical eight-control decision list as a decision set, not as eight simultaneously pending tasks.
