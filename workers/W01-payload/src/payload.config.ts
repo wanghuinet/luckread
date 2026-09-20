@@ -75,7 +75,7 @@ export default buildConfig({
   }),
   logger: isProduction ? cloudflareLogger : undefined,
   onInit: async (payload: Payload) => {
-    if (payload.db.name !== 'd1-sqlite') return
+    if (payload.db.packageName !== '@payloadcms/db-d1-sqlite') return
 
     // CC-MAPPING-0-AUTH-002-E4-5-D1-ADAPTER-CORRECTION-2026-09-20:
     // The pinned D1 adapter currently aliases upsert to updateOne without
