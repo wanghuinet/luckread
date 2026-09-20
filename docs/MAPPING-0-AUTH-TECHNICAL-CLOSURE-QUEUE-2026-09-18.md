@@ -104,3 +104,9 @@ Documentation, reconciliation notes, historical artifacts, or generic contracts 
 ## Current result
 
 This queue does not change any canonical Mapping record or status. It identifies the shortest admissible path from the current fail-closed state to technical closure.
+
+## Third-layer reconciliation trigger — 2026-09-20
+
+This checkpoint exists only to trigger the existing canonical AUTH reconciliation workflow against the current `main` inputs. It does not change any Contract, Blueprint, Mapping status, API operation, DTO, persistence schema, runtime evidence, or authority decision by itself.
+
+The workflow remains fail-closed and may only enrich Canonical Mapping from already-frozen AUTH contract sources; it must not invent API, DTO, Entity, Persistence, Runtime, Code, Test, or Evidence edges and must not promote Feature status.
