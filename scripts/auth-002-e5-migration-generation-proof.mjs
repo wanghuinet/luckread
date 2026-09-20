@@ -69,24 +69,20 @@ fs.copyFileSync(path.join(stage1, 'migrations', stage1Json[0]), path.join(stage2
 
 const diagnostic = path.join(stage2, 'diagnose-schema.mjs')
 const diagnosticSource = [
-  "import { is, getTableConfig, getTableName, SQLiteTable } from 'drizzle-orm/sqlite-core'",
   "import payload from 'payload'",
   "process.env.PAYLOAD_MIGRATING = 'true'",
   `const mod = await import(${JSON.stringify(path.join(stage2, 'payload.config.ts'))})`,
   "await payload.init({ config: mod.default, disableDBConnect: true, disableOnInit: true })",
-  "const entries = Object.entries(payload.db.schema)",
-  "const tables = []",
-  "for (const [key, value] of entries) {",
-  "  if (!is(value, SQLiteTable)) continue",
-  "  try {",
-  "    const config = getTableConfig(value)",
-  "    tables.push({ key, tableName: getTableName(value), columns: config.columns.map((c) => c.name), indexes: config.indexes.map((i) => i.config.name) })",
-  "  } catch (error) {",
-  "    tables.push({ key, tableName: null, error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error) })",
-  "  }",
+  "const report = { schemaKeys: Object.keys(payload.db.schema), generated: null, error: null }",
+  "try {",
+  "  const kit = payload.db.requireDrizzleKit()",
+  "  const snapshot = await kit.generateDrizzleJson(payload.db.schema)",
+  "  report.generated = { tableNames: Object.keys(snapshot.tables ?? {}), tableCount: Object.keys(snapshot.tables ?? {}).length }",
+  "} catch (error) {",
+  "  report.error = error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error)",
   "}",
-  "console.log(JSON.stringify({ schemaKeys: entries.map(([key]) => key), tables }, null, 2))",
-].join('\n')
+  "console.log(JSON.stringify(report, null, 2))",
+].join('\\n')
 fs.writeFileSync(diagnostic, diagnosticSource, 'utf8')
 const diagnosticOutput = run('pnpm', ['exec', 'node', diagnostic], root, { PAYLOAD_SECRET: 'e5-generation-only-not-production' })
 fs.writeFileSync(path.join(outDir, 'schema-diagnostic.json'), diagnosticOutput)
