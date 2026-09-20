@@ -2,7 +2,7 @@
 
 ## Status
 
-DECIDED — RECONCILIATION PENDING
+CLOSED — RECONCILIATION VERIFIED
 
 ## Verified facts
 
@@ -64,3 +64,12 @@ No canonical mapping or implementation status is changed by this record.
 ## Decision accepted — 2026-09-20
 
 Decision 5 accepted: canonical AUTH-006 DTO names are the non-PASSKEY identifiers; logical domain follows D01 Core.
+
+
+## Reconciliation verified — 2026-09-20
+
+Decision 5 is now the governing vocabulary:
+- canonical AUTH-006 DTO names are the non-PASSKEY identifiers;
+- `D01 Core` is the logical domain label;
+- legacy `DTO-AUTH-006-PASSKEY-*` references remain downstream stale aliases until the AUTH-006 OpenAPI/DTO admission gate is satisfied.
+No alias is promoted into the canonical DTO registry by this control.
