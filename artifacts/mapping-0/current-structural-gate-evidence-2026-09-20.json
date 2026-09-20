@@ -1,13 +1,13 @@
 {
   "version": "1.0",
   "auditId": "M0-STRUCTURAL-GATE-EVIDENCE-2026-09-20",
-  "testedCommit": "6dd714c5e26e4b6672d222355aacc9dd40d8b19b",
+  "testedCommit": "2b475f7991f82c25a715e091f46049edd7d4852c",
   "workflowRun": {
-    "runId": 35492431437,
+    "runId": 35492578135,
     "name": "Mapping 0 Structural Gate",
     "event": "push",
     "conclusion": "success",
-    "jobId": 106029555236,
+    "jobId": 106029931574,
     "jobName": "Mapping 0 structural/contract verification"
   },
   "verification": {
@@ -26,7 +26,7 @@
     "batchGOrphanDuplicateSweep": "executed_successfully"
   },
   "importantBoundary": "Structural GREEN proves repository shape/inventory integrity for the tested commit only. It does not prove feature-level downstream closure, runtime evidence, or canonical graph GREEN.",
-  "freshness": "Fresh current-main structural evidence for this exact tested commit. Reuse only for later documentation-only commits unless structural inputs change; do not interpret as feature-level GREEN.",
+  "freshness": "Fresh current-main structural evidence for this exact tested commit. Reuse only for later documentation-only descendants unless structural inputs change; do not interpret as feature-level GREEN.",
   "mappingStatusSnapshot": {
     "PARTIAL": 17,
     "MISSING": 1,
