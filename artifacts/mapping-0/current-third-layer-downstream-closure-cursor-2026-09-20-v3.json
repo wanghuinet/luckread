@@ -1,0 +1,66 @@
+{
+  "version": "3.0.0",
+  "evidenceType": "MAPPING_0_THIRD_LAYER_DOWNSTREAM_CLOSURE_CURSOR",
+  "generatedAt": "2026-09-20",
+  "repository": "wanghuinet/luckread",
+  "sourceHead": "66e2320a2f5940bc54d7bf1d85b3282bddb2d86c",
+  "previousCursor": "artifacts/mapping-0/current-third-layer-downstream-closure-cursor-2026-09-20-v2.json",
+  "completedBatch": {
+    "id": "M0-AUTH-002-REMOTE-BASELINE-002",
+    "result": "BASELINE_CAPTURED_AND_VALIDATED",
+    "workflowRunId": 35505235088,
+    "workflowJobId": 106063805501,
+    "captureCommit": "66e2320a2f5940bc54d7bf1d85b3282bddb2d86c",
+    "validatorFixCommit": "183abc887aea10406fd24b12f498a19ebd667352",
+    "evidenceArtifact": "GitHub Actions artifact auth-002-schema-evidence-35505235088",
+    "validationMarker": "AUTH-002_BASELINE_EVIDENCE_VALIDATION_PASS",
+    "mappingEvidenceBoundFeature": "AUTH-002"
+  },
+  "currentState": {
+    "canonicalMapping": {
+      "total": 449,
+      "status": "NOT_GREEN",
+      "partial": 17,
+      "unresolved": 431,
+      "missing": 1,
+      "missingFeature": "AUTH-007"
+    },
+    "fiveWay": "PENDING_CURRENT_HEAD_VERIFICATION",
+    "r4": {
+      "total": 449,
+      "ready": 0,
+      "blocked": 449
+    },
+    "evidenceRegistry": "NOT_GREEN"
+  },
+  "auth002": {
+    "remoteTarget": "luckread/2f80471e-3756-49f9-8db1-7707a433ad64",
+    "environment": "CONTROLLED_REMOTE_D1",
+    "remoteTables": [
+      "_cf_KV"
+    ],
+    "payloadMigrations": "ABSENT",
+    "users": "ABSENT",
+    "authSessionState": "ABSENT",
+    "remoteWritesDuringCapture": 0,
+    "postMigrationEvidence": false,
+    "baselineEvidenceValidation": "PASS",
+    "migrationExecutionAdmission": "GREEN — EXECUTION ADMITTED",
+    "executionState": "BLOCKED_EXTERNAL",
+    "nextRequiredAction": "Run existing W01 Baseline Migration Execution workflow with explicit EXECUTE_W01_BASELINE confirmation, then review post-migration migration history and schema evidence."
+  },
+  "closureProgress": {
+    "deterministicMappingStatusPromotions": 0,
+    "newEvidenceBindings": 1,
+    "newCanonicalFeatureEdges": 0,
+    "contractChanges": 0,
+    "blueprintChanges": 0,
+    "architectureChanges": 0,
+    "d1WritesByEvidenceWorkflow": 0
+  },
+  "antiLoop": {
+    "inheritedStructuralGate": true,
+    "inheritedClosedAuthorityControls": true,
+    "auth002BaselineEvidenceReusableUntilInputsChange": true
+  }
+}
