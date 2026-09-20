@@ -82,8 +82,12 @@ const withTimeout = async (label, promise, timeoutMs = 60_000) => {
 let payload
 writeStage('START')
 try {
-  writeStage('IMPORT_PAYLOAD_CONFIG')
-  const { default: config } = await import('../workers/W01-payload/src/payload.config.ts')
+  writeStage('IMPORT_PAYLOAD_CONFIG_START')
+  const { default: config } = await withTimeout(
+    'import payload.config.ts',
+    import('../workers/W01-payload/src/payload.config.ts'),
+  )
+  writeStage('IMPORT_PAYLOAD_CONFIG_DONE')
 
   writeStage('GET_PAYLOAD_START')
   payload = await withTimeout('getPayload', getPayload({ config, key: `e45-${runId}` }))
