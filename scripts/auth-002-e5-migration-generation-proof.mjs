@@ -90,7 +90,7 @@ console.log(JSON.stringify(report, null, 2))
 fs.writeFileSync(diagnostic, diagnosticSource, 'utf8')
 const diagnosticOutput = run(
   'pnpm',
-  ['exec', 'node', diagnostic],
+  ['exec', 'tsx', diagnostic],
   root,
   {
     PAYLOAD_CONFIG_PATH: path.join(stage2, 'payload.config.ts'),
