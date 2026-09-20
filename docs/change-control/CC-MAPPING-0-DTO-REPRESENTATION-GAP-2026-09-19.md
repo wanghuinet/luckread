@@ -2,7 +2,7 @@
 
 ## Status
 
-DECIDED — RECONCILIATION PENDING
+CLOSED — RECONCILIATION VERIFIED
 
 ## Purpose
 
@@ -64,3 +64,8 @@ The GAP is considered correctly registered when future verification consults thi
 ## Decision accepted — 2026-09-20
 
 Decision 3 accepted: retain DTO authority outside Canonical Mapping; no dtoIds schema addition.
+
+
+## Reconciliation verified — 2026-09-20
+
+Decision 3 is implemented by retaining DTO authority outside Canonical Mapping. The current Mapping schema has no `dtoIds` property, and the canonical DTO contract remains separately authoritative. No Mapping schema expansion was made.
