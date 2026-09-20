@@ -754,3 +754,26 @@ It is now synchronized to the current queue:
 - No Mapping-0 status, OpenAPI route, DTO registry entry, persistence schema, or runtime evidence is promoted by this synchronization.
 
 Anti-loop disposition: future continuation must use the current Change-Control queue as the state source and treat the historical eight-control decision list as a decision set, not as eight simultaneously pending tasks.
+
+
+## Superpowers continuation audit — verified Mapping 0 structural gate evidence — 2026-09-20
+
+A real GitHub Actions run was verified for the Mapping 0 Structural Gate:
+- Run: `35492168719`
+- Job: `106028872534`
+- Tested commit: `7023892ecf1eeae9b66a10d20e946ec99622a172`
+- Conclusion: `success`
+
+Verified structural outputs:
+- canonical feature count = 449;
+- mapping record count = 449;
+- structural missing record count = 0;
+- structural orphan record count = 0;
+- unresolved downstream gap count = 449;
+- canonical graph status = `NOT_GREEN`.
+
+Evidence artifact: `artifacts/mapping-0/current-structural-gate-evidence-2026-09-20.json`.
+
+Acceptance boundary: this is genuine Structural Gate evidence for the tested commit. It does not promote any Feature to GREEN and does not prove runtime/D1/migration/security-E2E closure. Mapping-0 status remains PARTIAL 17 / MISSING 1 / UNRESOLVED 431.
+
+Anti-loop rule: subsequent documentation-only commits may reuse this structural fact under the existing verification-lookup rules; a new current-HEAD certificate requires a new applicable workflow run.
