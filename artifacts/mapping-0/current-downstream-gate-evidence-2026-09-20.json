@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "auditId": "M0-CURRENT-DOWNSTREAM-GATE-EVIDENCE-2026-09-20",
+  "sourceCommit": "ce7d092587a9e28578f156f0a6790793720148dd",
+  "contractCiRun": 35492243047,
+  "status": "DOWNSTREAM_NOT_GREEN",
+  "admissionResults": {
+    "contractSemantic": "PASS",
+    "contractCommon": "PASS",
+    "contractStateMachines": "PASS",
+    "contractOpenAPI": "PASS",
+    "contractAuthz": "PASS",
+    "blueprintFeatureInventory": "PASS",
+    "payloadContractReconciliation": "PASS",
+    "capabilityContractGraph": "PASS",
+    "fiveWayAlignment": "FAIL_NOT_GREEN",
+    "strictDownstreamR4EvidenceR5": "FAIL_BLOCKED"
+  },
+  "fiveWay": {
+    "apiOperations": 151,
+    "payloadCollections": 2,
+    "codeEvidenceRecords": 203,
+    "blockerCount": 450,
+    "canonicalMissingCount": 0
+  },
+  "r4": {
+    "canonicalFeatureCount": 449,
+    "readyCount": 0,
+    "blockedCount": 449,
+    "missingEntityBinding": 440,
+    "persistenceNotVerified": 9
+  },
+  "interpretation": "The failing gates are downstream closure gates, not evidence of a malformed canonical contract set. They correctly remain fail-closed while feature-level Entity/Persistence/Evidence/runtime closure is absent.",
+  "independentFixAvailableFromExistingAuthority": false,
+  "prohibitedInference": [
+    "Do not convert downstream gaps to PASS without feature-specific evidence.",
+    "Do not create 440 Entity bindings from route/name similarity.",
+    "Do not convert the 9 persistence-not-verified records into verified state without persistence/runtime evidence.",
+    "Do not relax Five-Way or R4 gates merely to make Contract CI green."
+  ],
+  "nextControlledBlockers": [
+    "AUTH-003 exact public Wire Schema authority",
+    "B01-CONFLICT-002 explicit Worker topology authority decision",
+    "AUTH-002 controlled external D1 migration/runtime evidence"
+  ],
+  "mapping0Effect": "NONE",
+  "implementationAuthorization": false
+}
