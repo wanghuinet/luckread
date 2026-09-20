@@ -78,3 +78,32 @@ Safety rule remains unchanged:
 - do not promote the generated full-schema artifact;
 - do not execute a remote migration;
 - establish the authoritative baseline first, then regenerate under the supported migration workflow.
+
+## Controlled remote baseline evidence — 2026-09-20
+
+- Evidence workflow run: `35484344942`
+- Tested commit: `45af6bb9fd91a61c6fd242d71eda3c831fdc9dd0`
+- Target: `luckread` / `2f80471e-3756-49f9-8db1-7707a433ad64`
+- Environment: `CONTROLLED_REMOTE_D1`
+- Remote catalog: only Cloudflare internal `_cf_KV`; `users`, `users_sessions`, `payload_migrations`, and `auth_session_state` are absent.
+- D1 metadata: `num_tables=0`, `rows_written_24h=0`.
+- Evidence workflow performed read-only queries only; no migration was applied.
+
+### Baseline authority determination
+The controlled target is an empty D1 database. The repository contains exactly one executable Payload baseline migration, `workers/W01-payload/src/migrations/20250929_111647.ts`, and no later accepted migration. Its `up` path creates the native Payload baseline tables, including `users`, `users_sessions`, `media`, Payload lock/preference tables, and `payload_migrations`.
+
+Therefore the remote evidence resolves the prior ambiguity about whether the target already contains an incompatible pre-existing schema: it does not. The existing `20250929_111647` artifact is the candidate initial W01 baseline for this empty target.
+
+This does **not** authorize execution. The current W01 source also contains six approved User profile fields that are absent from the baseline migration, so the safe sequence must still prevent a partially migrated application from being promoted and must not treat the previously generated full-schema artifact as an additive second migration.
+
+### Execution admission state
+`READY_FOR_EXPLICIT_BASELINE_EXECUTION_ADMISSION`
+
+Required before any remote mutation:
+1. Explicitly admit execution of the existing `20250929_111647` baseline only.
+2. Execute against `luckread` under controlled environment.
+3. Re-capture remote schema and migration history after execution.
+4. Generate/reconcile the next additive migration for the six current User profile fields using the supported Payload migration workflow; do not hand-author or infer DDL.
+5. Keep the generated full-schema diagnostic artifact unpromoted.
+
+No remote D1 mutation is authorized by this document until the explicit admission state is changed.
