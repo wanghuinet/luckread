@@ -3,7 +3,7 @@
 - ID: CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20
 - Date: 2026-09-20
 - Scope: W01 Payload migration generation only
-- Status: OPEN — EXECUTION NOT ADMITTED
+- Status: GREEN — EXECUTION ADMITTED
 
 ## Finding
 
@@ -107,3 +107,29 @@ Required before any remote mutation:
 5. Keep the generated full-schema diagnostic artifact unpromoted.
 
 No remote D1 mutation is authorized by this document until the explicit admission state is changed.
+
+
+## Explicit baseline execution admission — 2026-09-20
+
+Status: GREEN — EXECUTION ADMITTED
+
+Scope is intentionally narrow and fail-closed:
+
+- Target D1: `luckread` / `2f80471e-3756-49f9-8db1-7707a433ad64`
+- Environment: `CONTROLLED_REMOTE_D1`
+- Approved migration: `workers/W01-payload/src/migrations/20250929_111647.ts` only
+- Approved migration index: `workers/W01-payload/src/migrations/index.ts`
+- Approved migration blob SHA: `21e4a9ce27c828da655e479e35eb44ea3daff0f3`
+- Approved migration index blob SHA: `e596aeb65381fd3bb2e0cfa7879c8f850bb77cbe`
+
+Preconditions established before this admission:
+
+1. Controlled remote D1 evidence shows the target is empty of non-internal application tables.
+2. The repository contains exactly one executable Payload baseline migration.
+3. The previously generated full-schema migration is not promoted and is outside this execution scope.
+4. The migration execution guard must validate this exact migration source/index and reject any additional migration source before remote execution.
+5. Post-execution migration-history and schema evidence is mandatory.
+
+This admission authorizes execution of the approved baseline only. It does not authorize the generated full-schema artifact, an additive User-profile migration, `auth_session_state`, or any other migration.
+
+The existing post-execution evidence workflow remains required. No Mapping/Contract status is promoted merely by executing this migration.
