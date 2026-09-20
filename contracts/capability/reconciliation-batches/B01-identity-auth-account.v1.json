@@ -655,10 +655,10 @@
     },
     {
       "id": "B01-CONFLICT-003",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "type": "API_CANONICAL_PATH",
-      "description": "Existing auth policy uses /auth/* paths while the broader B01 acceptance criteria reference canonical /v1/auth/* and /v1/me/* surfaces.",
-      "requiredAction": "Resolve through API reconciliation/Change Control; do not silently declare one path canonical."
+      "description": "The apparent /auth/* versus /v1/* conflict is a representation-layer difference: OpenAPI declares server base /api/v1 and operation-relative paths such as /auth/*; the API alignment inventory canonicalizes those paths to /v1/* while retaining openapiPath separately.",
+      "requiredAction": "Reconciliation verified by existing API contract CI/alignment normalization rules; do not duplicate the server base in operation paths."
     }
   ],
   "batchExit": {
