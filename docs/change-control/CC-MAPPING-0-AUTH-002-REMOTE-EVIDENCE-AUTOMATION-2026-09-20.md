@@ -51,3 +51,7 @@ The manifest must bind the evidence to the exact tested GitHub SHA and locked Pa
 
 A successful evidence capture does not itself authorize migration promotion. The evidence must be reviewed against the AUTH-002 baseline contract before any migration decision.
 
+
+## Repository evidence persistence
+
+For the one-shot push-triggered run only, the workflow may use `contents: write` to persist the validated read-only evidence package under `artifacts/evidence/auth-002/` and remove the trigger marker. This repository write is evidence persistence only; it does not grant D1 mutation authority.
