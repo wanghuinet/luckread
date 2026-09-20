@@ -1,0 +1,223 @@
+name: AUTH-002 Session Schema Evidence (Rebound)
+
+on:
+  workflow_dispatch:
+    inputs:
+      database_name:
+        description: 'Controlled D1 database name used only for evidence capture'
+        required: true
+        default: luckread
+        type: string
+      environment_class:
+        description: 'Evidence environment; must be a controlled environment'
+        required: true
+        default: CONTROLLED_REMOTE_D1
+        type: choice
+        options:
+          - CONTROLLED_REMOTE_D1
+
+permissions:
+  contents: write
+
+env:
+  WRANGLER_VERSION: 4.33.1
+  W01_WRANGLER_CONFIG: workers/W01-payload/wrangler.jsonc
+
+jobs:
+  schema-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.34.5 --activate
+
+      - name: Install W01 locked dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-workspace
+
+      - name: Validate Gate-1 capture preconditions
+        run: node scripts/auth-session-schema-evidence-probe.mjs --gate1
+
+      - name: Require controlled remote evidence target
+        env:
+          EVIDENCE_ENVIRONMENT: ${{ github.event.inputs.environment_class || 'CONTROLLED_REMOTE_D1' }}
+          DATABASE_NAME: ${{ github.event.inputs.database_name || 'luckread' }}
+        run: |
+          set -euo pipefail
+          test "$EVIDENCE_ENVIRONMENT" = "CONTROLLED_REMOTE_D1"
+          test -n "$DATABASE_NAME"
+          printf '%s' "$DATABASE_NAME" | grep -Eq '^[A-Za-z0-9_-]{1,64}$'
+
+      - name: Capture remote D1 migration evidence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_NAME: ${{ github.event.inputs.database_name || 'luckread' }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/evidence/auth-002
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -f "$W01_WRANGLER_CONFIG"
+
+          set +e
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 migrations list "$DATABASE_NAME" --remote --config "$W01_WRANGLER_CONFIG" > artifacts/evidence/auth-002/migration-status.txt 2>&1
+          migration_exit=$?
+          set -e
+
+          MIGRATION_EXIT_CODE="$migration_exit" DATABASE_NAME="$DATABASE_NAME" WRANGLER_VERSION="$WRANGLER_VERSION" node -e '
+            const fs = require("node:fs");
+            const output = fs.readFileSync("artifacts/evidence/auth-002/migration-status.txt", "utf8");
+            fs.writeFileSync(
+              "artifacts/evidence/auth-002/migration-status.json",
+              JSON.stringify({
+                databaseName: process.env.DATABASE_NAME,
+                command: `wrangler@${process.env.WRANGLER_VERSION} d1 migrations list <database> --remote --config workers/W01-payload/wrangler.jsonc`,
+                exitCode: Number(process.env.MIGRATION_EXIT_CODE),
+                output
+              }, null, 2) + "\n"
+            );
+          '
+          rm -f artifacts/evidence/auth-002/migration-status.txt
+          test "$migration_exit" -eq 0
+
+      - name: Capture remote D1 catalog evidence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_NAME: ${{ github.event.inputs.database_name || 'luckread' }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/evidence/auth-002
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -f "$W01_WRANGLER_CONFIG"
+
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 info "$DATABASE_NAME" --json --config "$W01_WRANGLER_CONFIG" > artifacts/evidence/auth-002/d1-info.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
+            --command 'SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE type IN ("table","index","trigger") ORDER BY type,name;' \
+            > artifacts/evidence/auth-002/catalog.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
+            --command 'PRAGMA table_info("users");' \
+            > artifacts/evidence/auth-002/users-schema.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
+            --command 'PRAGMA index_list("users");' \
+            > artifacts/evidence/auth-002/users-indexes.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
+            --command 'PRAGMA foreign_key_list("users");' \
+            > artifacts/evidence/auth-002/users-foreign-keys.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
+            --command 'PRAGMA table_info("auth_session_state");' \
+            > artifacts/evidence/auth-002/auth-session-state-schema.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
+            --command 'PRAGMA index_list("auth_session_state");' \
+            > artifacts/evidence/auth-002/auth-session-state-indexes.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG" \
+            --command 'PRAGMA foreign_key_list("auth_session_state");' \
+            > artifacts/evidence/auth-002/auth-session-state-foreign-keys.json
+
+      - name: Build reproducible evidence provenance
+        env:
+          DATABASE_NAME: ${{ github.event.inputs.database_name || 'luckread' }}
+          EVIDENCE_ENVIRONMENT: ${{ github.event.inputs.environment_class || 'CONTROLLED_REMOTE_D1' }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const provenance = {
+            repository: process.env.GITHUB_REPOSITORY,
+            workflow: process.env.GITHUB_WORKFLOW,
+            workflowRef: process.env.GITHUB_WORKFLOW_REF,
+            workflowSha: process.env.GITHUB_SHA,
+            runId: Number(process.env.GITHUB_RUN_ID),
+            runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            eventName: process.env.GITHUB_EVENT_NAME,
+            databaseName: process.env.DATABASE_NAME,
+            environmentClass: process.env.EVIDENCE_ENVIRONMENT,
+          };
+          fs.mkdirSync('artifacts/evidence/auth-002', { recursive: true });
+          fs.writeFileSync('artifacts/evidence/auth-002/provenance.json', `${JSON.stringify(provenance, null, 2)}\n`);
+          NODE
+
+      - name: Build reproducible evidence manifest
+        env:
+          DATABASE_NAME: ${{ github.event.inputs.database_name || 'luckread' }}
+          EVIDENCE_ENVIRONMENT: ${{ github.event.inputs.environment_class || 'CONTROLLED_REMOTE_D1' }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+          const { execFileSync } = require('node:child_process');
+
+          const dir = 'artifacts/evidence/auth-002';
+          const evidenceFiles = [
+            'd1-info.json',
+            'migration-status.json',
+            'catalog.json',
+            'users-schema.json',
+            'users-indexes.json',
+            'users-foreign-keys.json',
+            'auth-session-state-schema.json',
+            'auth-session-state-indexes.json',
+            'auth-session-state-foreign-keys.json',
+            'provenance.json',
+          ];
+          const sha256 = (file) => crypto.createHash('sha256').update(fs.readFileSync(`${dir}/${file}`)).digest('hex');
+          const pkg = JSON.parse(fs.readFileSync('workers/W01-payload/package.json', 'utf8'));
+          const lockText = fs.readFileSync('workers/W01-payload/pnpm-lock.yaml', 'utf8');
+          const provenance = JSON.parse(fs.readFileSync(`${dir}/provenance.json`, 'utf8'));
+          const manifest = {
+            testedCommitSha: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+            environmentClass: process.env.EVIDENCE_ENVIRONMENT,
+            databaseName: process.env.DATABASE_NAME,
+            payloadVersion: pkg.dependencies?.payload ?? null,
+            payloadLockedVersion: /(?:^|\n)      payload:\s*\n        specifier:\s*[^\n]+\n        version:\s*([^\n]+)/m.exec(lockText)?.[1] ?? null,
+            d1AdapterVersion: pkg.dependencies?.['@payloadcms/db-d1-sqlite'] ?? null,
+            d1AdapterLockedVersion: /(?:^|\n)      ['"]?@payloadcms\/db-d1-sqlite['"]?:\s*\n        specifier:\s*[^\n]+\n        version:\s*([^\n]+)/m.exec(lockText)?.[1] ?? null,
+            nodeVersion: process.version,
+            wranglerVersion: process.env.WRANGLER_VERSION,
+            executedAt: new Date().toISOString(),
+            provenance,
+            evidenceFiles: Object.fromEntries(evidenceFiles.map((file) => [file, sha256(file)])),
+          };
+          if (manifest.testedCommitSha !== process.env.GITHUB_SHA) throw new Error('GitHub SHA mismatch');
+          if (provenance.workflowSha !== process.env.GITHUB_SHA) throw new Error('provenance workflow SHA mismatch');
+          if (manifest.payloadVersion !== '3.87.1' || manifest.payloadLockedVersion !== '3.87.1') throw new Error('Payload dependency lock mismatch');
+          if (manifest.d1AdapterVersion !== '3.87.1' || manifest.d1AdapterLockedVersion !== '3.87.1') throw new Error('D1 adapter dependency lock mismatch');
+          fs.writeFileSync(`${dir}/manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+          NODE
+
+      - name: Validate evidence package
+        run: node scripts/auth-session-schema-evidence-validate.mjs
+
+      - name: Persist validated evidence package to repository
+        if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add artifacts/evidence/auth-002/
+          git rm -f artifacts/mapping-0/AUTH-002-REMOTE-CAPTURE-REQUEST.txt
+          git commit -m 'evidence(auth-002): persist validated remote D1 schema evidence'
+          git -c http.extraheader="AUTHORIZATION: bearer $GH_TOKEN" push origin HEAD:main
+
+      - name: Upload schema evidence artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-002-schema-evidence-${{ github.run_id }}
+          path: artifacts/evidence/auth-002/
+          if-no-files-found: error
+          retention-days: 14
