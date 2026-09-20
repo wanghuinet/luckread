@@ -24,8 +24,9 @@
     },
     {
       "id": "CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19",
-      "state": "DECIDED_RECONCILIATION_PENDING",
-      "decision": "Canonical AUTH-003 set is authCredentialList/authCredentialAdd/authCredentialReplace/authCredentialRemove."
+      "state": "TODO_FIX",
+      "decision": "Canonical AUTH-003 set is authCredentialList/authCredentialAdd/authCredentialReplace/authCredentialRemove.",
+      "note": "Canonical operation set is accepted and source vocabulary is fixed; dependent OpenAPI/DTO admission remains blocked by exact wire-schema prerequisites."
     },
     {
       "id": "CC-MAPPING-0-AUTH-006-ALIAS-AND-DOMAIN-CONFLICT-2026-09-19",
