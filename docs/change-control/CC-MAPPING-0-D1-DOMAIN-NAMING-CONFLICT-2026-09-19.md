@@ -2,7 +2,7 @@
 
 ## Status
 
-DECIDED — RECONCILIATION PENDING
+CLOSED — RECONCILIATION VERIFIED
 
 ## Scope
 
@@ -64,3 +64,12 @@ Future conversations must treat this as one already-registered cross-feature nam
 ## Decision accepted — 2026-09-20
 
 Decision 6 accepted: D01 Core is the canonical logical domain label for AUTH-006/AUTH-013/AUTH-015 reconciliation; no physical D1 schema is inferred.
+
+## Reconciliation verified — 2026-09-20
+
+Applied to the affected source reconciliation surfaces:
+- B01 cross-cutting conflict `B01-CONFLICT-001` marked `RESOLVED`.
+- AUTH-013 D1 naming narrative reconciled; remaining Worker/API/DTO/persistence/runtime/evidence blockers retained.
+- AUTH-015 D1 naming narrative reconciled; remaining deletion/API/persistence/runtime/evidence blockers retained.
+
+No physical D1 identifier, table, migration, Worker assignment, or runtime status was changed.
