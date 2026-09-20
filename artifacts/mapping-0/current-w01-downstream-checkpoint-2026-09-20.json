@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "9ec383f2402e062e132c1ea1a478f89e69c79cf5",
+  "sourceHead": "82c5add35ce84de5bdc23df15f908fbc7e2375b5",
   "checkpointDate": "2026-09-20",
   "checks": {
     "Payload Implementation Admission": {
@@ -38,7 +38,7 @@
     "executionMode": "read-only evidence capture; no migration apply command"
   },
   "currentState": "BLOCKED_EXTERNAL",
-  "nextAction": "Proceed through the existing migration Change Control only: establish/confirm the authoritative W01 baseline strategy, regenerate an accepted non-duplicating migration if required, and obtain separate controlled execution admission/evidence. Do not mutate D1 from the evidence workflow.",
+  "nextAction": "Manual controlled execution of the already-admitted 20250929_111647 baseline, followed by fresh post-migration evidence review. Do not execute via the read-only evidence workflow.",
   "currentHeadAudit": {
     "migrationGenerationAdmission": "PASS_VERIFIED",
     "migrationStaticAudit": "PASS_VERIFIED",
