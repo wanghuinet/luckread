@@ -3,7 +3,7 @@
 - ID: CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19
 - Date: 2026-09-19
 - Scope: Canonical Mapping status semantics
-- Status: DECIDED — RECONCILIATION PENDING
+- Status: CLOSED — RECONCILIATION VERIFIED
 
 ## Finding
 
@@ -34,6 +34,6 @@ A future status-classification decision must explicitly define the canonical pre
 Decision 1 accepted: MISSING means zero valid mapping-bearing edges; PARTIAL means one or more valid mapping-bearing edges exist while downstream closure remains incomplete.
 
 
-## Reconciliation verified — 2026-09-20
+## Closure — 2026-09-20
 
 Decision 1 is reflected in the current Canonical Mapping: AUTH-006 is `PARTIAL`, not `MISSING`, because valid API and Entity mapping-bearing edges are present while downstream closure remains incomplete. No implementation or Evidence Registry status is promoted.
