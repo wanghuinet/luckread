@@ -57,7 +57,7 @@
     "No business implementation is inferred from Mapping 0 structural acceptance.",
     "Unchanged validation results are inherited across evidence-only documentation commits."
   ],
-  "currentHeadBaseline": "ce7d092587a9e28578f156f0a6790793720148dd",
+  "currentHeadBaseline": "5abea0fa25a0a06f493a4e72967bccd54a942c7f",
   "reconciledControls": [
     {
       "id": "CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19",
@@ -106,10 +106,10 @@
   "nextObjective": "Continue fail-closed technical closure. AUTH-002 remote baseline execution is deferred by user; AUTH-003 wire-schema authority remains unresolved. Already verified Change Controls are not to be re-opened.",
   "cursorUpdate": {
     "updatedAt": "2026-09-20",
-    "reason": "Recorded verified Mapping 0 Structural Gate evidence without promoting feature closure.",
-    "latestEvidence": "M0-STRUCTURAL-GATE-EVIDENCE-2026-09-20",
-    "testedCommit": "7023892ecf1eeae9b66a10d20e946ec99622a172",
-    "workflowRunId": 35492168719,
-    "reuseRule": "Structural fact may be inherited across documentation-only commits unless structural inputs change."
+    "reason": "Captured real downstream Contract CI boundary evidence; no feature promotion.",
+    "latestEvidence": "M0-CURRENT-DOWNSTREAM-GATE-EVIDENCE-2026-09-20",
+    "sourceCommit": "ce7d092587a9e28578f156f0a6790793720148dd",
+    "contractCiRunId": 35492243047,
+    "replayRule": "Reuse downstream gate result until Feature/Entity/Persistence/Evidence inputs change."
   }
 }
