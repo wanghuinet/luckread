@@ -23,6 +23,7 @@ const data = {
   key,
   value: { probe: key, sequence: 1 },
 }
+const where = { key: { equals: key } }
 
 const result = {
   version: '1.0.0',
@@ -46,19 +47,20 @@ const result = {
 }
 
 let payload
-let where
 try {
   const { default: config } = await import('../workers/W01-payload/src/payload.config.ts')
   payload = await getPayload({ config, key: `e45-${runId}` })
 
   result.adapterUpsertAliasesUpdateOne = payload.db.upsert === payload.db.updateOne
 
-  where = { key: { equals: key } }
-
   let upsertError = null
   let upsertResult = null
   try {
-    upsertResult = await payload.db.upsert({ collection: 'payload-preferences', data, where })
+    upsertResult = await payload.db.upsert({
+      collection: 'payload-preferences',
+      data,
+      where,
+    })
   } catch (error) {
     upsertError = error instanceof Error ? error.message : String(error)
   }
@@ -95,30 +97,11 @@ try {
   }
 } catch (error) {
   result.error = `setup: ${error instanceof Error ? error.message : String(error)}`.slice(0, 300)
-} finally {
-  // No auxiliary identity is required for this adapter-only probe.
-}
-  if (payload && createdUserId !== null) {
-    try {
-      await payload.db.deleteOne({ collection: 'users', id: createdUserId })
-      const afterUserCleanup = await payload.db.findOne({
-        collection: 'users',
-        where: { id: { equals: createdUserId } },
-      })
-      if (afterUserCleanup) {
-        result.cleanedUp = false
-        result.error = result.error || 'cleanup user: synthetic user still exists'
-      }
-    } catch (error) {
-      result.cleanedUp = false
-      result.error = result.error || `cleanup user: ${error instanceof Error ? error.message : String(error)}`.slice(0, 300)
-    }
-  }
 }
 
 writeFileSync(
   `${outDir}/adapter-regression.json`,
-  JSON.stringify(result, null, 2) + '\n',
+  JSON.stringify(result, null, 2) + '\\n',
 )
 
 console.log(JSON.stringify(result, null, 2))
