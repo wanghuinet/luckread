@@ -521,7 +521,7 @@
       "d1Domain": "D01 Core",
       "testRefs": [],
       "evidenceRefs": [],
-      "reconciliationState": "CONFLICT",
+      "reconciliationState": "PARTIAL",
       "blockers": [
         "worker ownership and evidence mapping incomplete"
       ]
