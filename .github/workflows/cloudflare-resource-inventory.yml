@@ -1,0 +1,109 @@
+name: Cloudflare Resource Inventory
+
+on:
+  push:
+    paths:
+      - ".github/workflows/cloudflare-resource-inventory.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    name: Read-only Cloudflare D1 and Worker inventory
+    runs-on: ubuntu-latest
+    env:
+      CF_API_BASE: https://api.cloudflare.com/client/v4
+      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCOUNT_ID"
+          test -n "$CF_API_TOKEN"
+
+      - name: Collect read-only Cloudflare inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          auth_header=(-H "Authorization: Bearer $CF_API_TOKEN")
+          json_header=(-H "Content-Type: application/json")
+
+          mkdir -p artifacts
+
+          page=1
+          per_page=100
+          d1_pages=()
+          while :; do
+            body="$(curl -fsS --retry 3 --retry-all-errors               "${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/d1/database?page=${page}&per_page=${per_page}"               "${auth_header[@]}" "${json_header[@]}")"
+            d1_pages+=("$body")
+            total="$(jq -r '.result_info.total_count // (.result | length)' <<<"$body")"
+            (( page * per_page >= total )) && break
+            ((page++))
+          done
+
+          page=1
+          worker_pages=()
+          while :; do
+            body="$(curl -fsS --retry 3 --retry-all-errors               "${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts?page=${page}&per_page=${per_page}"               "${auth_header[@]}" "${json_header[@]}")"
+            worker_pages+=("$body")
+            total="$(jq -r '.result_info.total_count // (.result | length)' <<<"$body")"
+            (( page * per_page >= total )) && break
+            ((page++))
+          done
+
+          {
+            jq -s '{
+              inventoryType: "cloudflare-account-read-only",
+              d1: (
+                map(.result // []) | add |
+                map({
+                  name,
+                  uuid: (.uuid // .id // null),
+                  created_at: (.created_at // null),
+                  jurisdiction: (.jurisdiction // null)
+                })
+              )
+            }' <<<"${d1_pages[@]}" > /tmp/d1.json
+
+            jq -s '{
+              workers: (
+                map(.result // []) | add |
+                map({
+                  id: (.id // null),
+                  created_on: (.created_on // null),
+                  modified_on: (.modified_on // null),
+                  compatibility_date: (.compatibility_date // null)
+                })
+              )
+            }' <<<"${worker_pages[@]}" > /tmp/workers.json
+
+            jq -n               --arg accountId "$CF_ACCOUNT_ID"               --slurpfile d1 /tmp/d1.json               --slurpfile workers /tmp/workers.json               '{
+                schemaVersion: 1,
+                source: "Cloudflare API read-only inventory",
+                accountId: $accountId,
+                d1: $d1[0].d1,
+                workers: $workers[0].workers,
+                counts: {
+                  d1: ($d1[0].d1 | length),
+                  workers: ($workers[0].workers | length)
+                }
+              }'
+          } > artifacts/cloudflare-resource-inventory.json
+
+          # Emit only sanitized inventory metadata; never echo the API token.
+          jq '{schemaVersion,source,counts,d1:[.d1[]|{name,uuid,created_at,jurisdiction}],workers:[.workers[]|{id,created_on,modified_on,compatibility_date}]}'             artifacts/cloudflare-resource-inventory.json             > artifacts/cloudflare-resource-inventory-sanitized.json
+
+          jq . artifacts/cloudflare-resource-inventory-sanitized.json
+
+      - name: Publish inventory artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-resource-inventory
+          path: artifacts/cloudflare-resource-inventory-sanitized.json
+          if-no-files-found: error
