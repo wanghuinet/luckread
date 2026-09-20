@@ -77,22 +77,22 @@ export const authSessionStateSchemaHook: SQLiteSchemaHook = (args) => {
       userIdIdx: {
         name: 'auth_session_state_user_id_idx',
         unique: false,
-        on: ['user_id'],
+        on: ['userId'],
       },
       deviceIdIdx: {
         name: 'auth_session_state_device_id_idx',
         unique: false,
-        on: ['device_id'],
+        on: ['deviceId'],
       },
       tokenVersionIdx: {
         name: 'auth_session_state_token_version_idx',
         unique: false,
-        on: ['token_version'],
+        on: ['tokenVersion'],
       },
       revokedAtIdx: {
         name: 'auth_session_state_revoked_at_idx',
         unique: false,
-        on: ['revoked_at'],
+        on: ['revokedAt'],
       },
     },
   }
