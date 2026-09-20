@@ -83,7 +83,7 @@ These figures are explicitly historical until a new mapping-status snapshot is g
 
 ## Continuation cursor
 
-Current structural handoff baseline: `9cdc9d4fb81d929dbd1911ac00be0c3c3769184d`.
+Current structural handoff baseline: `9cdc9d4fb81d929dbd1911ac00be0c3c3769184d` (inherited; no structural-input change).
 Primary task:
 - `M0-STRUCTURAL-HANDOFF-FINAL-ACCEPTANCE-01` = `PASS_VERIFIED`
 
@@ -98,6 +98,8 @@ The intervening commits after the tested source head are reconciliation/evidence
 
 NEXT_ITEM_ID: `W01-MIGRATION-BASELINE-AUTHORITY-001`
 NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
+Latest repository main head for this continuation checkpoint: `cdaa95affc551278ca19b3c5827678bd09a9c7bf`.
+The W01 baseline execution workflow default is aligned to this head, but `remoteD1MigrationExecuted` remains false until a manual dispatch produces post-migration evidence.
 Objective: generate and statically audit the exact Payload migration required by the approved ENT-USER schema in active W01. Do not execute remote D1 migrations. Do not hand-author DDL.
 
 Generation evidence:
