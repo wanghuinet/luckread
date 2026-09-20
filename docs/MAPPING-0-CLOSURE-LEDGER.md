@@ -595,3 +595,23 @@ AUTH-010 is contract-frozen with an explicit canonical OpenAPI patch, but its ow
 User-directed deferral:
 - `W01-MIGRATION-BASELINE-AUTHORITY-001` / AUTH-002 remains externally blocked and is intentionally deferred for this continuation pass.
 - No remote D1 operation is executed or simulated.
+
+
+## Superpowers continuation audit — resolved D1 domain naming reconciliation — 2026-09-20
+
+Current source head at completion: `15ad396a532cdb203b6e208457291ab6da6c49ee`.
+
+Reconciled under the already accepted Decision 6 / `CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19`:
+- B01 `B01-CONFLICT-001`: `RESOLVED`, canonical logical domain = `D01 Core`.
+- AUTH-006 B01 `d1Domain`: `D01 Core`.
+- AUTH-013: D1 naming blocker removed; remaining Worker ownership/evidence blocker retained.
+- AUTH-015: D1 naming conflict removed; reconciliation state reduced from `CONFLICT` to `PARTIAL`; deletion/anonymization migration evidence blocker retained.
+- Change Control status: `CLOSED — RECONCILIATION VERIFIED`.
+
+Safety boundary:
+- This was logical-domain reconciliation only.
+- No physical D1 database/table/column/migration was changed.
+- No Worker ownership was inferred.
+- No runtime, persistence, security, test or Evidence Registry status was promoted.
+
+The global B04-B20 edge sweep remains `NO NEW EDGE`; AUTH-002 remains deferred by user as `BLOCKED_EXTERNAL`.
