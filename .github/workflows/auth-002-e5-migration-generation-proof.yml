@@ -42,4 +42,5 @@ jobs:
           name: auth-002-e5-migration-generation-proof-${{ github.run_id }}
           path: artifacts/evidence/auth-002/e5-generation/
           if-no-files-found: error
+          if: always()
           retention-days: 14
