@@ -1,0 +1,61 @@
+name: W01 D1 Adapter Regression E4.5
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 24
+  PNPM_VERSION: 10.34.5
+  WRANGLER_VERSION: 4.116.0
+
+jobs:
+  e4-5:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+
+      - name: Install W01 locked dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-workspace
+
+      - name: Validate W01 package pins
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          node -e 'const p=require("./package.json"); if(p.dependencies.payload!=="3.87.1") process.exit(1); if(p.dependencies["@payloadcms/db-d1-sqlite"]!=="3.87.1") process.exit(1); if(p.devDependencies.wrangler!=="~4.116.0") process.exit(1)'
+
+      - name: Run E4.5 controlled remote regression probe
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -uo pipefail
+          mkdir -p artifacts/evidence/auth-002/adapter-regression
+          set +e
+          pnpm --dir workers/W01-payload exec tsx ../../scripts/w01-d1-adapter-regression-probe.mjs
+          rc=$?
+          set -e
+          echo "E4_5_EXIT_CODE=$rc"
+          exit $rc
+
+      - name: Upload E4.5 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-002-e4-5-adapter-regression-${{ github.run_id }}
+          path: artifacts/evidence/auth-002/adapter-regression/
+          if-no-files-found: error
+          retention-days: 14
