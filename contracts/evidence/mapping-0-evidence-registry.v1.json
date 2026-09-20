@@ -179,6 +179,38 @@
       "status": "CREATED",
       "validUntil": "2026-09-17T00:00:00.000Z",
       "note": "No W01 runtime implementation; batch doc BLOCKED_NOT_GREEN. Implementation not admitted until Mapping-0 GREEN per B18 section 9."
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B09-SCHEMA-REMOTE-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-002::D1-SCHEMA",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "GitHub Actions W01 Baseline Migration Execution against controlled Cloudflare D1",
+      "sourceRef": "artifacts/evidence/auth-002-remote-baseline/run-35508571153.json",
+      "commitSha": "313dddc911a82ab58ca5063be9d24a86b509fd84",
+      "timestamp": "2026-09-20T11:43:18Z",
+      "producer": "Wrangler D1 remote read-only schema capture",
+      "result": "PASS",
+      "status": "CREATED",
+      "validUntil": "2026-09-20T00:00:00Z",
+      "note": "Controlled remote D1 luckread captured after approved baseline migration. D1 info reports 8 tables; application tables are media, payload_locked_documents, payload_locked_documents_rels, payload_migrations, payload_preferences, payload_preferences_rels, users, users_sessions. Users physical schema captured with 10 columns. Evidence artifact is GitHub Actions run 35508571153, artifact 10604388551. No evidence-query writes occurred."
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B10-MIGRATION-REMOTE-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-002::MIGRATION",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "Payload 3.87.1 migration execution on controlled Cloudflare D1",
+      "sourceRef": "artifacts/evidence/auth-002-remote-baseline/run-35508571153.json",
+      "commitSha": "313dddc911a82ab58ca5063be9d24a86b509fd84",
+      "timestamp": "2026-09-20T11:43:02Z",
+      "producer": "pnpm exec payload migrate with remote binding",
+      "result": "PASS",
+      "status": "CREATED",
+      "validUntil": "2026-09-20T00:00:00Z",
+      "note": "Migration 20250929_111647 completed successfully after remote connection establishment. Remote payload_migrations contains id=1, name=20250929_111647, batch=1. The pre-migration application-table check returned zero; post-migration schema and migration queries succeeded against the controlled remote target."
     }
   ]
 }
