@@ -114,8 +114,8 @@
     "updatedAt": "2026-09-20",
     "reason": "Fresh current-main Structural Gate evidence recorded and synchronized into the closure ledger.",
     "latestStructuralEvidence": {
-      "workflowRunId": 35492431437,
-      "testedCommit": "6dd714c5e26e4b6672d222355aacc9dd40d8b19b",
+      "workflowRunId": 35492578135,
+      "testedCommit": "2b475f7991f82c25a715e091f46049edd7d4852c",
       "status": "GREEN",
       "canonicalFeatureCount": 449,
       "mappingRecordCount": 449,
