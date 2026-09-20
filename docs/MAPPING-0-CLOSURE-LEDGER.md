@@ -818,3 +818,29 @@ Verified outputs:
 This supersedes the older Structural Gate test commit in the current evidence artifact. It still does not promote feature-level or runtime closure.
 
 Anti-loop disposition: this exact Structural Gate fact can now be inherited for later documentation-only commits until structural inputs change; do not re-run identical checks merely because HEAD advances through evidence/ledger-only commits.
+
+## Superpowers continuation audit — B01 Worker ownership reconciliation closure — 2026-09-20
+
+Source main baseline at audit: `8ccd9f281987a1bb61d98f9630955583ac82ad7b`.
+
+Resolved:
+- `B01-CONFLICT-002 / WORKER_OWNERSHIP = RESOLVED`.
+- Current `docs/04-WORKER-MASTER-v1.0.md` is explicitly `ACTIVE / CANONICAL WORKER MASTER` and freezes exactly 12 Workers / 4 D1 domains / 25 Contract Tasks.
+- The current Worker Master explicitly classifies historical Worker models, including the historical W01-W13 topology, as historical evidence only.
+- `docs/03-WORKER-BINDING-MAPPING-v1.0.md` is explicitly `ACTIVE / CANONICAL` and confirms W01 as the public API boundary with no direct authoritative D1 authority, while W02 owns D1-01 identity/account/authorization.
+- `docs/02-FINAL-MAPPING-v1.0.md` independently resolves identity/account ownership to T01/W02/D1-01 and API platform boundary to T24/W01.
+
+Evidence artifact:
+`artifacts/mapping-0/b01-worker-ownership-reconciliation-audit-2026-09-20.json`.
+
+Acceptance:
+- No Worker/D1 topology changed.
+- No historical document was deleted or rewritten.
+- No Feature→Worker mapping was newly inferred.
+- No Mapping-0 feature status was promoted.
+- No implementation authorization was granted.
+
+Anti-loop:
+- Do not reopen `B01-CONFLICT-002` unless the canonical Worker Master or canonical Worker × D1 Binding Mapping changes.
+- The remaining cross-cutting B01 authority issue is now empty; AUTH-003 wire-schema authority remains unresolved and AUTH-002 remains user-deferred / BLOCKED_EXTERNAL.
+\n
