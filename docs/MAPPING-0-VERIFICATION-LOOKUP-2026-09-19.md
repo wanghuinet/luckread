@@ -194,9 +194,13 @@ Do not reopen either finding unless the underlying authoritative inputs change.
 
 Current OPEN governance decisions are consolidated in `artifacts/mapping-0/current-change-control-decision-queue-2026-09-19.json`. The queue currently contains 8 OPEN controls and 2 scoped CLOSED controls. Consult this queue before creating a new Mapping 0 finding.
 
-## 18. USER-001/USER-006 blocker precision audit
+## 18. USER-001/USER-006 blocker precision audit — CLOSED
 
-The evidence-bound USER delta is present on current `main`. USER-001 already has explicit API/Entity edges, so its historical B02 blocker wording is stale and is tracked by `docs/change-control/CC-MAPPING-0-USER-001-006-BLOCKER-PRECISION-2026-09-19.md`. USER-006 has explicit API/policy evidence but still lacks feature-bound Entity/Field and downstream executable closure. See `artifacts/mapping-0/user-001-006-blocker-precision-audit-2026-09-19.json`. No Feature status was promoted.
+The evidence-bound USER delta is present on current `main`. USER-001 has explicit API/Entity edges, and USER-006 has explicit API/policy edges while retaining unresolved feature-bound Entity/Field and downstream executable closure.
+
+The blocker-text reconciliation control `CC-MAPPING-0-USER-001-006-BLOCKER-PRECISION-2026-09-19` is now `CLOSED — RECONCILIATION VERIFIED`. The authoritative B01-B03 source wording was refined in commit `42a98bb568adf0ebbe3410b19fef616019351a32`; the closure changes only governance wording state and does not promote Feature status or invent DTO/Persistence/Payload/Code/Security/Lifecycle/Test/Evidence edges.
+
+See `artifacts/mapping-0/user-001-006-blocker-precision-audit-2026-09-19.json` for the original audit record. No Feature status was promoted.
 
 ## 19. Current-HEAD API/Entity edge freshness audits
 
