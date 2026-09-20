@@ -1,0 +1,70 @@
+{
+  "version": "5.0.0",
+  "evidenceType": "MAPPING_0_THIRD_LAYER_DOWNSTREAM_CLOSURE_CURSOR",
+  "generatedAt": "2026-09-20",
+  "repository": "wanghuinet/luckread",
+  "sourceHead": "db48aaca5ba8c818620966e3d07d73f510227f48",
+  "previousCursor": "artifacts/mapping-0/current-third-layer-downstream-closure-cursor-2026-09-20-v4.json",
+  "completedBatch": {
+    "id": "M0-AUTH-002-REMOTE-E45-002",
+    "result": "ADAPTER_REGRESSION_VERIFIED_PASS",
+    "workflowRunId": 35535570923,
+    "workflowJobId": 106143870080,
+    "testedCommitSha": "cd2f5a79321806ec81b0c261b3f8deb40e809b0e",
+    "evidenceArtifactId": 10612971115,
+    "evidenceManifest": "artifacts/evidence/auth-002/adapter-regression/run-35535570923.json",
+    "mappingEvidenceBoundFeature": "AUTH-002",
+    "validationMarker": "AUTH-002_E4_5_REMOTE_ADAPTER_REGRESSION_PASS"
+  },
+  "currentState": {
+    "canonicalMapping": {
+      "total": 449,
+      "status": "NOT_GREEN",
+      "partial": 17,
+      "unresolved": 431,
+      "missing": 1,
+      "missingFeature": "AUTH-007"
+    },
+    "fiveWay": "NOT_GREEN",
+    "r4": {
+      "total": 449,
+      "ready": 0,
+      "blocked": 449
+    },
+    "evidenceRegistry": "NOT_GREEN",
+    "auth002": {
+      "e4_5": "PASS_VERIFIED",
+      "e5": "WAIT_AUTHORITY_DECISION",
+      "overall": "NOT_GREEN",
+      "remainingRuntimeGaps": [
+        "GAP-07-01",
+        "GAP-07-02",
+        "GAP-07-03"
+      ]
+    }
+  },
+  "nextItem": {
+    "id": "M0-AUTH-002-E5-MIGRATION-SOURCE-AUTHORITY-001",
+    "state": "WAIT_AUTHORITY_DECISION",
+    "objective": "Admit a deterministic generation path for the contracted auth_session_state extension without hand-authored DDL or a second session authority.",
+    "audit": "artifacts/mapping-0/auth-002-e5-migration-source-authority-audit-2026-09-20.json",
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E5-MIGRATION-SOURCE-AUTHORITY-2026-09-20.md"
+  },
+  "governance": {
+    "contractChanges": 0,
+    "blueprintChanges": 0,
+    "architectureChanges": 0,
+    "payloadCoreChanges": 0,
+    "d1SchemaChanges": 0,
+    "remoteMigrationExecutedByThisBatch": false,
+    "evidenceRegistryChange": true,
+    "failedE45EvidencePreserved": true,
+    "e5AuthorityGapRecorded": true
+  },
+  "antiLoop": {
+    "structuralGateInherited": true,
+    "e45PassReusableUntilRelevantInputsChange": true,
+    "e5SourceGapFrozenUntilAuthorityOrSourceChanges": true,
+    "doNotAddDuplicateSessionAuthority": true
+  }
+}
