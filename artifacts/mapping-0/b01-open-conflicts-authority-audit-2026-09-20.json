@@ -1,0 +1,79 @@
+{
+  "version": "1.0",
+  "auditId": "M0-B01-OPEN-CONFLICTS-AUTHORITY-AUDIT-2026-09-20",
+  "sourceHead": "4e6dc135ee08d8ff3faf25b151b0f7848c7346ed",
+  "featureBatch": "B01 Identity/Auth/Account",
+  "noInference": true,
+  "purpose": "Determine whether the two remaining B01 cross-cutting conflicts can be closed from existing canonical authority without a new decision.",
+  "conflicts": [
+    {
+      "id": "B01-CONFLICT-002",
+      "type": "WORKER_OWNERSHIP",
+      "currentState": "OPEN",
+      "authoritativeCurrentWorkerSources": [
+        {
+          "path": "docs/04-WORKER-MASTER-v1.0.md",
+          "finding": "W01 is Public API/Gateway boundary; W02 is Identity/Account/Authorization."
+        },
+        {
+          "path": "docs/03-WORKER-BINDING-MAPPING-v1.0.md",
+          "finding": "W01 has no direct authoritative D1 authority; W02 owns D1-01 identity/account/authorization."
+        },
+        {
+          "path": "docs/02-FINAL-MAPPING-v1.0.md",
+          "finding": "Identity/account maps to T01/W02/D1-01 and API boundary maps to T24/W01."
+        }
+      ],
+      "conflictingRepositorySources": [
+        {
+          "path": "docs/300-ARCHITECTURE-BASELINE-WORKER-D1-R2-CACHE-MAP-v1.0.md",
+          "finding": "Claims a W00-W08 canonical logical-domain model with W00 Payload Core, W01 API/BFF, W02 Media, and older D1 ownership semantics."
+        },
+        {
+          "path": "contracts/resource-budget/edge-first-worker-topology.json",
+          "finding": "Contains a separate W01-W13 logical-worker topology that conflicts with the frozen 12-worker Worker Master."
+        }
+      ],
+      "disposition": "AUTHORITY_RECONCILIATION_REQUIRED",
+      "reason": "The repository contains explicit competing worker topology authorities. Current canonical Worker Master is clear for W01/W02, but the conflicting documents still declare authoritative/locked status. Their authority cannot be downgraded or rewritten by inference.",
+      "mapping0Effect": "NONE"
+    },
+    {
+      "id": "B01-CONFLICT-003",
+      "type": "API_CANONICAL_PATH",
+      "currentState": "OPEN",
+      "observedLayers": [
+        {
+          "source": "contracts/api/auth-operation-policy.v1.json",
+          "representation": "/auth/*"
+        },
+        {
+          "source": "contracts/openapi/v1/openapi.yaml",
+          "representation": "server=/api/v1 plus paths=/auth/* and /users/*"
+        },
+        {
+          "source": "contracts/api/api-inventory.v1.json",
+          "representation": "/v1/auth/* and /v1/users/*"
+        },
+        {
+          "source": "docs/batches/01-FOUNDATION-IDENTITY-IMPLEMENTATION-PLAN-v1.0.md",
+          "representation": "canonical public /v1/auth/* and /v1/me/*"
+        }
+      ],
+      "disposition": "AUTHORITY_RECONCILIATION_REQUIRED",
+      "reason": "The observed forms may represent different transport/base-path layers, but the repository does not contain an explicit canonical normalization rule that permits selecting one representation for Mapping-0 by inference.",
+      "mapping0Effect": "NONE"
+    }
+  ],
+  "requiredAuthority": {
+    "B01-CONFLICT-002": "Explicit Change Control must identify which worker topology source is canonical and reconcile or formally classify competing topology documents before new feature-level worker assignments.",
+    "B01-CONFLICT-003": "Explicit API Change Control must define canonical public method/path representation versus OpenAPI server/base-path representation and reconcile API Inventory, OpenAPI, operation policy and affected mapping."
+  },
+  "prohibitions": [
+    "Do not assign new Feature→Worker edges from route or directory names.",
+    "Do not silently rename /auth/* to /v1/auth/* or vice versa.",
+    "Do not delete or rewrite competing historical/canonical documents without authority decision.",
+    "Do not promote Mapping-0 status from this audit."
+  ],
+  "implementationAuthorization": false
+}
