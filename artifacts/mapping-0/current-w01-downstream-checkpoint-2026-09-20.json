@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "82c5add35ce84de5bdc23df15f908fbc7e2375b5",
+  "sourceHead": "f31e8bc691298995e2732cb1012c794a1e6897e2",
   "checkpointDate": "2026-09-20",
   "checks": {
     "Payload Implementation Admission": {
@@ -49,7 +49,8 @@
     "remoteD1MigrationExecuted": false,
     "remoteEvidencePushPath": "PASS_VERIFIED",
     "executionAdmission": "PASS_VERIFIED",
-    "executionWorkflowPath": "PASS_VERIFIED"
+    "executionWorkflowPath": "PASS_VERIFIED",
+    "workflowDefaultSourceHead": "f31e8bc691298995e2732cb1012c794a1e6897e2"
   },
   "remoteEvidenceCapture": {
     "workflowRunId": 35484344942,
