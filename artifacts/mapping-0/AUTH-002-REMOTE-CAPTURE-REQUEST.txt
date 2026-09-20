@@ -18,3 +18,4 @@ Re-armed for third-layer downstream closure on 2026-09-20; this marker change is
 Re-armed after validator state-separation fix at commit 924a2e3530b298e932d7e35e509f7899d24dffdc.
 Re-armed after validator declaration-order fix at commit 3983cc45c0779e04373ec042e6cb763a4f8b752f.
 Re-armed after duplicate-declaration fix at commit 1bb8855ec155552aeeb48336f2df4a89211092fb.
+Re-armed after D1 result-envelope normalization fix at commit 183abc887aea10406fd24b12f498a19ebd667352.
