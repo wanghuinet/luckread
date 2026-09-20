@@ -3,6 +3,7 @@ import path from 'path'
 import { sqliteD1Adapter } from '@payloadcms/db-d1-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig } from 'payload'
+import type { Payload } from 'payload'
 import { fileURLToPath } from 'url'
 import { CloudflareContext, getCloudflareContext } from '@opennextjs/cloudflare'
 import { GetPlatformProxyOptions } from 'wrangler'
@@ -73,6 +74,20 @@ export default buildConfig({
     migrationDir: path.resolve(dirname, 'migrations'),
   }),
   logger: isProduction ? cloudflareLogger : undefined,
+  onInit: async (payload: Payload) => {
+    if (payload.db.name !== 'd1-sqlite') return
+
+    // CC-MAPPING-0-AUTH-002-E4-5-D1-ADAPTER-CORRECTION-2026-09-20:
+    // The pinned D1 adapter currently aliases upsert to updateOne without
+    // forwarding the required { upsert: true } option. Keep the correction
+    // at the W01 configuration boundary; do not modify Payload core.
+    const updateOne = payload.db.updateOne.bind(payload.db)
+    payload.db.upsert = (args) =>
+      updateOne({
+        ...args,
+        options: { upsert: true },
+      })
+  },
   plugins: [
     r2Storage({
       bucket: cloudflare.env.R2,
