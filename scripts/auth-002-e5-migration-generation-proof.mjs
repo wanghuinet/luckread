@@ -68,25 +68,24 @@ if (stage1Json.length !== 1) throw new Error('Expected exactly one generated bas
 fs.copyFileSync(path.join(stage1, 'migrations', stage1Json[0]), path.join(stage2, 'migrations', 'baseline.json'))
 
 const diagnostic = path.join(stage2, 'diagnose-schema.mjs')
-const diagnosticSource = [
-  "import payload from 'payload'",
-  "process.env.PAYLOAD_MIGRATING = 'true'",
-  `const mod = await import(${JSON.stringify(path.join(stage2, 'payload.config.ts'))})`,
-  "await payload.init({ config: mod.default, disableDBConnect: true, disableOnInit: true })",
-  "const report = { schemaKeys: Object.keys(payload.db.schema), generated: null, error: null }",
-  "try {",
-  "  const kit = payload.db.requireDrizzleKit()",
-  "  const snapshot = await kit.generateDrizzleJson(payload.db.schema)",
-  "  report.generated = { tableNames: Object.keys(snapshot.tables ?? {}), tableCount: Object.keys(snapshot.tables ?? {}).length }",
-  "} catch (error) {",
-  "  report.error = error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error)",
-  "}",
-  "console.log(JSON.stringify(report, null, 2))",
-].join('\\n')
+const diagnosticSource = `
+import payload from 'payload'
+process.env.PAYLOAD_MIGRATING = 'true'
+const mod = await import(__CONFIG_PATH__)
+await payload.init({ config: mod.default, disableDBConnect: true, disableOnInit: true })
+const report = { schemaKeys: Object.keys(payload.db.schema), generated: null, error: null }
+try {
+  const kit = payload.db.requireDrizzleKit()
+  const snapshot = await kit.generateDrizzleJson(payload.db.schema)
+  report.generated = { tableNames: Object.keys(snapshot.tables ?? {}), tableCount: Object.keys(snapshot.tables ?? {}).length }
+} catch (error) {
+  report.error = error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error)
+}
+console.log(JSON.stringify(report, null, 2))
+`
 fs.writeFileSync(diagnostic, diagnosticSource, 'utf8')
 const diagnosticOutput = run('pnpm', ['exec', 'node', diagnostic], root, { PAYLOAD_SECRET: 'e5-generation-only-not-production' })
 fs.writeFileSync(path.join(outDir, 'schema-diagnostic.json'), diagnosticOutput)
-
 runCreate(stage2, 'MIG-AUTH-002-SESSION-V1')
 const stage2Dir = path.join(stage2, 'migrations')
 const generated = fs.readdirSync(stage2Dir).filter((f) => f.endsWith('.ts') && f.includes('MIG-AUTH-002-SESSION-V1'))
