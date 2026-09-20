@@ -11,6 +11,7 @@ import { r2Storage } from '@payloadcms/storage-r2'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
+import { authSessionStateSchemaHook } from './db/auth-session-state-schema'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -72,6 +73,7 @@ export default buildConfig({
     binding: cloudflare.env.D1,
     push: false,
     migrationDir: path.resolve(dirname, 'migrations'),
+    beforeSchemaInit: [authSessionStateSchemaHook],
   }),
   logger: isProduction ? cloudflareLogger : undefined,
   onInit: async (payload: Payload) => {
