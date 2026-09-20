@@ -2,7 +2,7 @@
 
 ## Status
 
-DECIDED — RECONCILIATION PENDING
+CLOSED — RECONCILIATION VERIFIED
 
 ## Purpose
 
@@ -88,3 +88,8 @@ Therefore the substantive conflict is unchanged: the six canonical ENT-USER fiel
 ## Decision accepted — 2026-09-20
 
 Decision 7 accepted: the six existing canonical ENT-USER fields remain the target W01 Users contract; implementation remains behind GREEN→implement.
+
+
+## Reconciliation verified — 2026-09-20
+
+Decision 7 is reflected in active W01 source: `workers/W01-payload/src/collections/Users.ts` contains the six target ENT-USER fields (`username`, `displayName`, `bio`, `avatar`, `locale`, `timezone`). Payload reconciliation for these fields is already verified. Migration/runtime execution remains a separate downstream evidence gate.
