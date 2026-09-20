@@ -20,6 +20,8 @@ const run = (cmd, args, cwd, env = {}) => execFileSync(cmd, args, {
   stdio: ['ignore', 'pipe', 'pipe'],
 })
 
+run('git', ['fetch', '--no-tags', 'origin', baselineSha, '--depth=1'], repoRoot)
+
 const show = (sha, rel) => run('git', ['show', sha + ':' + rel], repoRoot)
 
 const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'luckread-auth002-e5-'))
