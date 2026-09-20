@@ -648,10 +648,13 @@
     },
     {
       "id": "B01-CONFLICT-002",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "type": "WORKER_OWNERSHIP",
-      "description": "Legacy identity documents may reference worker ownership inconsistent with the frozen 12-worker baseline.",
-      "requiredAction": "Reconcile ownership against the frozen Worker Contract before assigning any new worker mapping."
+      "description": "Legacy/alternative Worker ownership references are superseded for current ownership by the ACTIVE/CANONICAL 12-Worker Master and canonical Worker × D1 Binding Mapping.",
+      "requiredAction": "None — current Worker authority and binding are reconciled. Future ownership changes require an explicit approved Mapping/Contract change.",
+      "resolution": "W01 = Public API / Gateway / Developer & Admin API Boundary; W02 = Identity / Account / Authorization; W01 has no direct authoritative D1 authority; W02 owns D1-01 identity/account/authorization.",
+      "resolutionControl": "M0-B01-WORKER-OWNERSHIP-RECONCILIATION-AUDIT-2026-09-20",
+      "resolutionDate": "2026-09-20"
     },
     {
       "id": "B01-CONFLICT-003",
