@@ -38,9 +38,9 @@ jobs:
         run: pnpm exec node ../../scripts/auth-002-e5-migration-generation-proof.mjs
       - name: Upload E5 generated migration proof
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: auth-002-e5-migration-generation-proof-${{ github.run_id }}
           path: artifacts/evidence/auth-002/e5-generation/
           if-no-files-found: error
-          if: always()
           retention-days: 14
