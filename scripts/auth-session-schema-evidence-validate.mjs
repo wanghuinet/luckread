@@ -134,13 +134,6 @@ if (baselineUninitialized) {
 
 if (!catalogRows.some((row) => row?.type === 'table' && row?.name === 'users')) fail('catalog does not prove a physical users table')
 
-const usersRows = unwrapRows(users)
-const indexRows = unwrapRows(indexes)
-const foreignKeyRows = unwrapRows(foreignKeys)
-const extensionSchemaRows = unwrapRows(extensionSchema)
-const extensionIndexRows = unwrapRows(extensionIndexes)
-const extensionForeignKeyRows = unwrapRows(extensionForeignKeys)
-
 if (!Array.isArray(usersRows)) fail('users-schema evidence is not row-shaped')
 if (!Array.isArray(indexRows)) fail('users-indexes evidence is not row-shaped')
 if (!Array.isArray(foreignKeyRows)) fail('users-foreign-keys evidence is not row-shaped')
