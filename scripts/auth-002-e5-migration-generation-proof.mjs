@@ -57,7 +57,7 @@ writeFixture(stage2, setMigrationDir(currentConfig, path.join(stage2, 'migration
 const runCreate = (dir, name) => run(
   'pnpm',
   ['exec', 'payload', 'migrate:create', name, '--skip-empty'],
-  dir,
+  root,
   { PAYLOAD_CONFIG_PATH: path.join(dir, 'payload.config.ts') },
 )
 
