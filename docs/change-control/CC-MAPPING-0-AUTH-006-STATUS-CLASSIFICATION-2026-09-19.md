@@ -32,3 +32,8 @@ A future status-classification decision must explicitly define the canonical pre
 ## Decision accepted — 2026-09-20
 
 Decision 1 accepted: MISSING means zero valid mapping-bearing edges; PARTIAL means one or more valid mapping-bearing edges exist while downstream closure remains incomplete.
+
+
+## Reconciliation verified — 2026-09-20
+
+Decision 1 is reflected in the current Canonical Mapping: AUTH-006 is `PARTIAL`, not `MISSING`, because valid API and Entity mapping-bearing edges are present while downstream closure remains incomplete. No implementation or Evidence Registry status is promoted.
