@@ -1,8 +1,8 @@
 {
   "version": "1.0",
   "auditId": "M0-CURRENT-DOWNSTREAM-GATE-EVIDENCE-2026-09-20",
-  "sourceCommit": "ce7d092587a9e28578f156f0a6790793720148dd",
-  "contractCiRun": 35492243047,
+  "sourceCommit": "2b475f7991f82c25a715e091f46049edd7d4852c",
+  "contractCiRun": 35492578141,
   "status": "DOWNSTREAM_NOT_GREEN",
   "admissionResults": {
     "contractSemantic": "PASS",
@@ -30,7 +30,7 @@
     "missingEntityBinding": 440,
     "persistenceNotVerified": 9
   },
-  "interpretation": "The failing gates are downstream closure gates, not evidence of a malformed canonical contract set. They correctly remain fail-closed while feature-level Entity/Persistence/Evidence/runtime closure is absent.",
+  "interpretation": "Current Contract CI confirms the same intended fail-closed downstream boundary on the B01 ownership-reconciliation descendant: structural and admission layers pass, while feature-level Entity/Persistence/Evidence closure is not complete.",
   "independentFixAvailableFromExistingAuthority": false,
   "prohibitedInference": [
     "Do not convert downstream gaps to PASS without feature-specific evidence.",
@@ -40,9 +40,10 @@
   ],
   "nextControlledBlockers": [
     "AUTH-003 exact public Wire Schema authority",
-    "B01-CONFLICT-002 explicit Worker topology authority decision",
-    "AUTH-002 controlled external D1 migration/runtime evidence"
+    "AUTH-002 controlled external D1 migration/runtime evidence",
+    "449 feature-level Entity/Persistence/Evidence downstream closure; only explicit authority/evidence may reduce this set."
   ],
   "mapping0Effect": "NONE",
-  "implementationAuthorization": false
+  "implementationAuthorization": false,
+  "freshness": "Fresh Contract CI evidence for commit 2b475f7991f82c25a715e091f46049edd7d4852c; reuse until underlying downstream inputs change."
 }
