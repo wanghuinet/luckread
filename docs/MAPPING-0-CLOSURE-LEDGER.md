@@ -481,3 +481,25 @@ NEXT_ITEM_ID: W01-MIGRATION-BASELINE-AUTHORITY-001
 NEXT_ITEM_STATE: BLOCKED_EXTERNAL
 NEXT required external evidence: run the existing AUTH-002 Session Schema Evidence workflow from GitHub Actions using database_name=luckread and environment_class=CONTROLLED_REMOTE_D1, then inspect its migration-status/schema/catalog artifacts before any migration admission decision.
 
+
+
+## Superpowers continuation checkpoint — 2026-09-20 (HEAD 8da0c14f7e0c16044f2cc40cf2a6c3092042fbf8)
+
+Fresh verification:
+- Existing formal AUTH-002 workflow remains the canonical controlled remote evidence path.
+- Attempted rerun of AUTH-002 run `35482755313` was rejected by GitHub with HTTP 403: the workflow run cannot be retried.
+- No new AUTH-002 run was created by that attempt; current run history still shows the AUTH-002 execution as `failure` with zero jobs.
+- The repository already contains the canonical Mapping 0 Evidence Registry at `contracts/evidence/mapping-0-evidence-registry.v1.json`; it is `NOT_GREEN`. No replacement registry was created.
+- The AUTH-002 Evidence Registry instance contract requires current executable PASS evidence and explicitly rejects stale/documentation-only evidence. Existing AUTH-002 local evidence is historical/expired and cannot satisfy the current remote claim.
+- AUTH-003 request/wire authority remains `BLOCKED_NOT_GREEN`; exact request/response wire fields, requiredness, status/error semantics and public projection are not explicitly contracted. No OpenAPI or DTO promotion is justified by inference.
+- Current Canonical Mapping/Five-Way/R4 state is therefore unchanged. No feature status was promoted.
+
+Acceptance:
+- AUTH-002 remote baseline authority = `BLOCKED_EXTERNAL`.
+- Evidence Registry = `NOT_GREEN`; existing registry is authoritative and must not be replaced.
+- AUTH-003 wire schema = `WAIT_FOR_EXPLICIT_PUBLIC_WIRE_SCHEMA_AUTHORITY`.
+- No remote D1 mutation, hand-authored DDL, migration promotion, or inferred DTO/OpenAPI schema is admitted.
+
+NEXT_ITEM_ID: `W01-MIGRATION-BASELINE-AUTHORITY-001`
+NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
+NEXT required external evidence: execute the existing AUTH-002 Session Schema Evidence workflow against `luckread` with `CONTROLLED_REMOTE_D1`, then review the generated migration-status/catalog/schema evidence before migration admission.
