@@ -55,27 +55,6 @@ const writeFixture = (dir, config, users, includeAuthSchema) => {
 writeFixture(stage1, setMigrationDir(historicalConfig, path.join(stage1, 'migrations')), historicalUsers, false)
 writeFixture(stage2, setMigrationDir(currentConfig, path.join(stage2, 'migrations')), historicalUsers, true)
 
-const diagnosticPath = path.join(outDir, 'after-schema-diagnostic.json')
-const diagnosticHook = path.join(stage2, 'e5-after-schema-diagnostic.ts')
-const diagnosticHookSource = [
-  "import { is } from 'drizzle-orm'",
-  "import { SQLiteTable, getTableConfig, getTableName } from 'drizzle-orm/sqlite-core'",
-  "import fs from 'node:fs'",
-  "export const e5AfterSchemaDiagnosticHook = ({ schema }: any) => {",
-  "  const table = schema.tables?.auth_session_state",
-  "  const report: any = { schemaTableKeys: Object.keys(schema.tables ?? {}), hasAuthSessionState: !!table, isSQLiteTable: false, tableName: null, columns: [], indexes: [], error: null }",
-  "  if (table) { try { report.isSQLiteTable = is(table, SQLiteTable); if (report.isSQLiteTable) { const cfg = getTableConfig(table); report.tableName = getTableName(table); report.columns = cfg.columns.map((c: any) => c.name); report.indexes = cfg.indexes.map((i: any) => i.config?.name ?? null) } } catch (error) { report.error = error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error) } }",
-  "  fs.writeFileSync(process.env.E5_DIAGNOSTIC_PATH!, JSON.stringify(report, null, 2) + '\\n')",
-  "  return schema",
-  "}",
-].join('\\n')
-fs.writeFileSync(diagnosticHook, diagnosticHookSource, 'utf8')
-const stage2ConfigPath = path.join(stage2, 'payload.config.ts')
-let stage2Config = fs.readFileSync(stage2ConfigPath, 'utf8')
-stage2Config = stage2Config.replace("import { authSessionStateSchemaHook } from './db/auth-session-state-schema'", "import { authSessionStateSchemaHook } from './db/auth-session-state-schema'\\nimport { e5AfterSchemaDiagnosticHook } from './e5-after-schema-diagnostic'")
-stage2Config = stage2Config.replace("beforeSchemaInit: [authSessionStateSchemaHook],", "beforeSchemaInit: [authSessionStateSchemaHook],\\n    afterSchemaInit: [e5AfterSchemaDiagnosticHook],")
-fs.writeFileSync(stage2ConfigPath, stage2Config, 'utf8')
-
 const runCreate = (dir, name) => run(
   'pnpm',
   ['exec', 'payload', 'migrate:create', name, '--skip-empty'],
