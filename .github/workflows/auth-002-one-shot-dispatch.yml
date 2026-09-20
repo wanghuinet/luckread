@@ -22,7 +22,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh workflow run .github/workflows/auth-session-schema-evidence.yml \
+          gh workflow run .github/workflows/auth-002-session-schema-evidence-rebound.yml \
             --ref main \
             -f database_name=luckread \
             -f environment_class=CONTROLLED_REMOTE_D1
