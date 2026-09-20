@@ -1,6 +1,32 @@
 import type { SQLiteSchemaHook } from '@payloadcms/db-d1-sqlite'
 import { index, integer, sqliteTable, text } from '@payloadcms/db-d1-sqlite/drizzle/sqlite-core'
 
+type RawSchemaAdapter = {
+  rawTables: Record<
+    string,
+    {
+      name: string
+      columns: Record<
+        string,
+        {
+          name: string
+          type: 'integer' | 'text'
+          primaryKey?: boolean
+          notNull?: boolean
+        }
+      >
+      indexes?: Record<
+        string,
+        {
+          name: string
+          on: string | string[]
+          unique?: boolean
+        }
+      >
+    }
+  >
+}
+
 export const authSessionState = sqliteTable(
   'auth_session_state',
   {
@@ -20,10 +46,15 @@ export const authSessionState = sqliteTable(
   }),
 )
 
-export const authSessionStateSchemaHook: SQLiteSchemaHook = ({ adapter, schema }) => {
-  // Payload's migration generator serializes the adapter's raw SQL schema.
-  // Keep the same contracted table in both raw schema and Drizzle schema so
-  // runtime access and official migration generation observe one source.
+export const authSessionStateSchemaHook: SQLiteSchemaHook = (args) => {
+  // D1 3.87.1 executes SQLite schema hooks with the runtime adapter object,
+  // while its public hook type intentionally exposes only extendTable/schema.
+  // Narrow that runtime shape locally; do not modify Payload Core types.
+  const { adapter, schema } = args as typeof args & { adapter: RawSchemaAdapter }
+
+  // Payload's migration generator serializes adapter.rawTables. Keep the same
+  // contracted table in raw schema and Drizzle schema so generation and runtime
+  // observe one source without creating a Payload Collection.
   adapter.rawTables.authSessionState = {
     name: 'auth_session_state',
     columns: {
