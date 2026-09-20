@@ -412,3 +412,22 @@ Continuation decision:
 - `W01-MIGRATION-BASELINE-AUTHORITY-001` remains `BLOCKED_EXTERNAL`.
 - Additional physical D1 creation is **not admitted** until authoritative physical naming/binding is established.
 - Worker creation/deployment is **not admitted** from the 12 logical Worker IDs alone; physical Worker names and implementation admission must be established first.
+
+## Current execution cursor — 2026-09-20 (AUTH-002 remote evidence attempt)
+
+Current main head at this checkpoint: `8314d36257863657965d1c8b333ceff4027df2fe`.
+
+Fresh execution observations:
+- AUTH-002 remote evidence run `35482032691` was created from trigger commit `67c55157b286c133ac63ee8691359c3e3eb5d621`, then completed with `failure` and zero workflow jobs; no remote evidence artifact was produced.
+- The workflow source used `inputs.*` in push-event step environments. GitHub documents the `inputs` context as available only for `workflow_dispatch` or reusable workflows, so this push-path construction was invalid for the intended trigger mode.
+- Workflow correction committed at `81f9260bce9c8040d561f82fdca7c17d5f413769`: push-mode values now use `github.event.inputs.*` with controlled defaults; push-mode artifact upload was also enabled for the admitted one-shot trigger.
+- A new exact-message trigger commit `8314d36257863657965d1c8b333ceff4027df2fe` was accepted into `main`. Its current check-run set shows only Structural/Contract and Feature Inventory workflows; no new AUTH-002 workflow run has been created.
+- Therefore AUTH-002 remains `BLOCKED_EXTERNAL / NOT_GREEN`; no remote D1 migration or DDL was executed and no schema fact was inferred.
+
+Inheritance:
+- The Structural Mapping 0 result is inherited from the previously verified source/evidence because this execution-only correction did not change Contract/Blueprint/Mapping semantics.
+- The current downstream implementation boundary remains unchanged.
+
+Current next item:
+- `W01-MIGRATION-BASELINE-AUTHORITY-001` remains `BLOCKED_EXTERNAL`.
+- Required external action remains execution of the existing AUTH-002 controlled remote evidence workflow; no migration promotion is admitted before that evidence is reviewed.
