@@ -2,7 +2,7 @@
 
 ## Status
 
-DECIDED — RECONCILIATION PENDING
+CLOSED — RECONCILIATION VERIFIED
 
 ## Finding
 
@@ -57,3 +57,8 @@ No implementation authorization is granted by this record.
 ## Decision accepted — 2026-09-20
 
 Decision 8 accepted: W01 media remains a Payload support collection with an exact source exemption; no ENT-MEDIA is created.
+
+
+## Reconciliation verified — 2026-09-20
+
+Decision 8 is reflected by the exact source exemption in `contracts/payload/payload-support-collection-exemptions.v1.json`, and `scripts/payload-contract-reconciliation-check.mjs` consumes that exemption by exact source reference. W01 `media` remains a Payload support collection; no ENT-MEDIA is created.
