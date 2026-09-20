@@ -1,0 +1,4 @@
+Controlled one-shot AUTH-002 remote evidence capture request.
+Target database: luckread
+Environment class: CONTROLLED_REMOTE_D1
+This file is a trigger marker only; the workflow performs read-only remote evidence capture.
