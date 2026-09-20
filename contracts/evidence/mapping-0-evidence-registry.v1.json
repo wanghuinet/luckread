@@ -224,9 +224,24 @@
       "timestamp": "2026-09-20T11:53:31Z",
       "producer": "Payload 3.87.1 native database runtime probe",
       "result": "FAIL",
-      "status": "CREATED",
+      "status": "SUPERSEDED",
       "validUntil": "2026-09-20T00:00:00Z",
-      "note": "Controlled remote E4.5 probe reproduced the D1 adapter upsert regression: payload.db.upsert === payload.db.updateOne; upsert returned no document, no error, and no preference row was persisted. Evidence artifact 10604653629 / run 35509055040. This blocks E4.5 acceptance and downstream AUTH-002 promotion."
+      "note": "Controlled remote E4.5 probe reproduced the D1 adapter upsert regression: payload.db.upsert === payload.db.updateOne; upsert returned no document, no error, and no preference row was persisted. Evidence artifact 10604653629 / run 35509055040. This blocks E4.5 acceptance and downstream AUTH-002 promotion. Superseded by verified E4.5 rerun EVD-AUTH002-B11-D1-ADAPTER-E45-REMOTE-002 at run 35535570923; original failure remains preserved for failure→repair→rerun traceability."
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B11-D1-ADAPTER-E45-REMOTE-002",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-002::D1-ADAPTER-E4.5",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "GitHub Actions W01 D1 Adapter Regression E4.5 against controlled Cloudflare D1",
+      "sourceRef": "artifacts/evidence/auth-002/adapter-regression/run-35535570923.json",
+      "commitSha": "cd2f5a79321806ec81b0c261b3f8deb40e809b0e",
+      "timestamp": "2026-09-20T20:27:25Z",
+      "producer": "Payload 3.87.1 native database runtime probe",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "note": "Controlled remote E4.5 probe on the exact current W01 commit verified payload.db.upsert on payload-preferences: upsert returned a document, no upsert error occurred, the row was present on read-back with matching value, cleanup succeeded, and payload.db.upsert was not aliased to payload.db.updateOne. The runner process later timed out while Wrangler retained internal workerd processes (process exit 124), but the complete evidence object was written and independently validated by the workflow as E4_5_RESULT=PASS before runner cleanup. This evidence supersedes EVD-AUTH002-B11-D1-ADAPTER-E45-REMOTE-001 without deleting the failed historical evidence."
     }
   ]
 }
