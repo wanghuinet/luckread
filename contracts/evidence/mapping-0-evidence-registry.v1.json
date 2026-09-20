@@ -211,6 +211,22 @@
       "status": "CREATED",
       "validUntil": "2026-09-20T00:00:00Z",
       "note": "Migration 20250929_111647 completed successfully after remote connection establishment. Remote payload_migrations contains id=1, name=20250929_111647, batch=1. The pre-migration application-table check returned zero; post-migration schema and migration queries succeeded against the controlled remote target."
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B11-D1-ADAPTER-E45-REMOTE-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-002::D1-ADAPTER-E4.5",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "GitHub Actions W01 D1 Adapter Regression E4.5 against controlled Cloudflare D1",
+      "sourceRef": "artifacts/evidence/auth-002/adapter-regression/run-35509055040.json",
+      "commitSha": "3c1ed995477be05340f3941be9eaf14c10681948",
+      "timestamp": "2026-09-20T11:53:31Z",
+      "producer": "Payload 3.87.1 native database runtime probe",
+      "result": "FAIL",
+      "status": "CREATED",
+      "validUntil": "2026-09-20T00:00:00Z",
+      "note": "Controlled remote E4.5 probe reproduced the D1 adapter upsert regression: payload.db.upsert === payload.db.updateOne; upsert returned no document, no error, and no preference row was persisted. Evidence artifact 10604653629 / run 35509055040. This blocks E4.5 acceptance and downstream AUTH-002 promotion."
     }
   ]
 }
