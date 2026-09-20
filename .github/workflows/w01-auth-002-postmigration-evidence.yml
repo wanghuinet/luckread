@@ -1,0 +1,149 @@
+name: W01 AUTH-002 Post-Migration Evidence Capture
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/w01-auth-002-postmigration-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.33.1
+  DATABASE_NAME: luckread
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+
+      - name: Configure Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Capture remote D1 evidence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -uo pipefail
+          mkdir -p artifacts/evidence/w01-auth-002-postmigration
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+          run_capture() {
+            local label="$1"
+            shift
+            local output="artifacts/evidence/w01-auth-002-postmigration/${label}.json"
+            echo "::group::${label}"
+            set +e
+            "$@" > "$output" 2>&1
+            local rc=$?
+            set -e
+            echo "CAPTURE_LABEL=${label}"
+            echo "CAPTURE_EXIT_CODE=${rc}"
+            cat "$output"
+            echo "::endgroup::"
+            echo "${rc}" > "artifacts/evidence/w01-auth-002-postmigration/${label}.exit"
+            return 0
+          }
+
+          run_capture migration-status \
+            npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc \
+            --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;'
+
+          run_capture catalog \
+            npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc \
+            --command 'SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE type IN ("table","index","trigger") ORDER BY type,name;'
+
+          run_capture users-schema \
+            npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc \
+            --command 'PRAGMA table_info("users");'
+
+          run_capture d1-info \
+            npx --yes "wrangler@${WRANGLER_VERSION}" d1 info "$DATABASE_NAME" --json --config workers/W01-payload/wrangler.jsonc
+
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'artifacts/evidence/w01-auth-002-postmigration';
+          const labels = ['migration-status','catalog','users-schema','d1-info'];
+          const errors = [];
+
+          for (const label of labels) {
+            const rc = Number(fs.readFileSync(path + '/' + label + '.exit', 'utf8').trim());
+            if (rc !== 0) errors.push(label + ': command exit ' + rc);
+          }
+
+          function parse(label) {
+            const raw = fs.readFileSync(path + '/' + label + '.json', 'utf8').trim();
+            try { return JSON.parse(raw); } catch (e) {
+              errors.push(label + ': non-JSON output');
+              return null;
+            }
+          }
+
+          const migration = parse('migration-status');
+          const catalog = parse('catalog');
+          const users = parse('users-schema');
+          parse('d1-info');
+
+          function rows(x) {
+            if (Array.isArray(x)) {
+              for (const item of x) if (Array.isArray(item?.results)) return item.results;
+            }
+            if (Array.isArray(x?.results)) return x.results;
+            if (Array.isArray(x?.result?.results)) return x.result.results;
+            return [];
+          }
+
+          const migrationRows = rows(migration);
+          const catalogRows = rows(catalog);
+          const userRows = rows(users);
+
+          if (!migrationRows.some(r => r?.name === '20250929_111647')) {
+            errors.push('migration-status: approved baseline migration 20250929_111647 not found');
+          }
+          if (!catalogRows.some(r => r?.type === 'table' && r?.name === 'users')) {
+            errors.push('catalog: users table not found');
+          }
+          if (userRows.length === 0) {
+            errors.push('users-schema: PRAGMA table_info("users") returned no columns');
+          }
+
+          console.log('AUTH-002_POST_MIGRATION_EVIDENCE_VALIDATION=' + (errors.length ? 'FAIL' : 'PASS'));
+          if (errors.length) {
+            for (const e of errors) console.error('AUTH-002_EVIDENCE_ERROR=' + e);
+            process.exit(1);
+          }
+          NODE
+
+      - name: Record provenance
+        if: always()
+        run: |
+          cat > artifacts/evidence/w01-auth-002-postmigration/provenance.json <<EOF
+          {
+            "repository": "${GITHUB_REPOSITORY}",
+            "workflow": "${GITHUB_WORKFLOW}",
+            "runId": ${GITHUB_RUN_ID},
+            "sourceSha": "${GITHUB_SHA}",
+            "databaseName": "${DATABASE_NAME}",
+            "evidenceScope": "AUTH-002 remote post-migration D1 schema and migration history",
+            "sourceOfExecution": "CONTROLLED_REMOTE_D1"
+          }
+          EOF
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-002-postmigration-evidence-${{ github.run_id }}
+          path: artifacts/evidence/w01-auth-002-postmigration/
+          if-no-files-found: error
+          retention-days: 14
