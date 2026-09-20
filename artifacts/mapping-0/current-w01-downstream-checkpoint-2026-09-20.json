@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "68aedc29fd7fac02080341c23c305c82be58fd0d",
+  "sourceHead": "45af6bb9fd91a61c6fd242d71eda3c831fdc9dd0",
   "checkpointDate": "2026-09-20",
   "checks": {
     "Payload Implementation Admission": {
@@ -38,14 +38,36 @@
     "executionMode": "read-only evidence capture; no migration apply command"
   },
   "currentState": "BLOCKED_EXTERNAL",
-  "nextAction": "Execute the existing AUTH-002 Session Schema Evidence workflow manually against the explicitly controlled D1 target, then review migration-status and schema/catalog artifacts before any migration promotion decision.",
+  "nextAction": "Proceed through the existing migration Change Control only: establish/confirm the authoritative W01 baseline strategy, regenerate an accepted non-duplicating migration if required, and obtain separate controlled execution admission/evidence. Do not mutate D1 from the evidence workflow.",
   "currentHeadAudit": {
     "migrationGenerationAdmission": "PASS_VERIFIED",
     "migrationStaticAudit": "PASS_VERIFIED",
-    "remoteD1BaselineAuthority": "BLOCKED_EXTERNAL",
+    "remoteD1BaselineAuthority": "BLOCKED_EXTERNAL_CONFIRMED",
     "remoteEvidenceWorkflowDispatchAvailableInSession": false,
     "duplicateMappingReexecution": "SKIPPED_BY_INHERITANCE",
     "generatedFullSchemaMigrationPromoted": false,
-    "remoteD1MigrationExecuted": false
+    "remoteD1MigrationExecuted": false,
+    "remoteEvidencePushPath": "PASS_VERIFIED"
+  },
+  "remoteEvidenceCapture": {
+    "workflowRunId": 35484344942,
+    "jobId": 106007813815,
+    "testedCommitSha": "45af6bb9fd91a61c6fd242d71eda3c831fdc9dd0",
+    "environmentClass": "CONTROLLED_REMOTE_D1",
+    "databaseName": "luckread",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "migrationHistoryTable": "payload_migrations",
+    "migrationHistoryStatus": "TABLE_ABSENT",
+    "physicalUsersTable": "ABSENT",
+    "physicalUsersSessionsTable": "ABSENT",
+    "physicalAuthSessionStateTable": "ABSENT",
+    "d1NumTables": 0,
+    "d1DatabaseSizeBytes": 12288,
+    "remoteWrites": 0,
+    "validator": "FAILED_EXPECTED_BASELINE_NOT_PRESENT",
+    "validatorReason": "catalog does not prove a physical users table",
+    "artifactId": 10596323024,
+    "artifactDigest": "sha256:a08284d79fd2d3f3ef14dee73a3d0964739dc9d5a722a3256fd7a56c1a0b48a7",
+    "interpretation": "Controlled remote D1 query succeeded and proved the target database is currently uninitialized for the W01 Payload baseline. No migration was applied by the evidence workflow."
   }
 }
