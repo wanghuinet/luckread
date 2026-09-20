@@ -19,7 +19,10 @@ const outDir = resolve(repositoryRoot, 'artifacts/evidence/auth-002/adapter-regr
 mkdirSync(outDir, { recursive: true })
 
 const key = `w01-e45-${runId}`
-const syntheticUserEmail = `e45-${runId}@example.invalid`
+const data = {
+  key,
+  value: { probe: key, sequence: 1 },
+}
 
 const result = {
   version: '1.0.0',
@@ -33,7 +36,6 @@ const result = {
   environmentClass: 'CONTROLLED_REMOTE_D1',
   databaseName: 'luckread',
   probeKey: key,
-  syntheticUserId: null,
   operation: 'payload.db.upsert(payload-preferences)',
   expected: 'missing preference row is inserted and can be read back',
   observed: null,
@@ -44,34 +46,14 @@ const result = {
 }
 
 let payload
-let createdUserId = null
 let where
-let data
 try {
   const { default: config } = await import('../workers/W01-payload/src/payload.config.ts')
   payload = await getPayload({ config, key: `e45-${runId}` })
 
   result.adapterUpsertAliasesUpdateOne = payload.db.upsert === payload.db.updateOne
 
-  const createdUser = await payload.db.create({
-    collection: 'users',
-    data: { email: syntheticUserEmail },
-  })
-  createdUserId = createdUser.id
-  result.syntheticUserId = createdUserId
-
-  where = {
-    and: [
-      { key: { equals: key } },
-      { 'user.value': { equals: createdUserId } },
-      { 'user.relationTo': { equals: 'users' } },
-    ],
-  }
-  data = {
-    key,
-    user: { relationTo: 'users', value: createdUserId },
-    value: { probe: key, sequence: 1 },
-  }
+  where = { key: { equals: key } }
 
   let upsertError = null
   let upsertResult = null
@@ -114,6 +96,8 @@ try {
 } catch (error) {
   result.error = `setup: ${error instanceof Error ? error.message : String(error)}`.slice(0, 300)
 } finally {
+  // No auxiliary identity is required for this adapter-only probe.
+}
   if (payload && createdUserId !== null) {
     try {
       await payload.db.deleteOne({ collection: 'users', id: createdUserId })
