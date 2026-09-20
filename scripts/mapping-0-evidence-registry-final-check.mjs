@@ -84,6 +84,7 @@ const evidenceIds = new Set()
 const claims = new Map()
 const results = new Set(['PASS'])
 const activeStatuses = new Set(['ACTIVE', 'VERIFIED'])
+const historicalStatuses = new Set(['SUPERSEDED', 'EXPIRED', 'INVALIDATED'])
 const executableTypes = new Set(['CODE', 'UNIT_TEST', 'INTEGRATION_TEST', 'CL', 'CI', 'SMOKE', 'DEPLOYMENT', 'OBSERVABILITY', 'PERFORMANCE', 'SECURITY', 'USER_ACCEPTANCE'])
 const hex40 = /^[0-9a-f]{40}$/
 
@@ -95,7 +96,7 @@ const sourceRefResolvable = (sourceRef) => {
   if (typeof sourceRef !== 'string' || sourceRef.length === 0) return false
   if (/^https?:\/\//.test(sourceRef)) return true
   const clean = cleanSourceRef(sourceRef)
-  const allowed = ['contracts/', 'docs/', 'scripts/', 'src/', 'tests/', '.github/']
+  const allowed = ['contracts/', 'docs/', 'scripts/', 'src/', 'tests/', '.github/', 'artifacts/']
   if (!allowed.some((prefix) => clean.startsWith(prefix))) return false
   return fs.existsSync(path.join(root, clean))
 }
@@ -114,17 +115,26 @@ for (const record of registry.records) {
   evidenceIds.add(record.evidenceId)
   if (!featureIds.has(record.subjectId)) fail(`evidence references non-canonical Feature: ${record.evidenceId} -> ${record.subjectId}`)
   if (!hex40.test(record.commitSha ?? '')) fail(`invalid commitSha: ${record.evidenceId}`)
-  if (record.commitSha !== currentCommit) fail(`stale evidence commit: ${record.evidenceId}`)
   if (Number.isNaN(Date.parse(record.timestamp ?? ''))) fail(`invalid timestamp: ${record.evidenceId}`)
-  if (!results.has(record.result)) fail(`evidence result must be PASS: ${record.evidenceId}`)
-  if (!activeStatuses.has(record.status)) fail(`evidence must be ACTIVE or VERIFIED: ${record.evidenceId}`)
-  if (!executableTypes.has(record.type)) fail(`evidence type is not executable: ${record.evidenceId}`)
-  if (!sourceRefResolvable(record.sourceRef)) fail(`sourceRef is not resolvable: ${record.evidenceId}`)
 
-  const claimKey = `${record.subjectId}::${record.claimId}`
-  const list = claims.get(claimKey) ?? []
-  list.push(record)
-  claims.set(claimKey, list)
+  const isHistorical = historicalStatuses.has(record.status)
+  if (!isHistorical) {
+    if (record.commitSha !== currentCommit) fail(`stale evidence commit: ${record.evidenceId}`)
+    if (!results.has(record.result)) fail(`evidence result must be PASS: ${record.evidenceId}`)
+    if (!activeStatuses.has(record.status)) fail(`evidence must be ACTIVE or VERIFIED: ${record.evidenceId}`)
+    if (!executableTypes.has(record.type)) fail(`evidence type is not executable: ${record.evidenceId}`)
+    if (!sourceRefResolvable(record.sourceRef)) fail(`sourceRef is not resolvable: ${record.evidenceId}`)
+  } else if (!record.sourceRef) {
+    fail(`historical evidence is missing sourceRef: ${record.evidenceId}`)
+  }
+
+  // Only current ACTIVE/VERIFIED evidence participates in claim-level PASS admission.
+  if (activeStatuses.has(record.status)) {
+    const claimKey = `${record.subjectId}::${record.claimId}`
+    const list = claims.get(claimKey) ?? []
+    list.push(record)
+    claims.set(claimKey, list)
+  }
 }
 
 for (const featureId of featureIds) {
