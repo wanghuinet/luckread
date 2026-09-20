@@ -568,3 +568,30 @@ No Mapping row, Contract definition, or runtime status is promoted by the admiss
 - Approved baseline migration/index blob pins are unchanged and remain enforced by `scripts/w01-remote-migration-admission.mjs`.
 - No controlled remote D1 migration execution has occurred; `W01-MIGRATION-BASELINE-AUTHORITY-001` remains `BLOCKED_EXTERNAL`.
 - This change is workflow metadata alignment only; no Contract, Blueprint, migration source, or schema content was changed.
+
+
+## Superpowers continuation audit — 2026-09-20 (global batch edge sweep)
+
+Source head: `5e556d3f32001369a7d6f764ef881722293ff769`.
+
+Fresh repository-only audit of the six remaining major JSON mapping batches:
+- `B04-B06-content-creator-article.v1.json`: 31 records, 0 records with explicit API/Entity/Payload/Code mapping-bearing edges.
+- `B07-B09-media-feed.v1.json`: 34 records, 0 such edges.
+- `B10-B12-search-interaction-messaging.v1.json`: 28 records, 0 such edges.
+- `B13-B15-creator-membership-commerce.v1.json`: 24 records, 0 such edges.
+- `B16-B20-live-advertising-recommendation-growth-analytics.v1.json`: 57 records, 0 such edges.
+- `B19-B20-rights-safety-governance-admin-portability.v1.json`: 58 records, 0 such edges.
+
+Acceptance:
+- No new Canonical Mapping edge is justified from these batch sources.
+- No status promotion is made.
+- Existing Structural Mapping 0 verification remains inherited.
+- This sweep does not replace downstream runtime/persistence/security/Evidence Registry requirements.
+
+USER-001 / USER-006 evidence-bound delta remains a separate reconciled source; its explicit API/entity evidence is already reflected in current Canonical Mapping where applicable, while Payload/DTO/downstream edges remain intentionally unestablished.
+
+AUTH-010 is contract-frozen with an explicit canonical OpenAPI patch, but its own gate requires AUTH-002 schema evidence before canonical OpenAPI/DTO promotion; therefore skipping AUTH-002 does not create a safe independent promotion path.
+
+User-directed deferral:
+- `W01-MIGRATION-BASELINE-AUTHORITY-001` / AUTH-002 remains externally blocked and is intentionally deferred for this continuation pass.
+- No remote D1 operation is executed or simulated.
