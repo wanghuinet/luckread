@@ -457,3 +457,27 @@ Current decision:
 NEXT_ITEM_ID remains: `W01-MIGRATION-BASELINE-AUTHORITY-001`.
 NEXT_ITEM_STATE remains: `BLOCKED_EXTERNAL`.
 NEXT required evidence: successful execution of the formal AUTH-002 controlled remote evidence workflow producing the contracted migration/schema/catalog artifacts.
+
+
+## Current verification checkpoint — 2026-09-20 (HEAD 52c09394733f28ed7d457f20ce135acb28fd60a0)
+
+Fresh current-main verification:
+- main resolves to 52c09394733f28ed7d457f20ce135acb28fd60a0.
+- Mapping 0 Structural Gate run 35482667695 = SUCCESS at this exact head.
+- Ensure Feature Inventory run 35482667623 = SUCCESS at this exact head.
+- The stable AUTH-002 workflow file is present at .github/workflows/auth-session-schema-evidence.yml and retains workflow_dispatch with required inputs database_name and environment_class=CONTROLLED_REMOTE_D1.
+- No AUTH-002 run exists on the current head. The latest observed AUTH-002 run is 35482406671, event push, conclusion failure, with zero jobs; no remote evidence artifact was produced.
+- The connected GitHub action set exposes no workflow-dispatch write operation. Therefore no manual workflow execution is claimed or simulated.
+- No remote D1 migration, DDL, schema inference, or migration promotion has occurred.
+
+Acceptance:
+- Current-head Mapping 0 structural verification = PASS_VERIFIED.
+- Current-head Feature Inventory verification = PASS_VERIFIED.
+- W01 migration generation/static safety remains inherited from its already verified evidence.
+- W01-MIGRATION-BASELINE-AUTHORITY-001 remains BLOCKED_EXTERNAL.
+- No additional mapping row re-execution is authorized while its inputs/evidence remain unchanged.
+
+NEXT_ITEM_ID: W01-MIGRATION-BASELINE-AUTHORITY-001
+NEXT_ITEM_STATE: BLOCKED_EXTERNAL
+NEXT required external evidence: run the existing AUTH-002 Session Schema Evidence workflow from GitHub Actions using database_name=luckread and environment_class=CONTROLLED_REMOTE_D1, then inspect its migration-status/schema/catalog artifacts before any migration admission decision.
+
