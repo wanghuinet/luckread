@@ -57,7 +57,7 @@
     "No business implementation is inferred from Mapping 0 structural acceptance.",
     "Unchanged validation results are inherited across evidence-only documentation commits."
   ],
-  "currentHeadBaseline": "9cdc9d4fb81d929dbd1911ac00be0c3c3769184d",
+  "currentHeadBaseline": "2ae8c17ea801877fdd5daa7644a21fbf14142e0f",
   "reconciledControls": [
     {
       "id": "CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19",
@@ -103,5 +103,12 @@
   "reconciliationPendingControls": [
     "CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19"
   ],
-  "nextObjective": "Continue fail-closed technical closure. AUTH-002 remote baseline execution is deferred by user; AUTH-003 wire-schema authority remains unresolved. Already verified Change Controls are not to be re-opened."
+  "nextObjective": "Continue fail-closed technical closure. AUTH-002 remote baseline execution is deferred by user; AUTH-003 wire-schema authority remains unresolved. Already verified Change Controls are not to be re-opened.",
+  "cursorUpdate": {
+    "updatedAt": "2026-09-20",
+    "reason": "Cursor hygiene after documentation-only reconciliation commits; decision basis and control states unchanged.",
+    "latestReconciliation": "B01-CONFLICT-003",
+    "latestReconciliationState": "RESOLVED",
+    "noStatusPromotion": true
+  }
 }
