@@ -715,3 +715,29 @@ Remaining B01 authority conflict: `B01-CONFLICT-002 / WORKER_OWNERSHIP`, because
 
 NEXT_ITEM_ID remains: `W01-MIGRATION-BASELINE-AUTHORITY-001`.
 NEXT_ITEM_STATE remains: `BLOCKED_EXTERNAL`.
+
+
+## Superpowers continuation audit — AUTH-003 exact wire-schema blocker freeze — 2026-09-20
+
+Source head before audit artifact: `f20ffb2ad8c04d8740d1965ceb2b77432295baa5`.
+
+Audit artifact: `artifacts/mapping-0/auth-003-wire-schema-blocker-audit-2026-09-20.json`.
+
+The AUTH-003 control remains `TODO_FIX / BLOCKED_NOT_GREEN`. A nine-item blocker set was deterministically recorded covering:
+
+1. Add request fields/requiredness;
+2. Replace request fields/requiredness and kind-change semantics;
+3. Public credential response projection;
+4. Public `kind` representation;
+5. List pagination/cursor/ordering envelope;
+6. `credentialId` parameter schema and canonical namespace;
+7. Success status/body semantics, including remove;
+8. Validation and generic credential-conflict error mapping;
+9. Unknown-property behavior and post-approval examples.
+
+No item was promoted because current repository authority proves operation identity, credential domain rules and security exclusions, but not the exact public wire schema. No OpenAPI, DTO registry, Mapping-0, persistence or runtime state was changed.
+
+Anti-loop disposition: future continuation must reuse this blocker audit unless one of its listed authority inputs changes. Do not recreate the same AUTH-003 schema-search work from scratch.
+
+NEXT_ITEM_ID remains: `W01-MIGRATION-BASELINE-AUTHORITY-001`.
+NEXT_ITEM_STATE remains: `BLOCKED_EXTERNAL`.
