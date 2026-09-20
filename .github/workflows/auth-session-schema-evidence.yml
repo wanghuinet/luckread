@@ -15,30 +15,21 @@ on:
         type: choice
         options:
           - CONTROLLED_REMOTE_D1
-  push:
-    branches: [main]
-    paths:
-      - 'artifacts/mapping-0/AUTH-002-REMOTE-CAPTURE-REQUEST.txt'
-      - 'workers/W01-payload/package.json'
-      - 'workers/W01-payload/pnpm-lock.yaml'
-      - 'workers/W01-payload/src/collections/Users.ts'
-      - 'workers/W01-payload/src/payload.config.ts'
-      - 'workers/W01-payload/src/migrations/**'
-      - 'scripts/auth-session-schema-evidence-probe.mjs'
-      - 'scripts/auth-session-schema-evidence-validate.mjs'
-      - '.github/workflows/auth-session-schema-evidence.yml'
-      - 'workers/W01-payload/wrangler.jsonc'
-  pull_request:
-    paths:
-      - 'workers/W01-payload/package.json'
-      - 'workers/W01-payload/pnpm-lock.yaml'
-      - 'workers/W01-payload/src/collections/Users.ts'
-      - 'workers/W01-payload/src/payload.config.ts'
-      - 'workers/W01-payload/src/migrations/**'
-      - 'scripts/auth-session-schema-evidence-probe.mjs'
-      - 'scripts/auth-session-schema-evidence-validate.mjs'
-      - '.github/workflows/auth-session-schema-evidence.yml'
-      - 'workers/W01-payload/wrangler.jsonc'
+  workflow_call:
+    inputs:
+      database_name:
+        description: 'Controlled D1 database name used only for evidence capture'
+        required: true
+        type: string
+      environment_class:
+        description: 'Evidence environment; must be a controlled environment'
+        required: true
+        type: string
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
 
 permissions:
   contents: write
@@ -72,10 +63,10 @@ jobs:
         run: node scripts/auth-session-schema-evidence-probe.mjs --gate1
 
       - name: Require controlled remote evidence target
-        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema') }}
+        if: ${{ github.event_name == 'workflow_dispatch' || ((github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema')) }}
         env:
-          EVIDENCE_ENVIRONMENT: ${{ github.event.inputs.environment_class || 'CONTROLLED_REMOTE_D1' }}
-          DATABASE_NAME: ${{ github.event.inputs.database_name || 'luckread' }}
+          EVIDENCE_ENVIRONMENT: ${{ inputs.environment_class || 'CONTROLLED_REMOTE_D1' }}
+          DATABASE_NAME: ${{ inputs.database_name || 'luckread' }}
         run: |
           set -euo pipefail
           test "$EVIDENCE_ENVIRONMENT" = "CONTROLLED_REMOTE_D1"
@@ -83,11 +74,11 @@ jobs:
           printf '%s' "$DATABASE_NAME" | grep -Eq '^[A-Za-z0-9_-]{1,64}$'
 
       - name: Capture remote D1 migration evidence
-        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema') }}
+        if: ${{ github.event_name == 'workflow_dispatch' || ((github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema')) }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DATABASE_NAME: ${{ github.event.inputs.database_name || 'luckread' }}
+          DATABASE_NAME: ${{ inputs.database_name || 'luckread' }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/evidence/auth-002
@@ -117,11 +108,11 @@ jobs:
           test "$migration_exit" -eq 0
 
       - name: Capture remote D1 catalog evidence
-        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema') }}
+        if: ${{ github.event_name == 'workflow_dispatch' || ((github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema')) }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DATABASE_NAME: ${{ github.event.inputs.database_name || 'luckread' }}
+          DATABASE_NAME: ${{ inputs.database_name || 'luckread' }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/evidence/auth-002
@@ -153,10 +144,10 @@ jobs:
             > artifacts/evidence/auth-002/auth-session-state-foreign-keys.json
 
       - name: Build reproducible evidence provenance
-        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema') }}
+        if: ${{ github.event_name == 'workflow_dispatch' || ((github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema')) }}
         env:
-          DATABASE_NAME: ${{ github.event.inputs.database_name || 'luckread' }}
-          EVIDENCE_ENVIRONMENT: ${{ github.event.inputs.environment_class || 'CONTROLLED_REMOTE_D1' }}
+          DATABASE_NAME: ${{ inputs.database_name || 'luckread' }}
+          EVIDENCE_ENVIRONMENT: ${{ inputs.environment_class || 'CONTROLLED_REMOTE_D1' }}
         run: |
           set -euo pipefail
           node - <<'NODE'
@@ -177,10 +168,10 @@ jobs:
           NODE
 
       - name: Build reproducible evidence manifest
-        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema') }}
+        if: ${{ github.event_name == 'workflow_dispatch' || ((github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema')) }}
         env:
-          DATABASE_NAME: ${{ github.event.inputs.database_name || 'luckread' }}
-          EVIDENCE_ENVIRONMENT: ${{ github.event.inputs.environment_class || 'CONTROLLED_REMOTE_D1' }}
+          DATABASE_NAME: ${{ inputs.database_name || 'luckread' }}
+          EVIDENCE_ENVIRONMENT: ${{ inputs.environment_class || 'CONTROLLED_REMOTE_D1' }}
         run: |
           set -euo pipefail
           node - <<'NODE'
@@ -227,11 +218,11 @@ jobs:
           NODE
 
       - name: Validate evidence package
-        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema') }}
+        if: ${{ github.event_name == 'workflow_dispatch' || ((github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema')) }}
         run: node scripts/auth-session-schema-evidence-validate.mjs
 
       - name: Persist validated evidence package to repository
-        if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema' }}
+        if: ${{ (github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema') }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -244,7 +235,7 @@ jobs:
           git -c http.extraheader="AUTHORIZATION: bearer $GH_TOKEN" push origin HEAD:main
 
       - name: Upload schema evidence artifacts
-        if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema')) }}
+        if: ${{ always() && (github.event_name == 'workflow_dispatch' || ((github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema'))) }}
         uses: actions/upload-artifact@v4
         with:
           name: auth-002-schema-evidence-${{ github.run_id }}
