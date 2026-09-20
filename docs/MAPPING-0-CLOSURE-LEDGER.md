@@ -902,3 +902,55 @@ Disposition:
 Anti-loop:
 Reuse this exact remote baseline evidence unless the controlled target, approved migration, or relevant W01 schema inputs change. Do not repeat the empty-target probe merely because documentation commits advance.
 
+
+
+## Superpowers continuation — AUTH-002 E4.5 adapter correction verified PASS — 2026-09-20
+
+Source head at verification: `cd2f5a79321806ec81b0c261b3f8deb40e809b0e`.
+
+Verified GitHub Actions evidence:
+- Workflow: `W01 D1 Adapter Regression E4.5`
+- Run: `35535570923`
+- Job: `106143870080`
+- Result: `SUCCESS`
+- Evidence artifact: `auth-002-e4-5-adapter-regression-35535570923`, artifact ID `10612971115`
+
+The controlled remote probe itself recorded:
+- `payload.db.upsert` returned a document;
+- no upsert error;
+- the preference row was present on read-back;
+- stored value matched the probe value;
+- persistence after upsert = true;
+- cleanup = true;
+- `payload.db.upsert === payload.db.updateOne` = false.
+
+The probe process required a bounded timeout because Wrangler retained internal `workerd` processes after the evidence object had already been written. The workflow independently validated the complete evidence object and emitted `E4_5_RESULT=PASS` before runner cleanup. This is recorded as execution-hygiene evidence, not as an E4.5 business failure.
+
+Evidence Registry closure:
+- `EVD-AUTH002-B11-D1-ADAPTER-E45-REMOTE-001` remains preserved as the historical failure and is now `SUPERSEDED`.
+- `EVD-AUTH002-B11-D1-ADAPTER-E45-REMOTE-002` is registered as `result=PASS`, `status=VERIFIED`, bound to the exact tested commit.
+
+Change Control:
+- `CC-MAPPING-0-AUTH-002-E4-5-D1-ADAPTER-CORRECTION-2026-09-20` = `CLOSED — REMEDIATION VERIFIED`.
+- `E4.5 = PASS`.
+- `AUTH-002) remains `NOT_GREEN` because E6 session-runtime evidence is still missing and the pre-existing GAP-07-01/02/03 remain open.
+
+Current Canonical Mapping remains unchanged:
+- total 449
+- PARTIAL 17
+- UNRESOLVED 431
+- MISSING 1 (`AUTH-007`)
+
+Current downstream blockers remain:
+- Five-Way Alignment: NOT_GREEN.
+- Strict R4/Evidence/R5: NOT_GREEN.
+- No Feature status promotion occurred from the E4.5 pass.
+
+NEXT_ITEM_ID: `M0-AUTH-002-E6-RUNTIME-EVIDENCE-001`
+NEXT_ITEM_STATE: `TODO_VERIFY`
+
+Execution authority:
+- reuse `contracts/persistence/AUTH-002-runtime-session-evidence-gate.v1.json`;
+- reuse `contracts/persistence/AUTH-002-runtime-evidence-execution-runbook.v1.md`;
+- do not mint a second session identifier;
+- do not modify Payload core or D1 schema to satisfy E6.
