@@ -6,7 +6,7 @@ on:
       source_sha:
         description: "Exact Git commit to execute; must contain only the approved baseline migration"
         required: true
-        default: "2b4b8de47da303ad33b9ec39d5e2b7a20c8c20be"
+        default: "b317d613567950f79988d0850a4b2fc22c2c44fd"
         type: string
       database_name:
         description: "Controlled D1 database name"
@@ -66,7 +66,8 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-workspace
 
       - name: Check migration execution admission
-        run: node scripts/w01-remote-migration-admission.mjs
+        working-directory: workers/W01-payload
+        run: node ../../scripts/w01-remote-migration-admission.mjs
 
       - name: Require exact baseline migration source
         working-directory: workers/W01-payload
