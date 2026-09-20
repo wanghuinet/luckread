@@ -8,3 +8,5 @@ Retry after push-context compatibility correction.
 Reusable workflow dispatch path is now the canonical execution path.
 
 Explicit secret binding validated; retry through reusable caller.
+
+Current execution path: direct push event with exact commit message `evidence(auth-002): capture controlled remote schema`; no migration mutation.
