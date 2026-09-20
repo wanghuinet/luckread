@@ -20,9 +20,13 @@ const isPayloadCLI = process.argv.some((value) => {
   return resolved !== undefined && resolved.endsWith(path.join('payload', 'bin.js'))
 })
 const isProduction = process.env.NODE_ENV === 'production'
+// The migration workflow sets this only for the explicitly admitted baseline
+// migration. This makes the remote-D1 decision independent of package-manager
+// CLI argv/symlink shape while keeping next build/dev offline.
+const isExplicitRemoteMigration = process.env.PAYLOAD_MIGRATION_REMOTE === 'true'
 // ADR-B001 (docs/312-BUILD-BASELINE-AND-BINDING-SEMANTICS-v1.0.md, D-03):
 // runtime detection is the only signal stable across all process shapes;
-// `process.argv`-based detection fails in Next.js page-data collection workers.
+// process.argv-based detection fails in Next.js page-data collection workers.
 const isWorkerRuntime =
   typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers'
 
@@ -82,14 +86,12 @@ function getCloudflareContextFromWrangler(): Promise<CloudflareContext> {
     ({ getPlatformProxy }) =>
       getPlatformProxy({
         environment: process.env.CLOUDFLARE_ENV,
-        // D-02: only the Payload CLI in production must hit the real remote D1.
-        // `next build` / `next dev` stay on the local miniflare proxy so the
-        // build never opens a remote Cloudflare session (INV-BUILD-001).
-        remoteBindings: isProduction && isPayloadCLI,
-        // During `next build` the page-data phase forks parallel workers, each
-        // of which loads the config and starts its own workerd against the same
-        // local D1 persistence file, crashing with SQLITE_BUSY. Production
-        // (non-CLI) evaluation is the build; keep it in-memory and offline.
+        // D-02: next build/dev stay local; only production Payload CLI
+        // migrations admitted by the workflow may opt into remote D1.
+        remoteBindings: isProduction && (isPayloadCLI || isExplicitRemoteMigration),
+        // During next build the page-data phase forks parallel workers, each
+        // of which loads its own workerd against the same local D1 persistence
+        // file, so production non-CLI evaluation stays in-memory and offline.
         persist: isProduction ? false : undefined,
       } satisfies GetPlatformProxyOptions),
   )
