@@ -169,7 +169,7 @@ The current Worker Master is authoritative for current Worker identity. W02 is t
 
 However, the Worker Master explicitly states that Worker/D1 feature ownership cannot be inferred from code, route, collection or directory names, and that Worker -> D1 binding remains a separate mandatory gate. Therefore AUTH-015 receives no silent Worker assignment here.
 
-The B01 AUTH-015 record has an explicit D1 conflict between the legacy `D1-01` naming in the account lifecycle contract and the frozen baseline naming `D01 Core`. This conflict requires approved Change Control / Worker x D1 binding reconciliation before Contract Green.
+The B01 AUTH-015 D1 logical-domain naming conflict is RESOLVED by Change Control: `D01 Core` is canonical for this affected reconciliation surface. This does not prove physical D1 schema or Worker ownership.
 
 The registry's `system.job` actor does not by itself prove that W10 owns the deletion workflow; W10 is an async execution boundary and has no artificial Primary Task in the canonical Worker Master.
 
@@ -221,7 +221,7 @@ No test result or CI pass is inferred from the existence of registry rows.
 | State | PARTIAL | executable transition + precondition + side-effect mapping |
 | Event | PARTIAL | canonical event set + consumers + evidence |
 | Worker | UNRESOLVED | approved Worker feature binding |
-| D1 | CONFLICT | frozen 4-domain naming/authority reconciliation |
+| D1 | RECONCILED | D01 Core logical-domain naming authority is resolved; physical schema/Worker evidence remains separate |
 | Payload/Persistence | MISSING | explicit supported persistence + migration evidence |
 | Tests | MISSING | registry-linked executable tests |
 | Evidence | MISSING | non-empty Evidence Registry + commit-tied CI result |
@@ -238,7 +238,6 @@ The most material blockers are:
 - no deletion/restoration DTO contract IDs;
 - no verified canonical deletion/restoration entities and fields;
 - no verified `account_state` / `account_state_version` field implementation;
-- unresolved D1 authority/naming conflict;
 - no explicit Worker feature binding;
 - no runtime deletion/restoration implementation evidence;
 - no executable lifecycle/security E2E evidence;
