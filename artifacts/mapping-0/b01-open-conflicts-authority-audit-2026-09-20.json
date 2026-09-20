@@ -9,7 +9,7 @@
     {
       "id": "B01-CONFLICT-002",
       "type": "WORKER_OWNERSHIP",
-      "currentState": "OPEN",
+      "currentState": "RESOLVED",
       "authoritativeCurrentWorkerSources": [
         {
           "path": "docs/04-WORKER-MASTER-v1.0.md",
@@ -34,8 +34,8 @@
           "finding": "Contains a separate W01-W13 logical-worker topology that conflicts with the frozen 12-worker Worker Master."
         }
       ],
-      "disposition": "AUTHORITY_RECONCILIATION_REQUIRED",
-      "reason": "The repository contains explicit competing worker topology authorities. Current canonical Worker Master is clear for W01/W02, but the conflicting documents still declare authoritative/locked status. Their authority cannot be downgraded or rewritten by inference.",
+      "disposition": "RECONCILED",
+      "reason": "The current ACTIVE/CANONICAL Worker Master explicitly supersedes historical Worker models, including the historical W01-W13 topology, and the canonical Worker × D1 Binding Mapping confirms W01/W02 ownership. No competing source is used for current ownership.",
       "mapping0Effect": "NONE"
     },
     {
@@ -67,7 +67,8 @@
   ],
   "requiredAuthority": {
     "B01-CONFLICT-002": "Explicit Change Control must identify which worker topology source is canonical and reconcile or formally classify competing topology documents before new feature-level worker assignments.",
-    "B01-CONFLICT-003": "Satisfied by the existing server-prefix/path normalization rule; no new path decision or contract change is required."
+    "B01-CONFLICT-003": "Satisfied by the existing server-prefix/path normalization rule; no new path decision or contract change is required.",
+    "B01_CONFLICT_002": "Satisfied by the ACTIVE/CANONICAL Worker Master plus canonical Worker × D1 Binding Mapping; future ownership changes require explicit approved Mapping/Contract change."
   },
   "prohibitions": [
     "Do not assign new Feature→Worker edges from route or directory names.",
@@ -78,10 +79,10 @@
   "implementationAuthorization": false,
   "summary": {
     "resolved": [
+      "B01-CONFLICT-002",
       "B01-CONFLICT-003"
     ],
-    "remainingOpen": [
-      "B01-CONFLICT-002"
-    ]
-  }
+    "remainingOpen": []
+  },
+  "resolutionEvidence": "artifacts/mapping-0/b01-worker-ownership-reconciliation-audit-2026-09-20.json"
 }
