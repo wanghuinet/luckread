@@ -93,6 +93,38 @@ const unwrapRows = (value) => {
   return []
 }
 const catalogRows = unwrapRows(catalog)
+const applicationCatalogRows = catalogRows.filter((row) => {
+  const name = String(row?.name ?? '')
+  return name.length > 0 && !name.startsWith('_cf_')
+})
+const baselineUninitialized = migration.status === 'TABLE_ABSENT' && applicationCatalogRows.length === 0
+
+if (baselineUninitialized) {
+  if (Number(d1Info.num_tables ?? -1) !== 0) fail('baseline target reports non-zero num_tables')
+  if (usersRows.length !== 0) fail('baseline target unexpectedly returned users schema rows')
+  if (indexRows.length !== 0) fail('baseline target unexpectedly returned users indexes')
+  if (foreignKeyRows.length !== 0) fail('baseline target unexpectedly returned users foreign keys')
+  if (extensionSchemaRows.length !== 0) fail('baseline target unexpectedly returned auth_session_state schema rows')
+  if (extensionIndexRows.length !== 0) fail('baseline target unexpectedly returned auth_session_state indexes')
+  if (extensionForeignKeyRows.length !== 0) fail('baseline target unexpectedly returned auth_session_state foreign keys')
+
+  const forbiddenApplicationCatalog = applicationCatalogRows.filter((row) => String(row?.type ?? '') !== '')
+  if (forbiddenApplicationCatalog.length > 0) fail('baseline target contains unexpected application catalog objects')
+
+  const expectedEvidenceFiles = required.filter((file) => file !== 'manifest.json')
+  const manifestEvidence = manifest.evidenceFiles ?? {}
+  for (const file of expectedEvidenceFiles) {
+    if (!manifestEvidence[file]) fail(`manifest missing hash entry for ${file}`)
+    const actualHash = createHash('sha256').update(readFileSync(`${dir}/${file}`)).digest('hex')
+    if (manifestEvidence[file] !== actualHash) fail(`evidence hash mismatch for ${file}`)
+  }
+
+  console.log('AUTH-002_BASELINE_EVIDENCE_VALIDATION_PASS')
+  console.log('Validated controlled remote D1 baseline: target is reachable, application catalog is uninitialized, Payload migration history is absent, queried W01 application tables are absent, auth_session_state is absent, and evidence hashes/provenance are valid.')
+  console.log('This baseline result does not prove or promote post-migration W01 schema equivalence and does not promote AUTH-002.')
+  process.exit(0)
+}
+
 if (!catalogRows.some((row) => row?.type === 'table' && row?.name === 'users')) fail('catalog does not prove a physical users table')
 
 const usersRows = unwrapRows(users)
