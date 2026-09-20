@@ -1,9 +1,12 @@
 import { createRequire } from 'node:module'
 import { mkdirSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { resolve, dirname } from 'node:path'
 
 const requireFromW01 = createRequire(new URL('../workers/W01-payload/package.json', import.meta.url))
 const { getPayload } = requireFromW01('payload')
 
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const runId = Number(process.env.GITHUB_RUN_ID || 0)
 if (!runId) throw new Error('GITHUB_RUN_ID is required')
 
@@ -12,7 +15,7 @@ process.env.CLOUDFLARE_ENV = 'production'
 process.env.PAYLOAD_MIGRATION_REMOTE = 'true'
 process.env.PAYLOAD_SECRET = 'ignore'
 
-const outDir = 'artifacts/evidence/auth-002/adapter-regression'
+const outDir = resolve(repositoryRoot, 'artifacts/evidence/auth-002/adapter-regression')
 mkdirSync(outDir, { recursive: true })
 
 const key = `w01-e45-${runId}`
