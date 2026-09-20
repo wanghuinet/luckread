@@ -24,7 +24,7 @@ run('git', ['fetch', '--no-tags', 'origin', baselineSha, '--depth=1'], repoRoot)
 
 const show = (sha, rel) => run('git', ['show', sha + ':' + rel], repoRoot)
 
-const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'luckread-auth002-e5-'))
+const fixture = fs.mkdtempSync(path.join(root, '.e5-generation-'))
 const stage1 = path.join(fixture, 'stage1')
 const stage2 = path.join(fixture, 'stage2')
 
