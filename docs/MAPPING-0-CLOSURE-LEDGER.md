@@ -563,8 +563,8 @@ No Mapping row, Contract definition, or runtime status is promoted by the admiss
 
 ## W01 execution workflow cursor refresh — 2026-09-20
 
-- Source head: `f31e8bc691298995e2732cb1012c794a1e6897e2`.
-- `.github/workflows/w01-baseline-migration-execution.yml` default `source_sha` is aligned to this current main head.
+- Source head for this cursor refresh: `f31e8bc691298995e2732cb1012c794a1e6897e2`.
+- `.github/workflows/w01-baseline-migration-execution.yml` default `source_sha` is pinned to `1797f015488ec75e26fed2ebc612ed89d83c5050`, the latest migration-bearing main head used for the controlled execution scope; subsequent commits are governance/checkpoint metadata only.
 - Approved baseline migration/index blob pins are unchanged and remain enforced by `scripts/w01-remote-migration-admission.mjs`.
 - No controlled remote D1 migration execution has occurred; `W01-MIGRATION-BASELINE-AUTHORITY-001` remains `BLOCKED_EXTERNAL`.
 - This change is workflow metadata alignment only; no Contract, Blueprint, migration source, or schema content was changed.
