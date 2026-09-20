@@ -104,7 +104,7 @@ Generation evidence:
 - First attempt run `35459726942` failed because the W01 production CLI path triggered Wrangler remote proxy without `CLOUDFLARE_API_TOKEN`.
 - The workflow was corrected in `8f5df6646dda757e5dd9f7b5847a2efbc1cb93e4` to use the local proxy for migration generation.
 - Second attempt run `35459760432` is the current generation evidence source.
-- Generation run 35459850548 succeeded and static audit passed. The generated artifact is not admitted as a second migration because it is a full schema snapshot; see CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20.
+- Generation run `35459850548` succeeded and static audit passed. The generated artifact is not admitted as a second migration because it is a full schema snapshot; see CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20.
 
 
 ## Completion gate
@@ -192,9 +192,9 @@ Latest main verification source:
 
 Contract CI verification:
 - Run `35461495486` tested source head `5aab443cd93dbbc2d053798fb17d07caed56eebe` and completed with failure only in downstream alignment/evidence gates.
-- Core Contract/Structural, OpenAPI, Semantic, Common, State Machines, AuthZ, Feature Inventory, Payload Reconciliation, Enums and Capability Contract Graph all = SUCCESS.
+- Core Contract/Structural, OpenAPI, Semantic, Common, State Machines, AuthZ, Feature Inventory, Payload Reconciliation, Enums and Capability Graph all = SUCCESS.
 - Five-Way Alignment = FAILURE with `450 blocker(s)`; this is downstream implementation/evidence alignment and does not invalidate the structural Mapping 0 handoff.
-- Strict Downstream R4/Evidence/R5 = FAILURE, remaining a downstream executable-evidence closure gate.
+- Strict Downstream R4-Evidence-R5 = FAILURE, remaining a downstream executable-evidence closure gate.
 - No new contract-definition conflict was introduced by the Security Hardening correction.
 
 Security hardening correction:
@@ -284,6 +284,7 @@ Current continuation decision:
 - The required next evidence is controlled target D1 migration-state evidence; remote D1 mutation remains prohibited until the migration Change Control reaches explicit GREEN execution admission.
 
 
+
 ## Continuation execution audit — 2026-09-20 (current main)
 
 Current GitHub main at audit time: `3f82bec0ba6dc3c8dd8218e313866d5b93ee8e56`.
@@ -306,6 +307,7 @@ NEXT_ITEM_STATE remains: `BLOCKED_EXTERNAL`.
 NEXT required external evidence: execute the existing `AUTH-002 Session Schema Evidence` workflow against the explicitly controlled D1 target, then review the resulting migration-status and schema/catalog artifacts before any migration promotion decision.
 
 
+
 ## Legacy Payload root authority check — 2026-09-20
 
 Exact current-main file checks returned 404 for:
@@ -315,6 +317,7 @@ Exact current-main file checks returned 404 for:
 Therefore the legacy root Payload scaffold is not an active source path on current `main`. Current W01 runtime authority remains `workers/W01-payload/`; archived legacy material remains under `archive/legacy-payload-root/` and is not treated as active implementation evidence.
 
 This is an authority-path verification only. It does not change Mapping-0 status or promote runtime/persistence evidence.
+
 
 
 ## Derived Payload inventory drift correction — 2026-09-20
@@ -333,6 +336,7 @@ Acceptance:
 - No Mapping-0 status promotion.
 - No migration, API, DTO, Entity, persistence, runtime, or security status promotion.
 - Main continuation cursor remains `W01-MIGRATION-BASELINE-AUTHORITY-001 / BLOCKED_EXTERNAL`.
+
 
 
 ## ENT-USER Payload-native provenance correction — 2026-09-20
@@ -382,3 +386,29 @@ Acceptance:
 - `M0-AUTH-002-REMOTE-EVIDENCE-DISPATCH-2026-09-20 = PASS_VERIFIED` as an execution-handoff artifact.
 - `W01-MIGRATION-BASELINE-AUTHORITY-001` remains `BLOCKED_EXTERNAL` until the actual workflow evidence exists and is reviewed.
 
+## Cloudflare physical resource inventory — 2026-09-20
+
+Evidence artifact:
+`artifacts/cloudflare/current-resource-inventory-2026-09-20.json`.
+
+Collection workflow:
+`.github/workflows/cloudflare-resource-inventory.yml`.
+Run: `35480031531`, conclusion `success`.
+
+Read-only Cloudflare API result:
+- D1 databases: **2**
+  - `luckread` — UUID `2f80471e-3756-49f9-8db1-7707a433ad64`
+  - `luckreadpro` — UUID `6c342634-97f6-4248-9f4a-85772af4f22c`
+- Uploaded Worker Scripts: **0**
+
+Reconciliation:
+- The existing `luckread` D1 has an explicit W01 `workers/W01-payload/wrangler.jsonc` binding and is not to be modified or reassigned.
+- `luckreadpro` has no authoritative repository binding found in the current `main`; no D1 domain is inferred from its name.
+- The canonical architecture remains **4 logical D1 domains / 12 canonical Workers**; physical resources are not assumed to equal those logical counts.
+- No Cloudflare resource was created, modified, deleted, migrated, or rebound by this inventory action.
+
+Continuation decision:
+- This is evidence only; it does not change Mapping 0 status.
+- `W01-MIGRATION-BASELINE-AUTHORITY-001` remains `BLOCKED_EXTERNAL`.
+- Additional physical D1 creation is **not admitted** until authoritative physical naming/binding is established.
+- Worker creation/deployment is **not admitted** from the 12 logical Worker IDs alone; physical Worker names and implementation admission must be established first.
