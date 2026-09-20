@@ -636,3 +636,16 @@ No Mapping row was promoted to GREEN. No physical D1 schema, migration, Worker a
 
 Current Canonical Mapping remains: 449 total; `17 PARTIAL / 431 UNRESOLVED / 1 MISSING`.
 AUTH-002 remote baseline execution remains user-deferred and `BLOCKED_EXTERNAL`.
+
+
+## Superpowers continuation audit — USER-001/USER-006 blocker precision closure — 2026-09-20
+
+Source head at closure: `1ae6eb72377b002fc9510f382df27894521693bb`.
+
+- `CC-MAPPING-0-USER-001-006-BLOCKER-PRECISION-2026-09-19` is now `CLOSED — RECONCILIATION VERIFIED`.
+- The authoritative B01-B03 source batch had already incorporated the required blocker-text refinement in `42a98bb568adf0ebbe3410b19fef616019351a32`.
+- Current Canonical Mapping retains the explicit USER-001 API/Entity edges and USER-006 API/policy evidence without Feature status promotion.
+- No DTO, Persistence, Payload, Code, Security, Lifecycle, Test, or Evidence Registry edge was inferred or promoted.
+- This closure is governance/wording reconciliation only; it does not alter Mapping 0 status counts.
+
+The next governed external blocker remains `W01-MIGRATION-BASELINE-AUTHORITY-001` / AUTH-002. AUTH-003 remains technically pending on explicit public wire-schema authority. Already verified controls remain inherited and are not re-run.
