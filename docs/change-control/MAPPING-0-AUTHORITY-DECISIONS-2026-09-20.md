@@ -100,16 +100,34 @@ The current W01 `media` collection is treated as a Payload support collection fo
 
 ## Decision-to-reconciliation dependency
 
-The eight authority controls may now leave `WAIT_AUTHORITY_DECISION`; they move to `RECONCILIATION_PENDING`.
-No feature/runtime status is promoted by this document.
+The eight authority controls have been processed through deterministic reconciliation. Current state is:
 
-## Required deterministic reconciliation scope
+| Control | Current reconciliation state |
+|---|---|
+| `CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19` | `PASS_VERIFIED` |
+| `CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19` | `PASS_VERIFIED` |
+| `CC-MAPPING-0-DTO-REPRESENTATION-GAP-2026-09-19` | `PASS_VERIFIED` |
+| `CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19` | `TODO_FIX` — wire-schema authority still blocked |
+| `CC-MAPPING-0-AUTH-006-ALIAS-AND-DOMAIN-CONFLICT-2026-09-19` | `PASS_VERIFIED` |
+| `CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19` | `PASS_VERIFIED` |
+| `CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18` | `PASS_VERIFIED` |
+| `CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19` | `PASS_VERIFIED` |
 
-1. Entitlements API Inventory/OpenAPI/policy/generated artifacts.
-2. AUTH-003 canonical operation references.
-3. AUTH-006 DTO aliases and logical domain references.
-4. AUTH-013/AUTH-015 logical domain references.
-5. ENT-USER field target-source references, without runtime implementation promotion.
-6. W01 Media support-collection exemption.
-7. Mapping status classifier rule and deterministic regeneration.
-8. Full Contract CI and Mapping 0 re-validation after the above inputs change.
+No feature/runtime status is promoted by this decision record.
+
+## Reconciliation completed for the closed controls
+
+1. Entitlements API Inventory/OpenAPI/policy/generated artifacts — reconciled.
+2. AUTH-006 DTO aliases and logical domain references — reconciled.
+3. AUTH-013/AUTH-015 logical domain references — reconciled.
+4. ENT-USER field target-source references — reconciled at contract/source level; migration/runtime evidence remains separate.
+5. W01 Media support-collection exemption — reconciled.
+6. Mapping status classifier rule — accepted and applied; AUTH-006 is `PARTIAL`.
+7. B01 API path representation was additionally reconciled in `M0-B01-API-PATH-NORMALIZATION-AUDIT-2026-09-20`.
+8. Full Contract CI / Mapping-0 re-validation remains a downstream gate and is not claimed GREEN by this record.
+
+## Remaining explicit blocker
+
+Only `CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19` remains technically pending from this eight-control decision batch, because the exact public AUTH-003 Wire Schema has not been explicitly contracted.
+
+This does not authorize OpenAPI/DTO/Mapping promotion.
