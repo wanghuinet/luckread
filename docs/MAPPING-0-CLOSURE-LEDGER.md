@@ -431,3 +431,29 @@ Inheritance:
 Current next item:
 - `W01-MIGRATION-BASELINE-AUTHORITY-001` remains `BLOCKED_EXTERNAL`.
 - Required external action remains execution of the existing AUTH-002 controlled remote evidence workflow; no migration promotion is admitted before that evidence is reviewed.
+
+## AUTH-002 Actions dispatcher isolation result — 2026-09-20
+
+Current HEAD: `61f1dc636188336bd56be0bf115ccaad4f277f83`.
+
+Fresh evidence:
+- Formal AUTH-002 run `35482032691` and later run `35482406671` both resolved to the registered AUTH-002 workflow but completed `failure` with **0 jobs** and no job logs/artifacts.
+- A separate workflow-run-only dispatch bridge was tested and was itself recorded by GitHub as a `push` event with `failure` and **0 jobs**.
+- A separately registered rebound AUTH-002 workflow was also recorded as a `push` event despite its current YAML containing only `workflow_dispatch`, and it likewise failed before job creation.
+- In contrast, the repository's normal Mapping 0 and Feature Inventory workflows continue to create jobs and complete successfully on the same heads.
+- This isolates the current blocker to GitHub Actions workflow registration/dispatch/pre-job processing for the affected workflows, rather than a Cloudflare D1 command failure or a runner-step failure.
+- Recent public GitHub Community reports document the same class of Actions behavior: runs ending in `startup_failure` with 0 jobs before runner assignment. These are reports, not proof of a GitHub-wide incident for this repository.
+
+Cleanup:
+- Temporary bridge and rebound workflow files were removed. They must not be treated as canonical project capabilities.
+- Formal AUTH-002 workflow remains the sole controlled evidence workflow.
+
+Current decision:
+- `AUTH-002` remains `BLOCKED_EXTERNAL / NOT_GREEN`.
+- No remote D1 migration, DDL, or schema inference was performed.
+- Do not generate additional workflow variants or repeatedly trigger the affected workflow until the Actions pre-job/dispatch condition is externally recoverable.
+- Structural Mapping 0 results remain inherited; same-head structural checks at `61f1dc6` are SUCCESS.
+
+NEXT_ITEM_ID remains: `W01-MIGRATION-BASELINE-AUTHORITY-001`.
+NEXT_ITEM_STATE remains: `BLOCKED_EXTERNAL`.
+NEXT required evidence: successful execution of the formal AUTH-002 controlled remote evidence workflow producing the contracted migration/schema/catalog artifacts.
