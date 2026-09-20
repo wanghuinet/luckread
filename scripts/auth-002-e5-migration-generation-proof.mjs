@@ -70,9 +70,13 @@ fs.copyFileSync(path.join(stage1, 'migrations', stage1Json[0]), path.join(stage2
 const diagnostic = path.join(stage2, 'diagnose-schema.mjs')
 const diagnosticSource = `
 import payload from 'payload'
+
 process.env.PAYLOAD_MIGRATING = 'true'
-const mod = await import(__CONFIG_PATH__)
+const configPath = process.env.PAYLOAD_CONFIG_PATH
+if (!configPath) throw new Error('PAYLOAD_CONFIG_PATH is required for schema diagnostic')
+const mod = await import(configPath)
 await payload.init({ config: mod.default, disableDBConnect: true, disableOnInit: true })
+
 const report = { schemaKeys: Object.keys(payload.db.schema), generated: null, error: null }
 try {
   const kit = payload.db.requireDrizzleKit()
@@ -84,8 +88,17 @@ try {
 console.log(JSON.stringify(report, null, 2))
 `
 fs.writeFileSync(diagnostic, diagnosticSource, 'utf8')
-const diagnosticOutput = run('pnpm', ['exec', 'node', diagnostic], root, { PAYLOAD_SECRET: 'e5-generation-only-not-production' })
+const diagnosticOutput = run(
+  'pnpm',
+  ['exec', 'node', diagnostic],
+  root,
+  {
+    PAYLOAD_CONFIG_PATH: path.join(stage2, 'payload.config.ts'),
+    PAYLOAD_SECRET: 'e5-generation-only-not-production',
+  },
+)
 fs.writeFileSync(path.join(outDir, 'schema-diagnostic.json'), diagnosticOutput)
+
 runCreate(stage2, 'MIG-AUTH-002-SESSION-V1')
 const stage2Dir = path.join(stage2, 'migrations')
 const generated = fs.readdirSync(stage2Dir).filter((f) => f.endsWith('.ts') && f.includes('MIG-AUTH-002-SESSION-V1'))
