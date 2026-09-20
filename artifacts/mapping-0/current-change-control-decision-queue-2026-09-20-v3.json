@@ -9,17 +9,17 @@
   "decidedControls": [
     {
       "id": "CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19",
-      "state": "DECIDED_RECONCILIATION_PENDING",
+      "state": "PASS_VERIFIED",
       "decision": "MISSING means no valid mapping-bearing edge; PARTIAL means one or more valid mapping-bearing edges exist while required downstream closure remains incomplete."
     },
     {
       "id": "CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19",
-      "state": "DECIDED_RECONCILIATION_PENDING",
+      "state": "PASS_VERIFIED",
       "decision": "GET /v1/entitlements = listEntitlements; GET /v1/entitlements/{subjectId} = getEntitlements; getEntitlementsOp is non-canonical collision suffix."
     },
     {
       "id": "CC-MAPPING-0-DTO-REPRESENTATION-GAP-2026-09-19",
-      "state": "DECIDED_RECONCILIATION_PENDING",
+      "state": "PASS_VERIFIED",
       "decision": "Keep DTO authority external to Canonical Mapping; no dtoIds schema addition."
     },
     {
@@ -29,27 +29,27 @@
     },
     {
       "id": "CC-MAPPING-0-AUTH-006-ALIAS-AND-DOMAIN-CONFLICT-2026-09-19",
-      "state": "DECIDED_RECONCILIATION_PENDING",
+      "state": "PASS_VERIFIED",
       "decision": "Canonical AUTH-006 DTO names use the non-PASSKEY identifiers; domain follows D01 Core."
     },
     {
       "id": "CC-MAPPING-0-D1-DOMAIN-NAMING-CONFLICT-2026-09-19",
-      "state": "DECIDED_RECONCILIATION_PENDING",
+      "state": "PASS_VERIFIED",
       "decision": "D01 Core is the canonical logical domain label for AUTH-006/AUTH-013/AUTH-015 reconciliation."
     },
     {
       "id": "CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18",
-      "state": "DECIDED_RECONCILIATION_PENDING",
+      "state": "PASS_VERIFIED",
       "decision": "Six canonical ENT-USER fields remain the target W01 Users contract; implementation stays behind GREEN→implement."
     },
     {
       "id": "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19",
-      "state": "DECIDED_RECONCILIATION_PENDING",
+      "state": "PASS_VERIFIED",
       "decision": "W01 media remains a Payload support collection with exact source exemption; no canonical Media Entity is created."
     }
   ],
-  "nextItemId": "M0-STRUCTURAL-HANDOFF-FINAL-ACCEPTANCE-01",
-  "nextItemState": "PASS_VERIFIED",
+  "nextItemId": "W01-MIGRATION-BASELINE-AUTHORITY-001",
+  "nextItemState": "BLOCKED_EXTERNAL",
   "rules": [
     "Decision acceptance does not equal runtime evidence.",
     "Only AUTH-003 remains technically pending from the eight original authority conflicts because canonical API admission prerequisites are not yet satisfied.",
@@ -102,5 +102,5 @@
   "reconciliationPendingControls": [
     "CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19"
   ],
-  "nextObjective": "Structural Mapping 0 handoff is accepted. Keep downstream technical/runtime/evidence closure fail-closed; next project work is separately governed implementation/admission."
+  "nextObjective": "Continue fail-closed technical closure. AUTH-002 remote baseline execution is deferred by user; AUTH-003 wire-schema authority remains unresolved. Already verified Change Controls are not to be re-opened."
 }
