@@ -1,4 +1,5 @@
 name: AUTH-002 Session Schema Evidence
+# registration-refresh: controlled remote evidence workflow
 
 on:
   workflow_dispatch:
