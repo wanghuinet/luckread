@@ -55,7 +55,8 @@
     "Decision acceptance does not equal runtime evidence.",
     "Only AUTH-003 remains technically pending from the eight original authority conflicts because canonical API admission prerequisites are not yet satisfied.",
     "No business implementation is inferred from Mapping 0 structural acceptance.",
-    "Unchanged validation results are inherited across evidence-only documentation commits."
+    "Unchanged validation results are inherited across evidence-only documentation commits.",
+    "B01-CONFLICT-002 is resolved from existing canonical Worker authority; do not reopen unless the canonical Worker Master/Binding Mapping changes."
   ],
   "currentHeadBaseline": "6d438c27b299853d4cdba20efe9d803547ed696a",
   "reconciledControls": [
@@ -98,12 +99,17 @@
       "id": "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19",
       "state": "PASS_VERIFIED",
       "note": "Exact support-collection exemption is active and Payload reconciliation passes; no canonical Media Entity created."
+    },
+    {
+      "id": "B01-CONFLICT-002",
+      "state": "PASS_VERIFIED",
+      "note": "Current ACTIVE/CANONICAL Worker Master and canonical Worker × D1 Binding Mapping reconcile W01/W02 ownership; historical W01-W13 and W00-W08 topology documents remain non-authoritative for current ownership."
     }
   ],
   "reconciliationPendingControls": [
     "CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19"
   ],
-  "nextObjective": "Continue fail-closed technical closure. AUTH-002 remote baseline execution is deferred by user; AUTH-003 wire-schema authority remains unresolved. Already verified Change Controls are not to be re-opened.",
+  "nextObjective": "Continue fail-closed technical closure. AUTH-002 remote baseline execution remains user-deferred/BLOCKED_EXTERNAL; AUTH-003 wire-schema authority remains unresolved. B01 worker-ownership reconciliation is now PASS_VERIFIED. Already verified controls are not to be re-opened.",
   "cursorUpdate": {
     "updatedAt": "2026-09-20",
     "reason": "Fresh current-main Structural Gate evidence recorded and synchronized into the closure ledger.",
