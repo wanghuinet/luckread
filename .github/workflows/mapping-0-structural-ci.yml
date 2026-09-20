@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   mapping-0-structural:
@@ -39,16 +39,3 @@ jobs:
 
       - name: Report Batch G orphan/duplicate sweep
         run: node scripts/mapping-0-batch-g-final-sweep.mjs
-
-
-  auth-002-remote-evidence:
-    name: AUTH-002 controlled remote D1 evidence
-    if: ${{ github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema' }}
-    needs: mapping-0-structural
-    uses: ./.github/workflows/auth-session-schema-evidence.yml
-    with:
-      database_name: luckread
-      environment_class: CONTROLLED_REMOTE_D1
-    secrets:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
