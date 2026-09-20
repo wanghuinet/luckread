@@ -6,7 +6,7 @@ on:
       source_sha:
         description: "Exact Git commit to execute; must contain only the approved baseline migration"
         required: true
-        default: "af6dfc222b074eac4f111f0acb0251936e62036d"
+        default: "90099199cd40a1e0416e142b828787548e173a43"
         type: string
       database_name:
         description: "Controlled D1 database name"
