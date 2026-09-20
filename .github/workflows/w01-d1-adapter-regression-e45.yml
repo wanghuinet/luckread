@@ -1,6 +1,16 @@
 name: W01 D1 Adapter Regression E4.5
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/w01-d1-adapter-regression-e45.yml"
+      - "scripts/w01-d1-adapter-regression-probe.mjs"
+      - "workers/W01-payload/package.json"
+      - "workers/W01-payload/pnpm-lock.yaml"
+      - "workers/W01-payload/src/payload.config.ts"
+      - "workers/W01-payload/src/collections/Users.ts"
   workflow_dispatch:
 
 permissions:
