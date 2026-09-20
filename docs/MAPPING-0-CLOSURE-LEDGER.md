@@ -795,3 +795,26 @@ Disposition: no independent structural repair is justified from these failures. 
 Evidence artifact: `artifacts/mapping-0/current-downstream-gate-evidence-2026-09-20.json`.
 
 Anti-loop disposition: reuse this downstream boundary evidence until the underlying Feature/Entity/Persistence/Evidence inputs change.
+
+
+## Superpowers continuation audit — fresh current-main Structural Gate — 2026-09-20
+
+Fresh GitHub Actions evidence now exists for the current main ancestry:
+- tested commit: `6dd714c5e26e4b6672d222355aacc9dd40d8b19b`;
+- Mapping 0 Structural Gate run: `35492431437`;
+- job: `106029555236`;
+- conclusion: `success`.
+
+Verified outputs:
+- Structural Gate = `GREEN`;
+- canonicalFeatureCount = 449;
+- mappingRecordCount = 449;
+- structural missingRecordCount = 0;
+- structural orphanRecordCount = 0;
+- unresolved downstream gap count = 449;
+- canonical Mapping status = `NOT_GREEN`;
+- status distribution = PARTIAL 17 / MISSING 1 / UNRESOLVED 431.
+
+This supersedes the older Structural Gate test commit in the current evidence artifact. It still does not promote feature-level or runtime closure.
+
+Anti-loop disposition: this exact Structural Gate fact can now be inherited for later documentation-only commits until structural inputs change; do not re-run identical checks merely because HEAD advances through evidence/ledger-only commits.
