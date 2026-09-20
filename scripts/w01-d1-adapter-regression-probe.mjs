@@ -61,7 +61,7 @@ const writeStage = (stage, extra = {}) => {
       },
       null,
       2,
-    ) + '\\n',
+    ) + '\n',
   )
 }
 
@@ -165,7 +165,7 @@ try {
 
 writeFileSync(
   `${outDir}/adapter-regression.json`,
-  JSON.stringify(result, null, 2) + '\\n',
+  JSON.stringify(result, null, 2) + '\n',
 )
 
 console.log(JSON.stringify(result, null, 2))
