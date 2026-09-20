@@ -24,6 +24,7 @@ const data = {
   value: { probe: key, sequence: 1 },
 }
 const where = { key: { equals: key } }
+const stageFile = `${outDir}/probe-stage.json`
 
 const result = {
   version: '1.0.0',
@@ -46,29 +47,78 @@ const result = {
   error: null,
 }
 
+const writeStage = (stage, extra = {}) => {
+  writeFileSync(
+    stageFile,
+    JSON.stringify(
+      {
+        version: '1.0.0',
+        runId,
+        testedCommitSha: process.env.GITHUB_SHA || '',
+        stage,
+        timestamp: new Date().toISOString(),
+        ...extra,
+      },
+      null,
+      2,
+    ) + '\\n',
+  )
+}
+
+const withTimeout = async (label, promise, timeoutMs = 60_000) => {
+  let timer
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 let payload
+writeStage('START')
 try {
+  writeStage('IMPORT_PAYLOAD_CONFIG')
   const { default: config } = await import('../workers/W01-payload/src/payload.config.ts')
-  payload = await getPayload({ config, key: `e45-${runId}` })
+
+  writeStage('GET_PAYLOAD_START')
+  payload = await withTimeout('getPayload', getPayload({ config, key: `e45-${runId}` }))
+  writeStage('GET_PAYLOAD_DONE')
 
   result.adapterUpsertAliasesUpdateOne = payload.db.upsert === payload.db.updateOne
 
+  writeStage('UPSERT_START', {
+    adapterUpsertAliasesUpdateOne: result.adapterUpsertAliasesUpdateOne,
+  })
   let upsertError = null
   let upsertResult = null
   try {
-    upsertResult = await payload.db.upsert({
-      collection: 'payload-preferences',
-      data,
-      where,
-    })
+    upsertResult = await withTimeout(
+      'payload.db.upsert(payload-preferences)',
+      payload.db.upsert({
+        collection: 'payload-preferences',
+        data,
+        where,
+      }),
+    )
   } catch (error) {
     upsertError = error instanceof Error ? error.message : String(error)
   }
+  writeStage('UPSERT_DONE', { upsertError })
 
-  const stored = await payload.db.findOne({
-    collection: 'payload-preferences',
-    where,
-  })
+  writeStage('FIND_ONE_START')
+  const stored = await withTimeout(
+    'payload.db.findOne(payload-preferences)',
+    payload.db.findOne({
+      collection: 'payload-preferences',
+      where,
+    }),
+  )
+  writeStage('FIND_ONE_DONE', { storedRowPresent: Boolean(stored) })
 
   result.observed = {
     upsertReturnedDocument: Boolean(upsertResult),
@@ -82,21 +132,31 @@ try {
     stored && JSON.stringify(stored.value) === JSON.stringify(data.value),
   )
 
+  writeStage('CLEANUP_START')
   try {
-    await payload.db.deleteMany({
-      collection: 'payload-preferences',
-      where,
-    })
-    const afterCleanup = await payload.db.findOne({
-      collection: 'payload-preferences',
-      where,
-    })
+    await withTimeout(
+      'payload.db.deleteMany(payload-preferences)',
+      payload.db.deleteMany({
+        collection: 'payload-preferences',
+        where,
+      }),
+    )
+    const afterCleanup = await withTimeout(
+      'payload.db.findOne(payload-preferences) cleanup check',
+      payload.db.findOne({
+        collection: 'payload-preferences',
+        where,
+      }),
+    )
     result.cleanedUp = !afterCleanup
+    writeStage('CLEANUP_DONE', { cleanedUp: result.cleanedUp })
   } catch (error) {
     result.error = `cleanup preference: ${error instanceof Error ? error.message : String(error)}`.slice(0, 300)
+    writeStage('CLEANUP_ERROR', { error: result.error })
   }
 } catch (error) {
   result.error = `setup: ${error instanceof Error ? error.message : String(error)}`.slice(0, 300)
+  writeStage('ERROR', { error: result.error })
 }
 
 writeFileSync(
