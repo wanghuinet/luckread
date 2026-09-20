@@ -1,0 +1,106 @@
+{
+  "version": "1.0",
+  "auditId": "M0-AUTH-003-WIRE-SCHEMA-BLOCKER-AUDIT-2026-09-20",
+  "sourceHead": "f20ffb2ad8c04d8740d1965ceb2b77432295baa5",
+  "featureId": "AUTH-003",
+  "controlId": "CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19",
+  "status": "BLOCKED_NOT_GREEN",
+  "authorityBoundary": "Only explicit API/public-wire authority may close these items; entity fields, persistence mappings, generated types, examples, or implementation behavior are non-authoritative for this gate.",
+  "established": [
+    "Canonical operations: authCredentialList, authCredentialAdd, authCredentialReplace, authCredentialRemove.",
+    "Canonical feature-contract routes: /auth/credentials and /auth/credentials/{credentialId}.",
+    "DTO identities are fixed.",
+    "Credential kinds are username|email|phone.",
+    "Mutations require authenticated self scope and Idempotency-Key.",
+    "Secret-derived and internal credential fields are non-public."
+  ],
+  "blockers": [
+    {
+      "id": "A003-WIRE-001",
+      "item": "Add request wire field set and requiredness",
+      "current": "UNRESOLVED",
+      "why": "No explicit public field names/requiredness in current API contract."
+    },
+    {
+      "id": "A003-WIRE-002",
+      "item": "Replace request wire field set and requiredness",
+      "current": "UNRESOLVED",
+      "why": "No explicit public field names/requiredness or kind-change semantics in current API contract."
+    },
+    {
+      "id": "A003-WIRE-003",
+      "item": "Public credential item/response projection",
+      "current": "UNRESOLVED",
+      "why": "No authoritative public response field set; current entity authority forbids inference."
+    },
+    {
+      "id": "A003-WIRE-004",
+      "item": "Public representation of kind",
+      "current": "UNRESOLVED",
+      "why": "Entity allows username|email|phone, but public projection remains conditional and unapproved."
+    },
+    {
+      "id": "A003-WIRE-005",
+      "item": "List pagination envelope, cursor and ordering",
+      "current": "UNRESOLVED",
+      "why": "List response exists only as a DTO identity; no list envelope/order/limit semantics are explicitly contracted."
+    },
+    {
+      "id": "A003-WIRE-006",
+      "item": "credentialId parameter schema and canonical namespace",
+      "current": "UNRESOLVED",
+      "why": "Generic ResourceId exists, but credential namespace is not explicitly bound to it."
+    },
+    {
+      "id": "A003-WIRE-007",
+      "item": "Success HTTP statuses and body semantics",
+      "current": "UNRESOLVED",
+      "why": "Current AUTH-003 contract does not define exact success statuses; remove body-vs-204 is also open."
+    },
+    {
+      "id": "A003-WIRE-008",
+      "item": "Canonical validation and generic credential-conflict error mapping",
+      "current": "UNRESOLVED",
+      "why": "Shared error categories exist, but AUTH-003-specific HTTP/code mapping is not explicit."
+    },
+    {
+      "id": "A003-WIRE-009",
+      "item": "Unknown-property behavior and final examples",
+      "current": "UNRESOLVED",
+      "why": "Unknown-property rejection and examples depend on the approved schema; examples cannot become schema authority."
+    }
+  ],
+  "proofSources": [
+    "contracts/alignment/mapping-batches/AUTH-003-dto-wire-field-matrix.v1.md",
+    "contracts/alignment/mapping-batches/AUTH-003-request-dto-closure-gate.v1.md",
+    "contracts/alignment/mapping-batches/AUTH-003-wire-projection-decision-gate.v1.md",
+    "contracts/alignment/mapping-batches/AUTH-003-replace-request-authority-audit.v1.md",
+    "contracts/alignment/mapping-batches/AUTH-003-006-openapi-promotion-input.v1.md",
+    "contracts/api/AUTH-003-credential-management-contract.v1.json"
+  ],
+  "decisionsPermittedFromCurrentRepo": [],
+  "prohibitedActions": [
+    "Do not add guessed request or response fields.",
+    "Do not infer credentialId format from Payload IDs or another entity namespace.",
+    "Do not infer list cursor envelope from unrelated API contracts.",
+    "Do not infer success/error HTTP mappings from generic categories alone.",
+    "Do not write AUTH-003 routes into OpenAPI yet.",
+    "Do not promote DTO registry or Mapping-0."
+  ],
+  "nextAuthorityAction": {
+    "sequence": [
+      "1. Explicitly approve public credential response projection (including whether kind is public).",
+      "2. Explicitly freeze Add request fields/requiredness/validation.",
+      "3. Explicitly freeze Replace request fields, kind-change rule, and validation.",
+      "4. Explicitly bind credentialId to canonical ID namespace/parameter schema.",
+      "5. Explicitly freeze list envelope/order/cursor semantics.",
+      "6. Explicitly freeze success and generic conflict/validation HTTP semantics.",
+      "7. Explicitly decide unknown-property behavior.",
+      "8. Encode approved DTO schemas into canonical AUTH-003 API contract.",
+      "9. Only then promote to OpenAPI, DTO registry, and Mapping-0."
+    ]
+  },
+  "mapping0Effect": "NONE",
+  "runtimeEvidenceEffect": "NONE",
+  "implementationAuthorization": false
+}
