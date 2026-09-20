@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "45af6bb9fd91a61c6fd242d71eda3c831fdc9dd0",
+  "sourceHead": "9ec383f2402e062e132c1ea1a478f89e69c79cf5",
   "checkpointDate": "2026-09-20",
   "checks": {
     "Payload Implementation Admission": {
@@ -47,7 +47,9 @@
     "duplicateMappingReexecution": "SKIPPED_BY_INHERITANCE",
     "generatedFullSchemaMigrationPromoted": false,
     "remoteD1MigrationExecuted": false,
-    "remoteEvidencePushPath": "PASS_VERIFIED"
+    "remoteEvidencePushPath": "PASS_VERIFIED",
+    "executionAdmission": "PASS_VERIFIED",
+    "executionWorkflowPath": "PASS_VERIFIED"
   },
   "remoteEvidenceCapture": {
     "workflowRunId": 35484344942,
@@ -69,5 +71,20 @@
     "artifactId": 10596323024,
     "artifactDigest": "sha256:a08284d79fd2d3f3ef14dee73a3d0964739dc9d5a722a3256fd7a56c1a0b48a7",
     "interpretation": "Controlled remote D1 query succeeded and proved the target database is currently uninitialized for the W01 Payload baseline. No migration was applied by the evidence workflow."
+  },
+  "executionAdmission": {
+    "status": "GREEN — EXECUTION ADMITTED",
+    "changeControl": "docs/change-control/CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20.md",
+    "scope": {
+      "databaseName": "luckread",
+      "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+      "environmentClass": "CONTROLLED_REMOTE_D1",
+      "migration": "20250929_111647",
+      "migrationBlobSha": "21e4a9ce27c828da655e479e35eb44ea3daff0f3",
+      "migrationIndexBlobSha": "e596aeb65381fd3bb2e0cfa7879c8f850bb77cbe"
+    },
+    "executionWorkflow": ".github/workflows/w01-baseline-migration-execution.yml",
+    "executed": false,
+    "nextStep": "manual controlled workflow dispatch followed by fresh post-migration evidence review"
   }
 }
