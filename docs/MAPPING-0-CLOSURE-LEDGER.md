@@ -668,3 +668,25 @@ Disposition:
 
 NEXT_ITEM_ID remains: `W01-MIGRATION-BASELINE-AUTHORITY-001`.
 NEXT_ITEM_STATE remains: `BLOCKED_EXTERNAL`.
+
+
+## Superpowers continuation audit — B01 remaining authority conflicts — 2026-09-20
+
+Source head at audit: `4e6dc135ee08d8ff3faf25b151b0f7848c7346ed`.
+
+Two B01 cross-cutting conflicts remain genuinely unresolved and are now explicitly fenced against rediscovery:
+
+- `B01-CONFLICT-002` / WORKER_OWNERSHIP: current Worker Master/Binding Mapping define W01 as API boundary and W02 as Identity/Account/Authorization, but repository also contains competing older/alternative topology sources that still declare canonical/locked states. No topology source was downgraded or rewritten by inference.
+- `B01-CONFLICT-003` / API_CANONICAL_PATH: Auth policy uses `/auth/*`, OpenAPI uses `server=/api/v1` with `/auth/*`/ `/users/*` paths, while API inventory and B01 implementation planning use `/v1/*` forms. These may be transport/base-path representations, but no explicit normalization authority was found.
+
+Audit artifact:
+`artifacts/mapping-0/b01-open-conflicts-authority-audit-2026-09-20.json`
+
+Disposition:
+- Both remain `OPEN / AUTHORITY_RECONCILIATION_REQUIRED`.
+- No Feature→Worker or API path status was changed.
+- No new Change-Control decision was invented.
+- Subsequent work must not rediscover these as new gaps unless an authoritative source changes.
+
+NEXT_ITEM_ID remains: `W01-MIGRATION-BASELINE-AUTHORITY-001`.
+NEXT_ITEM_STATE remains: `BLOCKED_EXTERNAL`.
