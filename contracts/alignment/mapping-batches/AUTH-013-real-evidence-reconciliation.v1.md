@@ -94,9 +94,9 @@ The state machine additionally references `user.unfreeze`, `user.reinstate`, and
 
 The existence of these IDs is confirmed at contract level; current executable enforcement and test evidence are not established.
 
-## 6. Critical ownership conflicts
+## 6. Critical ownership boundaries
 
-### 6.1 D1 domain naming conflict
+### 6.1 D1 domain naming conflict — RESOLVED
 
 The B01 AUTH-013 record currently declares:
 
@@ -110,7 +110,7 @@ The logical domain naming decision is now reconciled to `D01 Core` under Change 
 
 The current canonical Worker Master explicitly makes W00 historical/non-current and assigns Identity / Account / Authorization to **W02 / D1-01**. Therefore `W00` cannot be promoted as current runtime ownership by inference.
 
-This is a second blocking authority conflict and requires formal reconciliation before AUTH-013 can be GREEN.
+The remaining blocker is Worker ownership reconciliation; the D1 logical-domain naming decision is already closed.
 
 ## 7. Entity / field / persistence evidence
 
@@ -202,7 +202,7 @@ and the D1 and Worker authority conflicts have been formally resolved.
 
 ## 12. Closure criteria
 
-1. Resolve the `D1-01` versus `D01 Core` naming conflict through the canonical data/Worker mapping.
+1. D1-01 versus D01 Core naming conflict — RESOLVED under Change Control; do not infer physical D1 schema.
 2. Resolve the stale `W00` authoritative-writer declaration against the current W02 ownership model.
 3. Establish canonical `account_state` and `account_state_version` field IDs.
 4. Bind canonical API operation IDs for suspend/restore and any explicitly approved freeze/ban operations.
@@ -210,4 +210,4 @@ and the D1 and Worker authority conflicts have been formally resolved.
 6. Establish authoritative D1 persistence and migration evidence without relying on undocumented Payload schema.
 7. Implement and verify the full state-transition side-effect chain only after Contract authorization.
 8. Execute complete positive/negative/security/integration tests and populate non-empty Evidence Registry entries.
-9. Change AUTH-013 from `CONFLICT/PARTIAL` to `GREEN` only after the final Mapping 0 validator passes.
+9. AUTH-013 remains non-green until all remaining Worker/API/DTO/persistence/runtime/evidence gates pass.
