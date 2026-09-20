@@ -31,6 +31,7 @@ const stage2 = path.join(fixture, 'stage2')
 for (const dir of [stage1, stage2]) {
   for (const sub of ['collections', 'db', 'migrations']) fs.mkdirSync(path.join(dir, sub), { recursive: true })
   fs.writeFileSync(path.join(dir, 'tsconfig.json'), JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext', target: 'ES2022', strict: true, esModuleInterop: true, skipLibCheck: true } }))
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ type: 'module', private: true }))
 }
 
 const historicalUsers = show(baselineSha, 'workers/W01-payload/src/collections/Users.ts')
