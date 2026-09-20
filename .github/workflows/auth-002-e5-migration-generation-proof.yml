@@ -1,0 +1,45 @@
+name: AUTH-002 E5 Migration Generation Proof
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W01-payload/src/db/**'
+      - 'workers/W01-payload/src/payload.config.ts'
+      - 'workers/W01-payload/src/collections/Users.ts'
+      - 'workers/W01-payload/src/migrations/**'
+      - 'scripts/auth-002-e5-migration-generation-proof.mjs'
+      - '.github/workflows/auth-002-e5-migration-generation-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.34.5 --activate
+      - name: Install W01 locked dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-workspace
+      - name: Run E5 official Payload migration generation proof
+        working-directory: workers/W01-payload
+        env:
+          E5_BASELINE_SHA: 62aecc7a9343b9b4b6e374bacbd68381c46baa1c
+        run: pnpm exec node ../../scripts/auth-002-e5-migration-generation-proof.mjs
+      - name: Upload E5 generated migration proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-002-e5-migration-generation-proof-${{ github.run_id }}
+          path: artifacts/evidence/auth-002/e5-generation/
+          if-no-files-found: error
+          retention-days: 14
