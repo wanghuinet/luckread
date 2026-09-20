@@ -503,3 +503,33 @@ Acceptance:
 NEXT_ITEM_ID: `W01-MIGRATION-BASELINE-AUTHORITY-001`
 NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
 NEXT required external evidence: execute the existing AUTH-002 Session Schema Evidence workflow against `luckread` with `CONTROLLED_REMOTE_D1`, then review the generated migration-status/catalog/schema evidence before migration admission.
+
+## Superpowers continuation checkpoint — 2026-09-20 (REMOTE AUTH-002 BASELINE RESOLVED)
+
+Verified current main checkpoint commit: `a1198e3fd6302e3b1693e68760fec7c87f063073`
+
+Fresh evidence superseding the older 8da0c14f / 35482755313 observations:
+- AUTH-002 Session Schema Evidence run `35484344942` created a real job and completed all remote D1 capture commands.
+- Target: `luckread` / `2f80471e-3756-49f9-8db1-7707a433ad64`.
+- Environment: `CONTROLLED_REMOTE_D1`.
+- Remote D1 metadata reports `num_tables=0`, `write_queries_24h=0`, `rows_written_24h=0`.
+- Remote catalog contains only Cloudflare internal `_cf_KV`; W01 Payload tables `users`, `users_sessions`, and `payload_migrations` are absent.
+- `auth_session_state` is absent, as expected before its separately admitted extension migration.
+- The evidence workflow performed no migration application and no remote DDL/DML.
+- The evidence artifact is retained as GitHub Actions artifact `10596323024`, digest `sha256:a08284d79fd2d3f3ef14dee73a3d0964739dc9d5a722a3256fd7a56c1a0b48a7`.
+- Gate-1 validator correctly rejected the package because the expected W01 baseline `users` table is not yet present. This is a substantive baseline-state finding, not a workflow failure.
+
+Current W01 migration baseline finding:
+- Existing committed baseline remains `workers/W01-payload/src/migrations/20250929_111647.ts`.
+- Current W01 source/config has six additional User profile fields not present in that baseline.
+- The prior generated full-schema migration remains NOT_PROMOTED.
+- Existing Change Control now records the remote empty-target finding and status `READY_FOR_EXPLICIT_BASELINE_EXECUTION_ADMISSION`.
+- Remote migration remains blocked until explicit execution admission; no execution is simulated.
+
+NEXT_ITEM_ID: `W01-MIGRATION-BASELINE-AUTHORITY-001`
+NEXT_ITEM_STATE: `READY_FOR_EXPLICIT_BASELINE_EXECUTION_ADMISSION`
+NEXT ACTION:
+1. Admit execution of the existing `20250929_111647` baseline only, against `luckread`.
+2. Re-capture remote D1 schema/migration evidence after execution.
+3. Only after baseline evidence is accepted, resolve the supported Payload migration-snapshot/delta workflow for the six current User profile fields.
+4. Do not hand-author/infer an additive ALTER/DDL migration and do not promote the prior full-schema generated artifact.
