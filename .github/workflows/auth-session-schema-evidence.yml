@@ -114,7 +114,9 @@ jobs:
               }, null, 2) + "\n"
             );
           '
-          rm -f artifacts/evidence/auth-002/migration-status.txt
+          if [ "$migration_exit" -eq 0 ]; then
+            rm -f artifacts/evidence/auth-002/migration-status.txt
+          fi
           test "$migration_exit" -eq 0
 
       - name: Capture remote D1 catalog evidence
@@ -232,7 +234,7 @@ jobs:
         run: node scripts/auth-session-schema-evidence-validate.mjs
 
       - name: Upload schema evidence artifacts
-        if: "${{ github.event_name == 'workflow_dispatch' && always() }}"
+        if: "${{ (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.event.head_commit.message == 'evidence(auth-002): capture controlled remote schema')) && always() }}"
         uses: actions/upload-artifact@v4
         with:
           name: auth-002-schema-evidence-${{ github.run_id }}
