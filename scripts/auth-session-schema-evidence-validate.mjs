@@ -87,7 +87,14 @@ for (const pattern of forbiddenValuePatterns) {
 }
 
 const unwrapRows = (value) => {
-  if (Array.isArray(value)) return value
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => {
+      if (Array.isArray(item)) return item
+      if (item && Array.isArray(item.results)) return item.results
+      if (item && Array.isArray(item.result)) return item.result
+      return []
+    })
+  }
   if (value && Array.isArray(value.results)) return value.results
   if (value && Array.isArray(value.result)) return value.result
   return []
