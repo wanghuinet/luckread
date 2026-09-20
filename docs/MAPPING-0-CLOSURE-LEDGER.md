@@ -559,3 +559,12 @@ NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
 NEXT ACTION: manually dispatch `.github/workflows/w01-baseline-migration-execution.yml` with `confirm=EXECUTE_W01_BASELINE`, `database_name=luckread`, and source SHA `9ec383f2402e062e132c1ea1a478f89e69c79cf5`; then review the resulting post-migration evidence before any additive migration is generated.
 
 No Mapping row, Contract definition, or runtime status is promoted by the admission alone.
+
+
+## W01 execution workflow cursor refresh — 2026-09-20
+
+- Source head: `f31e8bc691298995e2732cb1012c794a1e6897e2`.
+- `.github/workflows/w01-baseline-migration-execution.yml` default `source_sha` is aligned to this current main head.
+- Approved baseline migration/index blob pins are unchanged and remain enforced by `scripts/w01-remote-migration-admission.mjs`.
+- No controlled remote D1 migration execution has occurred; `W01-MIGRATION-BASELINE-AUTHORITY-001` remains `BLOCKED_EXTERNAL`.
+- This change is workflow metadata alignment only; no Contract, Blueprint, migration source, or schema content was changed.
