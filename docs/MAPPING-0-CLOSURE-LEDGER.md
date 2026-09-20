@@ -777,3 +777,21 @@ Evidence artifact: `artifacts/mapping-0/current-structural-gate-evidence-2026-09
 Acceptance boundary: this is genuine Structural Gate evidence for the tested commit. It does not promote any Feature to GREEN and does not prove runtime/D1/migration/security-E2E closure. Mapping-0 status remains PARTIAL 17 / MISSING 1 / UNRESOLVED 431.
 
 Anti-loop rule: subsequent documentation-only commits may reuse this structural fact under the existing verification-lookup rules; a new current-HEAD certificate requires a new applicable workflow run.
+
+
+## Superpowers continuation audit — downstream Contract CI boundary — 2026-09-20
+
+Verified GitHub Actions Contract CI run `35492243047` against commit `ce7d092587a9e28578f156f0a6790793720148dd`.
+
+Admission layers that passed: semantic, common, state-machines, OpenAPI, authz, feature inventory, Payload reconciliation, and capability-contract graph. The failing layers were Five-Way Alignment and Strict Downstream R4/Evidence/R5.
+
+Observed downstream evidence:
+- Five-Way reconciliation: `450 blockers`, with 151 canonical API operations, 2 Payload collections, and 203 code-evidence records discovered.
+- R4 evidence gap: 449 total, 0 ready, 449 blocked; 440 missing entity bindings; 9 persistence-not-verified.
+- Evidence Registry final check correctly remains RED because Canonical Mapping and Feature-level evidence are not GREEN.
+
+Disposition: no independent structural repair is justified from these failures. They represent the intended fail-closed downstream closure boundary. Do not weaken gates or synthesize Entity/Persistence/Evidence edges to obtain Contract CI GREEN.
+
+Evidence artifact: `artifacts/mapping-0/current-downstream-gate-evidence-2026-09-20.json`.
+
+Anti-loop disposition: reuse this downstream boundary evidence until the underlying Feature/Entity/Persistence/Evidence inputs change.
