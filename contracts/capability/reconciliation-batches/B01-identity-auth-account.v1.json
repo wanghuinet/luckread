@@ -262,7 +262,7 @@
       ],
       "eventRefs": [],
       "workerRefs": [],
-      "d1Domain": "UNRESOLVED",
+      "d1Domain": "D01 Core",
       "testRefs": [],
       "evidenceRefs": [],
       "reconciliationState": "MISSING",
@@ -523,7 +523,6 @@
       "evidenceRefs": [],
       "reconciliationState": "CONFLICT",
       "blockers": [
-        "D1 domain naming conflict requires Change Control",
         "worker ownership and evidence mapping incomplete"
       ]
     },
@@ -599,9 +598,8 @@
       "d1Domain": "D01 Core",
       "testRefs": [],
       "evidenceRefs": [],
-      "reconciliationState": "CONFLICT",
+      "reconciliationState": "PARTIAL",
       "blockers": [
-        "D1 naming conflict requires Change Control",
         "deletion/anonymization migration evidence missing"
       ]
     },
