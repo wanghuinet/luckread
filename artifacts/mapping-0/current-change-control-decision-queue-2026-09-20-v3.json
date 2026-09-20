@@ -57,7 +57,7 @@
     "No business implementation is inferred from Mapping 0 structural acceptance.",
     "Unchanged validation results are inherited across evidence-only documentation commits."
   ],
-  "currentHeadBaseline": "2ae8c17ea801877fdd5daa7644a21fbf14142e0f",
+  "currentHeadBaseline": "5ac6f6e6413408a2c13eb07f28af4d748702d190",
   "reconciledControls": [
     {
       "id": "CC-MAPPING-0-AUTH-006-STATUS-CLASSIFICATION-2026-09-19",
@@ -106,9 +106,9 @@
   "nextObjective": "Continue fail-closed technical closure. AUTH-002 remote baseline execution is deferred by user; AUTH-003 wire-schema authority remains unresolved. Already verified Change Controls are not to be re-opened.",
   "cursorUpdate": {
     "updatedAt": "2026-09-20",
-    "reason": "Cursor hygiene after documentation-only reconciliation commits; decision basis and control states unchanged.",
-    "latestReconciliation": "B01-CONFLICT-003",
-    "latestReconciliationState": "RESOLVED",
-    "noStatusPromotion": true
+    "reason": "Cursor advanced after AUTH-003 wire-schema blocker freeze; no contract/API/DTO/Mapping promotion occurred.",
+    "latestAudit": "M0-AUTH-003-WIRE-SCHEMA-BLOCKER-AUDIT-2026-09-20",
+    "latestAuditCommit": "bc4638df7fb4a2b83d9beb37a1a85e191c58e92e",
+    "replayRule": "Reuse blocker audit until an authority input changes."
   }
 }
