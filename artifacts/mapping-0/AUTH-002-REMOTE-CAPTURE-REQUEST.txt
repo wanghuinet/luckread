@@ -11,3 +11,4 @@ Explicit secret binding validated; retry through reusable caller.
 
 Current execution path: direct push event with exact commit message `evidence(auth-002): capture controlled remote schema`; no migration mutation.
 Re-armed after diagnostic-retention fix at commit 221ab6512c033aaf304a1d5c0486b323ddc1d555.
+Re-armed after Payload migration-history query correction at commit 7912b83c46688c97b2e2bfdbe50617892dad6da2.
