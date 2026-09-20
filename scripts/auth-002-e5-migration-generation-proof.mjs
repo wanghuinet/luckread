@@ -67,37 +67,6 @@ const stage1Json = fs.readdirSync(path.join(stage1, 'migrations')).filter((f) =>
 if (stage1Json.length !== 1) throw new Error('Expected exactly one generated baseline snapshot; found ' + stage1Json.length)
 fs.copyFileSync(path.join(stage1, 'migrations', stage1Json[0]), path.join(stage2, 'migrations', 'baseline.json'))
 
-const diagnostic = path.join(stage2, 'diagnose-schema.mjs')
-const diagnosticSource = `
-import payload from 'payload'
-
-process.env.PAYLOAD_MIGRATING = 'true'
-const configPath = process.env.PAYLOAD_CONFIG_PATH
-if (!configPath) throw new Error('PAYLOAD_CONFIG_PATH is required for schema diagnostic')
-const mod = await import(configPath)
-await payload.init({ config: mod.default, disableDBConnect: true, disableOnInit: true })
-
-const report = { schemaKeys: Object.keys(payload.db.schema), generated: null, error: null }
-try {
-  const kit = payload.db.requireDrizzleKit()
-  const snapshot = await kit.generateDrizzleJson(payload.db.schema)
-  report.generated = { tableNames: Object.keys(snapshot.tables ?? {}), tableCount: Object.keys(snapshot.tables ?? {}).length }
-} catch (error) {
-  report.error = error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error)
-}
-console.log(JSON.stringify(report, null, 2))
-`
-fs.writeFileSync(diagnostic, diagnosticSource, 'utf8')
-const diagnosticOutput = run(
-  'pnpm',
-  ['exec', 'tsx', diagnostic],
-  root,
-  {
-    PAYLOAD_CONFIG_PATH: path.join(stage2, 'payload.config.ts'),
-    PAYLOAD_SECRET: 'e5-generation-only-not-production',
-  },
-)
-fs.writeFileSync(path.join(outDir, 'schema-diagnostic.json'), diagnosticOutput)
 
 runCreate(stage2, 'MIG-AUTH-002-SESSION-V1')
 const stage2Dir = path.join(stage2, 'migrations')
