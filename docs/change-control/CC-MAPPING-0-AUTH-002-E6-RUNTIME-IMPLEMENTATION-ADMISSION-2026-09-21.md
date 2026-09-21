@@ -2,7 +2,7 @@
 
 - ID: CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21
 - Date: 2026-09-21
-- Status: BLOCKED — REQUIRED CONTRACT INPUTS INCOMPLETE
+- Status: BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED
 - Feature: AUTH-002
 - Gate: E6 Native Session Runtime Evidence
 - Depends on:
@@ -77,16 +77,26 @@ The parent E5 authority incident is now explicitly reconciled by the project Aut
 - no retroactive GREEN authorization exists;
 - no second E5 execution is permitted.
 
-This reconciliation clears the incident-dependency only. E6 implementation is now explicitly blocked by the missing wire/input authority recorded in `docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md`. The project GREEN→implement rule remains in force.
+This reconciliation clears the incident dependency. The wire/input authority is closed and the RoleAssignment/layer authority is now reconciled by `contracts/entity/AUTHZ-role-assignment-authority.v1.json` and `contracts/authz/role-assignment-layer-resolution.v1.json`. E6 implementation remains blocked only until an exact existing W01/Payload runtime binding is admitted and the required controlled evidence path is established. The project GREEN→implement rule remains in force.
 
 ## Current disposition
 
 - GAP-E6-RUNTIME-001: OPEN.
 - E6-WIRE-001: PASS_VERIFIED_AUTHORITY — authRefresh request/response/error/credential-carrier contract reconciled.
 - E6-WIRE-002: PASS_VERIFIED_AUTHORITY — deviceId source/transport/binding semantics reconciled.
-- E6-LAYER-001: OPEN — response layer source/resolver authority is not established.
-- This Change Control: BLOCKED — REQUIRED CONTRACT INPUTS MISSING.
+- E6-LAYER-001: AUTHORITY CLOSED — deterministic resolver contract established; runtime binding/evidence remains open.
+- This Change Control: BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED.
 - No runtime code added by this record.
 - No remote D1 write performed by this record.
 - AUTH-002 remains NOT_GREEN.
 - Mapping 0 remains NOT_GREEN.
+
+
+## Latest authority reconciliation — 2026-09-21
+
+- RoleAssignment authority contract: `contracts/entity/AUTHZ-role-assignment-authority.v1.json`.
+- Deterministic layer resolver contract: `contracts/authz/role-assignment-layer-resolution.v1.json`.
+- E6-WIRE-001 and E6-WIRE-002: PASS_VERIFIED_AUTHORITY.
+- E6-LAYER-001 authority semantics: CLOSED — CONTRACT RECONCILED.
+- Remaining GAP-E6-RUNTIME-001: exact W01/Payload runtime extension point, implementation, static validation, controlled execution, and Evidence Registry evidence.
+- Runtime implementation remains unauthorized while this Change Control is BLOCKED.
