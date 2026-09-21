@@ -6,3 +6,5 @@ This file is a trigger marker only; the workflow performs read-only remote evide
 Refresh requested after W01 baseline execution preflight diagnostic capture.
 
 Refresh requested after E5 execution incident reconciliation; read-only capture only.
+
+Final read-only recapture after validator scope correction.
