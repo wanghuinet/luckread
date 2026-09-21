@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "34254d26266b7277918655f7fd96711e8aa0e4d3",
+  "sourceHead": "7f1da18d3e29590b01f86198fe9111255d1f89a6",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -118,7 +118,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Resolve E6 layer output authority: canonical source, precedence, and deterministic resolver for authLogin/authRefresh response layer L0-L8. Do not hard-code a layer or add a User field by inference.",
+  "nextRequiredExternalAction": "E6-LAYER-001 remains the only identified runtime admission blocker: D1-01 Role/RoleAssignment is now verified as the authoritative domain/input, but the deterministic effective-RoleAssignment-to-L0-L8 resolver, multi-assignment precedence, and authLogin/authRefresh runtime binding still require explicit Contract-First authority decision. Do not hard-code a layer or add a User field by inference.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -212,8 +212,8 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "34254d26266b7277918655f7fd96711e8aa0e4d3",
-  "note": "Current main includes E6 wire authority closure and deterministic E6 admission guard PASS. Runtime remains blocked by E6-LAYER-001; no runtime code or D1 mutation performed.",
+  "latestReconciliationCommit": "7f1da18d3e29590b01f86198fe9111255d1f89a6",
+  "note": "Current main includes E6 wire authority closure, deterministic admission guard PASS, and a new Layer Authority Audit narrowing the blocker to the missing effective RoleAssignment→L0-L8 resolver/precedence/runtime binding. Runtime remains blocked; no runtime code or D1 mutation performed.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -303,8 +303,14 @@
   },
   "e6LayerAuthority": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-LAYER-AUTHORITY-2026-09-21.md",
+    "audit": "artifacts/mapping-0/auth-002-e6-layer-authority-audit-2026-09-21.md",
     "status": "OPEN — EXPLICIT AUTHORITY DECISION REQUIRED",
-    "evidence": "Current W01 source has no canonical layer field/resolver; repository search found L0-L8 definitions but no executable resolver.",
+    "authorityDomain": "D1-01 Identity / Account / Access",
+    "authorityInput": "RoleAssignment (authorization input)",
+    "layerDefinitionSource": "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
+    "machineLayerSource": "contracts/authz/layers.json",
+    "payloadUserRoleRule": "User.role is compatibility metadata and is not complete authorization authority",
+    "verifiedGap": "No executable deterministic effective-role-to-layer resolver or multi-assignment precedence is established in W01",
     "implementationAuthorized": false
   }
 }
