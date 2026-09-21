@@ -1,0 +1,16 @@
+{
+  "artifact": "current-auth-002-remote-execution-failure-2026-09-21",
+  "workflowRunId": 35550671505,
+  "workflow": "W01 Baseline Migration Execution",
+  "sourceSha": "fe95f41695c822480ee411e3a77453d1970b355f",
+  "runAttempt": 2,
+  "conclusion": "failure",
+  "mutationReached": false,
+  "evidenceArtifactProduced": false,
+  "failedStep": "Prove controlled target is still empty",
+  "observed": "Wrangler D1 remote execute failed before the preflight table-set query completed.",
+  "migrationExecutionStepReached": false,
+  "postMigrationEvidenceStepReached": false,
+  "safetyConclusion": "No new remote migration-success evidence is admitted from this run; do not treat it as proof of schema state.",
+  "nextAllowedAction": "Obtain a fresh controlled read-only target evidence run or explicitly retry the approved workflow through the existing governed dispatch path; do not infer success from this failed run."
+}
