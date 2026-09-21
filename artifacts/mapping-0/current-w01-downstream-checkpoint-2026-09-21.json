@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "9fd9e7c954d982288a39c1946d6af7140e688069",
+  "sourceHead": "212e47363146f847a213a70469e5638c532c5e0b",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -118,7 +118,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Resolve only the remaining E6-WIRE-001 schema inputs: canonical Request DTO, Response DTO, Error/status mapping, credential-carrier semantics, and promotion of the existing /auth/refresh Discovery Draft to admitted Wire Authority. API path/base-path normalization is already PASS_VERIFIED. Resolve E6-WIRE-002 through an explicit AUTH-002 device-binding source/transport decision. Do not implement runtime auth code, add transport fields, promote the Discovery Draft, or mutate D1 before both inputs are reconciled.",
+  "nextRequiredExternalAction": "External Contract-First authority decision required. AUTH-011 must explicitly define the exact authRefresh Request/Response/Error schemas, DTO identity, credential-carrier semantics, and route admission; AUTH-002 must explicitly define the authoritative device-binding source, transport, and ownership/control semantics. Do not repeat repository searches unless a new authority source is committed. Do not implement runtime auth code, add transport fields, promote the Discovery Draft, or mutate D1 before both decisions are reconciled.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -212,7 +212,7 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "9fd9e7c954d982288a39c1946d6af7140e688069",
+  "latestReconciliationCommit": "212e47363146f847a213a70469e5638c532c5e0b",
   "note": "Authoritative continuation cursor. E5 authority incident is reconciled. E6-WIRE-001 remains OPEN because /auth/refresh exists only as DISCOVERY_DRAFT; E6-WIRE-002 remains OPEN because device binding source/transport is still undefined. This correction changes evidence interpretation only; no runtime authentication code or D1 mutation was performed.",
   "executionTriggerAttempts": {
     "commits": [
@@ -269,7 +269,7 @@
   },
   "e6WireInputGaps": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md",
-    "status": "OPEN — REQUIRED CONTRACT INPUTS MISSING",
+    "status": "OPEN — EXPLICIT DECISION INPUTS REQUIRED",
     "evidence": {
       "E6_WIRE_001": {
         "artifact": "artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json",
@@ -283,7 +283,8 @@
         "status": "INPUT_AUTHORITY_MISSING_CONFIRMED",
         "sufficiencyAudit": "artifacts/mapping-0/e6-wire-input-sufficiency-audit-2026-09-21.json"
       }
-    }
+    },
+    "decisionBoundary": "No existing authoritative source can legally supply E6-WIRE-001 or E6-WIRE-002; implementation remains fail-closed."
   },
   "auth011WireAuthorityDrift": {
     "audit": "artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json",
