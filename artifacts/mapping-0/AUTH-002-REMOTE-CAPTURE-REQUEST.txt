@@ -1,0 +1,1 @@
+Controlled AUTH-002 remote schema evidence capture request. Read-only evidence collection only; no migration, DDL, INSERT, UPDATE, or DELETE.
