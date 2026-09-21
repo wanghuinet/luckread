@@ -152,3 +152,21 @@ Reconciliation state:
 - Authority incident reconciliation: `PASS_VERIFIED`.
 - E5 technical evidence: retained, not retroactively authorized.
 - Next gate: E6 runtime integration under its existing implementation/evidence Change Controls.
+
+
+### 10. AUTH-002 E6 implementation admission / wire-input gaps
+
+Review result for `CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21`:
+
+Decision:
+- E6 runtime implementation is **not admitted yet**.
+- `authRefresh` exists in the Auth API policy, but its canonical OpenAPI wire definition is missing; no request/response/error contract may be inferred from the policy or Payload-native refresh behavior.
+- `ENT-SESSION-F-DEVICE-ID` is a required canonical field, but the current AUTH-002 public login wire contract does not define an authoritative transport/source for the device binding.
+- Therefore E6 implementation must remain blocked until these two inputs are resolved through normal Contract-First Change Control.
+- No new device entity, header, API field, refresh endpoint, DTO, Worker or D1 domain is introduced by this decision.
+
+Reconciliation state:
+- Parent E5 authority incident: `PASS_VERIFIED`.
+- E5 technical result: retained without retroactive authorization.
+- E6 implementation admission: `BLOCKED — REQUIRED CONTRACT INPUTS MISSING`.
+- Mapping 0 remains `NOT_GREEN`.
