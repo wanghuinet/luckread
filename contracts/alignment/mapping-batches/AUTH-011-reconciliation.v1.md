@@ -24,3 +24,14 @@ The canonical mapping binds `AUTH-011` to `authRefresh` and security ID `user.se
 ## Next closure action
 
 Reconcile refresh-token/credential lifecycle against the authoritative identity/session registry and real repository artifacts, bind the full traceability chain, then rerun the fail-closed Mapping 0 validator.
+
+
+## 6A. Current API/OpenAPI authority drift correction — 2026-09-21
+
+A current repository-only authority audit confirms:
+- `contracts/api/api-inventory.v1.json` requires `POST /v1/auth/refresh`.
+- `contracts/openapi/v1/openapi.yaml` currently has no canonical `/auth/refresh` path and no `operationId: authRefresh` definition.
+- `artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json` records this as `DRIFT_CONFIRMED`.
+- The older `artifacts/mapping-0/api-dto-four-layer-crosscheck-2026-09-19.json` claim that `authRefresh` had an OpenAPI occurrence must be treated as stale evidence for current-head authority and must not be used for promotion.
+
+This correction changes only the evidence interpretation. It does not add or modify the canonical OpenAPI route, DTOs, API inventory, or runtime implementation.
