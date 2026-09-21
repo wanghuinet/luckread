@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "d7b1fe78cd0e39e62b0b60ae4761894fe07cfc1c",
+  "sourceHead": "b1192393271e32e013fc3d4268b0bc934d1b419c",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -131,6 +131,6 @@
     "E5_remote_execution": "NOT_ADMITTED",
     "overall": "NOT_GREEN"
   },
-  "latestReconciliationCommit": "d7b1fe78cd0e39e62b0b60ae4761894fe07cfc1c",
-  "note": "Current main head aligned after E5 execution-channel preparation. This batch changed only guarded workflow/governance code and evidence cursor; no remote D1 mutation was executed."
+  "latestReconciliationCommit": "b1192393271e32e013fc3d4268b0bc934d1b419c",
+  "note": "Current main head aligned to the latest governance checkpoint. No remote D1 mutation executed; E5 remains WAIT_AUTHORITY_DECISION."
 }
