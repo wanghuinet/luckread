@@ -36,6 +36,13 @@ Required resolution:
 - Do not derive a fingerprint from IP, User-Agent or other uncontracted attributes.
 - Do not create `ENT-DEVICE-RECORD` or another device persistence authority solely to fill this gap.
 
+## Cross-domain dependency confirmation
+
+The repository already identifies `AUTH-011/authRefresh` as a separate Contract-First dependency:
+- `contracts/alignment/mapping-batches/AUTH-011-runtime-gate.v1.md` requires the canonical OpenAPI path, Request DTO, Response DTO, credential/session field authority and executable rotation/reuse evidence before runtime promotion.
+- `contracts/alignment/mapping-batches/AUTH-010-canonical-openapi-patch.v1.md` does not authorize an `authRefresh` route handler; it only defines the separate session-list/revoke OpenAPI patch.
+- Therefore E6 cannot invent a refresh route or DTO to satisfy its runtime test. The missing `authRefresh` wire authority must be resolved through the existing AUTH-011/AUTH-010 contract chain where applicable.
+
 ## Impact
 
 Until E6-WIRE-001 and E6-WIRE-002 are resolved:
