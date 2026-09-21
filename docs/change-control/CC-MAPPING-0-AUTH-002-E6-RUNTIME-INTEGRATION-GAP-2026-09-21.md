@@ -50,3 +50,13 @@ GAP -> approved implementation/change control -> exact W01 runtime implementatio
 ## Current disposition
 
 This gap is recorded only. No runtime code was added in this Change Control.
+
+
+## Latest reconciliation — RoleAssignment authority exists, source implementation does not — 2026-09-21
+
+- The RoleAssignment authority semantics are now frozen by `contracts/entity/AUTHZ-role-assignment-authority.v1.json`.
+- The deterministic layer algorithm is frozen by `contracts/authz/role-assignment-layer-resolution.v1.json`.
+- Current Entity Catalog still records `ENT-ROLE-ASSIGNMENT` as `PROPOSED`; current persistence/code-evidence inventories contain no implementation, schema, migration, or runtime record for that entity.
+- Therefore the remaining GAP-E6-RUNTIME-001 dependency is two-part: (a) an authoritative RoleAssignment source must exist and be evidence-bound without inventing a second authorization authority, and (b) the resolver must be bound to the existing W01/Payload runtime extension point.
+- No new RoleAssignment table, persistence schema, Worker, D1 domain, or fallback authority is authorized by this finding.
+- Runtime implementation remains blocked until the existing Contract-First implementation gate admits both the authoritative source and the W01 runtime binding, followed by controlled evidence.
