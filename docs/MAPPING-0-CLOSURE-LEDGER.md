@@ -1215,3 +1215,18 @@ Authority review has now classified the E6 implementation gate:
 
 Anti-loop: do not start W01 auth runtime implementation until E6-WIRE-001 and E6-WIRE-002 are resolved and reconciled into the existing E6 implementation admission control.
 
+
+## Superpowers continuation — E6 implementation admission fail-closed guard — 2026-09-21
+
+Added a non-mutating E6 implementation admission guard:
+- `scripts/auth-002-e6-implementation-admission.mjs`
+- `.github/workflows/auth-002-e6-implementation-admission.yml`
+
+The guard enforces:
+- explicit `GREEN — IMPLEMENTATION ADMITTED` is required before protected W01 authentication runtime files may change;
+- E6-WIRE-001 and E6-WIRE-002 must be reconciled before admission;
+- contradictory state (GREEN implementation while wire/input gaps remain open) fails closed;
+- current blocked state remains accepted for documentation/control changes only.
+
+No authentication runtime code was changed and no remote D1 mutation occurred.
+
