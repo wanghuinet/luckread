@@ -56,3 +56,21 @@ No resource creation is authorized by this record.
 ## Current disposition
 
 OPEN. This control becomes a prerequisite for physical runtime implementation admission where the current repository has no already-proven physical binding.
+
+
+## Evidence acquisition delta — 2026-09-21
+
+A current-head repository/configuration audit was performed without executing or mutating Cloudflare resources:
+
+1. `workers/W01-payload/wrangler.jsonc` declares a concrete Cloudflare Worker name `luckread-w01-payload` and explicitly binds D1 `luckread` (UUID `2f80471e-3756-49f9-8db1-7707a433ad64`).
+2. This is repository/configuration evidence only. It does **not** establish that a corresponding Worker script is currently uploaded/deployed, and it does not by itself prove logical W01 identity because the ACTIVE Worker Master forbids ownership inference from directory/config naming.
+3. `workers/W02-content/wrangler.jsonc` is absent on current `main`; the W02 directory currently contains only its README skeleton in the inspected root. Therefore no current physical W02 runtime/deployment binding is established by repository configuration.
+4. Equivalent `wrangler.jsonc` files were not found at the inspected roots for the physical W03-W12 directories. These paths therefore do not establish current physical Worker bindings either.
+5. The latest committed Cloudflare inventory evidence remains the successful read-only run `35480031531`, captured 2026-09-20, and records zero uploaded Worker scripts. No newer inventory run is evidenced in the current repository state during this audit.
+6. The audit therefore **does not promote any physical Worker → canonical Worker binding**. The only concrete current repository runtime candidate is W01 Payload, while canonical W02 runtime remains unbound.
+
+### Gate result
+
+`Canonical logical Worker → physical Worker resource/name → deployed source commit → configuration/binding → runtime evidence` remains **NOT_ESTABLISHED** for the AUTH-002-relevant W02 boundary.
+
+No directory rename, Worker creation, deployment, D1 mutation, or runtime implementation admission occurred.
