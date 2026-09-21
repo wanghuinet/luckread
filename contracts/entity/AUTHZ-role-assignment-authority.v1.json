@@ -22,7 +22,8 @@
     "roleIdentifierSource": "contracts/authz/layers.json#x-layers[].roles",
     "layerSource": "contracts/authz/layers.json#x-layers",
     "assignmentDoesNotCreateMembership": true,
-    "assignmentDoesNotCreateOwnership": true
+    "assignmentDoesNotCreateOwnership": true,
+    "resolutionContract": "contracts/authz/role-assignment-layer-resolution.v1.json"
   },
   "fields": [
     {
@@ -263,5 +264,6 @@
       "D1/persistence evidence when implementation is introduced.",
       "Evidence Registry record bound to the validating commit."
     ]
-  }
+  },
+  "resolverContractRef": "contracts/authz/role-assignment-layer-resolution.v1.json"
 }
