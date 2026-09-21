@@ -11,7 +11,7 @@ const changeControlPath = join(
 )
 
 const source = readFileSync(changeControlPath, 'utf8')
-const admitted = /Status:\s*GREEN\s+—\s*EXECUTION ADMITTED/i.test(source)
+const admitted = /^- Status:\s*GREEN\s+—\s*EXECUTION ADMITTED\s*$/m.test(source)
 
 const migrationPath = 'workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts'
 const migrationIndexPath = 'workers/W01-payload/src/migrations/index.ts'
