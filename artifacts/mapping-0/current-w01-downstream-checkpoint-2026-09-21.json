@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "347750086cadc2541d423f82eff0eb97338c77e8",
+  "sourceHead": "d9b6840d4812cceaaabf8936e8c0fa9de4c8c393",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -120,7 +120,7 @@
     "previousItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
     "previousItemState": "CLOSED — REPRESENTATION RECONCILED"
   },
-  "nextRequiredExternalAction": "Define and reconcile the existing D1-01 ENT-ROLE-ASSIGNMENT authority contract: subject binding, canonical role identifier, status/validity, scope, temporal validity, revocation, uniqueness/conflict constraints, version/change semantics, organization/IP relationship, and effectiveness evidence. Do not implement persistence, Layer Resolver, or authLogin/authRefresh runtime until that authority contract is closed.",
+  "nextRequiredExternalAction": "Define and reconcile the existing D1-01 ENT-ROLE-ASSIGNMENT authority contract. The L1/L2 representation ambiguity is already closed: normalized user→L1 and verified_user→L2; Verification remains separate from Role. Do not implement RoleAssignment persistence, Layer Resolver, or authLogin/authRefresh runtime until the RoleAssignment authority contract defines subject binding, role identifier, validity/status, scope, temporal validity, revocation, uniqueness/conflict constraints, version/change semantics, organization/IP relationship, and effectiveness evidence.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -214,7 +214,7 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "347750086cadc2541d423f82eff0eb97338c77e8",
+  "latestReconciliationCommit": "d9b6840d4812cceaaabf8936e8c0fa9de4c8c393",
   "note": "Current main records a genuine Contract authority conflict: docs/301 distinguishes user(unverified)->L1 and user(verified)->L2 while contracts/authz/layers.json maps user->L1 and verified_user->L2. This must be reconciled before a deterministic RoleAssignment-to-L0-L8 resolver can be admitted. No runtime code or D1 mutation performed.",
   "executionTriggerAttempts": {
     "commits": [
