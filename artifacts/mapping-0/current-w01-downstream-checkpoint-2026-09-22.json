@@ -1,7 +1,13 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "fabbcb295d08a362445f8cf1864e1e59b57e4084",
+  "currentMainHead": "ba929bc9585b65e1d6fd17cca81d886febaacbe5",
   "checkpointDate": "2026-09-22",
+  "headVerification": {
+    "method": "GitHub main ref + commit fetch",
+    "verifiedMainHead": "ba929bc9585b65e1d6fd17cca81d886febaacbe5",
+    "priorRecordedHead": "fabbcb295d08a362445f8cf1864e1e59b57e4084",
+    "state": "RECONCILED"
+  },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
     "state": "BLOCKED_EXTERNAL / IMPLEMENTATION_NOT_ADMITTED",
@@ -31,9 +37,20 @@
     },
     "runtimeStatus": "NOT_GREEN"
   },
+  "cloudflareInventory": {
+    "status": "PASS_VERIFIED_READ_ONLY_HISTORICAL",
+    "workflowRunId": 35598525409,
+    "artifactId": 10637318432,
+    "testedSourceHead": "75e5a25fba48d95c432476cda6b0b6d6d4c70b06",
+    "counts": {
+      "d1": 2,
+      "workers": 0
+    },
+    "note": "No newer Cloudflare inventory evidence is present in main; this artifact does not establish current physical W02 binding."
+  },
   "blockers": [
     "D1-01 ENT-ROLE-ASSIGNMENT remains PROPOSED / CONTRACT_ONLY with no implementation or persistence evidence.",
-    "Canonical W02 physical resource/name/source/deployment binding remains unestablished; latest read-only inventory reports 0 uploaded Worker scripts.",
+    "Canonical W02 physical resource/name/source/deployment binding remains unestablished; latest available read-only inventory reports 0 uploaded Worker scripts.",
     "W02/T01/T03 runtime implementation is not admitted.",
     "Controlled authLogin/authRefresh runtime evidence is not generated."
   ],
