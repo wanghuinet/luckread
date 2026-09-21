@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "c1b15ca22cddc19f8075d40df84f1e629f3b2abe",
+  "sourceHead": "a02697aef7ef13ade3c708e27ad22cc17c3f26bc",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -120,7 +120,7 @@
     "previousItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
     "previousItemState": "CLOSED — REPRESENTATION RECONCILED"
   },
-  "nextRequiredExternalAction": "Physical runtime prerequisite remains open: establish an authorized current Cloudflare Worker resource/binding for canonical W02/T01/T03 (including deployed source commit and required configuration) through the project’s approved deployment/admission path; separately evidence-bind the contracted D1-01 RoleAssignment source; then execute controlled E6 runtime evidence. Do not infer from physical directory names or historical topology. No resource creation is implied by this checkpoint.",
+  "nextRequiredExternalAction": "Obtain/record the normal Contract-First authority decision that binds each admitted canonical logical Worker to its concrete current physical Worker resource/name. For AUTH-002 this specifically requires canonical W02/T01/T03 binding, then deployed source-commit/configuration evidence and E6 runtime evidence. Do not derive names from repository directories or historical P01-P08 topology, and do not create resources merely to satisfy the gap.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -363,5 +363,14 @@
     "evidencePath": "artifacts/cloudflare/current-resource-inventory-2026-09-21.json",
     "mutationPerformed": false,
     "conclusion": "Fresh read-only Cloudflare API inventory confirms zero uploaded Worker scripts at capture time. Physical Worker deployment/source binding therefore remains unestablished."
+  },
+  "workerDeploymentAdmissionAudit": {
+    "status": "BLOCKED — PHYSICAL NAMING/RESOURCE BINDING AUTHORITY NOT ESTABLISHED",
+    "audit": "artifacts/mapping-0/worker-deployment-admission-audit-2026-09-21.md",
+    "freshCloudflareInventoryRunId": 35598525409,
+    "uploadedWorkerScripts": 0,
+    "physicalNamingRuleFound": false,
+    "deploymentEvidenceChainDefined": true,
+    "runtimeImplementationAuthorized": false
   }
 }
