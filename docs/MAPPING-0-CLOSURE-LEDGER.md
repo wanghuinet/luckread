@@ -1132,3 +1132,29 @@ Anti-loop:
 - Do not rerun E5 migration.
 - Do not repeat Gate-1 schema capture unless relevant schema/runtime inputs change.
 - Do not execute E6 against the remote D1 until the runtime implementation gap is explicitly resolved through Change Control.
+
+## Superpowers continuation — E5 authority incident control remediation closed — 2026-09-21
+
+Control remediation is now independently recorded as closed:
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTH-002-E5-AUTHORITY-INCIDENT-REMEDIATION-2026-09-21.md`
+- Status: `CLOSED — CONTROL REMEDIATION VERIFIED`
+- The record closes only the admission/control defect. It does not retroactively authorize run 35552919573 and does not promote AUTH-002 or Mapping 0.
+- E5 admission now requires the exact authoritative status line and the dedicated workflow is manual-dispatch only; obsolete push-path validation has been removed.
+
+Current authority boundary remains unchanged:
+- Parent E5 Remote Execution Change Control: `OPEN — EXECUTION DECISION REQUIRED`.
+- E5 technical execution evidence remains retained but governance authorization is `NOT_VALIDATED`.
+- E5 must not be rerun.
+- Baseline migration must not be rerun.
+
+Current Mapping metrics remain unchanged:
+- 449 total
+- PARTIAL 17
+- UNRESOLVED 431
+- MISSING 1 (`AUTH-007`)
+- API edges 11 / Entity edges 9 / Payload edges 1 / Code Evidence edges 0 / Evidence refs 449
+
+Current next item remains:
+`M0-AUTH-002-E5-REMOTE-EXECUTION-AUTHORITY-001` / `WAIT_AUTHORITY_DECISION`
+
+After explicit authority reconciliation, the next substantive technical gate is `GAP-E6-RUNTIME-001`; current Mapping-0 task rules still prohibit implementing authentication runtime code before Mapping-0 GREEN.
