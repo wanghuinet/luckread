@@ -2,7 +2,7 @@
 
 - ID: CC-MAPPING-0-AUTH-002-E6-LAYER-AUTHORITY-2026-09-21
 - Date: 2026-09-21
-- Status: OPEN — EXPLICIT AUTHORITY DECISION REQUIRED
+- Status: CLOSED — AUTHORITY RECONCILED
 - Feature: AUTH-002 / AUTH-011
 - Gate: E6 Wire/Runtime output authority
 
@@ -37,22 +37,37 @@ Do not:
 - introduce a new layer entity or Worker;
 - treat documentation layer definitions as executable runtime evidence.
 
-## Required authority decision
+## Reconciled authority decision
 
-A Contract-First authority decision must identify the canonical source and resolver semantics for the response layer before E6 runtime implementation can be promoted.
+The authority decision is now recorded and reconciled in:
+- `contracts/entity/AUTHZ-role-assignment-authority.v1.json`
+- `contracts/authz/role-assignment-layer-resolution.v1.json`
+- `docs/change-control/MAPPING-0-AUTHORITY-DECISIONS-2026-09-20.md`
 
-The decision must specify:
-1. authoritative source;
-2. precedence when multiple authorization dimensions exist;
-3. deterministic resolver input;
-4. whether the layer is persisted, derived, or projected;
-5. runtime binding for authLogin/authRefresh;
-6. negative behavior when the resolver cannot establish a valid L0-L8 result.
+Resolved:
+1. authoritative source = D1-01 RoleAssignment;
+2. global-layer precedence = highest numeric L0-L8 among eligible global assignments;
+3. organization/IP assignments do not affect global response layer;
+4. layer is derived at evaluation time;
+5. non-ACTIVE account state denies before successful issuance/rotation;
+6. no valid global assignment or unknown role fails closed under the existing authentication/error contract.
+
+Runtime binding remains separately gated and is not authorized by this Change Control.
 
 ## Current disposition
 
-- E6 layer output authority: OPEN.
-- E6 runtime implementation: BLOCKED by this gap.
+- E6 layer output authority: CLOSED — AUTHORITY RECONCILED.
+- E6 runtime implementation: BLOCKED only for exact W01 runtime binding and controlled evidence.
 - No runtime implementation or layer field is authorized by this record.
 - Existing E6-WIRE-001 and E6-WIRE-002 remain resolved at authority scope.
 - AUTH-002 and Mapping 0 remain NOT_GREEN.
+
+
+## Closure evidence
+
+- Deterministic resolver contract: `contracts/authz/role-assignment-layer-resolution.v1.json`
+- Resolver schema: `contracts/authz/role-assignment-layer-resolution.v1.schema.json`
+- Upstream RoleAssignment authority: `contracts/entity/AUTHZ-role-assignment-authority.v1.json`
+- No W01 runtime code changed.
+- No D1 mutation performed.
+- E6 implementation remains subject to the existing runtime admission gate.
