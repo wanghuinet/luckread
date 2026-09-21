@@ -64,3 +64,27 @@ Until explicit GREEN admission:
 - do not modify D1 manually;
 - do not promote AUTH-002 or Mapping 0;
 - do not rerun the already-applied 20250929_111647 baseline migration.
+
+## Execution incident reconciliation — 2026-09-21
+
+Run 35552919573 completed successfully and applied MIG-AUTH-002-SESSION-V1 to the controlled D1 target.
+
+Governance finding:
+- At the tested source SHA fe1f2784d21f3f629bbad0baa971f1aa56520914, this Change Control still stated Status: OPEN — EXECUTION DECISION REQUIRED.
+- The E5 admission guard incorrectly searched the whole document for the phrase Status: GREEN — EXECUTION ADMITTED, so it matched the explanatory sentence in the Decision boundary section rather than the actual status field.
+- This was a guard implementation defect, not an explicit change of authority.
+
+Disposition:
+- The remote execution result is retained as technical execution evidence, but it is NOT promoted as governance-authorized execution evidence until the authority mismatch is reconciled.
+- The admission guard has been corrected to require an exact status line anchored to - Status:.
+- The implicit push execution path has been removed; future E5 execution requires explicit workflow dispatch.
+- No rollback or compensating D1 mutation is performed from this incident record.
+- AUTH-002 and Mapping 0 remain NOT_GREEN pending governance reconciliation and fresh evidence acceptance.
+
+Technical result retained:
+- Run: 35552919573
+- Artifact: 10618729380
+- Artifact digest: sha256:c9bfcadba7ade81c8002786e6f323a5849c13dfb6f2390aeef44ea27584c44a1
+- Migration: 20260921_003203_MIG_AUTH_002_SESSION_V1
+- Remote mutation: occurred
+- Post-migration validation steps: success
