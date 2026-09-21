@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "generatedAt": "2026-09-21",
-  "sourceHead": "0fd04029e26d074101a26ddd609689a37d95d541",
+  "sourceHead": "75d94885010d99c88764eaa2a00cf6d556ff1125",
   "scope": "AUTH-002 E6 wire/input closure sufficiency audit",
   "status": "BLOCKED_INPUTS_CONFIRMED",
   "antiLoop": true,
@@ -17,13 +17,19 @@
       "canonical response DTO identity and exact response schema",
       "canonical error DTO/status mapping for expiry, revocation and reuse",
       "exact refresh credential carrier semantics",
-      "explicit canonical route admission and /v1 base-path reconciliation"
+      "explicit route admission from DISCOVERY_DRAFT to canonical Wire Authority"
     ],
     "prohibitedInference": [
       "Do not synthesize refresh schema from authLogin response",
       "Do not synthesize from Payload native refresh behavior",
       "Do not promote the current Discovery Draft to canonical Wire Authority"
-    ]
+    ],
+    "pathBaseNormalization": {
+      "status": "PASS_VERIFIED",
+      "evidence": "artifacts/mapping-0/b01-api-path-normalization-audit-2026-09-20.json",
+      "rule": "API Inventory /v1/auth/refresh; OpenAPI server /api/v1 + operation path /auth/refresh; Auth Policy /auth/refresh are representation layers, not alternate routes.",
+      "activeBlocker": false
+    }
   },
   "E6_WIRE_002": {
     "status": "OPEN",
@@ -45,7 +51,7 @@
       "Do not create ENT-DEVICE-RECORD solely to close this gap"
     ]
   },
-  "decision": "The two blockers are genuine contract-input gaps, not missing implementation work. E6 runtime implementation remains unauthorized until both are resolved through normal Contract-First Change Control.",
+  "decision": "Two blockers remain genuine contract-input gaps. API path/base-path normalization itself is resolved and is no longer an E6 blocker.",
   "noRuntimeCodeChange": true,
   "noD1Mutation": true,
   "noMappingPromotion": true
