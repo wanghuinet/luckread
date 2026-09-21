@@ -1242,3 +1242,12 @@ A repository-only authority audit established a current-vs-historical evidence m
 
 This tightens E6-WIRE-001: the missing `authRefresh` wire authority is confirmed rather than inferred from stale crosscheck data. AUTH-011 and E6 remain blocked until the existing Contract-First chain closes the wire/DTO authority.
 
+
+## Superpowers continuation — E6 wire/input gaps evidence-bound — 2026-09-21
+
+The two active E6 blockers now have direct current-source evidence:
+- E6-WIRE-001 → `artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json` (`DRIFT_CONFIRMED`).
+- E6-WIRE-002 → `artifacts/mapping-0/auth-002-device-binding-authority-audit-2026-09-21.json` (`INPUT_AUTHORITY_MISSING_CONFIRMED`).
+
+This confirms the gaps without inventing a refresh schema or device transport. No Contract/Blueprint promotion and no runtime implementation occurred.
+
