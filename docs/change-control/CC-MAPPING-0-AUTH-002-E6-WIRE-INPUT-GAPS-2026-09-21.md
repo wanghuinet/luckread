@@ -2,7 +2,7 @@
 
 - ID: CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21
 - Date: 2026-09-21
-- Status: OPEN — REQUIRED CONTRACT INPUTS MISSING
+- Status: CLOSED — CONTRACT INPUTS RESOLVED
 - Feature: AUTH-002
 - Gate: E6 Native Session Runtime Evidence
 - Parent: CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21
@@ -114,3 +114,15 @@ These are therefore **decision inputs**, not implementation defects. The active 
 2. AUTH-002: approve the authoritative device-binding source/transport for `ENT-SESSION-F-DEVICE-ID` without deriving it from uncontracted request metadata.
 
 Until those decisions exist, implementation admission remains fail-closed. No runtime code, new header, new request field, new device entity, or D1 mutation is authorized.
+
+## Resolution — 2026-09-21
+
+The missing contract inputs are resolved by:
+- CC-MAPPING-0-AUTH-002-E6-WIRE-AUTHORITY-DECISION-2026-09-21
+- canonical OpenAPI reconciliation for authRefresh and authLogin device binding
+- canonical DTO registry binding for DTO-AUTH-REFRESH-REQUEST and DTO-AUTH-REFRESH-RESPONSE
+
+E6-WIRE-001 = PASS_VERIFIED at contract-authority scope.
+E6-WIRE-002 = PASS_VERIFIED at contract-authority scope.
+
+This closure does not promote runtime implementation, persistence verification, security E2E, concurrency evidence, Evidence Registry, AUTH-002, or Mapping 0.
