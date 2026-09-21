@@ -1,4 +1,5 @@
 name: Cloudflare Resource Inventory
+run-name: Read-only Cloudflare inventory @ ${{ github.sha }}
 
 on:
   push:
@@ -75,7 +76,7 @@ jobs:
               workers: (
                 map(.result // []) | add |
                 map({
-                  id: (.id // null),
+                  id: (.id // .name // null),
                   created_on: (.created_on // null),
                   modified_on: (.modified_on // null),
                   compatibility_date: (.compatibility_date // null)
@@ -92,6 +93,10 @@ jobs:
                 counts: {
                   d1: ($d1[0].d1 | length),
                   workers: ($workers[0].workers | length)
+                },
+                observation: {
+                  workerResourceNames: ($workers[0].workers | map(.id)),
+                  readOnly: true
                 }
               }'
           } > artifacts/cloudflare-resource-inventory.json
