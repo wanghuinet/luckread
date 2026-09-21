@@ -242,6 +242,22 @@
       "result": "PASS",
       "status": "VERIFIED",
       "note": "Controlled remote E4.5 probe on the exact current W01 commit verified payload.db.upsert on payload-preferences: upsert returned a document, no upsert error occurred, the row was present on read-back with matching value, cleanup succeeded, and payload.db.upsert was not aliased to payload.db.updateOne. The runner process later timed out while Wrangler retained internal workerd processes (process exit 124), but the complete evidence object was written and independently validated by the workflow as E4_5_RESULT=PASS before runner cleanup. This evidence supersedes EVD-AUTH002-B11-D1-ADAPTER-E45-REMOTE-001 without deleting the failed historical evidence."
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B12-SCHEMA-REMOTE-002",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-002::D1-SCHEMA-POST-E5",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "GitHub Actions AUTH-002 Session Schema Evidence against controlled Cloudflare D1",
+      "sourceRef": "actions/runs/35657959095 (artifact 10665837908)",
+      "commitSha": "48575b4a2b86bf317e4e4ccac6c6ec17739cf2eb",
+      "timestamp": "2026-09-21T21:35:27.430Z",
+      "producer": "Wrangler 4.33.1 read-only D1 schema/catalog evidence workflow",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "AUTH-002-G1-REMOTE-SCHEMA-POST-E5",
+      "workflowRef": ".github/workflows/auth-session-schema-evidence.yml@48575b4a2b86bf317e4e4ccac6c6ec17739cf2eb"
     }
   ]
 }
