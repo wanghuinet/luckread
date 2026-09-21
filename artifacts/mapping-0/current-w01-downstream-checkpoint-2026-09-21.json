@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "d9b6840d4812cceaaabf8936e8c0fa9de4c8c393",
+  "sourceHead": "79a671eac8b0dd41c3c36a6216c4e9aff9a14412",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -120,7 +120,7 @@
     "previousItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
     "previousItemState": "CLOSED — REPRESENTATION RECONCILED"
   },
-  "nextRequiredExternalAction": "Define and reconcile the existing D1-01 ENT-ROLE-ASSIGNMENT authority contract. The L1/L2 representation ambiguity is already closed: normalized user→L1 and verified_user→L2; Verification remains separate from Role. Do not implement RoleAssignment persistence, Layer Resolver, or authLogin/authRefresh runtime until the RoleAssignment authority contract defines subject binding, role identifier, validity/status, scope, temporal validity, revocation, uniqueness/conflict constraints, version/change semantics, organization/IP relationship, and effectiveness evidence.",
+  "nextRequiredExternalAction": "Provide or reconcile an explicit Contract-First ENT-ROLE-ASSIGNMENT authority contract. Existing repository sources only establish D1-01 ownership, RoleAssignment as an authorization input, normalized role identifiers user→L1 and verified_user→L2, role_version invalidation, and fail-closed authorization. They do not establish RoleAssignment field semantics or deterministic multi-assignment/global-layer behavior. Do not implement persistence, Layer Resolver, or authLogin/authRefresh runtime by inference.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -214,7 +214,7 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "d9b6840d4812cceaaabf8936e8c0fa9de4c8c393",
+  "latestReconciliationCommit": "79a671eac8b0dd41c3c36a6216c4e9aff9a14412",
   "note": "Current main records a genuine Contract authority conflict: docs/301 distinguishes user(unverified)->L1 and user(verified)->L2 while contracts/authz/layers.json maps user->L1 and verified_user->L2. This must be reconciled before a deterministic RoleAssignment-to-L0-L8 resolver can be admitted. No runtime code or D1 mutation performed.",
   "executionTriggerAttempts": {
     "commits": [
@@ -318,7 +318,8 @@
     "upstreamDependencies": [
       "ENT-ROLE-ASSIGNMENT authority contract"
     ],
-    "e6RoleRepresentationConflict": "CLOSED — see docs/change-control/CC-MAPPING-0-AUTHZ-L1-L2-ROLE-REPRESENTATION-2026-09-21.md"
+    "e6RoleRepresentationConflict": "CLOSED — see docs/change-control/CC-MAPPING-0-AUTHZ-L1-L2-ROLE-REPRESENTATION-2026-09-21.md",
+    "e6RoleAssignmentAuthorityBoundary": "OPEN — no canonical concrete RoleAssignment authority contract found; see docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md"
   },
   "e6LayerAuthorityDecisionInput": "artifacts/mapping-0/auth-002-e6-layer-authority-decision-input-2026-09-21.md",
   "e6RoleAssignmentAuthorityChangeControl": "docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md",
