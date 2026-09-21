@@ -17,22 +17,20 @@ if (implementationAdmitted && gapStatus !== 'CLOSED — REQUIRED CONTRACT INPUTS
   throw new Error('E6 admission contradiction: implementation is GREEN while required wire/input gaps are not reconciled')
 }
 
-const protectedPattern = /^workers\/W01-payload\/src\/(collections\/Users\.ts|.*auth.*|.*Auth.*|payload\.config\.ts)$/
-let changed = []
-try {
-  changed = execFileSync('git', ['show', '--format=', '--name-only', 'HEAD'], { encoding: 'utf8' })
-    .split(/\r?\n/).map((x) => x.trim()).filter(Boolean)
-} catch {
-  changed = []
+const protectedBaseline = {
+  'workers/W01-payload/src/collections/Users.ts': '988046fbe4afa824765b72b55e5006f6fd14faa4',
+  'workers/W01-payload/src/db/auth-session-state-schema.ts': '628f6b251c12d80232ab610ee7b080f86fa43c88',
+  'workers/W01-payload/src/payload.config.ts': '7075187d36c3fe266b7bf85b174a67949d6b6dda',
 }
 
-const protectedChanges = changed.filter((p) => protectedPattern.test(p))
-
-if (!implementationAdmitted && protectedChanges.length > 0) {
-  throw new Error(
-    'E6 implementation admission blocked: protected W01 authentication runtime files changed while the implementation Change Control is not GREEN. Changed: ' +
-      protectedChanges.join(', '),
-  )
+const protectedChanges = []
+for (const [file, baselineSha] of Object.entries(protectedBaseline)) {
+  try {
+    const currentSha = execFileSync('git', ['rev-parse', 'HEAD:' + file], { encoding: 'utf8' }).trim()
+    if (currentSha !== baselineSha) protectedChanges.push(file)
+  } catch {
+    protectedChanges.push(file)
+  }
 }
 
 if (!implementationAdmitted) {
