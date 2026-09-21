@@ -1,15 +1,16 @@
 # AUTHZ Layer Mapping Conflict Audit — 2026-09-21
 
 - Audit ID: M0-AUTHZ-LAYER-MAPPING-CONFLICT-001
-- Status: OPEN — CANONICAL SOURCE RECONCILIATION REQUIRED
+- Status: CLOSED — REPRESENTATION RECONCILED
 - Parent: CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21
-- Impact: blocks deterministic RoleAssignment to L0-L8 resolver
+- Resolution: docs/change-control/CC-MAPPING-0-AUTHZ-L1-L2-ROLE-REPRESENTATION-2026-09-21.md
+- Impact after resolution: the L1/L2 role-identifier ambiguity is closed; ENT-ROLE-ASSIGNMENT authority remains independently open and still blocks deterministic runtime resolution.
 
 ## Conflicting existing statements
 
 ### Canonical prose contract: docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md
 
-The role-to-layer table distinguishes:
+The role-to-layer table describes:
 - user (unverified) to L1
 - user (verified) to L2
 - creator to L3
@@ -19,7 +20,7 @@ The role-to-layer table distinguishes:
 - admin to L7
 - super_admin to L8
 
-The same contract also states that verified_user is a required new role at L2.
+The same contract also declares `verified_user` a required new role at L2.
 
 ### Machine-readable contract: contracts/authz/layers.json
 
@@ -32,45 +33,43 @@ The machine-readable mapping states:
 - admin to L7
 - super_admin to L8
 
-## Why this matters
+## Reconciliation decision
 
-The repository currently does not define whether a verified existing user assignment:
-1. changes its role identity from user to verified_user;
-2. remains user with a separate verification/eligibility dimension;
-3. carries two assignments with deterministic precedence;
-4. or uses another canonical representation.
+The `user (verified)` wording in the descriptive table is treated as a human-readable account/verification state, not as a second normalized RoleAssignment identifier.
 
-That choice directly affects the public authLogin/authRefresh layer output and cannot be inferred without changing authorization semantics.
+The canonical normalized mapping is:
 
-## Additional verified constraints
+```text
+user          → L1
+verified_user → L2
+```
 
-- docs/303 makes RoleAssignment an authorization input and Account State a separate decisive input.
-- docs/14 prohibits treating Payload User.role as complete public API authorization authority.
-- No executable RoleAssignment resolver exists in W01.
-- No RoleAssignment persistence implementation exists in the entity/persistence inventories.
-- No existing contract was found that resolves the verified-user representation.
+Verification remains a separate authorization input under docs/303. It is not itself a Role or Entitlement and does not become arbitrary authorization solely by being present.
 
-## Required reconciliation
+Existing Payload `User.role` remains a compatibility/projection field and is not rewritten by this reconciliation.
 
-The canonical Contract-First decision must explicitly settle:
+## Explicit non-decisions
 
-1. authoritative representation of an L2 verified user;
-2. whether user and verified_user are distinct RoleAssignment role identifiers;
-3. how the transition or activation between them is represented;
-4. whether multiple assignments can coexist;
-5. deterministic precedence if they coexist;
-6. how this representation feeds the global auth response layer.
+This reconciliation does not define:
+- RoleAssignment table/schema fields;
+- RoleAssignment status or temporal-validity model;
+- assignment activation workflow;
+- multi-assignment coexistence or precedence;
+- organization/IP scoped assignment behavior;
+- runtime resolver implementation;
+- authLogin/authRefresh integration.
 
-## Prohibitions
+Those remain under the separate ENT-ROLE-ASSIGNMENT authority Change Control.
 
-Until closed:
-- do not implement RoleAssignment storage;
-- do not implement layer resolver;
-- do not alter docs/301 or layers.json by guess;
-- do not add User.layer;
-- do not use Payload User.role as a substitute;
-- do not start authLogin/authRefresh runtime.
+## Closure checks
 
-## Disposition
+- Existing machine mapping remains unchanged.
+- No new role name was introduced by this reconciliation; `verified_user` was already declared by the canonical contract.
+- No `User.layer` field was introduced.
+- No D1 mutation or RoleAssignment persistence was introduced.
+- No runtime code was changed.
+- The ambiguity no longer requires choosing between `user→L2` and `verified_user→L2`; normalized L2 role identity is `verified_user`.
 
-This is a genuine Contract/authority conflict, not an implementation bug. E6-LAYER-001 remains blocked.
+## Next dependency
+
+`CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21` remains OPEN. Its required authority contract must define the concrete RoleAssignment inputs before E6-LAYER-001 can advance to deterministic resolver specification.
