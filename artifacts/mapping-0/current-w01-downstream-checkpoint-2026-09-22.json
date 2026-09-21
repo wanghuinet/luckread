@@ -5,7 +5,7 @@
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
     "verifiedMainHead": "547c46ee97c3c0c2475d20e48205a49720ae6734",
-    "priorRecordedHead": "547c46ee97c3c0c2475d20e48205a49720ae6734",
+    "priorRecordedHead": "ba929bc9585b65e1d6fd17cca81d886febaacbe5",
     "state": "RECONCILED"
   },
   "cursor": {
