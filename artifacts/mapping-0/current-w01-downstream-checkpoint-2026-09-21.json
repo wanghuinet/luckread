@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "e40a8c14231c429ad3180586aa9b631cd0d79961",
+  "sourceHead": "347750086cadc2541d423f82eff0eb97338c77e8",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -101,8 +101,8 @@
   },
   "mapping0": {
     "status": "NOT_GREEN",
-    "nextItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
-    "nextItemState": "WAIT_AUTHORITY_DECISION",
+    "nextItemId": "M0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-001",
+    "nextItemState": "WAIT_AUTHORITY_CONTRACT",
     "noMappingRowsReexecuted": true,
     "metrics": {
       "canonicalRecords": 449,
@@ -116,9 +116,11 @@
       "payloadEdges": 1,
       "codeEvidenceEdges": 0,
       "evidenceReferenceCoverage": 449
-    }
+    },
+    "previousItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
+    "previousItemState": "CLOSED — REPRESENTATION RECONCILED"
   },
-  "nextRequiredExternalAction": "Reconcile the canonical L1/L2 role representation conflict documented in artifacts/mapping-0/authz-layer-mapping-conflict-audit-2026-09-21.md. Decide whether verified users transition from role user to verified_user, use a separate verification dimension, or another canonical representation. Do not implement RoleAssignment persistence or the Layer Resolver until this conflict is explicitly closed.",
+  "nextRequiredExternalAction": "Define and reconcile the existing D1-01 ENT-ROLE-ASSIGNMENT authority contract: subject binding, canonical role identifier, status/validity, scope, temporal validity, revocation, uniqueness/conflict constraints, version/change semantics, organization/IP relationship, and effectiveness evidence. Do not implement persistence, Layer Resolver, or authLogin/authRefresh runtime until that authority contract is closed.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -212,7 +214,7 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "e40a8c14231c429ad3180586aa9b631cd0d79961",
+  "latestReconciliationCommit": "347750086cadc2541d423f82eff0eb97338c77e8",
   "note": "Current main records a genuine Contract authority conflict: docs/301 distinguishes user(unverified)->L1 and user(verified)->L2 while contracts/authz/layers.json maps user->L1 and verified_user->L2. This must be reconciled before a deterministic RoleAssignment-to-L0-L8 resolver can be admitted. No runtime code or D1 mutation performed.",
   "executionTriggerAttempts": {
     "commits": [
@@ -304,7 +306,7 @@
   "e6LayerAuthority": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-LAYER-AUTHORITY-2026-09-21.md",
     "audit": "artifacts/mapping-0/auth-002-e6-layer-authority-audit-2026-09-21.md",
-    "status": "OPEN — BLOCKED BY ROLE_ASSIGNMENT_AND_L1_L2_MAPPING_AUTHORITY",
+    "status": "OPEN — BLOCKED BY ENT-ROLE-ASSIGNMENT AUTHORITY CONTRACT",
     "authorityDomain": "D1-01 Identity / Account / Access",
     "authorityInput": "RoleAssignment (authorization input)",
     "layerDefinitionSource": "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
@@ -314,11 +316,11 @@
     "implementationAuthorized": false,
     "upstreamDependency": "ENT-ROLE-ASSIGNMENT authority contract",
     "upstreamDependencies": [
-      "ENT-ROLE-ASSIGNMENT authority contract",
-      "L1/L2 user versus verified_user canonical representation"
-    ]
+      "ENT-ROLE-ASSIGNMENT authority contract"
+    ],
+    "e6RoleRepresentationConflict": "CLOSED — see docs/change-control/CC-MAPPING-0-AUTHZ-L1-L2-ROLE-REPRESENTATION-2026-09-21.md"
   },
   "e6LayerAuthorityDecisionInput": "artifacts/mapping-0/auth-002-e6-layer-authority-decision-input-2026-09-21.md",
   "e6RoleAssignmentAuthorityChangeControl": "docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md",
-  "e6RoleAssignmentAuthorityConflict": "artifacts/mapping-0/authz-layer-mapping-conflict-audit-2026-09-21.md"
+  "e6RoleAssignmentAuthorityConflict": "CLOSED — representation ambiguity only; authority contract remains OPEN"
 }
