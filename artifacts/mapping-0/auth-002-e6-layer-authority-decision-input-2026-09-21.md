@@ -2,7 +2,7 @@
 
 - Decision ID: M0-AUTH-002-E6-LAYER-AUTHORITY-DECISION-INPUT-001
 - Parent Change Control: docs/change-control/CC-MAPPING-0-AUTH-002-E6-LAYER-AUTHORITY-2026-09-21.md
-- Status: DECISION INPUT READY — NO AUTHORITY SELECTED
+- Status: RESOLVED — AUTHORITY DECISION RECORDED
 - Runtime implementation: BLOCKED
 - D1 mutation: NOT AUTHORIZED
 
@@ -18,7 +18,26 @@
 | Payload User.role | Compatibility metadata only; not complete authorization authority |
 | Public response shape | authLogin/authRefresh require layer matching ^L[0-8]$ |
 
-## Decision questions that remain
+## Decision resolution
+
+The decision questions were resolved by the following canonical records:
+- RoleAssignment authority: `contracts/entity/AUTHZ-role-assignment-authority.v1.json`
+- Deterministic layer resolver: `contracts/authz/role-assignment-layer-resolution.v1.json`
+- Authority decision record: `docs/change-control/MAPPING-0-AUTHORITY-DECISIONS-2026-09-20.md`
+
+Reconciled outcome:
+- Effective source = authoritative D1-01 RoleAssignment records for the subject.
+- Eligibility = ACTIVE + temporal validity + applicable authoritative scope.
+- Global response layer uses only global assignments.
+- Organization/IP assignments remain scoped authorization inputs.
+- Multiple eligible global assignments select the highest numeric L0-L8 layer.
+- Layer maps directly through `contracts/authz/layers.json`.
+- Non-ACTIVE account state denies before successful token issuance/rotation.
+- Layer is derived at evaluation time, not persisted.
+- Unknown/no eligible global role fails closed under the existing authentication/error contract.
+- Runtime binding remains an implementation/evidence task, not a contract gap.
+
+## Historical decision questions (now resolved)
 
 The authority record must explicitly answer all of the following:
 
@@ -39,7 +58,7 @@ The authority record must explicitly answer all of the following:
 - Do not treat Payload admin state or User.role as complete public API authority.
 - Do not add User.layer, a duplicate layer entity, a new Worker, or a new D1 solely to satisfy the DTO.
 - Do not change the frozen authLogin/authRefresh wire field or regex.
-- No runtime implementation is admitted until this decision is recorded and reconciled.
+- No runtime implementation is admitted by this document alone; implementation remains gated by the existing E6 implementation-admission Change Control.
 
 ## Closure evidence required after decision
 
@@ -50,6 +69,11 @@ The authority record must explicitly answer all of the following:
 5. W01 runtime implementation admission update.
 6. Executable tests/evidence proving the resolver behavior.
 7. Auth login/refresh integration evidence showing the returned layer matches the resolved authority.
+
+## Current closure state
+
+E6-LAYER-001 authority-input portion is **CLOSED — CONTRACT RECONCILED**.
+The remaining work is the exact existing W01 runtime binding and controlled executable evidence. Do not reopen this input pack unless a new authoritative contract changes these inputs.
 
 ## Anti-loop marker
 
