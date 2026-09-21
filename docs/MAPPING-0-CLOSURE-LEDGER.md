@@ -1509,3 +1509,27 @@ Source head: `465b556e093a7b6da5b40137d41fa96850e40450`.
 - `GAP-E6-RUNTIME-001` remains the primary runtime closure item.
 - No Worker creation/deployment, D1 mutation, or runtime business implementation was introduced by this reconciliation.
 - Do not reopen the resolved AUTH-003 operation vocabulary control or the resolved Entitlements operationId decision unless a relevant authoritative input changes.
+
+
+## AUTH-002 current remote schema evidence — 2026-09-22
+
+Fresh controlled evidence run `35657959095` completed with `success` on current `main` request commit `48575b4a2b86bf317e4e4ccac6c6ec17739cf2eb`.
+
+Verified evidence facts:
+- Target: Cloudflare D1 `luckread`, UUID `2f80471e-3756-49f9-8db1-7707a433ad64`.
+- Environment: `CONTROLLED_REMOTE_D1`.
+- Payload/D1 adapter locked versions: `3.87.1 / 3.87.1`.
+- Read-only capture returned migration history: `20250929_111647` (batch 1) and `20260921_003203_MIG_AUTH_002_SESSION_V1` (batch 2).
+- Physical `auth_session_state` schema matches the contracted extension columns: `session_id`, `user_id`, `device_id`, `token_version`, `refresh_credential_hash`, `revoked_at`, `last_seen_at`.
+- Required extension indexes are present; the extension table has no physical foreign keys; catalog evidence contains no prohibited raw token/password columns in the extension table.
+- Native `users` and `users_sessions` remain present, with the native session shape retained; `createdAt/expiresAt` are not duplicated into `auth_session_state`.
+- Evidence manifest provenance and hashes were generated and the existing validator passed.
+
+Evidence Registry:
+- Registered as `EVD-AUTH002-B12-SCHEMA-REMOTE-002`, status `VERIFIED`.
+- The registration proves a current controlled remote schema observation; it does **not** promote AUTH-002, ENT-SESSION, or Mapping 0 to GREEN.
+
+Promotion boundary remains:
+- AUTH-002 runtime evidence is still missing (login dual-state creation, logout revocation/idempotency, expiry, tokenVersion invalidation, device binding, refresh replay/concurrency, fail-closed behavior).
+- ENT-ROLE-ASSIGNMENT physical persistence/evidence and canonical physical W02 binding remain unresolved prerequisites for `GAP-E6-RUNTIME-001`.
+- Do not mark the Feature→Entity→Persistence registry VERIFIED solely from this schema evidence because the current AUTH-002 record also contains `ENT-IDENTITY` and `ENT-CREDENTIAL`, whose persistence is not proven by this run.
