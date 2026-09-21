@@ -160,7 +160,7 @@ Review result for `CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-202
 
 Decision:
 - E6 runtime implementation is **not admitted yet**.
-- `authRefresh` exists in the Auth API policy, but its canonical OpenAPI wire definition is missing; no request/response/error contract may be inferred from the policy or Payload-native refresh behavior.
+- `authRefresh` exists in the Auth API policy and has a canonical OpenAPI discovery shell, but its admitted Wire Schema is missing; no request/response/error contract may be inferred from the policy, Discovery Draft, or Payload-native refresh behavior.
 - `ENT-SESSION-F-DEVICE-ID` is a required canonical field, but the current AUTH-002 public login wire contract does not define an authoritative transport/source for the device binding.
 - Therefore E6 implementation must remain blocked until these two inputs are resolved through normal Contract-First Change Control.
 - No new device entity, header, API field, refresh endpoint, DTO, Worker or D1 domain is introduced by this decision.
