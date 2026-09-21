@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "b6898ac802d4051ef684f9cdbadb6fb2d4d68b23",
+  "sourceHead": "f0b2f8a9f5de1c32cfc1d2103f887f49093be4f1",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -118,7 +118,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Resolve E6-WIRE-001 via the existing AUTH-011/AUTH-010 Contract-First OpenAPI/DTO chain and E6-WIRE-002 via an explicit AUTH-002 device-binding source/transport decision. Do not implement runtime auth code or infer either input.",
+  "nextRequiredExternalAction": "Resolve E6-WIRE-001 through the existing AUTH-011/AUTH-010 Contract-First OpenAPI/DTO chain and E6-WIRE-002 through an explicit AUTH-002 device-binding source/transport decision. Only after those inputs are reconciled may E6 implementation admission be reconsidered. Do not implement runtime auth code or infer either input.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -212,8 +212,8 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "b6898ac802d4051ef684f9cdbadb6fb2d4d68b23",
-  "note": "Current authoritative checkpoint at main. E5 authority incident is fully reconciled; E5 technical evidence is retained without retroactive authorization. Active blockers are E6-WIRE-001 and E6-WIRE-002. No runtime authentication code or remote D1 mutation occurred in the current continuation.",
+  "latestReconciliationCommit": "f0b2f8a9f5de1c32cfc1d2103f887f49093be4f1",
+  "note": "Authoritative continuation cursor. E5 authority incident is reconciled; E6-WIRE-001 and E6-WIRE-002 are current evidence-bound blockers. No Mapping rows or runtime authentication code were modified in this continuation.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
