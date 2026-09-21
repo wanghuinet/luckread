@@ -2,7 +2,7 @@
 
 - ID: CC-MAPPING-0-AUTH-002-E5-REMOTE-EXECUTION-2026-09-21
 - Date: 2026-09-21
-- Status: OPEN — EXECUTION DECISION REQUIRED
+- Status: CLOSED — EXECUTION NOT AUTHORIZED; TECHNICAL RESULT RETAINED
 - Feature: AUTH-002
 - Migration: MIG-AUTH-002-SESSION-V1
 
@@ -65,6 +65,15 @@ Until explicit GREEN admission:
 - do not promote AUTH-002 or Mapping 0;
 - do not rerun the already-applied 20250929_111647 baseline migration.
 
+## Authority reconciliation decision — 2026-09-21
+
+Decision:
+- Run 35552919573 was **not authorized at the time of execution** because the authoritative Status field was OPEN.
+- The run's technical postconditions and the independent read-only schema evidence are retained as factual evidence of the observed remote state.
+- The execution is **not retroactively classified as GREEN-authorized execution**.
+- No second E5 execution is permitted and no compensating D1 mutation is required solely to recreate governance authorization.
+- This Change Control is closed because the authority incident is reconciled and the future execution path is fail-closed; closure does not promote AUTH-002 or Mapping 0.
+
 ## Execution incident reconciliation — 2026-09-21
 
 Run 35552919573 completed successfully and applied MIG-AUTH-002-SESSION-V1 to the controlled D1 target.
@@ -104,7 +113,8 @@ Result:
 - The validator correction is limited to preventing native Payload users.password schema from being misclassified as an E5 secret-field violation; it does not relax E5 auth_session_state checks.
 - Technical E5 execution evidence from run 35552919573 and independent read-only schema evidence are both retained for provenance.
 
-Governance status remains unchanged:
-- This Change Control remains OPEN — EXECUTION DECISION REQUIRED because the actual E5 execution occurred while this control's status field was still OPEN.
-- The execution is therefore not promoted as governance-authorized completion merely because the technical postconditions passed.
-- AUTH-002 and Mapping 0 remain NOT_GREEN pending explicit governance reconciliation of the incident and subsequent runtime evidence.
+Governance reconciliation is now complete:
+- The historical execution remains unauthorized; no retroactive GREEN authorization is recorded.
+- Technical evidence remains retained and is not re-labeled as contemporaneously authorized execution evidence.
+- This closes the incident decision point without declaring AUTH-002 or Mapping 0 GREEN.
+- E6 runtime integration remains separately blocked until its implementation Change Control is explicitly admitted and the existing E6 evidence gate is satisfied.
