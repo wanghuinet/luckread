@@ -6,6 +6,20 @@
 - Feature: AUTH-002 / AUTH-011
 - Gate: E6 Wire/Runtime output authority
 
+## Upstream authority reconciliation
+
+The upstream RoleAssignment authority blocker is now closed by:
+`contracts/entity/AUTHZ-role-assignment-authority.v1.json`
+
+The following E6 layer semantics are now authoritative for the next resolver/implementation gate:
+- Only eligible global RoleAssignments participate in the public authLogin/authRefresh response layer.
+- Organization/IP-scoped assignments remain scoped authorization inputs and do not change the global response layer.
+- Each eligible roleId maps directly through `contracts/authz/layers.json`.
+- Multiple eligible global assignments resolve to the highest numeric L0-L8 layer; equal-layer assignments are equivalent.
+- Non-ACTIVE account state remains a deny gate before token issuance/rotation.
+- Layer is derived at evaluation time; it is not persisted as User.layer and is not taken from cache.
+- No valid global assignment may be replaced by an inferred fallback from verification, User.role, entitlement, subscription, membership, device or IP.
+
 ## Observed facts
 
 The canonical authLogin/authRefresh response schema requires:
