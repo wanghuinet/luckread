@@ -1158,3 +1158,15 @@ Current next item remains:
 `M0-AUTH-002-E5-REMOTE-EXECUTION-AUTHORITY-001` / `WAIT_AUTHORITY_DECISION`
 
 After explicit authority reconciliation, the next substantive technical gate is `GAP-E6-RUNTIME-001`; current Mapping-0 task rules still prohibit implementing authentication runtime code before Mapping-0 GREEN.
+
+
+## Superpowers continuation — E6 implementation admission staged — 2026-09-21
+
+A preparatory Change Control was added for the existing `GAP-E6-RUNTIME-001`:
+- `docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21.md`
+- Status: `OPEN — IMPLEMENTATION DECISION REQUIRED`
+- Scope is limited to the minimum W01 runtime integration required by the existing AUTH-002 E6 contracts.
+- It does not authorize implementation, remote D1 mutation, new APIs/fields/Workers, second session authority, or Mapping-0 promotion.
+- The implementation gate is explicitly dependent on reconciliation of the parent E5 authority incident.
+- No runtime code was changed in this step.
+
