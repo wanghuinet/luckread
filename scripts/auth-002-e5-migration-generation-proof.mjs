@@ -45,6 +45,10 @@ const setMigrationDir = (config, dir) => config.replace(
   '    migrationDir: ' + JSON.stringify(dir) + ',',
 )
 
+const setGenerateSchemaOutputFile = (config, outputFile) => config.replace(
+  "    migrationDir: path.resolve(dirname, 'migrations'),",
+  "    migrationDir: path.resolve(dirname, 'migrations'),\\n    generateSchemaOutputFile: " + JSON.stringify(outputFile) + ",",
+)
 const writeFixture = (dir, config, users, includeAuthSchema) => {
   fs.writeFileSync(path.join(dir, 'payload.config.ts'), config)
   fs.writeFileSync(path.join(dir, 'collections/Users.ts'), users)
@@ -53,7 +57,7 @@ const writeFixture = (dir, config, users, includeAuthSchema) => {
 }
 
 writeFixture(stage1, setMigrationDir(historicalConfig, path.join(stage1, 'migrations')), historicalUsers, false)
-writeFixture(stage2, setMigrationDir(currentConfig, path.join(stage2, 'migrations')), historicalUsers, true)
+writeFixture(stage2, setGenerateSchemaOutputFile(setMigrationDir(currentConfig, path.join(stage2, 'migrations')), path.join(stage2, 'payload-generated-schema.ts')), historicalUsers, true)
 
 const runCreate = (dir, name) => run(
   'pnpm',
@@ -68,6 +72,18 @@ if (stage1Json.length !== 1) throw new Error('Expected exactly one generated bas
 fs.copyFileSync(path.join(stage1, 'migrations', stage1Json[0]), path.join(stage2, 'migrations', 'baseline.json'))
 
 
+const schemaProbeFile = path.join(stage2, 'payload-generated-schema.ts')
+run('pnpm', ['exec', 'payload', 'generate:db-schema'], root, {
+  PAYLOAD_CONFIG_PATH: path.join(stage2, 'payload.config.ts'),
+  PAYLOAD_SECRET: 'e5-generation-only-not-production',
+})
+if (!fs.existsSync(schemaProbeFile)) throw new Error('E5 generated DB schema file was not created')
+const schemaProbeText = fs.readFileSync(schemaProbeFile, 'utf8')
+fs.writeFileSync(
+  path.join(outDir, 'payload-generated-schema-probe.txt'),
+  schemaProbeText.includes('auth_session_state') ? 'AUTH_SESSION_STATE_PRESENT\\n' : 'AUTH_SESSION_STATE_ABSENT\\n',
+)
+if (!schemaProbeText.includes('auth_session_state')) throw new Error('Payload generated DB schema missing auth_session_state')
 runCreate(stage2, 'MIG-AUTH-002-SESSION-V1')
 const stage2Dir = path.join(stage2, 'migrations')
 const generated = fs.readdirSync(stage2Dir).filter((f) => f.endsWith('.ts') && f.includes('MIG-AUTH-002-SESSION-V1'))
