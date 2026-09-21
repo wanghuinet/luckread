@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "99ce54cdcf3bf2c5b6b128598e45a5fcf9a2f55d",
+  "sourceHead": "0e74cf5c8dbff51d75ad1564d0c8f4574c322e31",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -118,7 +118,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Resolve E6-WIRE-001 through the existing AUTH-011/AUTH-010 Contract-First chain: promote the existing /auth/refresh discovery shell only after exact Request/Response/Error DTO and credential-carrier semantics are explicitly contracted. Resolve E6-WIRE-002 through an explicit AUTH-002 device-binding source/transport decision. Do not implement runtime auth code, add transport fields, promote the route, or mutate D1 until both inputs are reconciled.",
+  "nextRequiredExternalAction": "Resolve E6-WIRE-001 by explicitly contracting the exact authRefresh Request/Response/Error Wire Schema and credential-carrier semantics through the existing AUTH-011 Contract-First chain; resolve E6-WIRE-002 by explicitly contracting the authoritative device-binding source and transport. The current sufficiency audit confirms neither can be filled from existing contracts. Do not implement runtime auth code, add transport fields, promote the Discovery Draft, or mutate D1 before reconciliation.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -212,7 +212,7 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "99ce54cdcf3bf2c5b6b128598e45a5fcf9a2f55d",
+  "latestReconciliationCommit": "0e74cf5c8dbff51d75ad1564d0c8f4574c322e31",
   "note": "Authoritative continuation cursor. E5 authority incident is reconciled. E6-WIRE-001 remains OPEN because /auth/refresh exists only as DISCOVERY_DRAFT; E6-WIRE-002 remains OPEN because device binding source/transport is still undefined. This correction changes evidence interpretation only; no runtime authentication code or D1 mutation was performed.",
   "executionTriggerAttempts": {
     "commits": [
@@ -273,11 +273,13 @@
     "evidence": {
       "E6_WIRE_001": {
         "artifact": "artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json",
-        "status": "DRIFT_CONFIRMED"
+        "status": "DRIFT_CONFIRMED",
+        "sufficiencyAudit": "artifacts/mapping-0/e6-wire-input-sufficiency-audit-2026-09-21.json"
       },
       "E6_WIRE_002": {
         "artifact": "artifacts/mapping-0/auth-002-device-binding-authority-audit-2026-09-21.json",
-        "status": "INPUT_AUTHORITY_MISSING_CONFIRMED"
+        "status": "INPUT_AUTHORITY_MISSING_CONFIRMED",
+        "sufficiencyAudit": "artifacts/mapping-0/e6-wire-input-sufficiency-audit-2026-09-21.json"
       }
     }
   },
@@ -291,5 +293,11 @@
     "currentOpenApiRefreshContractStatus": "DISCOVERY_DRAFT",
     "currentOpenApiRefreshWireSchemaComplete": false,
     "currentOpenApiRefreshRouteAdmitted": false
+  },
+  "e6WireInputSufficiencyAudit": {
+    "artifact": "artifacts/mapping-0/e6-wire-input-sufficiency-audit-2026-09-21.json",
+    "status": "BLOCKED_INPUTS_CONFIRMED",
+    "antiLoop": true,
+    "finding": "Neither E6 wire/input gap can be closed from an existing exact canonical contract; no implementation work is admitted by inference."
   }
 }
