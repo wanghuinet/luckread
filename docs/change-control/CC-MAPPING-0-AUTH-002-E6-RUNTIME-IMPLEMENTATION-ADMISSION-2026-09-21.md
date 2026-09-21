@@ -100,3 +100,12 @@ This reconciliation clears the incident dependency. The wire/input authority is 
 - E6-LAYER-001 authority semantics: CLOSED — CONTRACT RECONCILED.
 - Remaining GAP-E6-RUNTIME-001: exact W01/Payload runtime extension point, implementation, static validation, controlled execution, and Evidence Registry evidence.
 - Runtime implementation remains unauthorized while this Change Control is BLOCKED.
+
+
+## Current blocking inputs — 2026-09-21
+
+1. `ENT-ROLE-ASSIGNMENT` authority contract is closed, but its Entity Catalog status remains `PROPOSED` and no persistence/implementation evidence exists. The runtime resolver cannot treat contract-only records as live authorization data.
+2. The exact existing W01/Payload runtime extension point for authLogin/authRefresh layer binding has not been proven in the active source tree.
+3. Controlled E6 runtime evidence has not been generated against an admitted implementation commit.
+
+Accordingly this gate remains `BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED`. Contract reconciliation does not authorize implementation or D1 mutation.
