@@ -1,4 +1,0 @@
-Controlled E5 remote execution negative-gate probe.
-This marker intentionally exercises the execution workflow while the governing Change Control remains OPEN.
-Expected result: admission guard blocks before any remote D1 mutation.
-Do not interpret this file as authority to execute the migration.
