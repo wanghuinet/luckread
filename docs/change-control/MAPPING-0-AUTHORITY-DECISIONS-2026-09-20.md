@@ -131,3 +131,24 @@ No feature/runtime status is promoted by this decision record.
 Only `CC-MAPPING-0-AUTH-003-OPERATION-ID-SOURCE-CONFLICT-2026-09-19` remains technically pending from this eight-control decision batch, because the exact public AUTH-003 Wire Schema has not been explicitly contracted.
 
 This does not authorize OpenAPI/DTO/Mapping promotion.
+
+
+### 9. AUTH-002 E5 execution authorization incident
+Control: `CC-MAPPING-0-AUTH-002-E5-REMOTE-EXECUTION-2026-09-21`
+
+Decision:
+- Run 35552919573 was **not authorized at execution time** because the authoritative E5 Status field was `OPEN — EXECUTION DECISION REQUIRED`.
+- The technical postconditions and independent read-only schema evidence are retained as factual evidence of the observed remote state.
+- The run is not retroactively classified as GREEN-authorized execution evidence.
+- No second E5 execution and no compensating D1 mutation are authorized solely to repair the governance incident.
+- The parent E5 execution Change Control is closed as an authority-reconciliation incident with the technical result retained.
+- This decision does not promote AUTH-002 or Mapping 0.
+
+Rationale:
+The recorded execution was technically successful, but the governing authority condition was false at the moment of execution. Correct reconciliation is to preserve provenance, classify authorization accurately, harden the admission control, and prevent duplicate mutation rather than rewrite the historical authorization state.
+
+Reconciliation state:
+- Control-defect remediation: `PASS_VERIFIED`.
+- Authority incident reconciliation: `PASS_VERIFIED`.
+- E5 technical evidence: retained, not retroactively authorized.
+- Next gate: E6 runtime integration under its existing implementation/evidence Change Controls.
