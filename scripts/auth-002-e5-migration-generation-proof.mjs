@@ -59,7 +59,7 @@ const runCreate = (dir, name) => run(
   'pnpm',
   ['exec', 'payload', 'migrate:create', name, '--skip-empty'],
   root,
-  { PAYLOAD_CONFIG_PATH: path.join(dir, 'payload.config.ts'), PAYLOAD_SECRET: 'e5-generation-only-not-production', E5_DIAGNOSTIC_PATH: diagnosticPath },
+  { PAYLOAD_CONFIG_PATH: path.join(dir, 'payload.config.ts'), PAYLOAD_SECRET: 'e5-generation-only-not-production' },
 )
 
 runCreate(stage1, 'E5_BASELINE_FIXTURE')
