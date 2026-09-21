@@ -47,7 +47,8 @@ jobs:
             test "$EVENT_NAME" = "workflow_dispatch"
           fi
 
-      - name: Validate dispatch confirmation        env:
+      - name: Validate dispatch confirmation
+        env:
           CONFIRM: ${{ inputs.confirm || 'EXECUTE_W01_BASELINE' }}
           DATABASE_NAME: ${{ inputs.database_name || 'luckread' }}
         run: |
