@@ -1419,3 +1419,15 @@ This section supersedes earlier continuation cursors for current work selection.
 - Current next item remains `GAP-E6-RUNTIME-001`.
 - Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
 - No runtime code or D1 mutation was introduced; already-passed Mapping/E5/structural work was not re-executed.
+
+## Superpowers continuation — current physical Worker binding control opened — 2026-09-21
+
+- New Change Control: `docs/change-control/CC-MAPPING-0-WORKER-PHYSICAL-BINDING-2026-09-21.md`
+- Current authoritative resource inventory already records `canonicalWorkers=12`, `physicalToLogicalMapping=NOT_ESTABLISHED`, and `workerProvisioningStatus=NO_UPLOADED_SCRIPTS_CONFIRMED`.
+- The historical `contracts/resource-budget/edge-first-worker-topology.json` is explicitly excluded from current physical binding because it is a historical W01-W13/P01-P08 model.
+- Logical Worker authority remains unchanged: W01 API/Gateway; W02 Identity/Account/Authorization; T01/T02/T03 → W02 → D1-01.
+- Physical Worker name/ID, deployed source commit and configuration binding are now a distinct governed prerequisite; no resource creation or rename is implied.
+- AUTH-002/E6 remains blocked until the canonical W02 runtime boundary and D1-01 RoleAssignment source are evidence-bound.
+- Current next item remains `GAP-E6-RUNTIME-001`.
+- Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
+- No runtime code or D1 mutation was introduced; no passed Mapping/E5/structural task was re-executed.
