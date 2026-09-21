@@ -47,7 +47,7 @@ const setMigrationDir = (config, dir) => config.replace(
 
 const setGenerateSchemaOutputFile = (config, outputFile) => config.replace(
   "    migrationDir: path.resolve(dirname, 'migrations'),",
-  "    migrationDir: path.resolve(dirname, 'migrations'),\\n    generateSchemaOutputFile: " + JSON.stringify(outputFile) + ",",
+  "    migrationDir: path.resolve(dirname, 'migrations'),\n    generateSchemaOutputFile: " + JSON.stringify(outputFile) + ",",
 )
 const writeFixture = (dir, config, users, includeAuthSchema) => {
   fs.writeFileSync(path.join(dir, 'payload.config.ts'), config)
