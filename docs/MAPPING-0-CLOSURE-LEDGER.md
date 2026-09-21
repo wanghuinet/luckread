@@ -1251,3 +1251,17 @@ The two active E6 blockers now have direct current-source evidence:
 
 This confirms the gaps without inventing a refresh schema or device transport. No Contract/Blueprint promotion and no runtime implementation occurred.
 
+
+
+## E6-WIRE-001 evidence correction — 2026-09-21
+
+Current-head authority review found that the canonical OpenAPI file does contain a `/auth/refresh` shell with `operationId: authRefresh`, but it is explicitly `DISCOVERY_DRAFT` and contains no concrete request body or concrete success response schema.
+
+Therefore the earlier wording that the route was entirely absent is superseded. The authoritative conclusion remains unchanged: `authRefresh` is not admitted as canonical Wire Authority, and E6-WIRE-001 remains `OPEN / DRIFT_CONFIRMED`.
+
+Corrective evidence:
+- `scripts/auth-011-wire-authority-consistency-audit.mjs` hardened in `f45fc4b096a1e2bede7b62cf5d987b66e18bbf4d`.
+- `artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json` updated as v1.1.0.
+- `contracts/alignment/mapping-batches/AUTH-011-reconciliation.v1.md` corrected to distinguish discovery shell from admitted Wire Schema.
+
+Anti-inference remains active: no DTO promotion, no OpenAPI schema completion, no route implementation, and no E6 runtime admission from this correction.
