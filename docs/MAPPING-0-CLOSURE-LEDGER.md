@@ -1376,3 +1376,19 @@ This section supersedes earlier continuation cursors for current work selection.
 - Current next item remains `GAP-E6-RUNTIME-001`.
 - Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
 - No runtime code or D1 mutation was introduced; no already-passed Mapping/E5/structural task was re-executed.
+
+## Superpowers continuation — physical Worker layout drift frozen — 2026-09-21
+
+- New audit: `artifacts/mapping-0/worker-physical-layout-reconciliation-2026-09-21.md`
+- Current canonical logical Worker authority remains unchanged.
+- Current physical `workers/*` directories use a legacy/alternative role naming scheme and must not be treated as canonical Worker identity.
+- Critical concrete finding: `workers/W02-content` is an Article/content skeleton, while canonical W02 is Identity/Account/Authorization.
+- The same ID/name mismatch exists across the physical W03-W12 skeletons; W01-payload is the substantive Payload runtime boundary but is not thereby promoted to W02 business authority.
+- No directory was renamed, deleted, merged or created.
+- AUTH-002/E6 must not place business authorization into W01-payload or W02-content merely from directory names.
+- Canonical AUTH-002 authority remains T01/T03 → W02 → D1-01; W01 remains API/Gateway boundary.
+- Physical canonical-W02 materialization and the W01↔W02 transport binding remain implementation-boundary work requiring explicit Contract/Change Control.
+- E6 implementation admission remains **BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED**.
+- Current next item remains `GAP-E6-RUNTIME-001`.
+- Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
+- No runtime code or D1 mutation was introduced; already-passed Mapping/E5/structural work was not re-executed.
