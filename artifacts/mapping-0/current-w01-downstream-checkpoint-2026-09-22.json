@@ -1,11 +1,11 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "ba929bc9585b65e1d6fd17cca81d886febaacbe5",
+  "currentMainHead": "547c46ee97c3c0c2475d20e48205a49720ae6734",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "ba929bc9585b65e1d6fd17cca81d886febaacbe5",
-    "priorRecordedHead": "fabbcb295d08a362445f8cf1864e1e59b57e4084",
+    "verifiedMainHead": "547c46ee97c3c0c2475d20e48205a49720ae6734",
+    "priorRecordedHead": "547c46ee97c3c0c2475d20e48205a49720ae6734",
     "state": "RECONCILED"
   },
   "cursor": {
@@ -27,26 +27,67 @@
     "remoteSchemaEvidence": {
       "status": "PASS_VERIFIED_READ_ONLY",
       "workflowRunId": 35657959095,
+      "runAttempt": 2,
+      "artifactId": 10670655260,
+      "artifactDigest": "sha256:6acc426894f47f54bf1e6eb7c3a9923fd9618318d9b8d2cfe94452183326fbb5",
       "testedSourceHead": "48575b4a2b86bf317e4e4ccac6c6ec17739cf2eb",
-      "artifactId": 10665837908,
       "targetD1": "luckread",
       "targetD1Id": "2f80471e-3756-49f9-8db1-7707a433ad64",
       "payloadVersion": "3.87.1",
       "d1AdapterVersion": "3.87.1",
-      "writesDuringCapture": 0
+      "executedAt": "2026-09-21T23:34:06.171Z",
+      "remoteState": {
+        "numTables": 9,
+        "migrationRows": [
+          "20250929_111647",
+          "20260921_003203_MIG_AUTH_002_SESSION_V1"
+        ],
+        "nativeTablesPresent": [
+          "users",
+          "users_sessions"
+        ],
+        "extensionTable": "auth_session_state",
+        "extensionColumns": [
+          "session_id",
+          "user_id",
+          "device_id",
+          "token_version",
+          "refresh_credential_hash",
+          "revoked_at",
+          "last_seen_at"
+        ],
+        "requiredExtensionIndexesPresent": true,
+        "extensionPhysicalForeignKeyCount": 0,
+        "evidenceQueryWrites": 0
+      },
+      "validator": "AUTH-002_SCHEMA_EVIDENCE_VALIDATION_PASS",
+      "runtimeStatus": "NOT_GREEN",
+      "note": "Fresh remote-state capture is read-only. The tested source SHA is older than current main; the evidence proves remote schema state, not current-head runtime binding."
     },
     "runtimeStatus": "NOT_GREEN"
   },
   "cloudflareInventory": {
-    "status": "PASS_VERIFIED_READ_ONLY_HISTORICAL",
+    "status": "PASS_VERIFIED_READ_ONLY",
     "workflowRunId": 35598525409,
-    "artifactId": 10637318432,
-    "testedSourceHead": "75e5a25fba48d95c432476cda6b0b6d6d4c70b06",
+    "rerunJobId": 106557792558,
+    "artifactId": 10670290293,
+    "artifactDigest": "sha256:de97662ee5d746e71b5227b82a8ff80828c5cdbdaa2951abc52c738b95e18f7b",
+    "testedWorkflowHead": "75e5a25fba48d95c432476cda6b0b6d6d4c70b06",
     "counts": {
       "d1": 2,
       "workers": 0
     },
-    "note": "No newer Cloudflare inventory evidence is present in main; this artifact does not establish current physical W02 binding."
+    "d1": [
+      {
+        "name": "luckreadpro",
+        "uuid": "6c342634-97f6-4248-9f4a-85772af4f22c"
+      },
+      {
+        "name": "luckread",
+        "uuid": "2f80471e-3756-49f9-8db1-7707a433ad64"
+      }
+    ],
+    "note": "Fresh read-only Cloudflare API inventory after job rerun; source checkout head is historical and does not affect the remote resource observation. No current physical W02 binding is established."
   },
   "blockers": [
     "D1-01 ENT-ROLE-ASSIGNMENT remains PROPOSED / CONTRACT_ONLY with no implementation or persistence evidence.",
@@ -65,5 +106,12 @@
     "Do not repeat the 449-row Mapping 0 scan without relevant source/authority/evidence input changes.",
     "Do not repeat AUTH-002 remote schema capture without relevant source, contract, target D1 state, or evidence-scope changes.",
     "Do not re-run already-passed structural gates as new closure work."
-  ]
+  ],
+  "evidenceRefresh": {
+    "date": "2026-09-22",
+    "state": "FRESH_READ_ONLY_EVIDENCE_REGISTERED",
+    "mappingPromotion": "NONE",
+    "runtimePromotion": "NONE",
+    "roleAssignmentPromotion": "NONE"
+  }
 }
