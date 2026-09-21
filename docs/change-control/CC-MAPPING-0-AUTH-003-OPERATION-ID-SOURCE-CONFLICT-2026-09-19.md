@@ -2,7 +2,7 @@
 
 ## Status
 
-DECIDED — RECONCILIATION PENDING
+PASS_VERIFIED — OPERATION SET RECONCILED; WIRE SCHEMA REMAINS BLOCKED
 
 ## Purpose
 
@@ -68,3 +68,19 @@ Future Mapping 0 conversations must classify this as an already-detected AUTH-00
 ## Decision accepted — 2026-09-20
 
 Decision 4 accepted: AUTH-003 canonical operation set is authCredentialList/authCredentialAdd/authCredentialReplace/authCredentialRemove; persistence-side identifiers remain downstream stale aliases pending admission.
+
+
+## Reconciliation closure — 2026-09-22
+
+The operationId source-conflict portion of this Change Control is now closed at the authority/reconciliation layer.
+
+- Canonical operation set remains exactly: `authCredentialList`, `authCredentialAdd`, `authCredentialReplace`, `authCredentialRemove`.
+- The accepted operation set is the authoritative vocabulary for the AUTH-003 feature surface.
+- Persistence-side identifiers (`authUsernameCreate`, `authUsernameChange`, `authEmailAdd`, `authEmailChange`, `authPhoneAdd`, `authPhoneChange`) remain stale/downstream aliases and are not promoted.
+- This closure does not define or infer any request/response field, status code, error body, list ordering, path-parameter schema, DTO schema, persistence schema, runtime behavior, or OpenAPI admission.
+- The exact public Wire Schema remains governed by the existing AUTH-003 wire-schema closure gate.
+
+Acceptance boundary:
+- Operation vocabulary conflict: `PASS_VERIFIED`.
+- Wire Schema / OpenAPI / DTO admission: unchanged and still blocked.
+- No runtime, persistence, Worker, D1, or Mapping promotion is authorized by this reconciliation alone.
