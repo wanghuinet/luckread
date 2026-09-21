@@ -127,5 +127,12 @@
       }
     },
     "replayRule": "Reuse exact structural evidence for documentation-only descendants; revalidate only when structural inputs change."
+  },
+  "currentness": {
+    "status": "HISTORICAL_SNAPSHOT_NOT_CURRENT_CURSOR",
+    "supersededBy": "docs/MAPPING-0-CLOSURE-LEDGER.md",
+    "supersedingCheckpoint": "artifacts/mapping-0/current-w01-downstream-checkpoint-2026-09-21.json",
+    "reason": "This queue snapshot is dated 2026-09-20 and retains the prior W01 migration cursor. Current 2026-09-21 main evidence has advanced to GAP-E6-RUNTIME-001 and must not regress to the superseded migration cursor.",
+    "reexecutionRule": "Do not re-open or re-execute W01-MIGRATION-BASELINE-AUTHORITY-001 solely because this historical queue snapshot remains in the repository."
   }
 }
