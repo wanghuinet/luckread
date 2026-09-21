@@ -20,6 +20,7 @@ on:
     branches: [main]
     paths:
       - "artifacts/mapping-0/AUTH-002-EXECUTE-E5-REQUEST.txt"
+      - ".github/workflows/auth-002-e5-remote-migration-execution.yml"
 
 permissions:
   contents: read
