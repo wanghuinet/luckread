@@ -9,13 +9,7 @@
 
 ## Observed current-state facts
 
-The active W01 source contains:
-- native Payload authentication in workers/W01-payload/src/collections/Users.ts;
-- the auth_session_state Drizzle schema source;
-- the E5 additive migration source;
-- the Payload D1 adapter hook that installs the schema source.
-
-Repository search did not establish an active W01 runtime read/write path that correlates native Payload sid lifecycle events with auth_session_state fields.
+The active repository contains the W01 Payload API-edge baseline and the contracted auth_session_state schema/migration sources. The canonical Worker authority, however, assigns authoritative Identity/Account/Authorization implementation to W02/T01/T03/D1-01. Repository search has not established an admitted W02 runtime implementation/binding or an approved W01↔W02 runtime path that correlates native Payload sid lifecycle events with auth_session_state fields.
 
 ## Contract boundary
 
@@ -33,7 +27,7 @@ This Change Control does not add fields, APIs, Workers, D1 domains, or a second 
 GAP-E6-RUNTIME-001:
 - Type: implementation/runtime evidence gap
 - Current state: NOT_PROVEN
-- Required proof: executable W01 runtime integration plus controlled remote E6 evidence
+- Required proof: admitted W02/T01/T03 runtime implementation/binding plus approved W01 API-edge integration and controlled remote E6 evidence
 - Prohibited shortcut: marking schema existence as runtime correlation
 
 ## Acceptance boundary
@@ -45,7 +39,7 @@ Do not:
 - promote AUTH-002 or Mapping 0.
 
 Resolution path:
-GAP -> approved implementation/change control -> exact W01 runtime implementation -> controlled remote E6 evidence -> validator -> Evidence Registry -> Mapping-0 validation.
+GAP -> approved implementation/change control -> evidence-bound RoleAssignment source -> admitted W02/T01/T03 implementation/binding plus approved W01 API-edge integration -> controlled remote E6 evidence -> validator -> Evidence Registry -> Mapping-0 validation.
 
 ## Current disposition
 
@@ -57,6 +51,6 @@ This gap is recorded only. No runtime code was added in this Change Control.
 - The RoleAssignment authority semantics are now frozen by `contracts/entity/AUTHZ-role-assignment-authority.v1.json`.
 - The deterministic layer algorithm is frozen by `contracts/authz/role-assignment-layer-resolution.v1.json`.
 - Current Entity Catalog still records `ENT-ROLE-ASSIGNMENT` as `PROPOSED`; current persistence/code-evidence inventories contain no implementation, schema, migration, or runtime record for that entity.
-- Therefore the remaining GAP-E6-RUNTIME-001 dependency is two-part: (a) an authoritative RoleAssignment source must exist and be evidence-bound without inventing a second authorization authority, and (b) the resolver must be bound to the existing W01/Payload runtime extension point.
+- Therefore the remaining GAP-E6-RUNTIME-001 dependency is two-part: (a) an authoritative RoleAssignment source must exist and be evidence-bound without inventing a second authorization authority, and (b) the resolver must be bound to the canonical W02/T01/T03 implementation boundary, with any W01 API-edge integration separately evidenced.
 - No new RoleAssignment table, persistence schema, Worker, D1 domain, or fallback authority is authorized by this finding.
-- Runtime implementation remains blocked until the existing Contract-First implementation gate admits both the authoritative source and the W01 runtime binding, followed by controlled evidence.
+- Runtime implementation remains blocked until the existing Contract-First implementation gate admits both the authoritative source and the canonical W02 implementation/binding, followed by controlled evidence.
