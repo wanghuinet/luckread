@@ -35,3 +35,25 @@ A current repository-only authority audit confirms:
 - The older `artifacts/mapping-0/api-dto-four-layer-crosscheck-2026-09-19.json` claim that `authRefresh` had an OpenAPI occurrence must be treated as stale evidence for current-head authority and must not be used for promotion.
 
 This correction changes only the evidence interpretation. It does not add or modify the canonical OpenAPI route, DTOs, API inventory, or runtime implementation.
+
+
+## 6B. Current OpenAPI shell is discovery-only — 2026-09-21
+
+Fresh current-head inspection confirms that `contracts/openapi/v1/openapi.yaml` contains:
+
+- `/auth/refresh`
+- `operationId: authRefresh`
+
+but the operation is explicitly marked:
+
+- `x-luckread-contract-status: DISCOVERY_DRAFT`
+- discovery-only summary
+- no concrete request body
+- no concrete success response schema
+
+Therefore this is **not** canonical admitted Wire Schema evidence. The corrected audit artifact `artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json` classifies the state as `DRIFT_CONFIRMED` because API Inventory requires the operation while the OpenAPI shell has not been promoted to an exact, admitted contract.
+
+Required closure remains:
+`OpenAPI -> Request DTO -> Response DTO -> canonical errors -> credential carrier semantics -> session/persistence authority -> runtime rotation/reuse evidence`.
+
+No runtime implementation or DTO promotion is authorized by this correction.
