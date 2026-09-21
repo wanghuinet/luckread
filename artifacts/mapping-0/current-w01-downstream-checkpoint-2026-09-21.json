@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
+  "sourceHead": "9241545d1a6dff7d87f0c3351e9a36867b6228af",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -128,11 +128,18 @@
     "baselineMigrationExecution": "PASS_VERIFIED",
     "E5_generation": "PASS_VERIFIED",
     "E5_static_audit": "PASS_VERIFIED",
-    "E5_remote_execution": "NOT_ADMITTED",
-    "overall": "NOT_GREEN"
+    "E5_remote_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILIATION_REQUIRED",
+    "overall": "NOT_GREEN",
+    "governanceIncident": {
+      "runId": 35552919573,
+      "testedSourceSha": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
+      "governingChangeControlStatusAtExecution": "OPEN — EXECUTION DECISION REQUIRED",
+      "admissionGuardDefect": "unanchored Status regex matched explanatory text",
+      "currentGuardStatus": "CORRECTED"
+    }
   },
-  "latestReconciliationCommit": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
-  "note": "Latest main aligned. Multiple E5 trigger commits were observed, but the governing Change Control remains OPEN and no successful E5 remote mutation evidence is present. Do not infer D1 mutation from trigger commits.",
+  "latestReconciliationCommit": "9241545d1a6dff7d87f0c3351e9a36867b6228af",
+  "note": "E5 remote mutation technically succeeded but occurred under an invalidly permissive admission guard while the governing Change Control was OPEN. Guard and trigger are contained; independent read-only schema evidence is pending. No compensating D1 mutation is performed.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -142,5 +149,11 @@
     "changeControlStatus": "OPEN — EXECUTION DECISION REQUIRED",
     "repositoryEvidenceOfSuccessfulE5Mutation": false,
     "interpretation": "Trigger attempts do not constitute execution evidence. No E5 success/schema/migration artifact is currently present in repository search."
+  },
+  "independentSchemaEvidence": {
+    "workflowRunId": 35553227463,
+    "status": "RUNNING",
+    "resultNotPromoted": true,
+    "purpose": "read-only post-execution remote D1 schema/catalog recapture"
   }
 }
