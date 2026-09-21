@@ -1533,3 +1533,14 @@ Closure boundary:
 - Mapping 0 remains **NOT_GREEN** with 449 records: PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
 - The unique implementation-boundary cursor remains `GAP-E6-RUNTIME-001`; its prerequisite external authority remains physical canonical W02 binding plus evidence-bound D1-01 RoleAssignment realization, followed by controlled runtime evidence.
 - This checkpoint intentionally changes no Contract, Blueprint, Entity, persistence authority, Worker topology, D1 resource, or runtime implementation.
+
+
+## AUTH-002 remote execution attempt audit — 2026-09-21
+
+- Workflow run `35550671505` / attempt 2 is a real `workflow_dispatch` execution against the controlled W01 baseline path.
+- It checked out source commit `fe95f41695c822480ee411e3a77453d1970b355f` and passed the explicit migration-admission guard.
+- The run failed at **Prove controlled target is still empty** while executing the read-only Wrangler D1 preflight query.
+- The migration execution step was not reached; the post-migration evidence step was not reached; the run produced no execution-evidence artifact.
+- Therefore this run provides **no new proof of successful remote migration or current D1 schema** and cannot satisfy the current baseline-authority gate.
+- Machine-readable failure record: `artifacts/mapping-0/current-auth-002-remote-execution-failure-2026-09-21.json`.
+- This is an external execution failure, not a reason to weaken migration admission or infer D1 state. A future retry must use the existing governed path and fresh evidence.
