@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "89aad86a1635122e0843618c75210819c1817d22",
+  "sourceHead": "e40a8c14231c429ad3180586aa9b631cd0d79961",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -101,7 +101,7 @@
   },
   "mapping0": {
     "status": "NOT_GREEN",
-    "nextItemId": "M0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-001",
+    "nextItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
     "nextItemState": "WAIT_AUTHORITY_DECISION",
     "noMappingRowsReexecuted": true,
     "metrics": {
@@ -118,7 +118,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Resolve ENT-ROLE-ASSIGNMENT authority under docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md. This is the upstream prerequisite for E6-LAYER-001. Do not repeat layer searches, add User.layer, hand-author RoleAssignment persistence, or start W01 auth runtime until RoleAssignment fields/validity/scope/revocation/version semantics are explicitly contracted.",
+  "nextRequiredExternalAction": "Reconcile the canonical L1/L2 role representation conflict documented in artifacts/mapping-0/authz-layer-mapping-conflict-audit-2026-09-21.md. Decide whether verified users transition from role user to verified_user, use a separate verification dimension, or another canonical representation. Do not implement RoleAssignment persistence or the Layer Resolver until this conflict is explicitly closed.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -212,8 +212,8 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "89aad86a1635122e0843618c75210819c1817d22",
-  "note": "Current main isolates ENT-ROLE-ASSIGNMENT authority as the upstream prerequisite for E6 layer resolution. Layer definition and D1-01 authority are established, but RoleAssignment field/validity/scope/revocation/version semantics are not canonical. Runtime remains blocked; no runtime code or D1 mutation performed.",
+  "latestReconciliationCommit": "e40a8c14231c429ad3180586aa9b631cd0d79961",
+  "note": "Current main records a genuine Contract authority conflict: docs/301 distinguishes user(unverified)->L1 and user(verified)->L2 while contracts/authz/layers.json maps user->L1 and verified_user->L2. This must be reconciled before a deterministic RoleAssignment-to-L0-L8 resolver can be admitted. No runtime code or D1 mutation performed.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -304,7 +304,7 @@
   "e6LayerAuthority": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-LAYER-AUTHORITY-2026-09-21.md",
     "audit": "artifacts/mapping-0/auth-002-e6-layer-authority-audit-2026-09-21.md",
-    "status": "OPEN — BLOCKED BY ROLE_ASSIGNMENT_AUTHORITY",
+    "status": "OPEN — BLOCKED BY ROLE_ASSIGNMENT_AND_L1_L2_MAPPING_AUTHORITY",
     "authorityDomain": "D1-01 Identity / Account / Access",
     "authorityInput": "RoleAssignment (authorization input)",
     "layerDefinitionSource": "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
@@ -312,8 +312,13 @@
     "payloadUserRoleRule": "User.role is compatibility metadata and is not complete authorization authority",
     "verifiedGap": "No executable deterministic effective-role-to-layer resolver or multi-assignment precedence is established in W01",
     "implementationAuthorized": false,
-    "upstreamDependency": "ENT-ROLE-ASSIGNMENT authority contract"
+    "upstreamDependency": "ENT-ROLE-ASSIGNMENT authority contract",
+    "upstreamDependencies": [
+      "ENT-ROLE-ASSIGNMENT authority contract",
+      "L1/L2 user versus verified_user canonical representation"
+    ]
   },
   "e6LayerAuthorityDecisionInput": "artifacts/mapping-0/auth-002-e6-layer-authority-decision-input-2026-09-21.md",
-  "e6RoleAssignmentAuthorityChangeControl": "docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md"
+  "e6RoleAssignmentAuthorityChangeControl": "docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md",
+  "e6RoleAssignmentAuthorityConflict": "artifacts/mapping-0/authz-layer-mapping-conflict-audit-2026-09-21.md"
 }
