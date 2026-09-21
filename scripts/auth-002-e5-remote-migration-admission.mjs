@@ -74,7 +74,7 @@ const indexSource = readFileSync(join(root, 'workers', 'W01-payload', 'src', 'mi
 for (const name of [baselineMigration, e5Migration]) {
   const matches = indexSource.match(new RegExp(`name:\\s*'${name.replace(/[.*+?^$()|[\\]\\\\]/g, '\\\\$&')}'`, 'g')) ?? []
   if (matches.length !== 1) {
-    console.error(`AUTH-002_E5_REMOTE_MIGRATION_ADMISSION_BLOCKED: expected exactly one index registration for ${name}; observed ${count}.`)
+    console.error(`AUTH-002_E5_REMOTE_MIGRATION_ADMISSION_BLOCKED: expected exactly one index registration for ${name}; observed ${matches.length}.`)
     process.exit(1)
   }
 }
