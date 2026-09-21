@@ -124,4 +124,4 @@ export const authSessionStateSchemaHook: SQLiteSchemaHook = (args) => {
       ...schema.tables,
       auth_session_state: authSessionState,
     },
-  }}
+  }
