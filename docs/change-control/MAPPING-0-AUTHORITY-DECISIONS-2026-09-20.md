@@ -189,3 +189,30 @@ Reconciliation state:
 - PASS_VERIFIED for authority selection.
 - Canonical OpenAPI/DTO reconciliation is admitted.
 - Runtime implementation remains separately gated.
+
+
+### 12. AUTHZ RoleAssignment authority — D1-01
+
+Control: `CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21`
+
+Canonical authority contract: `contracts/entity/AUTHZ-role-assignment-authority.v1.json`
+
+Decision:
+- D1-01 remains the sole authority domain for RoleAssignment.
+- `subjectId` binds an assignment to exactly one authoritative USER identity. RoleAssignment does not create Identity, Verification, Organization Membership, Ownership, Entitlement or Subscription state.
+- `roleId` is valid only when declared by `contracts/authz/layers.json#x-layers[].roles`; unknown or forbidden roles fail closed.
+- Canonical assignment scope is `global | organization | ip`. Non-global assignments require `scopeId` referencing an already-authoritative scope and do not create that scope.
+- Effective assignment requires `status=ACTIVE`, `validFrom <= evaluationTime`, and either no `validUntil` or `evaluationTime < validUntil`. Revoked or temporally invalid assignments are ineffective.
+- Concurrent effective duplicates of `(subjectId, roleId, scopeType, scopeId)` are not permitted. Role/scope changes revoke the old assignment and create a new assignment rather than overwriting historical authority facts.
+- Effective assignment-set changes, including revocation, MUST advance the authoritative `role_version` (or an existing authoritative equivalent) and participate in the existing authorization-cache invalidation contract.
+- For the public `authLogin` / `authRefresh` response `layer`, only eligible `global` RoleAssignments participate. Organization/IP-scoped RoleAssignments remain resource-scope authorization inputs and do not raise the global response layer.
+- With multiple eligible global assignments, resolve the highest numeric L0-L8 layer from the canonical `layers.json` mapping. Equal-layer assignments require no secondary precedence.
+- Account-state/security deny remains before successful token issuance or rotation; RoleAssignment cannot bypass a non-ACTIVE account state.
+- The response `layer` is derived at evaluation time. No `User.layer`, duplicate layer entity, new Worker, new D1 domain, or cache-derived layer is introduced.
+- If no valid global RoleAssignment resolves to an L0-L8 layer, do not synthesize a fallback from verification, User.role, entitlement, subscription, membership, IP, device or cache; authentication/token issuance or refresh fails closed under the existing canonical authentication/error contract without a new error enum.
+- This decision changes authority specification only. It does not authorize runtime implementation, migration, persistence mutation, or ENT-ROLE-ASSIGNMENT promotion to VERIFIED.
+
+Reconciliation state:
+- `PASS_VERIFIED` for RoleAssignment authority.
+- E6-LAYER-001 may advance from authority-input blockage to deterministic resolver specification.
+- Runtime implementation remains separately gated by the existing E6 implementation-admission control.
