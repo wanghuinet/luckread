@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "48d41390ce709bf2377a78fa4d928a109d4ddfc4",
+  "sourceHead": "f20413017799aab14a5d29fb6759fbeb888a1b29",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -123,5 +123,6 @@
     "E5_remote_execution": "NOT_ADMITTED",
     "overall": "NOT_GREEN"
   },
-  "latestReconciliationCommit": "48d41390ce709bf2377a78fa4d928a109d4ddfc4"
+  "latestReconciliationCommit": "f20413017799aab14a5d29fb6759fbeb888a1b29",
+  "note": "Current main head aligned. No source/contract/runtime mutation implied by this checkpoint-only update."
 }
