@@ -170,3 +170,22 @@ Reconciliation state:
 - E5 technical result: retained without retroactive authorization.
 - E6 implementation admission: `BLOCKED — REQUIRED CONTRACT INPUTS MISSING`.
 - Mapping 0 remains `NOT_GREEN`.
+
+
+### 11. AUTH-002 / AUTH-011 E6 Wire Authority
+
+Control: CC-MAPPING-0-AUTH-002-E6-WIRE-AUTHORITY-DECISION-2026-09-21
+
+Decision:
+- authRefresh canonical request DTO = DTO-AUTH-REFRESH-REQUEST, JSON body containing required refreshToken only.
+- authRefresh canonical response DTO = DTO-AUTH-REFRESH-RESPONSE, containing accessToken, refreshToken, expiresIn, and layer.
+- Refresh credential carrier is JSON body refreshToken; no bearer/cookie/custom-header carrier is canonical.
+- Expired, revoked, invalid, and reused refresh credentials use canonical UNAUTHENTICATED / HTTP 401; rate limiting uses the existing HTTP 429 / RateLimited contract. No new error enum is introduced.
+- authLogin and authRefresh require an opaque client-generated deviceId input. The server binds it to the native Payload sid as the canonical privacy-safe device reference.
+- deviceId is not an authentication secret or authorization claim and must not be derived from IP, User-Agent, fingerprinting, cookies, geolocation, advertising identifiers, hardware serials, or other uncontracted signals.
+- No ENT-DEVICE-RECORD, alternate session identity, new Worker, or new D1 domain is introduced.
+
+Reconciliation state:
+- PASS_VERIFIED for authority selection.
+- Canonical OpenAPI/DTO reconciliation is admitted.
+- Runtime implementation remains separately gated.
