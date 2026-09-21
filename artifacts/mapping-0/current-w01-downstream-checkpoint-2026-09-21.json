@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "9f1717425ad684a6b27cd9324ed41a62d9483746",
+  "sourceHead": "aa8eeef71e94a2e38af7ad5f77e1873d0e5c34e4",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -101,8 +101,8 @@
   },
   "mapping0": {
     "status": "NOT_GREEN",
-    "nextItemId": "M0-AUTH-002-E6-WIRE-INPUTS-001",
-    "nextItemState": "BLOCKED_UNTIL_CONTRACT_INPUTS_RESOLVED",
+    "nextItemId": "M0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-001",
+    "nextItemState": "BLOCKED_BY_RUNTIME_EVIDENCE",
     "noMappingRowsReexecuted": true,
     "metrics": {
       "canonicalRecords": 449,
@@ -118,7 +118,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "External Contract-First authority decision required. AUTH-011 must explicitly define the exact authRefresh Request/Response/Error schemas, DTO identity, credential-carrier semantics, and route admission; AUTH-002 must explicitly define the authoritative device-binding source, transport, and ownership/control semantics. Do not repeat repository searches unless a new authority source is committed. Do not implement runtime auth code, add transport fields, promote the Discovery Draft, or mutate D1 before both decisions are reconciled.",
+  "nextRequiredExternalAction": "Run the existing E6 runtime admission/evidence path after Contract reconciliation. Do not promote AUTH-002 until executable login/refresh/logout/session/device-binding/rotation/reuse/security evidence is accepted.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -212,8 +212,8 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "9f1717425ad684a6b27cd9324ed41a62d9483746",
-  "note": "Latest main checked at 9f1717425ad684a6b27cd9324ed41a62d9483746. No new authoritative E6 wire/device decisions were found; no runtime code or D1 mutation performed.",
+  "latestReconciliationCommit": "aa8eeef71e94a2e38af7ad5f77e1873d0e5c34e4",
+  "note": "E6-WIRE-001 and E6-WIRE-002 were resolved through explicit Contract-First authority decision and canonical OpenAPI/DTO reconciliation. Contract CI still has a pre-existing semantic duplicate-operationId failure unrelated to authRefresh; runtime admission remains fail-closed.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -242,7 +242,7 @@
   },
   "e6RuntimeImplementationAdmission": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21.md",
-    "status": "BLOCKED — REQUIRED CONTRACT INPUTS MISSING",
+    "status": "BLOCKED — RUNTIME IMPLEMENTATION EVIDENCE REQUIRED",
     "implementationAuthorized": false,
     "runtimeCodeChanged": false,
     "remoteD1Mutation": false,
@@ -269,22 +269,10 @@
   },
   "e6WireInputGaps": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md",
-    "status": "OPEN — EXPLICIT DECISION INPUTS REQUIRED",
-    "evidence": {
-      "E6_WIRE_001": {
-        "artifact": "artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json",
-        "status": "DRIFT_CONFIRMED",
-        "sufficiencyAudit": "artifacts/mapping-0/e6-wire-input-sufficiency-audit-2026-09-21.json",
-        "pathBaseNormalization": "PASS_VERIFIED",
-        "pathBaseNormalizationEvidence": "artifacts/mapping-0/b01-api-path-normalization-audit-2026-09-20.json"
-      },
-      "E6_WIRE_002": {
-        "artifact": "artifacts/mapping-0/auth-002-device-binding-authority-audit-2026-09-21.json",
-        "status": "INPUT_AUTHORITY_MISSING_CONFIRMED",
-        "sufficiencyAudit": "artifacts/mapping-0/e6-wire-input-sufficiency-audit-2026-09-21.json"
-      }
-    },
-    "decisionBoundary": "No existing authoritative source can legally supply E6-WIRE-001 or E6-WIRE-002; implementation remains fail-closed."
+    "status": "CLOSED — CONTRACT INPUTS RESOLVED",
+    "decisionControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-AUTHORITY-DECISION-2026-09-21",
+    "E6_WIRE_001": "PASS_VERIFIED_AUTHORITY",
+    "E6_WIRE_002": "PASS_VERIFIED_AUTHORITY"
   },
   "auth011WireAuthorityDrift": {
     "audit": "artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json",
