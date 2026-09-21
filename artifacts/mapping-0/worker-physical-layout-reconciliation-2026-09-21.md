@@ -65,3 +65,18 @@ The Worker topology is **logically frozen but not physically materialized to the
 This is an implementation-boundary gap, not a reason to change the canonical architecture.
 
 For Mapping 0, the finding is recorded as evidence and must not be repeatedly rediscovered.
+
+
+## Supersession correction — 2026-09-21
+
+A further authority cross-check found that `contracts/resource-budget/edge-first-worker-topology.json` defines a historical W01-W13 logical / P01-P08 physical grouping and is explicitly classified by `docs/04-WORKER-TOPOLOGY-CHANGE-CONTROL-v1.0.md` as historical and not matching the current 12-worker target.
+
+Accordingly, this audit does **not** assert that the physical P01-P08 topology is current, nor does it require a physical directory rename based on that historical model.
+
+The safe current conclusion is narrower:
+
+- Canonical logical Worker authority remains the ACTIVE/CANONICAL Worker Master.
+- The repository's physical `workers/*` directories do not independently establish canonical Worker identity.
+- The canonical **physical-to-logical Worker binding is not yet established by current evidence**.
+- This is distinct from the historical P01-P08 topology and must not be resolved by importing that historical topology.
+- No directory rename/delete/creation is authorized by this audit.
