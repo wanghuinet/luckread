@@ -2,7 +2,7 @@
 
 - Audit ID: M0-AUTH-002-E6-LAYER-AUTHORITY-AUDIT-001
 - Scope: determine whether the repository already contains an authoritative runtime source and deterministic resolver for the `authLogin` / `authRefresh` response `layer` field.
-- Result: SOURCE DOMAIN IDENTIFIED; RESOLVER SEMANTICS STILL OPEN
+- Result: SOURCE DOMAIN IDENTIFIED; RESOLVER SEMANTICS RECONCILED; RUNTIME BINDING OPEN
 - Runtime implementation authorization: false
 
 ## Verified authority facts
@@ -33,12 +33,16 @@ The following remain unauthorized:
 
 ## Closure decision
 
-The audit narrows E6-LAYER-001 from “unknown authority source” to:
+The original audit finding is retained as historical discovery evidence. It is superseded for current authority by:
+`contracts/entity/AUTHZ-role-assignment-authority.v1.json`
+and
+`contracts/authz/role-assignment-layer-resolution.v1.json`.
 
-`D1-01 Role/RoleAssignment authority identified; effective RoleAssignment-to-L0-L8 resolver and multi-assignment precedence are still contract inputs requiring explicit authority decision.`
+Current reconciled result:
+`D1-01 RoleAssignment authority + deterministic RoleAssignment-to-L0-L8 resolver semantics are contractually defined; exact W01 runtime binding and executable evidence remain open.`
 
 Therefore:
-- E6-LAYER-001 remains OPEN.
+- E6-LAYER-001 remains OPEN only for runtime binding and controlled execution evidence.
 - E6 runtime implementation remains BLOCKED.
 - No W01 runtime code changed.
 - No D1 mutation performed.
