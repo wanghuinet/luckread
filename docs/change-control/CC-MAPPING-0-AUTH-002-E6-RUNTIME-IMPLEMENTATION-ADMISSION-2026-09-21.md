@@ -162,3 +162,17 @@ Decision:
 - physical binding and W01↔W02 transport require an explicit implementation/binding Contract before runtime work is admitted.
 
 This audit further constrains GAP-E6-RUNTIME-001 and does not authorize implementation.
+
+## Historical physical-topology correction — 2026-09-21
+
+Audit update: `artifacts/mapping-0/worker-physical-layout-reconciliation-2026-09-21.md`.
+
+A separate `contracts/resource-budget/edge-first-worker-topology.json` artifact defines a historical W01-W13 logical / P01-P08 physical grouping and is explicitly marked historical by the current Worker Topology Change Control. It is not a source for the current 12-Worker target.
+
+Therefore:
+- do not import P01-P08 or W13 into the current architecture;
+- do not infer current physical Worker binding from legacy directory names;
+- current evidence establishes logical Worker authority, but current physical-to-logical Worker binding remains **NOT_ESTABLISHED**;
+- this does not authorize renaming or relocating the existing worker directories.
+
+For E6, the canonical logical authority remains W02/T01/T03/D1-01. The physical implementation location and any W01↔W02 runtime transport remain unadmitted until supported by a current binding contract.
