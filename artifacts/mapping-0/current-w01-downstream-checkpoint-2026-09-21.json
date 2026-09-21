@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "50e322696c297f06e1aeb9014885ea541e5ae190",
+  "sourceHead": "012538c00f2aa7ac4eec58ad6e47b51710793e70",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -27,30 +27,61 @@
     }
   },
   "approvedBaselineExecution": {
-    "status": "GREEN — EXECUTION ADMITTED",
-    "workflow": ".github/workflows/w01-baseline-migration-execution.yml",
-    "sourceSha": "56926bab09951a8a0e15c820f1fb58dd8ba7090f",
-    "migration": "20250929_111647",
-    "migrationBlobSha": "21e4a9ce27c828da655e479e35eb44ea3daff0f3",
-    "migrationIndexBlobSha": "e596aeb65381fd3bb2e0cfa7879c8f850bb77cbe",
-    "remoteMigrationExecuted": false,
-    "preflightFixCommit": "f38fc756d3c7754c6d5205bb46e47618c85b9cdc",
-    "preflightFixVerifiedInMain": "50e322696c297f06e1aeb9014885ea541e5ae190"
-  },
-  "remoteEvidence": {
-    "workflow": "AUTH-002 Session Schema Evidence",
-    "runId": 35550865820,
-    "testedCommitSha": "50e322696c297f06e1aeb9014885ea541e5ae190",
-    "conclusion": "success",
-    "validator": "AUTH-002_SCHEMA_EVIDENCE_VALIDATION_PASS",
-    "artifactId": 10618331781,
-    "environmentClass": "CONTROLLED_REMOTE_D1",
+    "status": "PASS_VERIFIED",
+    "evidenceWorkflow": "W01 Baseline Migration Execution",
+    "evidenceRunId": 35508571153,
+    "evidenceJobId": 106072401909,
+    "evidenceArtifactId": 10604388551,
+    "evidenceSourceSha": "56926bab09951a8a0e15c820f1fb58dd8ba7090f",
     "databaseName": "luckread",
     "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
-    "baselineState": "BASELINE_CONFIRMED_UNINITIALIZED",
-    "applicationTables": [],
-    "remoteWritesDuringCapture": 0,
-    "postMigrationEvidence": false
+    "migration": "20250929_111647",
+    "migrationResult": "PASS",
+    "recordedInPayloadMigrations": true,
+    "batch": 1,
+    "postMigrationApplicationTables": [
+      "media",
+      "payload_locked_documents",
+      "payload_locked_documents_rels",
+      "payload_migrations",
+      "payload_preferences",
+      "payload_preferences_rels",
+      "users",
+      "users_sessions"
+    ],
+    "canonicalProfileFieldsPresent": [],
+    "remoteEvidenceWrites": 0,
+    "currentPreflightReconfirmationRunId": 35551188747,
+    "currentPreflightApplicationTables": [
+      "media",
+      "payload_locked_documents",
+      "payload_locked_documents_rels",
+      "payload_migrations",
+      "payload_preferences",
+      "payload_preferences_rels",
+      "users",
+      "users_sessions"
+    ],
+    "currentPreflightConclusion": "BLOCKED_AS_ALREADY_APPLIED"
+  },
+  "remoteEvidence": {
+    "baselineExecution": "PASS_VERIFIED",
+    "baselineEvidenceRunId": 35508571153,
+    "latestReadOnlyEvidenceRunId": 35550865820,
+    "latestReadOnlyEvidenceConclusion": "PASS",
+    "currentBaselinePresenceReconfirmationRunId": 35551188747,
+    "currentBaselinePresenceReconfirmationConclusion": "BLOCKED_AS_ALREADY_APPLIED",
+    "currentRemoteState": [
+      "media",
+      "payload_locked_documents",
+      "payload_locked_documents_rels",
+      "payload_migrations",
+      "payload_preferences",
+      "payload_preferences_rels",
+      "users",
+      "users_sessions"
+    ],
+    "remoteWritesDuringLatestReadOnlyCapture": 0
   },
   "AUTH-002": {
     "E5": "GENERATED_AND_REGISTERED",
@@ -61,10 +92,32 @@
   },
   "mapping0": {
     "status": "NOT_GREEN",
-    "nextItemId": "W01-MIGRATION-BASELINE-AUTHORITY-001",
-    "nextItemState": "BLOCKED_EXTERNAL",
+    "nextItemId": "M0-AUTH-002-E5-REMOTE-EXECUTION-AUTHORITY-001",
+    "nextItemState": "WAIT_AUTHORITY_DECISION",
     "noMappingRowsReexecuted": true
   },
-  "nextRequiredExternalAction": "Run the existing W01 Baseline Migration Execution workflow with source_sha=56926bab09951a8a0e15c820f1fb58dd8ba7090f, database_name=luckread, confirm=EXECUTE_W01_BASELINE. The workflow now records the preflight result and will execute only if the controlled target has no non-_cf application tables; then review fresh post-migration evidence.",
-  "noMappingRowsReexecuted": true
+  "nextRequiredExternalAction": "Establish explicit execution admission for MIG-AUTH-002-SESSION-V1 against the already-initialized luckread D1. Do not rerun the baseline migration. After execution, capture fresh auth_session_state schema/migration-history evidence and then proceed to AUTH-002 runtime evidence.",
+  "noMappingRowsReexecuted": true,
+  "e5": {
+    "migrationId": "MIG-AUTH-002-SESSION-V1",
+    "sourcePath": "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
+    "sourceBlobSha": "2b43a7b08fe7c5be98793da7eb07ddd2cf9e6921",
+    "indexBlobSha": "436c37e395145017d9135f938d69a741a936c60b",
+    "generationProofRunId": 35547971500,
+    "generationProofConclusion": "success",
+    "sourceAuditRunId": 35548553203,
+    "sourceAuditConclusion": "success",
+    "schemaSourceChangeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E5-DRIZZLE-SCHEMA-SOURCE-2026-09-21.md",
+    "executionStatus": "NOT_ADMITTED",
+    "remoteTableBeforeExecution": "ABSENT",
+    "requiredNextGate": "EXPLICIT_E5_REMOTE_EXECUTION_AUTHORITY"
+  },
+  "AUTH002": {
+    "E4_5": "PASS_VERIFIED",
+    "baselineMigrationExecution": "PASS_VERIFIED",
+    "E5_generation": "PASS_VERIFIED",
+    "E5_static_audit": "PASS_VERIFIED",
+    "E5_remote_execution": "NOT_ADMITTED",
+    "overall": "NOT_GREEN"
+  }
 }
