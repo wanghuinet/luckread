@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "7cecc38d1322a7f3f75d6e877e3e8c32a3c853c8",
+  "sourceHead": "6e9da326bcd9b9c4556257764cdeaf0b8dd140f1",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -95,8 +95,8 @@
   },
   "mapping0": {
     "status": "NOT_GREEN",
-    "nextItemId": "M0-AUTH-002-E5-REMOTE-EXECUTION-AUTHORITY-001",
-    "nextItemState": "WAIT_AUTHORITY_DECISION",
+    "nextItemId": "M0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-001",
+    "nextItemState": "BLOCKED_UNTIL_IMPLEMENTATION_ADMISSION",
     "noMappingRowsReexecuted": true,
     "metrics": {
       "canonicalRecords": 449,
@@ -112,7 +112,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Explicit authority reconciliation of the parent E5 execution incident. Do not rerun E5 or baseline. After reconciliation, admit the staged E6 implementation Change Control and resolve GAP-E6-RUNTIME-001.",
+  "nextRequiredExternalAction": "Resolve E6 implementation admission under the existing GREEN→implement rule. Do not run E5 or baseline again. No runtime authentication code has been added.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -162,6 +162,13 @@
         "parent authority remains OPEN",
         "stale execute marker absent"
       ]
+    },
+    "authorityReconciliation": {
+      "decisionRecord": "docs/change-control/MAPPING-0-AUTHORITY-DECISIONS-2026-09-20.md",
+      "decision": "E5 execution was not authorized at execution time; technical result retained; no retroactive GREEN authorization; no rerun.",
+      "parentChangeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E5-REMOTE-EXECUTION-2026-09-21.md",
+      "parentStatus": "CLOSED — EXECUTION NOT AUTHORIZED; TECHNICAL RESULT RETAINED",
+      "reconciliationStatus": "PASS_VERIFIED"
     }
   },
   "AUTH002": {
@@ -193,8 +200,8 @@
       "scope": "read-only post-execution remote D1 schema/catalog recapture"
     }
   },
-  "latestReconciliationCommit": "7cecc38d1322a7f3f75d6e877e3e8c32a3c853c8",
-  "note": "Current head contains only control/evidence hardening after the E5 incident. No Mapping rows, authentication runtime code, or remote D1 state were changed.",
+  "latestReconciliationCommit": "6e9da326bcd9b9c4556257764cdeaf0b8dd140f1",
+  "note": "E5 authority incident is reconciled by project Authority Decisions. Technical E5 state/evidence retained without retroactive authorization. E6 implementation admission is the active blocker; Mapping-0 remains NOT_GREEN.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -227,6 +234,7 @@
     "implementationAuthorized": false,
     "runtimeCodeChanged": false,
     "remoteD1Mutation": false,
-    "dependsOnE5AuthorityReconciliation": true
+    "dependsOnE5AuthorityReconciliation": true,
+    "parentE5AuthorityIncidentReconciled": true
   }
 }
