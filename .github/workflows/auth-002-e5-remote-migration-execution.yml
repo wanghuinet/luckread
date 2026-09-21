@@ -32,14 +32,9 @@ jobs:
       - name: Validate execution trigger
         env:
           EVENT_NAME: ${{ github.event_name }}
-          HEAD_MESSAGE: ${{ github.event.head_commit.message || '' }}
         run: |
           set -euo pipefail
-          if [ "$EVENT_NAME" = "push" ]; then
-            test "$HEAD_MESSAGE" = "execute(auth-002): admitted E5 remote migration"
-          else
-            test "$EVENT_NAME" = "workflow_dispatch"
-          fi
+          test "$EVENT_NAME" = "workflow_dispatch"
 
       - name: Validate dispatch confirmation
         env:
