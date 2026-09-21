@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "6e9da326bcd9b9c4556257764cdeaf0b8dd140f1",
+  "sourceHead": "2f5d98ea66607b942c69a68aa72ba9fe4b80f415",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -70,11 +70,12 @@
   "remoteEvidence": {
     "baselineExecution": "PASS_VERIFIED",
     "baselineEvidenceRunId": 35508571153,
-    "latestReadOnlyEvidenceRunId": 35550865820,
-    "latestReadOnlyEvidenceConclusion": "PASS",
+    "latestReadOnlyEvidenceRunId": 35553227463,
+    "latestReadOnlyEvidenceConclusion": "PASS_VERIFIED_POST_E5",
     "currentBaselinePresenceReconfirmationRunId": 35551188747,
     "currentBaselinePresenceReconfirmationConclusion": "BLOCKED_AS_ALREADY_APPLIED",
     "currentRemoteState": [
+      "auth_session_state",
       "media",
       "payload_locked_documents",
       "payload_locked_documents_rels",
@@ -112,7 +113,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Resolve E6 implementation admission under the existing GREEN→implement rule. Do not run E5 or baseline again. No runtime authentication code has been added.",
+  "nextRequiredExternalAction": "Resolve E6 implementation admission under the existing GREEN→implement rule. Only after implementation admission may W01 runtime integration be changed and controlled E6 evidence executed. Do not rerun E5 or baseline.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -124,9 +125,9 @@
     "sourceAuditRunId": 35548553203,
     "sourceAuditConclusion": "success",
     "schemaSourceChangeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E5-DRIZZLE-SCHEMA-SOURCE-2026-09-21.md",
-    "executionStatus": "TECHNICAL_PASS_GOVERNANCE_RECONCILIATION_REQUIRED",
+    "executionStatus": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "remoteTableBeforeExecution": "CONFIRMED_ABSENT_BY_E5_PREFLIGHT_AT_EXECUTION",
-    "requiredNextGate": "EXPLICIT_E5_REMOTE_EXECUTION_AUTHORITY",
+    "requiredNextGate": "E6_RUNTIME_IMPLEMENTATION_ADMISSION",
     "executionChannel": {
       "admissionGuard": "scripts/auth-002-e5-remote-migration-admission.mjs",
       "admissionGuardCommit": "d76fc52126907719d29903d6ea6089fe1e48e1bc",
@@ -143,7 +144,7 @@
       "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E5-AUTHORITY-INCIDENT-REMEDIATION-2026-09-21.md",
       "status": "CLOSED — CONTROL REMEDIATION VERIFIED",
       "retroactiveAuthorization": false,
-      "parentAuthorityDecision": "OPEN — EXECUTION DECISION REQUIRED",
+      "parentAuthorityDecision": "CLOSED — EXECUTION NOT AUTHORIZED; TECHNICAL RESULT RETAINED",
       "currentGuardCommit": "e302fb15284bb5b3f00f4c29bc5479c7f2a223da",
       "currentWorkflowHardeningCommit": "19e6b50aafa204ccabde8b656d705fd7766d0269"
     },
@@ -159,7 +160,7 @@
         "OPEN-status non-admission",
         "manual-dispatch-only E5 workflow",
         "no obsolete push-marker validation",
-        "parent authority remains OPEN",
+        "reconciled parent authority is not GREEN",
         "stale execute marker absent"
       ]
     },
@@ -188,7 +189,10 @@
         "implicit push execution removed",
         "stale trigger marker removed"
       ],
-      "compensatingD1Mutation": false
+      "compensatingD1Mutation": false,
+      "governanceStatusAtExecution": "OPEN — EXECUTION DECISION REQUIRED",
+      "reconciliationStatus": "PASS_VERIFIED",
+      "retroactiveAuthorization": false
     },
     "E5_independent_schema_evidence": {
       "workflowRunId": 35553227463,
@@ -198,10 +202,12 @@
       "digest": "sha256:68a812d812da703ace3b14e62360b56815c01c939418eb70a6e7252a573e9f31",
       "testedCommitSha": "9241545d1a6dff7d87f0c3351e9a36867b6228af",
       "scope": "read-only post-execution remote D1 schema/catalog recapture"
-    }
+    },
+    "E5": "GENERATED_AND_REGISTERED",
+    "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED"
   },
-  "latestReconciliationCommit": "6e9da326bcd9b9c4556257764cdeaf0b8dd140f1",
-  "note": "E5 authority incident is reconciled by project Authority Decisions. Technical E5 state/evidence retained without retroactive authorization. E6 implementation admission is the active blocker; Mapping-0 remains NOT_GREEN.",
+  "latestReconciliationCommit": "2f5d98ea66607b942c69a68aa72ba9fe4b80f415",
+  "note": "Current authoritative checkpoint. E5 authority incident is reconciled and closed without retroactive authorization. E5 technical result is retained. E6 implementation admission is the active blocker. No business runtime code or remote D1 mutation occurred in this continuation.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
