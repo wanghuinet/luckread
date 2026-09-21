@@ -72,3 +72,17 @@ The two gaps are now independently tied to current repository snapshots:
 - E6-WIRE-002: `artifacts/mapping-0/auth-002-device-binding-authority-audit-2026-09-21.json` = `INPUT_AUTHORITY_MISSING_CONFIRMED`. The canonical Session/entity and persistence contracts require `deviceId`, but current AUTH API/DTO/Policy sources define no transport/source authority.
 
 These artifacts are authority/evidence records only. They do not promote either operation or field and do not authorize implementation.
+
+
+## Current evidence correction — 2026-09-21
+
+A fresh current-head inspection corrected the earlier description of E6-WIRE-001:
+- `contracts/openapi/v1/openapi.yaml` **does contain** `/auth/refresh`.
+- It also contains `operationId: authRefresh`.
+- The operation is explicitly marked `x-luckread-contract-status: DISCOVERY_DRAFT`.
+- Its summary remains discovery-only (`Discovery draft for POST undefined`), with no concrete request body and no concrete success response schema.
+- Therefore the route shell is present, but the canonical Wire Authority is **not admitted** and the exact Request/Response/Error DTO contract remains unresolved.
+- The corrected audit artifact is `artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json` = `DRIFT_CONFIRMED`.
+- The audit script was hardened in commit `f45fc4b096a1e2bede7b62cf5d987b66e18bbf4d` so a Discovery Draft is not mistaken for canonical admission.
+
+This is a correction to evidence interpretation only. It does not promote the route, add DTOs, or authorize runtime implementation.
