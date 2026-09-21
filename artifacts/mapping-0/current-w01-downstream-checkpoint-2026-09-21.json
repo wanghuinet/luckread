@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "fc84d9c4c059031e6eab91ed94e5c8929ad29a15",
+  "sourceHead": "49cd3e9a7d3c52cf0a4b2b8adbc574f53b314b1e",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -101,8 +101,8 @@
   },
   "mapping0": {
     "status": "NOT_GREEN",
-    "nextItemId": "M0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-001",
-    "nextItemState": "BLOCKED_UNTIL_IMPLEMENTATION_ADMISSION",
+    "nextItemId": "M0-AUTH-002-E6-WIRE-INPUTS-001",
+    "nextItemState": "BLOCKED_UNTIL_CONTRACT_INPUTS_RESOLVED",
     "noMappingRowsReexecuted": true,
     "metrics": {
       "canonicalRecords": 449,
@@ -118,7 +118,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Resolve E6 implementation admission under the existing GREEN→implement rule. Only after implementation admission may W01 runtime integration be changed and controlled E6 evidence executed. Do not rerun E5 or baseline.",
+  "nextRequiredExternalAction": "Resolve E6-WIRE-001 and E6-WIRE-002 through normal Contract-First Change Control. Do not implement runtime auth code, add device transport, add refresh endpoint, or mutate D1 until these inputs are reconciled.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -211,8 +211,8 @@
     "E5": "GENERATED_AND_REGISTERED",
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED"
   },
-  "latestReconciliationCommit": "fc84d9c4c059031e6eab91ed94e5c8929ad29a15",
-  "note": "Current authoritative checkpoint. E5 authority incident is reconciled and closed without retroactive authorization. E5 technical result is retained. E6 implementation admission is the active blocker. No business runtime code or remote D1 mutation occurred in this continuation.",
+  "latestReconciliationCommit": "49cd3e9a7d3c52cf0a4b2b8adbc574f53b314b1e",
+  "note": "E5 authority incident is reconciled. Current active blockers are two E6 contract-input gaps. No Mapping rows, runtime authentication code, or remote D1 state were changed in this continuation.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -241,11 +241,23 @@
   },
   "e6RuntimeImplementationAdmission": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21.md",
-    "status": "OPEN — IMPLEMENTATION DECISION REQUIRED",
+    "status": "BLOCKED — REQUIRED CONTRACT INPUTS MISSING",
     "implementationAuthorized": false,
     "runtimeCodeChanged": false,
     "remoteD1Mutation": false,
     "dependsOnE5AuthorityReconciliation": true,
-    "parentE5AuthorityIncidentReconciled": true
+    "parentE5AuthorityIncidentReconciled": true,
+    "gaps": [
+      {
+        "id": "E6-WIRE-001",
+        "status": "OPEN",
+        "finding": "authRefresh exists in auth-operation policy but lacks canonical OpenAPI wire definition"
+      },
+      {
+        "id": "E6-WIRE-002",
+        "status": "OPEN",
+        "finding": "ENT-SESSION-F-DEVICE-ID is required but AUTH-002 login contract lacks authoritative transport/source"
+      }
+    ]
   }
 }
