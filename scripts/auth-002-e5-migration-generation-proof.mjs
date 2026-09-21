@@ -59,9 +59,9 @@ const writeFixture = (dir, config, users, includeAuthSchema) => {
 writeFixture(stage1, setMigrationDir(historicalConfig, path.join(stage1, 'migrations')), historicalUsers, false)
 writeFixture(stage2, setMigrationDir(setGenerateSchemaOutputFile(currentConfig, path.join(stage2, 'payload-generated-schema.ts')), path.join(stage2, 'migrations')), historicalUsers, true)
 
-const runCreate = (dir, name) => run(
+const runCreate = (dir, name, force = false) => run(
   'pnpm',
-  ['exec', 'payload', 'migrate:create', name, '--skip-empty'],
+  ['exec', 'payload', 'migrate:create', name, ...(force ? ['--forceAcceptWarning'] : ['--skip-empty'])],
   root,
   { PAYLOAD_CONFIG_PATH: path.join(dir, 'payload.config.ts'), PAYLOAD_SECRET: 'e5-generation-only-not-production' },
 )
@@ -84,12 +84,16 @@ fs.writeFileSync(
   schemaProbeText.includes('auth_session_state') ? 'AUTH_SESSION_STATE_PRESENT\\n' : 'AUTH_SESSION_STATE_ABSENT\\n',
 )
 if (!schemaProbeText.includes('auth_session_state')) throw new Error('Payload generated DB schema missing auth_session_state')
-runCreate(stage2, 'MIG-AUTH-002-SESSION-V1')
+runCreate(stage2, 'MIG-AUTH-002-SESSION-V1', true)
 const stage2Dir = path.join(stage2, 'migrations')
 const generated = fs.readdirSync(stage2Dir).filter((f) => f.endsWith('.ts') && f.includes('MIG-AUTH-002-SESSION-V1'))
 if (generated.length !== 1) throw new Error('Expected exactly one generated AUTH-002 migration; found ' + generated.length)
 const migrationFile = path.join(stage2Dir, generated[0])
 const migrationText = fs.readFileSync(migrationFile, 'utf8')
+fs.copyFileSync(migrationFile, path.join(outDir, generated[0]))
+const stage2JsonAll = fs.readdirSync(stage2Dir).filter((f) => f.endsWith('.json') && f !== 'baseline.json').sort()
+if (stage2JsonAll.length !== 1) throw new Error('Expected exactly one generated post-schema snapshot; found ' + stage2JsonAll.length)
+fs.copyFileSync(path.join(stage2Dir, stage2JsonAll[0]), path.join(outDir, stage2JsonAll[0]))
 
 const required = ['auth_session_state','session_id','user_id','device_id','token_version','refresh_credential_hash','revoked_at','last_seen_at','auth_session_state_user_id_idx','auth_session_state_device_id_idx','auth_session_state_token_version_idx','auth_session_state_revoked_at_idx']
 const forbidden = ['CREATE TABLE `users`','CREATE TABLE `users_sessions`','CREATE TABLE `media`','CREATE TABLE `payload_migrations`','CREATE TABLE `payload_preferences`','CREATE TABLE `payload_locked_documents','raw_access_token','raw_refresh_token','`password`','created_at`','expires_at`']
@@ -99,8 +103,6 @@ for (const value of forbidden) if (migrationText.includes(value)) throw new Erro
 const postJson = fs.readdirSync(stage2Dir).filter((f) => f.endsWith('.json') && f !== 'baseline.json').sort()
 if (postJson.length !== 1) throw new Error('Expected exactly one generated post-schema snapshot; found ' + postJson.length)
 
-fs.copyFileSync(migrationFile, path.join(outDir, generated[0]))
-fs.copyFileSync(path.join(stage2Dir, postJson[0]), path.join(outDir, postJson[0]))
 
 const testedCommit = run('git', ['rev-parse', 'HEAD'], repoRoot).trim()
 fs.writeFileSync(path.join(outDir, 'generation-manifest.json'), JSON.stringify({
