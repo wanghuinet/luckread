@@ -327,7 +327,12 @@
   "e6RoleAssignmentAuthorityChangeControl": "docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md",
   "e6RoleAssignmentAuthorityConflict": "CLOSED — AUTHORITY CONTRACT RECONCILED",
   "currentPhysicalWorkerBindingControl": "docs/change-control/CC-MAPPING-0-WORKER-PHYSICAL-BINDING-2026-09-21.md",
-  "currentPhysicalWorkerBindingStatus": "OPEN — CURRENT PHYSICAL BINDING REQUIRED",
+  "currentPhysicalWorkerBindingStatus": "WAIT_AUTHORITY_DECISION — PHYSICAL BINDING AUTHORITY REQUIRED",
+  "physicalWorkerBindingAuthoritySearch": {
+    "status": "COMPLETE_NO_NEW_AUTHORITY_FOUND",
+    "testedMainHead": "14a41a4c49c09cbf5c3fefa67635d1ca7e8e56a9",
+    "conclusion": "No current Contract/decision supplies concrete physical Worker resource/name bindings for canonical W02-W12; do not infer, create, rename or deploy."
+  },
   "physicalWorkerBindingEvidenceDelta": {
     "status": "PASS_VERIFIED_AUDIT — BINDING STILL NOT ESTABLISHED",
     "w01RepositoryCandidate": {
