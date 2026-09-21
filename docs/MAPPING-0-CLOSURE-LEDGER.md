@@ -1057,3 +1057,33 @@ Acceptance boundary:
 NEXT_ITEM_ID: `M0-AUTH-002-E5-REMOTE-EXECUTION-AUTHORITY-001`
 NEXT_ITEM_STATE: `WAIT_AUTHORITY_DECISION`
 Anti-loop: once explicit GREEN admission exists, execute only through the dedicated E5 workflow; do not use the old baseline execution workflow and do not manually mutate D1.
+
+
+## Superpowers continuation — E5 execution authorization incident and containment — 2026-09-21
+
+Incident run 35552919573 completed successfully and applied MIG-AUTH-002-SESSION-V1 remotely.
+
+Governance reconciliation:
+- The governing E5 Remote Execution Change Control was still OPEN — EXECUTION DECISION REQUIRED at the run's tested source SHA fe1f2784d21f3f629bbad0baa971f1aa56520914.
+- The admission guard's unanchored status regex matched the explanatory Decision-boundary sentence, causing unintended admission.
+- This is a guard defect; it is not evidence of an explicit authority decision.
+- Technical execution evidence is retained but is not promoted to governance-authorized evidence until reconciliation is completed.
+
+Containment completed:
+- E5 admission guard changed to an exact line-anchored Status field check.
+- Implicit push-based E5 execution trigger removed.
+- Stale E5 execution marker removed.
+- No rollback or compensating D1 mutation performed.
+
+Independent post-execution verification:
+- Read-only AUTH-002 Session Schema Evidence recapture requested after the incident.
+- Workflow run: 35553144559.
+- This read-only workflow is the current independent schema/catalog evidence path and performs no D1 mutation.
+
+Continuation state:
+- AUTH-002 remains NOT_GREEN.
+- Mapping 0 remains NOT_GREEN.
+- NEXT_ITEM_ID: M0-AUTH-002-E5-REMOTE-EXECUTION-AUTHORITY-001.
+- NEXT_ITEM_STATE: WAIT_AUTHORITY_DECISION.
+- Do not re-run the baseline migration.
+- Do not execute additional E5 mutation until the authority incident is explicitly reconciled.
