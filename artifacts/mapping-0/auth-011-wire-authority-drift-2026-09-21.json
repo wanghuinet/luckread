@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-09-21",
+  "sourceHead": "958f7c79c798f9b3a42375294ca70c6aab11d8ed",
+  "sourceRefs": {
+    "openapi": "contracts/openapi/v1/openapi.yaml",
+    "apiInventory": "contracts/api/api-inventory.v1.json",
+    "staleCrosscheck": "artifacts/mapping-0/api-dto-four-layer-crosscheck-2026-09-19.json"
+  },
+  "status": "DRIFT_CONFIRMED",
+  "current": {
+    "apiInventoryRequiredPath": "POST /v1/auth/refresh",
+    "canonicalOpenApiContainsRefreshPath": false,
+    "canonicalOpenApiContainsRefreshOperationId": false
+  },
+  "staleEvidence": {
+    "historicalCrosscheck": "api-dto-four-layer-crosscheck-2026-09-19.json",
+    "claimedOpenApiExactlyOnceForAuthRefresh": true,
+    "conclusion": "stale; must not be treated as current canonical OpenAPI evidence"
+  },
+  "impact": {
+    "AUTH011": "BLOCKED_NOT_GREEN",
+    "E6Wire001": "OPEN",
+    "implementationAuthorized": false,
+    "noContractPromotion": true,
+    "noRuntimeCodeChange": true
+  },
+  "reconciliationAction": "Resolve authRefresh through the existing AUTH-011/AUTH-010 Contract-First wire/DTO chain; do not infer or patch the route from historical crosscheck data."
+}
