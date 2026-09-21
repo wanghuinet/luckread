@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "f6b1f297422e99a8d26ca0103a9e6d4971de9f74",
+  "sourceHead": "c1b15ca22cddc19f8075d40df84f1e629f3b2abe",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -120,7 +120,7 @@
     "previousItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
     "previousItemState": "CLOSED — REPRESENTATION RECONCILED"
   },
-  "nextRequiredExternalAction": "Resolve governed physical/runtime prerequisites without architecture change: establish the current physical Worker resource and source/deployment binding for canonical W02/T01/T03; establish/evidence-bind the already-contracted D1-01 RoleAssignment authority; establish any required W01 API-edge to W02 transport through an approved binding contract; then bind the resolver and execute controlled E6 runtime evidence. Do not infer from workers/* names or historical P01-P08 topology.",
+  "nextRequiredExternalAction": "Physical runtime prerequisite remains open: establish an authorized current Cloudflare Worker resource/binding for canonical W02/T01/T03 (including deployed source commit and required configuration) through the project’s approved deployment/admission path; separately evidence-bind the contracted D1-01 RoleAssignment source; then execute controlled E6 runtime evidence. Do not infer from physical directory names or historical topology. No resource creation is implied by this checkpoint.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -350,5 +350,18 @@
     },
     "conclusion": "Canonical W02 physical resource/source/deployment binding remains unestablished; E6 runtime admission remains blocked. No resource mutation performed.",
     "reexecution": "NONE"
+  },
+  "cloudflareInventory": {
+    "status": "PASS_VERIFIED_READ_ONLY",
+    "runId": 35598525409,
+    "artifactId": 10637318432,
+    "artifactDigest": "sha256:8767fe564ab8f11b8ded8b63ab8577487fb609e579ff15243e639cb0dd2a046",
+    "sourceCommit": "75e5a25fba48d95c432476cda6b0b6d6d4c70b06",
+    "d1Count": 2,
+    "workerUploadedScriptCount": 0,
+    "workerResources": [],
+    "evidencePath": "artifacts/cloudflare/current-resource-inventory-2026-09-21.json",
+    "mutationPerformed": false,
+    "conclusion": "Fresh read-only Cloudflare API inventory confirms zero uploaded Worker scripts at capture time. Physical Worker deployment/source binding therefore remains unestablished."
   }
 }
