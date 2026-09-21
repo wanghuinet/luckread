@@ -12,7 +12,9 @@
       "responseDtoId": "DTO-AUTH-REGISTER-RESPONSE",
       "requestSchemaRef": "#/paths/~1auth~1register/post/requestBody/content/application~1json/schema",
       "responseSchemaRef": "#/paths/~1auth~1register/post/responses/201/content/application~1json/schema",
-      "entityIds": ["ENT-USER"],
+      "entityIds": [
+        "ENT-USER"
+      ],
       "status": "CONTRACT_BOUND"
     },
     {
@@ -60,7 +62,9 @@
       "responseDtoId": "DTO-AUTH-SESSION-LIST-RESPONSE",
       "requestSchemaRef": null,
       "responseSchemaRef": "#/paths/~1auth~1sessions/get/responses/200/content/application~1json/schema",
-      "entityIds": ["ENT-SESSION"],
+      "entityIds": [
+        "ENT-SESSION"
+      ],
       "status": "RESERVED_PENDING_OPENAPI_PATH"
     },
     {
@@ -70,8 +74,23 @@
       "responseDtoId": "DTO-AUTH-SESSION-REVOKE-RESPONSE",
       "requestSchemaRef": "#/paths/~1auth~1sessions~1{sessionId}/parameters/0/schema",
       "responseSchemaRef": null,
-      "entityIds": ["ENT-SESSION"],
+      "entityIds": [
+        "ENT-SESSION"
+      ],
       "status": "RESERVED_PENDING_OPENAPI_PATH"
+    },
+    {
+      "featureId": "AUTH-011",
+      "operationId": "authRefresh",
+      "requestDtoId": "DTO-AUTH-REFRESH-REQUEST",
+      "responseDtoId": "DTO-AUTH-REFRESH-RESPONSE",
+      "requestSchemaRef": "#/paths/~1auth~1refresh/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": "#/paths/~1auth~1refresh/post/responses/200/content/application~1json/schema",
+      "errorSchemaRef": "#/components/schemas/ErrorResponse",
+      "entityIds": [
+        "ENT-SESSION"
+      ],
+      "status": "CONTRACT_BOUND"
     }
   ],
   "bindingRules": {
