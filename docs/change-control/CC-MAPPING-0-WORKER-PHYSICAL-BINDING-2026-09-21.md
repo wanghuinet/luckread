@@ -1,7 +1,7 @@
 # Change Control — Mapping 0 Current Physical Worker Binding Gap — 2026-09-21
 
 - ID: CC-MAPPING-0-WORKER-PHYSICAL-BINDING-2026-09-21
-- Status: OPEN — CURRENT PHYSICAL BINDING REQUIRED
+- Status: WAIT_AUTHORITY_DECISION — PHYSICAL BINDING AUTHORITY REQUIRED
 - Scope: evidence-bound physical deployment mapping for the already-frozen 12 canonical logical Workers.
 - This is a binding/evidence control only. It does not change the 12-Worker architecture.
 
@@ -55,7 +55,7 @@ No resource creation is authorized by this record.
 
 ## Current disposition
 
-OPEN. This control becomes a prerequisite for physical runtime implementation admission where the current repository has no already-proven physical binding.
+WAIT_AUTHORITY_DECISION. The technical search/evidence acquisition portion is complete. Closure now requires the normal Contract-First authority decision that binds each admitted canonical logical Worker to its concrete physical Worker resource/name; no resource creation, rename, or runtime implementation is implied.
 
 
 ## Evidence acquisition delta — 2026-09-21
@@ -91,7 +91,7 @@ A new read-only inventory was executed from `main` commit `75e5a25fba48d95c43247
 
 ### Updated disposition
 
-The physical Worker binding prerequisite remains **OPEN**, now with a stronger evidence state:
+The physical Worker binding prerequisite remains **WAIT_AUTHORITY_DECISION**, now with a stronger evidence state:
 
 `Cloudflare actual uploaded Worker scripts = 0`
 
