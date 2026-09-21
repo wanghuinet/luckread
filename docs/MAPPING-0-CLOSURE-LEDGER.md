@@ -1460,3 +1460,14 @@ This section supersedes earlier continuation cursors for current work selection.
 - AUTH-002/E6 remains fail-closed at `GAP-E6-RUNTIME-001`; no runtime implementation, Worker creation/deployment, D1 mutation, or directory rename was performed.
 - Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
 - Already-passed Mapping/E5/structural work was not re-executed.
+
+
+## Superpowers continuation — Worker physical naming/deployment authority boundary confirmed — 2026-09-21
+
+- Fresh Cloudflare inventory `35598525409` is SUCCESS and reports 2 D1 resources / 0 uploaded Worker scripts.
+- Current deployment-admission contracts define the evidence trace chain but do not define concrete physical Worker names/resources for canonical W02-W12.
+- New audit: `artifacts/mapping-0/worker-deployment-admission-audit-2026-09-21.md` = **BLOCKED — PHYSICAL NAMING / RESOURCE BINDING AUTHORITY NOT ESTABLISHED**.
+- This is now the exact remaining infrastructure authority boundary for physical runtime admission; it is not a new business feature or architecture proposal.
+- No physical Worker name was invented, no historical P01-P08 mapping was promoted, no Worker was created/deployed, and no D1 mutation occurred.
+- AUTH-002/E6 remains at `GAP-E6-RUNTIME-001`; canonical W02 physical binding and subsequent runtime evidence remain blocked.
+- Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
