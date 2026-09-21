@@ -7,4 +7,4 @@ Approved source SHA: 56926bab09951a8a0e15c820f1fb58dd8ba7090f
 Change Control: CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20
 Admission: GREEN — EXECUTION ADMITTED
 Scope: execute approved baseline only; capture fresh post-migration evidence.
-Trigger nonce: 2026-09-21T01:32Z
+Trigger nonce: 2026-09-21T01:33Z
