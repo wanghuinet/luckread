@@ -59,9 +59,9 @@ const writeFixture = (dir, config, users, includeAuthSchema) => {
 writeFixture(stage1, setMigrationDir(historicalConfig, path.join(stage1, 'migrations')), historicalUsers, false)
 writeFixture(stage2, setMigrationDir(setGenerateSchemaOutputFile(currentConfig, path.join(stage2, 'payload-generated-schema.ts')), path.join(stage2, 'migrations')), historicalUsers, true)
 
-const runCreate = (dir, name, force = false) => run(
+const runCreate = (dir, name) => run(
   'pnpm',
-  ['exec', 'payload', 'migrate:create', name, ...(force ? ['--forceAcceptWarning'] : ['--skip-empty'])],
+  ['exec', 'payload', 'migrate:create', name, '--skip-empty'],
   root,
   { PAYLOAD_CONFIG_PATH: path.join(dir, 'payload.config.ts'), PAYLOAD_SECRET: 'e5-generation-only-not-production' },
 )
@@ -84,9 +84,10 @@ fs.writeFileSync(
   schemaProbeText.includes('auth_session_state') ? 'AUTH_SESSION_STATE_PRESENT\\n' : 'AUTH_SESSION_STATE_ABSENT\\n',
 )
 if (!schemaProbeText.includes('auth_session_state')) throw new Error('Payload generated DB schema missing auth_session_state')
-runCreate(stage2, 'MIG-AUTH-002-SESSION-V1', true)
+runCreate(stage2, 'MIG-AUTH-002-SESSION-V1')
 const stage2Dir = path.join(stage2, 'migrations')
-const generated = fs.readdirSync(stage2Dir).filter((f) => f.endsWith('.ts') && f.includes('MIG-AUTH-002-SESSION-V1'))
+const generatedNameToken = 'MIG-AUTH-002-SESSION-V1'.replace(/\W/g, '_')
+const generated = fs.readdirSync(stage2Dir).filter((f) => f.endsWith('.ts') && f.includes(generatedNameToken))
 if (generated.length !== 1) throw new Error('Expected exactly one generated AUTH-002 migration; found ' + generated.length)
 const migrationFile = path.join(stage2Dir, generated[0])
 const migrationText = fs.readFileSync(migrationFile, 'utf8')
