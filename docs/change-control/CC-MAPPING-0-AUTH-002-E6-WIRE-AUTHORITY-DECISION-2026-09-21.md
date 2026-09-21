@@ -83,3 +83,14 @@ After this decision is committed:
 Decision owner: LuckRead project review/acceptance process.
 Decision type: Contract authority selection, not runtime authorization.
 Effective source: this Change Control plus the reconciled canonical Contract files.
+
+
+## Decision 3 — layer output authority gap
+
+The existing login/refresh response contract requires a `layer` value matching `L0-L8`, but current W01 runtime sources do not expose an authoritative layer field or executable resolver.
+
+Therefore:
+- `layer` remains a required response field in the frozen Wire Schema.
+- No default such as L1 or L2 may be hard-coded.
+- No layer may be inferred from username, account age, email verification absence, role names, entitlements, subscription, or other unbound runtime metadata.
+- E6 Runtime implementation must remain blocked until an authoritative layer resolver/source is explicitly bound by Contract-First Change Control.
