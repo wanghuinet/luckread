@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "f20413017799aab14a5d29fb6759fbeb888a1b29",
+  "sourceHead": "d7b1fe78cd0e39e62b0b60ae4761894fe07cfc1c",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -112,8 +112,16 @@
     "sourceAuditConclusion": "success",
     "schemaSourceChangeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E5-DRIZZLE-SCHEMA-SOURCE-2026-09-21.md",
     "executionStatus": "NOT_ADMITTED",
-    "remoteTableBeforeExecution": "ABSENT",
-    "requiredNextGate": "EXPLICIT_E5_REMOTE_EXECUTION_AUTHORITY"
+    "remoteTableBeforeExecution": "REQUIRES_FRESH_E5_PREFLIGHT",
+    "requiredNextGate": "EXPLICIT_E5_REMOTE_EXECUTION_AUTHORITY",
+    "executionChannel": {
+      "admissionGuard": "scripts/auth-002-e5-remote-migration-admission.mjs",
+      "admissionGuardCommit": "d539e3cf2ae29bddf716c16e7f2d8eb9594146a8",
+      "workflow": ".github/workflows/auth-002-e5-remote-migration-execution.yml",
+      "workflowPreparedCommit": "831dba5e9637ebe71d45394644d7ca0b0d72290e",
+      "workflowHardeningCommit": "1c01f40a6752c711b61a169a5488c0ed70b447df",
+      "remoteExecutionStarted": false
+    }
   },
   "AUTH002": {
     "E4_5": "PASS_VERIFIED",
@@ -123,6 +131,6 @@
     "E5_remote_execution": "NOT_ADMITTED",
     "overall": "NOT_GREEN"
   },
-  "latestReconciliationCommit": "f20413017799aab14a5d29fb6759fbeb888a1b29",
-  "note": "Current main head aligned. No source/contract/runtime mutation implied by this checkpoint-only update."
+  "latestReconciliationCommit": "d7b1fe78cd0e39e62b0b60ae4761894fe07cfc1c",
+  "note": "Current main head aligned after E5 execution-channel preparation. This batch changed only guarded workflow/governance code and evidence cursor; no remote D1 mutation was executed."
 }
