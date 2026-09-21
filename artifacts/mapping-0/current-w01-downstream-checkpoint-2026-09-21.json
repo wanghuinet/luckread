@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "92dd133cf416192b295442e6c1e53e9e35c1dd0d",
+  "sourceHead": "d98c48d0649b93fb52724b1bb51ed08cbcae8ade",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -99,7 +99,7 @@
     "nextItemState": "WAIT_AUTHORITY_DECISION",
     "noMappingRowsReexecuted": true
   },
-  "nextRequiredExternalAction": "Reconcile the E5 execution authorization incident explicitly; do not rerun baseline or E5 migration. After governance reconciliation, proceed to AUTH-002 runtime evidence.",
+  "nextRequiredExternalAction": "Reconcile the E5 execution authorization incident explicitly. Do not rerun E5 or baseline. After governance reconciliation, resolve GAP-E6-RUNTIME-001 through approved implementation Change Control and controlled runtime evidence.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -156,8 +156,8 @@
       "resultNotPromoted": true
     }
   },
-  "latestReconciliationCommit": "92dd133cf416192b295442e6c1e53e9e35c1dd0d",
-  "note": "E5 technical execution and independent read-only schema evidence are complete; governance authorization was invalidly permissive at execution time and remains unreconciled. No further D1 mutation is authorized by this checkpoint.",
+  "latestReconciliationCommit": "d98c48d0649b93fb52724b1bb51ed08cbcae8ade",
+  "note": "E5 technical execution plus independent schema evidence are complete. Governance authorization for the E5 execution remains unreconciled. E6 runtime integration is separately recorded as an implementation/evidence gap; no runtime D1 mutation has been started.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -176,5 +176,12 @@
     "artifactId": 10619545790,
     "digest": "sha256:68a812d812da703ace3b14e62360b56815c01c939418eb70a6e7252a573e9f31",
     "testedCommitSha": "9241545d1a6dff7d87f0c3351e9a36867b6228af"
+  },
+  "e6RuntimeIntegrationGap": {
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-INTEGRATION-GAP-2026-09-21.md",
+    "gapId": "GAP-E6-RUNTIME-001",
+    "status": "OPEN — RUNTIME IMPLEMENTATION EVIDENCE REQUIRED",
+    "currentFinding": "No independently verified W01 runtime read/write correlation path for auth_session_state",
+    "remoteRuntimeExecutionStarted": false
   }
 }
