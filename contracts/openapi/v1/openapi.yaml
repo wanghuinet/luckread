@@ -89,10 +89,16 @@ paths:
           application/json:
             schema:
               type: object
-              required: [identity, credential]
+              required: [identity, credential, deviceId]
+              additionalProperties: false
               properties:
                 identity: { type: string }
                 credential: { type: string, format: password }
+                deviceId:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                  description: Opaque client-generated privacy-safe device reference; never derive from IP, User-Agent, fingerprinting, cookies, geolocation or hardware identifiers.
       responses:
         '200':
           description: Authenticated.
@@ -1244,13 +1250,1094 @@ paths:
   /auth/refresh:
     post:
       tags: [Auth]
-      summary: Discovery draft for POST undefined
+      summary: Refresh session tokens with rotation and reuse detection
       operationId: authRefresh
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/auth-operation-policy.v1.json
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken, deviceId]
+              additionalProperties: false
+              properties:
+                refreshToken:
+                  type: string
+                  minLength: 1
+                  description: Refresh credential presented for the current session; never log or persist in raw form.
+                deviceId:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                  description: Opaque client-generated privacy-safe device reference bound to the native session id.
+      responses:
+        '200':
+          description: Refresh succeeded and the predecessor refresh credential is invalidated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accessToken, refreshToken, expiresIn, layer]
+                additionalProperties: false
+                properties:
+                  accessToken: { type: string }
+                  refreshToken: { type: string }
+                  expiresIn: { type: integer }
+                  layer: { type: string, pattern: '^L[0-8]
+  /auth/revoke:
+    post:
+      tags: [Auth]
+      summary: Discovery draft for POST undefined
+      operationId: postAuthRevoke
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /comments/{commentId}:
+    delete:
+      tags: [Interactions]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteCommentsCommentId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Interactions]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchCommentsCommentId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /comments/{commentId}/likes:
+    delete:
+      tags: [Interactions]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteCommentsCommentIdLikes
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Interactions]
+      summary: Discovery draft for POST undefined
+      operationId: postCommentsCommentIdLikes
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content:
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postContent
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}:
+    delete:
+      tags: [Contents]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteContentContentId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    get:
+      tags: [Contents]
+      summary: Discovery draft for GET undefined
+      operationId: getContentContentId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Contents]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchContentContentId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}/comments:
+    get:
+      tags: [Interactions]
+      summary: Discovery draft for GET undefined
+      operationId: getContentContentIdComments
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Interactions]
+      summary: Discovery draft for POST undefined
+      operationId: postContentContentIdComments
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}/favorites:
+    delete:
+      tags: [Interactions]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteContentContentIdFavorites
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Interactions]
+      summary: Discovery draft for POST undefined
+      operationId: postContentContentIdFavorites
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}/likes:
+    delete:
+      tags: [Interactions]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteContentContentIdLikes
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Interactions]
+      summary: Discovery draft for POST undefined
+      operationId: postContentContentIdLikes
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}/publish:
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postContentContentIdPublish
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}/related:
+    get:
+      tags: [Feed]
+      summary: Discovery draft for GET undefined
+      operationId: getContentContentIdRelated
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}/unpublish:
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postContentContentIdUnpublish
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /creator/analytics:
+    get:
+      tags: [Analytics]
+      summary: Discovery draft for GET undefined
+      operationId: getCreatorAnalytics
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /creator/profile:
+    get:
+      tags: [Creators]
+      summary: Discovery draft for GET undefined
+      operationId: getCreatorProfile
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Creators]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchCreatorProfile
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/api-keys:
+    post:
+      tags: [Developer]
+      summary: Discovery draft for POST undefined
+      operationId: postDeveloperApiKeys
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/api-keys/{keyId}:
+    delete:
+      tags: [Developer]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteDeveloperApiKeysKeyId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/apps:
+    get:
+      tags: [Developer]
+      summary: Discovery draft for GET undefined
+      operationId: getDeveloperApps
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Developer]
+      summary: Discovery draft for POST undefined
+      operationId: postDeveloperApps
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/apps/{appId}:
+    patch:
+      tags: [Developer]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchDeveloperAppsAppId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/oauth/authorize:
+    post:
+      tags: [Developer]
+      summary: Discovery draft for POST undefined
+      operationId: postDeveloperOauthAuthorize
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/usage:
+    get:
+      tags: [Developer]
+      summary: Discovery draft for GET undefined
+      operationId: getDeveloperUsage
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/webhooks:
+    get:
+      tags: [Developer]
+      summary: Discovery draft for GET undefined
+      operationId: getDeveloperWebhooks
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Developer]
+      summary: Discovery draft for POST undefined
+      operationId: postDeveloperWebhooks
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/webhooks/{webhookId}:
+    delete:
+      tags: [Developer]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteDeveloperWebhooksWebhookId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /discovery/creators:
+    get:
+      tags: [Search]
+      summary: Discovery draft for GET undefined
+      operationId: getDiscoveryCreators
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /discovery/topics:
+    get:
+      tags: [Search]
+      summary: Discovery draft for GET undefined
+      operationId: getDiscoveryTopics
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /entitlements:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: listEntitlements
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /feed/following:
+    get:
+      tags: [Feed]
+      summary: Discovery draft for GET undefined
+      operationId: getFollowingFeed
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /feed/recommended:
+    get:
+      tags: [Feed]
+      summary: Discovery draft for GET undefined
+      operationId: getFeedRecommended
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /feed/user/{userId}:
+    get:
+      tags: [Feed]
+      summary: Discovery draft for GET undefined
+      operationId: getFeedUserUserId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /galleries:
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postGalleries
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /galleries/{galleryId}:
+    get:
+      tags: [Contents]
+      summary: Discovery draft for GET undefined
+      operationId: getGalleriesGalleryId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Contents]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchGalleriesGalleryId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /ip/assets:
+    get:
+      tags: [Creators]
+      summary: Discovery draft for GET undefined
+      operationId: getIpAssets
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Creators]
+      summary: Discovery draft for POST undefined
+      operationId: postIpAssets
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /ip/assets/{assetId}:
+    patch:
+      tags: [Creators]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchIpAssetsAssetId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /mcn/organizations:
+    get:
+      tags: [Creators]
+      summary: Discovery draft for GET undefined
+      operationId: getMcnOrganizations
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Creators]
+      summary: Discovery draft for POST undefined
+      operationId: postMcnOrganizations
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /mcn/organizations/{orgId}:
+    get:
+      tags: [Creators]
+      summary: Discovery draft for GET undefined
+      operationId: getMcnOrganizationsOrgId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /mcn/organizations/{orgId}/members:
+    post:
+      tags: [Creators]
+      summary: Discovery draft for POST undefined
+      operationId: postMcnOrganizationsOrgIdMembers
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /mcn/organizations/{orgId}/members/{userId}:
+    delete:
+      tags: [Creators]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteMcnOrganizationsOrgIdMembersUserId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /media/{mediaId}/playback:
+    get:
+      tags: [Media]
+      summary: Discovery draft for GET undefined
+      operationId: getMediaMediaIdPlayback
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /media/{mediaId}/process:
+    post:
+      tags: [Media]
+      summary: Discovery draft for POST undefined
+      operationId: postMediaMediaIdProcess
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /media/{mediaId}/processing:
+    get:
+      tags: [Media]
+      summary: Discovery draft for GET undefined
+      operationId: getMediaMediaIdProcessing
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /media/{mediaId}/variants:
+    get:
+      tags: [Media]
+      summary: Discovery draft for GET undefined
+      operationId: listMediaVariants
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /media/uploads:
+    post:
+      tags: [Media]
+      summary: Discovery draft for POST undefined
+      operationId: postMediaUploads
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /media/uploads/{uploadId}/complete:
+    post:
+      tags: [Media]
+      summary: Discovery draft for POST undefined
+      operationId: completeUpload
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /notification-preferences:
+    get:
+      tags: [Notifications]
+      summary: Discovery draft for GET undefined
+      operationId: getNotificationPreferences
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Notifications]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchNotificationPreferences
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /notifications/{notificationId}/read:
+    post:
+      tags: [Notifications]
+      summary: Discovery draft for POST undefined
+      operationId: postNotificationsNotificationIdRead
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Discovery draft for POST undefined
+      operationId: postNotificationsReadAll
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /payments/{paymentId}:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getPaymentsPaymentId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /payments/intents:
+    post:
+      tags: [Users]
+      summary: Discovery draft for POST undefined
+      operationId: postPaymentsIntents
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /plans:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getPlans
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /posts:
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postPosts
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /posts/{postId}:
+    get:
+      tags: [Contents]
+      summary: Discovery draft for GET undefined
+      operationId: getPostsPostId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Contents]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchPostsPostId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /realtime/presence:
+    post:
+      tags: [Feed]
+      summary: Discovery draft for POST undefined
+      operationId: postRealtimePresence
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /realtime/session:
+    get:
+      tags: [Feed]
+      summary: Discovery draft for GET undefined
+      operationId: getRealtimeSession
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /recommendation/context:
+    get:
+      tags: [Feed]
+      summary: Discovery draft for GET undefined
+      operationId: getRecommendationContext
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /recommendation/feedback:
+    post:
+      tags: [Feed]
+      summary: Discovery draft for POST undefined
+      operationId: postRecommendationFeedback
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /search/suggestions:
+    get:
+      tags: [Search]
+      summary: Discovery draft for GET undefined
+      operationId: getSearchSuggestions
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /search/trending:
+    get:
+      tags: [Search]
+      summary: Discovery draft for GET undefined
+      operationId: getSearchTrending
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /subscriptions:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getSubscriptions
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Users]
+      summary: Discovery draft for POST undefined
+      operationId: postSubscriptions
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /subscriptions/{subscriptionId}:
+    delete:
+      tags: [Users]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteSubscriptionsSubscriptionId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getUserProfile
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Users]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchUsersUserId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /users/{userId}/follow:
+    delete:
+      tags: [Interactions]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteUsersUserIdFollow
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Interactions]
+      summary: Discovery draft for POST undefined
+      operationId: postUsersUserIdFollow
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /users/{userId}/followers:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getUsersUserIdFollowers
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /users/{userId}/following:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getUsersUserIdFollowing
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /users/{userId}/profile:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getUsersUserIdProfile
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    ContentId:
+      name: contentId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    MediaId:
+      name: mediaId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    IpId:
+      name: ipId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, minLength: 1, maxLength: 256 }
+    IdempotencyKeyRequired:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 256 }
+    IfMatchRequired:
+      name: If-Match
+      in: header
+      required: true
+      schema: { $ref: '#/components/schemas/ETag' }
+  responses:
+    ValidationFailed:
+      description: Validation failed.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: Rate limited.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PermissionDenied:
+      description: Permission denied.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InvalidState:
+      description: Invalid lifecycle transition.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PreconditionFailed:
+      description: If-Match does not match current ETag.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PreconditionRequired:
+      description: If-Match is required for this operation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    UnsupportedMediaType:
+      description: Unsupported media type.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InvalidCursor:
+      description: Invalid cursor.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ClientError:
+      description: Client error.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    ResourceId:
+      type: string
+      minLength: 1
+      maxLength: 128
+    ETag:
+      type: string
+      minLength: 1
+      maxLength: 256
+    AccountState:
+      $ref: '../../enums/account-state.json'
+    ContentState:
+      $ref: '../../enums/content-state.json'
+    ErrorResponse:
+      $ref: '../../schemas/common/error-response.json'
+    ListResponse:
+      $ref: '../../schemas/common/list-response.json'
+    User:
+      type: object
+      required: [id, username, accountState, layer]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        accountState: { $ref: '#/components/schemas/AccountState' }
+        layer: { type: string, pattern: '^L[0-8]$' }
+    Content:
+      type: object
+      required: [id, state, version, etag]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        state: { $ref: '#/components/schemas/ContentState' }
+        version: { type: integer, minimum: 1 }
+        etag: { $ref: '#/components/schemas/ETag' }
+    ContentInput:
+      type: object
+      required: [title, bodyRef]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 512 }
+        bodyRef: { type: string, description: R2 object reference }
+    Media:
+      type: object
+      required: [id, mimeType, size, checksum, status]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        mimeType: { type: string }
+        size: { type: integer, minimum: 1 }
+        checksum: { type: string }
+        status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
+    Comment:
+      type: object
+      required: [id, body, state]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        body: { type: string }
+        state: { enum: [PENDING, PUBLISHED, REJECTED] }
+    InteractionTarget:
+      type: object
+      required: [targetType, targetId]
+      properties:
+        targetType: { enum: [content, comment, creator, ip] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    Creator:
+      type: object
+      required: [id, userId, displayName]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        userId: { $ref: '#/components/schemas/ResourceId' }
+        displayName: { type: string }
+    IP:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    Organization:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+ }
+        '401':
+          description: Refresh credential is invalid, expired, revoked or reused.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /auth/revoke:
     post:
