@@ -74,3 +74,25 @@ A current-head repository/configuration audit was performed without executing or
 `Canonical logical Worker → physical Worker resource/name → deployed source commit → configuration/binding → runtime evidence` remains **NOT_ESTABLISHED** for the AUTH-002-relevant W02 boundary.
 
 No directory rename, Worker creation, deployment, D1 mutation, or runtime implementation admission occurred.
+
+
+## Fresh Cloudflare API evidence — 2026-09-21
+
+A new read-only inventory was executed from `main` commit `75e5a25fba48d95c432476cda6b0b6d6d4c70b06`.
+
+- Workflow run: `35598525409`
+- Result: **SUCCESS**
+- Artifact: `10637318432`
+- Fresh inventory artifact: `artifacts/cloudflare/current-resource-inventory-2026-09-21.json`
+- Cloudflare API returned **2 D1 resources and 0 uploaded Worker scripts**.
+- `luckread` remains explicitly bound by repository configuration to `workers/W01-payload/wrangler.jsonc`.
+- No Worker resource was returned by the account Worker-script inventory, so no current deployed Worker name/ID/source-commit binding can be promoted from this evidence.
+- This confirms the absence of current uploaded-Worker evidence at capture time; it does not prove that no other non-script deployment mechanism exists outside the queried Worker-script inventory, and it does not authorize resource creation.
+
+### Updated disposition
+
+The physical Worker binding prerequisite remains **OPEN**, now with a stronger evidence state:
+
+`Cloudflare actual uploaded Worker scripts = 0`
+
+Therefore canonical W02 remains without an evidence-bound physical runtime, and AUTH-002/E6 remains fail-closed. No Worker/D1 resource mutation was performed.
