@@ -88,3 +88,23 @@ Technical result retained:
 - Migration: 20260921_003203_MIG_AUTH_002_SESSION_V1
 - Remote mutation: occurred
 - Post-migration validation steps: success
+
+## Independent read-only evidence reconciliation — 2026-09-21
+
+Independent AUTH-002 Session Schema Evidence run 35553227463 completed successfully after the E5 execution incident.
+
+Evidence artifact:
+- Artifact ID: 10619545790
+- Digest: sha256:68a812d812da703ace3b14e62360b56815c01c939418eb70a6e7252a573e9f31
+- Tested source SHA: 9241545d1a6dff7d87f0c3351e9a36867b6228af
+- Capture scope: read-only controlled remote D1 schema/catalog evidence
+
+Result:
+- Current remote schema evidence validates the post-execution D1 catalog and AUTH-002 extension constraints through the existing validator.
+- The validator correction is limited to preventing native Payload users.password schema from being misclassified as an E5 secret-field violation; it does not relax E5 auth_session_state checks.
+- Technical E5 execution evidence from run 35552919573 and independent read-only schema evidence are both retained for provenance.
+
+Governance status remains unchanged:
+- This Change Control remains OPEN — EXECUTION DECISION REQUIRED because the actual E5 execution occurred while this control's status field was still OPEN.
+- The execution is therefore not promoted as governance-authorized completion merely because the technical postconditions passed.
+- AUTH-002 and Mapping 0 remain NOT_GREEN pending explicit governance reconciliation of the incident and subsequent runtime evidence.
