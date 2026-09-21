@@ -1,7 +1,7 @@
 # Change Control — AUTHZ RoleAssignment Authority Gap v1
 
 - ID: CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21
-- Status: OPEN — CONTRACT INPUT REQUIRED
+- Status: CLOSED — AUTHORITY CONTRACT RECONCILED
 - Scope: establish the existing D1-01 RoleAssignment authority needed by E6 layer resolution
 - Parent: CC-MAPPING-0-AUTH-002-E6-LAYER-AUTHORITY-2026-09-21
 - Runtime implementation: NOT AUTHORIZED
@@ -68,6 +68,29 @@ The following are explicitly not authorized as substitutes:
 
 This Change Control can close only when an explicit Contract-First RoleAssignment authority record reconciles the above authority dimensions with the existing D1-01, authorization and layer contracts, including an explicit multi-assignment/global-layer rule. Only then may E6-LAYER-001 advance to deterministic resolver specification and runtime admission.
 
+## Reconciled authority decision
+
+The explicit Contract-First authority record is now present at:
+`contracts/entity/AUTHZ-role-assignment-authority.v1.json`
+
+Reconciled decisions:
+- D1-01 is the sole RoleAssignment authority domain.
+- `subjectId` binds to exactly one authoritative USER.
+- `roleId` is sourced only from `contracts/authz/layers.json#x-layers[].roles`.
+- Assignment scope is `global | organization | ip`; organization/IP assignments require an existing authoritative scope and do not create membership or ownership.
+- Effective assignment requires ACTIVE status and temporal validity; REVOKED/expired/not-yet-effective assignments are excluded.
+- Effective duplicates of `(subjectId, roleId, scopeType, scopeId)` are forbidden.
+- Role/scope changes revoke the old assignment and create a new assignment.
+- Effective assignment-set changes advance `role_version` (or the already-authoritative equivalent) and invalidate authorization cache state according to the existing cache contract.
+- Only eligible global assignments contribute to the `authLogin`/`authRefresh` response layer; organization/IP-scoped assignments remain scoped authorization inputs.
+- Multiple eligible global assignments resolve by the highest numeric L0-L8 layer in `contracts/authz/layers.json`; equal-layer assignments are equivalent.
+- Non-ACTIVE account state remains an earlier deny gate.
+- Layer is derived at evaluation time; no User.layer, duplicate layer entity, new Worker, new D1 domain, or cache-derived authority is introduced.
+- No valid global RoleAssignment produces no invented fallback; the existing authentication/error contract applies fail-closed behavior.
+- This is authority reconciliation only. It does not authorize runtime implementation, migration, persistence mutation, or ENT-ROLE-ASSIGNMENT promotion to VERIFIED.
+
 ## Current decision
 
-E6-LAYER-001 remains blocked. The L1/L2 representation conflict is resolved, but the upstream ENT-ROLE-ASSIGNMENT authority contract is not present in the repository. No implementation or D1 mutation is authorized.
+E6-LAYER-001 is no longer blocked by the upstream RoleAssignment authority contract. It may advance to deterministic resolver specification and evidence planning under the existing E6 implementation-admission gate.
+
+No runtime implementation or D1 mutation is authorized by this Change Control.
