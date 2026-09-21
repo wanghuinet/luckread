@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "0d51a14ce24371977534e8a79cc767ce49bb5684",
+  "sourceHead": "f6b1f297422e99a8d26ca0103a9e6d4971de9f74",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -120,7 +120,7 @@
     "previousItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
     "previousItemState": "CLOSED — REPRESENTATION RECONCILED"
   },
-  "nextRequiredExternalAction": "Resolve the governed physical/runtime prerequisites without architecture change: establish current physical-to-logical binding for canonical W02/T01/T03 and its source/deployment evidence; establish/evidence-bind the already-contracted D1-01 RoleAssignment authority; establish any required W01 API-edge to W02 transport through a current approved binding contract; then bind the resolver and execute controlled E6 evidence. Historical P01-P08 topology and legacy worker directory names are non-authoritative.",
+  "nextRequiredExternalAction": "Resolve governed physical/runtime prerequisites without architecture change: establish the current physical Worker resource and source/deployment binding for canonical W02/T01/T03; establish/evidence-bind the already-contracted D1-01 RoleAssignment authority; establish any required W01 API-edge to W02 transport through an approved binding contract; then bind the resolver and execute controlled E6 runtime evidence. Do not infer from workers/* names or historical P01-P08 topology.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -327,5 +327,28 @@
   "e6RoleAssignmentAuthorityChangeControl": "docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md",
   "e6RoleAssignmentAuthorityConflict": "CLOSED — AUTHORITY CONTRACT RECONCILED",
   "currentPhysicalWorkerBindingControl": "docs/change-control/CC-MAPPING-0-WORKER-PHYSICAL-BINDING-2026-09-21.md",
-  "currentPhysicalWorkerBindingStatus": "OPEN — CURRENT PHYSICAL BINDING REQUIRED"
+  "currentPhysicalWorkerBindingStatus": "OPEN — CURRENT PHYSICAL BINDING REQUIRED",
+  "physicalWorkerBindingEvidenceDelta": {
+    "status": "PASS_VERIFIED_AUDIT — BINDING STILL NOT ESTABLISHED",
+    "w01RepositoryCandidate": {
+      "path": "workers/W01-payload/wrangler.jsonc",
+      "workerName": "luckread-w01-payload",
+      "d1Binding": "luckread",
+      "d1DatabaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+      "promotion": "NOT_PROMOTED_TO_CANONICAL_WORKER_IDENTITY"
+    },
+    "w02RepositoryBinding": {
+      "path": "workers/W02-content/wrangler.jsonc",
+      "status": "ABSENT_ON_CURRENT_MAIN"
+    },
+    "physicalWorkerDirectoryRule": "DIRECTORY_AND_CONFIG_NAMES_ARE_NON-AUTHORITATIVE_FOR_LOGICAL_WORKER_OWNERSHIP",
+    "latestCloudflareInventory": {
+      "runId": 35480031531,
+      "capturedAt": "2026-09-20T00:55:27Z",
+      "uploadedScriptCount": 0,
+      "physicalToLogicalMapping": "NOT_ESTABLISHED"
+    },
+    "conclusion": "Canonical W02 physical resource/source/deployment binding remains unestablished; E6 runtime admission remains blocked. No resource mutation performed.",
+    "reexecution": "NONE"
+  }
 }
