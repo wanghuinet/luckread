@@ -252,7 +252,7 @@
       {
         "id": "E6-WIRE-001",
         "status": "OPEN",
-        "finding": "authRefresh exists in auth-operation policy but lacks canonical OpenAPI wire definition"
+        "finding": "authRefresh exists in auth-operation policy and has an OpenAPI discovery shell, but lacks an admitted canonical Wire definition"
       },
       {
         "id": "E6-WIRE-002",
