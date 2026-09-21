@@ -17,6 +17,11 @@ if (implementationAdmitted && gapStatus !== 'CLOSED — REQUIRED CONTRACT INPUTS
   throw new Error('E6 admission contradiction: implementation is GREEN while required wire/input gaps are not reconciled')
 }
 
+const resolverContractPath = resolve(root, 'contracts/authz/role-assignment-layer-resolution.v1.json')
+if (!readFileSync(resolverContractPath, 'utf8').includes('"status": "CONTRACTED_NOT_VERIFIED"')) {
+  throw new Error('E6 admission guard: deterministic RoleAssignment layer resolver contract is missing or unexpectedly promoted')
+}
+
 const protectedBaseline = {
   'workers/W01-payload/src/collections/Users.ts': '988046fbe4afa824765b72b55e5006f6fd14faa4',
   'workers/W01-payload/src/db/auth-session-state-schema.ts': '628f6b251c12d80232ab610ee7b080f86fa43c88',
@@ -34,7 +39,7 @@ for (const [file, baselineSha] of Object.entries(protectedBaseline)) {
 }
 
 if (!implementationAdmitted) {
-  if (!['BLOCKED — REQUIRED CONTRACT INPUTS MISSING', 'BLOCKED — REQUIRED CONTRACT INPUTS INCOMPLETE'].includes(status)) {
+  if (!['BLOCKED — REQUIRED CONTRACT INPUTS MISSING', 'BLOCKED — REQUIRED CONTRACT INPUTS INCOMPLETE', 'BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED'].includes(status)) {
     throw new Error('E6 admission guard: unexpected current implementation-control status: ' + status)
   }
   if (!gaps.includes('E6-WIRE-001') || !gaps.includes('E6-WIRE-002')) {
