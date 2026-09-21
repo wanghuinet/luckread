@@ -1087,3 +1087,29 @@ Continuation state:
 - NEXT_ITEM_STATE: WAIT_AUTHORITY_DECISION.
 - Do not re-run the baseline migration.
 - Do not execute additional E5 mutation until the authority incident is explicitly reconciled.
+
+## Superpowers continuation — E5 technical evidence closed, authorization incident still open — 2026-09-21
+
+Technical evidence:
+- E5 remote execution run 35552919573 = SUCCESS.
+- E5 execution artifact 10618729380, digest sha256:c9bfcadba7ade81c8002786e6f323a5849c13dfb6f2390aeef44ea27584c44a1.
+- Independent read-only AUTH-002 schema evidence run 35553227463 = SUCCESS.
+- Independent evidence artifact 10619545790, digest sha256:68a812d812da703ace3b14e62360b56815c01c939418eb70a6e7252a573e9f31.
+- The independent evidence validator was corrected to scope secret-schema rejection to auth_session_state, allowing the native Payload users.password schema to be observed without weakening E5 extension checks.
+
+Governance incident:
+- Run 35552919573 executed E5 while CC-MAPPING-0-AUTH-002-E5-REMOTE-EXECUTION-2026-09-21 was still OPEN.
+- Root cause: the admission regex matched an explanatory sentence instead of the exact status field.
+- Containment: status regex anchored to the exact - Status: line; implicit push execution removed; stale trigger marker removed.
+- No compensating D1 mutation or rollback was performed.
+
+Current continuation state:
+- E5 technical schema/migration evidence: PASS_VERIFIED for evidence purposes.
+- Governance authorization for that execution: NOT_VALIDATED.
+- AUTH-002: NOT_GREEN.
+- Mapping 0: NOT_GREEN.
+- NEXT_ITEM_ID: M0-AUTH-002-E5-REMOTE-EXECUTION-AUTHORITY-001.
+- NEXT_ITEM_STATE: WAIT_AUTHORITY_DECISION.
+- Do not run another E5 migration attempt.
+- Do not rerun the already-applied baseline migration.
+- After explicit governance reconciliation, proceed to AUTH-002 runtime evidence rather than repeating schema generation/capture.
