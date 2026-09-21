@@ -1202,3 +1202,16 @@ Project Authority Decisions delegated the outstanding Mapping-0 authority decisi
 
 The next technical blocker is now E6 runtime integration `GAP-E6-RUNTIME-001`. The E6 implementation admission is staged but remains `OPEN — IMPLEMENTATION DECISION REQUIRED`; no runtime code was added.
 
+
+## Superpowers continuation — E6 implementation blocked by two authoritative input gaps — 2026-09-21
+
+Authority review has now classified the E6 implementation gate:
+- E6 runtime implementation is not admitted yet.
+- `E6-WIRE-001`: `authRefresh` is present in Auth API policy but absent from canonical OpenAPI wire authority; no request/response/error schema may be inferred.
+- `E6-WIRE-002`: `deviceId` is required by ENT-SESSION but the current AUTH-002 login wire contract does not define its authoritative transport/source.
+- New Change Control: `docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md`.
+- No device entity, new header, new public endpoint, DTO, Worker, D1 domain, or runtime code was introduced.
+- E5 authority incident is already reconciled; E6 is now blocked on these contract-input closures.
+
+Anti-loop: do not start W01 auth runtime implementation until E6-WIRE-001 and E6-WIRE-002 are resolved and reconciled into the existing E6 implementation admission control.
+
