@@ -34,7 +34,7 @@ The auth operation policy defines:
 
 The operation remains `CONTRACTED_PARTIAL` and its policy evidence marks OpenAPI, permission, state, anti-abuse, integration, and security-E2E evidence as missing.
 
-The API inventory includes `POST /v1/auth/refresh` as a required authentication endpoint group. The OpenAPI document currently exposes token issuance on `authLogin`, but repository evidence does not establish a dedicated `authRefresh` path/operation definition. The `/v1` path prefix versus policy-relative `/auth/refresh` form must be explicitly reconciled by the canonical API mapping; it must not be inferred.
+The API inventory includes `POST /v1/auth/refresh` as a required authentication endpoint group. The canonical OpenAPI document contains a `/auth/refresh` shell with `operationId: authRefresh`, but it is explicitly `DISCOVERY_DRAFT`, has a discovery-only summary, and does not define the concrete request/success/error Wire Schema. The `/v1` path prefix versus policy-relative `/auth/refresh` form must still be explicitly reconciled by the canonical API mapping; it must not be inferred.
 
 ## 3. Confirmed session/token security evidence
 
