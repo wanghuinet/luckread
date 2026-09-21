@@ -1,0 +1,9 @@
+One-shot controlled W01 AUTH-002 baseline execution request.
+Target database: luckread
+Target UUID: 2f80471e-3756-49f9-8db1-7707a433ad64
+Environment class: CONTROLLED_REMOTE_D1
+Approved migration: 20250929_111647
+Approved source SHA: 56926bab09951a8a0e15c820f1fb58dd8ba7090f
+Change Control: CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20
+Admission: GREEN — EXECUTION ADMITTED
+Scope: execute approved baseline only; capture fresh post-migration evidence.
