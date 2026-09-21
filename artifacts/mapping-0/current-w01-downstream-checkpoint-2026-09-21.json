@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "9241545d1a6dff7d87f0c3351e9a36867b6228af",
+  "sourceHead": "c1bd793157d7fbcff342301953fec7463fb552da",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -111,8 +111,8 @@
     "sourceAuditRunId": 35548553203,
     "sourceAuditConclusion": "success",
     "schemaSourceChangeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E5-DRIZZLE-SCHEMA-SOURCE-2026-09-21.md",
-    "executionStatus": "NOT_ADMITTED",
-    "remoteTableBeforeExecution": "REQUIRES_FRESH_E5_PREFLIGHT",
+    "executionStatus": "TECHNICAL_PASS_GOVERNANCE_RECONCILIATION_REQUIRED",
+    "remoteTableBeforeExecution": "CONFIRMED_ABSENT_BY_E5_PREFLIGHT_AT_EXECUTION",
     "requiredNextGate": "EXPLICIT_E5_REMOTE_EXECUTION_AUTHORITY",
     "executionChannel": {
       "admissionGuard": "scripts/auth-002-e5-remote-migration-admission.mjs",
@@ -134,12 +134,26 @@
       "runId": 35552919573,
       "testedSourceSha": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
       "governingChangeControlStatusAtExecution": "OPEN — EXECUTION DECISION REQUIRED",
-      "admissionGuardDefect": "unanchored Status regex matched explanatory text",
-      "currentGuardStatus": "CORRECTED"
+      "rootCause": "unanchored admission regex matched explanatory text",
+      "containment": [
+        "exact-line anchored Status check",
+        "implicit push execution removed",
+        "stale trigger marker removed"
+      ],
+      "compensatingD1Mutation": false
+    },
+    "E5_independent_schema_evidence": {
+      "runId": 35553227463,
+      "artifactId": 10619545790,
+      "digest": "sha256:68a812d812da703ace3b14e62360b56815c01c939418eb70a6e7252a573e9f31",
+      "conclusion": "success",
+      "testedCommitSha": "9241545d1a6dff7d87f0c3351e9a36867b6228af",
+      "scope": "read-only controlled remote D1 schema/catalog recapture",
+      "promotion": "NOT_YET_PROMOTED"
     }
   },
-  "latestReconciliationCommit": "9241545d1a6dff7d87f0c3351e9a36867b6228af",
-  "note": "E5 remote mutation technically succeeded but occurred under an invalidly permissive admission guard while the governing Change Control was OPEN. Guard and trigger are contained; independent read-only schema evidence is pending. No compensating D1 mutation is performed.",
+  "latestReconciliationCommit": "c1bd793157d7fbcff342301953fec7463fb552da",
+  "note": "E5 technical execution and independent read-only schema evidence are complete; governance authorization was invalidly permissive at execution time and remains unreconciled. No further D1 mutation is authorized by this checkpoint.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
