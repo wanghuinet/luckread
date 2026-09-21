@@ -1,0 +1,52 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-09-21",
+  "sourceHead": "0fd04029e26d074101a26ddd609689a37d95d541",
+  "scope": "AUTH-002 E6 wire/input closure sufficiency audit",
+  "status": "BLOCKED_INPUTS_CONFIRMED",
+  "antiLoop": true,
+  "E6_WIRE_001": {
+    "status": "OPEN",
+    "conclusion": "No existing exact canonical refresh Request/Response/Error Wire Schema was found. The current OpenAPI entry exists only as DISCOVERY_DRAFT.",
+    "reusableAuthorityFound": [
+      "auth-operation-policy.v1.json: operation, method/path, auth mode, permission, resource and security policy",
+      "authLogin OpenAPI response: accessToken, refreshToken, expiresIn, layer (not a separate refresh-operation contract)"
+    ],
+    "missingInputs": [
+      "canonical request DTO identity and exact request schema",
+      "canonical response DTO identity and exact response schema",
+      "canonical error DTO/status mapping for expiry, revocation and reuse",
+      "exact refresh credential carrier semantics",
+      "explicit canonical route admission and /v1 base-path reconciliation"
+    ],
+    "prohibitedInference": [
+      "Do not synthesize refresh schema from authLogin response",
+      "Do not synthesize from Payload native refresh behavior",
+      "Do not promote the current Discovery Draft to canonical Wire Authority"
+    ]
+  },
+  "E6_WIRE_002": {
+    "status": "OPEN",
+    "conclusion": "No existing AUTH-002 contract defines the source or transport for ENT-SESSION-F-DEVICE-ID. ENT-DEVICE-RECORD is PROPOSED with no field contract and cannot fill the gap.",
+    "reusableAuthorityFound": [
+      "AUTH-002 session field contract: deviceId is required, immutable and privacy-sensitive",
+      "AUTH-002 minimum integration contract: device binding is required and must be privacy-safe/server-bound",
+      "L5/L6 registry: session-device-bind-01 and device lifecycle capabilities (not a transport/source contract)"
+    ],
+    "missingInputs": [
+      "authoritative device-binding source",
+      "transport semantics at login/session issuance",
+      "ownership/control semantics for the bound value"
+    ],
+    "prohibitedInference": [
+      "Do not invent X-Device-Id",
+      "Do not add login request deviceId by inference",
+      "Do not derive from IP, User-Agent, fingerprint, cookie or other uncontracted attributes",
+      "Do not create ENT-DEVICE-RECORD solely to close this gap"
+    ]
+  },
+  "decision": "The two blockers are genuine contract-input gaps, not missing implementation work. E6 runtime implementation remains unauthorized until both are resolved through normal Contract-First Change Control.",
+  "noRuntimeCodeChange": true,
+  "noD1Mutation": true,
+  "noMappingPromotion": true
+}
