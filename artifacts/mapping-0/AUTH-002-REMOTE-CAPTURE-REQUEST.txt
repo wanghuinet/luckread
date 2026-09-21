@@ -3,20 +3,4 @@ Target database: luckread
 Target UUID: 2f80471e-3756-49f9-8db1-7707a433ad64
 Environment class: CONTROLLED_REMOTE_D1
 This file is a trigger marker only; the workflow performs read-only remote evidence capture.
-Retry after push-context compatibility correction.
-
-Reusable workflow dispatch path is now the canonical execution path.
-
-Explicit secret binding validated; retry through reusable caller.
-
-Current execution path: direct push event with exact commit message `evidence(auth-002): capture controlled remote schema`; no migration mutation.
-Re-armed after diagnostic-retention fix at commit 221ab6512c033aaf304a1d5c0486b323ddc1d555.
-Re-armed after Payload migration-history query correction at commit 7912b83c46688c97b2e2bfdbe50617892dad6da2.
-Re-armed after migration-history absence handling at commit 3baaffd09473eb1ec4b4ba41f7c23a0a75514b0e.
-Re-armed after evidence-manifest version normalization at commit 33ab758afde19f67c50db0d868e1eb07da6ba12f.
-Re-armed for third-layer downstream closure on 2026-09-20; this marker change is documentation-only and authorizes no migration. The exact push commit message below is the existing workflow's controlled read-only capture trigger.
-Re-armed after validator state-separation fix at commit 924a2e3530b298e932d7e35e509f7899d24dffdc.
-Re-armed after validator declaration-order fix at commit 3983cc45c0779e04373ec042e6cb763a4f8b752f.
-Re-armed after duplicate-declaration fix at commit 1bb8855ec155552aeeb48336f2df4a89211092fb.
-Re-armed after D1 result-envelope normalization fix at commit 183abc887aea10406fd24b12f498a19ebd667352.
-Re-armed after committing the E5-generated AUTH-002 migration source and migration index at commit e34e18c5a0e13759503b8ac9636e419e491291d8.
+Refresh requested after W01 baseline execution preflight diagnostic capture.
