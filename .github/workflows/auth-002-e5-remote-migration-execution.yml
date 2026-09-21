@@ -117,6 +117,8 @@ jobs:
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
             --command 'PRAGMA table_info("users_sessions");' \
             > ../../artifacts/evidence/auth-002/e5-remote/preflight-users-sessions-schema.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 info "$DATABASE_NAME" --json --config wrangler.jsonc \
+            > ../../artifacts/evidence/auth-002/e5-remote/preflight-d1-info.json
           node - <<'NODE'
           const fs = require('node:fs');
           const dir = '../../artifacts/evidence/auth-002/e5-remote';
@@ -136,6 +138,17 @@ jobs:
           const catalog = rows('preflight-catalog.json');
           const users = rows('preflight-users-schema.json');
           const usersSessions = rows('preflight-users-sessions-schema.json');
+          const d1Info = read('preflight-d1-info.json');
+          const findUuid = (value) => {
+            if (typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) return value;
+            if (Array.isArray(value)) for (const item of value) { const found = findUuid(item); if (found) return found; }
+            if (value && typeof value === 'object') for (const child of Object.values(value)) { const found = findUuid(child); if (found) return found; }
+            return null;
+          };
+          const actualDatabaseId = findUuid(d1Info);
+          if (actualDatabaseId?.toLowerCase() !== '2f80471e-3756-49f9-8db1-7707a433ad64'.toLowerCase()) {
+            throw new Error('E5 preflight database UUID mismatch: ' + String(actualDatabaseId));
+          }
           const expectedTables = ['media','payload_locked_documents','payload_locked_documents_rels','payload_migrations','payload_preferences','payload_preferences_rels','users','users_sessions'];
           if (JSON.stringify(tables) !== JSON.stringify(expectedTables)) throw new Error('E5 preflight table set mismatch: ' + JSON.stringify(tables));
           if (migrations.length !== 1) throw new Error('preflight migration history must contain exactly one baseline record: ' + JSON.stringify(migrations));
@@ -150,6 +163,7 @@ jobs:
             usersSchema: users,
             usersSessionsSchema: usersSessions,
             catalog: catalog,
+            databaseId: actualDatabaseId,
             authSessionStatePresent: false,
             result: 'PASS'
           }, null, 2) + '\n');
