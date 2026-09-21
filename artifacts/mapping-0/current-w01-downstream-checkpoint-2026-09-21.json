@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "aa8eeef71e94a2e38af7ad5f77e1873d0e5c34e4",
+  "sourceHead": "c589c80a961cbf804354e883d314600eff79e0c1",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -101,8 +101,8 @@
   },
   "mapping0": {
     "status": "NOT_GREEN",
-    "nextItemId": "M0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-001",
-    "nextItemState": "BLOCKED_BY_RUNTIME_EVIDENCE",
+    "nextItemId": "M0-AUTH-002-E6-LAYER-AUTHORITY-001",
+    "nextItemState": "BLOCKED_UNTIL_AUTHORITY_DECISION",
     "noMappingRowsReexecuted": true,
     "metrics": {
       "canonicalRecords": 449,
@@ -118,7 +118,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Run the existing E6 runtime admission/evidence path after Contract reconciliation. Do not promote AUTH-002 until executable login/refresh/logout/session/device-binding/rotation/reuse/security evidence is accepted.",
+  "nextRequiredExternalAction": "Resolve the E6 layer output authority: define the canonical source, precedence and deterministic resolver for authLogin/authRefresh response layer (L0-L8). Do not hard-code a default or add a User field by inference.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -212,8 +212,8 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "aa8eeef71e94a2e38af7ad5f77e1873d0e5c34e4",
-  "note": "E6-WIRE-001 and E6-WIRE-002 were resolved through explicit Contract-First authority decision and canonical OpenAPI/DTO reconciliation. Contract CI still has a pre-existing semantic duplicate-operationId failure unrelated to authRefresh; runtime admission remains fail-closed.",
+  "latestReconciliationCommit": "c589c80a961cbf804354e883d314600eff79e0c1",
+  "note": "E6-WIRE-001 and E6-WIRE-002 are closed at Contract-First authority scope. Runtime implementation remains blocked by E6-LAYER-001. No runtime code or D1 mutation performed.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -242,7 +242,7 @@
   },
   "e6RuntimeImplementationAdmission": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21.md",
-    "status": "BLOCKED — RUNTIME IMPLEMENTATION EVIDENCE REQUIRED",
+    "status": "BLOCKED — REQUIRED CONTRACT INPUTS INCOMPLETE",
     "implementationAuthorized": false,
     "runtimeCodeChanged": false,
     "remoteD1Mutation": false,
@@ -250,14 +250,9 @@
     "parentE5AuthorityIncidentReconciled": true,
     "gaps": [
       {
-        "id": "E6-WIRE-001",
+        "id": "E6-LAYER-001",
         "status": "OPEN",
-        "finding": "authRefresh exists in auth-operation policy and has an OpenAPI discovery shell, but lacks an admitted canonical Wire definition"
-      },
-      {
-        "id": "E6-WIRE-002",
-        "status": "OPEN",
-        "finding": "ENT-SESSION-F-DEVICE-ID is required but AUTH-002 login contract lacks authoritative transport/source"
+        "finding": "authLogin/authRefresh response requires layer L0-L8 but W01 has no authoritative runtime source/resolver"
       }
     ],
     "failClosedGuard": {
@@ -303,5 +298,11 @@
     "newAuthorityFound": false,
     "status": "NO_NEW_CANONICAL_AUTHORITY",
     "conclusion": "E6-WIRE-001 and E6-WIRE-002 remain genuine Contract-First decision inputs; runtime implementation remains fail-closed."
+  },
+  "e6LayerAuthority": {
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-LAYER-AUTHORITY-2026-09-21.md",
+    "status": "OPEN — EXPLICIT AUTHORITY DECISION REQUIRED",
+    "evidence": "Current W01 source has no canonical layer field/resolver; repository search found L0-L8 definitions but no executable resolver.",
+    "implementationAuthorized": false
   }
 }
