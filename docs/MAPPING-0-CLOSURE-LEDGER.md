@@ -1471,3 +1471,17 @@ This section supersedes earlier continuation cursors for current work selection.
 - No physical Worker name was invented, no historical P01-P08 mapping was promoted, no Worker was created/deployed, and no D1 mutation occurred.
 - AUTH-002/E6 remains at `GAP-E6-RUNTIME-001`; canonical W02 physical binding and subsequent runtime evidence remain blocked.
 - Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
+
+
+## Superpowers continuation — physical Worker binding search closed; authority wait state frozen — 2026-09-21
+
+- Current main head at this checkpoint: `4f19255b28c845d41e804f009751b6197d64a54c`.
+- Targeted current-main search found no authoritative contract/decision that supplies concrete physical Worker resource/name bindings for canonical W02-W12.
+- Existing canonical logical Worker authority remains unchanged; historical P01-P08 topology and physical directory names remain non-authoritative for logical Worker identity.
+- Fresh Cloudflare read-only inventory `35598525409` remains the strongest external evidence: 2 D1 resources / 0 uploaded Worker scripts.
+- The physical binding Change Control is now explicitly classified `WAIT_AUTHORITY_DECISION — PHYSICAL BINDING AUTHORITY REQUIRED`.
+- The technical discovery/reconciliation work for this gap is complete; repeating repository searches would not add evidence.
+- Closure now requires the normal Contract-First authority decision for concrete physical Worker resource/name binding, followed by source/deployment/configuration evidence. No resource creation, rename, reassignment, or runtime implementation is authorized by this record.
+- AUTH-002/E6 remains fail-closed at `GAP-E6-RUNTIME-001`.
+- Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
+- No already-passed Mapping/E5/structural task was re-executed.
