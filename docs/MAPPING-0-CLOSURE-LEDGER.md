@@ -1278,3 +1278,26 @@ The current-head closure audit has exhausted reusable authority for the two E6 w
 Decision boundary is now explicit in `CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md`.
 
 Anti-loop rule: do not repeat repository searches for these same inputs unless a new authoritative contract/decision source is committed. Do not infer a device transport, synthesize refresh DTOs, promote the Discovery Draft, or start E6 runtime implementation.
+
+## Latest continuation reconciliation — 2026-09-21
+
+This section supersedes the historical continuation cursor entries above for current work selection. Earlier entries remain historical evidence and are not repeated.
+
+- Current main head: `9dfcde1c18399cdf463490b9e414bf7a87abd447`
+- Latest W01 downstream checkpoint: `artifacts/mapping-0/current-w01-downstream-checkpoint-2026-09-21.json`
+- L1/L2 role representation conflict `M0-AUTHZ-LAYER-MAPPING-CONFLICT-001`: **CLOSED — REPRESENTATION RECONCILED**
+- Reconciliation record: `docs/change-control/CC-MAPPING-0-AUTHZ-L1-L2-ROLE-REPRESENTATION-2026-09-21.md`
+- No runtime code or D1 mutation was introduced by that reconciliation.
+- Current Mapping 0 status remains **NOT_GREEN**.
+- Current canonical count remains 449:
+  - PARTIAL: 17
+  - UNRESOLVED: 431
+  - MISSING: 1
+- Current selected next item:
+  - `M0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-001`
+  - State: `WAIT_AUTHORITY_CONTRACT`
+  - Change Control: `docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md`
+- Current E6 layer status: **OPEN — BLOCKED BY ENT-ROLE-ASSIGNMENT AUTHORITY CONTRACT**
+- Runtime implementation remains unauthorized until the RoleAssignment authority contract is closed.
+- Do not re-execute AUTH-002/E5 or the already verified Mapping structural gates merely because this governance ledger changed.
+- The next required authority work is limited to the existing D1-01 RoleAssignment contract inputs: subject binding, canonical role identifier, validity/status, scope, temporal validity, revocation, uniqueness/conflict constraints, version/change semantics, organization/IP relationship, and effectiveness evidence.
