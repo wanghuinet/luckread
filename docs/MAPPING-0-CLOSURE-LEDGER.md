@@ -1265,3 +1265,16 @@ Corrective evidence:
 - `contracts/alignment/mapping-batches/AUTH-011-reconciliation.v1.md` corrected to distinguish discovery shell from admitted Wire Schema.
 
 Anti-inference remains active: no DTO promotion, no OpenAPI schema completion, no route implementation, and no E6 runtime admission from this correction.
+
+## E6 explicit decision boundary — 2026-09-21
+
+The current-head closure audit has exhausted reusable authority for the two E6 wire/input gaps. No existing contract was found that can legally supply the missing decisions.
+
+| Gap | Existing authority reusable | Missing authoritative decision | Implementation allowed |
+|---|---|---|---|
+| E6-WIRE-001 `authRefresh` | Auth operation policy + OpenAPI Discovery Draft + API path normalization | Exact Request/Response/Error schemas, DTO identity, credential-carrier semantics, and promotion to admitted Wire Authority | NO |
+| E6-WIRE-002 `deviceId` | ENT-SESSION field contract + minimum integration contract + L5/L6 binding claim | Authoritative device-binding source, transport, and ownership/control semantics | NO |
+
+Decision boundary is now explicit in `CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md`.
+
+Anti-loop rule: do not repeat repository searches for these same inputs unless a new authoritative contract/decision source is committed. Do not infer a device transport, synthesize refresh DTOs, promote the Discovery Draft, or start E6 runtime implementation.
