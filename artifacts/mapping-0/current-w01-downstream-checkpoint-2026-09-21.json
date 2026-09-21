@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "46b5eb5c1dd0fbdd0c746bb98796068551634f0a",
+  "sourceHead": "b6898ac802d4051ef684f9cdbadb6fb2d4d68b23",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -118,7 +118,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Close E6-WIRE-001 via the existing AUTH-011/AUTH-010 Contract-First OpenAPI/DTO authority chain and E6-WIRE-002 via an explicit AUTH-002 device-binding source/transport decision. Do not implement runtime auth code or infer either input.",
+  "nextRequiredExternalAction": "Resolve E6-WIRE-001 via the existing AUTH-011/AUTH-010 Contract-First OpenAPI/DTO chain and E6-WIRE-002 via an explicit AUTH-002 device-binding source/transport decision. Do not implement runtime auth code or infer either input.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -132,7 +132,7 @@
     "schemaSourceChangeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E5-DRIZZLE-SCHEMA-SOURCE-2026-09-21.md",
     "executionStatus": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "remoteTableBeforeExecution": "CONFIRMED_ABSENT_BY_E5_PREFLIGHT_AT_EXECUTION",
-    "requiredNextGate": "E6_RUNTIME_IMPLEMENTATION_ADMISSION",
+    "requiredNextGate": "E6_WIRE_INPUTS",
     "executionChannel": {
       "admissionGuard": "scripts/auth-002-e5-remote-migration-admission.mjs",
       "admissionGuardCommit": "d76fc52126907719d29903d6ea6089fe1e48e1bc",
@@ -209,19 +209,20 @@
       "scope": "read-only post-execution remote D1 schema/catalog recapture"
     },
     "E5": "GENERATED_AND_REGISTERED",
-    "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED"
+    "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
+    "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "46b5eb5c1dd0fbdd0c746bb98796068551634f0a",
-  "note": "Current checkpoint: E5 authority incident reconciled. E6-WIRE-001 and E6-WIRE-002 are independently evidence-bound as current contract-input gaps. No runtime authentication code or remote D1 mutation occurred in this continuation.",
+  "latestReconciliationCommit": "b6898ac802d4051ef684f9cdbadb6fb2d4d68b23",
+  "note": "Current authoritative checkpoint at main. E5 authority incident is fully reconciled; E5 technical evidence is retained without retroactive authorization. Active blockers are E6-WIRE-001 and E6-WIRE-002. No runtime authentication code or remote D1 mutation occurred in the current continuation.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
       "525379507d47b1845a6d13e1f1f499fd90000d96",
       "fe1f2784d21f3f629bbad0baa971f1aa56520914"
     ],
-    "changeControlStatus": "OPEN — EXECUTION DECISION REQUIRED",
     "repositoryEvidenceOfSuccessfulE5Mutation": true,
-    "interpretation": "Run 35552919573 is the authoritative technical execution evidence; governance authorization was invalidly permissive because the guard regex matched explanatory text while the Change Control status remained OPEN."
+    "interpretation": "Run 35552919573 is the authoritative technical execution evidence; governance authorization was invalidly permissive because the guard regex matched explanatory text while the Change Control status remained OPEN.",
+    "changeControlStatusAtExecution": "OPEN — EXECUTION DECISION REQUIRED"
   },
   "independentSchemaEvidence": {
     "workflowRunId": 35553227463,
