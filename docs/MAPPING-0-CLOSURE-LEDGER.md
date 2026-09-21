@@ -1283,8 +1283,9 @@ Anti-loop rule: do not repeat repository searches for these same inputs unless a
 
 This section supersedes the historical continuation cursor entries above for current work selection. Earlier entries remain historical evidence and are not repeated.
 
-- Current main head: `9dfcde1c18399cdf463490b9e414bf7a87abd447`
-- Latest W01 downstream checkpoint: `artifacts/mapping-0/current-w01-downstream-checkpoint-2026-09-21.json`
+- The latest W01 downstream checkpoint file is the authoritative continuation cursor; any later governance-only commits that do not change its protected inputs do not require re-executing completed checks.
+- Checkpoint path: `artifacts/mapping-0/current-w01-downstream-checkpoint-2026-09-21.json`
+- Checkpoint reconciliation baseline before this ledger edit: `e86667831413465a49bd3100f89d19fa8262d0ff`
 - L1/L2 role representation conflict `M0-AUTHZ-LAYER-MAPPING-CONFLICT-001`: **CLOSED — REPRESENTATION RECONCILED**
 - Reconciliation record: `docs/change-control/CC-MAPPING-0-AUTHZ-L1-L2-ROLE-REPRESENTATION-2026-09-21.md`
 - No runtime code or D1 mutation was introduced by that reconciliation.
