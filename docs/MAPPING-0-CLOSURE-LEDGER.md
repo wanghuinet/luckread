@@ -1170,3 +1170,21 @@ A preparatory Change Control was added for the existing `GAP-E6-RUNTIME-001`:
 - The implementation gate is explicitly dependent on reconciliation of the parent E5 authority incident.
 - No runtime code was changed in this step.
 
+
+## Superpowers continuation — E5 admission regression gate added — 2026-09-21
+
+A non-mutating regression gate is now committed:
+- `scripts/auth-002-e5-admission-regression.mjs`
+- `.github/workflows/auth-002-e5-control-regression.yml`
+
+The gate verifies:
+- the admission check is anchored to the exact authoritative `- Status:` line;
+- explanatory prose cannot trigger GREEN admission;
+- OPEN status cannot admit execution;
+- the E5 migration workflow remains `workflow_dispatch` only and contains no automatic push trigger;
+- obsolete push-marker validation is absent;
+- the parent E5 authority control remains explicitly OPEN;
+- the stale E5 execution marker remains absent.
+
+This is control/evidence hardening only. It performs no D1 mutation, does not run E5, and does not alter AUTH-002 or Mapping-0 status.
+
