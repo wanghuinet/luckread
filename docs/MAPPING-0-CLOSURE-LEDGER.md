@@ -1392,3 +1392,16 @@ This section supersedes earlier continuation cursors for current work selection.
 - Current next item remains `GAP-E6-RUNTIME-001`.
 - Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
 - No runtime code or D1 mutation was introduced; already-passed Mapping/E5/structural work was not re-executed.
+
+## Superpowers continuation — RoleAssignment real implementation evidence absence frozen — 2026-09-21
+
+- New audit: `artifacts/mapping-0/authz-role-assignment-real-evidence-absence-audit-2026-09-21.md`
+- Current Entity Catalog, entity-field contract, persistence inventory, implementation-evidence inventory and code-evidence inventory consistently show `ENT-ROLE-ASSIGNMENT` as **PROPOSED / CONTRACT_ONLY / BLOCKED**.
+- Repository search found no physical RoleAssignment table, migration, runtime service/handler or implementation evidence.
+- Current retained AUTH-002 remote D1 evidence proves the native Payload/session baseline and `auth_session_state`, not RoleAssignment persistence.
+- Therefore no existing D1 table or Payload state can be reused as a falsely inferred RoleAssignment authority.
+- Canonical RoleAssignment authority semantics remain closed at the Contract level; concrete persistence/runtime realization remains an implementation Change-Control gate.
+- The next E6 prerequisite is now frozen: realize the already-contracted D1-01 RoleAssignment authority with evidence, then admit W02/T01/T03 runtime binding and controlled E6 authLogin/authRefresh evidence.
+- No runtime code, D1 mutation, new Worker, new D1, User.layer, duplicate layer entity, or hand-authored migration was introduced.
+- Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
+- Current next item remains `GAP-E6-RUNTIME-001`; no passed Mapping/E5/structural work was re-executed.
