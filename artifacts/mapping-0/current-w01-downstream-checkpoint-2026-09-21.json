@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "b1fd4656652b3adb806116a851a20a328a25586b",
+  "sourceHead": "f4618fb27fe02dbd2b4dc19e9f95339bd714e045",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -112,7 +112,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Explicitly reconcile the parent E5 execution-authority incident. Do not rerun E5 or baseline. After authority reconciliation, resolve GAP-E6-RUNTIME-001 through an approved implementation Change Control; current Mapping-0 task rules prohibit business runtime implementation before Mapping-0 GREEN.",
+  "nextRequiredExternalAction": "Reconcile the parent E5 execution-authority incident. After reconciliation and explicit implementation admission, resolve GAP-E6-RUNTIME-001 using the staged E6 implementation Change Control, then run controlled E6 runtime evidence.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -177,8 +177,8 @@
       "scope": "read-only post-execution remote D1 schema/catalog recapture"
     }
   },
-  "latestReconciliationCommit": "b1fd4656652b3adb806116a851a20a328a25586b",
-  "note": "Current head includes closed control-defect remediation only. It does not retroactively authorize the prior E5 execution. Mapping metrics and AUTH-002 remain unchanged and NOT_GREEN.",
+  "latestReconciliationCommit": "f4618fb27fe02dbd2b4dc19e9f95339bd714e045",
+  "note": "E5 control-defect remediation is closed; E6 implementation admission is staged but not authorized. No runtime code or remote D1 mutation occurred in this continuation.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -204,5 +204,13 @@
     "status": "OPEN — RUNTIME IMPLEMENTATION EVIDENCE REQUIRED",
     "runtimeCorrelationPathVerified": false,
     "remoteRuntimeExecutionStarted": false
+  },
+  "e6RuntimeImplementationAdmission": {
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21.md",
+    "status": "OPEN — IMPLEMENTATION DECISION REQUIRED",
+    "implementationAuthorized": false,
+    "runtimeCodeChanged": false,
+    "remoteD1Mutation": false,
+    "dependsOnE5AuthorityReconciliation": true
   }
 }
