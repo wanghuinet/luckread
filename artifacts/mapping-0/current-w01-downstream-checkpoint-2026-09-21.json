@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "212e47363146f847a213a70469e5638c532c5e0b",
+  "sourceHead": "9f1717425ad684a6b27cd9324ed41a62d9483746",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -212,8 +212,8 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "212e47363146f847a213a70469e5638c532c5e0b",
-  "note": "Authoritative continuation cursor. E5 authority incident is reconciled. E6-WIRE-001 remains OPEN because /auth/refresh exists only as DISCOVERY_DRAFT; E6-WIRE-002 remains OPEN because device binding source/transport is still undefined. This correction changes evidence interpretation only; no runtime authentication code or D1 mutation was performed.",
+  "latestReconciliationCommit": "9f1717425ad684a6b27cd9324ed41a62d9483746",
+  "note": "Latest main checked at 9f1717425ad684a6b27cd9324ed41a62d9483746. No new authoritative E6 wire/device decisions were found; no runtime code or D1 mutation performed.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -303,5 +303,17 @@
     "antiLoop": true,
     "finding": "Neither E6 wire/input gap can be closed from an existing exact canonical contract; no implementation work is admitted by inference.",
     "sourceHead": "9fd9e7c954d982288a39c1946d6af7140e688069"
+  },
+  "e6WireInputRecheck": {
+    "checkedAt": "2026-09-21",
+    "searchedFor": [
+      "AUTH-002 E6 decision",
+      "authRefresh wire decision",
+      "device binding decision",
+      "E6-WIRE"
+    ],
+    "newAuthorityFound": false,
+    "status": "NO_NEW_CANONICAL_AUTHORITY",
+    "conclusion": "E6-WIRE-001 and E6-WIRE-002 remain genuine Contract-First decision inputs; runtime implementation remains fail-closed."
   }
 }
