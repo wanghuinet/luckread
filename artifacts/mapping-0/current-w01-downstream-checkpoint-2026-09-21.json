@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "18e5a9b625360af6fb9ff4e316d19b965d8c7e1d",
+  "sourceHead": "0d51a14ce24371977534e8a79cc767ce49bb5684",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -120,7 +120,7 @@
     "previousItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
     "previousItemState": "CLOSED — REPRESENTATION RECONCILED"
   },
-  "nextRequiredExternalAction": "Resolve GAP-E6-RUNTIME-001 without importing historical topology: establish the current physical-to-logical Worker binding for canonical W02/T01/T03; establish an explicit current W01 API-edge to W02 transport contract if needed; establish/evidence-bind the already-contracted D1-01 RoleAssignment authority; then bind the deterministic resolver and produce controlled authLogin/authRefresh E6 evidence. Do not use historical W01-W13/P01-P08 topology, legacy directory names, W01 direct D1 authority, new D1/Worker, User.layer, duplicate layer entity, or hand-authored migration.",
+  "nextRequiredExternalAction": "Resolve the governed physical/runtime prerequisites without architecture change: establish current physical-to-logical binding for canonical W02/T01/T03 and its source/deployment evidence; establish/evidence-bind the already-contracted D1-01 RoleAssignment authority; establish any required W01 API-edge to W02 transport through a current approved binding contract; then bind the resolver and execute controlled E6 evidence. Historical P01-P08 topology and legacy worker directory names are non-authoritative.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -238,7 +238,7 @@
   "e6RuntimeIntegrationGap": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-INTEGRATION-GAP-2026-09-21.md",
     "gapId": "GAP-E6-RUNTIME-001",
-    "status": "OPEN — CANONICAL W02/T01/T03 RUNTIME BINDING + D1-01 ROLEASSIGNMENT SOURCE/EVIDENCE REQUIRED",
+    "status": "OPEN — CURRENT W02 PHYSICAL BINDING + D1-01 ROLEASSIGNMENT SOURCE/EVIDENCE + AUTH-002 RUNTIME EVIDENCE REQUIRED",
     "runtimeCorrelationPathVerified": false,
     "remoteRuntimeExecutionStarted": false,
     "audit": "artifacts/mapping-0/worker-physical-layout-reconciliation-2026-09-21.md"
@@ -325,5 +325,7 @@
   },
   "e6LayerAuthorityDecisionInput": "artifacts/mapping-0/auth-002-e6-layer-authority-decision-input-2026-09-21.md",
   "e6RoleAssignmentAuthorityChangeControl": "docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md",
-  "e6RoleAssignmentAuthorityConflict": "CLOSED — AUTHORITY CONTRACT RECONCILED"
+  "e6RoleAssignmentAuthorityConflict": "CLOSED — AUTHORITY CONTRACT RECONCILED",
+  "currentPhysicalWorkerBindingControl": "docs/change-control/CC-MAPPING-0-WORKER-PHYSICAL-BINDING-2026-09-21.md",
+  "currentPhysicalWorkerBindingStatus": "OPEN — CURRENT PHYSICAL BINDING REQUIRED"
 }
