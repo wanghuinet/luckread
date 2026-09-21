@@ -1188,3 +1188,17 @@ The gate verifies:
 
 This is control/evidence hardening only. It performs no D1 mutation, does not run E5, and does not alter AUTH-002 or Mapping-0 status.
 
+
+## Superpowers continuation — E5 authority incident reconciled — 2026-09-21
+
+Project Authority Decisions delegated the outstanding Mapping-0 authority decisions to the review/acceptance process. That authority is now applied to AUTH-002 E5:
+- Run 35552919573 was not authorized at execution time because the parent E5 Status field was OPEN.
+- The technical D1 result and independent schema evidence remain retained as factual evidence.
+- No retroactive GREEN authorization is recorded.
+- No second E5 execution or compensating D1 mutation is performed.
+- Parent control `CC-MAPPING-0-AUTH-002-E5-REMOTE-EXECUTION-2026-09-21` is now closed as `CLOSED — EXECUTION NOT AUTHORIZED; TECHNICAL RESULT RETAINED`.
+- The admission-control remediation remains `CLOSED — CONTROL REMEDIATION VERIFIED`.
+- The E5 authority item is therefore reconciled; this does not promote AUTH-002 or Mapping-0.
+
+The next technical blocker is now E6 runtime integration `GAP-E6-RUNTIME-001`. The E6 implementation admission is staged but remains `OPEN — IMPLEMENTATION DECISION REQUIRED`; no runtime code was added.
+
