@@ -1113,3 +1113,22 @@ Current continuation state:
 - Do not run another E5 migration attempt.
 - Do not rerun the already-applied baseline migration.
 - After explicit governance reconciliation, proceed to AUTH-002 runtime evidence rather than repeating schema generation/capture.
+
+## Superpowers continuation — E6 runtime integration gap recorded — 2026-09-21
+
+Current source inspection confirms the active W01 tree contains native Payload authentication, the auth_session_state schema source, and the E5 migration, but no independently verified runtime read/write correlation path for auth_session_state.
+
+Governance disposition:
+- New Change Control: docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-INTEGRATION-GAP-2026-09-21.md.
+- GAP-E6-RUNTIME-001 is recorded as an implementation/runtime evidence gap.
+- Existing E6 contracts remain the authority; no new fields, APIs, Workers, D1 domains, or second Session authority were introduced.
+- Do not infer deviceId, tokenVersion, refreshCredentialHash, revokedAt, or lastSeenAt runtime semantics from the schema alone.
+- Do not mark E6 or AUTH-002 GREEN from schema/migration evidence alone.
+
+Current order remains:
+E5 governance incident reconciliation -> approved runtime implementation path -> E6 controlled runtime evidence -> Evidence Registry -> Mapping-0 validation.
+
+Anti-loop:
+- Do not rerun E5 migration.
+- Do not repeat Gate-1 schema capture unless relevant schema/runtime inputs change.
+- Do not execute E6 against the remote D1 until the runtime implementation gap is explicitly resolved through Change Control.
