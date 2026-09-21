@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "2f5d98ea66607b942c69a68aa72ba9fe4b80f415",
+  "sourceHead": "fc84d9c4c059031e6eab91ed94e5c8929ad29a15",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -89,10 +89,15 @@
   },
   "AUTH-002": {
     "E5": "GENERATED_AND_REGISTERED",
-    "E5_execution": "NOT_EXECUTED",
+    "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "E4.5": "PASS_VERIFIED_HISTORICAL_UNTIL_REBOUND_TO_FINAL_SHA",
     "overall": "NOT_GREEN",
-    "E4_5": "PASS_VERIFIED_CURRENT_HEAD_REMOTE_BASELINE"
+    "E4_5": "PASS_VERIFIED",
+    "authorityReconciliationStatus": "PASS_VERIFIED",
+    "remoteExecutionRunId": 35552919573,
+    "remoteExecutionTechnicalResult": "PASS",
+    "retroactiveAuthorization": false,
+    "nextGate": "E6_RUNTIME_IMPLEMENTATION_ADMISSION"
   },
   "mapping0": {
     "status": "NOT_GREEN",
@@ -206,7 +211,7 @@
     "E5": "GENERATED_AND_REGISTERED",
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED"
   },
-  "latestReconciliationCommit": "2f5d98ea66607b942c69a68aa72ba9fe4b80f415",
+  "latestReconciliationCommit": "fc84d9c4c059031e6eab91ed94e5c8929ad29a15",
   "note": "Current authoritative checkpoint. E5 authority incident is reconciled and closed without retroactive authorization. E5 technical result is retained. E6 implementation admission is the active blocker. No business runtime code or remote D1 mutation occurred in this continuation.",
   "executionTriggerAttempts": {
     "commits": [
