@@ -1509,3 +1509,18 @@ Source head: `465b556e093a7b6da5b40137d41fa96850e40450`.
 - `GAP-E6-RUNTIME-001` remains the primary runtime closure item.
 - No Worker creation/deployment, D1 mutation, or runtime business implementation was introduced by this reconciliation.
 - Do not reopen the resolved AUTH-003 operation vocabulary control or the resolved Entitlements operationId decision unless a relevant authoritative input changes.
+
+## Current-head AUTH-002 remote schema evidence — 2026-09-22
+
+- Current main source head for the controlled read-only capture: `48575b4a2b86bf317e4e4ccac6c6ec17739cf2eb`.
+- Workflow: `AUTH-002 Session Schema Evidence`; run `35657959095` = **SUCCESS**.
+- Captured target: Cloudflare D1 `luckread`, UUID `2f80471e-3756-49f9-8db1-7707a433ad64`; Payload/D1 adapter `3.87.1`.
+- Fresh artifact: `10665837908`; evidence includes D1 metadata, migration status/history, catalog, `users`, `users_sessions`, `auth_session_state` schema/index/FK data, manifest and provenance.
+- Remote migration history confirms baseline `20250929_111647` and `20260921_003203_MIG_AUTH_002_SESSION_V1` are present; this is factual remote-state evidence only and does not retroactively authorize the earlier E5 execution.
+- `auth_session_state` is physically present with the contracted seven columns: `session_id`, `user_id`, `device_id`, `token_version`, `refresh_credential_hash`, `revoked_at`, `last_seen_at`; required indexes are present and physical FK count is zero.
+- Native Payload `users` and `users_sessions` remain present; the evidence validator found no prohibited plaintext `raw_access_token`, `raw_refresh_token` or password field in the extension schema.
+- Evidence capture was read-only; reported evidence queries performed **0 writes**.
+- This closes the **remote schema/evidence acquisition sub-step** for AUTH-002 at current head. It does **not** promote `ENT-SESSION`, `ENT-ROLE-ASSIGNMENT`, AUTH-002, or Mapping 0.
+- The current remaining E6 blockers are unchanged: evidence-bound D1-01 RoleAssignment realization, authoritative canonical W02 physical binding/deployment evidence, admitted W02/T01/T03 runtime implementation, and controlled authLogin/authRefresh runtime evidence.
+- Do not repeat remote schema capture unless the relevant source, contract, target D1 state, or evidence scope changes.
+- Current cursor remains `GAP-E6-RUNTIME-001`; Mapping 0 remains **NOT_GREEN** with 449 canonical records.
