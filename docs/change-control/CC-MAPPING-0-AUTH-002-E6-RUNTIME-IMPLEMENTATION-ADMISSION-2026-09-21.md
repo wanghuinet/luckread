@@ -71,7 +71,13 @@ Before E6 runtime execution can be admitted, the implementation change must have
 
 ## Dependency gate
 
-Implementation cannot be admitted until the parent E5 authority incident is explicitly reconciled. The closed remediation record only proves that the admission-control defect was fixed; it does not retroactively authorize run 35552919573.
+The parent E5 authority incident is now explicitly reconciled by the project Authority Decisions record and the parent E5 Change Control:
+- historical run 35552919573 remains classified as not authorized at execution time;
+- technical remote state evidence is retained;
+- no retroactive GREEN authorization exists;
+- no second E5 execution is permitted.
+
+This reconciliation clears the incident-dependency only. It does not admit E6 implementation. E6 implementation remains subject to this Change Control's own admission and the project GREEN→implement rule.
 
 ## Current disposition
 
