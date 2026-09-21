@@ -1207,7 +1207,7 @@ The next technical blocker is now E6 runtime integration `GAP-E6-RUNTIME-001`. T
 
 Authority review has now classified the E6 implementation gate:
 - E6 runtime implementation is not admitted yet.
-- `E6-WIRE-001`: `authRefresh` is present in Auth API policy but absent from canonical OpenAPI wire authority; no request/response/error schema may be inferred.
+- `E6-WIRE-001`: `authRefresh` is present in Auth API policy and has a canonical OpenAPI discovery shell, but remains non-admitted `DISCOVERY_DRAFT`; no request/response/error Wire Schema may be inferred or promoted.
 - `E6-WIRE-002`: `deviceId` is required by ENT-SESSION but the current AUTH-002 login wire contract does not define its authoritative transport/source.
 - New Change Control: `docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md`.
 - No device entity, new header, new public endpoint, DTO, Worker, D1 domain, or runtime code was introduced.
