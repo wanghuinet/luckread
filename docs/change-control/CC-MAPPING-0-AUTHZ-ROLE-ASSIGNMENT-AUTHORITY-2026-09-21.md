@@ -94,3 +94,19 @@ Reconciled decisions:
 E6-LAYER-001 is no longer blocked by the upstream RoleAssignment authority contract. It may advance to deterministic resolver specification and evidence planning under the existing E6 implementation-admission gate.
 
 No runtime implementation or D1 mutation is authorized by this Change Control.
+
+## Real-evidence absence reconciliation — 2026-09-21
+
+Audit: `artifacts/mapping-0/authz-role-assignment-real-evidence-absence-audit-2026-09-21.md`
+
+Current Entity Catalog, entity-field contract, database/persistence inventory, implementation-evidence registry and code-evidence inventory all agree that `ENT-ROLE-ASSIGNMENT` remains `PROPOSED / CONTRACT_ONLY / BLOCKED` with no implementation, schema, migration, Payload-native or runtime evidence.
+
+Current retained AUTH-002 remote D1 evidence proves the Payload/session baseline and `auth_session_state`, but does not prove a RoleAssignment physical table or live records.
+
+Decision:
+- no existing table or runtime source may be promoted as RoleAssignment authority;
+- `User.role`, `users_sessions`, `auth_session_state`, cache, `role_version`, documentation-only definitions and historical bindings are not RoleAssignment authority;
+- the canonical authority contract remains valid, but the concrete source is not yet evidence-bound;
+- creating a RoleAssignment persistence implementation remains a separate implementation/Change-Control gate and is not authorized by this reconciliation.
+
+The next E6 prerequisite is therefore explicitly the physical/runtime realization and evidence registration of the already-contracted D1-01 RoleAssignment authority, followed by canonical W02/T01/T03 binding and controlled E6 runtime evidence.
