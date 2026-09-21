@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "49c082039e74b1cfd1458884a2bd4de49921f297",
+  "sourceHead": "dda517ce97e60f5920ca129bdd2540c18c6a7830",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -120,7 +120,7 @@
     "previousItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
     "previousItemState": "CLOSED — REPRESENTATION RECONCILED"
   },
-  "nextRequiredExternalAction": "Resolve GAP-E6-RUNTIME-001 using only existing W01/Payload authority: first establish an evidence-bound authoritative RoleAssignment source (ENT-ROLE-ASSIGNMENT is currently PROPOSED with no persistence/runtime evidence), then bind the deterministic RoleAssignment→L0-L8 resolver to an existing W01/Payload extension point. Only after the existing E6 implementation-admission gate is GREEN may runtime code and controlled authLogin/authRefresh evidence be produced. No new Worker/D1/User.layer/layer entity/hand-authored migration.",
+  "nextRequiredExternalAction": "Resolve GAP-E6-RUNTIME-001 without inference: first establish an evidence-bound authoritative RoleAssignment source owned by D1-01; separately admit an explicit W01/Payload binding for the canonical authLogin/authRefresh operations and response projection under Change Control. Only after the existing E6 implementation-admission gate is GREEN may runtime code and controlled authLogin/authRefresh evidence be produced. No new Worker/D1/User.layer/layer entity/hand-authored migration.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -240,7 +240,8 @@
     "gapId": "GAP-E6-RUNTIME-001",
     "status": "OPEN — AUTHORITATIVE ROLEASSIGNMENT SOURCE + W01 RUNTIME EVIDENCE REQUIRED",
     "runtimeCorrelationPathVerified": false,
-    "remoteRuntimeExecutionStarted": false
+    "remoteRuntimeExecutionStarted": false,
+    "audit": "artifacts/mapping-0/auth-002-e6-runtime-binding-audit-2026-09-21.md"
   },
   "e6RuntimeImplementationAdmission": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21.md",
