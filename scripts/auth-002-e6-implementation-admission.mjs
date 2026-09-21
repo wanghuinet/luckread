@@ -20,7 +20,7 @@ if (implementationAdmitted && gapStatus !== 'CLOSED — REQUIRED CONTRACT INPUTS
 const protectedPattern = /^workers\/W01-payload\/src\/(collections\/Users\.ts|.*auth.*|.*Auth.*|payload\.config\.ts)$/
 let changed = []
 try {
-  changed = execFileSync('git', ['diff', '--name-only', 'HEAD^', 'HEAD'], { encoding: 'utf8' })
+  changed = execFileSync('git', ['show', '--format=', '--name-only', 'HEAD'], { encoding: 'utf8' })
     .split(/\r?\n/).map((x) => x.trim()).filter(Boolean)
 } catch {
   changed = []
@@ -36,11 +36,14 @@ if (!implementationAdmitted && protectedChanges.length > 0) {
 }
 
 if (!implementationAdmitted) {
-  if (status !== 'BLOCKED — REQUIRED CONTRACT INPUTS MISSING') {
+  if (!['BLOCKED — REQUIRED CONTRACT INPUTS MISSING', 'BLOCKED — REQUIRED CONTRACT INPUTS INCOMPLETE'].includes(status)) {
     throw new Error('E6 admission guard: unexpected current implementation-control status: ' + status)
   }
   if (!gaps.includes('E6-WIRE-001') || !gaps.includes('E6-WIRE-002')) {
     throw new Error('E6 admission guard: required wire/input gap records are missing')
+  }
+  if (!gaps.includes('CLOSED — CONTRACT INPUTS RESOLVED')) {
+    throw new Error('E6 admission guard: wire/input closure record is missing')
   }
 }
 
