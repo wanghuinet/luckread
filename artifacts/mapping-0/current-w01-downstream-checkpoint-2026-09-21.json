@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "d98c48d0649b93fb52724b1bb51ed08cbcae8ade",
+  "sourceHead": "3ee2e0d79987d28ab6952c9a1a2d82fa341ab730",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -99,7 +99,7 @@
     "nextItemState": "WAIT_AUTHORITY_DECISION",
     "noMappingRowsReexecuted": true
   },
-  "nextRequiredExternalAction": "Reconcile the E5 execution authorization incident explicitly. Do not rerun E5 or baseline. After governance reconciliation, resolve GAP-E6-RUNTIME-001 through approved implementation Change Control and controlled runtime evidence.",
+  "nextRequiredExternalAction": "Reconcile the E5 execution authorization incident explicitly. Do not rerun baseline or E5. After governance reconciliation, resolve GAP-E6-RUNTIME-001 through an approved implementation Change Control; current Mapping-0 task rules prohibit business-code implementation before Mapping-0 GREEN.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -122,7 +122,9 @@
       "workflowHardeningCommit": "1c01f40a6752c711b61a169a5488c0ed70b447df",
       "remoteExecutionStarted": true,
       "executionRunId": 35552919573,
-      "executionArtifactId": 10618729380
+      "executionArtifactId": 10618729380,
+      "guardFixed": true,
+      "pushExecutionRemoved": true
     }
   },
   "AUTH002": {
@@ -145,19 +147,17 @@
       "compensatingD1Mutation": false
     },
     "E5_independent_schema_evidence": {
-      "runId": 35553227463,
+      "workflowRunId": 35553227463,
+      "status": "PASS_VERIFIED",
+      "promotion": "NOT_YET_PROMOTED",
       "artifactId": 10619545790,
       "digest": "sha256:68a812d812da703ace3b14e62360b56815c01c939418eb70a6e7252a573e9f31",
-      "conclusion": "success",
       "testedCommitSha": "9241545d1a6dff7d87f0c3351e9a36867b6228af",
-      "scope": "read-only controlled remote D1 schema/catalog recapture",
-      "promotion": "NOT_YET_PROMOTED",
-      "status": "PASS_VERIFIED",
-      "resultNotPromoted": true
+      "scope": "read-only post-execution remote D1 schema/catalog recapture"
     }
   },
-  "latestReconciliationCommit": "d98c48d0649b93fb52724b1bb51ed08cbcae8ade",
-  "note": "E5 technical execution plus independent schema evidence are complete. Governance authorization for the E5 execution remains unreconciled. E6 runtime integration is separately recorded as an implementation/evidence gap; no runtime D1 mutation has been started.",
+  "latestReconciliationCommit": "3ee2e0d79987d28ab6952c9a1a2d82fa341ab730",
+  "note": "Current-state cursor only. Historical execution/evidence entries are preserved. E5 technical execution and independent schema evidence are complete; governance authorization remains unreconciled. E6 runtime integration remains unproven and blocked by current Mapping-0 task rules.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -181,7 +181,7 @@
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-INTEGRATION-GAP-2026-09-21.md",
     "gapId": "GAP-E6-RUNTIME-001",
     "status": "OPEN — RUNTIME IMPLEMENTATION EVIDENCE REQUIRED",
-    "currentFinding": "No independently verified W01 runtime read/write correlation path for auth_session_state",
+    "runtimeCorrelationPathVerified": false,
     "remoteRuntimeExecutionStarted": false
   }
 }
