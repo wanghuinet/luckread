@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "012538c00f2aa7ac4eec58ad6e47b51710793e70",
+  "sourceHead": "48d41390ce709bf2377a78fa4d928a109d4ddfc4",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -22,8 +22,10 @@
       "status": "REGISTERED"
     },
     "Current-head migration static CI": {
-      "status": "PENDING_OBSERVED_RUN",
-      "reason": "Source input changed after the last observed static-audit run; no current-head run is claimed here."
+      "status": "PASS_INHERITED",
+      "verifiedRunId": 35548553203,
+      "verifiedTestedCommitSha": "e34e18c5a0e13759503b8ac9636e419e491291d8",
+      "reason": "Only documentation/checkpoint/control files changed after the verified W01 migration source audit; migration source, payload config, Users, db schema source and migration files are unchanged."
     }
   },
   "approvedBaselineExecution": {
@@ -62,7 +64,8 @@
       "users",
       "users_sessions"
     ],
-    "currentPreflightConclusion": "BLOCKED_AS_ALREADY_APPLIED"
+    "currentPreflightConclusion": "BLOCKED_AS_ALREADY_APPLIED",
+    "currentPreflightRunId": 35551188747
   },
   "remoteEvidence": {
     "baselineExecution": "PASS_VERIFIED",
@@ -119,5 +122,6 @@
     "E5_static_audit": "PASS_VERIFIED",
     "E5_remote_execution": "NOT_ADMITTED",
     "overall": "NOT_GREEN"
-  }
+  },
+  "latestReconciliationCommit": "48d41390ce709bf2377a78fa4d928a109d4ddfc4"
 }
