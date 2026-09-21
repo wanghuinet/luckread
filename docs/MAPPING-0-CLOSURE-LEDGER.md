@@ -1324,3 +1324,27 @@ This section supersedes earlier continuation cursor entries for current work sel
 - Current next item: `GAP-E6-RUNTIME-001`
 - Next state: `TODO_FIX`
 - Runtime implementation remains unauthorized until the existing E6 implementation-admission control is explicitly satisfied and the required runtime evidence is produced.
+
+
+
+## Latest continuation reconciliation — E6 layer resolver authority closed; runtime source remains blocked — 2026-09-21
+
+This section supersedes earlier continuation cursors for current work selection.
+
+- RoleAssignment authority: **PASS_VERIFIED**
+  - `contracts/entity/AUTHZ-role-assignment-authority.v1.json`
+- Deterministic layer resolver authority: **PASS_VERIFIED**
+  - `contracts/authz/role-assignment-layer-resolution.v1.json`
+  - `contracts/authz/role-assignment-layer-resolution.v1.schema.json`
+- E6 layer authority Change Control: **CLOSED — AUTHORITY RECONCILED**
+- E6 wire/input authority: **PASS_VERIFIED_AUTHORITY**
+- E6 implementation gate: **BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED**
+- Real source dependency confirmed: `ENT-ROLE-ASSIGNMENT` remains `PROPOSED` with no persistence/implementation/runtime evidence in the current Entity/Field/Persistence/Code Evidence registries.
+- W01 source search confirms native Payload `auth: true` is present, while no admitted custom authLogin/authRefresh layer runtime binding is currently established.
+- No runtime authentication code, D1 mutation, new Worker, new D1 domain, User.layer, duplicate layer entity, or hand-authored RoleAssignment migration was introduced.
+- Current Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
+- No already-passed Mapping/E5/structural tasks were re-executed.
+- Current next item remains `GAP-E6-RUNTIME-001`, but its required implementation inputs are now explicitly:
+  1. an evidence-bound authoritative RoleAssignment source without inventing a second authorization authority;
+  2. the exact existing W01/Payload runtime extension binding;
+  3. controlled authLogin/authRefresh runtime evidence and Evidence Registry registration.
