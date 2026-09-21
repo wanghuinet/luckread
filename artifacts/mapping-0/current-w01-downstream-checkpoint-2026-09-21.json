@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "302367251b33dc287df97fb20ea91583ea9d1cf8",
+  "sourceHead": "1532e357c8955e451b93e312b1fcf5175201c31c",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -120,7 +120,7 @@
     "previousItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
     "previousItemState": "CLOSED — REPRESENTATION RECONCILED"
   },
-  "nextRequiredExternalAction": "Resolve GAP-E6-RUNTIME-001 by defining the exact existing W01 runtime binding for the authoritative RoleAssignment-to-L0-L8 resolver, then obtain controlled authLogin/authRefresh runtime evidence. Do not add a new Worker/D1 domain, User.layer, duplicate layer entity, or hand-authored migration; do not implement until the existing E6 implementation-admission gate is GREEN.",
+  "nextRequiredExternalAction": "Resolve GAP-E6-RUNTIME-001 by binding the now-authoritative RoleAssignment-to-L0-L8 resolver to the existing W01 runtime extension point and produce controlled authLogin/authRefresh runtime evidence. Implementation remains fail-closed until the existing E6 implementation-admission status is GREEN. No new Worker/D1/User.layer/layer entity/migration.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -214,7 +214,7 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "302367251b33dc287df97fb20ea91583ea9d1cf8",
+  "latestReconciliationCommit": "1532e357c8955e451b93e312b1fcf5175201c31c",
   "note": "Current main records a genuine Contract authority conflict: docs/301 distinguishes user(unverified)->L1 and user(verified)->L2 while contracts/authz/layers.json maps user->L1 and verified_user->L2. This must be reconciled before a deterministic RoleAssignment-to-L0-L8 resolver can be admitted. No runtime code or D1 mutation performed.",
   "executionTriggerAttempts": {
     "commits": [
@@ -265,7 +265,7 @@
       "latestRunId": 35561587245,
       "latestJobId": 106215329002
     },
-    "authorityDependency": "CLOSED — contracts/entity/AUTHZ-role-assignment-authority.v1.json"
+    "authorityDependency": "CLOSED — RoleAssignment authority and E6 layer semantics reconciled"
   },
   "e6WireInputGaps": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md",
@@ -307,7 +307,7 @@
   "e6LayerAuthority": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-LAYER-AUTHORITY-2026-09-21.md",
     "audit": "artifacts/mapping-0/auth-002-e6-layer-authority-audit-2026-09-21.md",
-    "status": "OPEN — RESOLVER/RUNTIME BINDING REQUIRED",
+    "status": "OPEN — RUNTIME BINDING/EVIDENCE REQUIRED",
     "authorityDomain": "D1-01 Identity / Account / Access",
     "authorityInput": "RoleAssignment (authorization input)",
     "layerDefinitionSource": "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
