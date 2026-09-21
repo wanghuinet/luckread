@@ -1485,3 +1485,27 @@ This section supersedes earlier continuation cursors for current work selection.
 - AUTH-002/E6 remains fail-closed at `GAP-E6-RUNTIME-001`.
 - Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
 - No already-passed Mapping/E5/structural task was re-executed.
+
+
+## Current-head reconciliation — 2026-09-22 (465b556)
+
+Source head: `465b556e093a7b6da5b40137d41fa96850e40450`.
+
+### AUTH-003 operation vocabulary reconciliation
+- OperationId source conflict is `PASS_VERIFIED`.
+- Canonical operation set remains `authCredentialList`, `authCredentialAdd`, `authCredentialReplace`, `authCredentialRemove`.
+- Persistence-side aliases remain stale/non-canonical and are not promoted.
+- Exact public Wire Schema remains separately blocked; no DTO/OpenAPI wire promotion is implied by this reconciliation alone.
+
+### OpenAPI structural repair
+- The duplicated/misplaced discovery block in `contracts/openapi/v1/openapi.yaml` was removed using the existing authoritative API Inventory/Policy source.
+- The `authRefresh` 401/429 response block was restored to its existing operation.
+- Current OpenAPI operation count is 151 with 151 unique operationIds and one components section.
+- Mapping 0 Structural Gate for the merged head: `35628695388` = SUCCESS.
+- Contract Semantic Gate on the repair branch: SUCCESS; remaining Contract CI failures are downstream Five-Way and Strict R4-Evidence-R5 gates.
+
+### Current downstream boundary
+- API Inventory Reconciliation remains `INCOMPLETE` with zero source-mismatch failures but 440 downstream findings; this is an evidence/implementation completeness condition, not an operationId duplication condition.
+- `GAP-E6-RUNTIME-001` remains the primary runtime closure item.
+- No Worker creation/deployment, D1 mutation, or runtime business implementation was introduced by this reconciliation.
+- Do not reopen the resolved AUTH-003 operation vocabulary control or the resolved Entitlements operationId decision unless a relevant authoritative input changes.
