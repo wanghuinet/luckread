@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "f4618fb27fe02dbd2b4dc19e9f95339bd714e045",
+  "sourceHead": "7cecc38d1322a7f3f75d6e877e3e8c32a3c853c8",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -112,7 +112,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Reconcile the parent E5 execution-authority incident. After reconciliation and explicit implementation admission, resolve GAP-E6-RUNTIME-001 using the staged E6 implementation Change Control, then run controlled E6 runtime evidence.",
+  "nextRequiredExternalAction": "Explicit authority reconciliation of the parent E5 execution incident. Do not rerun E5 or baseline. After reconciliation, admit the staged E6 implementation Change Control and resolve GAP-E6-RUNTIME-001.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -146,6 +146,22 @@
       "parentAuthorityDecision": "OPEN — EXECUTION DECISION REQUIRED",
       "currentGuardCommit": "e302fb15284bb5b3f00f4c29bc5479c7f2a223da",
       "currentWorkflowHardeningCommit": "19e6b50aafa204ccabde8b656d705fd7766d0269"
+    },
+    "admissionRegression": {
+      "script": "scripts/auth-002-e5-admission-regression.mjs",
+      "workflow": ".github/workflows/auth-002-e5-control-regression.yml",
+      "status": "STATIC_CONTROL_CHECK_COMMITTED",
+      "d1Mutation": false,
+      "e5Execution": false,
+      "verifies": [
+        "exact authoritative Status-line admission",
+        "explanatory-text non-admission",
+        "OPEN-status non-admission",
+        "manual-dispatch-only E5 workflow",
+        "no obsolete push-marker validation",
+        "parent authority remains OPEN",
+        "stale execute marker absent"
+      ]
     }
   },
   "AUTH002": {
@@ -177,8 +193,8 @@
       "scope": "read-only post-execution remote D1 schema/catalog recapture"
     }
   },
-  "latestReconciliationCommit": "f4618fb27fe02dbd2b4dc19e9f95339bd714e045",
-  "note": "E5 control-defect remediation is closed; E6 implementation admission is staged but not authorized. No runtime code or remote D1 mutation occurred in this continuation.",
+  "latestReconciliationCommit": "7cecc38d1322a7f3f75d6e877e3e8c32a3c853c8",
+  "note": "Current head contains only control/evidence hardening after the E5 incident. No Mapping rows, authentication runtime code, or remote D1 state were changed.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
