@@ -1509,3 +1509,27 @@ Source head: `465b556e093a7b6da5b40137d41fa96850e40450`.
 - `GAP-E6-RUNTIME-001` remains the primary runtime closure item.
 - No Worker creation/deployment, D1 mutation, or runtime business implementation was introduced by this reconciliation.
 - Do not reopen the resolved AUTH-003 operation vocabulary control or the resolved Entitlements operationId decision unless a relevant authoritative input changes.
+
+
+## Current downstream CI failure classification — 2026-09-22
+
+Source head: `bda2ee2afd84f23a6fc8d05f64f238d208456d5a`.
+
+Fresh current-head evidence:
+- Contract CI run `35628882580` = FAILURE.
+- Five-Way Alignment Admission Gate job `106430244303` = FAILURE: `canonicalFeatureCount=449`, `mappingRecordCount=449`, `blockingRecordCount=449`; the generated reconciliation reports `450 blocker(s)`.
+- Strict Downstream R4/Evidence/R5 job `106430422192` = FAILURE: `total=449`, `ready=0`, `blocked=449`, `missing-entity-binding=440`, `persistence-not-verified=9`.
+- The explicit Feature→Entity→Persistence registry currently contains exactly 1 record, `AUTH-002`, and that record itself is `BLOCKED`; therefore the registry gate correctly fails closed rather than inferring the remaining 448 mappings.
+- API Inventory Reconciliation run `35628695441` = FAILURE with `openapiOperationCount=151`, `openapiPolicyCount=151`, `failureCount=0`, and `findingCount=440`. Its findings are downstream inventory/domain reconciliation findings, not OpenAPI operation-source mismatches.
+
+Classification:
+- These failures are **real current closure blockers**, not historical duplicate observations.
+- No safe deterministic promotion is available from the current evidence: feature mappings with entity IDs in Canonical Mapping are not equivalent to VERIFIED persistence registrations, and the persistence inventory explicitly requires implementation/migration evidence before verification.
+- The 440 API-inventory findings likewise cannot be eliminated by inventing domain-operation mappings.
+- Do not weaken the R4/Five-Way gates or backfill VERIFIED registry rows by inference.
+
+Closure boundary:
+- Structural/Contract core gates remain GREEN and are inherited; they are not re-run as new closure work.
+- Mapping 0 remains **NOT_GREEN** with 449 records: PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
+- The unique implementation-boundary cursor remains `GAP-E6-RUNTIME-001`; its prerequisite external authority remains physical canonical W02 binding plus evidence-bound D1-01 RoleAssignment realization, followed by controlled runtime evidence.
+- This checkpoint intentionally changes no Contract, Blueprint, Entity, persistence authority, Worker topology, D1 resource, or runtime implementation.
