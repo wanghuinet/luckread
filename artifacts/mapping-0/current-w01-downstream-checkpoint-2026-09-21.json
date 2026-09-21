@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "d6f74e3b1516bd6b122d2d06e7ecf7d542382292",
+  "sourceHead": "e9c76598583a3448f28e8a18971023b56323585e",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
