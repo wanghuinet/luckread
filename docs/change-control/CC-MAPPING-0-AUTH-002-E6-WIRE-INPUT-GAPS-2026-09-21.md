@@ -86,3 +86,13 @@ A fresh current-head inspection corrected the earlier description of E6-WIRE-001
 - The audit script was hardened in commit `f45fc4b096a1e2bede7b62cf5d987b66e18bbf4d` so a Discovery Draft is not mistaken for canonical admission.
 
 This is a correction to evidence interpretation only. It does not promote the route, add DTOs, or authorize runtime implementation.
+
+## Contract-input sufficiency audit — 2026-09-21
+
+`artifacts/mapping-0/e6-wire-input-sufficiency-audit-2026-09-21.json` records the current-head closure check.
+
+- E6-WIRE-001: no existing exact canonical refresh Request/Response/Error Wire Schema is reusable. The existing OpenAPI `/auth/refresh` is only `DISCOVERY_DRAFT`.
+- E6-WIRE-002: no existing AUTH-002 authority defines the device-binding source/transport. `ENT-DEVICE-RECORD` is `PROPOSED` with no field contract.
+- The audit explicitly freezes the non-inference boundary and confirms that these are contract-input gaps rather than implementation gaps.
+
+Result: both blockers remain open; E6 implementation admission remains blocked.
