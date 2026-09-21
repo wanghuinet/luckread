@@ -16,12 +16,6 @@ on:
         description: "Type EXECUTE_AUTH_002_E5 to permit the controlled E5 migration step"
         required: true
         type: string
-  push:
-    branches: [main]
-    paths:
-      - "artifacts/mapping-0/AUTH-002-EXECUTE-E5-REQUEST.txt"
-      - ".github/workflows/auth-002-e5-remote-migration-execution.yml"
-
 permissions:
   contents: read
 
