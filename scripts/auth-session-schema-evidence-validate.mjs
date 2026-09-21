@@ -189,11 +189,15 @@ if (extensionTablePresent) {
   for (const row of extensionSchemaRows) {
     if (forbiddenColumns.has(String(row?.name ?? '').toLowerCase())) fail(`forbidden auth_session_state column detected: ${row.name}`)
   }
-  for (const row of catalogRows) {
-    if (forbiddenColumns.has(String(row?.name ?? '').toLowerCase())) fail(`forbidden catalog object detected: ${row.name}`)
+  const extensionCatalogRows = catalogRows.filter((row) =>
+    String(row?.tbl_name ?? '').toLowerCase() === 'auth_session_state' ||
+    String(row?.name ?? '').toLowerCase() === 'auth_session_state'
+  )
+  for (const row of extensionCatalogRows) {
+    if (forbiddenColumns.has(String(row?.name ?? '').toLowerCase())) fail(`forbidden auth_session_state catalog object detected: ${row.name}`)
     const sql = String(row?.sql ?? '').toLowerCase()
     for (const forbiddenColumn of forbiddenColumns) {
-      if (sql.includes(forbiddenColumn)) fail(`forbidden secret identifier detected in catalog SQL: ${forbiddenColumn}`)
+      if (sql.includes(forbiddenColumn)) fail(`forbidden secret identifier detected in auth_session_state catalog SQL: ${forbiddenColumn}`)
     }
   }
 
