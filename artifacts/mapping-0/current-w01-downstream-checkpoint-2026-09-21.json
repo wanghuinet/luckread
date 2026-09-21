@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "e9c76598583a3448f28e8a18971023b56323585e",
+  "sourceHead": "50e322696c297f06e1aeb9014885ea541e5ae190",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -33,21 +33,31 @@
     "migration": "20250929_111647",
     "migrationBlobSha": "21e4a9ce27c828da655e479e35eb44ea3daff0f3",
     "migrationIndexBlobSha": "e596aeb65381fd3bb2e0cfa7879c8f850bb77cbe",
-    "remoteMigrationExecuted": false
+    "remoteMigrationExecuted": false,
+    "preflightFixCommit": "f38fc756d3c7754c6d5205bb46e47618c85b9cdc",
+    "preflightFixVerifiedInMain": "50e322696c297f06e1aeb9014885ea541e5ae190"
   },
   "remoteEvidence": {
-    "target": "luckread",
-    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "workflow": "AUTH-002 Session Schema Evidence",
+    "runId": 35550865820,
+    "testedCommitSha": "50e322696c297f06e1aeb9014885ea541e5ae190",
+    "conclusion": "success",
+    "validator": "AUTH-002_SCHEMA_EVIDENCE_VALIDATION_PASS",
+    "artifactId": 10618331781,
     "environmentClass": "CONTROLLED_REMOTE_D1",
-    "previousBaselineEvidence": "PASS_VERIFIED_FOR_EMPTY_TARGET",
-    "newPushTriggerCommit": "d6f74e3b1516bd6b122d2d06e7ecf7d542382292",
-    "newTriggerRunObservedInSession": false
+    "databaseName": "luckread",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "baselineState": "BASELINE_CONFIRMED_UNINITIALIZED",
+    "applicationTables": [],
+    "remoteWritesDuringCapture": 0,
+    "postMigrationEvidence": false
   },
   "AUTH-002": {
     "E5": "GENERATED_AND_REGISTERED",
-    "E5_execution": "NOT_ADMITTED",
+    "E5_execution": "NOT_EXECUTED",
     "E4.5": "PASS_VERIFIED_HISTORICAL_UNTIL_REBOUND_TO_FINAL_SHA",
-    "overall": "NOT_GREEN"
+    "overall": "NOT_GREEN",
+    "E4_5": "PASS_VERIFIED_CURRENT_HEAD_REMOTE_BASELINE"
   },
   "mapping0": {
     "status": "NOT_GREEN",
@@ -55,5 +65,6 @@
     "nextItemState": "BLOCKED_EXTERNAL",
     "noMappingRowsReexecuted": true
   },
-  "nextRequiredExternalAction": "Run the existing W01 Baseline Migration Execution workflow against the exact approved source SHA above, then capture fresh post-migration D1 evidence. Do not apply MIG-AUTH-002-SESSION-V1 remotely until its own execution admission is explicitly established."
+  "nextRequiredExternalAction": "Run the existing W01 Baseline Migration Execution workflow with source_sha=56926bab09951a8a0e15c820f1fb58dd8ba7090f, database_name=luckread, confirm=EXECUTE_W01_BASELINE. The workflow now records the preflight result and will execute only if the controlled target has no non-_cf application tables; then review fresh post-migration evidence.",
+  "noMappingRowsReexecuted": true
 }
