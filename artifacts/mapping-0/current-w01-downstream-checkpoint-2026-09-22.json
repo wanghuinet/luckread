@@ -1,0 +1,52 @@
+{
+  "repository": "wanghuinet/luckread",
+  "currentMainHead": "fabbcb295d08a362445f8cf1864e1e59b57e4084",
+  "checkpointDate": "2026-09-22",
+  "cursor": {
+    "nextItemId": "GAP-E6-RUNTIME-001",
+    "state": "BLOCKED_EXTERNAL / IMPLEMENTATION_NOT_ADMITTED",
+    "noMappingRowsReexecuted": true
+  },
+  "mapping0": {
+    "status": "NOT_GREEN",
+    "canonicalRecords": 449,
+    "statusDistribution": {
+      "PARTIAL": 17,
+      "UNRESOLVED": 431,
+      "MISSING": 1
+    },
+    "note": "No percentage promotion is claimed from the evidence-only step."
+  },
+  "auth002": {
+    "remoteSchemaEvidence": {
+      "status": "PASS_VERIFIED_READ_ONLY",
+      "workflowRunId": 35657959095,
+      "testedSourceHead": "48575b4a2b86bf317e4e4ccac6c6ec17739cf2eb",
+      "artifactId": 10665837908,
+      "targetD1": "luckread",
+      "targetD1Id": "2f80471e-3756-49f9-8db1-7707a433ad64",
+      "payloadVersion": "3.87.1",
+      "d1AdapterVersion": "3.87.1",
+      "writesDuringCapture": 0
+    },
+    "runtimeStatus": "NOT_GREEN"
+  },
+  "blockers": [
+    "D1-01 ENT-ROLE-ASSIGNMENT remains PROPOSED / CONTRACT_ONLY with no implementation or persistence evidence.",
+    "Canonical W02 physical resource/name/source/deployment binding remains unestablished; latest read-only inventory reports 0 uploaded Worker scripts.",
+    "W02/T01/T03 runtime implementation is not admitted.",
+    "Controlled authLogin/authRefresh runtime evidence is not generated."
+  ],
+  "nextExternalAuthority": "Normal Contract-First authority decision for concrete canonical physical W02 binding and evidence-bound RoleAssignment realization; do not infer from directories or historical topology, and do not create resources merely to satisfy Mapping 0.",
+  "alreadyClosed": [
+    "AUTH-002 remote schema/evidence acquisition sub-step at tested head 48575b4",
+    "E6 wire/input authority reconciliation",
+    "E6 RoleAssignment/layer authority semantics reconciliation",
+    "physical Worker binding search/reconciliation as a repository question"
+  ],
+  "prohibitedReexecution": [
+    "Do not repeat the 449-row Mapping 0 scan without relevant source/authority/evidence input changes.",
+    "Do not repeat AUTH-002 remote schema capture without relevant source, contract, target D1 state, or evidence-scope changes.",
+    "Do not re-run already-passed structural gates as new closure work."
+  ]
+}
