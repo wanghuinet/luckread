@@ -1302,3 +1302,25 @@ This section supersedes the historical continuation cursor entries above for cur
 - Runtime implementation remains unauthorized until the RoleAssignment authority contract is closed.
 - Do not re-execute AUTH-002/E5 or the already verified Mapping structural gates merely because this governance ledger changed.
 - The next required authority work is limited to the existing D1-01 RoleAssignment contract inputs: subject binding, canonical role identifier, validity/status, scope, temporal validity, revocation, uniqueness/conflict constraints, version/change semantics, organization/IP relationship, and effectiveness evidence.
+
+
+
+## Latest continuation reconciliation — RoleAssignment authority closed — 2026-09-21
+
+This section supersedes earlier continuation cursor entries for current work selection. Historical evidence remains unchanged.
+
+- Current protected input head for this reconciliation: `302367251b33dc287df97fb20ea91583ea9d1cf8`
+- `M0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-001`: **PASS_VERIFIED**
+- Authority contract: `contracts/entity/AUTHZ-role-assignment-authority.v1.json`
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md` = **CLOSED — AUTHORITY CONTRACT RECONCILED**
+- The authority contract defines subject binding, canonical role identifiers, global/organization/IP scope, temporal validity, revocation, uniqueness, role_version invalidation, effectiveness evidence, and deterministic global-layer selection.
+- Only eligible global RoleAssignments affect the public authLogin/authRefresh `layer`; organization/IP assignments remain scoped authorization inputs.
+- Multiple eligible global assignments resolve to the highest numeric L0-L8 layer; equal-layer assignments are equivalent.
+- No User.layer, duplicate layer entity, new Worker, new D1 domain, hand-authored migration, or runtime implementation was introduced.
+- ENT-ROLE-ASSIGNMENT remains PROPOSED/CONTRACTED_NOT_VERIFIED; authority reconciliation is not implementation or persistence evidence.
+- Current Mapping 0 remains **NOT_GREEN** with 449 records: PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
+- No Mapping rows were re-executed. AUTH-002/E5 and the already verified structural gates remain inherited/retained and are not rerun merely because the authority contract changed.
+- E6 layer authority is no longer blocked by the upstream RoleAssignment authority contract. The remaining blocker is `GAP-E6-RUNTIME-001`: exact W01 runtime binding, implementation, and controlled evidence.
+- Current next item: `GAP-E6-RUNTIME-001`
+- Next state: `TODO_FIX`
+- Runtime implementation remains unauthorized until the existing E6 implementation-admission control is explicitly satisfied and the required runtime evidence is produced.
