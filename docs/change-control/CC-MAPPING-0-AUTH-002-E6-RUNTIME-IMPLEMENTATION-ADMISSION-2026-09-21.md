@@ -12,7 +12,7 @@
 
 ## Purpose
 
-Define the exact admission boundary for the missing W01 runtime integration work so that the GAP-E6-RUNTIME-001 resolution can proceed later without inventing architecture, contracts, session identity, or persistence authority.
+Define the exact admission boundary for the missing AUTH-002 E6 runtime integration across the canonical W01 API boundary and the W02/T01/T03/D1-01 implementation authority, so that GAP-E6-RUNTIME-001 can proceed later without inventing architecture, contracts, session identity, or persistence authority.
 
 This record is preparatory only. It does not authorize implementation, remote mutation, runtime deployment, or Mapping-0 promotion.
 
@@ -28,7 +28,7 @@ This record is preparatory only. It does not authorize implementation, remote mu
 
 ## Permitted implementation scope after explicit approval
 
-Only the minimum W01 runtime integration necessary to make the existing AUTH-002 E6 contract executable may be added.
+Only the minimum E6 integration necessary to make the existing AUTH-002 E6 contract executable may be added: W01 may remain the public API/Gateway boundary, while authoritative identity/account/authorization behavior belongs to W02/T01/T03/D1-01 under the canonical Worker and D1 mapping.
 
 The implementation must demonstrate, using the existing Payload authentication lifecycle and existing `auth_session_state` table:
 
@@ -41,7 +41,7 @@ The implementation must demonstrate, using the existing Payload authentication l
 7. logout/revocation and negative-security behavior fail closed;
 8. concurrency behavior is testable under the existing E6 gate.
 
-The implementation location/API mechanism must be selected from existing W01/Payload extension points after approval. This Change Control does not pre-authorize a particular Hook, Endpoint, plugin, or Payload Core modification.
+The W01 API-edge integration mechanism and the W02 implementation/binding mechanism must be selected from the already-authorized current architecture after approval. This Change Control does not pre-authorize a particular Hook, Endpoint, plugin, inter-Worker transport, or Payload Core modification.
 
 ## Prohibited implementation
 
@@ -105,7 +105,7 @@ This reconciliation clears the incident dependency. The wire/input authority is 
 ## Current blocking inputs — 2026-09-21
 
 1. `ENT-ROLE-ASSIGNMENT` authority contract is closed, but its Entity Catalog status remains `PROPOSED` and no persistence/implementation evidence exists. The runtime resolver cannot treat contract-only records as live authorization data.
-2. The exact existing W01/Payload runtime extension point for authLogin/authRefresh layer binding has not been proven in the active source tree.
+2. The canonical W02 physical runtime/binding and the concrete W01↔W02 integration point for authLogin/authRefresh have not been proven in the active source tree.
 3. Controlled E6 runtime evidence has not been generated against an admitted implementation commit.
 
 Accordingly this gate remains `BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED`. Contract reconciliation does not authorize implementation or D1 mutation.
@@ -115,13 +115,13 @@ Accordingly this gate remains `BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED`. C
 
 Audit: `artifacts/mapping-0/auth-002-e6-runtime-binding-audit-2026-09-21.md`
 
-The active W01 source-tree audit is now recorded. It confirms native Payload `auth: true`, but no existing `/auth/*` runtime route, custom auth strategy, or auth Hook binding is currently present in `workers/W01-payload/src/`. The repository's Payload reference material proves supported extension capabilities only; it does not establish W01 implementation evidence.
+The active W01 source-tree audit is now recorded. It confirms native Payload `auth: true`, but no admitted custom `/auth/*` runtime route, custom auth strategy, or auth Hook binding is currently present in `workers/W01-payload/src/`. This proves only the W01 API-edge candidate surface; it does not establish the authoritative W02 implementation/binding. The repository's Payload reference material proves supported extension capabilities only; it does not establish runtime implementation evidence.
 
-Therefore the exact existing W01/Payload runtime binding remains **NOT PROVEN**. This closes the repeated search question without authorizing implementation. The E6 admission remains `BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED`.
+Therefore the concrete W01 API-edge ↔ W02 implementation binding remains **NOT PROVEN**. This closes the repeated extension-point search question without authorizing implementation. The E6 admission remains `BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED`.
 
 The remaining implementation prerequisites stay:
 1. evidence-bound authoritative `ENT-ROLE-ASSIGNMENT` source owned by D1-01;
-2. explicit Change-Control-approved binding for the canonical authentication operations and response projection;
+2. admitted canonical W02/T01/T03 physical/runtime binding plus the approved W01 API-edge integration path;
 3. controlled E6 runtime evidence against the admitted commit.
 
 
