@@ -57,7 +57,7 @@ const writeFixture = (dir, config, users, includeAuthSchema) => {
 }
 
 writeFixture(stage1, setMigrationDir(historicalConfig, path.join(stage1, 'migrations')), historicalUsers, false)
-writeFixture(stage2, setGenerateSchemaOutputFile(setMigrationDir(currentConfig, path.join(stage2, 'migrations')), path.join(stage2, 'payload-generated-schema.ts')), historicalUsers, true)
+writeFixture(stage2, setMigrationDir(setGenerateSchemaOutputFile(currentConfig, path.join(stage2, 'payload-generated-schema.ts')), path.join(stage2, 'migrations')), historicalUsers, true)
 
 const runCreate = (dir, name) => run(
   'pnpm',
