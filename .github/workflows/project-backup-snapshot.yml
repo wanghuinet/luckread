@@ -1,0 +1,53 @@
+name: Project Backup Snapshot
+
+on:
+  push:
+    branches:
+      - "backup/2026-09-21-main-2599701"
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_SHA: 25997010d7a26777b64d1685524174d7b68285bb
+    steps:
+      - name: Checkout exact source snapshot
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+
+      - name: Build archives and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p backup-output
+          git archive --format=zip --output="backup-output/luckread-main-${SOURCE_SHA}.zip" "${SOURCE_SHA}"
+          git archive --format=tar.gz --output="backup-output/luckread-main-${SOURCE_SHA}.tar.gz" "${SOURCE_SHA}"
+          git ls-tree -r --full-tree "${SOURCE_SHA}" > backup-output/git-tree.txt
+          git ls-tree -r --full-tree --name-only "${SOURCE_SHA}" | sed '/^$/d' > backup-output/file-list.txt
+          {
+            echo "LuckRead repository backup manifest"
+            echo "Repository: wanghuinet/luckread"
+            echo "Snapshot SHA: ${SOURCE_SHA}"
+            echo "Backup branch: backup/2026-09-21-main-2599701"
+            echo "Created by GitHub Actions"
+            echo
+            echo "Tracked file count:"
+            git ls-tree -r --full-tree --name-only "${SOURCE_SHA}" | wc -l
+            echo
+            echo "Git tree:"
+            git ls-tree -r --full-tree "${SOURCE_SHA}"
+          } > backup-output/manifest.txt
+          sha256sum backup-output/* > backup-output/SHA256SUMS.txt
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: luckread-main-backup-25997010
+          path: backup-output/
+          if-no-files-found: error
+          retention-days: 90
