@@ -147,3 +147,18 @@ The remaining implementation gate is consequently:
 4. controlled E6 runtime evidence.
 
 No runtime implementation is authorized by this reconciliation alone.
+
+## Physical Worker layout reconciliation — 2026-09-21
+
+Audit: `artifacts/mapping-0/worker-physical-layout-reconciliation-2026-09-21.md`
+
+The current `workers/*` physical directories do not use the same role-to-ID mapping as the ACTIVE/CANONICAL Worker Master. In particular, `workers/W02-content` is a content skeleton while canonical W02 is Identity/Account/Authorization. The same legacy/alternative naming drift is present across W03-W12.
+
+Decision:
+- physical directory names are not promoted as Worker authority;
+- no directory is renamed or deleted as part of Mapping 0 closure;
+- AUTH-002 identity/authorization implementation must not be placed in `workers/W01-payload` or `workers/W02-content` merely from path names;
+- the canonical implementation boundary remains W02/T01/T03/D1-01;
+- physical binding and W01↔W02 transport require an explicit implementation/binding Contract before runtime work is admitted.
+
+This audit further constrains GAP-E6-RUNTIME-001 and does not authorize implementation.
