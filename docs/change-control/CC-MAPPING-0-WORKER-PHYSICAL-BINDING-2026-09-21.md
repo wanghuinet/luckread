@@ -96,3 +96,14 @@ The physical Worker binding prerequisite remains **OPEN**, now with a stronger e
 `Cloudflare actual uploaded Worker scripts = 0`
 
 Therefore canonical W02 remains without an evidence-bound physical runtime, and AUTH-002/E6 remains fail-closed. No Worker/D1 resource mutation was performed.
+
+
+## Deployment-admission authority cross-check — 2026-09-21
+
+A separate repository-only audit (artifacts/mapping-0/worker-deployment-admission-audit-2026-09-21.md) checked the current deployment/admission contracts.
+
+- The current contracts define the required deployment evidence chain: source commit → build artifact → Worker version → deployment → smoke → observability → acceptance.
+- They do not define concrete physical Worker resource/name bindings for canonical W02 or the remaining logical Workers.
+- Fresh Cloudflare inventory run 35598525409 independently confirms workers=0 uploaded scripts.
+- Therefore the missing item is now precisely identified as physical Worker naming/resource binding authority, followed by actual deployment evidence.
+- No physical name has been invented or promoted; no Worker was created/deployed.
