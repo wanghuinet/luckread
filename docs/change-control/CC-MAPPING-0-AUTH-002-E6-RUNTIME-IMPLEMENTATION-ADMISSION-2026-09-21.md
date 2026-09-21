@@ -123,3 +123,27 @@ The remaining implementation prerequisites stay:
 1. evidence-bound authoritative `ENT-ROLE-ASSIGNMENT` source owned by D1-01;
 2. explicit Change-Control-approved binding for the canonical authentication operations and response projection;
 3. controlled E6 runtime evidence against the admitted commit.
+
+
+## Worker-boundary reconciliation — 2026-09-21
+
+Audit: `artifacts/mapping-0/auth-002-worker-boundary-reconciliation-2026-09-21.md`
+
+Current canonical Worker mapping is now explicitly applied to E6:
+
+- W01 is API/Gateway boundary only and has no direct authoritative D1 authority.
+- W02 is the canonical Identity / Account / Authorization Worker for T01/T02/T03 and D1-01.
+- Therefore E6 runtime authority must not be implemented as W01-direct business authorization.
+- The previous wording "existing W01/Payload runtime extension point" is narrowed: W01 may expose the API boundary, but the authoritative AUTH-002/T01/T03 implementation and RoleAssignment resolution belong to W02 under the current canonical mapping.
+- No active `workers/W02/` implementation tree or admitted W02 auth handler was found in the repository.
+
+This does not change the architecture. It closes the worker-boundary question and prevents a direct W01→D1-01 authority drift.
+
+The remaining implementation gate is consequently:
+
+1. evidence-bound D1-01 RoleAssignment source;
+2. admitted W02/T01/T03 implementation/binding;
+3. canonical authLogin/authRefresh response projection;
+4. controlled E6 runtime evidence.
+
+No runtime implementation is authorized by this reconciliation alone.
