@@ -109,3 +109,17 @@ This reconciliation clears the incident dependency. The wire/input authority is 
 3. Controlled E6 runtime evidence has not been generated against an admitted implementation commit.
 
 Accordingly this gate remains `BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED`. Contract reconciliation does not authorize implementation or D1 mutation.
+
+
+## Runtime binding audit reconciliation — 2026-09-21
+
+Audit: `artifacts/mapping-0/auth-002-e6-runtime-binding-audit-2026-09-21.md`
+
+The active W01 source-tree audit is now recorded. It confirms native Payload `auth: true`, but no existing `/auth/*` runtime route, custom auth strategy, or auth Hook binding is currently present in `workers/W01-payload/src/`. The repository's Payload reference material proves supported extension capabilities only; it does not establish W01 implementation evidence.
+
+Therefore the exact existing W01/Payload runtime binding remains **NOT PROVEN**. This closes the repeated search question without authorizing implementation. The E6 admission remains `BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED`.
+
+The remaining implementation prerequisites stay:
+1. evidence-bound authoritative `ENT-ROLE-ASSIGNMENT` source owned by D1-01;
+2. explicit Change-Control-approved binding for the canonical authentication operations and response projection;
+3. controlled E6 runtime evidence against the admitted commit.
