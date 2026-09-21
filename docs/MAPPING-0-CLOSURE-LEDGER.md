@@ -1362,3 +1362,17 @@ This section supersedes earlier continuation cursors for current work selection.
 - No runtime code, D1 mutation, new Worker, new D1, User.layer, duplicate layer entity, or hand-authored RoleAssignment migration was introduced.
 - Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
 - Already-passed Mapping/E5/structural work was not re-executed.
+
+## Superpowers continuation — AUTH-002 Worker boundary corrected and frozen — 2026-09-21
+
+- New audit: `artifacts/mapping-0/auth-002-worker-boundary-reconciliation-2026-09-21.md`
+- Current canonical boundary is confirmed: **T01/T02/T03 → W02 → D1-01**; **T24 → W01 API/Gateway boundary**.
+- W01 has no direct authoritative D1 authority and must not become the business authorization/session owner for AUTH-002.
+- No active `workers/W02/` implementation tree or admitted W02 authentication handler is currently present.
+- Therefore the previous E6 phrasing requiring an "existing W01/Payload runtime extension point" is superseded by the more precise boundary: **W02/T01/T03 is the authoritative AUTH-002 implementation boundary; W01 is the API edge/boundary**.
+- The exact inter-Worker transport mechanism remains uncontracted and is not inferred.
+- This is a boundary correction, not an architecture change: no Worker/D1 topology was added, renamed, or moved.
+- E6 implementation admission remains **BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED**.
+- Current next item remains `GAP-E6-RUNTIME-001`.
+- Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
+- No runtime code or D1 mutation was introduced; no already-passed Mapping/E5/structural task was re-executed.
