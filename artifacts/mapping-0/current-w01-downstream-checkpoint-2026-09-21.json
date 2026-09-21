@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "692485616adef78fa07b4da539d4ee6b1bfe0e2a",
+  "sourceHead": "89aad86a1635122e0843618c75210819c1817d22",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -101,8 +101,8 @@
   },
   "mapping0": {
     "status": "NOT_GREEN",
-    "nextItemId": "M0-AUTH-002-E6-LAYER-AUTHORITY-001",
-    "nextItemState": "BLOCKED_UNTIL_AUTHORITY_DECISION",
+    "nextItemId": "M0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-001",
+    "nextItemState": "WAIT_AUTHORITY_DECISION",
     "noMappingRowsReexecuted": true,
     "metrics": {
       "canonicalRecords": 449,
@@ -118,7 +118,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "E6-LAYER-001 requires an explicit authority decision. Decision inputs are frozen in artifacts/mapping-0/auth-002-e6-layer-authority-decision-input-2026-09-21.md. Do not repeat repository-wide searches unless a new canonical authority artifact or implementation commit appears. No W01 runtime implementation is admitted until the resolver, multi-assignment precedence, scope semantics, persisted/derived/projection choice, runtime binding, and fail-closed behavior are explicitly reconciled.",
+  "nextRequiredExternalAction": "Resolve ENT-ROLE-ASSIGNMENT authority under docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md. This is the upstream prerequisite for E6-LAYER-001. Do not repeat layer searches, add User.layer, hand-author RoleAssignment persistence, or start W01 auth runtime until RoleAssignment fields/validity/scope/revocation/version semantics are explicitly contracted.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -212,8 +212,8 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "692485616adef78fa07b4da539d4ee6b1bfe0e2a",
-  "note": "Current main freezes E6 layer-authority decision inputs after targeted repository audit. D1-01 Role/RoleAssignment authority is identified; the deterministic RoleAssignment→L0-L8 resolver and precedence/binding semantics remain undecided. Runtime remains blocked; no runtime code or D1 mutation performed.",
+  "latestReconciliationCommit": "89aad86a1635122e0843618c75210819c1817d22",
+  "note": "Current main isolates ENT-ROLE-ASSIGNMENT authority as the upstream prerequisite for E6 layer resolution. Layer definition and D1-01 authority are established, but RoleAssignment field/validity/scope/revocation/version semantics are not canonical. Runtime remains blocked; no runtime code or D1 mutation performed.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -304,14 +304,16 @@
   "e6LayerAuthority": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-LAYER-AUTHORITY-2026-09-21.md",
     "audit": "artifacts/mapping-0/auth-002-e6-layer-authority-audit-2026-09-21.md",
-    "status": "OPEN — EXPLICIT AUTHORITY DECISION REQUIRED",
+    "status": "OPEN — BLOCKED BY ROLE_ASSIGNMENT_AUTHORITY",
     "authorityDomain": "D1-01 Identity / Account / Access",
     "authorityInput": "RoleAssignment (authorization input)",
     "layerDefinitionSource": "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
     "machineLayerSource": "contracts/authz/layers.json",
     "payloadUserRoleRule": "User.role is compatibility metadata and is not complete authorization authority",
     "verifiedGap": "No executable deterministic effective-role-to-layer resolver or multi-assignment precedence is established in W01",
-    "implementationAuthorized": false
+    "implementationAuthorized": false,
+    "upstreamDependency": "ENT-ROLE-ASSIGNMENT authority contract"
   },
-  "e6LayerAuthorityDecisionInput": "artifacts/mapping-0/auth-002-e6-layer-authority-decision-input-2026-09-21.md"
+  "e6LayerAuthorityDecisionInput": "artifacts/mapping-0/auth-002-e6-layer-authority-decision-input-2026-09-21.md",
+  "e6RoleAssignmentAuthorityChangeControl": "docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md"
 }
