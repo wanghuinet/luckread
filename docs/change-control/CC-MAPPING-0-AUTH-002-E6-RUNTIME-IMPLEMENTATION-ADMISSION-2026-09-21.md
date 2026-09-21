@@ -2,7 +2,7 @@
 
 - ID: CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21
 - Date: 2026-09-21
-- Status: OPEN — IMPLEMENTATION DECISION REQUIRED
+- Status: BLOCKED — REQUIRED CONTRACT INPUTS MISSING
 - Feature: AUTH-002
 - Gate: E6 Native Session Runtime Evidence
 - Depends on:
@@ -77,12 +77,14 @@ The parent E5 authority incident is now explicitly reconciled by the project Aut
 - no retroactive GREEN authorization exists;
 - no second E5 execution is permitted.
 
-This reconciliation clears the incident-dependency only. It does not admit E6 implementation. E6 implementation remains subject to this Change Control's own admission and the project GREEN→implement rule.
+This reconciliation clears the incident-dependency only. E6 implementation is now explicitly blocked by the missing wire/input authority recorded in `docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md`. The project GREEN→implement rule remains in force.
 
 ## Current disposition
 
 - GAP-E6-RUNTIME-001: OPEN.
-- This Change Control: OPEN — IMPLEMENTATION DECISION REQUIRED.
+- E6-WIRE-001: OPEN — canonical authRefresh wire authority missing.
+- E6-WIRE-002: OPEN — canonical device binding input authority missing.
+- This Change Control: BLOCKED — REQUIRED CONTRACT INPUTS MISSING.
 - No runtime code added by this record.
 - No remote D1 write performed by this record.
 - AUTH-002 remains NOT_GREEN.
