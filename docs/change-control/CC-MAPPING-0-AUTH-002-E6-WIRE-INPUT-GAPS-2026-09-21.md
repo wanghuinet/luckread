@@ -63,3 +63,12 @@ Until E6-WIRE-001 and E6-WIRE-002 are resolved:
 ## Exit condition
 
 Close this Change Control only after canonical wire/input authority is established and reconciled. The resulting decision must then feed the existing E6 Implementation Admission Change Control. No implementation is admitted by this record.
+
+
+## Current evidence binding — 2026-09-21
+
+The two gaps are now independently tied to current repository snapshots:
+- E6-WIRE-001: `artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json` = `DRIFT_CONFIRMED`. Current API Inventory requires `POST /v1/auth/refresh`; canonical OpenAPI does not currently define it.
+- E6-WIRE-002: `artifacts/mapping-0/auth-002-device-binding-authority-audit-2026-09-21.json` = `INPUT_AUTHORITY_MISSING_CONFIRMED`. The canonical Session/entity and persistence contracts require `deviceId`, but current AUTH API/DTO/Policy sources define no transport/source authority.
+
+These artifacts are authority/evidence records only. They do not promote either operation or field and do not authorize implementation.
