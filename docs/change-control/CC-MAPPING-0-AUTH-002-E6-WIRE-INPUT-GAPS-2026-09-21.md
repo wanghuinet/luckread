@@ -16,11 +16,14 @@ Record only the missing authoritative inputs that prevent safe implementation of
 Observed repository facts:
 - `contracts/api/auth-operation-policy.v1.json` defines `authRefresh` as POST `/auth/refresh` with refresh-token rotation, reuse detection, revoked-session denial and old-refresh-token invalidation.
 - `contracts/api/auth-operation-policy.v1.json` marks the operation `contractStatus: CONTRACTED_PARTIAL` and `evidence.openapi: MISSING`.
-- `contracts/openapi/v1/openapi.yaml` defines `authLogin` and `authLogout`, but no canonical `/auth/refresh` route is currently present.
+- `contracts/openapi/v1/openapi.yaml` contains `/auth/refresh` with `operationId: authRefresh`, but the operation is explicitly `DISCOVERY_DRAFT`.
+- The draft has no concrete request body or concrete success response schema.
+- API path/base-path normalization is already resolved by `M0-B01-API-PATH-NORMALIZATION-AUDIT-2026-09-20` and is not an active blocker.
 
 Required resolution:
-- Establish the canonical `authRefresh` wire contract (request, response, errors, authentication mode and permission semantics) through the normal Contract-First Change Control path.
-- Do not implement or expose a refresh endpoint by inferring its schema from the operation policy or Payload's native refresh endpoint.
+- Establish the exact canonical `authRefresh` request, response, error/status, credential-carrier and DTO semantics through normal Contract-First Change Control.
+- Only then promote the existing Discovery Draft shell to canonical Wire Authority.
+- Do not implement or expose runtime behavior by inference from the operation policy, authLogin response, or Payload's native refresh endpoint.
 
 ## Gap E6-WIRE-002 — device binding input authority missing
 
@@ -96,3 +99,18 @@ This is a correction to evidence interpretation only. It does not promote the ro
 - The audit explicitly freezes the non-inference boundary and confirms that these are contract-input gaps rather than implementation gaps.
 
 Result: both blockers remain open; E6 implementation admission remains blocked.
+
+## Decision boundary — 2026-09-21
+
+At the current repository head there is no pre-existing authoritative decision that selects:
+- the exact public authRefresh Request/Response/Error schemas or DTO IDs; or
+- the authoritative source and transport for AUTH-002 `deviceId`.
+
+These are therefore **decision inputs**, not implementation defects. The active project governance requires an explicit Contract-First decision before either is promoted.
+
+### Required external authority
+
+1. AUTH-011: approve the exact Wire Schema and DTO binding for `authRefresh`, then reconcile the existing Discovery Draft.
+2. AUTH-002: approve the authoritative device-binding source/transport for `ENT-SESSION-F-DEVICE-ID` without deriving it from uncontracted request metadata.
+
+Until those decisions exist, implementation admission remains fail-closed. No runtime code, new header, new request field, new device entity, or D1 mutation is authorized.
