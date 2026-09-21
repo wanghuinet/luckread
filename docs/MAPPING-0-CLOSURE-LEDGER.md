@@ -1405,3 +1405,17 @@ This section supersedes earlier continuation cursors for current work selection.
 - No runtime code, D1 mutation, new Worker, new D1, User.layer, duplicate layer entity, or hand-authored migration was introduced.
 - Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
 - Current next item remains `GAP-E6-RUNTIME-001`; no passed Mapping/E5/structural work was re-executed.
+
+## Superpowers continuation — historical physical-topology interpretation corrected — 2026-09-21
+
+- The earlier physical-layout audit has been corrected by current authority evidence.
+- `contracts/resource-budget/edge-first-worker-topology.json` is a historical W01-W13/P01-P08 model and is explicitly not the current 12-Worker target.
+- Therefore the current physical `workers/*` directory names are **not** treated as proof of canonical Worker identity, but neither are they being forced to match the historical P01-P08 model.
+- The precise current gap is: **canonical physical-to-logical Worker binding is NOT_ESTABLISHED**.
+- Canonical logical Worker authority remains the ACTIVE/CANONICAL Worker Master: W01 API/Gateway; W02 Identity/Account/Authorization; T01/T02/T03 → W02 → D1-01.
+- No directory rename/delete/create or topology change was performed.
+- AUTH-002/E6 remains blocked on evidence-bound RoleAssignment realization and admitted W02/T01/T03 runtime implementation/binding.
+- E6 implementation admission remains **BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED**.
+- Current next item remains `GAP-E6-RUNTIME-001`.
+- Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
+- No runtime code or D1 mutation was introduced; already-passed Mapping/E5/structural work was not re-executed.
