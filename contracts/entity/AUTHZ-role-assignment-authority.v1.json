@@ -1,0 +1,267 @@
+{
+  "version": "1.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "entityId": "ENT-ROLE-ASSIGNMENT",
+  "featureRefs": [
+    "AUTH-002"
+  ],
+  "sourceRefs": [
+    "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
+    "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
+    "contracts/authz/layers.json",
+    "contracts/authz/authorization-decision.json",
+    "contracts/authz/authz-cache-invariant.json",
+    "docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md",
+    "docs/change-control/MAPPING-0-AUTHORITY-DECISIONS-2026-09-20.md"
+  ],
+  "authority": {
+    "domainId": "D1-01",
+    "classification": "AUTHORIZATION",
+    "entityStatus": "PROPOSED_UNTIL_PERSISTENCE_AND_RUNTIME_EVIDENCE",
+    "subjectBinding": "subjectId MUST reference exactly one authoritative USER identity in D1-01 for the assignment lifetime.",
+    "roleIdentifierSource": "contracts/authz/layers.json#x-layers[].roles",
+    "layerSource": "contracts/authz/layers.json#x-layers",
+    "assignmentDoesNotCreateMembership": true,
+    "assignmentDoesNotCreateOwnership": true
+  },
+  "fields": [
+    {
+      "fieldId": "ENT-ROLE-ASSIGNMENT-F-ID",
+      "name": "id",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": true,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_IDENTIFIER",
+      "apiExposure": "NONE",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED_IDENTIFIER",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "Each assignment is a distinct auditable authorization fact."
+    },
+    {
+      "fieldId": "ENT-ROLE-ASSIGNMENT-F-SUBJECT-ID",
+      "name": "subjectId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_RELATION",
+      "apiExposure": "NONE",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED_IDENTIFIER",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "Authorization assignments are bound to one authoritative user identity."
+    },
+    {
+      "fieldId": "ENT-ROLE-ASSIGNMENT-F-ROLE-ID",
+      "name": "roleId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "AUTHORIZATION_STATE",
+      "apiExposure": "SCOPED",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "Role identifiers MUST come from the canonical machine-readable layer vocabulary."
+    },
+    {
+      "fieldId": "ENT-ROLE-ASSIGNMENT-F-SCOPE-TYPE",
+      "name": "scopeType",
+      "type": "enum",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "allowedValues": [
+        "global",
+        "organization",
+        "ip"
+      ],
+      "lifecycle": "immutable",
+      "classification": "AUTHORIZATION_SCOPE",
+      "apiExposure": "SCOPED",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "Assignments may be platform-global or limited to an existing organization/IP scope."
+    },
+    {
+      "fieldId": "ENT-ROLE-ASSIGNMENT-F-SCOPE-ID",
+      "name": "scopeId",
+      "type": "text",
+      "nullable": true,
+      "required": false,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "AUTHORIZATION_SCOPE",
+      "apiExposure": "SCOPED",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "Global assignments have no scopeId; organization/IP assignments reference an already-authoritative scope."
+    },
+    {
+      "fieldId": "ENT-ROLE-ASSIGNMENT-F-STATUS",
+      "name": "status",
+      "type": "enum",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "allowedValues": [
+        "ACTIVE",
+        "REVOKED"
+      ],
+      "lifecycle": "mutable",
+      "classification": "AUTHORIZATION_STATE",
+      "apiExposure": "NONE",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "Revocation must be durable and must immediately remove the assignment from the eligible set."
+    },
+    {
+      "fieldId": "ENT-ROLE-ASSIGNMENT-F-VALID-FROM",
+      "name": "validFrom",
+      "type": "datetime",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "AUTHORIZATION_VALIDITY",
+      "apiExposure": "NONE",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "An assignment becomes effective only at or after its authoritative start time."
+    },
+    {
+      "fieldId": "ENT-ROLE-ASSIGNMENT-F-VALID-UNTIL",
+      "name": "validUntil",
+      "type": "datetime",
+      "nullable": true,
+      "required": false,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "AUTHORIZATION_VALIDITY",
+      "apiExposure": "NONE",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "Optional expiry provides deterministic temporal validity; end time is exclusive."
+    },
+    {
+      "fieldId": "ENT-ROLE-ASSIGNMENT-F-CREATED-AT",
+      "name": "createdAt",
+      "type": "datetime",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "AUDIT_METADATA",
+      "apiExposure": "NONE",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "Assignment creation must remain auditable."
+    },
+    {
+      "fieldId": "ENT-ROLE-ASSIGNMENT-F-UPDATED-AT",
+      "name": "updatedAt",
+      "type": "datetime",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "mutable",
+      "classification": "AUDIT_METADATA",
+      "apiExposure": "NONE",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "Status/revocation changes require an authoritative update timestamp."
+    }
+  ],
+  "rules": {
+    "eligibility": [
+      "subjectId MUST equal the authenticated USER subject being evaluated.",
+      "status MUST be ACTIVE.",
+      "validFrom MUST be <= evaluation time.",
+      "validUntil MUST be null or evaluation time MUST be < validUntil.",
+      "For scopeType=organization or ip, scopeId MUST be present and the referenced scope MUST itself be authoritative and currently applicable.",
+      "A RoleAssignment does not establish Organization Membership, IP ownership, Resource Ownership, Entitlement, Subscription, Verification, or Account State."
+    ],
+    "roleMapping": "roleId MUST match exactly one role identifier declared by contracts/authz/layers.json; unknown or forbidden roles are invalid.",
+    "uniqueness": "Concurrent effective duplicates are forbidden for the tuple (subjectId, roleId, scopeType, scopeId). Historical REVOKED or expired assignments may coexist.",
+    "roleChange": "Changing a role or scope is represented as revoking the prior assignment and creating a new assignment; the prior immutable role/scope facts are not overwritten.",
+    "revocation": "Transition ACTIVE -> REVOKED removes eligibility immediately; revocation MUST increment role_version or the authoritative equivalent and invalidate authorization cache state under contracts/authz/authz-cache-invariant.json.",
+    "authorizationVersion": "Any change that alters the effective RoleAssignment set MUST advance the authoritative role_version used by authorization caching.",
+    "effectivenessEvidence": "An assignment becomes effective only after an authorized administrative/system action is recorded with audit provenance; client-supplied role names, JWT claims, verification state, entitlement, subscription, membership, cache, IP or device signals cannot establish an assignment.",
+    "globalLayerResolution": {
+      "eligibleAssignments": "Only ACTIVE, temporally valid assignments with scopeType=global participate in the authLogin/authRefresh response layer.",
+      "scopedAssignments": "organization- and ip-scoped assignments authorize scoped resources only and MUST NOT change the global authLogin/authRefresh layer.",
+      "mapping": "Resolve each eligible global roleId directly through contracts/authz/layers.json.",
+      "multipleAssignments": "When multiple eligible global assignments exist, select the highest numeric L0-L8 layer. Equal-layer assignments are equivalent and require no secondary precedence.",
+      "noValidGlobalAssignment": "Do not synthesize a layer from any non-RoleAssignment input. If no valid global assignment resolves to L0-L8, authentication/token issuance or refresh MUST fail closed using the existing canonical authentication/error contract; no new error enum is introduced."
+    },
+    "accountState": "Non-ACTIVE account state is rejected by the existing account-state security gate before successful token issuance/rotation; layer resolution cannot bypass that gate.",
+    "representation": "The authLogin/authRefresh layer is derived from current authoritative assignments at evaluation time. It is not persisted as User.layer and no duplicate layer entity is introduced.",
+    "cache": "Layer/role changes, revocations and relevant scope changes participate in authorization-cache invalidation; cache state is never authoritative."
+  },
+  "invariants": [
+    "Role is an authorization input; Layer is a derived capability level and is not itself an authorization source.",
+    "Verification, RoleAssignment, Entitlement, Subscription, Organization Membership, Account State and Ownership remain separate authorities.",
+    "Client-controlled input cannot create or elevate a RoleAssignment.",
+    "Unknown role identifiers fail closed.",
+    "Revoked or temporally invalid assignments are never effective.",
+    "Organization/IP scope does not become global authorization merely because the subject has that scoped role.",
+    "No assignment may grant access beyond the resource ownership/scope checks required by the Canonical Authorization Decision Contract."
+  ],
+  "nonGoals": [
+    "No W01 runtime resolver implementation.",
+    "No Payload User.layer field.",
+    "No parallel layer entity.",
+    "No new Worker or D1 domain.",
+    "No hand-authored RoleAssignment migration.",
+    "No change to existing authLogin/authRefresh wire DTOs.",
+    "No promotion of ENT-ROLE-ASSIGNMENT to VERIFIED without implementation, persistence and runtime evidence."
+  ],
+  "verificationRequirements": {
+    "contractReconciliation": [
+      "Reconcile this authority contract with docs/301, docs/303, contracts/authz/layers.json, contracts/authz/authorization-decision.json and contracts/authz/authz-cache-invariant.json.",
+      "Record the explicit multi-assignment/global-layer rule in the Mapping-0 Change Control."
+    ],
+    "resolverAdmission": [
+      "Define the deterministic W01 resolver binding without changing the authority semantics.",
+      "Prove global-role selection, scoped-role exclusion from global layer, account-state deny, revocation/version invalidation, and no-assignment fail-closed behavior."
+    ],
+    "implementationEvidence": [
+      "Runtime implementation evidence.",
+      "D1/persistence evidence when implementation is introduced.",
+      "Evidence Registry record bound to the validating commit."
+    ]
+  }
+}
