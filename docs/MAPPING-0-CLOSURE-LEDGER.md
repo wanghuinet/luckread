@@ -1028,3 +1028,32 @@ Continuation state:
 - NEXT_ITEM_ID: M0-AUTH-002-E5-REMOTE-EXECUTION-AUTHORITY-001.
 - NEXT_ITEM_STATE: WAIT_AUTHORITY_DECISION.
 - Anti-loop: do not rerun the baseline migration, repeat empty-target probes, or rediscover the E5 source gap unless an authoritative input changes.
+
+
+## Superpowers continuation — AUTH-002 E5 controlled execution channel prepared — 2026-09-21
+
+Source head before this ledger entry: `1c01f40a6752c711b61a169a5488c0ed70b447df`.
+
+The remaining E5 boundary was implemented as a dedicated fail-closed execution channel without changing any Contract/Blueprint or touching the remote D1:
+
+- Admission guard: `scripts/auth-002-e5-remote-migration-admission.mjs`.
+  - Requires explicit `Status: GREEN — EXECUTION ADMITTED` in the current E5 remote-execution Change Control.
+  - Verifies the exact E5 migration Blob `2b43a7b08fe7c5be98793da7eb07ddd2cf9e6921` and migration-index Blob `436c37e395145017d9135f938d69a741a936c60b`.
+  - Verifies the executable migration set is exactly the already-applied baseline plus `MIG-AUTH-002-SESSION-V1`.
+
+- Dedicated workflow: `.github/workflows/auth-002-e5-remote-migration-execution.yml`.
+  - Supports controlled manual dispatch and a dedicated exact push marker.
+  - Preflight requires exactly the eight known baseline application tables, exactly one baseline migration-history record, no E5 history record, no `auth_session_state`, and captures native `users/users_sessions` schema/catalog evidence.
+  - The mutation step is only reached after the explicit E5 GREEN admission guard passes.
+  - Post-validation requires exactly the baseline + E5 migration history, the exact `auth_session_state` columns and four indexes, zero physical foreign keys, no forbidden secret columns, and unchanged native users/users_sessions catalog objects.
+  - Evidence is uploaded with run/source provenance.
+
+Acceptance boundary:
+- No E5 remote execution has been started by this preparation batch.
+- No D1 mutation occurred.
+- Baseline `20250929_111647` remains PASS_VERIFIED and must not be rerun.
+- E5 remains `NOT_ADMITTED` because the governing Change Control still says `OPEN — EXECUTION DECISION REQUIRED`.
+
+NEXT_ITEM_ID: `M0-AUTH-002-E5-REMOTE-EXECUTION-AUTHORITY-001`
+NEXT_ITEM_STATE: `WAIT_AUTHORITY_DECISION`
+Anti-loop: once explicit GREEN admission exists, execute only through the dedicated E5 workflow; do not use the old baseline execution workflow and do not manually mutate D1.
