@@ -1,0 +1,279 @@
+name: AUTH-002 E5 Remote Migration Execution
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Exact Git commit to execute; must contain the admitted E5 migration set"
+        required: true
+        type: string
+      database_name:
+        description: "Controlled D1 database name"
+        required: true
+        default: "luckread"
+        type: string
+      confirm:
+        description: "Type EXECUTE_AUTH_002_E5 to permit the controlled E5 migration step"
+        required: true
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - "artifacts/mapping-0/AUTH-002-EXECUTE-E5-REQUEST.txt"
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  BASELINE_MIGRATION: 20250929_111647
+  E5_MIGRATION: 20260921_003203_MIG_AUTH_002_SESSION_V1
+
+jobs:
+  execute-e5:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Validate execution trigger
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_MESSAGE: ${{ github.event.head_commit.message || '' }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "push" ]; then
+            test "$HEAD_MESSAGE" = "execute(auth-002): admitted E5 remote migration"
+          else
+            test "$EVENT_NAME" = "workflow_dispatch"
+          fi
+
+      - name: Validate dispatch confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm || '' }}
+          DATABASE_NAME: ${{ inputs.database_name || 'luckread' }}
+        run: |
+          set -euo pipefail
+          test "$CONFIRM" = "EXECUTE_AUTH_002_E5"
+          test "$DATABASE_NAME" = "luckread"
+
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Validate exact source SHA
+        env:
+          REQUESTED_SHA: ${{ inputs.source_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$REQUESTED_SHA"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.34.5 --activate
+
+      - name: Install W01 locked dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-workspace
+
+      - name: Check explicit E5 remote execution admission
+        working-directory: workers/W01-payload
+        run: node ../../scripts/auth-002-e5-remote-migration-admission.mjs
+
+      - name: Configure Cloudflare access
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+      - name: Capture controlled target preflight
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_NAME: ${{ inputs.database_name || 'luckread' }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/evidence/auth-002/e5-remote
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'SELECT name FROM sqlite_schema WHERE type="table" AND name NOT GLOB "_cf_*" ORDER BY name;' \
+            > ../../artifacts/evidence/auth-002/e5-remote/preflight-tables.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' \
+            > ../../artifacts/evidence/auth-002/e5-remote/preflight-migrations.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE type IN ("table","index","trigger") ORDER BY type,name;' \
+            > ../../artifacts/evidence/auth-002/e5-remote/preflight-catalog.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'PRAGMA table_info("users");' \
+            > ../../artifacts/evidence/auth-002/e5-remote/preflight-users-schema.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'PRAGMA table_info("users_sessions");' \
+            > ../../artifacts/evidence/auth-002/e5-remote/preflight-users-sessions-schema.json
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const dir = '../../artifacts/evidence/auth-002/e5-remote';
+          const read = (name) => JSON.parse(fs.readFileSync(dir + '/' + name, 'utf8'));
+          const collectRows = (value, out = []) => {
+            if (Array.isArray(value)) for (const item of value) collectRows(item, out);
+            else if (value && typeof value === 'object') {
+              if (Array.isArray(value.results)) out.push(...value.results);
+              if (Array.isArray(value.result)) out.push(...value.result);
+              for (const child of Object.values(value)) collectRows(child, out);
+            }
+            return out;
+          };
+          const rows = (name) => [...new Map(collectRows(read(name)).map((r) => [JSON.stringify(r), r])).values()];
+          const tables = rows('preflight-tables.json').map((r) => r.name).filter(Boolean).sort();
+          const migrations = rows('preflight-migrations.json').sort((a,b)=>Number(a.id)-Number(b.id));
+          const catalog = rows('preflight-catalog.json');
+          const users = rows('preflight-users-schema.json');
+          const usersSessions = rows('preflight-users-sessions-schema.json');
+          const expectedTables = ['media','payload_locked_documents','payload_locked_documents_rels','payload_migrations','payload_preferences','payload_preferences_rels','users','users_sessions'];
+          if (JSON.stringify(tables) !== JSON.stringify(expectedTables)) throw new Error('E5 preflight table set mismatch: ' + JSON.stringify(tables));
+          if (migrations.filter((r)=>r.name===process.env.BASELINE_MIGRATION).length !== 1) throw new Error('baseline migration history is not present exactly once');
+          if (migrations.some((r)=>r.name===process.env.E5_MIGRATION)) throw new Error('E5 migration is already recorded; refusing duplicate execution');
+          if (catalog.some((r)=>r.tbl_name==='auth_session_state' || r.name==='auth_session_state')) throw new Error('auth_session_state already exists; refusing duplicate execution');
+          if (!users.length || !usersSessions.length) throw new Error('native users/users_sessions schema evidence missing');
+          fs.writeFileSync(dir + '/preflight-summary.json', JSON.stringify({
+            databaseName: process.env.DATABASE_NAME,
+            tables,
+            migrationHistory: migrations,
+            usersSchema: users,
+            usersSessionsSchema: usersSessions,
+            authSessionStatePresent: false,
+            result: 'PASS'
+          }, null, 2) + '\n');
+          NODE
+
+      - name: Execute admitted E5 migration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NODE_ENV: production
+          PAYLOAD_SECRET: ignore
+          CLOUDFLARE_ENV: production
+          PAYLOAD_MIGRATION_REMOTE: "true"
+        working-directory: workers/W01-payload
+        run: pnpm exec payload migrate
+
+      - name: Capture and validate post-migration evidence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_NAME: ${{ inputs.database_name || 'luckread' }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/evidence/auth-002/e5-remote
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' \
+            > ../../artifacts/evidence/auth-002/e5-remote/post-migration-history.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE type IN ("table","index","trigger") ORDER BY type,name;' \
+            > ../../artifacts/evidence/auth-002/e5-remote/post-catalog.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'PRAGMA table_info("auth_session_state");' \
+            > ../../artifacts/evidence/auth-002/e5-remote/auth-session-state-schema.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'PRAGMA index_list("auth_session_state");' \
+            > ../../artifacts/evidence/auth-002/e5-remote/auth-session-state-indexes.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'PRAGMA foreign_key_list("auth_session_state");' \
+            > ../../artifacts/evidence/auth-002/e5-remote/auth-session-state-fk.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'PRAGMA table_info("users");' \
+            > ../../artifacts/evidence/auth-002/e5-remote/post-users-schema.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'PRAGMA table_info("users_sessions");' \
+            > ../../artifacts/evidence/auth-002/e5-remote/post-users-sessions-schema.json
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const dir = '../../artifacts/evidence/auth-002/e5-remote';
+          const read = (name) => JSON.parse(fs.readFileSync(dir + '/' + name, 'utf8'));
+          const collectRows = (value, out = []) => {
+            if (Array.isArray(value)) for (const item of value) collectRows(item, out);
+            else if (value && typeof value === 'object') {
+              if (Array.isArray(value.results)) out.push(...value.results);
+              if (Array.isArray(value.result)) out.push(...value.result);
+              for (const child of Object.values(value)) collectRows(child, out);
+            }
+            return out;
+          };
+          const rows = (name) => [...new Map(collectRows(read(name)).map((r) => [JSON.stringify(r), r])).values()];
+          const migrations = rows('post-migration-history.json').sort((a,b)=>Number(a.id)-Number(b.id));
+          const catalog = rows('post-catalog.json');
+          const tables = catalog.filter((r)=>r.type==='table').map((r)=>r.name).filter(Boolean).filter((n)=>!n.startsWith('_cf_')).sort();
+          const expectedTables = ['auth_session_state','media','payload_locked_documents','payload_locked_documents_rels','payload_migrations','payload_preferences','payload_preferences_rels','users','users_sessions'];
+          const authColumns = rows('auth-session-state-schema.json').map((r)=>r.name);
+          const expectedColumns = ['session_id','user_id','device_id','token_version','refresh_credential_hash','revoked_at','last_seen_at'];
+          const idx = rows('auth-session-state-indexes.json').map((r)=>r.name).filter(Boolean).filter((n)=>n!=='sqlite_autoindex_auth_session_state_1').sort();
+          const expectedIdx = ['auth_session_state_device_id_idx','auth_session_state_revoked_at_idx','auth_session_state_token_version_idx','auth_session_state_user_id_idx'];
+          const fk = rows('auth-session-state-fk.json');
+          const users = rows('post-users-schema.json');
+          const usersSessions = rows('post-users-sessions-schema.json');
+          const preflight = JSON.parse(fs.readFileSync(dir + '/preflight-summary.json','utf8'));
+          if (JSON.stringify(migrations.map((r)=>r.name)) !== JSON.stringify([process.env.BASELINE_MIGRATION, process.env.E5_MIGRATION])) throw new Error('unexpected migration history: ' + JSON.stringify(migrations));
+          if (JSON.stringify(tables) !== JSON.stringify(expectedTables)) throw new Error('unexpected post table set: ' + JSON.stringify(tables));
+          if (JSON.stringify(authColumns) !== JSON.stringify(expectedColumns)) throw new Error('unexpected auth_session_state columns: ' + JSON.stringify(authColumns));
+          if (JSON.stringify(idx) !== JSON.stringify(expectedIdx)) throw new Error('unexpected auth_session_state indexes: ' + JSON.stringify(idx));
+          if (fk.length !== 0) throw new Error('auth_session_state has a physical foreign key; expected none');
+          if (JSON.stringify(users) !== JSON.stringify(preflight.usersSchema)) throw new Error('native users schema changed during E5 execution');
+          if (JSON.stringify(usersSessions) !== JSON.stringify(preflight.usersSessionsSchema)) throw new Error('native users_sessions schema changed during E5 execution');
+          const authSql = catalog.filter((r)=>r.tbl_name==='auth_session_state' && r.type==='table').map((r)=>String(r.sql||'')).join('\n').toLowerCase();
+          for (const forbidden of ['raw_access_token','raw_refresh_token','password','created_at','expires_at']) {
+            if (authSql.includes(forbidden)) throw new Error('forbidden auth_session_state schema content detected: ' + forbidden);
+          }
+          fs.writeFileSync(dir + '/post-validation-summary.json', JSON.stringify({
+            databaseName: process.env.DATABASE_NAME,
+            migrationHistory: migrations,
+            tables,
+            authSessionStateColumns: authColumns,
+            authSessionStateIndexes: idx,
+            foreignKeyCount: fk.length,
+            nativeUsersSchemaUnchanged: true,
+            nativeUsersSessionsSchemaUnchanged: true,
+            forbiddenSecretColumnsAbsent: true,
+            result: 'PASS'
+          }, null, 2) + '\n');
+          NODE
+
+      - name: Write provenance manifest
+        if: always()
+        env:
+          DATABASE_NAME: ${{ inputs.database_name || 'luckread' }}
+          REQUESTED_SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/evidence/auth-002/e5-remote
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const manifest = {
+            repository: process.env.GITHUB_REPOSITORY,
+            workflow: process.env.GITHUB_WORKFLOW,
+            runId: Number(process.env.GITHUB_RUN_ID),
+            runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            sourceSha: process.env.GITHUB_SHA,
+            requestedSourceSha: process.env.REQUESTED_SOURCE_SHA,
+            databaseName: process.env.DATABASE_NAME,
+            migration: process.env.E5_MIGRATION || '20260921_003203_MIG_AUTH_002_SESSION_V1',
+            environment: 'CONTROLLED_REMOTE_D1'
+          };
+          fs.writeFileSync('artifacts/evidence/auth-002/e5-remote/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
+          NODE
+
+      - name: Upload E5 remote execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-002-e5-remote-migration-evidence-${{ github.run_id }}
+          path: artifacts/evidence/auth-002/e5-remote/
+          if-no-files-found: error
+          retention-days: 30
