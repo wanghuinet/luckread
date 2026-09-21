@@ -1348,3 +1348,17 @@ This section supersedes earlier continuation cursors for current work selection.
   1. an evidence-bound authoritative RoleAssignment source without inventing a second authorization authority;
   2. the exact existing W01/Payload runtime extension binding;
   3. controlled authLogin/authRefresh runtime evidence and Evidence Registry registration.
+
+## Superpowers continuation — E6 runtime binding audit closed as evidence question — 2026-09-21
+
+- New audit: artifacts/mapping-0/auth-002-e6-runtime-binding-audit-2026-09-21.md
+- Audit result: **PASS_VERIFIED_AUDIT — NO EXISTING RUNTIME BINDING PROVEN; IMPLEMENTATION REMAINS BLOCKED**
+- Confirmed active W01 facts: Users.ts has native Payload auth: true; no custom auth strategy, auth Hook binding, route.ts, or canonical /auth/* runtime route is present in the active W01 source tree.
+- Payload reference material documents supported auth extension capabilities, but capability documentation is not W01 implementation evidence.
+- This finding is now frozen to prevent repeated extension-point searches from being treated as new progress.
+- ENT-ROLE-ASSIGNMENT remains **PROPOSED / CONTRACT_ONLY** with no persistence or runtime evidence; the runtime resolver cannot consume a contract-only source as live authorization state.
+- E6 implementation admission remains **BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED**.
+- Current next item remains GAP-E6-RUNTIME-001.
+- No runtime code, D1 mutation, new Worker, new D1, User.layer, duplicate layer entity, or hand-authored RoleAssignment migration was introduced.
+- Mapping 0 remains **NOT_GREEN**: 449 records = PARTIAL 17 / UNRESOLVED 431 / MISSING 1.
+- Already-passed Mapping/E5/structural work was not re-executed.
