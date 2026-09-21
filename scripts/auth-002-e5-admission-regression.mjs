@@ -46,8 +46,12 @@ if (workflow.includes('github.event_name') && workflow.includes('github.event.he
   throw new Error('E5 workflow still contains obsolete push-marker validation')
 }
 
-if (!/^\- Status:\s*OPEN\s+—\s+EXECUTION DECISION REQUIRED\s*$/m.test(parentCc)) {
-  throw new Error('Parent E5 Change Control must remain explicitly OPEN until authority reconciliation')
+const parentStatus = parentCc.match(/^\- Status:\s*(.+)$/m)?.[1] ?? ''
+if (parentStatus === 'GREEN — EXECUTION ADMITTED') {
+  throw new Error('E5 authority regression: incident parent control must not be retroactively GREEN')
+}
+if (parentStatus !== 'CLOSED — EXECUTION NOT AUTHORIZED; TECHNICAL RESULT RETAINED') {
+  throw new Error('E5 authority regression: unexpected reconciled parent status: ' + parentStatus)
 }
 
 const staleMarker = resolve(root, 'artifacts/mapping-0/AUTH-002-E5-EXECUTE-REQUEST.txt')
@@ -64,5 +68,5 @@ console.log('- explanatory prose cannot trigger admission')
 console.log('- OPEN status cannot trigger admission')
 console.log('- workflow is manual-dispatch only')
 console.log('- obsolete push-marker validation is absent')
-console.log('- parent authority remains OPEN and fail-closed')
+console.log('- parent authority is reconciled as not-authorized and remains fail-closed')
 console.log('- stale execution marker is absent')
