@@ -82,7 +82,7 @@ This reconciliation clears the incident-dependency only. E6 implementation is no
 ## Current disposition
 
 - GAP-E6-RUNTIME-001: OPEN.
-- E6-WIRE-001: OPEN — canonical authRefresh wire authority missing.
+- E6-WIRE-001: OPEN — canonical authRefresh wire authority remains non-admitted; current OpenAPI entry is DISCOVERY_DRAFT.
 - E6-WIRE-002: OPEN — canonical device binding input authority missing.
 - This Change Control: BLOCKED — REQUIRED CONTRACT INPUTS MISSING.
 - No runtime code added by this record.
