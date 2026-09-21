@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "79a671eac8b0dd41c3c36a6216c4e9aff9a14412",
+  "sourceHead": "302367251b33dc287df97fb20ea91583ea9d1cf8",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -101,8 +101,8 @@
   },
   "mapping0": {
     "status": "NOT_GREEN",
-    "nextItemId": "M0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-001",
-    "nextItemState": "WAIT_AUTHORITY_CONTRACT",
+    "nextItemId": "GAP-E6-RUNTIME-001",
+    "nextItemState": "TODO_FIX",
     "noMappingRowsReexecuted": true,
     "metrics": {
       "canonicalRecords": 449,
@@ -120,7 +120,7 @@
     "previousItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
     "previousItemState": "CLOSED — REPRESENTATION RECONCILED"
   },
-  "nextRequiredExternalAction": "Provide or reconcile an explicit Contract-First ENT-ROLE-ASSIGNMENT authority contract. Existing repository sources only establish D1-01 ownership, RoleAssignment as an authorization input, normalized role identifiers user→L1 and verified_user→L2, role_version invalidation, and fail-closed authorization. They do not establish RoleAssignment field semantics or deterministic multi-assignment/global-layer behavior. Do not implement persistence, Layer Resolver, or authLogin/authRefresh runtime by inference.",
+  "nextRequiredExternalAction": "Resolve GAP-E6-RUNTIME-001 by defining the exact existing W01 runtime binding for the authoritative RoleAssignment-to-L0-L8 resolver, then obtain controlled authLogin/authRefresh runtime evidence. Do not add a new Worker/D1 domain, User.layer, duplicate layer entity, or hand-authored migration; do not implement until the existing E6 implementation-admission gate is GREEN.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -214,7 +214,7 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "79a671eac8b0dd41c3c36a6216c4e9aff9a14412",
+  "latestReconciliationCommit": "302367251b33dc287df97fb20ea91583ea9d1cf8",
   "note": "Current main records a genuine Contract authority conflict: docs/301 distinguishes user(unverified)->L1 and user(verified)->L2 while contracts/authz/layers.json maps user->L1 and verified_user->L2. This must be reconciled before a deterministic RoleAssignment-to-L0-L8 resolver can be admitted. No runtime code or D1 mutation performed.",
   "executionTriggerAttempts": {
     "commits": [
@@ -244,7 +244,7 @@
   },
   "e6RuntimeImplementationAdmission": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21.md",
-    "status": "BLOCKED — REQUIRED CONTRACT INPUTS INCOMPLETE",
+    "status": "BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED",
     "implementationAuthorized": false,
     "runtimeCodeChanged": false,
     "remoteD1Mutation": false,
@@ -254,7 +254,7 @@
       {
         "id": "E6-LAYER-001",
         "status": "OPEN",
-        "finding": "authLogin/authRefresh response requires layer L0-L8 but W01 has no authoritative runtime source/resolver"
+        "finding": "RoleAssignment authority is now explicit; W01 still lacks an admitted runtime binding/resolver implementation and controlled authLogin/authRefresh evidence for the resulting L0-L8 layer."
       }
     ],
     "failClosedGuard": {
@@ -264,7 +264,8 @@
       "protectedRuntimePathsGuarded": true,
       "latestRunId": 35561587245,
       "latestJobId": 106215329002
-    }
+    },
+    "authorityDependency": "CLOSED — contracts/entity/AUTHZ-role-assignment-authority.v1.json"
   },
   "e6WireInputGaps": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md",
@@ -306,7 +307,7 @@
   "e6LayerAuthority": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-LAYER-AUTHORITY-2026-09-21.md",
     "audit": "artifacts/mapping-0/auth-002-e6-layer-authority-audit-2026-09-21.md",
-    "status": "OPEN — BLOCKED BY ENT-ROLE-ASSIGNMENT AUTHORITY CONTRACT",
+    "status": "OPEN — RESOLVER/RUNTIME BINDING REQUIRED",
     "authorityDomain": "D1-01 Identity / Account / Access",
     "authorityInput": "RoleAssignment (authorization input)",
     "layerDefinitionSource": "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
@@ -314,14 +315,14 @@
     "payloadUserRoleRule": "User.role is compatibility metadata and is not complete authorization authority",
     "verifiedGap": "No executable deterministic effective-role-to-layer resolver or multi-assignment precedence is established in W01",
     "implementationAuthorized": false,
-    "upstreamDependency": "ENT-ROLE-ASSIGNMENT authority contract",
+    "upstreamDependency": "RESOLVED — contracts/entity/AUTHZ-role-assignment-authority.v1.json",
     "upstreamDependencies": [
-      "ENT-ROLE-ASSIGNMENT authority contract"
+      "RESOLVED — contracts/entity/AUTHZ-role-assignment-authority.v1.json"
     ],
     "e6RoleRepresentationConflict": "CLOSED — see docs/change-control/CC-MAPPING-0-AUTHZ-L1-L2-ROLE-REPRESENTATION-2026-09-21.md",
-    "e6RoleAssignmentAuthorityBoundary": "OPEN — no canonical concrete RoleAssignment authority contract found; see docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md"
+    "e6RoleAssignmentAuthorityBoundary": "CLOSED — AUTHORITY CONTRACT RECONCILED"
   },
   "e6LayerAuthorityDecisionInput": "artifacts/mapping-0/auth-002-e6-layer-authority-decision-input-2026-09-21.md",
   "e6RoleAssignmentAuthorityChangeControl": "docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md",
-  "e6RoleAssignmentAuthorityConflict": "CLOSED — representation ambiguity only; authority contract remains OPEN"
+  "e6RoleAssignmentAuthorityConflict": "CLOSED — AUTHORITY CONTRACT RECONCILED"
 }
