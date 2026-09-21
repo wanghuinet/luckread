@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "b1192393271e32e013fc3d4268b0bc934d1b419c",
+  "sourceHead": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -131,6 +131,16 @@
     "E5_remote_execution": "NOT_ADMITTED",
     "overall": "NOT_GREEN"
   },
-  "latestReconciliationCommit": "b1192393271e32e013fc3d4268b0bc934d1b419c",
-  "note": "Current main head aligned to the latest governance checkpoint. No remote D1 mutation executed; E5 remains WAIT_AUTHORITY_DECISION."
+  "latestReconciliationCommit": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
+  "note": "Latest main aligned. Multiple E5 trigger commits were observed, but the governing Change Control remains OPEN and no successful E5 remote mutation evidence is present. Do not infer D1 mutation from trigger commits.",
+  "executionTriggerAttempts": {
+    "commits": [
+      "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
+      "525379507d47b1845a6d13e1f1f499fd90000d96",
+      "fe1f2784d21f3f629bbad0baa971f1aa56520914"
+    ],
+    "changeControlStatus": "OPEN — EXECUTION DECISION REQUIRED",
+    "repositoryEvidenceOfSuccessfulE5Mutation": false,
+    "interpretation": "Trigger attempts do not constitute execution evidence. No E5 success/schema/migration artifact is currently present in repository search."
+  }
 }
