@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "7f1da18d3e29590b01f86198fe9111255d1f89a6",
+  "sourceHead": "692485616adef78fa07b4da539d4ee6b1bfe0e2a",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -118,7 +118,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "E6-LAYER-001 remains the only identified runtime admission blocker: D1-01 Role/RoleAssignment is now verified as the authoritative domain/input, but the deterministic effective-RoleAssignment-to-L0-L8 resolver, multi-assignment precedence, and authLogin/authRefresh runtime binding still require explicit Contract-First authority decision. Do not hard-code a layer or add a User field by inference.",
+  "nextRequiredExternalAction": "E6-LAYER-001 requires an explicit authority decision. Decision inputs are frozen in artifacts/mapping-0/auth-002-e6-layer-authority-decision-input-2026-09-21.md. Do not repeat repository-wide searches unless a new canonical authority artifact or implementation commit appears. No W01 runtime implementation is admitted until the resolver, multi-assignment precedence, scope semantics, persisted/derived/projection choice, runtime binding, and fail-closed behavior are explicitly reconciled.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -212,8 +212,8 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "7f1da18d3e29590b01f86198fe9111255d1f89a6",
-  "note": "Current main includes E6 wire authority closure, deterministic admission guard PASS, and a new Layer Authority Audit narrowing the blocker to the missing effective RoleAssignment→L0-L8 resolver/precedence/runtime binding. Runtime remains blocked; no runtime code or D1 mutation performed.",
+  "latestReconciliationCommit": "692485616adef78fa07b4da539d4ee6b1bfe0e2a",
+  "note": "Current main freezes E6 layer-authority decision inputs after targeted repository audit. D1-01 Role/RoleAssignment authority is identified; the deterministic RoleAssignment→L0-L8 resolver and precedence/binding semantics remain undecided. Runtime remains blocked; no runtime code or D1 mutation performed.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -312,5 +312,6 @@
     "payloadUserRoleRule": "User.role is compatibility metadata and is not complete authorization authority",
     "verifiedGap": "No executable deterministic effective-role-to-layer resolver or multi-assignment precedence is established in W01",
     "implementationAuthorized": false
-  }
+  },
+  "e6LayerAuthorityDecisionInput": "artifacts/mapping-0/auth-002-e6-layer-authority-decision-input-2026-09-21.md"
 }
