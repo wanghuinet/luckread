@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "f0b2f8a9f5de1c32cfc1d2103f887f49093be4f1",
+  "sourceHead": "99ce54cdcf3bf2c5b6b128598e45a5fcf9a2f55d",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -118,7 +118,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Resolve E6-WIRE-001 through the existing AUTH-011/AUTH-010 Contract-First OpenAPI/DTO chain and E6-WIRE-002 through an explicit AUTH-002 device-binding source/transport decision. Only after those inputs are reconciled may E6 implementation admission be reconsidered. Do not implement runtime auth code or infer either input.",
+  "nextRequiredExternalAction": "Resolve E6-WIRE-001 through the existing AUTH-011/AUTH-010 Contract-First chain: promote the existing /auth/refresh discovery shell only after exact Request/Response/Error DTO and credential-carrier semantics are explicitly contracted. Resolve E6-WIRE-002 through an explicit AUTH-002 device-binding source/transport decision. Do not implement runtime auth code, add transport fields, promote the route, or mutate D1 until both inputs are reconciled.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -212,8 +212,8 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "f0b2f8a9f5de1c32cfc1d2103f887f49093be4f1",
-  "note": "Authoritative continuation cursor. E5 authority incident is reconciled; E6-WIRE-001 and E6-WIRE-002 are current evidence-bound blockers. No Mapping rows or runtime authentication code were modified in this continuation.",
+  "latestReconciliationCommit": "99ce54cdcf3bf2c5b6b128598e45a5fcf9a2f55d",
+  "note": "Authoritative continuation cursor. E5 authority incident is reconciled. E6-WIRE-001 remains OPEN because /auth/refresh exists only as DISCOVERY_DRAFT; E6-WIRE-002 remains OPEN because device binding source/transport is still undefined. This correction changes evidence interpretation only; no runtime authentication code or D1 mutation was performed.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -284,9 +284,12 @@
   "auth011WireAuthorityDrift": {
     "audit": "artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json",
     "status": "DRIFT_CONFIRMED",
-    "currentOpenApiRefreshPath": false,
-    "currentOpenApiRefreshOperationId": false,
+    "currentOpenApiRefreshPath": true,
+    "currentOpenApiRefreshOperationId": true,
     "apiInventoryRefreshRequired": true,
-    "staleCrosscheckMustNotPromote": true
+    "staleCrosscheckMustNotPromote": true,
+    "currentOpenApiRefreshContractStatus": "DISCOVERY_DRAFT",
+    "currentOpenApiRefreshWireSchemaComplete": false,
+    "currentOpenApiRefreshRouteAdmitted": false
   }
 }
