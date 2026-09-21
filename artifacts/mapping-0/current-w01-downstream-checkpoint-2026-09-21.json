@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "1532e357c8955e451b93e312b1fcf5175201c31c",
+  "sourceHead": "49c082039e74b1cfd1458884a2bd4de49921f297",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -120,7 +120,7 @@
     "previousItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
     "previousItemState": "CLOSED — REPRESENTATION RECONCILED"
   },
-  "nextRequiredExternalAction": "Resolve GAP-E6-RUNTIME-001 by binding the now-authoritative RoleAssignment-to-L0-L8 resolver to the existing W01 runtime extension point and produce controlled authLogin/authRefresh runtime evidence. Implementation remains fail-closed until the existing E6 implementation-admission status is GREEN. No new Worker/D1/User.layer/layer entity/migration.",
+  "nextRequiredExternalAction": "Resolve GAP-E6-RUNTIME-001 using only existing W01/Payload authority: first establish an evidence-bound authoritative RoleAssignment source (ENT-ROLE-ASSIGNMENT is currently PROPOSED with no persistence/runtime evidence), then bind the deterministic RoleAssignment→L0-L8 resolver to an existing W01/Payload extension point. Only after the existing E6 implementation-admission gate is GREEN may runtime code and controlled authLogin/authRefresh evidence be produced. No new Worker/D1/User.layer/layer entity/hand-authored migration.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -214,7 +214,7 @@
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
     "nextGate": "E6_WIRE_INPUTS"
   },
-  "latestReconciliationCommit": "1532e357c8955e451b93e312b1fcf5175201c31c",
+  "latestReconciliationCommit": "49c082039e74b1cfd1458884a2bd4de49921f297",
   "note": "Current main records a genuine Contract authority conflict: docs/301 distinguishes user(unverified)->L1 and user(verified)->L2 while contracts/authz/layers.json maps user->L1 and verified_user->L2. This must be reconciled before a deterministic RoleAssignment-to-L0-L8 resolver can be admitted. No runtime code or D1 mutation performed.",
   "executionTriggerAttempts": {
     "commits": [
@@ -238,7 +238,7 @@
   "e6RuntimeIntegrationGap": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-INTEGRATION-GAP-2026-09-21.md",
     "gapId": "GAP-E6-RUNTIME-001",
-    "status": "OPEN — RUNTIME IMPLEMENTATION EVIDENCE REQUIRED",
+    "status": "OPEN — AUTHORITATIVE ROLEASSIGNMENT SOURCE + W01 RUNTIME EVIDENCE REQUIRED",
     "runtimeCorrelationPathVerified": false,
     "remoteRuntimeExecutionStarted": false
   },
@@ -265,7 +265,7 @@
       "latestRunId": 35561587245,
       "latestJobId": 106215329002
     },
-    "authorityDependency": "CLOSED — RoleAssignment authority and E6 layer semantics reconciled"
+    "authorityDependency": "CLOSED — RoleAssignment authority and deterministic layer semantics reconciled"
   },
   "e6WireInputGaps": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md",
@@ -307,13 +307,13 @@
   "e6LayerAuthority": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-LAYER-AUTHORITY-2026-09-21.md",
     "audit": "artifacts/mapping-0/auth-002-e6-layer-authority-audit-2026-09-21.md",
-    "status": "OPEN — RUNTIME BINDING/EVIDENCE REQUIRED",
+    "status": "CLOSED — AUTHORITY RECONCILED; RUNTIME BINDING OPEN",
     "authorityDomain": "D1-01 Identity / Account / Access",
     "authorityInput": "RoleAssignment (authorization input)",
     "layerDefinitionSource": "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
     "machineLayerSource": "contracts/authz/layers.json",
     "payloadUserRoleRule": "User.role is compatibility metadata and is not complete authorization authority",
-    "verifiedGap": "No executable deterministic effective-role-to-layer resolver or multi-assignment precedence is established in W01",
+    "verifiedGap": "Deterministic RoleAssignment→L0-L8 semantics are contractually established; W01 still lacks an evidence-bound authoritative RoleAssignment source and admitted runtime binding.",
     "implementationAuthorized": false,
     "upstreamDependency": "RESOLVED — contracts/entity/AUTHZ-role-assignment-authority.v1.json",
     "upstreamDependencies": [
