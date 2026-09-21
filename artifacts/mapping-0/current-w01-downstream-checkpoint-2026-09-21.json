@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "92100e58155e2569461f16bf8ea497bd9a041487",
+  "sourceHead": "c5ec2ff7ecb3b571a8d2c38753bfb2822bd60ec7",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -120,7 +120,7 @@
     "previousItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
     "previousItemState": "CLOSED — REPRESENTATION RECONCILED"
   },
-  "nextRequiredExternalAction": "Resolve GAP-E6-RUNTIME-001 without architecture drift: establish an evidence-bound authoritative RoleAssignment source under D1-01; establish/admit the canonical W02/T01/T03 AUTH-002 implementation boundary; define the already-required W01 API-boundary to W02 transport only through approved existing binding contracts; then bind the deterministic RoleAssignment→L0-L8 resolver to the W02 authorization runtime and produce controlled authLogin/authRefresh evidence. No W01 direct D1-01 authority, new Worker/D1, User.layer, duplicate layer entity, or hand-authored migration.",
+  "nextRequiredExternalAction": "Resolve GAP-E6-RUNTIME-001 without topology drift: establish an evidence-bound authoritative RoleAssignment source under D1-01; establish/admit the physical implementation binding for canonical W02/T01/T03 identity/account/authorization; establish the W01 API-edge to W02 transport through an approved existing binding contract; then bind the deterministic RoleAssignment→L0-L8 resolver to W02 authorization runtime and produce controlled authLogin/authRefresh evidence. Do not treat legacy workers/W02-content or W01-payload as canonical W02 business authority. No new Worker/D1/User.layer/layer entity/hand-authored migration.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -238,10 +238,10 @@
   "e6RuntimeIntegrationGap": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-INTEGRATION-GAP-2026-09-21.md",
     "gapId": "GAP-E6-RUNTIME-001",
-    "status": "OPEN — D1-01 ROLEASSIGNMENT SOURCE + W02/T01/T03 RUNTIME IMPLEMENTATION/EVIDENCE REQUIRED",
+    "status": "OPEN — CANONICAL W02 IMPLEMENTATION BOUNDARY + D1-01 ROLEASSIGNMENT SOURCE + RUNTIME EVIDENCE REQUIRED",
     "runtimeCorrelationPathVerified": false,
     "remoteRuntimeExecutionStarted": false,
-    "audit": "artifacts/mapping-0/auth-002-worker-boundary-reconciliation-2026-09-21.md"
+    "audit": "artifacts/mapping-0/worker-physical-layout-reconciliation-2026-09-21.md"
   },
   "e6RuntimeImplementationAdmission": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21.md",
