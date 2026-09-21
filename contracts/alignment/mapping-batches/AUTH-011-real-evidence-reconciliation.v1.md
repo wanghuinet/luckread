@@ -34,7 +34,7 @@ The auth operation policy defines:
 
 The operation remains `CONTRACTED_PARTIAL` and its policy evidence marks OpenAPI, permission, state, anti-abuse, integration, and security-E2E evidence as missing.
 
-The API inventory includes `POST /v1/auth/refresh` as a required authentication endpoint group. The canonical OpenAPI document contains a `/auth/refresh` shell with `operationId: authRefresh`, but it is explicitly `DISCOVERY_DRAFT`, has a discovery-only summary, and does not define the concrete request/success/error Wire Schema. The `/v1` path prefix versus policy-relative `/auth/refresh` form must still be explicitly reconciled by the canonical API mapping; it must not be inferred.
+The API inventory includes `POST /v1/auth/refresh` as a required authentication endpoint group. The canonical OpenAPI document contains a `/auth/refresh` shell with `operationId: authRefresh`, but it is explicitly `DISCOVERY_DRAFT`, has a discovery-only summary, and does not define the concrete request/success/error Wire Schema. The `/v1` prefix versus `/auth/refresh` operation-relative representation is already reconciled by `M0-B01-API-PATH-NORMALIZATION-AUDIT-2026-09-20`; it is not an active E6 blocker.
 
 ## 3. Confirmed session/token security evidence
 
@@ -145,7 +145,7 @@ Promotion to GREEN requires bidirectional completion of:
 
 AUTH-011 may transition to GREEN only after all of the following are evidence-bound and validated without inventing identifiers:
 
-1. `authRefresh` has a canonical OpenAPI/inventory mapping with the API base-path convention reconciled.
+1. `authRefresh` uses the already-reconciled API path/base-path representation (`/v1/...` inventory versus `/api/v1` OpenAPI server plus `/auth/...` operation path).
 2. Request/response/error DTOs are canonical and mapped.
 3. `ENT-SESSION` / `ENT-CREDENTIAL` / `ENT-DEVICE-RECORD` fields and persistence authority are explicitly established.
 4. Refresh-token storage uses the canonical secret-protection contract and does not persist or log raw refresh secrets contrary to policy.
@@ -155,3 +155,13 @@ AUTH-011 may transition to GREEN only after all of the following are evidence-bo
 8. Positive, negative, replay, revocation, concurrency, state-transition, and security E2E tests execute successfully.
 9. Non-empty canonical Evidence Registry entries are bound to actual execution artifacts and commit SHA.
 10. Mapping 0 validator changes AUTH-011 from `PARTIAL` to `GREEN` only after every required gate passes.
+
+## 6C. API path/base-path sub-gate — PASS_VERIFIED
+
+`M0-B01-API-PATH-NORMALIZATION-AUDIT-2026-09-20` establishes the representation rule:
+
+`API Inventory /v1/auth/refresh` = canonical public API inventory representation;
+`OpenAPI server /api/v1 + path /auth/refresh` = transport representation;
+`Auth operation policy /auth/refresh` = operation-relative representation.
+
+Therefore API path normalization is no longer an AUTH-011 blocker. E6-WIRE-001 remains blocked only by the uncontracted exact Request/Response/Error Wire Schema, DTO binding, credential-carrier semantics, and route admission.
