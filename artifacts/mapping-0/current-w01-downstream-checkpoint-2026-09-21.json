@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "c1bd793157d7fbcff342301953fec7463fb552da",
+  "sourceHead": "92dd133cf416192b295442e6c1e53e9e35c1dd0d",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -99,7 +99,7 @@
     "nextItemState": "WAIT_AUTHORITY_DECISION",
     "noMappingRowsReexecuted": true
   },
-  "nextRequiredExternalAction": "Establish explicit execution admission for MIG-AUTH-002-SESSION-V1 against the already-initialized luckread D1. Do not rerun the baseline migration. After execution, capture fresh auth_session_state schema/migration-history evidence and then proceed to AUTH-002 runtime evidence.",
+  "nextRequiredExternalAction": "Reconcile the E5 execution authorization incident explicitly; do not rerun baseline or E5 migration. After governance reconciliation, proceed to AUTH-002 runtime evidence.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -116,11 +116,13 @@
     "requiredNextGate": "EXPLICIT_E5_REMOTE_EXECUTION_AUTHORITY",
     "executionChannel": {
       "admissionGuard": "scripts/auth-002-e5-remote-migration-admission.mjs",
-      "admissionGuardCommit": "d539e3cf2ae29bddf716c16e7f2d8eb9594146a8",
+      "admissionGuardCommit": "d76fc52126907719d29903d6ea6089fe1e48e1bc",
       "workflow": ".github/workflows/auth-002-e5-remote-migration-execution.yml",
       "workflowPreparedCommit": "831dba5e9637ebe71d45394644d7ca0b0d72290e",
       "workflowHardeningCommit": "1c01f40a6752c711b61a169a5488c0ed70b447df",
-      "remoteExecutionStarted": false
+      "remoteExecutionStarted": true,
+      "executionRunId": 35552919573,
+      "executionArtifactId": 10618729380
     }
   },
   "AUTH002": {
@@ -149,10 +151,12 @@
       "conclusion": "success",
       "testedCommitSha": "9241545d1a6dff7d87f0c3351e9a36867b6228af",
       "scope": "read-only controlled remote D1 schema/catalog recapture",
-      "promotion": "NOT_YET_PROMOTED"
+      "promotion": "NOT_YET_PROMOTED",
+      "status": "PASS_VERIFIED",
+      "resultNotPromoted": true
     }
   },
-  "latestReconciliationCommit": "c1bd793157d7fbcff342301953fec7463fb552da",
+  "latestReconciliationCommit": "92dd133cf416192b295442e6c1e53e9e35c1dd0d",
   "note": "E5 technical execution and independent read-only schema evidence are complete; governance authorization was invalidly permissive at execution time and remains unreconciled. No further D1 mutation is authorized by this checkpoint.",
   "executionTriggerAttempts": {
     "commits": [
@@ -161,13 +165,16 @@
       "fe1f2784d21f3f629bbad0baa971f1aa56520914"
     ],
     "changeControlStatus": "OPEN — EXECUTION DECISION REQUIRED",
-    "repositoryEvidenceOfSuccessfulE5Mutation": false,
-    "interpretation": "Trigger attempts do not constitute execution evidence. No E5 success/schema/migration artifact is currently present in repository search."
+    "repositoryEvidenceOfSuccessfulE5Mutation": true,
+    "interpretation": "Run 35552919573 is the authoritative technical execution evidence; governance authorization was invalidly permissive because the guard regex matched explanatory text while the Change Control status remained OPEN."
   },
   "independentSchemaEvidence": {
     "workflowRunId": 35553227463,
-    "status": "RUNNING",
+    "status": "PASS_VERIFIED",
     "resultNotPromoted": true,
-    "purpose": "read-only post-execution remote D1 schema/catalog recapture"
+    "purpose": "read-only post-execution remote D1 schema/catalog recapture",
+    "artifactId": 10619545790,
+    "digest": "sha256:68a812d812da703ace3b14e62360b56815c01c939418eb70a6e7252a573e9f31",
+    "testedCommitSha": "9241545d1a6dff7d87f0c3351e9a36867b6228af"
   }
 }
