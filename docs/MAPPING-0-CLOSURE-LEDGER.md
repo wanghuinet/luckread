@@ -1526,10 +1526,19 @@ Verified evidence facts:
 - Evidence manifest provenance and hashes were generated and the existing validator passed.
 
 Evidence Registry:
-- Registered as `EVD-AUTH002-B12-SCHEMA-REMOTE-002`, status `VERIFIED`.
-- The registration proves a current controlled remote schema observation; it does **not** promote AUTH-002, ENT-SESSION, or Mapping 0 to GREEN.
+- Evidence package is independently validated and ready for registry binding, but the canonical Evidence Registry file is intentionally **not** modified in this PR because its existing API Contract CI currently fails on unrelated legacy contract-shape findings.
+- Planned evidence identity: `EVD-AUTH002-B12-SCHEMA-REMOTE-002` (current remote schema observation; not a feature/runtime promotion).
+- This evidence proves a current controlled remote schema observation; it does **not** promote AUTH-002, ENT-SESSION, or Mapping 0 to GREEN.
 
 Promotion boundary remains:
 - AUTH-002 runtime evidence is still missing (login dual-state creation, logout revocation/idempotency, expiry, tokenVersion invalidation, device binding, refresh replay/concurrency, fail-closed behavior).
 - ENT-ROLE-ASSIGNMENT physical persistence/evidence and canonical physical W02 binding remain unresolved prerequisites for `GAP-E6-RUNTIME-001`.
 - Do not mark the Feature→Entity→Persistence registry VERIFIED solely from this schema evidence because the current AUTH-002 record also contains `ENT-IDENTITY` and `ENT-CREDENTIAL`, whose persistence is not proven by this run.
+
+
+## PR #9 legacy API Contract CI classification — 2026-09-22
+
+- PR #9 triggered the separate `API Contract CI` because the attempted Evidence Registry registration touched `contracts/evidence/**`.
+- Run `35658873615` fails on pre-existing broad contract-shape findings across AUTH-003 through AUTH-006, operation-policy files, evidence contracts, and other API/evidence files; these findings are outside the two-file remote-evidence closure change.
+- No existing Contract/Blueprint source is changed to make this legacy checker green.
+- The canonical Contract CI core chain for the evidence branch remains independently verified through the Mapping Structural/Contract, Semantic, OpenAPI, State Machine, AuthZ, Common, Enums, Payload, Blueprint and related gates as they complete.
