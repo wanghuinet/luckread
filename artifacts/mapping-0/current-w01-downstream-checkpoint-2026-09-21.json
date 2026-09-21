@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "sourceHead": "51cc085c0e00a2ff87935053e646fd05e5fe094f",
+  "sourceHead": "46b5eb5c1dd0fbdd0c746bb98796068551634f0a",
   "checkpointDate": "2026-09-21",
   "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
   "checks": {
@@ -118,7 +118,7 @@
       "evidenceReferenceCoverage": 449
     }
   },
-  "nextRequiredExternalAction": "Resolve E6-WIRE-001 through the existing AUTH-011/AUTH-010 Contract-First wire/DTO chain and E6-WIRE-002 through an authoritative AUTH-002 device-binding decision. Do not patch authRefresh into OpenAPI or add device transport by inference.",
+  "nextRequiredExternalAction": "Close E6-WIRE-001 via the existing AUTH-011/AUTH-010 Contract-First OpenAPI/DTO authority chain and E6-WIRE-002 via an explicit AUTH-002 device-binding source/transport decision. Do not implement runtime auth code or infer either input.",
   "noMappingRowsReexecuted": true,
   "e5": {
     "migrationId": "MIG-AUTH-002-SESSION-V1",
@@ -211,8 +211,8 @@
     "E5": "GENERATED_AND_REGISTERED",
     "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED"
   },
-  "latestReconciliationCommit": "51cc085c0e00a2ff87935053e646fd05e5fe094f",
-  "note": "Current head includes only evidence-authority correction. authRefresh OpenAPI drift is confirmed; no new API/DTO/runtime implementation was introduced. E6 remains blocked on the two previously recorded contract-input gaps.",
+  "latestReconciliationCommit": "46b5eb5c1dd0fbdd0c746bb98796068551634f0a",
+  "note": "Current checkpoint: E5 authority incident reconciled. E6-WIRE-001 and E6-WIRE-002 are independently evidence-bound as current contract-input gaps. No runtime authentication code or remote D1 mutation occurred in this continuation.",
   "executionTriggerAttempts": {
     "commits": [
       "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
@@ -269,18 +269,16 @@
   "e6WireInputGaps": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md",
     "status": "OPEN — REQUIRED CONTRACT INPUTS MISSING",
-    "items": [
-      {
-        "id": "E6-WIRE-001",
-        "status": "OPEN",
-        "dependency": "AUTH-011/AUTH-010 canonical authRefresh wire+DTO chain"
+    "evidence": {
+      "E6_WIRE_001": {
+        "artifact": "artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json",
+        "status": "DRIFT_CONFIRMED"
       },
-      {
-        "id": "E6-WIRE-002",
-        "status": "OPEN",
-        "dependency": "AUTH-002 authoritative device binding source/transport"
+      "E6_WIRE_002": {
+        "artifact": "artifacts/mapping-0/auth-002-device-binding-authority-audit-2026-09-21.json",
+        "status": "INPUT_AUTHORITY_MISSING_CONFIRMED"
       }
-    ]
+    }
   },
   "auth011WireAuthorityDrift": {
     "audit": "artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json",
