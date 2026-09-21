@@ -2,7 +2,7 @@
 
 - ID: CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21
 - Date: 2026-09-21
-- Status: BLOCKED — REQUIRED CONTRACT INPUTS MISSING
++ Status: BLOCKED — REQUIRED CONTRACT INPUTS INCOMPLETE
 - Feature: AUTH-002
 - Gate: E6 Native Session Runtime Evidence
 - Depends on:
@@ -82,8 +82,9 @@ This reconciliation clears the incident-dependency only. E6 implementation is no
 ## Current disposition
 
 - GAP-E6-RUNTIME-001: OPEN.
-- E6-WIRE-001: OPEN — canonical authRefresh wire authority remains non-admitted; current OpenAPI entry is DISCOVERY_DRAFT.
-- E6-WIRE-002: OPEN — canonical device binding input authority missing.
+- E6-WIRE-001: PASS_VERIFIED_AUTHORITY — authRefresh request/response/error/credential-carrier contract reconciled.
+- E6-WIRE-002: PASS_VERIFIED_AUTHORITY — deviceId source/transport/binding semantics reconciled.
+- E6-LAYER-001: OPEN — response layer source/resolver authority is not established.
 - This Change Control: BLOCKED — REQUIRED CONTRACT INPUTS MISSING.
 - No runtime code added by this record.
 - No remote D1 write performed by this record.
