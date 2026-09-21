@@ -999,3 +999,32 @@ Current cursor:
 
 Anti-loop:
 Do not repeat the E4.5 probe, the structural gate, or the migration-source search unless the relevant W01 source, migration contract, or approved generation mechanism changes.
+
+
+## Superpowers continuation audit — W01 baseline execution reconciliation and E5 boundary — 2026-09-21
+
+Current source head: 42417b8629f599b7cdc875aeac09b7bde97982e4.
+
+Baseline execution reconciliation:
+- The controlled D1 target is no longer uninitialized. Current execution preflight run 35551188747 observed exactly the eight Payload baseline application tables.
+- Historical execution evidence run 35508571153 records migration 20250929_111647 = PASS, recorded in payload_migrations batch 1, with the same eight application tables.
+- Therefore W01-MIGRATION-BASELINE-AUTHORITY-001 is PASS_VERIFIED. The baseline migration MUST NOT be re-executed.
+- The failed preflight attempts are retained as diagnostic evidence and are not treated as migration failures.
+
+E5 migration-source reconciliation:
+- MIG-AUTH-002-SESSION-V1 is now present at workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts.
+- E5 generation proof run 35547971500 = success.
+- W01 Migration Source Audit run 35548553203 = success.
+- The E5 schema-source Change Control is limited to deterministic schema generation and does not itself authorize remote execution.
+
+Current E5 execution boundary:
+- New control: docs/change-control/CC-MAPPING-0-AUTH-002-E5-REMOTE-EXECUTION-2026-09-21.md.
+- Status: OPEN — EXECUTION DECISION REQUIRED.
+- Remote execution of MIG-AUTH-002-SESSION-V1 is not authorized until explicit GREEN execution admission is recorded.
+- Required post-execution evidence includes migration history, exact auth_session_state schema/indexes, absence of forbidden secret columns, no physical FK to embedded users.sessions[], and native users/users_sessions schema preservation.
+
+Continuation state:
+- Canonical Mapping remains NOT_GREEN with historical distribution PARTIAL 17 / UNRESOLVED 431 / MISSING 1; no Mapping rows were re-executed or promoted in this batch.
+- NEXT_ITEM_ID: M0-AUTH-002-E5-REMOTE-EXECUTION-AUTHORITY-001.
+- NEXT_ITEM_STATE: WAIT_AUTHORITY_DECISION.
+- Anti-loop: do not rerun the baseline migration, repeat empty-target probes, or rediscover the E5 source gap unless an authoritative input changes.
