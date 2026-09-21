@@ -138,6 +138,7 @@ jobs:
           const usersSessions = rows('preflight-users-sessions-schema.json');
           const expectedTables = ['media','payload_locked_documents','payload_locked_documents_rels','payload_migrations','payload_preferences','payload_preferences_rels','users','users_sessions'];
           if (JSON.stringify(tables) !== JSON.stringify(expectedTables)) throw new Error('E5 preflight table set mismatch: ' + JSON.stringify(tables));
+          if (migrations.length !== 1) throw new Error('preflight migration history must contain exactly one baseline record: ' + JSON.stringify(migrations));
           if (migrations.filter((r)=>r.name===process.env.BASELINE_MIGRATION).length !== 1) throw new Error('baseline migration history is not present exactly once');
           if (migrations.some((r)=>r.name===process.env.E5_MIGRATION)) throw new Error('E5 migration is already recorded; refusing duplicate execution');
           if (catalog.some((r)=>r.tbl_name==='auth_session_state' || r.name==='auth_session_state')) throw new Error('auth_session_state already exists; refusing duplicate execution');
@@ -148,6 +149,7 @@ jobs:
             migrationHistory: migrations,
             usersSchema: users,
             usersSessionsSchema: usersSessions,
+            catalog: catalog,
             authSessionStatePresent: false,
             result: 'PASS'
           }, null, 2) + '\n');
@@ -220,6 +222,7 @@ jobs:
           const users = rows('post-users-schema.json');
           const usersSessions = rows('post-users-sessions-schema.json');
           const preflight = JSON.parse(fs.readFileSync(dir + '/preflight-summary.json','utf8'));
+          const nativeCatalog = (items) => items.filter((r)=>r.tbl_name==='users' || r.tbl_name==='users_sessions').sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
           if (JSON.stringify(migrations.map((r)=>r.name)) !== JSON.stringify([process.env.BASELINE_MIGRATION, process.env.E5_MIGRATION])) throw new Error('unexpected migration history: ' + JSON.stringify(migrations));
           if (JSON.stringify(tables) !== JSON.stringify(expectedTables)) throw new Error('unexpected post table set: ' + JSON.stringify(tables));
           if (JSON.stringify(authColumns) !== JSON.stringify(expectedColumns)) throw new Error('unexpected auth_session_state columns: ' + JSON.stringify(authColumns));
@@ -227,6 +230,7 @@ jobs:
           if (fk.length !== 0) throw new Error('auth_session_state has a physical foreign key; expected none');
           if (JSON.stringify(users) !== JSON.stringify(preflight.usersSchema)) throw new Error('native users schema changed during E5 execution');
           if (JSON.stringify(usersSessions) !== JSON.stringify(preflight.usersSessionsSchema)) throw new Error('native users_sessions schema changed during E5 execution');
+          if (JSON.stringify(nativeCatalog(catalog)) !== JSON.stringify(nativeCatalog(preflight.catalog || []))) throw new Error('native users/users_sessions catalog objects changed during E5 execution');
           const authSql = catalog.filter((r)=>r.tbl_name==='auth_session_state' && r.type==='table').map((r)=>String(r.sql||'')).join('\n').toLowerCase();
           for (const forbidden of ['raw_access_token','raw_refresh_token','password','created_at','expires_at']) {
             if (authSql.includes(forbidden)) throw new Error('forbidden auth_session_state schema content detected: ' + forbidden);
