@@ -1230,3 +1230,15 @@ The guard enforces:
 
 No authentication runtime code was changed and no remote D1 mutation occurred.
 
+
+## Superpowers continuation — AUTH-011 authRefresh current authority drift corrected — 2026-09-21
+
+A repository-only authority audit established a current-vs-historical evidence mismatch:
+- API Inventory requires `POST /v1/auth/refresh`.
+- Current canonical OpenAPI has no `/auth/refresh` path and no `authRefresh` operation definition.
+- The older `artifacts/mapping-0/api-dto-four-layer-crosscheck-2026-09-19.json` row that treated `authRefresh` as an OpenAPI-admitted operation is stale for current-head authority.
+- Current audit artifact: `artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json` = `DRIFT_CONFIRMED`.
+- No OpenAPI route, DTO, API inventory entry, runtime handler, or public field was added by this correction.
+
+This tightens E6-WIRE-001: the missing `authRefresh` wire authority is confirmed rather than inferred from stale crosscheck data. AUTH-011 and E6 remain blocked until the existing Contract-First chain closes the wire/DTO authority.
+
