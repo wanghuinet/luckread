@@ -186,3 +186,36 @@ For E6, the canonical logical authority remains W02/T01/T03/D1-01. The physical 
 
 Status remains: **BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED**.
 
+
+
+## Decision A status update — 2026-09-22
+
+Project authority has now explicitly selected the W02 physical source path and deployment/transport decisions:
+
+- Source path = `workers/W02-content`.
+- Physical Worker name = `luckread-w02`.
+- Deployment = controlled GitHub Actions `workflow_dispatch` + Wrangler with exact source-commit provenance.
+- W01 → W02 transport = Cloudflare Service Binding over HTTP, binding `W02_AUTH` to service `luckread-w02`.
+
+The corresponding decision record is:
+`docs/change-control/CC-MAPPING-0-E6-W02-DEPLOYMENT-TRANSPORT-DECISION-2026-09-22.md`
+
+These values are authority inputs only. Actual Worker existence, deployed version, source commit and binding deployment evidence remain unverified.
+
+## Remaining E6 authority blocker — Decision B
+
+Decision B remains unresolved only at the physical persistence realization layer for `ENT-ROLE-ASSIGNMENT`.
+
+Authoritative facts already closed:
+- owner = W02/T03;
+- domain = D1-01;
+- entity fields and authorization semantics = `contracts/entity/AUTHZ-role-assignment-authority.v1.json`;
+- deterministic resolver = `contracts/authz/role-assignment-layer-resolution.v1.json`.
+
+Still requiring an explicit physical persistence decision/evidence:
+- concrete physical D1 resource for D1-01;
+- persistence implementation source;
+- migration-generation path consistent with the Contract;
+- entity/field/persistence evidence registration.
+
+Do not infer the physical D1 resource from the names `luckread` or `luckreadpro`. The current repository evidence does not establish either as the D1-01 physical authority for RoleAssignment.
