@@ -1,19 +1,19 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "6f6d96dceb2a425333675860c064ec2ab2307d7f",
+  "currentMainHead": "d37cbdc1f2e3175caf454bd611f0bded4dc1fca2",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "6f6d96dceb2a425333675860c064ec2ab2307d7f",
-    "priorRecordedHead": "223b52e0ae64533eab7d11b23e30f29f15caea9a",
+    "verifiedMainHead": "d37cbdc1f2e3175caf454bd611f0bded4dc1fca2",
+    "priorRecordedHead": "6f6d96dceb2a425333675860c064ec2ab2307d7f",
     "state": "RECONCILED",
-    "note": "Current head is the W02 decision checkpoint commit. W02 source path, physical Worker name, deployment mode, and transport are decided; implementation/deployment evidence remains pending."
+    "note": "GitHub main ref was reverified at d37cbdc1f2e3175caf454bd611f0bded4dc1fca2. Latest commits are governance-only W02 decision-boundary records; no runtime/RoleAssignment/Mapping promotion."
   },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
     "state": "WAIT_AUTHORITY_DECISION / IMPLEMENTATION_NOT_ADMITTED",
     "noMappingRowsReexecuted": true,
-    "lastGovernanceCommit": "6f6d96dceb2a425333675860c064ec2ab2307d7f"
+    "lastGovernanceCommit": "d37cbdc1f2e3175caf454bd611f0bded4dc1fca2"
   },
   "mapping0": {
     "status": "NOT_GREEN",
@@ -117,12 +117,12 @@
     "runtimePromotion": "NONE",
     "roleAssignmentPromotion": "NONE",
     "governanceBoundaryReconciled": true,
-    "latestGovernanceCommit": "6f6d96dceb2a425333675860c064ec2ab2307d7f",
+    "latestGovernanceCommit": "d37cbdc1f2e3175caf454bd611f0bded4dc1fca2",
     "externalEvidenceRunId": 35677891303,
     "externalEvidenceArtifactId": 10673223547,
     "e6AdmissionGuardRunId": 35679278731,
     "e6AdmissionGuardConclusion": "SUCCESS_FAIL_CLOSED_NOT_ADMITTED",
-    "currentHeadReconciliation": "PASS_INHERITED — W02 deployment/transport decision recorded; no runtime/RoleAssignment/Mapping promotion",
+    "currentHeadReconciliation": "PASS_INHERITED — latest main d37cbdc is governance-only W02 decision-boundary continuation; no runtime/RoleAssignment/Mapping promotion",
     "w02DeploymentTransportDecision": "RECORDED",
     "w02WorkerName": "luckread-w02",
     "w02SourcePath": "workers/W02-content",
