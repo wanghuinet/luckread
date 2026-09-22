@@ -1,0 +1,37 @@
+name: W02 RoleAssignment Verification
+
+on:
+  pull_request:
+    paths:
+      - 'workers/W02-content/**'
+      - 'contracts/authz/**'
+      - 'contracts/entity/AUTHZ-role-assignment-authority.v1.json'
+      - 'scripts/generate-role-assignment-migration.mjs'
+      - '.github/workflows/w02-role-assignment-verification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Typecheck W02
+        run: npx tsc -p workers/W02-content/tsconfig.json --noEmit
+      - name: Verify generated migration
+        run: node scripts/generate-role-assignment-migration.mjs
+      - name: Assert migration artifact is committed
+        run: git diff --exit-code -- workers/W02-content/migrations/0001_role_assignments.sql
+      - name: Run RoleAssignment tests
+        run: npx vitest run workers/W02-content/src/authz/role-assignment.test.ts
