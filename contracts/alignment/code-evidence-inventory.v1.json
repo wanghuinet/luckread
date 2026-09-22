@@ -2504,16 +2504,24 @@
       "evidenceId": "ENTITY:ENT-ROLE-ASSIGNMENT",
       "subjectType": "ENTITY",
       "subjectId": "ENT-ROLE-ASSIGNMENT",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-content/src/authz/role-assignment.ts",
+        "workers/W02-content/src/index.ts"
+      ],
       "testRefs": [],
-      "schemaEvidenceRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W02-content/migrations/0001_role_assignments.sql"
+      ],
       "sourceRefs": [
         "contracts/entity/entity-catalog.v1.json",
         "contracts/entity/entity-implementation-evidence.v1.json"
       ],
       "blockers": [
-        "No concrete implementation evidence recorded."
+        "Remote D1-01 migration execution evidence is pending.",
+        "Controlled W02 deployment/version/source evidence is pending.",
+        "role_version mutation/invalidation runtime evidence is pending.",
+        "Controlled authLogin/authRefresh runtime evidence is pending."
       ]
     },
     {
