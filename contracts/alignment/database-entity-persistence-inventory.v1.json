@@ -98,13 +98,19 @@
       "entityName": "RoleAssignment",
       "domainId": "D1-01",
       "entityStatus": "PROPOSED",
-      "implementationRef": "",
-      "persistenceStatus": "NOT_APPLICABLE",
-      "adapter": "",
-      "migrationRefs": [],
+      "implementationRef": "workers/W02-content/src/authz/role-assignment.ts",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+      "adapter": "Cloudflare D1 (D1-01 primary) / W02 native D1 binding",
+      "migrationRefs": [
+        "workers/W02-content/migrations/0001_role_assignments.sql",
+        "scripts/generate-role-assignment-migration.mjs"
+      ],
       "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
       "evidenceRefs": [
-        "contracts/entity/entity-catalog.v1.json"
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/AUTHZ-role-assignment-authority.v1.json",
+        "workers/W02-content/wrangler.jsonc",
+        "workers/W02-content/migrations/0001_role_assignments.sql"
       ]
     },
     {
