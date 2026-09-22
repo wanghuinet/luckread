@@ -1,7 +1,7 @@
 # Change Control — Mapping 0 Current Physical Worker Binding Gap — 2026-09-21
 
 - ID: CC-MAPPING-0-WORKER-PHYSICAL-BINDING-2026-09-21
-- Status: WAIT_AUTHORITY_DECISION — PHYSICAL BINDING AUTHORITY REQUIRED
+- Status: DECISION_A_RECORDED — DEPLOYMENT EVIDENCE PENDING
 - Scope: evidence-bound physical deployment mapping for the already-frozen 12 canonical logical Workers.
 - This is a binding/evidence control only. It does not change the 12-Worker architecture.
 
@@ -55,7 +55,15 @@ No resource creation is authorized by this record.
 
 ## Current disposition
 
-WAIT_AUTHORITY_DECISION. The technical search/evidence acquisition portion is complete. Closure now requires the normal Contract-First authority decision that binds each admitted canonical logical Worker to its concrete physical Worker resource/name; no resource creation, rename, or runtime implementation is implied.
+Decision A is now recorded from the project authority's explicit source-path choice. The deployment/transport decision is recorded in `docs/change-control/CC-MAPPING-0-E6-W02-DEPLOYMENT-TRANSPORT-DECISION-2026-09-22.md`.
+
+For AUTH-002/W02:
+- source path = `workers/W02-content`;
+- physical Worker name = `luckread-w02`;
+- deployment = controlled GitHub Actions `workflow_dispatch` using Wrangler, with exact source-commit provenance;
+- W01 → W02 transport = Cloudflare Service Binding over HTTP, binding `W02_AUTH` → service `luckread-w02`.
+
+These decisions do not constitute deployment evidence. The Worker still must be implemented and admitted before deployment, and the target resource/version/source chain must then be proven. No Worker was created or deployed by this decision.
 
 
 ## Evidence acquisition delta — 2026-09-21
@@ -71,9 +79,22 @@ A current-head repository/configuration audit was performed without executing or
 
 ### Gate result
 
-`Canonical logical Worker → physical Worker resource/name → deployed source commit → configuration/binding → runtime evidence` remains **NOT_ESTABLISHED** for the AUTH-002-relevant W02 boundary.
+`Canonical logical Worker → physical Worker name → source path → deployment configuration → deployed source commit → runtime evidence` is now **DECIDED BUT NOT YET EVIDENCE-CLOSED** for the AUTH-002-relevant W02 boundary.
 
-No directory rename, Worker creation, deployment, D1 mutation, or runtime implementation admission occurred.
+Decision values:
+- physical name = `luckread-w02`;
+- source path = `workers/W02-content`;
+- deployment = controlled GitHub Actions `workflow_dispatch` + Wrangler;
+- transport = W01 `W02_AUTH` Service Binding over HTTP to `luckread-w02`.
+
+Outstanding evidence:
+- actual Worker resource/version existence;
+- exact deployed source commit;
+- build/deployment record;
+- W01 Service Binding deployment verification;
+- runtime smoke/evidence.
+
+No Worker creation, deployment, D1 mutation, or runtime implementation admission occurred.
 
 
 ## Fresh Cloudflare API evidence — 2026-09-21
@@ -91,7 +112,7 @@ A new read-only inventory was executed from `main` commit `75e5a25fba48d95c43247
 
 ### Updated disposition
 
-The physical Worker binding prerequisite remains **WAIT_AUTHORITY_DECISION**, now with a stronger evidence state:
+The physical Worker binding authority decision for W02 is now **RECORDED**. The external/deployed evidence state remains pending:
 
 `Cloudflare actual uploaded Worker scripts = 0`
 
