@@ -1614,6 +1614,16 @@ New authority input:
 
 Static repository verification found `workers/W02-content` previously contained only a legacy Content README; the README is now reconciled to canonical W02 Identity / Account / Authorization responsibility. No Worker was deployed and no D1 mutation occurred.
 
-Decision A is therefore recorded, but its deployment evidence is not yet closed. Decision B remains the only authority gap: concrete physical D1-01 resource/persistence realization for `ENT-ROLE-ASSIGNMENT`. Do not infer `luckread` or `luckreadpro` as D1-01 from their names; current authority does not establish either physical binding.
+Decision A is therefore recorded, but its deployment evidence is not yet closed. Decision B is now authority-resolved: D1-01 primary = Cloudflare D1 UUID `2f80471e-3756-49f9-8db1-7707a433ad64`; D1-02 secondary = Cloudflare D1 UUID `6c342634-97f6-4248-9f4a-85772af4f22c`. Display names are non-authoritative and may be renamed. This closes the physical-resource authority gap; it does not constitute RoleAssignment persistence/runtime/deployment evidence.
 
-Current cursor remains `GAP-E6-RUNTIME-001` with implementation not admitted. Mapping 0 remains NOT_GREEN. No previously passed Mapping/E5/AUTH-002 schema task was re-executed.
+Current cursor remains `GAP-E6-RUNTIME-001`; Decision B is closed at authority-input scope, but implementation remains not admitted. Mapping 0 remains NOT_GREEN. No previously passed Mapping/E5/AUTH-002 schema task was re-executed.
+
+## 2026-09-22 continuation — D1 physical authority resolved
+
+- Project authority explicitly mapped D1-01 to the primary database and D1-02 to the secondary database.
+- The controlled read-only Cloudflare inventory supplies the corresponding UUIDs; the inventory labels `luckread` / `luckreadpro` are retained only as historical capture labels and are not authoritative identifiers.
+- D1-01 UUID `2f80471e-3756-49f9-8db1-7707a433ad64` is the authoritative persistence target for `ENT-ROLE-ASSIGNMENT`.
+- D1-02 UUID `6c342634-97f6-4248-9f4a-85772af4f22c` is not a RoleAssignment persistence target.
+- This is a genuine new authority closure, not a rerun of a passed Mapping 0 item.
+- Remaining E6 blockers are implementation/deployment/evidence: contracted RoleAssignment persistence generation, W02 source/runtime implementation, controlled W02 deployment evidence, W01 `W02_AUTH` binding evidence, and controlled authLogin/authRefresh runtime evidence.
+
