@@ -31,11 +31,15 @@ jobs:
         with:
           node-version: 24
 
-      - name: Enable Corepack and install locked dependencies
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+          run_install: false
+
+      - name: Install locked dependencies
         working-directory: workers/W01-payload
-        run: |
-          corepack enable
-          pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Verify W01 W02_AUTH binding
         working-directory: workers/W01-payload
