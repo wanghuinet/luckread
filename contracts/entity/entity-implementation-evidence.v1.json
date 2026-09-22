@@ -16,14 +16,15 @@
         "workers/W01-payload/src/collections/Users.ts"
       ],
       "migrationEvidenceRefs": [
-        "workers/W01-payload/src/payload.config.ts"
+        "workers/W01-payload/src/payload.config.ts",
+        "artifacts/evidence/auth-002-remote-baseline/run-35508571153.json"
       ],
       "payloadNativeEvidenceRefs": [],
       "extensionEvidenceRefs": [
         "workers/W01-payload/src/collections/Users.ts"
       ],
       "blockers": [
-        "Migration execution evidence is not yet independently recorded."
+        "AUTH-002 native session runtime, extension correlation, and final Evidence Registry promotion remain open."
       ],
       "status": "NOT_GREEN"
     },
