@@ -1,0 +1,77 @@
+name: W01 W02 Auth Binding Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact W01 source commit to deploy
+        required: true
+        type: string
+      confirm:
+        description: Type DEPLOY_BINDING to permit W01 application deployment
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirm == 'DEPLOY_BINDING' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable Corepack and install locked dependencies
+        working-directory: workers/W01-payload
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+
+      - name: Verify W01 W02_AUTH binding
+        working-directory: workers/W01-payload
+        run: |
+          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8')); const b=(c.services||[]).find(x=>x.binding==='W02_AUTH'); if(!b || b.service!=='luckread-w02') throw new Error('W02_AUTH binding mismatch'); console.log(JSON.stringify(b));"
+
+      - name: Build W01 application without database migration
+        working-directory: workers/W01-payload
+        run: pnpm exec opennextjs-cloudflare build
+
+      - name: Deploy W01 application with Service Binding
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          mkdir -p ../../artifacts/mapping-0
+          set -o pipefail
+          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w01-w02-binding-deploy.log
+
+      - name: Write deployment provenance
+        run: |
+          cat > artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt <<EOF
+          workflow=W01 W02 Auth Binding Deploy
+          source_sha=${{ inputs.source_sha }}
+          confirmation=DEPLOY_BINDING
+          worker=luckread-w01-payload
+          binding=W02_AUTH
+          target=luckread-w02
+          database_mutation=false
+          EOF
+
+      - name: Upload deployment evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: w01-w02-binding-deployment-${{ inputs.source_sha }}
+          path: |
+            artifacts/mapping-0/w01-w02-binding-deploy.log
+            artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt
