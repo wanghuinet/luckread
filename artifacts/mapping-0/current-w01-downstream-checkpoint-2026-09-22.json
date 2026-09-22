@@ -1,19 +1,19 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "223b52e0ae64533eab7d11b23e30f29f15caea9a",
+  "currentMainHead": "6f6d96dceb2a425333675860c064ec2ab2307d7f",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "223b52e0ae64533eab7d11b23e30f29f15caea9a",
-    "priorRecordedHead": "d41db6c1db2e99f1de540f38dbed3d25638a0e74",
+    "verifiedMainHead": "6f6d96dceb2a425333675860c064ec2ab2307d7f",
+    "priorRecordedHead": "223b52e0ae64533eab7d11b23e30f29f15caea9a",
     "state": "RECONCILED",
-    "note": "Authority decision for W02 source path, physical Worker name, deployment mode, and W01→W02 transport is now recorded. No runtime implementation or deployment evidence is promoted."
+    "note": "Current head is the W02 decision checkpoint commit. W02 source path, physical Worker name, deployment mode, and transport are decided; implementation/deployment evidence remains pending."
   },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
     "state": "WAIT_AUTHORITY_DECISION / IMPLEMENTATION_NOT_ADMITTED",
     "noMappingRowsReexecuted": true,
-    "lastGovernanceCommit": "223b52e0ae64533eab7d11b23e30f29f15caea9a"
+    "lastGovernanceCommit": "6f6d96dceb2a425333675860c064ec2ab2307d7f"
   },
   "mapping0": {
     "status": "NOT_GREEN",
@@ -117,7 +117,7 @@
     "runtimePromotion": "NONE",
     "roleAssignmentPromotion": "NONE",
     "governanceBoundaryReconciled": true,
-    "latestGovernanceCommit": "223b52e0ae64533eab7d11b23e30f29f15caea9a",
+    "latestGovernanceCommit": "6f6d96dceb2a425333675860c064ec2ab2307d7f",
     "externalEvidenceRunId": 35677891303,
     "externalEvidenceArtifactId": 10673223547,
     "e6AdmissionGuardRunId": 35679278731,
