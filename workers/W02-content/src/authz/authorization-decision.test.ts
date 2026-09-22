@@ -149,6 +149,25 @@ describe('canonical authorization decision', () => {
     })
   })
 
+  it('returns a canonical check shape when required input is incomplete', () => {
+    const input = baseInput()
+    input.checks = { permission: 'PASS' } as never
+    const result = evaluateAuthorization(input)
+
+    expect(result).toMatchObject({
+      decision: 'DENY',
+      reasonCode: 'MISSING_AUTHORIZATION_INPUT',
+    })
+    expect(result.checks).toEqual(expect.objectContaining({
+      authentication: expect.any(String),
+      accountState: expect.any(String),
+      permission: 'PASS',
+      scope: expect.any(String),
+      resource: expect.any(String),
+      policy: expect.any(String),
+    }))
+  })
+
   it('fails closed on evaluation exceptions', () => {
     const input = baseInput()
     input.checks = undefined as never
