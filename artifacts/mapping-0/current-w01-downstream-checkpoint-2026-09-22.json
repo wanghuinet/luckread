@@ -1,21 +1,21 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "123d01d865112ec126c3862c68999d695b02a746",
+  "currentMainHead": "822de57b7f0e441d101066e676edd8dbe54b6ded",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "d37cbdc1f2e3175caf454bd611f0bded4dc1fca2",
-    "priorRecordedHead": "6f6d96dceb2a425333675860c064ec2ab2307d7f",
+    "verifiedMainHead": "822de57b7f0e441d101066e676edd8dbe54b6ded",
+    "priorRecordedHead": "822de57b7f0e441d101066e676edd8dbe54b6ded",
     "state": "RECONCILED",
-    "note": "GitHub main ref was reverified at d37cbdc1f2e3175caf454bd611f0bded4dc1fca2. Latest commits are governance-only W02 decision-boundary records; no runtime/RoleAssignment/Mapping promotion."
+    "note": "Latest main records explicit D1-01/D1-02 physical UUID allocation. No runtime or remote database mutation was performed."
   },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
-    "state": "D1_01_PHYSICAL_BINDING_EVIDENCE_PENDING",
+    "state": "W02_IMPLEMENTATION_AND_DEPLOYMENT_EVIDENCE_PENDING",
     "noMappingRowsReexecuted": true,
     "lastGovernanceCommit": "d37cbdc1f2e3175caf454bd611f0bded4dc1fca2",
-    "decisionB": "DECIDED — D1-01 primary; D1-02 secondary",
-    "next": "CONTROLLED_D1_01_UUID_BINDING_EVIDENCE"
+    "decisionB": "DECIDED — D1-01 primary UUID 2f80471e-3756-49f9-8db1-7707a433ad64; D1-02 secondary UUID 6c342634-97f6-4248-9f4a-85772af4f22c",
+    "next": "CONTRACTED_ROLEASSIGNMENT_PERSISTENCE_AND_W02_DEPLOYMENT_EVIDENCE"
   },
   "mapping0": {
     "status": "NOT_GREEN",
@@ -94,12 +94,12 @@
     "note": "Fresh read-only Cloudflare API inventory after job rerun; source checkout head is historical and does not affect the remote resource observation. No current physical W02 binding is established."
   },
   "blockers": [
-    "D1-01 ENT-ROLE-ASSIGNMENT remains PROPOSED / CONTRACT_ONLY with no implementation or persistence evidence.",
-    "W02 physical binding decision is recorded: source workers/W02-content, Worker luckread-w02, controlled GitHub Actions workflow_dispatch + Wrangler deployment, W01 W02_AUTH Service Binding over HTTP. Actual deployment/version/source evidence is pending.",
-    "W02/T01/T03 runtime implementation is not admitted.",
+    "ENT-ROLE-ASSIGNMENT remains contract-only; persistence implementation/evidence is pending.",
+    "W02 implementation and controlled deployment/version/source evidence are pending.",
+    "W01→W02 W02_AUTH Service Binding deployment evidence is pending.",
     "Controlled authLogin/authRefresh runtime evidence is not generated."
   ],
-  "nextExternalAuthority": "Evidence-bound ENT-ROLE-ASSIGNMENT realization remains required. W02 physical source/name/deployment/transport decision is recorded; actual Worker/deployment/binding evidence remains pending.",
+  "nextExternalAuthority": "No additional logical D1 authority decision is pending. The next closure work is implementation and evidence under the existing contracts/change-control gates.",
   "alreadyClosed": [
     "AUTH-002 remote schema/evidence acquisition sub-step at current head fbfd8aa",
     "E6 wire/input authority reconciliation",
@@ -119,16 +119,16 @@
     "runtimePromotion": "NONE",
     "roleAssignmentPromotion": "NONE",
     "governanceBoundaryReconciled": true,
-    "latestGovernanceCommit": "d37cbdc1f2e3175caf454bd611f0bded4dc1fca2",
+    "latestGovernanceCommit": "822de57b7f0e441d101066e676edd8dbe54b6ded",
     "externalEvidenceRunId": 35677891303,
     "externalEvidenceArtifactId": 10673223547,
     "e6AdmissionGuardRunId": 35679278731,
     "e6AdmissionGuardConclusion": "SUCCESS_FAIL_CLOSED_NOT_ADMITTED",
-    "currentHeadReconciliation": "PASS — authority decision recorded; no schema/runtime/deployment mutation",
+    "currentHeadReconciliation": "PASS — physical D1 authority input bound by UUID; no schema/runtime/deployment mutation",
     "w02DeploymentTransportDecision": "RECORDED",
     "w02WorkerName": "luckread-w02",
     "w02SourcePath": "workers/W02-content",
     "w01ToW02Transport": "Cloudflare Service Binding HTTP, binding W02_AUTH",
-    "d1AuthorityDecision": "D1-01 = primary database; D1-02 = secondary database; display names non-authoritative"
+    "d1AuthorityDecision": "D1-01 = primary database UUID 2f80471e-3756-49f9-8db1-7707a433ad64; D1-02 = secondary database UUID 6c342634-97f6-4248-9f4a-85772af4f22c; display names non-authoritative"
   }
 }
