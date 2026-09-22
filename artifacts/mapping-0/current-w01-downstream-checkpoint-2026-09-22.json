@@ -1,13 +1,13 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "8ddfb1fc570f1a833efa7fd7289aafdefa2a20bd",
+  "currentMainHead": "848c0921eae42a16f73906f44915024a6d37c672",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "8ddfb1fc570f1a833efa7fd7289aafdefa2a20bd",
+    "verifiedMainHead": "848c0921eae42a16f73906f44915024a6d37c672",
     "priorRecordedHead": "8ddfb1fc570f1a833efa7fd7289aafdefa2a20bd",
     "state": "RECONCILED",
-    "note": "Latest main preserves canonical D1-02 domain semantics while treating primary/secondary only as physical allocation labels."
+    "note": "Latest main aligns D1 physical allocation wording: D1-01 primary UUID and D1-02 secondary UUID are physical labels only; canonical domain semantics remain unchanged."
   },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
@@ -119,7 +119,7 @@
     "runtimePromotion": "NONE",
     "roleAssignmentPromotion": "NONE",
     "governanceBoundaryReconciled": true,
-    "latestGovernanceCommit": "8ddfb1fc570f1a833efa7fd7289aafdefa2a20bd",
+    "latestGovernanceCommit": "848c0921eae42a16f73906f44915024a6d37c672",
     "externalEvidenceRunId": 35677891303,
     "externalEvidenceArtifactId": 10673223547,
     "e6AdmissionGuardRunId": 35679278731,
