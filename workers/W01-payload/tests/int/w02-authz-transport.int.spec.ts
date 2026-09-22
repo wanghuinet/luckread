@@ -163,7 +163,7 @@ describe('W01 -> W02 authorization transport', () => {
         signal: controller.signal,
       }),
     ).rejects.toMatchObject({ code: 'DEPENDENCY_FAILED' })
-    expect(target.getCalls()).toBe(1)
+    expect(target.getCalls()).toBe(0)
   })
 
   it('omits absent optional correlation headers', async () => {
