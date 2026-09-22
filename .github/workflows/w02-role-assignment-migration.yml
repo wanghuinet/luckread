@@ -1,0 +1,45 @@
+name: W02 RoleAssignment D1-01 Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact implementation commit containing the approved migration
+        required: true
+        type: string
+      database_name:
+        description: Current Cloudflare display name for the D1-01 UUID bound in wrangler.jsonc
+        required: true
+        type: string
+      confirm:
+        description: Type APPLY to permit remote D1 mutation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact implementation commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify RoleAssignment migration artifact
+        run: node scripts/generate-role-assignment-migration.mjs
+      - name: Assert generated migration is committed
+        run: git diff --exit-code -- workers/W02-content/migrations/0001_role_assignments.sql
+      - name: Apply D1-01 migration remotely
+        working-directory: workers/W02-content
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 d1 migrations apply "${{ inputs.database_name }}" --remote --config wrangler.jsonc
