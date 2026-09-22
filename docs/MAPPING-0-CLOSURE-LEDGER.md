@@ -1582,3 +1582,22 @@ Acceptance:
 - No regression introduced by the E6 governance continuation.
 - Existing downstream failures remain inherited blockers, not new defects requiring a repeat of completed Mapping/E6 work.
 - `GAP-E6-RUNTIME-001` remains the sole active continuation cursor.
+
+## Superpowers continuation — current-head AUTH-002 evidence refreshed — 2026-09-22
+
+- Current authoritative main head after evidence-trigger commit: `fbfd8aa589afc493e0772bad35ed42fa11fc3ca1`.
+- Controlled workflow: `AUTH-002 Session Schema Evidence`, run `35677891303` = **SUCCESS**, attempt 1.
+- Artifact: `10673223547`, SHA256 `ea984e918c0af62c0e3ff453db81987336041b8fecf4e957432146738e59d455`.
+- Artifact provenance binds `GITHUB_SHA` and `testedCommitSha` to the current main head; environment = `CONTROLLED_REMOTE_D1`; database = `luckread`; Payload and D1 adapter = `3.87.1`.
+- Remote read-only state: 9 tables; Payload migration history contains `20250929_111647` and `20260921_003203_MIG_AUTH_002_SESSION_V1`; native `users` and `users_sessions` are present.
+- `auth_session_state` has the seven contracted columns; required indexes are present; physical FK count = 0; evidence queries reported 0 writes.
+- Validator result = `AUTH-002_SCHEMA_EVIDENCE_VALIDATION_PASS`.
+
+Acceptance:
+- The prior stale-SHA objection for the AUTH-002 remote schema/evidence sub-step is closed at **current-head read-only evidence scope**.
+- This does **not** promote `ENT-SESSION`, `ENT-ROLE-ASSIGNMENT`, AUTH-002 runtime status, or Mapping 0.
+- The remaining E6 blockers are unchanged: concrete canonical W02 physical binding/deployment authority, evidence-bound RoleAssignment implementation/persistence, admitted W02/T01/T03 runtime, and controlled authLogin/authRefresh runtime evidence.
+- No Mapping rows were re-executed and no Contract/Blueprint rule was changed.
+- `GAP-E6-RUNTIME-001` remains the sole active cursor.
+- Do not repeat the remote schema capture unless the relevant source, Contract, target D1 state, or evidence scope changes.
+
