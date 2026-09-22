@@ -33,5 +33,5 @@ jobs:
         run: node scripts/generate-role-assignment-migration.mjs
       - name: Assert migration artifact is committed
         run: git diff --exit-code -- workers/W02-content/migrations/0001_role_assignments.sql
-      - name: Run RoleAssignment tests
-        run: npx vitest run workers/W02-content/src/authz/role-assignment.test.ts
+      - name: Run RoleAssignment and Authorization tests
+        run: npx vitest run workers/W02-content/src/authz/role-assignment.test.ts workers/W02-content/src/authz/authorization-decision.test.ts
