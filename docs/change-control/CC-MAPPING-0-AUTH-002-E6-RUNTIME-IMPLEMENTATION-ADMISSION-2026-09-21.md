@@ -219,3 +219,17 @@ Still requiring an explicit physical persistence decision/evidence:
 - entity/field/persistence evidence registration.
 
 Do not infer the physical D1 resource from the names `luckread` or `luckreadpro`. The current repository evidence does not establish either as the D1-01 physical authority for RoleAssignment.
+
+## Decision B authority completion — 2026-09-22
+
+Project authority has now explicitly established the D1 physical allocation using the controlled read-only Cloudflare inventory captured in `artifacts/mapping-0/current-w01-downstream-checkpoint-2026-09-22.json`:
+
+- D1-01 primary database UUID = `2f80471e-3756-49f9-8db1-7707a433ad64` (inventory label at capture: `luckread`).
+- D1-02 secondary database UUID = `6c342634-97f6-4248-9f4a-85772af4f22c` (inventory label at capture: `luckreadpro`).
+- Database display names are non-authoritative and may be renamed; UUID is the physical binding identity for evidence.
+- `ENT-ROLE-ASSIGNMENT` remains owned by D1-01/W02/T03 and must persist only in the D1-01 authoritative source.
+
+This closes the prior physical-resource authority ambiguity for Decision B. It does not itself create a table, generate a migration, deploy W02, or promote RoleAssignment to VERIFIED.
+
+The remaining E6 admission prerequisites are now implementation/deployment/evidence steps: create the contracted RoleAssignment persistence through the approved migration path, establish the W02 runtime source/binding, deploy with source-commit provenance, then generate controlled runtime and security evidence.
+
