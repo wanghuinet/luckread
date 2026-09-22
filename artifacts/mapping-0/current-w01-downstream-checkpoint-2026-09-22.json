@@ -1,17 +1,18 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "7eb92fd13005ca602457ba6411d114000e0d13c9",
+  "currentMainHead": "0053dce26c7d918642452adfd8d6dd5953a15066",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "7eb92fd13005ca602457ba6411d114000e0d13c9",
-    "priorRecordedHead": "cc1158d5c71807b5134dfd50d0961867833cbd39",
+    "verifiedMainHead": "0053dce26c7d918642452adfd8d6dd5953a15066",
+    "priorRecordedHead": "97f789bcb0b82fdb8b3c28eb5d9992856048badc",
     "state": "RECONCILED"
   },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
-    "state": "BLOCKED_EXTERNAL / IMPLEMENTATION_NOT_ADMITTED",
-    "noMappingRowsReexecuted": true
+    "state": "WAIT_AUTHORITY_DECISION / IMPLEMENTATION_NOT_ADMITTED",
+    "noMappingRowsReexecuted": true,
+    "lastGovernanceCommit": "711d5a411a15abab8e2d2ec0114cb27975f51c6a"
   },
   "mapping0": {
     "status": "NOT_GREEN",
@@ -93,7 +94,8 @@
     "D1-01 ENT-ROLE-ASSIGNMENT remains PROPOSED / CONTRACT_ONLY with no implementation or persistence evidence.",
     "Canonical W02 physical resource/name/source/deployment binding remains unestablished; fresh read-only inventory reports 0 uploaded Worker scripts.",
     "W02/T01/T03 runtime implementation is not admitted.",
-    "Controlled authLogin/authRefresh runtime evidence is not generated."
+    "Controlled authLogin/authRefresh runtime evidence is not generated.",
+    "Decision packet prepared at docs/change-control/CC-MAPPING-0-E6-W02-PHYSICAL-BINDING-AND-ROLEASSIGNMENT-DECISION-PACKET-2026-09-22.md; no authority choice was made."
   ],
   "nextExternalAuthority": "Normal Contract-First authority decision for concrete canonical physical W02 binding and evidence-bound RoleAssignment realization; the E6 governance records now consistently treat W02/T01/T03/D1-01 as the authoritative implementation boundary and W01 as API/Gateway edge. Do not infer from directories or historical topology, and do not create resources merely to satisfy Mapping 0.",
   "alreadyClosed": [
@@ -114,6 +116,7 @@
     "mappingPromotion": "NONE",
     "runtimePromotion": "NONE",
     "roleAssignmentPromotion": "NONE",
-    "governanceBoundaryReconciled": true
+    "governanceBoundaryReconciled": true,
+    "latestGovernanceCommit": "0053dce26c7d918642452adfd8d6dd5953a15066"
   }
 }
