@@ -1,18 +1,18 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "5aa802ff3ee926ff441722d26a97f3d75d85fc4e",
+  "currentMainHead": "fa2c90412b9d3cd8fe30ab24ba22f54371f2f44b",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "5aa802ff3ee926ff441722d26a97f3d75d85fc4e",
-    "priorRecordedHead": "fbfd8aa589afc493e0772bad35ed42fa11fc3ca1",
+    "verifiedMainHead": "fa2c90412b9d3cd8fe30ab24ba22f54371f2f44b",
+    "priorRecordedHead": "5aa802ff3ee926ff441722d26a97f3d75d85fc4e",
     "state": "RECONCILED"
   },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
     "state": "WAIT_AUTHORITY_DECISION / IMPLEMENTATION_NOT_ADMITTED",
     "noMappingRowsReexecuted": true,
-    "lastGovernanceCommit": "5aa802ff3ee926ff441722d26a97f3d75d85fc4e"
+    "lastGovernanceCommit": "fa2c90412b9d3cd8fe30ab24ba22f54371f2f44b"
   },
   "mapping0": {
     "status": "NOT_GREEN",
@@ -97,7 +97,7 @@
     "Controlled authLogin/authRefresh runtime evidence is not generated.",
     "Decision packet prepared at docs/change-control/CC-MAPPING-0-E6-W02-PHYSICAL-BINDING-AND-ROLEASSIGNMENT-DECISION-PACKET-2026-09-22.md; no authority choice was made."
   ],
-  "nextExternalAuthority": "Normal Contract-First authority decision for concrete canonical physical W02 binding and evidence-bound RoleAssignment realization; current-head AUTH-002 schema evidence is now fresh and inherited. Do not infer or repeat the search until relevant inputs change.",
+  "nextExternalAuthority": "Concrete canonical W02 physical binding/deployment authority and evidence-bound ENT-ROLE-ASSIGNMENT realization remain required; E6 admission guard passes only its fail-closed control.",
   "alreadyClosed": [
     "AUTH-002 remote schema/evidence acquisition sub-step at current head fbfd8aa",
     "E6 wire/input authority reconciliation",
@@ -117,8 +117,10 @@
     "runtimePromotion": "NONE",
     "roleAssignmentPromotion": "NONE",
     "governanceBoundaryReconciled": true,
-    "latestGovernanceCommit": "5aa802ff3ee926ff441722d26a97f3d75d85fc4e",
+    "latestGovernanceCommit": "fa2c90412b9d3cd8fe30ab24ba22f54371f2f44b",
     "externalEvidenceRunId": 35677891303,
-    "externalEvidenceArtifactId": 10673223547
+    "externalEvidenceArtifactId": 10673223547,
+    "e6AdmissionGuardRunId": 35679278731,
+    "e6AdmissionGuardConclusion": "SUCCESS_FAIL_CLOSED_NOT_ADMITTED"
   }
 }
