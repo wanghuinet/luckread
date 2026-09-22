@@ -1,0 +1,85 @@
+name: W02 Remote D1 Readonly Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source commit to audit
+        required: true
+        type: string
+      database_name:
+        description: Cloudflare display name for D1-01
+        required: true
+        type: string
+      confirm:
+        description: Type READONLY to permit remote read-only verification
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: ${{ inputs.confirm == 'READONLY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify D1-01 binding identity
+        working-directory: workers/W02-content
+        run: >-
+          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
+          const d=c.d1_databases?.find(x=>x.binding==='D1_01');
+          if(!d) throw new Error('D1_01 binding missing');
+          console.log(JSON.stringify({binding:d.binding,database_name:d.database_name,database_id:d.database_id},null,2))"
+
+      - name: Read remote schema
+        working-directory: workers/W02-content
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: >-
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote
+          --config wrangler.jsonc --command "SELECT name, type, sql FROM sqlite_master
+          WHERE type IN ('table','index','trigger') ORDER BY type, name;"
+
+      - name: Read remote migration ledger
+        working-directory: workers/W02-content
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: >-
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote
+          --config wrangler.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND name='d1_migrations';"
+          && npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote
+          --config wrangler.jsonc --command "SELECT * FROM d1_migrations ORDER BY id;"
+
+      - name: Write provenance
+        run: |
+          mkdir -p artifacts/mapping-0
+          printf '%s\n' \
+            'W02 Remote D1 Readonly Evidence' \
+            'source_sha=${{ inputs.source_sha }}' \
+            'database_name=${{ inputs.database_name }}' \
+            'workflow_mode=READONLY' \
+            'no_remote_ddl=true' \
+            'no_remote_dml=true' > artifacts/mapping-0/w02-remote-d1-readonly-provenance.txt
+
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: w02-remote-d1-readonly-evidence-${{ inputs.source_sha }}
+          path: artifacts/mapping-0/w02-remote-d1-readonly-provenance.txt
