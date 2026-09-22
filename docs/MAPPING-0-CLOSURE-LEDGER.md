@@ -1601,3 +1601,19 @@ Acceptance:
 - `GAP-E6-RUNTIME-001` remains the sole active cursor.
 - Do not repeat the remote schema capture unless the relevant source, Contract, target D1 state, or evidence scope changes.
 
+
+
+## Superpowers continuation — W02 deployment/transport decision recorded — 2026-09-22
+
+New authority input:
+- W02 source path = `workers/W02-content`.
+- W02 physical Worker name = `luckread-w02`.
+- Deployment = controlled GitHub Actions `workflow_dispatch` + Wrangler with exact source-commit provenance.
+- W01 → W02 transport = Cloudflare Service Binding over HTTP, binding `W02_AUTH` → `luckread-w02`.
+- Decision record: `docs/change-control/CC-MAPPING-0-E6-W02-DEPLOYMENT-TRANSPORT-DECISION-2026-09-22.md`.
+
+Static repository verification found `workers/W02-content` previously contained only a legacy Content README; the README is now reconciled to canonical W02 Identity / Account / Authorization responsibility. No Worker was deployed and no D1 mutation occurred.
+
+Decision A is therefore recorded, but its deployment evidence is not yet closed. Decision B remains the only authority gap: concrete physical D1-01 resource/persistence realization for `ENT-ROLE-ASSIGNMENT`. Do not infer `luckread` or `luckreadpro` as D1-01 from their names; current authority does not establish either physical binding.
+
+Current cursor remains `GAP-E6-RUNTIME-001` with implementation not admitted. Mapping 0 remains NOT_GREEN. No previously passed Mapping/E5/AUTH-002 schema task was re-executed.
