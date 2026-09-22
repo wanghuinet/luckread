@@ -19,7 +19,7 @@ function nativeSession(overrides: Partial<NativeSessionAuthority> = {}): NativeS
   }
 }
 
-function dbFake(initial: SessionRecord | null) {
+function dbFake(initial: SessionRecord | null, forcedUpdateChanges?: number) {
   let row = initial
   let reads = 0
   let writes = 0
@@ -36,6 +36,7 @@ function dbFake(initial: SessionRecord | null) {
           if (!row) return { meta: { changes: 0 } }
           const [nextHash, nextSeenAt, , expectedOldHash] = args as [string, string, string, string]
           if (row.refreshCredentialHash !== expectedOldHash) return { meta: { changes: 0 } }
+          if (forcedUpdateChanges !== undefined) return { meta: { changes: forcedUpdateChanges } }
           row = { ...row, refreshCredentialHash: nextHash, lastSeenAt: nextSeenAt }
           return { meta: { changes: 1 } }
         },
@@ -91,7 +92,6 @@ describe('session runtime foundation', () => {
     const result = await rotateRefreshCredential(fake.db, {
       refreshToken: 'refresh-1',
       deviceId: 'device-a',
-      nativeSession: nativeSession(),
       now: NOW,
       issueAccessToken: () => 'access-1',
       randomToken: () => 'refresh-2',
@@ -146,7 +146,6 @@ describe('session runtime foundation', () => {
     await expect(rotateRefreshCredential(fake.db, {
       refreshToken: 'refresh-1',
       deviceId: 'device-a',
-      nativeSession: nativeSession({ expiresAt: '2026-09-22T12:59:59.999Z' }),
       now: NOW,
       issueAccessToken: () => 'access-1',
       hashToken: async () => 'hash',
@@ -161,11 +160,11 @@ describe('session runtime foundation', () => {
       userId: '42',
       deviceId: 'device-a',
       tokenVersion: 3,
-      refreshCredentialHash: 'new-hash',
+      refreshCredentialHash: 'old-hash',
       revokedAt: null,
       lastSeenAt: NOW,
       nativeExpiresAt: nativeSession().expiresAt,
-    })
+    }, 0)
 
     await expect(rotateRefreshCredential(fake.db, {
       refreshToken: 'refresh-1',
