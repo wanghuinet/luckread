@@ -118,3 +118,16 @@ No existing authoritative physical W02 name/resource binding, no current W02 run
 This observation does not change any Contract, Mapping record, Worker topology, D1 schema, or implementation status.
 
 Per the anti-loop rule, this search result is now inherited. It must not be repeated unless a new Contract, authority decision, implementation/persistence commit, deployment evidence, or relevant remote evidence changes the input set.
+
+## Decision B authority confirmation — 2026-09-22
+
+Project authority has now explicitly decided the logical-to-physical D1 allocation:
+
+- **D1-01 = 主数据库（primary database）** — authoritative persistence domain for Identity / Account / Access, including the already-contracted `ENT-ROLE-ASSIGNMENT`.
+- **D1-02 = 从数据库（secondary database）** — separate logical domain assignment; it is not the persistence authority for `ENT-ROLE-ASSIGNMENT`.
+- Physical database display names are **non-authoritative labels** and may be renamed. Binding evidence MUST use the actual Cloudflare database identity/UUID and deployment configuration, not the names `luckread` or `luckreadpro`.
+
+This closes the prior Decision B authority-input gap at the logical allocation level. It does **not** by itself prove physical UUID binding, create/mutate a D1 database, generate a migration, or promote `ENT-ROLE-ASSIGNMENT` to VERIFIED.
+
+Next controlled steps are therefore evidence binding and implementation admission: identify the physical D1-01 UUID from the controlled Cloudflare inventory, record the D1-01 binding, then proceed through the existing RoleAssignment implementation/evidence gate. No Contract or Blueprint semantics are changed.
+
