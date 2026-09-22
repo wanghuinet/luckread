@@ -1524,3 +1524,42 @@ Source head: `465b556e093a7b6da5b40137d41fa96850e40450`.
 - The current remaining E6 blockers are unchanged: evidence-bound D1-01 RoleAssignment realization, authoritative canonical W02 physical binding/deployment evidence, admitted W02/T01/T03 runtime implementation, and controlled authLogin/authRefresh runtime evidence.
 - Do not repeat remote schema capture unless the relevant source, contract, target D1 state, or evidence scope changes.
 - Current cursor remains `GAP-E6-RUNTIME-001`; Mapping 0 remains **NOT_GREEN** with 449 canonical records.
+
+
+## Superpowers continuation — authoritative current cursor reconciliation — 2026-09-22
+
+Current GitHub `main` head verified: `97f789bcb0b82fdb8b3c28eb5d9992856048badc`.
+
+The prior ledger cursor `W01-MIGRATION-BASELINE-AUTHORITY-001` is superseded by the later current-head AUTH-002 downstream checkpoint and is no longer the active continuation item.
+
+### Current continuation cursor
+
+- `NEXT_ITEM_ID = GAP-E6-RUNTIME-001`
+- `NEXT_ITEM_STATE = BLOCKED_EXTERNAL / IMPLEMENTATION_NOT_ADMITTED`
+- Mapping 0 remains `NOT_GREEN`.
+- Current canonical Mapping distribution recorded by the latest downstream checkpoint: 449 total, 17 PARTIAL, 431 UNRESOLVED, 1 MISSING.
+- No Mapping rows were re-executed in this continuation.
+
+### Already closed / inherited for this cursor
+
+- AUTH-002 remote schema/evidence acquisition sub-step: `PASS_VERIFIED_READ_ONLY`, workflow run `35657959095`, tested source `48575b4a2b86bf317e4e4ccac6c6ec17739cf2eb`.
+- E6 Wire/Input authority reconciliation: closed at contract-authority scope.
+- E6 RoleAssignment/layer authority semantics: reconciled.
+- Worker-boundary reconciliation: W01 API/Gateway edge; W02/T01/T03/D1-01 canonical business authority.
+- Physical Worker search/reconciliation: completed; no physical W02 binding is established.
+- Cloudflare read-only inventory: 2 D1 resources / 0 uploaded Worker scripts.
+
+### Active blocking inputs
+
+1. `ENT-ROLE-ASSIGNMENT` remains `PROPOSED / CONTRACT_ONLY` with no implementation or persistence evidence.
+2. Concrete physical canonical W02 resource/name/source/deployment binding is not established.
+3. W02/T01/T03 runtime implementation is not admitted.
+4. Controlled `authLogin/authRefresh` runtime evidence has not been generated.
+
+### Governance consequence
+
+The next admissible action is a normal Contract-First authority decision that supplies the missing concrete physical W02 binding and evidence-bound realization path for the already-contracted D1-01 RoleAssignment authority.
+
+No physical Worker name/resource, transport mechanism, migration, runtime handler, D1 mutation, new Worker, new D1, User.layer field, or duplicate authority may be inferred from directory names, historical topology, or existing schema alone.
+
+Until that authority exists, do not repeatedly search for an already-closed binding question and do not admit W02 runtime implementation. This section is the current recovery cursor for subsequent Superpowers turns.
