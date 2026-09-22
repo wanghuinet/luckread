@@ -12,7 +12,7 @@ const changeControlPath = join(
 
 const source = readFileSync(changeControlPath, 'utf8')
 
-const admitted = /Status:\s*GREEN\s+—\s*EXECUTION ADMITTED/i.test(source)
+const admitted = /^- Status:\s*GREEN\s+—\s*EXECUTION ADMITTED\s*$/m.test(source)
 const migrationPath = 'workers/W01-payload/src/migrations/20250929_111647.ts'
 const migrationIndexPath = 'workers/W01-payload/src/migrations/index.ts'
 const expectedMigrationBlob = '21e4a9ce27c828da655e479e35eb44ea3daff0f3'
