@@ -1639,3 +1639,13 @@ Current cursor remains `GAP-E6-RUNTIME-001`; Decision B is closed at authority-i
 - Therefore W02 source/logic verification is `PASS_VERIFIED`, while remote D1 evidence, Worker deployment, W01→W02 binding runtime evidence, and controlled authLogin/authRefresh runtime evidence remain open.
 - `GAP-E6-RUNTIME-001` remains the active continuation cursor. Mapping 0 remains `NOT_GREEN`.
 - No previously passed Mapping 0, AUTH-002 schema, Contract, or structural verification was re-executed.
+
+## 2026-09-22 continuation — W02 evidence inventory reconciliation and E6 admission guard
+
+- Current `main` head after this continuation: `1ef8682106e6cc0bf80f87fb0922f1dd96acb378`.
+- The generated `contracts/alignment/code-evidence-inventory.v1.json` was reconciled with the already-verified `ENT-ROLE-ASSIGNMENT` implementation source. Its implementation status is now `IMPLEMENTED`; remote migration, W02 deployment, role_version mutation/invalidation, and authLogin/authRefresh runtime remain explicit blockers.
+- E6 implementation admission guard now fails closed if implementation is marked GREEN while the existing RoleAssignment evidence record still contains the contracted `role_version` mutation/invalidation blocker.
+- PR #13 and PR #14 were merged. Neither change modifies Contract semantics or Worker/D1 architecture.
+- No executable remote Action run is claimed for the new read-only evidence workflow; current connected GitHub capabilities still do not expose workflow-dispatch execution.
+- The active cursor remains `GAP-E6-RUNTIME-001`; Mapping 0 remains `NOT_GREEN`.
+- No already-passed Mapping 0, AUTH-002 schema, Contract, or Structural verification was re-executed.
