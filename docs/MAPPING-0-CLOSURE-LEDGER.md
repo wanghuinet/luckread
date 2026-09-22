@@ -1649,3 +1649,36 @@ Current cursor remains `GAP-E6-RUNTIME-001`; Decision B is closed at authority-i
 - No executable remote Action run is claimed for the new read-only evidence workflow; current connected GitHub capabilities still do not expose workflow-dispatch execution.
 - The active cursor remains `GAP-E6-RUNTIME-001`; Mapping 0 remains `NOT_GREEN`.
 - No already-passed Mapping 0, AUTH-002 schema, Contract, or Structural verification was re-executed.
+
+## Superpowers continuation — W02 RoleAssignment remote realization and deployment evidence closed — 2026-09-22
+
+Current GitHub `main` head at reconciliation: `01d5b36190daa8bf261522598e7fcbd08faea2d7`.
+
+Fresh controlled external evidence:
+- W02 RoleAssignment D1-01 migration run `35793128427` = SUCCESS; exact source checkout `821e84f0dca776d177d48f44694a98fbe517dac8`.
+- Wrangler applied `0001_role_assignments.sql` successfully to D1-01 UUID `2f80471e-3756-49f9-8db1-7707a433ad64`.
+- W02 deployment run `35793226740` = SUCCESS; exact source checkout `821e84f0dca776d177d48f44694a98fbe517dac8`.
+- Cloudflare reported Worker `luckread-w02` uploaded successfully with Current Version ID `e905b498-47b5-41d6-b77d-aa7be5a36b6b`.
+- W02 read-only D1 evidence run `35793310927` = SUCCESS; artifact `10722564546`, digest `sha256:52eee83b9580a2631835e992d318ef9f7effc3d33ef9e032a4d4ef9172fa6e4f`.
+- Remote catalog contains `role_assignments` and both contracted no-overlap triggers; migration ledger contains `0001_role_assignments.sql`; verification queries reported zero writes.
+
+Evidence Registry updates:
+- `EVD-AUTH002-B12-ROLEASSIGNMENT-MIGRATION-REMOTE-001` = PASS / VERIFIED.
+- `EVD-AUTH002-B13-W02-DEPLOYMENT-REMOTE-001` = PASS / VERIFIED.
+- `EVD-AUTH002-B14-ROLEASSIGNMENT-REMOTE-READONLY-001` = PASS / VERIFIED.
+- These records preserve the actual tested commit `821e84f0dca776d177d48f44694a98fbe517dac8`; they do not falsely rebind evidence to the later evidence-registration commit. Per the ledger inheritance rule, later commits are acceptable only while relevant RoleAssignment implementation/Contract/dependency/test scope remains unchanged.
+
+Acceptance boundary:
+- `ENT-ROLE-ASSIGNMENT` remote persistence realization = PASS_VERIFIED at tested implementation scope.
+- W02 concrete deployment = PASS_VERIFIED at tested implementation scope.
+- W01 `W02_AUTH` Service Binding deployment = NOT_VERIFIED.
+- Controlled `authLogin/authRefresh` runtime evidence = NOT_EXECUTED.
+- AUTH-002 = NOT_GREEN.
+- Mapping 0 = NOT_GREEN.
+
+Current cursor:
+- `NEXT_ITEM_ID = GAP-E6-RUNTIME-001`
+- `NEXT_ITEM_STATE = TODO_FIX / W01-BINDING-EVIDENCE-PENDING`
+- Next admissible action: establish controlled W01 deployment evidence showing the committed `W02_AUTH -> luckread-w02` Service Binding is active, then proceed to the existing AUTH-002 E6 runtime evidence workflow. Do not repeat W02 RoleAssignment migration or deployment.
+
+No Contract, Blueprint, Worker topology, D1 topology, session identity model, or Mapping feature status was changed by this evidence reconciliation.
