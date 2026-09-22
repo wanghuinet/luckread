@@ -38,7 +38,25 @@ function validateShape(input: AuthorizationEvaluationInput): void {
   for (const key of Object.keys(input.checks) as FailureKey[]) if (!isCheckStatus(input.checks[key])) throw new Error('invalid check status')
 }
 function safeSubject(subject: AuthorizationSubject | undefined): AuthorizationSubject { return subject && isSubjectType(subject.type) ? subject : { type: 'ANONYMOUS', id: null } }
-function safeChecks(checks: AuthorizationChecks | undefined): AuthorizationChecks { return checks ? { ...checks } : { authentication: 'FAIL', accountState: 'FAIL', permission: 'FAIL', scope: 'FAIL', resource: 'FAIL', policy: 'FAIL' } }
+function safeChecks(checks: AuthorizationChecks | undefined): AuthorizationChecks {
+  const fallback: AuthorizationChecks = {
+    authentication: 'FAIL',
+    accountState: 'FAIL',
+    permission: 'FAIL',
+    scope: 'FAIL',
+    resource: 'FAIL',
+    policy: 'FAIL',
+  }
+  if (!checks || typeof checks !== 'object') return fallback
+
+  for (const key of Object.keys(checks) as Array<keyof AuthorizationChecks>) {
+    const value = checks[key]
+    if (isCheckStatus(value)) {
+      ;(fallback as Record<string, CheckStatus | undefined>)[key] = value
+    }
+  }
+  return fallback
+}
 function baseDecision(input: AuthorizationEvaluationInput): AuthorizationDecision { return { decision: 'ALLOW', subject: safeSubject(input.subject), action: input.action, resource: input.resource, checks: safeChecks(input.checks), policyVersion: input.policyVersion, ...(input.authorizationVersion ? { authorizationVersion: input.authorizationVersion } : {}) } }
 function deny(input: AuthorizationEvaluationInput, reasonCode: string): AuthorizationDecision { return { ...baseDecision(input), decision: 'DENY', reasonCode } }
 export function evaluateAuthorization(input: AuthorizationEvaluationInput): AuthorizationDecision {
