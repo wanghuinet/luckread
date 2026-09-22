@@ -47,7 +47,7 @@ jobs:
           set -euo pipefail
           node -e 'const p=require("./package.json"); if(p.dependencies.payload!=="3.87.1") process.exit(1); if(p.dependencies["@payloadcms/db-d1-sqlite"]!=="3.87.1") process.exit(1); if(p.devDependencies.wrangler!=="~4.116.0") process.exit(1)'
 
-      - name: Run E4.5 controlled remote regression probe
+      # Evidence refresh trigger: bind the probe result to the exact current main SHA.\n      - name: Run E4.5 controlled remote regression probe
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
