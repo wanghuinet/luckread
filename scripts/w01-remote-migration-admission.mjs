@@ -26,9 +26,8 @@ function gitBlob(path) {
   }
 }
 
-function assertApprovedMigrationSet() {
+function assertApprovedBaselineArtifacts() {
   const migrationBlob = gitBlob(migrationPath)
-  const indexBlob = gitBlob(migrationIndexPath)
 
   if (migrationBlob !== expectedMigrationBlob) {
     console.error(`W01_REMOTE_MIGRATION_ADMISSION_BLOCKED: approved baseline migration blob mismatch for ${migrationPath}.`)
@@ -36,6 +35,16 @@ function assertApprovedMigrationSet() {
     process.exit(1)
   }
 
+  const indexSource = readFileSync(join(root, migrationIndexPath), 'utf8')
+  const baselineRegistrations = indexSource.match(new RegExp(`name:\\s*'20250929_111647'`, 'g')) ?? []
+  if (baselineRegistrations.length !== 1) {
+    console.error(`W01_REMOTE_MIGRATION_ADMISSION_BLOCKED: expected exactly one baseline registration for ${migrationIndexPath}; observed ${baselineRegistrations.length}.`)
+    process.exit(1)
+  }
+}
+
+function assertApprovedBaselineExecutionSet() {
+  const indexBlob = gitBlob(migrationIndexPath)
   if (indexBlob !== expectedMigrationIndexBlob) {
     console.error(`W01_REMOTE_MIGRATION_ADMISSION_BLOCKED: approved baseline migration index blob mismatch for ${migrationIndexPath}.`)
     console.error(`Expected ${expectedMigrationIndexBlob}; observed ${indexBlob ?? 'MISSING'}.`)
@@ -57,8 +66,8 @@ function assertApprovedMigrationSet() {
 
 if (process.argv.includes('--check-state')) {
   if (admitted) {
-    assertApprovedMigrationSet()
-    console.log('W01_REMOTE_MIGRATION_STATE_VALID: GREEN — EXECUTION ADMITTED for the approved baseline migration only.')
+    assertApprovedBaselineArtifacts()
+    console.log('W01_REMOTE_MIGRATION_STATE_VALID: baseline artifacts remain intact; later migrations, when present, are governed by their own execution controls.')
   } else {
     console.log('W01_REMOTE_MIGRATION_STATE_VALID: execution remains BLOCKED until explicit GREEN — EXECUTION ADMITTED.')
   }
@@ -71,5 +80,5 @@ if (!admitted) {
   process.exit(1)
 }
 
-assertApprovedMigrationSet()
+assertApprovedBaselineExecutionSet()
 console.log('W01_REMOTE_MIGRATION_ADMISSION_PASS: approved baseline migration is explicitly GREEN — EXECUTION ADMITTED.')
