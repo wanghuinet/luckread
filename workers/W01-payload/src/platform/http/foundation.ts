@@ -1,5 +1,3 @@
-import type { Request } from 'undici'
-
 export const ERROR_HTTP_STATUS: Partial<Record<ErrorCode, number>> = {
   UNAUTHENTICATED: 401,
   PERMISSION_DENIED: 403,
