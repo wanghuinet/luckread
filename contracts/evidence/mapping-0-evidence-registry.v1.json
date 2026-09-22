@@ -257,6 +257,51 @@
       "result": "PASS",
       "status": "VERIFIED",
       "note": "Fresh controlled remote E4.5 execution on current main verified payload.db.upsert(payload-preferences): upsert returned a document; no upsert error; stored row present; stored value matched; cleanup succeeded; payload.db.upsert was not aliased to payload.db.updateOne. GitHub Actions job e4-5 completed successfully on run 35789608705, check run 106954669883, with artifact 10722065060 (sha256:68961bbab2d3303d47a7b2d667fc8166593cc050e7c5aa63683c0472b1bb8c)."
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B12-ROLEASSIGNMENT-MIGRATION-REMOTE-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-002::ROLE-ASSIGNMENT-D1-01-MIGRATION",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "GitHub Actions W02 RoleAssignment D1-01 Migration against controlled Cloudflare D1",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/35793128427",
+      "commitSha": "821e84f0dca776d177d48f44694a98fbe517dac8",
+      "timestamp": "2026-09-22T22:45:00Z",
+      "producer": "Wrangler 4.116.0 remote D1 migration workflow",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "note": "Exact implementation commit 821e84f0 was checked out. Generator verification passed and 0001_role_assignments.sql was applied successfully to D1-01 UUID 2f80471e-3756-49f9-8db1-7707a433ad64. This evidence proves remote RoleAssignment schema mutation at the tested implementation commit; later current-main commits do not modify the RoleAssignment migration/source inputs."
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B13-W02-DEPLOYMENT-REMOTE-001",
+      "type": "DEPLOYMENT",
+      "claimId": "AUTH-002::W02-DEPLOYMENT",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "GitHub Actions W02 Identity Authorization Deploy against controlled Cloudflare Worker",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/35793226740",
+      "commitSha": "821e84f0dca776d177d48f44694a98fbe517dac8",
+      "timestamp": "2026-09-22T22:45:00Z",
+      "producer": "Wrangler 4.116.0 controlled W02 deployment workflow",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "note": "Exact implementation commit 821e84f0 was checked out. Wrangler uploaded luckread-w02 successfully and reported Current Version ID e905b498-47b5-41d6-b77d-aa7be5a36b6b. This proves a concrete W02 deployment for the tested implementation source; it does not prove W01 Service Binding deployment."
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B14-ROLEASSIGNMENT-REMOTE-READONLY-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-002::ROLE-ASSIGNMENT-D1-01-SCHEMA",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "GitHub Actions W02 Remote D1 Readonly Evidence",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/35793310927",
+      "commitSha": "821e84f0dca776d177d48f44694a98fbe517dac8",
+      "timestamp": "2026-09-22T22:45:00Z",
+      "producer": "Wrangler 4.116.0 remote D1 read-only verification",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "note": "Exact source commit 821e84f0 was checked out. Remote sqlite_master contains role_assignments plus the two no-overlap triggers; d1_migrations contains 0001_role_assignments.sql applied at 2026-09-22 22:35:06. Read-only queries report rows_written=0 and no remote DDL/DML in this verification workflow. Artifact 10722564546, sha256:52eee83b9580a2631835e992d318ef9f7effc3d33ef9e032a4d4ef9172fa6e4f."
     }
   ]
 }
