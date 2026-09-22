@@ -1,18 +1,18 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "f3a2522bc4575ad5cc38158d87653121c9edaa05",
+  "currentMainHead": "f7c3aafbb95be8ac8ec598f8cf9d11eb4001bd36",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "f3a2522bc4575ad5cc38158d87653121c9edaa05",
-    "priorRecordedHead": "0053dce26c7d918642452adfd8d6dd5953a15066",
+    "verifiedMainHead": "f7c3aafbb95be8ac8ec598f8cf9d11eb4001bd36",
+    "priorRecordedHead": "f3a2522bc4575ad5cc38158d87653121c9edaa05",
     "state": "RECONCILED"
   },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
     "state": "WAIT_AUTHORITY_DECISION / IMPLEMENTATION_NOT_ADMITTED",
     "noMappingRowsReexecuted": true,
-    "lastGovernanceCommit": "f3a2522bc4575ad5cc38158d87653121c9edaa05"
+    "lastGovernanceCommit": "f7c3aafbb95be8ac8ec598f8cf9d11eb4001bd36"
   },
   "mapping0": {
     "status": "NOT_GREEN",
@@ -118,5 +118,15 @@
     "roleAssignmentPromotion": "NONE",
     "governanceBoundaryReconciled": true,
     "latestGovernanceCommit": "f3a2522bc4575ad5cc38158d87653121c9edaa05"
+  },
+  "ciInheritance": {
+    "latestStructuralRunId": 35674738975,
+    "latestFeatureInventoryRunId": 35674739013,
+    "latestContractCiRunId": 35674708266,
+    "structuralConclusion": "SUCCESS",
+    "downstreamConclusion": "FAILURE_IN_EXPECTED_TECHNICAL_EVIDENCE_ALIGNMENT",
+    "fiveWayBlockers": 450,
+    "canonicalMappingMaterialization": "NO_CHANGE_449",
+    "runtimePromotion": "NONE"
   }
 }
