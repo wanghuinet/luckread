@@ -1,11 +1,11 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "f7c3aafbb95be8ac8ec598f8cf9d11eb4001bd36",
+  "currentMainHead": "fbfd8aa589afc493e0772bad35ed42fa11fc3ca1",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "f7c3aafbb95be8ac8ec598f8cf9d11eb4001bd36",
-    "priorRecordedHead": "f3a2522bc4575ad5cc38158d87653121c9edaa05",
+    "verifiedMainHead": "fbfd8aa589afc493e0772bad35ed42fa11fc3ca1",
+    "priorRecordedHead": "f7c3aafbb95be8ac8ec598f8cf9d11eb4001bd36",
     "state": "RECONCILED"
   },
   "cursor": {
@@ -27,16 +27,16 @@
   "auth002": {
     "remoteSchemaEvidence": {
       "status": "PASS_VERIFIED_READ_ONLY",
-      "workflowRunId": 35657959095,
-      "runAttempt": 2,
-      "artifactId": 10670655260,
-      "artifactDigest": "sha256:6acc426894f47f54bf1e6eb7c3a9923fd9618318d9b8d2cfe94452183326fbb5",
-      "testedSourceHead": "48575b4a2b86bf317e4e4ccac6c6ec17739cf2eb",
+      "workflowRunId": 35677891303,
+      "runAttempt": 1,
+      "artifactId": 10673223547,
+      "artifactDigest": "sha256:ea984e918c0af62c0e3ff453db81987336041b8fecf4e957432146738e59d455",
+      "testedSourceHead": "fbfd8aa589afc493e0772bad35ed42fa11fc3ca1",
       "targetD1": "luckread",
       "targetD1Id": "2f80471e-3756-49f9-8db1-7707a433ad64",
       "payloadVersion": "3.87.1",
       "d1AdapterVersion": "3.87.1",
-      "executedAt": "2026-09-21T23:34:06.171Z",
+      "executedAt": "2026-09-22T02:01:41.995Z",
       "remoteState": {
         "numTables": 9,
         "migrationRows": [
@@ -63,7 +63,7 @@
       },
       "validator": "AUTH-002_SCHEMA_EVIDENCE_VALIDATION_PASS",
       "runtimeStatus": "NOT_GREEN",
-      "note": "Fresh remote-state capture is read-only. The tested source SHA is older than current main; the evidence proves remote schema state, not current-head runtime binding."
+      "note": "Current-head read-only capture. Validator passed and evidence is bound to the current main SHA; this proves remote schema state only, not runtime binding or W02/RoleAssignment closure."
     },
     "runtimeStatus": "NOT_GREEN"
   },
@@ -97,9 +97,9 @@
     "Controlled authLogin/authRefresh runtime evidence is not generated.",
     "Decision packet prepared at docs/change-control/CC-MAPPING-0-E6-W02-PHYSICAL-BINDING-AND-ROLEASSIGNMENT-DECISION-PACKET-2026-09-22.md; no authority choice was made."
   ],
-  "nextExternalAuthority": "Normal Contract-First authority decision for concrete canonical physical W02 binding and evidence-bound RoleAssignment realization; targeted revalidation found no new authority. Do not infer or repeat the search until relevant inputs change.",
+  "nextExternalAuthority": "Normal Contract-First authority decision for concrete canonical physical W02 binding and evidence-bound RoleAssignment realization; current-head AUTH-002 schema evidence is now fresh and inherited. Do not infer or repeat the search until relevant inputs change.",
   "alreadyClosed": [
-    "AUTH-002 remote schema/evidence acquisition sub-step at tested head 48575b4",
+    "AUTH-002 remote schema/evidence acquisition sub-step at current head fbfd8aa",
     "E6 wire/input authority reconciliation",
     "E6 RoleAssignment/layer authority semantics reconciliation",
     "physical Worker binding search/reconciliation as a repository question",
@@ -112,21 +112,11 @@
   ],
   "evidenceRefresh": {
     "date": "2026-09-22",
-    "state": "FRESH_READ_ONLY_EVIDENCE_REGISTERED",
+    "state": "CURRENT_HEAD_READ_ONLY_EVIDENCE_REGISTERED",
     "mappingPromotion": "NONE",
     "runtimePromotion": "NONE",
     "roleAssignmentPromotion": "NONE",
     "governanceBoundaryReconciled": true,
-    "latestGovernanceCommit": "f3a2522bc4575ad5cc38158d87653121c9edaa05"
-  },
-  "ciInheritance": {
-    "latestStructuralRunId": 35674738975,
-    "latestFeatureInventoryRunId": 35674739013,
-    "latestContractCiRunId": 35674708266,
-    "structuralConclusion": "SUCCESS",
-    "downstreamConclusion": "FAILURE_IN_EXPECTED_TECHNICAL_EVIDENCE_ALIGNMENT",
-    "fiveWayBlockers": 450,
-    "canonicalMappingMaterialization": "NO_CHANGE_449",
-    "runtimePromotion": "NONE"
+    "latestGovernanceCommit": "fbfd8aa589afc493e0772bad35ed42fa11fc3ca1"
   }
 }
