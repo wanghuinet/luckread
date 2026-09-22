@@ -1,6 +1,6 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "d37cbdc1f2e3175caf454bd611f0bded4dc1fca2",
+  "currentMainHead": "123d01d865112ec126c3862c68999d695b02a746",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
@@ -11,9 +11,11 @@
   },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
-    "state": "WAIT_AUTHORITY_DECISION / IMPLEMENTATION_NOT_ADMITTED",
+    "state": "D1_01_PHYSICAL_BINDING_EVIDENCE_PENDING",
     "noMappingRowsReexecuted": true,
-    "lastGovernanceCommit": "d37cbdc1f2e3175caf454bd611f0bded4dc1fca2"
+    "lastGovernanceCommit": "d37cbdc1f2e3175caf454bd611f0bded4dc1fca2",
+    "decisionB": "DECIDED — D1-01 primary; D1-02 secondary",
+    "next": "CONTROLLED_D1_01_UUID_BINDING_EVIDENCE"
   },
   "mapping0": {
     "status": "NOT_GREEN",
@@ -122,10 +124,11 @@
     "externalEvidenceArtifactId": 10673223547,
     "e6AdmissionGuardRunId": 35679278731,
     "e6AdmissionGuardConclusion": "SUCCESS_FAIL_CLOSED_NOT_ADMITTED",
-    "currentHeadReconciliation": "PASS_INHERITED — latest main d37cbdc is governance-only W02 decision-boundary continuation; no runtime/RoleAssignment/Mapping promotion",
+    "currentHeadReconciliation": "PASS — authority decision recorded; no schema/runtime/deployment mutation",
     "w02DeploymentTransportDecision": "RECORDED",
     "w02WorkerName": "luckread-w02",
     "w02SourcePath": "workers/W02-content",
-    "w01ToW02Transport": "Cloudflare Service Binding HTTP, binding W02_AUTH"
+    "w01ToW02Transport": "Cloudflare Service Binding HTTP, binding W02_AUTH",
+    "d1AuthorityDecision": "D1-01 = primary database; D1-02 = secondary database; display names non-authoritative"
   }
 }
