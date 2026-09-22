@@ -2,7 +2,7 @@
 
 - ID: CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21
 - Date: 2026-09-21
-- Status: BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED
+- Status: GREEN — IMPLEMENTATION ADMITTED
 - Feature: AUTH-002
 - Gate: E6 Native Session Runtime Evidence
 - Depends on:
@@ -14,7 +14,7 @@
 
 Define the exact admission boundary for the missing AUTH-002 E6 runtime integration across the canonical W01 API boundary and the W02/T01/T03/D1-01 implementation authority, so that GAP-E6-RUNTIME-001 can proceed later without inventing architecture, contracts, session identity, or persistence authority.
 
-This record is preparatory only. It does not authorize implementation, remote mutation, runtime deployment, or Mapping-0 promotion.
+Decision-B authority and physical D1 allocation are now resolved. This record admits implementation within the frozen W02/T01/T03/D1-01 boundary; it does not authorize remote D1 mutation or production deployment without the existing controlled execution gates.
 
 ## Existing authority that MUST be reused
 
@@ -233,3 +233,25 @@ Project authority has now explicitly established the D1 physical allocation usin
 This closes the prior physical-resource authority ambiguity for Decision B. It does not itself create a table, generate a migration, deploy W02, or promote RoleAssignment to VERIFIED.
 
 The remaining E6 admission prerequisites are now implementation/deployment/evidence steps: create the contracted RoleAssignment persistence through the approved migration path, establish the W02 runtime source/binding, deploy with source-commit provenance, then generate controlled runtime and security evidence.
+
+## Implementation admission — 2026-09-22
+
+Admission basis now satisfied at authority scope:
+
+- E6-WIRE-001 = PASS_VERIFIED_AUTHORITY.
+- E6-WIRE-002 = PASS_VERIFIED_AUTHORITY.
+- E6-LAYER-001 = AUTHORITY CLOSED.
+- W02 source/deployment/transport decision = recorded.
+- D1-01 physical primary allocation = `2f80471e-3756-49f9-8db1-7707a433ad64`.
+- D1-02 physical secondary allocation = `6c342634-97f6-4248-9f4a-85772af4f22c`.
+
+Implementation admission scope:
+- W02 source = `workers/W02-content`.
+- W02 Worker identity = `luckread-w02`.
+- RoleAssignment persistence authority = D1-01 only.
+- Existing RoleAssignment Contract and deterministic resolver Contract remain unchanged.
+- No User.layer, duplicate layer entity, second session authority, new Worker, or new D1 domain.
+- Any remote D1 mutation, Worker deployment, or final runtime evidence remains subject to controlled execution and evidence gates.
+
+Admission result: **GREEN — IMPLEMENTATION ADMITTED** for source implementation only.
+
