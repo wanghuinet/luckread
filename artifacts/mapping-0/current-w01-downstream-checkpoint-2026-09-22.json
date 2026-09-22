@@ -1,13 +1,13 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "9a56d94d15481fde4782a23034d818c2c020b0c2",
+  "currentMainHead": "8ddfb1fc570f1a833efa7fd7289aafdefa2a20bd",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "9a56d94d15481fde4782a23034d818c2c020b0c2",
-    "priorRecordedHead": "822de57b7f0e441d101066e676edd8dbe54b6ded",
+    "verifiedMainHead": "8ddfb1fc570f1a833efa7fd7289aafdefa2a20bd",
+    "priorRecordedHead": "8ddfb1fc570f1a833efa7fd7289aafdefa2a20bd",
     "state": "RECONCILED",
-    "note": "Latest main reconciles the D1-01 primary / D1-02 secondary physical UUID authority and closure ledger. No runtime or remote database mutation was performed."
+    "note": "Latest main preserves canonical D1-02 domain semantics while treating primary/secondary only as physical allocation labels."
   },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
@@ -119,7 +119,7 @@
     "runtimePromotion": "NONE",
     "roleAssignmentPromotion": "NONE",
     "governanceBoundaryReconciled": true,
-    "latestGovernanceCommit": "9a56d94d15481fde4782a230b0c2",
+    "latestGovernanceCommit": "8ddfb1fc570f1a833efa7fd7289aafdefa2a20bd",
     "externalEvidenceRunId": 35677891303,
     "externalEvidenceArtifactId": 10673223547,
     "e6AdmissionGuardRunId": 35679278731,
@@ -129,6 +129,6 @@
     "w02WorkerName": "luckread-w02",
     "w02SourcePath": "workers/W02-content",
     "w01ToW02Transport": "Cloudflare Service Binding HTTP, binding W02_AUTH",
-    "d1AuthorityDecision": "D1-01 = primary database UUID 2f80471e-3756-49f9-8db1-7707a433ad64; D1-02 = secondary database UUID 6c342634-97f6-4248-9f4a-85772af4f22c; display names non-authoritative"
+    "d1AuthorityDecision": "D1-01 physical primary allocation UUID 2f80471e-3756-49f9-8db1-7707a433ad64; D1-02 physical secondary allocation UUID 6c342634-97f6-4248-9f4a-85772af4f22c; primary/secondary are labels only and do not alter canonical D1 domain semantics"
   }
 }
