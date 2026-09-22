@@ -1,18 +1,18 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "0053dce26c7d918642452adfd8d6dd5953a15066",
+  "currentMainHead": "f3a2522bc4575ad5cc38158d87653121c9edaa05",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "0053dce26c7d918642452adfd8d6dd5953a15066",
-    "priorRecordedHead": "97f789bcb0b82fdb8b3c28eb5d9992856048badc",
+    "verifiedMainHead": "f3a2522bc4575ad5cc38158d87653121c9edaa05",
+    "priorRecordedHead": "0053dce26c7d918642452adfd8d6dd5953a15066",
     "state": "RECONCILED"
   },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
     "state": "WAIT_AUTHORITY_DECISION / IMPLEMENTATION_NOT_ADMITTED",
     "noMappingRowsReexecuted": true,
-    "lastGovernanceCommit": "711d5a411a15abab8e2d2ec0114cb27975f51c6a"
+    "lastGovernanceCommit": "f3a2522bc4575ad5cc38158d87653121c9edaa05"
   },
   "mapping0": {
     "status": "NOT_GREEN",
@@ -97,7 +97,7 @@
     "Controlled authLogin/authRefresh runtime evidence is not generated.",
     "Decision packet prepared at docs/change-control/CC-MAPPING-0-E6-W02-PHYSICAL-BINDING-AND-ROLEASSIGNMENT-DECISION-PACKET-2026-09-22.md; no authority choice was made."
   ],
-  "nextExternalAuthority": "Normal Contract-First authority decision for concrete canonical physical W02 binding and evidence-bound RoleAssignment realization; the E6 governance records now consistently treat W02/T01/T03/D1-01 as the authoritative implementation boundary and W01 as API/Gateway edge. Do not infer from directories or historical topology, and do not create resources merely to satisfy Mapping 0.",
+  "nextExternalAuthority": "Normal Contract-First authority decision for concrete canonical physical W02 binding and evidence-bound RoleAssignment realization; targeted revalidation found no new authority. Do not infer or repeat the search until relevant inputs change.",
   "alreadyClosed": [
     "AUTH-002 remote schema/evidence acquisition sub-step at tested head 48575b4",
     "E6 wire/input authority reconciliation",
@@ -117,6 +117,6 @@
     "runtimePromotion": "NONE",
     "roleAssignmentPromotion": "NONE",
     "governanceBoundaryReconciled": true,
-    "latestGovernanceCommit": "0053dce26c7d918642452adfd8d6dd5953a15066"
+    "latestGovernanceCommit": "f3a2522bc4575ad5cc38158d87653121c9edaa05"
   }
 }
