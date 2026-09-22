@@ -1,1 +1,3 @@
 Controlled AUTH-002 remote schema evidence capture request. Read-only evidence collection only; no migration, DDL, INSERT, UPDATE, or DELETE.
+
+Current-head capture requested for the current authoritative main commit. This request does not promote AUTH-002 and does not authorize runtime implementation.
