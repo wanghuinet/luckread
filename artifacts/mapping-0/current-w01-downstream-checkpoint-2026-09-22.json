@@ -1,19 +1,19 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "d9dceb6a42f4900deb4a53d9a5e700d0afb2ec35",
+  "currentMainHead": "223b52e0ae64533eab7d11b23e30f29f15caea9a",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "d9dceb6a42f4900deb4a53d9a5e700d0afb2ec35",
-    "priorRecordedHead": "fa2c90412b9d3cd8fe30ab24ba22f54371f2f44b",
+    "verifiedMainHead": "223b52e0ae64533eab7d11b23e30f29f15caea9a",
+    "priorRecordedHead": "d41db6c1db2e99f1de540f38dbed3d25638a0e74",
     "state": "RECONCILED",
-    "note": "Current head is a governance-only checkpoint commit; no protected Contract/Blueprint/implementation inputs changed, so previously verified downstream evidence remains inherited."
+    "note": "Authority decision for W02 source path, physical Worker name, deployment mode, and W01→W02 transport is now recorded. No runtime implementation or deployment evidence is promoted."
   },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
     "state": "WAIT_AUTHORITY_DECISION / IMPLEMENTATION_NOT_ADMITTED",
     "noMappingRowsReexecuted": true,
-    "lastGovernanceCommit": "d9dceb6a42f4900deb4a53d9a5e700d0afb2ec35"
+    "lastGovernanceCommit": "223b52e0ae64533eab7d11b23e30f29f15caea9a"
   },
   "mapping0": {
     "status": "NOT_GREEN",
@@ -93,12 +93,11 @@
   },
   "blockers": [
     "D1-01 ENT-ROLE-ASSIGNMENT remains PROPOSED / CONTRACT_ONLY with no implementation or persistence evidence.",
-    "Canonical W02 physical resource/name/source/deployment binding remains unestablished; fresh read-only inventory reports 0 uploaded Worker scripts.",
+    "W02 physical binding decision is recorded: source workers/W02-content, Worker luckread-w02, controlled GitHub Actions workflow_dispatch + Wrangler deployment, W01 W02_AUTH Service Binding over HTTP. Actual deployment/version/source evidence is pending.",
     "W02/T01/T03 runtime implementation is not admitted.",
-    "Controlled authLogin/authRefresh runtime evidence is not generated.",
-    "Decision packet prepared at docs/change-control/CC-MAPPING-0-E6-W02-PHYSICAL-BINDING-AND-ROLEASSIGNMENT-DECISION-PACKET-2026-09-22.md; no authority choice was made."
+    "Controlled authLogin/authRefresh runtime evidence is not generated."
   ],
-  "nextExternalAuthority": "Concrete canonical W02 physical binding/deployment authority and evidence-bound ENT-ROLE-ASSIGNMENT realization remain required; E6 admission guard passes only its fail-closed control.",
+  "nextExternalAuthority": "Evidence-bound ENT-ROLE-ASSIGNMENT realization remains required. W02 physical source/name/deployment/transport decision is recorded; actual Worker/deployment/binding evidence remains pending.",
   "alreadyClosed": [
     "AUTH-002 remote schema/evidence acquisition sub-step at current head fbfd8aa",
     "E6 wire/input authority reconciliation",
@@ -118,11 +117,15 @@
     "runtimePromotion": "NONE",
     "roleAssignmentPromotion": "NONE",
     "governanceBoundaryReconciled": true,
-    "latestGovernanceCommit": "d9dceb6a42f4900deb4a53d9a5e700d0afb2ec35",
+    "latestGovernanceCommit": "223b52e0ae64533eab7d11b23e30f29f15caea9a",
     "externalEvidenceRunId": 35677891303,
     "externalEvidenceArtifactId": 10673223547,
     "e6AdmissionGuardRunId": 35679278731,
     "e6AdmissionGuardConclusion": "SUCCESS_FAIL_CLOSED_NOT_ADMITTED",
-    "currentHeadReconciliation": "PASS_INHERITED — governance-only delta; no Mapping/runtime/RoleAssignment promotion"
+    "currentHeadReconciliation": "PASS_INHERITED — W02 deployment/transport decision recorded; no runtime/RoleAssignment/Mapping promotion",
+    "w02DeploymentTransportDecision": "RECORDED",
+    "w02WorkerName": "luckread-w02",
+    "w02SourcePath": "workers/W02-content",
+    "w01ToW02Transport": "Cloudflare Service Binding HTTP, binding W02_AUTH"
   }
 }
