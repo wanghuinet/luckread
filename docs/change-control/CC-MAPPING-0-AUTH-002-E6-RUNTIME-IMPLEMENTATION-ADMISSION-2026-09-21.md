@@ -176,3 +176,13 @@ Therefore:
 - this does not authorize renaming or relocating the existing worker directories.
 
 For E6, the canonical logical authority remains W02/T01/T03/D1-01. The physical implementation location and any W01↔W02 runtime transport remain unadmitted until supported by a current binding contract.
+
+## Current-head evidence refresh — 2026-09-22
+
+- Current main head: `b92ce3831aeb0bf70b9b4914e84314c52a32c686`.
+- Current-head controlled AUTH-002 schema evidence workflow: run `35677891303` = SUCCESS; artifact `10673223547`.
+- The evidence package is read-only and validator-approved; it proves remote schema state and provenance at the source head tested by the workflow.
+- This refresh does not alter the implementation admission status and does not constitute W02 physical binding, RoleAssignment implementation/persistence evidence, or runtime authLogin/authRefresh evidence.
+
+Status remains: **BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED**.
+
