@@ -1,13 +1,13 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "822de57b7f0e441d101066e676edd8dbe54b6ded",
+  "currentMainHead": "9a56d94d15481fde4782a23034d818c2c020b0c2",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "822de57b7f0e441d101066e676edd8dbe54b6ded",
+    "verifiedMainHead": "9a56d94d15481fde4782a23034d818c2c020b0c2",
     "priorRecordedHead": "822de57b7f0e441d101066e676edd8dbe54b6ded",
     "state": "RECONCILED",
-    "note": "Latest main records explicit D1-01/D1-02 physical UUID allocation. No runtime or remote database mutation was performed."
+    "note": "Latest main reconciles the D1-01 primary / D1-02 secondary physical UUID authority and closure ledger. No runtime or remote database mutation was performed."
   },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
@@ -119,12 +119,12 @@
     "runtimePromotion": "NONE",
     "roleAssignmentPromotion": "NONE",
     "governanceBoundaryReconciled": true,
-    "latestGovernanceCommit": "822de57b7f0e441d101066e676edd8dbe54b6ded",
+    "latestGovernanceCommit": "9a56d94d15481fde4782a230b0c2",
     "externalEvidenceRunId": 35677891303,
     "externalEvidenceArtifactId": 10673223547,
     "e6AdmissionGuardRunId": 35679278731,
     "e6AdmissionGuardConclusion": "SUCCESS_FAIL_CLOSED_NOT_ADMITTED",
-    "currentHeadReconciliation": "PASS — physical D1 authority input bound by UUID; no schema/runtime/deployment mutation",
+    "currentHeadReconciliation": "PASS — D1 physical UUID authority and closure-ledger wording reconciled; no schema/runtime/deployment mutation",
     "w02DeploymentTransportDecision": "RECORDED",
     "w02WorkerName": "luckread-w02",
     "w02SourcePath": "workers/W02-content",
