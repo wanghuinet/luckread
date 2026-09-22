@@ -1,0 +1,15 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "luckread-w02",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-08-15",
+  "workers_dev": false,
+  "d1_databases": [
+    {
+      "binding": "D1_01",
+      "database_name": "luckread",
+      "database_id": "2f80471e-3756-49f9-8db1-7707a433ad64",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
