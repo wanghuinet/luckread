@@ -1,18 +1,18 @@
 {
   "repository": "wanghuinet/luckread",
-  "currentMainHead": "fbfd8aa589afc493e0772bad35ed42fa11fc3ca1",
+  "currentMainHead": "5aa802ff3ee926ff441722d26a97f3d75d85fc4e",
   "checkpointDate": "2026-09-22",
   "headVerification": {
     "method": "GitHub main ref + commit fetch",
-    "verifiedMainHead": "fbfd8aa589afc493e0772bad35ed42fa11fc3ca1",
-    "priorRecordedHead": "f7c3aafbb95be8ac8ec598f8cf9d11eb4001bd36",
+    "verifiedMainHead": "5aa802ff3ee926ff441722d26a97f3d75d85fc4e",
+    "priorRecordedHead": "fbfd8aa589afc493e0772bad35ed42fa11fc3ca1",
     "state": "RECONCILED"
   },
   "cursor": {
     "nextItemId": "GAP-E6-RUNTIME-001",
     "state": "WAIT_AUTHORITY_DECISION / IMPLEMENTATION_NOT_ADMITTED",
     "noMappingRowsReexecuted": true,
-    "lastGovernanceCommit": "f7c3aafbb95be8ac8ec598f8cf9d11eb4001bd36"
+    "lastGovernanceCommit": "5aa802ff3ee926ff441722d26a97f3d75d85fc4e"
   },
   "mapping0": {
     "status": "NOT_GREEN",
@@ -117,6 +117,8 @@
     "runtimePromotion": "NONE",
     "roleAssignmentPromotion": "NONE",
     "governanceBoundaryReconciled": true,
-    "latestGovernanceCommit": "fbfd8aa589afc493e0772bad35ed42fa11fc3ca1"
+    "latestGovernanceCommit": "5aa802ff3ee926ff441722d26a97f3d75d85fc4e",
+    "externalEvidenceRunId": 35677891303,
+    "externalEvidenceArtifactId": 10673223547
   }
 }
