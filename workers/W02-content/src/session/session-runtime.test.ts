@@ -69,7 +69,7 @@ describe('session runtime foundation', () => {
 
   it('rejects empty device ids before persistence', async () => {
     const fake = dbFake(null)
-    await expect(createSessionExtension(fake.db, nativeSession(), '', NOW, {
+    await expect(createSessionExtension(fake.db, nativeSession(), '', NOW, 4, {
       randomToken: () => 'refresh-1',
       execute: async () => ({ meta: { changes: 1 } }),
     })).rejects.toThrow('deviceId')
