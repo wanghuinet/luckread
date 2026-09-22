@@ -100,7 +100,7 @@
     {
       "entityId": "ENT-ROLE-ASSIGNMENT",
       "catalogStatus": "PROPOSED",
-      "implementationStatus": "IMPLEMENTED_SOURCE_NOT_VERIFIED",
+      "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
         "workers/W02-content/src/authz/role-assignment.ts",
         "workers/W02-content/src/index.ts"
