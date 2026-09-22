@@ -1627,3 +1627,15 @@ Current cursor remains `GAP-E6-RUNTIME-001`; Decision B is closed at authority-i
 - This is a genuine new authority closure, not a rerun of a passed Mapping 0 item.
 - Remaining E6 blockers are implementation/deployment/evidence: contracted RoleAssignment persistence generation, W02 source/runtime implementation, controlled W02 deployment evidence, W01 `W02_AUTH` binding evidence, and controlled authLogin/authRefresh runtime evidence.
 
+
+## 2026-09-22 continuation — W02 source verification closed, remote execution remains explicit external step
+
+- W02 RoleAssignment implementation verification PR #10 was merged into `main` at `821e84f0dca776d177d48f44694a98fbe517dac8`.
+- GitHub Actions run `35705456180` = SUCCESS: W02 TypeScript check, generated-migration consistency, committed-artifact check, and 12 RoleAssignment resolver tests all passed.
+- Security Hardening Gate run `35705456175` = SUCCESS; Mapping 0 Structural Gate run `35705456105` = SUCCESS.
+- PR #11 introduced a controlled `workflow_dispatch` read-only remote D1 evidence path and was merged into `main` at `b7925afe2789eb54e4568b4f4f4be44153d000ad`.
+- The new remote evidence workflow performs read-only D1 schema/migration-ledger queries only; it does not perform remote DDL or DML.
+- The connected GitHub action set has no workflow-dispatch write operation, so this session has not claimed or simulated execution of the manual remote evidence workflow.
+- Therefore W02 source/logic verification is `PASS_VERIFIED`, while remote D1 evidence, Worker deployment, W01→W02 binding runtime evidence, and controlled authLogin/authRefresh runtime evidence remain open.
+- `GAP-E6-RUNTIME-001` remains the active continuation cursor. Mapping 0 remains `NOT_GREEN`.
+- No previously passed Mapping 0, AUTH-002 schema, Contract, or structural verification was re-executed.
