@@ -142,3 +142,20 @@ The project authority input has now bound the two currently inventoried physical
 
 This establishes the physical resource authority input required for Decision B. It does not create or alter database objects and does not by itself verify RoleAssignment persistence/runtime.
 
+
+## Implementation start — 2026-09-22
+
+Decision A and Decision B are now authority-resolved. Source implementation has begun within the existing W02/T01/T03/D1-01 boundary.
+
+Source-level implementation now present:
+- `workers/W02-content/wrangler.jsonc` — W02 physical Worker and D1-01 UUID binding.
+- `workers/W02-content/src/authz/role-assignment.ts` — deterministic RoleAssignment global-layer resolver.
+- `workers/W02-content/src/index.ts` — internal Service-Binding target endpoint for layer resolution, fail-closed on unavailable authorization inputs.
+- `workers/W02-content/migrations/0001_role_assignments.sql` — generated D1-01 persistence artifact.
+- `scripts/generate-role-assignment-migration.mjs` — canonical Contract-bound migration generator.
+- `.github/workflows/w02-deploy.yml` — controlled W02 deployment path.
+- `.github/workflows/w02-role-assignment-migration.yml` — controlled remote D1-01 mutation path.
+- `workers/W01-payload/wrangler.jsonc` — W01 `W02_AUTH` Service Binding configuration.
+
+Source implementation is not remote verification. Worker existence/version/source deployment evidence, remote D1 migration evidence, role-version mutation evidence, W01 auth integration evidence and controlled authLogin/authRefresh runtime evidence remain open.
+
