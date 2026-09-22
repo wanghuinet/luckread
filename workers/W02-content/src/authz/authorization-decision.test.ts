@@ -44,6 +44,15 @@ describe('canonical authorization decision', () => {
     })
   })
 
+  it('returns ALLOW when an optional check is omitted', () => {
+    const input = baseInput()
+    delete input.checks.entitlement
+    delete input.checks.workflow
+    delete input.checks.businessState
+    delete input.checks.credential
+    expect(evaluateAuthorization(input).decision).toBe('ALLOW')
+  })
+
   it('denies before permission when account security fails', () => {
     const input = baseInput()
     input.checks.accountState = 'FAIL'
@@ -60,10 +69,9 @@ describe('canonical authorization decision', () => {
     })
   })
 
-  it('denies when any mandatory check is missing', () => {
+  it('denies when any required check is missing', () => {
     const input = baseInput()
-    // @ts-expect-error Intentional incomplete boundary input for fail-closed behavior.
-    delete input.checks.policy
+    delete (input.checks as Partial<AuthorizationEvaluationInput['checks']>).policy
     expect(evaluateAuthorization(input)).toMatchObject({
       decision: 'DENY',
       reasonCode: 'MISSING_AUTHORIZATION_INPUT',
@@ -75,12 +83,31 @@ describe('canonical authorization decision', () => {
       ...baseInput(),
       role: 'admin',
     } as AuthorizationEvaluationInput & { role: string }
+
     expect(evaluateAuthorization(input)).toMatchObject({ decision: 'ALLOW' })
 
     input.checks.permission = 'FAIL'
     expect(evaluateAuthorization(input)).toMatchObject({
       decision: 'DENY',
       reasonCode: 'PERMISSION_DENIED',
+    })
+  })
+
+  it('denies a malformed subject type', () => {
+    const input = baseInput()
+    input.subject.type = 'UNKNOWN' as never
+    expect(evaluateAuthorization(input)).toMatchObject({
+      decision: 'DENY',
+      reasonCode: 'SUBJECT_TYPE_CHECK',
+    })
+  })
+
+  it('denies a failed policy check even when the other checks pass', () => {
+    const input = baseInput()
+    input.checks.policy = 'FAIL'
+    expect(evaluateAuthorization(input)).toMatchObject({
+      decision: 'DENY',
+      reasonCode: 'POLICY_DENIED',
     })
   })
 
