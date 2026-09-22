@@ -17,6 +17,15 @@ if (implementationAdmitted && gapStatus !== 'CLOSED — REQUIRED CONTRACT INPUTS
   throw new Error('E6 admission contradiction: implementation is GREEN while required wire/input gaps are not reconciled')
 }
 
+const roleAssignmentEvidencePath = resolve(root, 'contracts/entity/entity-implementation-evidence.v1.json')
+const roleAssignmentEvidence = JSON.parse(readFileSync(roleAssignmentEvidencePath, 'utf8')).records?.find((record) => record.entityId === 'ENT-ROLE-ASSIGNMENT')
+if (!roleAssignmentEvidence) {
+  throw new Error('E6 admission guard: ENT-ROLE-ASSIGNMENT implementation evidence record is missing')
+}
+if (implementationAdmitted && (roleAssignmentEvidence.blockers ?? []).some((blocker) => blocker.includes('role_version'))) {
+  throw new Error('E6 admission guard: implementation is GREEN while contracted role_version mutation/invalidation remains blocked')
+}
+
 const resolverContractPath = resolve(root, 'contracts/authz/role-assignment-layer-resolution.v1.json')
 if (!readFileSync(resolverContractPath, 'utf8').includes('"status": "CONTRACTED_NOT_VERIFIED"')) {
   throw new Error('E6 admission guard: deterministic RoleAssignment layer resolver contract is missing or unexpectedly promoted')
