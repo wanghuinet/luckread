@@ -122,7 +122,6 @@ describe('session runtime foundation', () => {
     await expect(rotateRefreshCredential(fake.db, {
       refreshToken: 'refresh-1',
       deviceId: 'device-b',
-      nativeSession: nativeSession(),
       now: NOW,
       issueAccessToken: () => 'access-1',
       hashToken: async () => 'hash',
@@ -169,7 +168,6 @@ describe('session runtime foundation', () => {
     await expect(rotateRefreshCredential(fake.db, {
       refreshToken: 'refresh-1',
       deviceId: 'device-a',
-      nativeSession: nativeSession(),
       now: NOW,
       issueAccessToken: () => 'access-1',
       hashToken: async () => 'old-hash',
