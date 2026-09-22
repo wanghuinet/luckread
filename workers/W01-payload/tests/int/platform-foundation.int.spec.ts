@@ -6,7 +6,7 @@ import {
   okResponse,
   parsePagination,
   requestContextFrom,
-} from '../../../src/platform/http/foundation'
+} from '../../src/platform/http/foundation'
 
 describe('W01 canonical HTTP foundation', () => {
   it('generates a canonical request id when the incoming id is absent', () => {
