@@ -39,7 +39,7 @@ function fakeD1(rows: RoleAssignmentRecord[]) {
       }),
     }),
   }
-  return { db: db as D1Database, getQueryCount: () => queryCount }
+  return { db: db as unknown as D1Database, getQueryCount: () => queryCount }
 }
 
 describe('RoleAssignment global layer resolution', () => {
