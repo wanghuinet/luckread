@@ -1,7 +1,7 @@
 # Mapping 0 — E6 W02 Physical Binding & RoleAssignment Decision Packet
 
 - Date: 2026-09-22
-- Status: `WAIT_AUTHORITY_DECISION`
+- Status: `DECISION_A_RECORDED / DECISION_B_WAIT_AUTHORITY_DECISION`
 - Scope: `GAP-E6-RUNTIME-001` only
 - Repository authority: GitHub `main`
 - Prepared against current main: `711d5a411a15abab8e2d2ec0114cb27975f51c6a`
@@ -10,7 +10,7 @@
 
 Prepare the minimum decision inputs required to unblock the existing AUTH-002 E6 runtime gate without changing the frozen 12-Worker / 4-D1 logical architecture, API contracts, session identity model, or authorization semantics.
 
-This packet is a decision aid only. It does not select a physical Worker name, transport, implementation location, D1 schema, or deployment target.
+Decision A is now recorded from the project authority's explicit source-path choice plus the deployment/transport decision recorded in `docs/change-control/CC-MAPPING-0-E6-W02-DEPLOYMENT-TRANSPORT-DECISION-2026-09-22.md`. Decision B remains unresolved.
 
 ## Verified current facts
 
@@ -36,7 +36,7 @@ The authority decision must establish, using the existing logical W02 ownership:
 - the approved W01 ↔ W02 transport mechanism for AUTH-002 / T01 / T03 traffic.
 
 Constraints:
-- Do not derive the physical identity from `workers/W02-content` or any directory naming convention.
+- Do not infer physical authority merely from directory naming. The project authority has now explicitly selected `workers/W02-content` as the W02 source path; that selection is the authority input for this Change Control.
 - Do not import historical P01-P08 or W01-W13 topology.
 - Do not create a Worker merely to satisfy Mapping 0.
 - Do not reassign `luckread-w01-payload` from W01 to W02.
@@ -75,9 +75,9 @@ Only after Decision A and Decision B are approved and implemented may the existi
 
 ## Current decision state
 
-- A: `WAIT_AUTHORITY_DECISION`
+- A: `DECIDED — source path, Worker name, deployment mode and transport recorded`
 - B: `WAIT_AUTHORITY_DECISION`
-- C: `BLOCKED` until A and B are complete
+- C: `BLOCKED` until B is complete and A has deployment evidence
 - AUTH-002: `NOT_GREEN`
 - Mapping 0: `NOT_GREEN`
 
@@ -95,6 +95,17 @@ This packet closes the discovery phase for GAP-E6-RUNTIME-001. Repeating broad r
 - `contracts/authz/role-assignment-layer-resolution.v1.json`
 - `docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21.md`
 
+
+## Decision A confirmation — 2026-09-22
+
+Project authority input now recorded:
+- W02 source path = `workers/W02-content`.
+- Physical Worker name = `luckread-w02`.
+- Deployment = controlled GitHub Actions `workflow_dispatch` using Wrangler, exact source-commit provenance, GitHub Cloudflare secrets, and no automatic push-to-production trigger.
+- Transport = W01 → W02 Cloudflare Service Binding over the HTTP interface, binding name `W02_AUTH`, target service `luckread-w02`.
+- The target Worker must be deployed before the caller's Service Binding deployment can succeed.
+
+These are decision inputs, not deployment evidence. No Worker was created or deployed by this decision record.
 
 ## Current-head revalidation — 2026-09-22
 
