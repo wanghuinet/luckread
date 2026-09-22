@@ -34,8 +34,8 @@ function dbFake(initial: SessionRecord | null) {
         run: async () => {
           writes += 1
           if (!row) return { meta: { changes: 0 } }
-          const [, nextHash, nextSeenAt] = args as [string, string, string]
-          if (row.refreshCredentialHash !== String(args[0])) return { meta: { changes: 0 } }
+          const [nextHash, nextSeenAt, , expectedOldHash] = args as [string, string, string, string]
+          if (row.refreshCredentialHash !== expectedOldHash) return { meta: { changes: 0 } }
           row = { ...row, refreshCredentialHash: nextHash, lastSeenAt: nextSeenAt }
           return { meta: { changes: 1 } }
         },
@@ -53,7 +53,7 @@ describe('session runtime foundation', () => {
   it('creates one extension record from the native session id and returns only a refresh credential', async () => {
     const calls: string[] = []
     const fake = dbFake(null)
-    const result = await createSessionExtension(fake.db, nativeSession(), 'device-a', NOW, {
+    const result = await createSessionExtension(fake.db, nativeSession(), 'device-a', NOW, 4, {
       randomToken: () => 'refresh-1',
       execute: async () => {
         calls.push('insert')
