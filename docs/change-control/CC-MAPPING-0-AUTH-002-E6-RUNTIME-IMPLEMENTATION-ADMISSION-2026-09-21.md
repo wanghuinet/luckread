@@ -232,4 +232,3 @@ Project authority has now explicitly established the D1 physical allocation usin
 This closes the prior physical-resource authority ambiguity for Decision B. It does not itself create a table, generate a migration, deploy W02, or promote RoleAssignment to VERIFIED.
 
 The remaining E6 admission prerequisites are now implementation/deployment/evidence steps: create the contracted RoleAssignment persistence through the approved migration path, establish the W02 runtime source/binding, deploy with source-commit provenance, then generate controlled runtime and security evidence.
-
