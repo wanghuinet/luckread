@@ -111,16 +111,18 @@
       ],
       "migrationEvidenceRefs": [
         "workers/W02-content/migrations/0001_role_assignments.sql",
-        "scripts/generate-role-assignment-migration.mjs"
+        "scripts/generate-role-assignment-migration.mjs",
+        "https://github.com/wanghuinet/luckread/actions/runs/35793128427",
+        "https://github.com/wanghuinet/luckread/actions/runs/35793310927"
       ],
       "payloadNativeEvidenceRefs": [],
       "extensionEvidenceRefs": [
-        "workers/W02-content/src/authz/role-assignment.ts"
+        "workers/W02-content/src/authz/role-assignment.ts",
+        "https://github.com/wanghuinet/luckread/actions/runs/35793226740"
       ],
       "blockers": [
-        "Remote D1-01 migration execution evidence is pending.",
-        "Controlled W02 deployment/version/source evidence is pending.",
-        "Controlled authLogin/authRefresh runtime evidence is pending."
+        "Controlled authLogin/authRefresh runtime evidence is pending.",
+        "Controlled authLogin/authRefresh runtime evidence and W01 Service Binding deployment evidence are pending."
       ],
       "status": "BLOCKED"
     },
