@@ -83,10 +83,14 @@ export async function createSessionExtension(
   session: NativeSessionAuthority,
   deviceId: string,
   now: string,
+  tokenVersion: number,
   options: MutationOptions = {},
 ): Promise<{ sessionId: string; refreshToken: string }> {
   assertNativeSession(session)
   assertDeviceId(deviceId)
+  if (!Number.isInteger(tokenVersion) || tokenVersion < 0) {
+    throw new SessionRuntimeError('INVALID_INPUT', 'tokenVersion must be a non-negative integer')
+  }
   assertNotExpired(session.expiresAt, now)
 
   const randomToken = options.randomToken ?? DEFAULT_RANDOM_TOKEN
@@ -108,7 +112,7 @@ export async function createSessionExtension(
       session.sessionId,
       session.userId,
       deviceId,
-      0,
+      tokenVersion,
       refreshCredentialHash,
       now,
     ])
