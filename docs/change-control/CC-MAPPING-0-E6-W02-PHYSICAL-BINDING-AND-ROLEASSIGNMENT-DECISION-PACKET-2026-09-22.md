@@ -76,8 +76,8 @@ Only after Decision A and Decision B are approved and implemented may the existi
 ## Current decision state
 
 - A: `DECIDED — source path, Worker name, deployment mode and transport recorded`
-- B: `WAIT_AUTHORITY_DECISION`
-- C: `BLOCKED` until B is complete and A has deployment evidence
+- B: `DECIDED — D1-01 physical UUID and D1-02 physical UUID explicitly allocated`
+- C: `BLOCKED` until B implementation and A deployment evidence are complete
 - AUTH-002: `NOT_GREEN`
 - Mapping 0: `NOT_GREEN`
 
@@ -130,4 +130,15 @@ Project authority has now explicitly decided the logical-to-physical D1 allocati
 This closes the prior Decision B authority-input gap at the logical allocation level. It does **not** by itself prove physical UUID binding, create/mutate a D1 database, generate a migration, or promote `ENT-ROLE-ASSIGNMENT` to VERIFIED.
 
 Next controlled steps are therefore evidence binding and implementation admission: identify the physical D1-01 UUID from the controlled Cloudflare inventory, record the D1-01 binding, then proceed through the existing RoleAssignment implementation/evidence gate. No Contract or Blueprint semantics are changed.
+
+
+## Decision B physical binding confirmation — 2026-09-22
+
+The project authority input has now bound the two currently inventoried physical D1 resources by UUID:
+
+- D1-01 primary = `2f80471e-3756-49f9-8db1-7707a433ad64` (inventory label then: `luckread`).
+- D1-02 secondary = `6c342634-97f6-4248-9f4a-85772af4f22c` (inventory label then: `luckreadpro`).
+- Display names are not authoritative and may be changed. Future evidence must identify resources by UUID.
+
+This establishes the physical resource authority input required for Decision B. It does not create or alter database objects and does not by itself verify RoleAssignment persistence/runtime.
 
