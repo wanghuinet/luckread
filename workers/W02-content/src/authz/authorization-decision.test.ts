@@ -53,11 +53,58 @@ describe('canonical authorization decision', () => {
     expect(evaluateAuthorization(input).decision).toBe('ALLOW')
   })
 
-  it('denies before permission when account security fails', () => {
+  it('uses account security as the first denial precedence', () => {
     const input = baseInput()
     input.checks.accountState = 'FAIL'
-    expect(evaluateAuthorization(input).decision).toBe('DENY')
-    expect(evaluateAuthorization(input).reasonCode).toBe('ACCOUNT_SECURITY_DENY')
+    input.checks.permission = 'FAIL'
+    expect(evaluateAuthorization(input)).toMatchObject({
+      decision: 'DENY',
+      reasonCode: 'ACCOUNT_SECURITY_DENY',
+    })
+  })
+
+  it('uses credential denial before permission denial', () => {
+    const input = baseInput()
+    input.checks.credential = 'FAIL'
+    input.checks.permission = 'FAIL'
+    expect(evaluateAuthorization(input)).toMatchObject({
+      decision: 'DENY',
+      reasonCode: 'CREDENTIAL_DENIED',
+    })
+  })
+
+  it('uses authentication denial before permission denial', () => {
+    const input = baseInput()
+    input.checks.authentication = 'FAIL'
+    input.checks.permission = 'FAIL'
+    expect(evaluateAuthorization(input)).toMatchObject({
+      decision: 'DENY',
+      reasonCode: 'AUTHENTICATION_DENIED',
+    })
+  })
+
+  it('uses subject-type denial before permission denial', () => {
+    const input = baseInput()
+    input.subject.type = 'UNKNOWN' as never
+    input.checks.permission = 'FAIL'
+    expect(evaluateAuthorization(input)).toMatchObject({
+      decision: 'DENY',
+      reasonCode: 'SUBJECT_TYPE_CHECK',
+    })
+    expect(evaluateAuthorization(input).subject).toEqual({
+      type: 'ANONYMOUS',
+      id: null,
+    })
+  })
+
+  it('uses account security precedence over malformed subject type', () => {
+    const input = baseInput()
+    input.subject.type = 'UNKNOWN' as never
+    input.checks.accountState = 'FAIL'
+    expect(evaluateAuthorization(input)).toMatchObject({
+      decision: 'DENY',
+      reasonCode: 'ACCOUNT_SECURITY_DENY',
+    })
   })
 
   it('denies when permission fails even when the resource id and ownership checks pass', () => {
@@ -90,15 +137,6 @@ describe('canonical authorization decision', () => {
     expect(evaluateAuthorization(input)).toMatchObject({
       decision: 'DENY',
       reasonCode: 'PERMISSION_DENIED',
-    })
-  })
-
-  it('denies a malformed subject type', () => {
-    const input = baseInput()
-    input.subject.type = 'UNKNOWN' as never
-    expect(evaluateAuthorization(input)).toMatchObject({
-      decision: 'DENY',
-      reasonCode: 'SUBJECT_TYPE_CHECK',
     })
   })
 
