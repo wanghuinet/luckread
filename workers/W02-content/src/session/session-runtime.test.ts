@@ -31,6 +31,10 @@ function dbFake(initial: SessionRecord | null, forcedUpdateChanges?: number) {
           reads += 1
           return row as T | null
         },
+        all: async <T>() => {
+          reads += 1
+          return { results: row ? [row as T] : [] }
+        },
         run: async () => {
           writes += 1
           if (!row) return { meta: { changes: 0 } }
