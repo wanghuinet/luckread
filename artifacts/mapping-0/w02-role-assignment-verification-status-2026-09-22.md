@@ -44,7 +44,8 @@ From the pre-implementation W02 decision head `d37cbdc1f2e3175caf454bd611f0bded4
 - W01 binding configuration delta: 6 LOC
 - Current PR test code: 144 LOC
 - Current PR CI workflow: 37 LOC
-- Current PR total additions: 181 LOC
+- Current PR verification-status document: 61 LOC
+- Current PR total additions: **242 LOC**
 
 This is the W02 implementation delta, not the total LuckRead repository size.
 
