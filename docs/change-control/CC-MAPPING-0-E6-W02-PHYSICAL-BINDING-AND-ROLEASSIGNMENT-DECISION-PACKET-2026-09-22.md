@@ -123,8 +123,8 @@ Per the anti-loop rule, this search result is now inherited. It must not be repe
 
 Project authority has now explicitly decided the logical-to-physical D1 allocation:
 
-- **D1-01 = 主数据库（primary database）** — authoritative persistence domain for Identity / Account / Access, including the already-contracted `ENT-ROLE-ASSIGNMENT`.
-- **D1-02 = 从数据库（secondary database）** — separate logical domain assignment; it is not the persistence authority for `ENT-ROLE-ASSIGNMENT`.
+- **D1-01 = 主数据库（primary physical allocation）** — authoritative persistence domain for Identity / Account / Access, including the already-contracted `ENT-ROLE-ASSIGNMENT`.
+- **D1-02 = 从数据库（secondary physical allocation）** — mapped to the canonical D1-02 Content / Community Data domain; this label does **not** change D1-02's canonical scoped write authority into a read-only replica and it is not the persistence authority for `ENT-ROLE-ASSIGNMENT`.
 - Physical database display names are **non-authoritative labels** and may be renamed. Binding evidence MUST use the actual Cloudflare database identity/UUID and deployment configuration, not the names `luckread` or `luckreadpro`.
 
 This closes the prior Decision B authority-input gap at the logical allocation level. It does **not** by itself prove physical UUID binding, create/mutate a D1 database, generate a migration, or promote `ENT-ROLE-ASSIGNMENT` to VERIFIED.
