@@ -43,13 +43,19 @@ Verified steps:
 ## Explicitly not closed
 
 - W02 controlled Cloudflare deployment provenance
-- D1-01 remote RoleAssignment migration execution/evidence
 - W01 -> W02 `W02_AUTH` deployed binding evidence
 - Public/edge `authLogin` runtime execution
 - Public/edge `authRefresh` runtime execution
 - Controlled E6 8-artifact runtime evidence package
-- Evidence Registry promotion of AUTH-002
+- Evidence Registry registration/promotion of AUTH-002
 - AUTH-013 concrete `User.account_state` implementation/evidence
+
+## Newly closed in this increment
+
+- D1-01 remote RoleAssignment migration + persistence readback is now execution-proven by GitHub Actions run `35815318484` against the controlled D1-01 UUID `2f80471e-3756-49f9-8db1-7707a433ad64`.
+- Exact implementation commit checked out by that run: `77a996ac1932b7b9b53264b79e4352d6626c5cc0`.
+- Controlled remote evidence artifact: `10731586089` (`w02-role-assignment-d1-01-remote-evidence-77a996ac1932b7b9b53264b79e4352d6626c5cc0`), digest `sha256:c0ca99774f398fbd77f0df83901f3e556a158a0ea906939009f46ef6dc4b5fd7`.
+- This closes the previously pending D1-01 migration/readback sub-gate only. It does not promote AUTH-002, ENT-SESSION, or Mapping 0.
 
 ## Governance boundaries
 
@@ -61,7 +67,14 @@ Verified steps:
 
 ## Next cursor
 
-`E6 Runtime-002 / controlled execution gate`
+`E6 Runtime-002 / W02 deployment + W01→W02 binding evidence`
+
+Remaining execution sequence:
+1. execute the already-authorized W02 deployment against the exact admitted source commit;
+2. execute W01 `W02_AUTH` binding deployment against its exact source commit;
+3. then generate the controlled authLogin/authRefresh runtime evidence package;
+4. register the resulting executable evidence without promoting stale or documentation-only records;
+5. resolve AUTH-013 separately before any dependent account-state runtime claim is promoted.
 
 Prerequisite before public auth runtime wiring:
 1. resolve the existing AUTH-013 account-state authority/implementation gap under its own contract/change-control path;
