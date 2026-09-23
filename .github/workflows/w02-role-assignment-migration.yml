@@ -43,3 +43,42 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx --yes wrangler@4.116.0 d1 migrations apply "${{ inputs.database_name }}" --remote --config wrangler.jsonc
+
+      - name: Verify RoleAssignment persistence remotely
+        working-directory: workers/W02-content
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          mkdir -p ../../artifacts/mapping-0
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+            --command "SELECT type, name, sql FROM sqlite_master WHERE name = 'role_assignments' OR name LIKE 'role_assignments_%' ORDER BY type, name;" \
+            > ../../artifacts/mapping-0/w02-role-assignment-remote-schema.txt
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+            --command "SELECT name FROM sqlite_master WHERE type='table' AND name='d1_migrations';" \
+            > ../../artifacts/mapping-0/w02-role-assignment-remote-ledger-check.txt
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+            --command "SELECT * FROM d1_migrations ORDER BY id;" \
+            > ../../artifacts/mapping-0/w02-role-assignment-remote-ledger.txt
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+            --command "SELECT COUNT(*) AS role_assignment_rows FROM role_assignments;" \
+            > ../../artifacts/mapping-0/w02-role-assignment-remote-row-count.txt
+
+      - name: Write controlled provenance
+        run: |
+          cat > artifacts/mapping-0/w02-role-assignment-remote-provenance.txt <<'EOF'
+          workflow=W02 RoleAssignment D1-01 Migration
+          source_sha=${{ inputs.source_sha }}
+          database_name=${{ inputs.database_name }}
+          binding=D1_01
+          database_id=2f80471e-3756-49f9-8db1-7707a433ad64
+          remote_mutation=true
+          post_migration_remote_readback=true
+          verification_scope=role_assignments schema, D1 migration ledger, row-count
+          EOF
+
+      - name: Upload controlled remote evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: w02-role-assignment-d1-01-remote-evidence-${{ inputs.source_sha }}
+          path: artifacts/mapping-0/w02-role-assignment-remote-*
