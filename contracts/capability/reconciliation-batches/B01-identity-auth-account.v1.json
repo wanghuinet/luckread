@@ -500,14 +500,20 @@
       "existingContracts": [
         "contracts/state-machines/account.json",
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/openapi/v1/operation-policy.json"
+        "contracts/openapi/v1/operation-policy.json",
+        "contracts/entity/entity-field-contract.v1.json"
       ],
       "apiRefs": [
         "transitionAccountState"
       ],
       "pageRefs": [],
       "dtoRefs": [],
-      "dataRefs": [],
+      "dataRefs": [
+        "ENT-USER-F-ACCOUNT-STATE",
+        "ENT-USER-F-ACCOUNT-STATE-VERSION",
+        "contracts/state-machines/account.json#x-luckread.state-field",
+        "contracts/state-machines/account.json#x-luckread.version-field"
+      ],
       "permissionRefs": [
         "user.restrict.limited",
         "user.freeze",
@@ -527,7 +533,7 @@
       "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
       "blockers": [
-        "worker ownership, DTO/entity/field/persistence, security/lifecycle, runtime and evidence mapping remain incomplete"
+        "DTO/entity/persistence, security/lifecycle, runtime and evidence mapping remain incomplete"
       ]
     },
     {
