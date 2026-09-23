@@ -110,7 +110,7 @@ The logical domain naming decision is now reconciled to `D01 Core` under Change 
 
 The current canonical Worker Master explicitly makes W00 historical/non-current and assigns Identity / Account / Authorization to **W02 / D1-01**. Therefore `W00` cannot be promoted as current runtime ownership by inference.
 
-The remaining blocker is Worker ownership reconciliation; the D1 logical-domain naming decision is already closed.
+The Worker ownership decision is now reconciled to W02 / D1-01. The remaining blockers are DTO, physical persistence, runtime and executable evidence.
 
 ## 7. Entity / field / persistence evidence
 
@@ -118,7 +118,7 @@ The remaining blocker is Worker ownership reconciliation; the D1 logical-domain 
 
 The account state machine names its entity as `User`, and the canonical entity catalog contains exactly one VERIFIED `User` entity: `ENT-USER`. Therefore the Feature → Entity mapping for AUTH-013 is deterministically reconciled to `ENT-USER`.
 
-This mapping does not define or verify any new field. `account_state` and `account_state_version` remain without canonical Field IDs and without physical persistence evidence.
+The canonical Field IDs are now admitted for the existing `ENT-USER` Entity: `ENT-USER-F-ACCOUNT-STATE` and `ENT-USER-F-ACCOUNT-STATE-VERSION`. They remain `CONTRACTED_NOT_VERIFIED` until physical schema/runtime evidence is captured.
 
 
 
@@ -137,8 +137,6 @@ The remaining identity entities are still proposed/contract-only, and the entity
 
 Therefore the following are unresolved and must not be inferred:
 
-- canonical `account_state` field ID
-- canonical `account_state_version` field ID
 - state-change reason field ID
 - actor/reference field IDs
 - approval record field ID
@@ -211,8 +209,8 @@ and the D1 and Worker authority conflicts have been formally resolved.
 ## 12. Closure criteria
 
 1. D1-01 versus D01 Core naming conflict — RESOLVED under Change Control; do not infer physical D1 schema.
-2. Resolve the stale `W00` authoritative-writer declaration against the current W02 ownership model.
-3. Establish canonical `account_state` and `account_state_version` field IDs.
+2. W02 / D1-01 authoritative-writer decision — RESOLVED by `CC-MAPPING-0-AUTH-013-AUTHORITY-2026-09-23`.
+3. Canonical `account_state` / `account_state_version` Field IDs — ADMITTED by `CC-MAPPING-0-AUTH-013-FIELD-ADMISSION-2026-09-23`.
 4. Keep the canonical `transitionAccountState` binding explicit; any separate suspend/restore/freeze/ban operation requires its own approved Contract admission before binding.
 5. Bind DTO, state, event, audit, cache, and security IDs.
 6. Establish authoritative D1 persistence and migration evidence without relying on undocumented Payload schema.
@@ -229,6 +227,6 @@ The following downstream evidence is now independently verified and is inherited
 - RoleAssignment D1-01 remote migration/readback: previously captured controlled evidence remains valid for the tested migration/source scope.
 - W01 → W02 `W02_AUTH` Service Binding: Run `35819898556`, source `d64d7527564239a487a6e0ad6dceb1b5e8dac3b9`, Cloudflare W01 version `3e6e2646-1979-488b-b273-72e84a582878`; deployment output explicitly reports `env.W02_AUTH (luckread-w02) -> Worker`.
 
-These facts close the previously open physical Worker/binding evidence items for the E6 downstream path, but they do not resolve the remaining AUTH-013 Contract authority inputs. In particular, the stale `W00` authoritative-writer declaration and the missing canonical Field IDs for `account_state` / `account_state_version` remain decision material. No runtime promotion is made by this reconciliation.
+These facts close the previously open physical Worker/binding evidence items for the E6 downstream path, but they do not resolve the remaining AUTH-013 Contract authority inputs. The W00 writer conflict and canonical Field-ID decision inputs are now resolved. Physical persistence, DTO, runtime and executable evidence remain open. No runtime promotion is made by this reconciliation.
 
 Current AUTH-013 disposition remains: **BLOCKED_NOT_GREEN / implementation authorization=false**.
