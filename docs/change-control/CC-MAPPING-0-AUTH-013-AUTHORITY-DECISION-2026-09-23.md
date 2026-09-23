@@ -39,7 +39,7 @@ This decision does **not** by itself admit:
 - AUTH-013 GREEN;
 - E6 Runtime-003 promotion.
 
-Candidate Field IDs already documented in the decision-input packet remain candidates until separately reconciled:
+Field IDs were subsequently admitted under separate Change Control; the following values are retained here as the historical candidates presented to the writer-authority decision:
 
 - `ENT-USER-F-ACCOUNT-STATE`
 - `ENT-USER-F-ACCOUNT-STATE-VERSION`
@@ -64,3 +64,8 @@ Current AUTH-013 status remains:
 Implementation authorization remains false until the remaining Contract and persistence inputs are closed.
 
 No previously verified W02 deployment, RoleAssignment migration, or W01 → W02 Service Binding evidence is re-executed by this decision.
+
+
+## Subsequent Field Decision
+
+The Field-ID dimension was later closed by `CC-MAPPING-0-AUTH-013-FIELD-ADMISSION-2026-09-23`. This document remains authoritative for the W02 / D1-01 writer decision only.
