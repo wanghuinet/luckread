@@ -1749,13 +1749,11 @@ No Contract, Blueprint, Worker topology, D1 topology, or authorization semantics
 
 ### Current blockers (not auto-decided)
 - AUTH-013 remains `BLOCKED_NOT_GREEN` / implementation authorization false.
+- Deterministic API mapping correction is now reconciled: AUTH-013 is explicitly bound to the existing canonical `transitionAccountState` operation. The separately inventoried `postAccountsAccountIdSuspend` / `postAccountsAccountIdRestore` routes remain Discovery Drafts and were not promoted.
 - `contracts/enums/account-state.json` still declares historical `W00` as authoritative-writer while the active Worker Master assigns Identity/Account/Authorization to W02. This is an explicit authority conflict, not an implementation typo to auto-edit.
 - Canonical Field IDs for `account_state` and `account_state_version` remain undefined in `contracts/entity/entity-field-contract.v1.json`.
-- Account-state operation/DTO/state/event/persistence evidence is not yet reconciled.
+- Account-state DTO/entity/field/persistence/runtime/security/lifecycle/event evidence is not yet reconciled.
 - Therefore controlled public `authLogin/authRefresh` runtime evidence remains blocked from promotion.
-
-### Evidence-registry limitation
-The strict Mapping-0 Evidence Registry validator requires current executable PASS evidence to use the exact current `main` commit. Existing historical/remote evidence is preserved, but must not be relabeled as current-head evidence merely because later commits are documentation-only. No such false promotion was made.
 
 ### Current cursor
 **AUTH-013 Contract-First authority reconciliation → then E6 Runtime-003 controlled authLogin/authRefresh evidence.**
