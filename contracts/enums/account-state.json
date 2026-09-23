@@ -21,7 +21,7 @@
   "x-luckread": {
     "canonical-source": "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
     "domain": "D1-01",
-    "authoritative-writer": "W00",
+    "authoritative-writer": "W02",
     "cache-version-field": "account_state_version",
     "terminal-states": [],
     "recoverable-tombstone-states": ["DELETED"]
