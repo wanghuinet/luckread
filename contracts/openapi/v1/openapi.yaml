@@ -110,7 +110,7 @@ paths:
                   accessToken: { type: string }
                   refreshToken: { type: string }
                   expiresIn: { type: integer }
-                  layer: { type: string, pattern: '^L[0-8]
+                  layer: { type: string, pattern: '^L[0-8]$' }
 
   /auth/logout:
     post:
@@ -1277,7 +1277,7 @@ paths:
                   accessToken: { type: string }
                   refreshToken: { type: string }
                   expiresIn: { type: integer }
-                  layer: { type: string, pattern: '^L[0-8]
+                  layer: { type: string, pattern: '^L[0-8]$' }
   /auth/revoke:
     post:
       tags: [Auth]
