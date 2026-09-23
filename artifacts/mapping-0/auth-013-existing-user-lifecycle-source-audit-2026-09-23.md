@@ -74,3 +74,29 @@ Decision C remains selected:
 The next investigation may inspect aggregate, privacy-safe metadata only. It must not export unnecessary User PII. Once a complete source is demonstrated, a separate Change Control admission can define the backfill values and release the migration gate.
 
 No remote mutation is authorized by this audit.
+
+## Current controlled-target evidence — 2026-09-23
+
+A fresh read-only GitHub Actions evidence run was completed against the current controlled D1-01 target:
+
+- Workflow run: `35852723250` — **SUCCESS**
+- Tested commit: `29c2e77e8393bec6f9f21183d40e3f2b1b07c28f`
+- Environment: `CONTROLLED_REMOTE_D1`
+- Database: `luckread`
+- Database UUID: `2f80471e-3756-49f9-8db1-7707a433ad64`
+- Evidence artifact: `10746087117`
+- Artifact digest: `sha256:9ea5048d252d0006665925387cfabed0116f4a0bc8841b884bc9ecff72a2d001`
+
+Observed target state:
+
+- `users` row count: **0**
+- `users` schema still has no `account_state` or `account_state_version`
+- migration history contains `20250929_111647` and `20260921_003203_MIG_AUTH_002_SESSION_V1`
+- the evidence SQL reported zero writes / no changed database
+
+### Updated disposition
+
+The current controlled target contains **no pre-existing User rows requiring lifecycle classification**. Therefore the row-coverage question is now deterministically satisfied for the captured target as **0/0 rows**.
+
+This does **not** authorize a migration or choose an initial `account_state_version`. The remaining semantic gate is the authoritative initialization rule for newly persisted User lifecycle version state, which must be explicitly admitted before final non-null persistence is implemented.
+
