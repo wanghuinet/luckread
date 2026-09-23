@@ -540,7 +540,7 @@
       "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
       "blockers": [
-        "existing-user account_state/account_state_version backfill policy remains an explicit decision gate",
+        "authoritative existing-user lifecycle classification source/policy is not established",
         "D1-01 migration execution and post-schema evidence remain pending",
         "security/lifecycle, runtime and Evidence Registry mapping remain incomplete"
       ]
