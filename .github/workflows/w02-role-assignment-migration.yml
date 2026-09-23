@@ -33,6 +33,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Verify D1-01 target binding
+        working-directory: workers/W02-content
+        run: |
+          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8')); const d=c.d1_databases?.find(x=>x.binding==='D1_01'); if(!d) throw new Error('D1_01 binding missing'); if(d.database_name !== process.env.EXPECTED_DB_NAME) throw new Error('database_name input must equal configured D1_01 database_name'); if(d.database_id !== process.env.EXPECTED_DB_ID) throw new Error('D1_01 database_id does not match controlled target'); console.log(JSON.stringify(d,null,2))" 
+        env:
+          EXPECTED_DB_NAME: ${{ inputs.database_name }}
+          EXPECTED_DB_ID: 2f80471e-3756-49f9-8db1-7707a433ad64
+
       - name: Verify RoleAssignment migration artifact
         run: node scripts/generate-role-assignment-migration.mjs
       - name: Assert generated migration is committed
