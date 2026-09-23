@@ -300,19 +300,20 @@ export async function refreshAuthenticatedSession(
   }
 
   const resolveLayer = input.resolveLayer ?? resolveGlobalLayer
-  let rotatedSession: SessionRecord | null = null
+  const holder: { session: SessionRecord | null } = { session: null }
   const rotated = await rotateRefreshCredential(db, {
     refreshToken: input.refreshToken,
     deviceId: input.deviceId,
     now: input.now,
     issueAccessToken: (session) => {
-      rotatedSession = session
+      holder.session = session
       return input.issueAccessToken(session)
     },
     ...(input.randomToken ? { randomToken: input.randomToken } : {}),
     ...(input.hashToken ? { hashToken: input.hashToken } : {}),
   })
 
+  const rotatedSession = holder.session
   if (!rotatedSession) {
     throw new SessionRuntimeError('UNAUTHENTICATED', 'session state is unavailable')
   }
