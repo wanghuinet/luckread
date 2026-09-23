@@ -1,0 +1,201 @@
+name: AUTH-013 Persistence Schema Evidence
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-013-persistence-schema-evidence
+  cancel-in-progress: false
+
+jobs:
+  schema-evidence:
+    runs-on: ubuntu-latest
+    env:
+      WRANGLER_VERSION: "4.33.1"
+      W01_WRANGLER_CONFIG: workers/W01-payload/wrangler.jsonc
+      DATABASE_NAME: luckread
+      EVIDENCE_ENVIRONMENT: CONTROLLED_REMOTE_D1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: workers/W01-payload/package.json
+
+      - name: Install W01 locked dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate evidence inputs
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -f "$W01_WRANGLER_CONFIG"
+          mkdir -p artifacts/evidence/auth-013
+
+      - name: Capture D1 metadata
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 info "$DATABASE_NAME" --json --config "$W01_WRANGLER_CONFIG"             > artifacts/evidence/auth-013/d1-info.json
+
+      - name: Capture users schema
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG"             --command 'PRAGMA table_info("users");'             > artifacts/evidence/auth-013/users-schema.json
+
+      - name: Capture users indexes
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG"             --command 'PRAGMA index_list("users");'             > artifacts/evidence/auth-013/users-indexes.json
+
+      - name: Capture users row count
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG"             --command 'SELECT COUNT(*) AS users_count FROM users;'             > artifacts/evidence/auth-013/users-count.json
+
+      - name: Capture account-state column presence
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG"             --command "SELECT name, type, notnull, dflt_value FROM pragma_table_info('users') WHERE name IN ('account_state','account_state_version') ORDER BY name;"             > artifacts/evidence/auth-013/account-state-columns.json
+
+      - name: Capture migration history
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG"             --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;'             > artifacts/evidence/auth-013/migration-history.json
+
+      - name: Capture reproducible provenance
+        shell: bash
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+          GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const provenance = {
+            repository: process.env.GITHUB_REPOSITORY,
+            workflow: process.env.GITHUB_WORKFLOW,
+            workflowRef: process.env.GITHUB_WORKFLOW_REF,
+            workflowSha: process.env.GITHUB_SHA,
+            runId: Number(process.env.GITHUB_RUN_ID),
+            runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            eventName: process.env.GITHUB_EVENT_NAME,
+            databaseName: process.env.DATABASE_NAME,
+            environmentClass: process.env.EVIDENCE_ENVIRONMENT,
+          };
+          fs.writeFileSync(
+            'artifacts/evidence/auth-013/provenance.json',
+            JSON.stringify(provenance, null, 2) + '\n'
+          );
+          NODE
+
+      - name: Validate evidence package
+        shell: bash
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+          const files = [
+            'd1-info.json',
+            'users-schema.json',
+            'users-indexes.json',
+            'users-count.json',
+            'account-state-columns.json',
+            'migration-history.json',
+            'provenance.json',
+          ];
+          const dir = 'artifacts/evidence/auth-013';
+          const provenance = JSON.parse(fs.readFileSync(dir + '/provenance.json', 'utf8'));
+          if (provenance.workflowSha !== process.env.GITHUB_SHA) {
+            throw new Error('AUTH-013 provenance SHA mismatch');
+          }
+          const result = {};
+          for (const file of files) {
+            const p = dir + '/' + file;
+            if (!fs.existsSync(p)) throw new Error('Missing evidence file: ' + file);
+            result[file] = crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+          }
+          const schema = JSON.parse(fs.readFileSync(dir + '/users-schema.json', 'utf8'));
+          const columns = (schema?.[0]?.results ?? []).map((r) => r.name);
+          const count = JSON.parse(fs.readFileSync(dir + '/users-count.json', 'utf8'));
+          const usersCount = count?.[0]?.results?.[0]?.users_count;
+          const stateColumns = JSON.parse(fs.readFileSync(dir + '/account-state-columns.json', 'utf8'));
+          const presentStateColumns = (stateColumns?.[0]?.results ?? []).map((r) => r.name);
+          const history = JSON.parse(fs.readFileSync(dir + '/migration-history.json', 'utf8'));
+          const migrationNames = (history?.[0]?.results ?? []).map((r) => r.name);
+          const manifest = {
+            testedCommitSha: process.env.GITHUB_SHA,
+            environmentClass: process.env.EVIDENCE_ENVIRONMENT,
+            databaseName: process.env.DATABASE_NAME,
+            usersColumns: columns,
+            usersCount,
+            accountStateColumnsPresent: presentStateColumns,
+            migrationNames,
+            evidenceFiles: result,
+          };
+          fs.writeFileSync(dir + '/manifest.json', JSON.stringify(manifest, null, 2) + '\n');
+          console.log(JSON.stringify({
+            AUTH_013_SCHEMA_CAPTURE: 'PASS_READ_ONLY',
+            usersCount,
+            accountStateColumnsPresent: presentStateColumns,
+            migrationNames,
+          }));
+          NODE
+
+      - name: Upload AUTH-013 schema evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-013-persistence-schema-evidence-${{ github.run_id }}
+          path: artifacts/evidence/auth-013/
+          if-no-files-found: error
+          retention-days: 14
