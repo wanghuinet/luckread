@@ -1,0 +1,27 @@
+name: AUTH-013 Migration Static Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W02-content/migrations/0002_auth_013_account_state.sql'
+      - 'scripts/auth-013-migration-static-audit.mjs'
+      - '.github/workflows/auth-013-migration-static-verification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install SQLite
+        run: sudo apt-get update && sudo apt-get install -y sqlite3
+      - name: Run AUTH-013 static migration audit
+        run: node scripts/auth-013-migration-static-audit.mjs

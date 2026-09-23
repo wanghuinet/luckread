@@ -1857,3 +1857,11 @@ Disposition:
 **AUTH-013 → controlled zero-row D1-01 migration execution → exact post-schema evidence → W02 transition runtime implementation → security/concurrency/audit/event tests → Evidence Registry promotion.**
 
 Do not rerun the already verified 0/0 classification evidence unless the controlled D1-01 target or relevant User-persistence inputs change.
+
+
+## 2026-09-23 Superpowers continuation — AUTH-013 migration static gate added
+
+- Added `scripts/auth-013-migration-static-audit.mjs` to verify required/fobidden migration structure and execute the migration against ephemeral SQLite fixtures.
+- Static gate proves the migration rejects a non-empty `users` table and succeeds for an empty `users` table with the admitted defaults.
+- Added `.github/workflows/auth-013-migration-static-verification.yml` as a read-only CI gate. It never contacts or mutates Cloudflare D1.
+- Remote D1 migration remains unexecuted and requires the existing controlled `workflow_dispatch` path with `confirm=APPLY`.
