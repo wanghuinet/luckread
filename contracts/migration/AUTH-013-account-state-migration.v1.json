@@ -41,8 +41,8 @@
     "Stage D: execute W02 runtime transition tests, concurrency/security/lifecycle checks, and capture Evidence Registry records."
   ],
   "gates": {
-    "backfillPolicy": "C_SELECTED_WAITING_AUTHORITY_SOURCE",
-    "migrationExecution": "NOT_AUTHORIZED",
+    "backfillPolicy": "CURRENT_TARGET_ZERO_ROWS_VERIFIED / FUTURE_NON_ZERO_TARGET_BLOCKED",
+    "migrationExecution": "AUTHORIZED_FOR_CONTROLLED_ZERO_ROW_TARGET_ONLY",
     "remoteMutation": "NOT_EXECUTED",
     "postSchemaVerification": "PENDING",
     "runtimeVerification": "PENDING"
@@ -65,6 +65,17 @@
     "concurrency tests",
     "security/lifecycle tests",
     "Evidence Registry entries",
-    "authoritative existing-user classification source/policy with complete coverage"
-  ]
+    "authoritative existing-user classification source/policy with complete coverage",
+    "preflight users_count = 0 immediately before mutation",
+    "post-migration account_state/account_state_version NOT NULL/default verification",
+    "post-migration D1 migration ledger evidence"
+  ],
+  "initializationSemantics": {
+    "firstPersistedAccountState": "PENDING_VERIFICATION",
+    "firstPersistedAccountStateVersion": 1,
+    "successfulTransitionVersionRule": "previous_version + 1",
+    "unsuccessfulTransitionMutatesVersion": false
+  },
+  "migrationFile": "workers/W02-content/migrations/0002_auth_013_account_state.sql",
+  "nonEmptyTargetPolicy": "Migration MUST stop for users_count > 0; no existing-user values may be auto-assigned on a non-empty target."
 }

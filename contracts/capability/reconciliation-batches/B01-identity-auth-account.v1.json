@@ -540,8 +540,8 @@
       "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
       "blockers": [
-        "authoritative existing-user lifecycle classification source/policy is not established",
-        "D1-01 migration execution and post-schema evidence remain pending",
+        "current controlled D1-01 target row applicability is PASS_VERIFIED at 0/0",
+        "controlled zero-row D1-01 migration execution and exact post-schema evidence remain pending",
         "security/lifecycle, runtime and Evidence Registry mapping remain incomplete"
       ]
     },

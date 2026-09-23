@@ -1838,3 +1838,22 @@ Disposition:
 ### Current cursor
 **AUTH-013 → authoritative initial `account_state_version` semantics → migration admission → isolated D1-01 execution → post-schema verification → W02 lifecycle transition implementation/evidence.**
 
+
+
+## 2026-09-23 Superpowers continuation — AUTH-013 initial version semantics admitted
+
+- Current controlled D1-01 target row applicability remains **PASS_VERIFIED 0/0** from workflow `35852723250`.
+- The remaining semantic gate is now closed by Change Control `CC-MAPPING-0-AUTH-013-INITIAL-VERSION-SEMANTICS-2026-09-23`.
+- First persisted User lifecycle state: `PENDING_VERIFICATION`.
+- First persisted `account_state_version`: **1**.
+- Every successful account-state transition increments the version exactly once (`N → N+1`); failed/rejected/stale transitions do not mutate it.
+- This interpretation preserves the existing logical `UNREGISTERED` state and does not alter the state machine or architecture.
+- A guarded W02/D1-01 migration source is now introduced: `workers/W02-content/migrations/0002_auth_013_account_state.sql`.
+- Migration admission is limited to the exact controlled target whose preflight `users_count = 0`; non-empty targets remain blocked and require separate authoritative backfill policy.
+- A manual workflow is provided at `.github/workflows/auth-013-account-state-migration.yml`; it requires `confirm=APPLY`, verifies the D1-01 binding, preflights the zero-row target, applies the migration, and captures post-schema evidence.
+- AUTH-013 remains **BLOCKED_NOT_GREEN** until remote migration evidence and subsequent W02 runtime/security/test evidence are captured.
+
+### Current cursor
+**AUTH-013 → controlled zero-row D1-01 migration execution → exact post-schema evidence → W02 transition runtime implementation → security/concurrency/audit/event tests → Evidence Registry promotion.**
+
+Do not rerun the already verified 0/0 classification evidence unless the controlled D1-01 target or relevant User-persistence inputs change.

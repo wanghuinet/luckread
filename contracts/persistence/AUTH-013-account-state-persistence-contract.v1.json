@@ -60,8 +60,10 @@
     "finalSchemaRequired": true,
     "transitionalNullableColumnsAllowed": true,
     "backfillRequiredForExistingRows": true,
-    "backfillDecisionStatus": "C_SELECTED_WAITING_AUTHORITY_SOURCE",
-    "executionStatus": "NOT_EXECUTED"
+    "backfillDecisionStatus": "CURRENT_TARGET_ZERO_ROWS_VERIFIED / FUTURE_NON_ZERO_TARGET_BLOCKED",
+    "executionStatus": "NOT_EXECUTED",
+    "executionWorkflow": ".github/workflows/auth-013-account-state-migration.yml",
+    "authorizedScope": "CONTROLLED_REMOTE_D1_ZERO_ROW_TARGET_ONLY"
   },
   "rules": {
     "existingUsersMustNotBeSilentlyAssignedState": true,
@@ -81,10 +83,28 @@
     "final schema is verified on the controlled D1-01 target"
   ],
   "remainingGaps": [
-    "authoritative existing-user classification source/policy is not established",
-    "initial account_state value for pre-existing rows is intentionally undecided",
-    "initial account_state_version value for pre-existing rows is intentionally undecided",
+    "non-zero pre-existing-user targets require separate authoritative classification policy before migration",
     "migration execution and post-schema evidence are absent",
     "runtime, concurrency, audit, event, cache and security evidence are absent"
-  ]
+  ],
+  "observedCurrentTargetRowCoverageEvidence": {
+    "workflowRun": 35852723250,
+    "testedCommitSha": "29c2e77e8393bec6f9f21183d40e3f2b1b07c28f",
+    "evidenceArtifact": "10746087117",
+    "evidenceDigest": "sha256:9ea5048d252d0006665925387cfabed0116f4a0bc8841b884bc9ecff72a2d001",
+    "environment": "CONTROLLED_REMOTE_D1",
+    "databaseName": "luckread",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "table": "users",
+    "usersCount": 0,
+    "accountStateColumnsPresent": false,
+    "writesDuringCapture": 0,
+    "disposition": "PASS_VERIFIED_ZERO_ROW_TARGET"
+  },
+  "initializationSemantics": {
+    "firstPersistedAccountState": "PENDING_VERIFICATION",
+    "firstPersistedAccountStateVersion": 1,
+    "successfulTransitionVersionRule": "previous_version + 1",
+    "unsuccessfulTransitionMutatesVersion": false
+  }
 }
