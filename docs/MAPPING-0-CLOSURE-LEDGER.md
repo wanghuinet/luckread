@@ -1682,3 +1682,30 @@ Current cursor:
 - Next admissible action: establish controlled W01 deployment evidence showing the committed `W02_AUTH -> luckread-w02` Service Binding is active, then proceed to the existing AUTH-002 E6 runtime evidence workflow. Do not repeat W02 RoleAssignment migration or deployment.
 
 No Contract, Blueprint, Worker topology, D1 topology, session identity model, or Mapping feature status was changed by this evidence reconciliation.
+
+
+## 2026-09-23 continuation — W02 deployment verified; W01 binding dependency gate repaired
+
+- Fresh W02 controlled deployment run `35816952574` = SUCCESS.
+- Exact W02 checkout = `0c0c250f1f2ec6da38a8b3c50834d74a4999f5da`.
+- Cloudflare Worker = `luckread-w02`; Current Version ID = `7eb5d373-14b3-4354-9d72-af72c1a0a6cc`.
+- This fresh deployment evidence supersedes neither Contract semantics nor the already-verified W02 implementation; it is current deployment evidence and does not establish the caller-side W01 Service Binding.
+
+- W01 `W02_AUTH` binding workflow run `35816996216` = FAILURE.
+- The failure is isolated to `pnpm install --frozen-lockfile` under pinned pnpm `11.0.0`, which rejected unreviewed dependency build scripts before the binding/build/deploy steps executed.
+- This run is recorded as a tooling-gate failure, not as Service Binding failure evidence.
+- Repair commit `d64d7527564239a487a6e0ad6dceb1b5e8dac3b9` adds explicit `allowBuilds` entries for `esbuild`, `sharp`, `unrs-resolver`, and `workerd` only.
+- Current pnpm build-policy documentation supports explicit `allowBuilds` and confirms unreviewed builds can fail installation under `strictDepBuilds`: `https://pnpm.io/settings/build`.
+- No Contract, Blueprint, Worker topology, D1 topology, or authorization semantics were changed by the repair.
+
+Current continuation state:
+- `GAP-E6-RUNTIME-001` remains active.
+- W02 RoleAssignment migration/persistence = `PASS_VERIFIED`.
+- W02 deployment = `PASS_VERIFIED` at current tested source scope.
+- W01 `W02_AUTH` binding deployment = `TODO_VERIFY` after tooling-gate repair.
+- Controlled `authLogin/authRefresh` runtime evidence = not yet executed.
+
+Next admissible external action:
+- Manually dispatch `W01 W02 Auth Binding Deploy` with `source_sha=d64d7527564239a487a6e0ad6dceb1b5e8dac3b9` and `confirm=DEPLOY_BINDING`.
+- Do not repeat W02 migration or W02 deployment.
+- Do not start auth runtime evidence until the W01 binding workflow completes successfully.
