@@ -1,6 +1,14 @@
 name: W02 RoleAssignment Verification
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W02-content/**'
+      - 'contracts/authz/**'
+      - 'contracts/entity/AUTHZ-role-assignment-authority.v1.json'
+      - 'scripts/generate-role-assignment-migration.mjs'
+      - '.github/workflows/w02-role-assignment-verification.yml'
   pull_request:
     paths:
       - 'workers/W02-content/**'
