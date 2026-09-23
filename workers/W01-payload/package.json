@@ -62,13 +62,6 @@
     "node": ">=24.15.0",
     "pnpm": "^9 || ^10 || ^11"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "sharp",
-      "esbuild",
-      "unrs-resolver"
-    ]
-  },
   "cloudflare": {
     "bindings": {
       "PAYLOAD_SECRET": {
