@@ -141,7 +141,7 @@ async function loadRefreshSession(db: D1Database, refreshCredentialHash: string)
     FROM auth_session_state AS a
     INNER JOIN users_sessions AS s
       ON s.id = a.session_id
-     AND CAST(s._parent_id AS TEXT) = a.userId
+     AND CAST(s._parent_id AS TEXT) = a.user_id
     WHERE a.refresh_credential_hash = ?
     LIMIT 1
   `
