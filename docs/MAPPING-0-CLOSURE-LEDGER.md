@@ -1757,6 +1757,8 @@ No Contract, Blueprint, Worker topology, D1 topology, or authorization semantics
 
 ### Stage 1 / Slice 1 checkpoint — 2026-09-23
 
+- AUTH-013 Feature → Entity mapping: `ENT-USER` is now deterministically reconciled from the authoritative Account State Machine entity `User` plus the unique VERIFIED Entity Catalog record.
+- AUTH-013 Feature → current Worker mapping: `W02` is now explicitly recorded from resolved `B01-CONFLICT-002` / current Worker Master ownership. This does not resolve the separate stale `authoritative-writer: W00` declaration in `contracts/enums/account-state.json`.
 - W02 Session Runtime unit-test gate: **PASS_VERIFIED**.
 - GitHub Actions Run: `35827604032`.
 - Tested source commit: `49a50787f9d913459fa4eacc5f7e5b828e5d2703`.
