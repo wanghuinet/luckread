@@ -1,0 +1,68 @@
+{
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "promotion": "NOT_GREEN",
+  "purpose": "AUTH-013 staged migration contract for the existing D1-01 users table. Defines the target schema without claiming execution.",
+  "migrationId": "MIG-AUTH-013-ACCOUNT-STATE-V1",
+  "featureId": "AUTH-013",
+  "authority": {
+    "worker": "W02",
+    "domain": "D1-01",
+    "entity": "ENT-USER",
+    "persistenceContract": "contracts/persistence/AUTH-013-account-state-persistence-contract.v1.json"
+  },
+  "target": {
+    "physicalTable": "users",
+    "sourceEvidence": {
+      "workflowRun": 35657959095,
+      "testedCommitSha": "48575b4a2b86bf317e4e4ccac6c6ec17739cf2eb",
+      "environment": "CONTROLLED_REMOTE_D1",
+      "observation": "users table exists; target account-state columns were absent in the captured pre-schema snapshot"
+    }
+  },
+  "targetColumns": [
+    {
+      "fieldId": "ENT-USER-F-ACCOUNT-STATE",
+      "column": "account_state",
+      "dbType": "TEXT",
+      "finalNullable": false
+    },
+    {
+      "fieldId": "ENT-USER-F-ACCOUNT-STATE-VERSION",
+      "column": "account_state_version",
+      "dbType": "INTEGER",
+      "finalNullable": false
+    }
+  ],
+  "stagedPlan": [
+    "Stage A: introduce the target columns using a migration-compatible transitional form without asserting final nullability.",
+    "Stage B: backfill every existing row using an explicitly approved account-state policy and an explicitly approved initial version policy.",
+    "Stage C: enforce the final non-null contract and verify the resulting schema.",
+    "Stage D: execute W02 runtime transition tests, concurrency/security/lifecycle checks, and capture Evidence Registry records."
+  ],
+  "gates": {
+    "backfillPolicy": "BLOCKED_DECISION_REQUIRED",
+    "migrationExecution": "NOT_AUTHORIZED",
+    "remoteMutation": "NOT_EXECUTED",
+    "postSchemaVerification": "PENDING",
+    "runtimeVerification": "PENDING"
+  },
+  "forbiddenInference": [
+    "do not infer existing users are ACTIVE",
+    "do not infer an initial account_state_version",
+    "do not modify workers/W01-payload/src/collections/Users.ts as part of this migration gate",
+    "do not claim remote schema contains the target columns before post-migration evidence"
+  ],
+  "evidenceRequirements": [
+    "exact pre-schema snapshot",
+    "approved migration source",
+    "exact tested commit SHA",
+    "isolated D1-01 execution",
+    "exact post-schema snapshot",
+    "row-level backfill validation",
+    "runtime persistence tests",
+    "concurrency tests",
+    "security/lifecycle tests",
+    "Evidence Registry entries"
+  ]
+}
