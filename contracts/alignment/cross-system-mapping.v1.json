@@ -334,7 +334,9 @@
       "apiOperationIds": [
         "transitionAccountState"
       ],
-      "entityIds": [],
+      "entityIds": [
+        "ENT-USER"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [

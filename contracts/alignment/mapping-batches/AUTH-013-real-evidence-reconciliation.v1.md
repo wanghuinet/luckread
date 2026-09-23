@@ -114,6 +114,14 @@ The remaining blocker is Worker ownership reconciliation; the D1 logical-domain 
 
 ## 7. Entity / field / persistence evidence
 
+### 7.1 Deterministic entity binding
+
+The account state machine names its entity as `User`, and the canonical entity catalog contains exactly one VERIFIED `User` entity: `ENT-USER`. Therefore the Feature → Entity mapping for AUTH-013 is deterministically reconciled to `ENT-USER`.
+
+This mapping does not define or verify any new field. `account_state` and `account_state_version` remain without canonical Field IDs and without physical persistence evidence.
+
+
+
 `ENT-USER` is the only currently verified identity entity implementation. The current entity-field contract defines verified User fields only for:
 
 - username

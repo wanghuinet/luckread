@@ -19,6 +19,8 @@ const mappingPath = path.join(root, 'contracts/alignment/cross-system-mapping.v1
 const jsonBindingPath = path.join(root, 'contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json')
 const auth010BindingPath = path.join(root, 'contracts/alignment/mapping-batches/AUTH-010-session-field-binding.v1.md')
 const auth011GatePath = path.join(root, 'contracts/alignment/mapping-batches/AUTH-011-runtime-gate.v1.md')
+const auth013StateMachinePath = path.join(root, 'contracts/state-machines/account.json')
+const auth013EntityCatalogPath = path.join(root, 'contracts/entity/entity-catalog.v1.json')
 const authDtoContractPath = path.join(root, 'contracts/dto/auth-dto-contract.v1.json')
 
 const apiContractPaths = {
@@ -44,10 +46,16 @@ const readText = (file) => fs.readFileSync(file, 'utf8')
 const mapping = readJson(mappingPath)
 const jsonBinding = readJson(jsonBindingPath)
 const authDtoContract = readJson(authDtoContractPath)
+const auth013StateMachine = readJson(auth013StateMachinePath)
+const auth013EntityCatalog = readJson(auth013EntityCatalogPath)
 
 if (!Array.isArray(mapping.records)) throw new Error('canonical mapping records must be an array')
 if (!Array.isArray(jsonBinding.bindings)) throw new Error('AUTH-002..006 binding records must be an array')
 if (!Array.isArray(authDtoContract.records)) throw new Error('AUTH DTO contract records must be an array')
+if (auth013StateMachine?.['x-luckread']?.entity !== 'User') throw new Error('AUTH-013 state machine must bind entity User')
+if (!Array.isArray(auth013EntityCatalog.records)) throw new Error('AUTH-013 entity catalog records must be an array')
+const auth013UserEntities = auth013EntityCatalog.records.filter((record) => record?.name === 'User' && record?.entityId === 'ENT-USER' && record?.status === 'VERIFIED')
+if (auth013UserEntities.length !== 1) throw new Error('AUTH-013 requires exactly one VERIFIED ENT-USER entity catalog binding for User')
 
 const entityRefsByFeature = new Map()
 const apiOperationIdsByFeature = new Map()
@@ -148,6 +156,7 @@ const auth011Entities = [...new Set(requiredChain.match(/ENT-[A-Z0-9-]+/g) ?? []
 if (auth011Entities.length === 0) throw new Error('AUTH-011 runtime gate did not expose entity references in the required contract chain')
 addEntityBinding('AUTH-011', auth011Entities, 'AUTH-011 runtime gate required contract chain')
 addEvidenceRef('AUTH-011', 'contracts/alignment/mapping-batches/AUTH-011-runtime-gate.v1.md')
+addEntityBinding('AUTH-013', ['ENT-USER'], 'AUTH-013 account state machine + entity catalog')
 
 const mappingById = new Map()
 for (const record of mapping.records) {

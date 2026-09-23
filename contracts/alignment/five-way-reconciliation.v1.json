@@ -1340,7 +1340,9 @@
     {
       "featureId": "AUTH-013",
       "status": "PARTIAL",
-      "entityIds": [],
+      "entityIds": [
+        "ENT-USER"
+      ],
       "apiOperationIds": [
         "transitionAccountState"
       ],
