@@ -96,7 +96,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG"             --command "SELECT name, type, notnull, dflt_value FROM pragma_table_info('users') WHERE name IN ('account_state','account_state_version') ORDER BY name;"             > artifacts/evidence/auth-013/account-state-columns.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config "$W01_WRANGLER_CONFIG"             --command 'PRAGMA table_info("users");'             > artifacts/evidence/auth-013/account-state-columns.json
 
       - name: Capture migration history
         shell: bash
@@ -171,7 +171,14 @@ jobs:
           const count = JSON.parse(fs.readFileSync(dir + '/users-count.json', 'utf8'));
           const usersCount = count?.[0]?.results?.[0]?.users_count;
           const stateColumns = JSON.parse(fs.readFileSync(dir + '/account-state-columns.json', 'utf8'));
-          const presentStateColumns = (stateColumns?.[0]?.results ?? []).map((r) => r.name);
+          const presentStateColumns = (stateColumns?.[0]?.results ?? [])
+            .filter((r) => ['account_state', 'account_state_version'].includes(r.name))
+            .map((r) => ({
+              name: r.name,
+              type: r.type,
+              notnull: r.notnull,
+              dflt_value: r.dflt_value,
+            }));
           const history = JSON.parse(fs.readFileSync(dir + '/migration-history.json', 'utf8'));
           const migrationNames = (history?.[0]?.results ?? []).map((r) => r.name);
           const manifest = {
