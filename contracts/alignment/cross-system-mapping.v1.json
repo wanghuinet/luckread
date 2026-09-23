@@ -350,7 +350,7 @@
         "docs/04-WORKER-MASTER-v1.0.md"
       ],
       "blockers": [
-        "account-state authority, DTO/entity/field/persistence, Worker/runtime and evidence mapping remain incomplete"
+        "D1-01 persistence/migration, DTO, security/lifecycle, runtime and evidence mapping remain incomplete"
       ]
     },
     {
