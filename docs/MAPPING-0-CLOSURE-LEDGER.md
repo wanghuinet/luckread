@@ -1787,3 +1787,18 @@ Do not repeat the verified W02 deployment or W01 `W02_AUTH` binding deployment u
 
 ### Current cursor
 **AUTH-013 → D1-01 persistence mapping / migration contract gate → W02 implementation admission → executable evidence → E6 Runtime-003.**
+
+
+## 2026-09-23 Superpowers continuation — AUTH-013 persistence target and DTO gates
+
+- Existing D1-01 physical `users` table is now the admitted AUTH-013 persistence target.
+- Controlled remote schema run `35657959095` proves the pre-migration `users` schema and shows no `account_state` / `account_state_version` columns at that snapshot; no writes were performed.
+- Persistence Contract: `contracts/persistence/AUTH-013-account-state-persistence-contract.v1.json`.
+- Migration Contract: `contracts/migration/AUTH-013-account-state-migration.v1.json`.
+- Canonical DTO IDs are admitted for `transitionAccountState` and bound to existing OpenAPI inline schemas.
+- Current-head read-only evidence workflow: `.github/workflows/auth-013-persistence-schema-evidence.yml`.
+- **AUTH-013 remains BLOCKED_NOT_GREEN / implementation authorization=false.**
+- Immediate blocker: explicit initial `account_state` + `account_state_version` backfill semantics for existing rows, followed by controlled migration execution and exact post-schema evidence.
+
+### Current cursor
+**AUTH-013 → approve/admit existing-user backfill semantics → execute isolated D1-01 migration → post-schema verification → W02 runtime implementation/evidence.**
