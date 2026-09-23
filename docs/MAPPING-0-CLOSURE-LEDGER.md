@@ -1770,3 +1770,20 @@ No Contract, Blueprint, Worker topology, D1 topology, or authorization semantics
 **AUTH-013 Contract-First authority reconciliation → then E6 Runtime-003 controlled authLogin/authRefresh evidence.**
 
 Do not repeat the verified W02 deployment or W01 `W02_AUTH` binding deployment unless a relevant runtime source, contract, binding target, dependency, or evidence scope changes.
+
+
+## 2026-09-23 Superpowers continuation — AUTH-013 authority and field admission closed
+
+- Current AUTH-013 authority decision: **W02 / D1-01 authoritative writer — RESOLVED** under `CC-MAPPING-0-AUTH-013-AUTHORITY-2026-09-23`.
+- Canonical Field IDs admitted for the existing verified `ENT-USER` Entity:
+  - `ENT-USER-F-ACCOUNT-STATE`
+  - `ENT-USER-F-ACCOUNT-STATE-VERSION`
+- Field contract status remains `CONTRACTED_NOT_VERIFIED`; this is contract admission, not runtime/persistence evidence.
+- B01 AUTH-013 mapping now references the two canonical Field IDs and the state-machine field sources.
+- AUTH-013 remains `BLOCKED_NOT_GREEN`; implementation authorization remains false.
+- Remaining AUTH-013 blockers: authoritative D1-01 physical table/column mapping, migration evidence, DTO contract admission, W02 transition implementation, event/audit/security/lifecycle execution evidence, tests, and Evidence Registry promotion.
+- The latest automated mapping formatting/evidence-reference commits `be8618a6...` and `ae5fea54...` were reviewed; they only normalize AUTH-013 mapping evidence references and do not change Contract semantics or architecture.
+- Do not repeat verified W02 deployment, W02 RoleAssignment migration, or W01 `W02_AUTH` binding evidence.
+
+### Current cursor
+**AUTH-013 → D1-01 persistence mapping / migration contract gate → W02 implementation admission → executable evidence → E6 Runtime-003.**
