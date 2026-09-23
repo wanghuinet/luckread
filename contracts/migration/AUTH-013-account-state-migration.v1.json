@@ -41,7 +41,7 @@
     "Stage D: execute W02 runtime transition tests, concurrency/security/lifecycle checks, and capture Evidence Registry records."
   ],
   "gates": {
-    "backfillPolicy": "BLOCKED_DECISION_REQUIRED",
+    "backfillPolicy": "C_SELECTED_WAITING_AUTHORITY_SOURCE",
     "migrationExecution": "NOT_AUTHORIZED",
     "remoteMutation": "NOT_EXECUTED",
     "postSchemaVerification": "PENDING",
@@ -51,7 +51,8 @@
     "do not infer existing users are ACTIVE",
     "do not infer an initial account_state_version",
     "do not modify workers/W01-payload/src/collections/Users.ts as part of this migration gate",
-    "do not claim remote schema contains the target columns before post-migration evidence"
+    "do not claim remote schema contains the target columns before post-migration evidence",
+    "do not use login_attempts or lock_until as substitutes for lifecycle account_state"
   ],
   "evidenceRequirements": [
     "exact pre-schema snapshot",
@@ -63,6 +64,7 @@
     "runtime persistence tests",
     "concurrency tests",
     "security/lifecycle tests",
-    "Evidence Registry entries"
+    "Evidence Registry entries",
+    "authoritative existing-user classification source/policy with complete coverage"
   ]
 }
