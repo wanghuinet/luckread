@@ -1814,3 +1814,27 @@ Do not repeat the verified W02 deployment or W01 `W02_AUTH` binding deployment u
 
 ### Current cursor
 **AUTH-013 → authoritative existing-user lifecycle classification source/policy evidence → migration admission → isolated D1-01 execution → post-schema verification → W02 runtime implementation/evidence.**
+
+## 2026-09-23 continuation — AUTH-013 current D1 target row-coverage gate resolved
+
+Fresh controlled read-only evidence has now closed the **current-target row applicability** sub-step:
+
+- AUTH-013 schema evidence workflow run `35852723250` = **SUCCESS**.
+- Tested source commit: `29c2e77e8393bec6f9f21183d40e3f2b1b07c28f`.
+- Target: D1-01 / `luckread` / UUID `2f80471e-3756-49f9-8db1-7707a433ad64`.
+- Evidence artifact: `10746087117`; digest `sha256:9ea5048d252d0006665925387cfabed0116f4a0bc8841b884bc9ecff72a2d001`.
+- `users` row count = **0**.
+- `account_state` and `account_state_version` are both absent.
+- Migration history remains baseline `20250929_111647` plus `20260921_003203_MIG_AUTH_002_SESSION_V1`.
+- Read-only evidence queries reported zero writes / unchanged database.
+
+Disposition:
+- The existing-user lifecycle classification coverage requirement is now **PASS_VERIFIED for the captured controlled target as 0/0 rows**.
+- This does not authorize migration execution.
+- This does not select an initial `account_state_version`.
+- The remaining AUTH-013 semantic gate is now specifically the authoritative initialization rule for lifecycle version state for newly persisted Users; after that rule is admitted, the staged migration can be evaluated for execution.
+- Do not rerun the 0/0 classification probe unless the controlled D1 target or relevant User-persistence inputs change.
+
+### Current cursor
+**AUTH-013 → authoritative initial `account_state_version` semantics → migration admission → isolated D1-01 execution → post-schema verification → W02 lifecycle transition implementation/evidence.**
+
