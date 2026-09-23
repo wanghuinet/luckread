@@ -91,6 +91,18 @@
         "ENT-SESSION"
       ],
       "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "AUTH-013",
+      "operationId": "transitionAccountState",
+      "requestDtoId": "DTO-AUTH-013-ACCOUNT-STATE-TRANSITION-REQUEST",
+      "responseDtoId": "DTO-AUTH-013-ACCOUNT-STATE-TRANSITION-RESPONSE",
+      "requestSchemaRef": "#/paths/~1users~1{userId}~1account-state/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": "#/paths/~1users~1{userId}~1account-state/post/responses/200/content/application~1json/schema",
+      "entityIds": [
+        "ENT-USER"
+      ],
+      "status": "CONTRACT_BOUND"
     }
   ],
   "bindingRules": {
