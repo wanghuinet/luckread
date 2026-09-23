@@ -1,0 +1,89 @@
+{
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "promotion": "NOT_GREEN",
+  "purpose": "Canonical AUTH-013 persistence contract for account_state and account_state_version on the existing D1-01 User record. This contract distinguishes observed remote schema from target migration state.",
+  "featureId": "AUTH-013",
+  "entityId": "ENT-USER",
+  "authoritativeWriter": "W02",
+  "persistenceDomain": "D1-01",
+  "observedPreSchemaEvidence": {
+    "workflowRun": 35657959095,
+    "testedCommitSha": "48575b4a2b86bf317e4e4ccac6c6ec17739cf2eb",
+    "environment": "CONTROLLED_REMOTE_D1",
+    "databaseName": "luckread",
+    "table": "users",
+    "result": "OBSERVED",
+    "observedColumns": [
+      "id",
+      "updated_at",
+      "created_at",
+      "email",
+      "reset_password_token",
+      "reset_password_expiration",
+      "salt",
+      "hash",
+      "login_attempts",
+      "lock_until"
+    ],
+    "accountStateColumnsPresent": false,
+    "writesDuringCapture": 0,
+    "note": "The captured remote schema proves the target columns were absent at the tested pre-schema snapshot. It does not prove a current-head post-migration state."
+  },
+  "fieldMappings": [
+    {
+      "fieldId": "ENT-USER-F-ACCOUNT-STATE",
+      "canonicalName": "account_state",
+      "targetTable": "users",
+      "targetColumn": "account_state",
+      "dbType": "TEXT",
+      "finalNullable": false,
+      "finalRequired": true,
+      "observedCurrently": false,
+      "mappingStatus": "TARGET_DEFINED_AWAITING_MIGRATION"
+    },
+    {
+      "fieldId": "ENT-USER-F-ACCOUNT-STATE-VERSION",
+      "canonicalName": "account_state_version",
+      "targetTable": "users",
+      "targetColumn": "account_state_version",
+      "dbType": "INTEGER",
+      "finalNullable": false,
+      "finalRequired": true,
+      "observedCurrently": false,
+      "mappingStatus": "TARGET_DEFINED_AWAITING_MIGRATION"
+    }
+  ],
+  "migration": {
+    "migrationId": "MIG-AUTH-013-ACCOUNT-STATE-V1",
+    "status": "CONTRACTED_NOT_VERIFIED",
+    "finalSchemaRequired": true,
+    "transitionalNullableColumnsAllowed": true,
+    "backfillRequiredForExistingRows": true,
+    "backfillDecisionStatus": "BLOCKED_DECISION_REQUIRED",
+    "executionStatus": "NOT_EXECUTED"
+  },
+  "rules": {
+    "existingUsersMustNotBeSilentlyAssignedState": true,
+    "existingUsersMustNotBeSilentlyAssignedVersion": true,
+    "noW01PayloadCollectionMutationForThisContract": true,
+    "noPayloadGeneratedColumnInference": true,
+    "noRemoteMutationWithoutApprovedMigrationAdmission": true,
+    "postSchemaMustBeCapturedAgainstExactTestedCommitSha": true,
+    "runtimeWritesMustUseW02Authority": true
+  },
+  "finalPostconditions": [
+    "users.account_state exists as TEXT NOT NULL",
+    "users.account_state_version exists as INTEGER NOT NULL",
+    "every existing user row has an explicitly authorized account_state value",
+    "every existing user row has an explicitly authorized account_state_version value",
+    "state/version mutation authority is W02",
+    "final schema is verified on the controlled D1-01 target"
+  ],
+  "remainingGaps": [
+    "initial account_state policy for existing users is not yet explicitly authorized",
+    "initial account_state_version policy for existing users is not yet explicitly authorized",
+    "migration execution and post-schema evidence are absent",
+    "runtime, concurrency, audit, event, cache and security evidence are absent"
+  ]
+}
