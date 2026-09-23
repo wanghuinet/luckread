@@ -31,10 +31,11 @@ jobs:
         with:
           node-version: 24
 
-      - name: Enable pnpm
+      - name: Setup pnpm 11
         uses: pnpm/action-setup@v4
         with:
-          package_json_file: workers/W01-payload/package.json
+          version: 11.0.0
+          run_install: false
 
       - name: Install W01 locked dependencies
         working-directory: workers/W01-payload
