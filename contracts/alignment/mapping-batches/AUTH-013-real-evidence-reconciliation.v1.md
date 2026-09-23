@@ -245,4 +245,9 @@ Current AUTH-013 disposition remains: **BLOCKED_NOT_GREEN / implementation autho
 
 ## Explicit migration blocker
 
-The existing-user backfill semantics are still unresolved. The Account State Machine defines lifecycle states and transitions but does not authorize an initial `account_state` or `account_state_version` for pre-existing rows. No migration execution is authorized until those values are explicitly decided and admitted.
+The existing-user backfill semantics are intentionally **deferred under Decision C**. The Account State Machine defines lifecycle states and transitions but does not authorize an initial `account_state` or `account_state_version` for pre-existing rows. No migration execution is authorized until an authoritative, complete, deterministic classification source/policy is admitted.
+
+
+## 2026-09-23 backfill decision closure
+
+Decision `CC-MAPPING-0-AUTH-013-BACKFILL-DECISION-2026-09-23` selects **C**: do not invent initial lifecycle state/version for existing Users. Current repository evidence does not establish a complete authoritative source from which those values can be safely derived. This is now a recorded data-semantic gate, not an unresolved question to be rediscovered.
