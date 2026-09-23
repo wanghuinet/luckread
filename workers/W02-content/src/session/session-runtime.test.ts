@@ -194,3 +194,77 @@ describe('session runtime foundation', () => {
     expect(result).toEqual({ revoked: true })
   })
 })
+
+
+describe('authenticated session orchestration', () => {
+  it('requires an authoritative account state and binds an allowed layer before issuing refresh state', async () => {
+    const fake = dbFake(null)
+    const calls: string[] = []
+    const result = await establishAuthenticatedSession(
+      fake.db,
+      nativeSession(),
+      'device-a',
+      'ACTIVE',
+      NOW,
+      4,
+      {
+        resolveLayer: async (_db, subjectId, accountState) => {
+          calls.push(`${subjectId}:${accountState}`)
+          return { decision: 'ALLOW', layer: 'L2' }
+        },
+        randomToken: () => 'refresh-1',
+        execute: async () => ({ meta: { changes: 1 } }),
+      },
+    )
+
+    expect(result).toEqual({ sessionId: 'sid-1', refreshToken: 'refresh-1', layer: 'L2' })
+    expect(calls).toEqual(['42:ACTIVE'])
+  })
+
+  it('does not create extension state when authoritative layer resolution denies', async () => {
+    const fake = dbFake(null)
+    await expect(establishAuthenticatedSession(
+      fake.db,
+      nativeSession(),
+      'device-a',
+      'SUSPENDED',
+      NOW,
+      4,
+      {
+        resolveLayer: async () => ({ decision: 'DENY' }),
+        execute: async () => { throw new Error('extension must not be written') },
+      },
+    )).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
+  })
+
+  it('returns the rotated credential and authoritative layer after refresh', async () => {
+    const hash = 'old-hash'
+    const record: SessionRecord = {
+      sessionId: 'sid-1',
+      userId: '42',
+      deviceId: 'device-a',
+      tokenVersion: 3,
+      refreshCredentialHash: hash,
+      revokedAt: null,
+      lastSeenAt: NOW,
+      nativeExpiresAt: nativeSession().expiresAt,
+    }
+    const fake = dbFake(record)
+    const result = await refreshAuthenticatedSession(fake.db, {
+      refreshToken: 'refresh-1',
+      deviceId: 'device-a',
+      accountState: 'ACTIVE',
+      now: NOW,
+      hashToken: async () => hash,
+      randomToken: () => 'refresh-2',
+      issueAccessToken: () => 'access-2',
+      resolveLayer: async (_db, subjectId, accountState) => {
+        expect(subjectId).toBe('42')
+        expect(accountState).toBe('ACTIVE')
+        return { decision: 'ALLOW', layer: 'L3' }
+      },
+    })
+
+    expect(result).toEqual({ sessionId: 'sid-1', accessToken: 'access-2', refreshToken: 'refresh-2', layer: 'L3' })
+  })
+})
