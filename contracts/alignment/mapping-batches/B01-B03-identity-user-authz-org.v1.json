@@ -201,8 +201,11 @@
         "ENT-USER"
       ],
       "payloadCollections": [],
+      "workerRefs": ["W02"],
       "codeEvidenceRefs": [],
       "evidence": [
+        "docs/04-WORKER-MASTER-v1.0.md",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
