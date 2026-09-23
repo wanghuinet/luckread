@@ -1736,3 +1736,28 @@ Current cursor:
 - Do not repeat W01 binding deployment or W02 deployment unless relevant source, Contract, binding target, dependency, or verification scope changes.
 
 No Contract, Blueprint, Worker topology, D1 topology, or authorization semantics were changed by this evidence reconciliation.
+
+
+## 2026-09-23 Superpowers continuation — E6 guard reconciliation and AUTH-013 cursor
+
+### Verified / inherited
+- W02 controlled deployment: Run `35816952574`, source `0c0c250f1f2ec6da38a8b3c50834d74a4999f5da`, Cloudflare version `7eb5d373-14b3-4354-9d72-af72c1a0a6cc` — **PASS_VERIFIED**.
+- W01 → W02 `W02_AUTH` Service Binding: Run `35819898556`, source `d64d7527564239a487a6e0ad6dceb1b5e8dac3b9`, Cloudflare version `3e6e2646-1979-488b-b273-72e84a582878` — **PASS_VERIFIED**.
+- E6 implementation-admission guard: Run `35822391295` on `b4edc123cf48c8b73dd85249b5b3879d57342d15` — **PASS** after correcting the guard's expected Wire-Gap status literal. No business Contract was changed.
+- Capability Contract Graph Gate on the same head — **PASS**.
+- Blueprint Feature Inventory, Mapping 0 Structural Gate, and the core Contract admission jobs on the same head are **PASS**.
+
+### Current blockers (not auto-decided)
+- AUTH-013 remains `BLOCKED_NOT_GREEN` / implementation authorization false.
+- `contracts/enums/account-state.json` still declares historical `W00` as authoritative-writer while the active Worker Master assigns Identity/Account/Authorization to W02. This is an explicit authority conflict, not an implementation typo to auto-edit.
+- Canonical Field IDs for `account_state` and `account_state_version` remain undefined in `contracts/entity/entity-field-contract.v1.json`.
+- Account-state operation/DTO/state/event/persistence evidence is not yet reconciled.
+- Therefore controlled public `authLogin/authRefresh` runtime evidence remains blocked from promotion.
+
+### Evidence-registry limitation
+The strict Mapping-0 Evidence Registry validator requires current executable PASS evidence to use the exact current `main` commit. Existing historical/remote evidence is preserved, but must not be relabeled as current-head evidence merely because later commits are documentation-only. No such false promotion was made.
+
+### Current cursor
+**AUTH-013 Contract-First authority reconciliation → then E6 Runtime-003 controlled authLogin/authRefresh evidence.**
+
+Do not repeat the verified W02 deployment or W01 `W02_AUTH` binding deployment unless a relevant runtime source, contract, binding target, dependency, or evidence scope changes.
