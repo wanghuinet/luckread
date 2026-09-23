@@ -338,15 +338,16 @@
         "ENT-USER"
       ],
       "payloadCollections": [],
-      "workerRefs": ["W02"],
+      "workerRefs": [
+        "W02"
+      ],
       "codeEvidenceRefs": [],
       "evidence": [
         "docs/04-WORKER-MASTER-v1.0.md",
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/alignment/mapping-batches/AUTH-013-real-evidence-reconciliation.v1.md",
         "contracts/alignment/mapping-batches/AUTH-013-reconciliation.v1.md",
-        "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json"
       ],
       "blockers": [
         "account-state authority, DTO/entity/field/persistence, Worker/runtime and evidence mapping remain incomplete"
