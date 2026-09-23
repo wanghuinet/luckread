@@ -69,3 +69,59 @@ This packet does not:
 `AUTH-013 = BLOCKED_NOT_GREEN`
 
 Next admissible action is a normal Contract-First authority decision/reconciliation. After that decision is GREEN, implementation and runtime evidence may proceed under the existing E6 admission/change-control chain.
+
+## Decision-ready resolution matrix
+
+The repository currently provides evidence for the following decision inputs, but no artifact that has formally selected one of the alternatives.
+
+### A. Authoritative writer
+
+**Alternative A — W02 / D1-01**
+- Align the account-state authoritative writer with the active Worker Master.
+- Existing supporting evidence: the active Worker Master assigns Identity / Account / Authorization to W02 and primary D1 authority to D1-01.
+- Existing B01 worker-ownership reconciliation also records W02 as the current Identity / Account / Authorization owner.
+- Consequence: the stale `authoritative-writer: W00` contract declaration must be changed through normal Contract-First Change Control.
+
+**Alternative B — retain W00**
+- Requires an explicit new authority decision that supersedes the active Worker Master for account-state writes.
+- The current repository search did not identify such a superseding authority decision or a current W00 runtime implementation/evidence chain.
+- Consequence: W00 cannot be treated as current merely because the enum still contains the old declaration.
+
+No alternative is selected by this packet.
+
+### B. Canonical Field IDs
+
+No canonical Field IDs currently exist for `account_state` or `account_state_version`.
+
+The existing Entity/Field registry uses the `ENT-USER-F-...` namespace for User fields. Candidate identifiers may therefore be recorded for decision purposes, but are **not canonical until explicitly admitted**:
+- candidate for `account_state`: `ENT-USER-F-ACCOUNT-STATE`
+- candidate for `account_state_version`: `ENT-USER-F-ACCOUNT-STATE-VERSION`
+
+These strings must not be added to the canonical entity-field contract solely by this packet.
+
+### C. Persistence decision boundary
+
+After the writer and Field IDs are admitted, the authoritative persistence artifact must be identified inside existing D1-01 scope. The decision must name the actual table/column mapping from repository evidence or an executed schema/migration result. Payload-generated names must not be inferred from the state contract.
+
+### D. Runtime admission boundary
+
+Only after A-C are formally reconciled may the repository:
+1. admit the authoritative transition handler for `transitionAccountState`;
+2. bind executable code evidence;
+3. add positive/negative/security/integration tests;
+4. populate Evidence Registry entries;
+5. advance AUTH-013 toward GREEN;
+6. unlock the dependent E6 Runtime-003 account-state input.
+
+## Decision output required
+
+A GREEN authority decision should explicitly record:
+- selected authoritative writer;
+- canonical Field ID for `account_state`;
+- canonical Field ID for `account_state_version`;
+- authoritative D1-01 persistence artifact and mapping;
+- effective date/revision of the decision;
+- Change Control record governing the contract update.
+
+Until that output exists, the status remains `DECISION_INPUT — BLOCKED_NOT_GREEN`.
+
