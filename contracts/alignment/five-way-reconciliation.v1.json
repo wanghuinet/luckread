@@ -1341,7 +1341,9 @@
       "featureId": "AUTH-013",
       "status": "PARTIAL",
       "entityIds": [],
-      "apiOperationIds": [],
+      "apiOperationIds": [
+        "transitionAccountState"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
@@ -1352,7 +1354,7 @@
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
-        "account-state enforcement mapping incomplete"
+        "account-state authority, DTO/entity/field/persistence, Worker/runtime and evidence mapping remain incomplete"
       ]
     },
     {

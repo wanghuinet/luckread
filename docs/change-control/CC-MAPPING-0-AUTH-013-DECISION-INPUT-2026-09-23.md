@@ -48,9 +48,9 @@ A Contract-First authority decision must explicitly resolve, as one consistent s
 
 1. **Authoritative writer** — reconcile the stale `W00` declaration with the current W02 ownership model, or retain W00 only if a new explicit Worker authority decision supersedes the current Worker Master.
 2. **Canonical field IDs** — select stable Field IDs for `account_state` and `account_state_version` and bind them to an authoritative Entity record.
-3. **Canonical operation bindings** — bind the already-inventoried suspend/restore/account-state transition operations to the selected authority without introducing duplicate operationIds.
+3. **Canonical operation bindings** — `transitionAccountState` is now explicitly bound to AUTH-013 at the mapping layer; the separately inventoried suspend/restore routes remain Discovery Drafts and cannot be promoted without their own Contract admission.
 4. **Persistence mapping** — bind those fields to the existing D1-01 domain and an explicit owning persistence artifact; do not create a new D1.
-5. **Runtime handler/evidence boundary** — only after 1–4 are resolved, authorize implementation and executable evidence.
+5. **Runtime handler/evidence boundary** — only after the remaining authority/field/persistence inputs are resolved, authorize implementation and executable evidence.
 6. **E6 dependency statement** — update the E6 runtime admission path so it can consume the resolved account-state authority without inference.
 
 ## Non-decisions

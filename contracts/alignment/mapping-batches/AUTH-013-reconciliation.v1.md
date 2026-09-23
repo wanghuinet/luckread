@@ -8,7 +8,7 @@
 
 ## Current evidence
 
-The canonical mapping records `AUTH-013` as `PARTIAL` with no API operation, entity, Payload collection, or code-evidence references. Its explicit blocker is `account-state enforcement mapping incomplete`.
+The canonical mapping records `AUTH-013` as `PARTIAL` and now binds the existing canonical `transitionAccountState` API operation; entity, Payload collection, code-evidence and runtime references remain unresolved. Its explicit blocker is `account-state enforcement mapping incomplete`.
 
 Blueprint/capability inventory establishes the requirement, but does not establish executable enforcement.
 
@@ -21,7 +21,7 @@ No inferred API, DTO, entity, field, Payload table, Worker, or test identifier m
 ## Blocking gaps
 
 1. Canonical account-state model and transitions are not fully reconciled.
-2. Enforcement API/DTO mapping is missing.
+2. The canonical enforcement API binding is `transitionAccountState`; DTO mapping and runtime enforcement evidence are still missing.
 3. Entity/field/persistence mapping is missing.
 4. Security enforcement and deny-by-default behavior are not evidence-bound.
 5. Lifecycle and restoration semantics are not fully reconciled.

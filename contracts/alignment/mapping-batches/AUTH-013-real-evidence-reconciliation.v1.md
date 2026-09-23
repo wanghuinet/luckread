@@ -75,9 +75,9 @@ These are contract requirements, not runtime proof.
 - `POST /v1/accounts/{accountId}/suspend`
 - `POST /v1/accounts/{accountId}/restore`
 
-However, the current AUTH-013 B01 record has `apiRefs: []`. No canonical operation IDs are currently bound to AUTH-013, and no canonical operation is explicitly established for `freeze` or `ban` in the API inventory.
+The current AUTH-013 B01 record now binds the existing canonical `transitionAccountState` operation. The separately inventoried `postAccountsAccountIdSuspend` and `postAccountsAccountIdRestore` operations remain Discovery Drafts, and no separate canonical freeze/ban operation is established by inference.
 
-Therefore no endpoint may be inferred as the canonical freeze/ban implementation merely from route naming.
+Therefore `transitionAccountState` is the only currently bound canonical account-state operation for AUTH-013; freeze/ban-specific endpoint semantics may not be inferred from Discovery Draft route names.
 
 The API inventory requires each endpoint to bind schema, OpenAPI operation ID, permission, scope, state machine, cache policy, resource/retry/event/queue budgets, anti-abuse, idempotency, mapping, examples, and integration/security evidence before GREEN.
 
@@ -205,7 +205,7 @@ and the D1 and Worker authority conflicts have been formally resolved.
 1. D1-01 versus D01 Core naming conflict — RESOLVED under Change Control; do not infer physical D1 schema.
 2. Resolve the stale `W00` authoritative-writer declaration against the current W02 ownership model.
 3. Establish canonical `account_state` and `account_state_version` field IDs.
-4. Bind canonical API operation IDs for suspend/restore and any explicitly approved freeze/ban operations.
+4. Keep the canonical `transitionAccountState` binding explicit; any separate suspend/restore/freeze/ban operation requires its own approved Contract admission before binding.
 5. Bind DTO, state, event, audit, cache, and security IDs.
 6. Establish authoritative D1 persistence and migration evidence without relying on undocumented Payload schema.
 7. Implement and verify the full state-transition side-effect chain only after Contract authorization.

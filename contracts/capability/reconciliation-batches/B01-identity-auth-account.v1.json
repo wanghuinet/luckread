@@ -498,9 +498,13 @@
         "l8": "Mapped to existing authoritative account state machine"
       },
       "existingContracts": [
-        "contracts/state-machines/account.json"
+        "contracts/state-machines/account.json",
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/openapi/v1/operation-policy.json"
       ],
-      "apiRefs": [],
+      "apiRefs": [
+        "transitionAccountState"
+      ],
       "pageRefs": [],
       "dtoRefs": [],
       "dataRefs": [],
@@ -523,7 +527,7 @@
       "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
       "blockers": [
-        "worker ownership and evidence mapping incomplete"
+        "worker ownership, DTO/entity/field/persistence, security/lifecycle, runtime and evidence mapping remain incomplete"
       ]
     },
     {
