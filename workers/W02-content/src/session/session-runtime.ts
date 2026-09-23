@@ -240,3 +240,95 @@ export async function revokeSessionExtension(
 
   return { revoked: true }
 }
+
+
+import { resolveGlobalLayer, type LayerResolution } from '../authz/role-assignment.js'
+
+type LayerResolver = (
+  db: D1Database,
+  subjectId: string,
+  accountState: string,
+  now: string,
+) => Promise<LayerResolution>
+
+export async function establishAuthenticatedSession(
+  db: D1Database,
+  session: NativeSessionAuthority,
+  deviceId: string,
+  accountState: string,
+  now: string,
+  tokenVersion: number,
+  options: MutationOptions & { resolveLayer?: LayerResolver } = {},
+): Promise<{ sessionId: string; refreshToken: string; layer: string }> {
+  if (typeof accountState !== 'string' || accountState.length === 0) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'authoritative account state is required')
+  }
+
+  const resolveLayer = options.resolveLayer ?? resolveGlobalLayer
+  const layerResolution = await resolveLayer(db, session.userId, accountState, now)
+  if (layerResolution.decision !== 'ALLOW' || !layerResolution.layer) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'account authorization denied')
+  }
+
+  const extension = await createSessionExtension(
+    db,
+    session,
+    deviceId,
+    now,
+    tokenVersion,
+    options,
+  )
+
+  return { ...extension, layer: layerResolution.layer }
+}
+
+export async function refreshAuthenticatedSession(
+  db: D1Database,
+  input: {
+    refreshToken: string
+    deviceId: string
+    accountState: string
+    now: string
+    issueAccessToken: (session: SessionRecord) => string
+    randomToken?: () => string
+    hashToken?: (token: string) => Promise<string>
+    resolveLayer?: LayerResolver
+  },
+): Promise<{ sessionId: string; accessToken: string; refreshToken: string; layer: string }> {
+  if (typeof input.accountState !== 'string' || input.accountState.length === 0) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'authoritative account state is required')
+  }
+
+  const resolveLayer = input.resolveLayer ?? resolveGlobalLayer
+  let rotatedSession: SessionRecord | null = null
+  const rotated = await rotateRefreshCredential(db, {
+    refreshToken: input.refreshToken,
+    deviceId: input.deviceId,
+    now: input.now,
+    issueAccessToken: (session) => {
+      rotatedSession = session
+      return input.issueAccessToken(session)
+    },
+    ...(input.randomToken ? { randomToken: input.randomToken } : {}),
+    ...(input.hashToken ? { hashToken: input.hashToken } : {}),
+  })
+
+  if (!rotatedSession) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'session state is unavailable')
+  }
+
+  let layerResolution: LayerResolution
+  try {
+    layerResolution = await resolveLayer(db, rotatedSession.userId, input.accountState, input.now)
+  } catch {
+    await revokeSessionExtension(db, rotatedSession.sessionId, input.now)
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'account authorization unavailable')
+  }
+
+  if (layerResolution.decision !== 'ALLOW' || !layerResolution.layer) {
+    await revokeSessionExtension(db, rotatedSession.sessionId, input.now)
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'account authorization denied')
+  }
+
+  return { ...rotated, layer: layerResolution.layer }
+}
