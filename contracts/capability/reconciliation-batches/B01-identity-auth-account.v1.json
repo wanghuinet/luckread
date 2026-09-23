@@ -501,7 +501,9 @@
         "contracts/state-machines/account.json",
         "contracts/openapi/v1/openapi.yaml",
         "contracts/openapi/v1/operation-policy.json",
-        "contracts/entity/entity-field-contract.v1.json"
+        "contracts/entity/entity-field-contract.v1.json",
+        "contracts/persistence/AUTH-013-account-state-persistence-contract.v1.json",
+        "contracts/migration/AUTH-013-account-state-migration.v1.json"
       ],
       "apiRefs": [
         "transitionAccountState"
@@ -535,7 +537,9 @@
       "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
       "blockers": [
-        "DTO/entity/persistence, security/lifecycle, runtime and evidence mapping remain incomplete"
+        "existing-user account_state/account_state_version backfill policy remains an explicit decision gate",
+        "D1-01 migration execution and post-schema evidence remain pending",
+        "DTO, security/lifecycle, runtime and Evidence Registry mapping remain incomplete"
       ]
     },
     {
