@@ -13,7 +13,7 @@ const status = cc.match(/^- Status:\s*(.+)$/m)?.[1] ?? ''
 const gapStatus = gaps.match(/^- Status:\s*(.+)$/m)?.[1] ?? ''
 
 const implementationAdmitted = status === 'GREEN — IMPLEMENTATION ADMITTED'
-if (implementationAdmitted && gapStatus !== 'CLOSED — REQUIRED CONTRACT INPUTS RECONCILED') {
+if (implementationAdmitted && gapStatus !== 'CLOSED — CONTRACT INPUTS RESOLVED') {
   throw new Error('E6 admission contradiction: implementation is GREEN while required wire/input gaps are not reconciled')
 }
 
