@@ -7,22 +7,15 @@
 -- non-empty target requires a separate authoritative backfill policy admission.
 
 CREATE TABLE auth_013_migration_guard_20260923 (
-  marker INTEGER NOT NULL
+  marker INTEGER NOT NULL CHECK (marker = 1)
 );
 
-CREATE TRIGGER auth_013_migration_guard_20260923_trigger
-BEFORE UPDATE ON auth_013_migration_guard_20260923
-BEGIN
-  SELECT CASE
-    WHEN (SELECT COUNT(*) FROM users) <> 0
-    THEN RAISE(ABORT, 'AUTH-013 migration requires zero pre-existing users')
-  END;
+INSERT INTO auth_013_migration_guard_20260923 (marker)
+SELECT CASE
+  WHEN (SELECT COUNT(*) FROM users) = 0 THEN 1
+  ELSE 0
 END;
 
-INSERT INTO auth_013_migration_guard_20260923 (marker) VALUES (1);
-UPDATE auth_013_migration_guard_20260923 SET marker = marker;
-
-DROP TRIGGER auth_013_migration_guard_20260923_trigger;
 DROP TABLE auth_013_migration_guard_20260923;
 
 ALTER TABLE users
