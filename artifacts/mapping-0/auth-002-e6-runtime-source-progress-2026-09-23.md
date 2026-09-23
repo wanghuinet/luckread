@@ -34,6 +34,7 @@ Verified steps:
 ## Controlled remote execution gate update
 
 - Evidence-collection workflow updated at commit `8996436496c509f04302e2c738c933a16102b523`.
+- The current `main` adds an execution-time guard at `5bdc317eb4b80176a95ae7edc849b155a089ddf3` that requires the input database name to equal the configured `D1_01` target and the controlled D1-01 UUID.
 - The workflow now performs the approved D1-01 remote RoleAssignment migration and then reads back `role_assignments`, its indexes/triggers, the D1 migration ledger, and the current row count.
 - It uploads controlled provenance plus the remote readback outputs as a GitHub Actions artifact.
 - This is execution infrastructure only; it is **not** remote execution evidence until the workflow is actually run successfully against D1-01.
