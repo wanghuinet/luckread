@@ -60,7 +60,7 @@
     "finalSchemaRequired": true,
     "transitionalNullableColumnsAllowed": true,
     "backfillRequiredForExistingRows": true,
-    "backfillDecisionStatus": "BLOCKED_DECISION_REQUIRED",
+    "backfillDecisionStatus": "C_SELECTED_WAITING_AUTHORITY_SOURCE",
     "executionStatus": "NOT_EXECUTED"
   },
   "rules": {
@@ -81,8 +81,9 @@
     "final schema is verified on the controlled D1-01 target"
   ],
   "remainingGaps": [
-    "initial account_state policy for existing users is not yet explicitly authorized",
-    "initial account_state_version policy for existing users is not yet explicitly authorized",
+    "authoritative existing-user classification source/policy is not established",
+    "initial account_state value for pre-existing rows is intentionally undecided",
+    "initial account_state_version value for pre-existing rows is intentionally undecided",
     "migration execution and post-schema evidence are absent",
     "runtime, concurrency, audit, event, cache and security evidence are absent"
   ]
