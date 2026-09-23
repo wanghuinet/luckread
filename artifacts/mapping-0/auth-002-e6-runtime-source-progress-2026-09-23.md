@@ -81,3 +81,33 @@ Prerequisite before public auth runtime wiring:
 2. execute the already-authorized W02 deployment and D1-01 migration workflows;
 3. execute W01 `W02_AUTH` binding deployment;
 4. then produce controlled authLogin/authRefresh runtime evidence against the exact deployed source commit.
+
+
+## Superpowers continuation — W02 deployment verified; W01 binding CI blocker isolated — 2026-09-23
+
+### W02 deployment evidence
+- Controlled W02 deployment workflow run `35816952574` = **SUCCESS**.
+- Exact source checkout: `0c0c250f1f2ec6da38a8b3c50834d74a4999f5da`.
+- Worker: `luckread-w02`.
+- Cloudflare Current Version ID: `7eb5d373-14b3-4354-9d72-af72c1a0a6cc`.
+- Deployment used fixed Wrangler `4.116.0` and the configured `D1_01 -> luckread` binding.
+- This is fresh W02 deployment evidence at a later source head than the earlier W02 deployment record; it does not prove W01 `W02_AUTH` binding.
+
+### W01 `W02_AUTH` binding attempt
+- Controlled W01 binding workflow run `35816996216` = **FAILURE**.
+- Exact source checkout: `0c0c250f1f2ec6da38a8b3c50834d74a4999f5da`.
+- Failure occurred at `pnpm install --frozen-lockfile` before binding verification, build, or deployment.
+- Runner output reports `ERR_PNPM_IGNORED_BUILDS` for `esbuild`, `sharp`, `unrs-resolver`, and `workerd`.
+- Therefore this run is **not** W01 binding failure evidence and does not establish or invalidate the Service Binding itself.
+
+### Repair applied
+- GitHub `main` commit `d64d7527564239a487a6e0ad6dceb1b5e8dac3b9` adds `workers/W01-payload/pnpm-workspace.yaml`.
+- The file explicitly allows build scripts only for the packages reported by the failed install; unrestricted dependency build execution was not enabled.
+- Current pnpm documentation confirms unreviewed dependency build scripts can fail installation under `strictDepBuilds`, while explicit `allowBuilds` entries are the supported control. Reference: https://pnpm.io/settings/build.
+
+### Current cursor
+- W02 deployment: **PASS_VERIFIED** at tested source scope.
+- W01 `W02_AUTH` deployment/binding: **TODO_VERIFY**; pending a controlled rerun after the dependency-install repair.
+- Do not repeat W02 migration/deployment.
+- Required next external execution: dispatch `W01 W02 Auth Binding Deploy` with `source_sha=d64d7527564239a487a6e0ad6dceb1b5e8dac3b9` and `confirm=DEPLOY_BINDING`.
+- Only after a successful W01 binding deployment should the existing controlled `authLogin/authRefresh` runtime evidence path be executed.
