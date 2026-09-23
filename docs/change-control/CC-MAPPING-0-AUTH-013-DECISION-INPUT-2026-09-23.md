@@ -125,3 +125,14 @@ A GREEN authority decision should explicitly record:
 
 Until that output exists, the status remains `DECISION_INPUT — BLOCKED_NOT_GREEN`.
 
+
+
+## Subsequent decisions recorded on 2026-09-23
+
+This document remains the historical decision-input packet. Its Field-ID section is superseded by `CC-MAPPING-0-AUTH-013-FIELD-ADMISSION-2026-09-23`, which admitted:
+- `ENT-USER-F-ACCOUNT-STATE`
+- `ENT-USER-F-ACCOUNT-STATE-VERSION`
+
+Its Worker-authority question is superseded by `CC-MAPPING-0-AUTH-013-AUTHORITY-DECISION-2026-09-23` (W02 / D1-01), and its persistence target is subsequently recorded by `CC-MAPPING-0-AUTH-013-PERSISTENCE-TARGET-2026-09-23`.
+
+The remaining open decision is the existing-user backfill policy recorded by `CC-MAPPING-0-AUTH-013-BACKFILL-DECISION-INPUT-2026-09-23`.
