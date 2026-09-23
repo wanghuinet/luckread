@@ -229,6 +229,20 @@ The following downstream evidence is now independently verified and is inherited
 - RoleAssignment D1-01 remote migration/readback: previously captured controlled evidence remains valid for the tested migration/source scope.
 - W01 → W02 `W02_AUTH` Service Binding: Run `35819898556`, source `d64d7527564239a487a6e0ad6dceb1b5e8dac3b9`, Cloudflare W01 version `3e6e2646-1979-488b-b273-72e84a582878`; deployment output explicitly reports `env.W02_AUTH (luckread-w02) -> Worker`.
 
-These facts close the previously open physical Worker/binding evidence items for the E6 downstream path, but they do not resolve the remaining AUTH-013 Contract authority inputs. The W00 writer conflict and canonical Field-ID decision inputs are now resolved. Physical persistence, DTO, runtime and executable evidence remain open. No runtime promotion is made by this reconciliation.
+These facts close the previously open physical Worker/binding evidence items for the E6 downstream path, but they do not resolve the remaining AUTH-013 Contract authority inputs. The W00 writer conflict and canonical Field-ID decision inputs are now resolved. The persistence target is now contracted to the existing D1-01 `users` table, and the DTO binding is admitted. The captured remote pre-schema evidence shows that `account_state` and `account_state_version` are not yet present. No runtime promotion is made by this reconciliation.
 
 Current AUTH-013 disposition remains: **BLOCKED_NOT_GREEN / implementation authorization=false**.
+
+
+## 2026-09-23 persistence/DTO gate evidence
+
+- D1-01 physical target table: `users` — observed in controlled remote schema evidence from workflow run `35657959095`.
+- Observed pre-schema columns: `id`, `updated_at`, `created_at`, `email`, `reset_password_token`, `reset_password_expiration`, `salt`, `hash`, `login_attempts`, `lock_until`.
+- `account_state` and `account_state_version` were **not present** in that captured snapshot.
+- Target physical columns are therefore migration targets, not current remote evidence.
+- Canonical DTOs are now bound to the existing OpenAPI schemas under `transitionAccountState`.
+- A new read-only current-head workflow `.github/workflows/auth-013-persistence-schema-evidence.yml` captures D1 metadata, users schema/indexes, user-row count, target-column presence, and migration history with exact `GITHUB_SHA` provenance.
+
+## Explicit migration blocker
+
+The existing-user backfill semantics are still unresolved. The Account State Machine defines lifecycle states and transitions but does not authorize an initial `account_state` or `account_state_version` for pre-existing rows. No migration execution is authorized until those values are explicitly decided and admitted.
