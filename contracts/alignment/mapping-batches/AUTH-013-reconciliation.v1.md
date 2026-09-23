@@ -8,7 +8,7 @@
 
 ## Current evidence
 
-The canonical mapping records `AUTH-013` as `PARTIAL` and now binds the existing canonical `transitionAccountState` API operation; entity, Payload collection, code-evidence and runtime references remain unresolved. Its explicit blocker is `account-state enforcement mapping incomplete`.
+The canonical mapping records `AUTH-013` as `PARTIAL`, binds `transitionAccountState`, binds `ENT-USER`, and now records the canonical account-state Field IDs. Payload collection, DTO, persistence, code-evidence and runtime references remain unresolved.
 
 Blueprint/capability inventory establishes the requirement, but does not establish executable enforcement.
 
@@ -22,7 +22,7 @@ No inferred API, DTO, entity, field, Payload table, Worker, or test identifier m
 
 1. Canonical account-state model and transitions are not fully reconciled.
 2. The canonical enforcement API binding is `transitionAccountState`; DTO mapping and runtime enforcement evidence are still missing.
-3. Entity/field/persistence mapping is missing.
+3. Entity field IDs are now admitted; physical persistence mapping remains missing.
 4. Security enforcement and deny-by-default behavior are not evidence-bound.
 5. Lifecycle and restoration semantics are not fully reconciled.
 6. Implementation and integration/security test evidence are not mapped.
@@ -34,4 +34,4 @@ No inferred API, DTO, entity, field, Payload table, Worker, or test identifier m
 
 ## Next closure action
 
-Close the authoritative account-state contract, then bind API/DTO/entity/field/security/lifecycle/test/evidence identifiers to real repository artifacts and rerun the fail-closed Mapping 0 validator.
+With authority and canonical Field IDs admitted, establish the authoritative D1-01 persistence mapping from actual schema/migration evidence, then bind DTO/security/lifecycle/test/evidence identifiers and rerun the fail-closed Mapping 0 validator.
