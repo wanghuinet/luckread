@@ -1,0 +1,41 @@
+name: W02 Session Runtime CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W02-content/src/session/**'
+      - '.github/workflows/w02-session-runtime-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - 'workers/W02-content/src/session/**'
+      - '.github/workflows/w02-session-runtime-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  session-runtime:
+    name: W02 Session Runtime Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run W02 session runtime tests
+        run: npx vitest@3.2.4 run workers/W02-content/src/session/session-runtime.test.ts
