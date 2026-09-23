@@ -212,11 +212,13 @@ and the D1 and Worker authority conflicts have been formally resolved.
 2. W02 / D1-01 authoritative-writer decision — RESOLVED by `CC-MAPPING-0-AUTH-013-AUTHORITY-2026-09-23`.
 3. Canonical `account_state` / `account_state_version` Field IDs — ADMITTED by `CC-MAPPING-0-AUTH-013-FIELD-ADMISSION-2026-09-23`.
 4. Keep the canonical `transitionAccountState` binding explicit; any separate suspend/restore/freeze/ban operation requires its own approved Contract admission before binding.
-5. Bind DTO, state, event, audit, cache, and security IDs.
-6. Establish authoritative D1 persistence and migration evidence without relying on undocumented Payload schema.
-7. Implement and verify the full state-transition side-effect chain only after Contract authorization.
-8. Execute complete positive/negative/security/integration tests and populate non-empty Evidence Registry entries.
-9. AUTH-013 remains non-green until all remaining Worker/API/DTO/persistence/runtime/evidence gates pass.
+5. DTO binding — ADMITTED by `CC-MAPPING-0-AUTH-013-DTO-ADMISSION-2026-09-23`.
+6. Bind state, event, audit, cache, and security IDs.
+7. Establish authoritative D1 persistence and migration evidence; current target is `users`, while physical target columns remain uncreated.
+8. Resolve the explicit existing-user state/version backfill decision before migration execution.
+9. Implement and verify the full state-transition side-effect chain only after Contract authorization.
+10. Execute complete positive/negative/security/integration tests and populate non-empty Evidence Registry entries.
+11. AUTH-013 remains non-green until all remaining persistence/backfill/runtime/evidence gates pass.
 
 
 ## Current evidence reconciliation — 2026-09-23
