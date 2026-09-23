@@ -31,6 +31,14 @@ Verified steps:
 - W02 authorization tests: PASS
 - W02 session runtime tests: PASS
 
+## Controlled remote execution gate update
+
+- Evidence-collection workflow updated at commit `8996436496c509f04302e2c738c933a16102b523`.
+- The workflow now performs the approved D1-01 remote RoleAssignment migration and then reads back `role_assignments`, its indexes/triggers, the D1 migration ledger, and the current row count.
+- It uploads controlled provenance plus the remote readback outputs as a GitHub Actions artifact.
+- This is execution infrastructure only; it is **not** remote execution evidence until the workflow is actually run successfully against D1-01.
+- Required dispatch inputs for the current `main`: `source_sha=8996436496c509f04302e2c738c933a16102b523`, `database_name=luckread`, `confirm=APPLY`.
+
 ## Explicitly not closed
 
 - W02 controlled Cloudflare deployment provenance
