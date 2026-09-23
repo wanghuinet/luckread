@@ -1709,3 +1709,30 @@ Next admissible external action:
 - Manually dispatch `W01 W02 Auth Binding Deploy` with `source_sha=d64d7527564239a487a6e0ad6dceb1b5e8dac3b9` and `confirm=DEPLOY_BINDING`.
 - Do not repeat W02 migration or W02 deployment.
 - Do not start auth runtime evidence until the W01 binding workflow completes successfully.
+
+
+## 2026-09-23 continuation — W01→W02 W02_AUTH Service Binding deployment verified
+
+Controlled workflow run `35819898556` (W01 W02 Auth Binding Deploy, workflow_dispatch, run #4) completed **SUCCESS** against admitted source input `d64d7527564239a487a6e0ad6dceb1b5e8dac3b9`.
+
+- Worker: `luckread-w01-payload`.
+- Cloudflare Current Version ID: `3e6e2646-1979-488b-b273-72e84a582878`.
+- `Verify W01 W02_AUTH binding`: SUCCESS.
+- W01 build: SUCCESS.
+- W01 deployment: SUCCESS.
+- Cloudflare deployment binding list explicitly contains `env.W02_AUTH (luckread-w02) -> Worker`.
+- Provenance records binding `W02_AUTH`, target `luckread-w02`, and `database_mutation=false`.
+- Evidence artifact: `10732689143`; digest `sha256:2dc8c6cf8c59fb0d02bd0599c3970fdee307ceaf69236c46402551f0413c3355`.
+
+Acceptance:
+- W01→W02 `W02_AUTH` Service Binding deployment = **PASS_VERIFIED** at the tested source scope.
+- The earlier run `35816996216` remains historical tooling-gate failure and is not reinterpreted as binding failure.
+- W02 deployment/migration evidence is inherited; no rerun performed by this step.
+- Controlled `authLogin/authRefresh` runtime evidence remains **NOT_EXECUTED**.
+- AUTH-002 remains **NOT_GREEN** pending controlled runtime evidence and remaining dependent authority/evidence gates.
+
+Current cursor:
+- **E6 Runtime-003 — controlled authLogin/authRefresh runtime evidence**.
+- Do not repeat W01 binding deployment or W02 deployment unless relevant source, Contract, binding target, dependency, or verification scope changes.
+
+No Contract, Blueprint, Worker topology, D1 topology, or authorization semantics were changed by this evidence reconciliation.
