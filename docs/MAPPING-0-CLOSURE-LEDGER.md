@@ -1755,6 +1755,15 @@ No Contract, Blueprint, Worker topology, D1 topology, or authorization semantics
 - Account-state DTO/entity/field/persistence/runtime/security/lifecycle/event evidence is not yet reconciled.
 - Therefore controlled public `authLogin/authRefresh` runtime evidence remains blocked from promotion.
 
+### Stage 1 / Slice 1 checkpoint — 2026-09-23
+
+- W02 Session Runtime unit-test gate: **PASS_VERIFIED**.
+- GitHub Actions Run: `35827604032`.
+- Tested source commit: `49a50787f9d913459fa4eacc5f7e5b828e5d2703`.
+- Evidence artifact: `artifacts/mapping-0/stage1-slice1-session-runtime-test-evidence-2026-09-23.md`.
+- This closes only the automated-test execution sub-scope. It does not promote AUTH-002/AUTH-013, and it does not replace the remaining controlled public runtime/evidence gate.
+- Slice 1 remains **BLOCKED** by the unresolved AUTH-013 account-state authority/Field-ID/persistence chain before public auth runtime promotion.
+
 ### Current cursor
 **AUTH-013 Contract-First authority reconciliation → then E6 Runtime-003 controlled authLogin/authRefresh evidence.**
 
