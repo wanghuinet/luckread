@@ -509,7 +509,10 @@
         "transitionAccountState"
       ],
       "pageRefs": [],
-      "dtoRefs": [],
+      "dtoRefs": [
+        "DTO-AUTH-013-ACCOUNT-STATE-TRANSITION-REQUEST",
+        "DTO-AUTH-013-ACCOUNT-STATE-TRANSITION-RESPONSE"
+      ],
       "dataRefs": [
         "ENT-USER-F-ACCOUNT-STATE",
         "ENT-USER-F-ACCOUNT-STATE-VERSION",
@@ -539,7 +542,7 @@
       "blockers": [
         "existing-user account_state/account_state_version backfill policy remains an explicit decision gate",
         "D1-01 migration execution and post-schema evidence remain pending",
-        "DTO, security/lifecycle, runtime and Evidence Registry mapping remain incomplete"
+        "security/lifecycle, runtime and Evidence Registry mapping remain incomplete"
       ]
     },
     {
