@@ -211,3 +211,16 @@ and the D1 and Worker authority conflicts have been formally resolved.
 7. Implement and verify the full state-transition side-effect chain only after Contract authorization.
 8. Execute complete positive/negative/security/integration tests and populate non-empty Evidence Registry entries.
 9. AUTH-013 remains non-green until all remaining Worker/API/DTO/persistence/runtime/evidence gates pass.
+
+
+## Current evidence reconciliation — 2026-09-23
+
+The following downstream evidence is now independently verified and is inherited without re-execution:
+
+- W02 physical deployment: GitHub Actions Run `35816952574`, source `0c0c250f1f2ec6da38a8b3c50834d74a4999f5da`, Cloudflare Worker `luckread-w02`, version `7eb5d373-14b3-4354-9d72-af72c1a0a6cc`.
+- RoleAssignment D1-01 remote migration/readback: previously captured controlled evidence remains valid for the tested migration/source scope.
+- W01 → W02 `W02_AUTH` Service Binding: Run `35819898556`, source `d64d7527564239a487a6e0ad6dceb1b5e8dac3b9`, Cloudflare W01 version `3e6e2646-1979-488b-b273-72e84a582878`; deployment output explicitly reports `env.W02_AUTH (luckread-w02) -> Worker`.
+
+These facts close the previously open physical Worker/binding evidence items for the E6 downstream path, but they do not resolve the remaining AUTH-013 Contract authority inputs. In particular, the stale `W00` authoritative-writer declaration and the missing canonical Field IDs for `account_state` / `account_state_version` remain decision material. No runtime promotion is made by this reconciliation.
+
+Current AUTH-013 disposition remains: **BLOCKED_NOT_GREEN / implementation authorization=false**.
