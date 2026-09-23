@@ -527,7 +527,9 @@
       "eventRefs": [
         "identity.account_state_changed"
       ],
-      "workerRefs": [],
+      "workerRefs": [
+        "W02"
+      ],
       "d1Domain": "D01 Core",
       "testRefs": [],
       "evidenceRefs": [],
