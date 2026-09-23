@@ -88,3 +88,19 @@ The existing E6 implementation-admission Change Control remains the implementati
 - ENT-ROLE-ASSIGNMENT implementation/persistence: **NOT_YET_VERIFIED**
 - E6 runtime implementation: **ADMITTED_FOR_SOURCE_ONLY / RUNTIME_EVIDENCE_PENDING**
 - Mapping 0: **NOT_GREEN**
+
+## Verification reconciliation — 2026-09-23
+
+Controlled execution has now verified the deployment and transport facts previously marked pending:
+
+- W02 controlled deployment run: `35816952574` = SUCCESS; exact admitted source input `0c0c250f1f2ec6da38a8b3c50834d74a4999f5da`; Cloudflare version `7eb5d373-14b3-4354-9d72-af72c1a0a6cc`.
+- W01 `W02_AUTH` controlled binding deployment run: `35819898556` = SUCCESS; exact admitted source input `d64d7527564239a487a6e0ad6dceb1b5e8dac3b9`; Cloudflare version `3e6e2646-1979-488b-b273-72e84a582878`.
+- W01 deployment output explicitly reports `env.W02_AUTH (luckread-w02) -> Worker`.
+- W01 provenance records caller Worker `luckread-w01-payload`, binding `W02_AUTH`, target `luckread-w02`, and `database_mutation=false`.
+
+Updated result:
+- Physical Worker deployed existence: **VERIFIED**
+- W01 service binding deployed existence: **VERIFIED**
+- Deployment/transport decision: **VERIFIED_AT_RUNTIME_SCOPE**
+
+Remaining E6 blockers are independent of this deployment decision: AUTH-013 account-state authority/implementation remains unresolved, and controlled public `authLogin/authRefresh` runtime evidence has not yet been executed.
