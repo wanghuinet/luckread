@@ -111,3 +111,29 @@ Prerequisite before public auth runtime wiring:
 - Do not repeat W02 migration/deployment.
 - Required next external execution: dispatch `W01 W02 Auth Binding Deploy` with `source_sha=d64d7527564239a487a6e0ad6dceb1b5e8dac3b9` and `confirm=DEPLOY_BINDING`.
 - Only after a successful W01 binding deployment should the existing controlled `authLogin/authRefresh` runtime evidence path be executed.
+
+
+## Superpowers continuation — W01→W02 W02_AUTH binding verified — 2026-09-23
+
+Controlled workflow run: `35819898556` = **SUCCESS** (workflow_dispatch, run #4).
+
+- Exact admitted source input: `source_sha=d64d7527564239a487a6e0ad6dceb1b5e8dac3b9`.
+- Worker: `luckread-w01-payload`.
+- Cloudflare Current Version ID: `3e6e2646-1979-488b-b273-72e84a582878`.
+- Binding verification step: PASS.
+- Build step: PASS.
+- Deployment step: PASS.
+- Cloudflare deployment bindings explicitly report `env.W02_AUTH (luckread-w02)`.
+- Target W02: `luckread-w02`.
+- D1 mutation: false.
+- Evidence artifact: `10732689143`, SHA256 `sha256:2dc8c6cf8c59fb0d02bd0599c3970fdee307ceaf69236c46402551f0413c3355`.
+
+Acceptance boundary:
+- W01 `W02_AUTH` Service Binding deployment evidence = **PASS_VERIFIED** at tested source scope.
+- W02 deployment evidence remains **PASS_VERIFIED**; not re-executed here.
+- Controlled `authLogin/authRefresh` runtime evidence remains **NOT_EXECUTED**.
+- AUTH-002 remains **NOT_GREEN** until the controlled runtime evidence package and its dependent authority/evidence gates are satisfied.
+
+Next cursor:
+- **E6 Runtime-003: controlled authLogin/authRefresh runtime evidence.**
+- Do not repeat the W01 binding deployment or W02 deployment unless a relevant source, contract, binding target, dependency, or verification scope changes.
