@@ -269,4 +269,39 @@ describe('authenticated session orchestration', () => {
 
     expect(result).toEqual({ sessionId: 'sid-1', accessToken: 'access-2', refreshToken: 'refresh-2', layer: 'L3' })
   })
+  it('does not mint or rotate when authoritative layer resolution denies', async () => {
+    const hash = 'old-hash'
+    const record: SessionRecord = {
+      sessionId: 'sid-1',
+      userId: '42',
+      deviceId: 'device-a',
+      tokenVersion: 3,
+      refreshCredentialHash: hash,
+      revokedAt: null,
+      lastSeenAt: NOW,
+      nativeExpiresAt: nativeSession().expiresAt,
+    }
+    const fake = dbFake(record)
+    let issueCount = 0
+
+    await expect(refreshAuthenticatedSession(fake.db, {
+      refreshToken: 'refresh-1',
+      deviceId: 'device-a',
+      accountState: 'ACTIVE',
+      now: NOW,
+      hashToken: async () => hash,
+      randomToken: () => 'refresh-2',
+      issueAccessToken: () => {
+        issueCount += 1
+        return 'access-2'
+      },
+      resolveLayer: async () => ({ decision: 'DENY' }),
+    })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
+
+    expect(issueCount).toBe(0)
+    expect(fake.getReads()).toBe(1)
+    expect(fake.getWrites()).toBe(0)
+    expect(fake.getRow()?.refreshCredentialHash).toBe(hash)
+  })
+
 })
