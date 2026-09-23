@@ -1802,3 +1802,15 @@ Do not repeat the verified W02 deployment or W01 `W02_AUTH` binding deployment u
 
 ### Current cursor
 **AUTH-013 → approve/admit existing-user backfill semantics → execute isolated D1-01 migration → post-schema verification → W02 runtime implementation/evidence.**
+
+
+## 2026-09-23 Superpowers continuation — AUTH-013 existing-user backfill decision
+
+- Existing-user backfill decision: **C selected** under `CC-MAPPING-0-AUTH-013-BACKFILL-DECISION-2026-09-23`.
+- Do not assign a blanket initial `account_state` / `account_state_version` and do not derive them from verification, role, entitlement, subscription, session state, `login_attempts`, `lock_until`, or cache.
+- Evidence basis: active W01 `Users.ts` has no lifecycle fields; controlled D1-01 `users` snapshot from run `35657959095` has no lifecycle columns; no complete authoritative pre-existing-user classification source was found in the current repository evidence.
+- AUTH-013 migration remains **NOT_AUTHORIZED / NOT_EXECUTED**.
+- The decision itself is closed; the remaining task is to identify/admit the authoritative classification source/policy, then perform isolated migration and post-schema verification.
+
+### Current cursor
+**AUTH-013 → authoritative existing-user lifecycle classification source/policy evidence → migration admission → isolated D1-01 execution → post-schema verification → W02 runtime implementation/evidence.**
