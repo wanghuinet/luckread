@@ -38,7 +38,7 @@ Verified steps:
 - The workflow now performs the approved D1-01 remote RoleAssignment migration and then reads back `role_assignments`, its indexes/triggers, the D1 migration ledger, and the current row count.
 - It uploads controlled provenance plus the remote readback outputs as a GitHub Actions artifact.
 - This is execution infrastructure only; it is **not** remote execution evidence until the workflow is actually run successfully against D1-01.
-- Required dispatch inputs for the current `main`: `source_sha=8996436496c509f04302e2c738c933a16102b523`, `database_name=luckread`, `confirm=APPLY`.
+- Required dispatch inputs for the current `main`: `source_sha=77a996ac1932b7b9b53264b79e4352d6626c5cc0`, `database_name=luckread`, `confirm=APPLY`.
 
 ## Explicitly not closed
 
