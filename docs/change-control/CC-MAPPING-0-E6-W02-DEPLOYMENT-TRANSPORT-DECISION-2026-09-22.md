@@ -1,6 +1,6 @@
 # Mapping 0 — E6 W02 Deployment & Transport Decision — 2026-09-22
 
-- Status: `DECISION_RECORDED — IMPLEMENTATION_NOT_YET_ADMITTED`
+- Status: `DECISION_RECORDED — IMPLEMENTATION_ADMITTED / DEPLOYMENT_EVIDENCE_PENDING`
 - Scope: `GAP-E6-RUNTIME-001`
 - Repository authority: GitHub `main`
 - Canonical logical Worker: W02 — Identity / Account / Authorization
@@ -30,7 +30,7 @@ Required configuration:
 - Deployment trigger: controlled `workflow_dispatch` for the initial/admission-bound deployment; no implicit push-to-production deployment is introduced by this decision.
 - Source provenance: workflow must pin the exact implementation commit and retain build/deployment evidence.
 
-This deployment choice is consistent with the repository's existing fail-closed admission model. It does not by itself create or deploy the Worker.
+This deployment choice is consistent with the repository's existing fail-closed admission model. The separate E6 implementation-admission Change Control has now admitted source implementation; this decision still does not by itself prove Cloudflare deployment.
 
 ### 3. W01 → W02 transport
 
@@ -53,7 +53,7 @@ HTTP Service Binding is selected rather than RPC because the existing W01 bounda
 
 ### 4. Required binding contract evidence
 
-Before runtime implementation is admitted, the implementation change must record:
+Before runtime execution is accepted, the implementation must record:
 - caller = W01;
 - callee = W02;
 - operation IDs and versions = existing governed AUTH/T01/T03 contracts only;
@@ -67,8 +67,8 @@ Before runtime implementation is admitted, the implementation change must record
 ### 5. Explicit non-decisions
 
 This decision does not:
-- authorize W02 runtime code by itself;
-- authorize RoleAssignment persistence implementation;
+- by itself prove W02 runtime deployment or runtime acceptance;
+- by itself prove RoleAssignment persistence runtime acceptance;
 - create a Worker or D1 resource immediately;
 - modify Payload Core;
 - add a public W02 API;
@@ -86,5 +86,5 @@ The existing E6 implementation-admission Change Control remains the implementati
 - Physical Worker deployed existence: **NOT_YET_VERIFIED**
 - W01 service binding deployed existence: **NOT_YET_VERIFIED**
 - ENT-ROLE-ASSIGNMENT implementation/persistence: **NOT_YET_VERIFIED**
-- E6 runtime implementation: **NOT_ADMITTED**
+- E6 runtime implementation: **ADMITTED_FOR_SOURCE_ONLY / RUNTIME_EVIDENCE_PENDING**
 - Mapping 0: **NOT_GREEN**
