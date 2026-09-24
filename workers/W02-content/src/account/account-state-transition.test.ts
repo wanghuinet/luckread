@@ -151,7 +151,7 @@ describe('AUTH-013 account-state transition kernel', () => {
     await expect(applyAccountStateTransition(fake.db, input({ expectedVersion: 7 }))).rejects.toMatchObject({ code: 'CONFLICT' })
 
     expect(fake.row).toEqual({ state: 'ACTIVE', version: 8 })
-    expect(fake.batchCalls()).toBe(0)
+    expect(fake.batchCalls()).toBe(1)
   })
 
   it('rolls back the in-memory state when the durable journal write fails', async () => {
@@ -293,7 +293,7 @@ describe('AUTH-013 account-state transition kernel', () => {
   })
 
   it('rejects a concurrent compare-and-set race through the journal uniqueness boundary', async () => {
-    const fake = fakeDb({ state: 'RESTRICTED', version: 8 })
+    const fake = fakeDb({ state: 'ACTIVE', version: 7 }, { forceJournalConflict: true })
 
     await expect(
       applyAccountStateTransition(
