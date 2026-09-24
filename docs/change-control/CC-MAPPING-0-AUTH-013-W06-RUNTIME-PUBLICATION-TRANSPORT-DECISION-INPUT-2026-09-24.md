@@ -184,3 +184,38 @@ Unverified downstream claims:
 **Next state: WAIT_AUTHORITY_DECISION.**
 
 No implementation change is admitted until the transport and actor-type questions are resolved against existing authority.
+
+
+## 9. Current-head reconciliation findings — 2026-09-24
+
+A read-only current-`main` inspection narrowed the unresolved boundary without changing any authoritative Contract/Blueprint:
+
+1. The cross-cutting event contract already exists at `docs/163-EVENT-SEMANTICS-DELIVERY-ORDERING-REPLAY-DLQ-CONTRACT-v1.0.md`.
+   - Canonical event envelope requires `eventId`, `eventType`, `schemaVersion`, producer/resource/correlation/causation metadata, `idempotencyKey`, `attempt`, `sourceVersion` and payload.
+   - Delivery is **at-least-once** by default; consumers must be idempotent.
+   - The transaction boundary permits a transactional outbox / durable publication boundary / equivalent, but requires durable event intent after the authoritative transition.
+   - Cross-domain consumers must not become a second authority.
+
+2. The active D1 Domain Master confirms that D1-03 owns `Outbox`, `Inbox` and operational idempotency records, while preserving the frozen:
+   `Authoritative transaction → Outbox/event → Queue/consumer → Idempotent state transition → Reconciliation/evidence`
+   pattern.
+   This confirms the event semantics, but does **not** identify an executable AUTH-013 producer binding or queue resource.
+
+3. Current W02 source/config was inspected:
+   - `workers/W02-content/wrangler.jsonc` binds only D1-01.
+   - `applyAccountStateTransition()` currently performs the authoritative D1-01 state/version update and returns the transition result.
+   - No Outbox write, event publication call, or W06 transport call is present in that admitted function.
+   Therefore an implementation that adds one ad hoc at this stage would be a new cross-domain contract decision, not a routine code completion.
+
+4. The canonical Worker Master still gives W10 no artificial Primary Task, and the current repository search did not identify an executable `workers/W10*` implementation/configuration that could be promoted as an existing runtime boundary by inference.
+
+### Narrowed decision state
+
+- **Q1:** The platform-level event delivery semantics are already authoritative; the remaining unresolved item is the concrete AUTH-013 producer/outbox-to-queue binding.
+- **Q2:** Still UNRESOLVED. W10 is an approved execution boundary in architecture, but there is no current executable W10 implementation or task-specific admission establishing this consumer.
+- **Q3:** Still UNRESOLVED. `operator` remains outside the canonical common Actor enum; no silent normalization is permitted.
+- **Q4:** RESOLVED at contract/topology level as recorded above.
+
+### Admission consequence
+
+No source-code implementation is admitted from this inspection alone. The smallest next artifact is an explicit authority decision that binds the existing event semantics to the AUTH-013 producer/consumer path and resolves the Actor representation. Only after that decision may the corresponding producer/consumer Contract/Blueprint delta be admitted and implemented.
