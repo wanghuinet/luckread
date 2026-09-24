@@ -1,0 +1,185 @@
+name: AUTH-013 W06 Queue Consumer Runtime Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployed_source_sha:
+        description: Exact admitted source SHA whose W06 deployment is being evidenced
+        required: true
+        type: string
+      confirm:
+        description: Type RUN to execute the controlled queue consumer probe
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    if: ${{ inputs.confirm == 'RUN' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      SOURCE_SHA: ${{ inputs.deployed_source_sha }}
+      QUEUE_NAME: luckread-auth013-account-state
+      DLQ_NAME: luckread-auth013-account-state-dlq
+      W06_NAME: luckread-w06
+      PROBE_ID: auth013-w06-queue-runtime-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Validate Cloudflare credentials
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+
+      - name: Verify the referenced W06 deployment succeeded
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -n "$SOURCE_SHA"
+          run_id="$(gh run list             --repo "$GITHUB_REPOSITORY"             --workflow auth-013-w06-queue-slice-deploy.yml             --commit "$SOURCE_SHA"             --limit 1             --json databaseId,conclusion             --jq '.[] | select(.conclusion == "success") | .databaseId' | head -n 1)"
+          test -n "$run_id"
+          echo "W06_DEPLOYMENT_RUN=$run_id"
+
+      - name: Resolve physical Queue and DLQ identities
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues"
+          curl -fsS             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "$api?per_page=100" > queues.json
+
+          queue_id="$(jq -r --arg name "$QUEUE_NAME" '.result[] | select(.queue_name == $name) | .queue_id' queues.json | head -n 1)"
+          dlq_id="$(jq -r --arg name "$DLQ_NAME" '.result[] | select(.queue_name == $name) | .queue_id' queues.json | head -n 1)"
+
+          test -n "$queue_id"
+          test -n "$dlq_id"
+
+          echo "QUEUE_ID=$queue_id" >> "$GITHUB_ENV"
+          echo "DLQ_ID=$dlq_id" >> "$GITHUB_ENV"
+          echo "QUEUE_ID=$queue_id"
+          echo "DLQ_ID=$dlq_id"
+
+      - name: Verify the live W06 queue consumer binding
+        run: |
+          set -euo pipefail
+          endpoint="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$QUEUE_ID/consumers"
+          curl -fsS             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "$endpoint" > consumers.json
+
+          jq --arg worker "$W06_NAME" --arg queue "$QUEUE_NAME" --arg dlq "$DLQ_NAME" '
+            .result
+            | map(select(.script_name == $worker and .queue_name == $queue and .dead_letter_queue == $dlq))
+            | length
+          ' consumers.json | grep -qx '1'
+
+          echo "AUTH_013_W06_CONSUMER_BINDING=PASS"
+
+      - name: Fail closed unless both queues are empty before the probe
+        run: |
+          set -euo pipefail
+
+          queue_metrics="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$QUEUE_ID/metrics"
+          dlq_metrics="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$DLQ_ID/metrics"
+
+          curl -fsS             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "$queue_metrics" > queue-metrics-before.json
+          curl -fsS             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "$dlq_metrics" > dlq-metrics-before.json
+
+          queue_backlog="$(jq -r '.result.backlog_count' queue-metrics-before.json)"
+          dlq_backlog="$(jq -r '.result.backlog_count' dlq-metrics-before.json)"
+
+          test "$queue_backlog" = "0"
+          test "$dlq_backlog" = "0"
+
+          echo "QUEUE_BACKLOG_BEFORE=$queue_backlog"
+          echo "DLQ_BACKLOG_BEFORE=$dlq_backlog"
+
+      - name: Push a non-mutating invalid AUTH-013 envelope
+        run: |
+          set -euo pipefail
+
+          endpoint="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$QUEUE_ID/messages"
+          body="$(jq -nc --arg probe "$PROBE_ID" '{
+            body: {
+              probeId: $probe,
+              eventType: "AUTH-013-RUNTIME-PROBE_INVALID",
+              reason: "controlled-negative-path-consumer-reachability"
+            },
+            content_type: "json"
+          }')"
+
+          curl -fsS             -X POST             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             --data "$body"             "$endpoint" > push-result.json
+
+          jq -e '.success == true' push-result.json
+          echo "AUTH_013_W06_RUNTIME_PROBE_MESSAGE_ACCEPTED=TRUE"
+
+      - name: Verify the live consumer reaches the DLQ and the source queue drains
+        run: |
+          set -euo pipefail
+
+          queue_metrics="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$QUEUE_ID/metrics"
+          dlq_metrics="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$DLQ_ID/metrics"
+
+          reached_dlq=0
+          drained=0
+
+          for _ in $(seq 1 90); do
+            curl -fsS               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               "$queue_metrics" > queue-metrics.json
+            curl -fsS               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               "$dlq_metrics" > dlq-metrics.json
+
+            queue_backlog="$(jq -r '.result.backlog_count' queue-metrics.json)"
+            dlq_backlog="$(jq -r '.result.backlog_count' dlq-metrics.json)"
+
+            if [ "$queue_backlog" = "0" ]; then
+              drained=1
+            fi
+
+            if [ "$dlq_backlog" -ge 1 ]; then
+              reached_dlq=1
+            fi
+
+            if [ "$drained" = "1" ] && [ "$reached_dlq" = "1" ]; then
+              break
+            fi
+
+            sleep 2
+          done
+
+          test "$drained" = "1"
+          test "$reached_dlq" = "1"
+
+          echo "AUTH_013_W06_QUEUE_CONSUMED_INVALID_PROBE=PASS"
+          echo "AUTH_013_W06_DLQ_RETRY_PATH=PASS"
+
+      - name: Purge only the synthetic probe from the DLQ
+        run: |
+          set -euo pipefail
+
+          endpoint="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$DLQ_ID/purge"
+          curl -fsS             -X POST             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "$endpoint" > purge-result.json
+
+          jq -e '.success == true' purge-result.json
+
+          metrics="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$DLQ_ID/metrics"
+          for _ in $(seq 1 30); do
+            curl -fsS               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               "$metrics" > dlq-after-purge.json
+            backlog="$(jq -r '.result.backlog_count' dlq-after-purge.json)"
+            if [ "$backlog" = "0" ]; then
+              echo "DLQ synthetic probe cleanup: PASS"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "DLQ cleanup did not reach zero" >&2
+          exit 1
+
+      - name: Emit evidence verdict
+        run: |
+          echo "AUTH_013_W06_QUEUE_RUNTIME_EVIDENCE=PASS"
+          echo "scope=QUEUE_CONSUMER_REACHABILITY_RETRY_DLQ_ONLY"
+          echo "d1_03_persistence=NOT_TESTED"
+          echo "positive_event_path=NOT_PROMOTED"
+
