@@ -58,7 +58,7 @@ jobs:
           mkdir -p "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-evidence"
           node - <<'NODE'
           const fs = require('node:fs')
-          const path = 'artifacts/mapping-0/w06-audit-event-evidence/d1-query.json'
+          const path = `${process.env.GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-evidence/d1-query.json`
           const endpoint =
             `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/d1/database/${process.env.EXPECTED_DB_ID}/query`
           const batch = [
@@ -102,7 +102,7 @@ jobs:
           set -euo pipefail
           node - <<'NODE'
           const fs = require('node:fs')
-          const path = 'artifacts/mapping-0/w06-audit-event-evidence'
+          const path = `${process.env.GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-evidence`
           const read = (f) => JSON.parse(fs.readFileSync(path + '/' + f, 'utf8'))
           const body = read('d1-query.json')
           const results = body?.result ?? []
