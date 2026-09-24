@@ -2337,3 +2337,35 @@ No new Worker/D1, direct W02→W06 Service Binding, public route, actor mapping,
 
 Already-verified W01→W02 transport, W02 transition kernel, W06 source CI, W06 D1-03 schema, and W06 Worker upload evidence remain inherited unless authoritative inputs change.
 
+
+
+## 2026-09-24 Superpowers continuation — AUTH-013 event boundary narrowed at current main
+
+Current main checkpoint before this ledger update: `5f73960b752c590cbbabe37e6f87585c8f56afdd`.
+
+Read-only reconciliation against current `main` confirmed:
+
+- The existing cross-cutting event contract `docs/163-EVENT-SEMANTICS-DELIVERY-ORDERING-REPLAY-DLQ-CONTRACT-v1.0.md` already defines the canonical event envelope, at-least-once delivery, idempotent consumers, durable publication boundary, ordering/replay/DLQ semantics, and cross-domain authority rules.
+- The active D1 Domain Master assigns Outbox / Inbox / operational idempotency records to D1-03 and preserves the frozen cross-D1 pattern:
+  **Authoritative transaction → Outbox/event → Queue/consumer → Idempotent state transition → Reconciliation/evidence**.
+- W02 `wrangler.jsonc` currently binds only D1-01.
+- W02 `applyAccountStateTransition()` currently performs only the authoritative D1-01 account-state/version update and returns the transition result; no Outbox write, event publication call, or W06 call is present.
+- No executable `workers/W10*` implementation/configuration was found in the current repository tree, so W10 cannot be promoted as an AUTH-013 consumer implementation by inference.
+- Actor normalization remains unresolved: account state authority permits `operator`; canonical AuditActor remains `user | service | admin | system | job`.
+
+Decision Material was updated in:
+`docs/change-control/CC-MAPPING-0-AUTH-013-W06-RUNTIME-PUBLICATION-TRANSPORT-DECISION-INPUT-2026-09-24.md`
+
+Current decision state:
+- Q1 = **UNRESOLVED**, narrowed to the concrete AUTH-013 producer/outbox-to-queue binding.
+- Q2 = **UNRESOLVED**, because W10 execution-boundary authority exists but no task-specific consumer admission or executable implementation exists.
+- Q3 = **UNRESOLVED**, no actor normalization authorized.
+- Q4 = **RESOLVED at contract/topology level**.
+
+No Contract/Blueprint authority was changed. No Worker/D1 was added. No direct W02→W06 binding, public route, or actor mapping was introduced.
+
+### Current cursor
+
+**Explicit authority decision for the existing event boundary + actor representation → admit the smallest AUTH-013 producer/consumer contract delta → implement → source CI → controlled runtime evidence → real W02 transition→W06 AuditEvent persistence → cache/session/deindex side-effect evidence → E2E security/integration → AUTH-013 Evidence Registry promotion.**
+
+Do not repeat already-green W02 transition, W06 source CI, D1-03 schema, inventory, or deployment-upload evidence unless an authoritative input changes.
