@@ -51,6 +51,8 @@ jobs:
           while IFS= read -r file; do
             [ -z "$file" ] && continue
             case "$file" in
+              .github/workflows/auth-013-w06-queue-slice-deploy.yml)
+                ;;
               .github/workflows/auth-013-queue-resource-provisioning.yml)
                 ;;
               .github/workflows/w02-auth-013-runtime-source-verification.yml)
