@@ -1,5 +1,6 @@
 import { buildAccountStateChangedAuditEvent, type AccountStateChangedAuditInput } from './audit-event'
 import { persistAuditEvent } from './audit-event-persistence'
+import { consumeAccountStateChanged } from './auth-013-queue-consumer'
 
 interface Env {
   D1_03: D1Database
@@ -165,5 +166,20 @@ export default {
     }
 
     return new Response(null, { status: 404 })
+  },
+
+  async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
+    for (const message of batch.messages) {
+      try {
+        await consumeAccountStateChanged(env.D1_03, message.body)
+        message.ack()
+      } catch (error) {
+        if (error instanceof Error && error.message === 'INVALID_AUTH_013_EVENT') {
+          message.retry({ delaySeconds: 0 })
+          continue
+        }
+        message.retry()
+      }
+    }
   },
 }
