@@ -2552,3 +2552,30 @@ Do not begin W02 atomic transition+journal implementation before the Journal sta
 
 Manual remote migration workflow:
 `https://github.com/wanghuinet/luckread/actions/workflows/auth-013-publication-journal-migration.yml`
+
+## 2026-09-24 Superpowers continuation — AUTH-013 Slice 1 GREEN and W02 atomic Journal implementation admitted
+
+Source-head evidence:
+- Journal static verification Run `36000971085` = SUCCESS at `202244cd2a67d54733fe0ddd6518a8b4a41a7251`.
+- Controlled D1-01 journal migration Run `36000833449` = SUCCESS at `202244cd2a67d54733fe0ddd6518a8b4a41a7251`.
+- Both runs uploaded current-head artifacts; the migration job completed binding verification, preflight, remote mutation, post-schema/index verification, and migration-ledger capture.
+
+Slice 1 status is now **PASS_VERIFIED** for physical D1-01 Journal schema/migration. No duplicate migration should be run.
+
+A reconciliation Change Control also fixed the Event Contract timestamp boundary without changing the schema: `publishedAt` is the immutable durable-publication timestamp at journal commit; Queue delivery does not rewrite the event envelope.
+
+W02 implementation commit: `a4478c3ff0c42d8eae4827537697bb01958e181c`.
+It changes only the AUTH-013 account-state transition boundary to:
+- build the canonical `identity.account_state_changed` envelope;
+- map `operator` to Common Actor `actorType=user` + `operationalRole=PLATFORM_OPERATOR`;
+- atomically execute Account State UPDATE + Journal INSERT through D1 `batch()`;
+- fail closed on journal transaction errors;
+- preserve D1-01 as the sole Account State authority.
+
+Current W02 runtime Source CI is **TODO_VERIFY_EXTERNAL** pending the new GitHub Actions result for commit `a4478c3ff0c42d8eae4827537697bb01958e181c`.
+
+### Current cursor
+
+**W02 AUTH-013 Source CI GREEN → controlled W02 deployment → real Account State transition + journal evidence → Queue producer/resource → W06 consumer/idempotency → W06 deployment/runtime evidence → AuditEvent persistence → side-effect convergence → E2E → Evidence Registry promotion.**
+
+Do not repeat Journal migration, W02 kernel prior PASS evidence, W06 source/schema evidence, inventory, or Mapping 0 closure evidence unless authoritative inputs change.
