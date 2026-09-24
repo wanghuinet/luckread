@@ -94,7 +94,7 @@ jobs:
           const required = [
             '"name": "luckread-w06"',
             '"binding": "D1_03"',
-            '"database_id": "bda1d247-a371-4244-91ae-aef9607b0736"'
+            '"database_id": "bda1d247-a371-4244-91ae-aef674b0d736"'
           ]
           for (const value of required) {
             if (!text.includes(value)) throw new Error(`Missing required binding assertion: ${value}`)
