@@ -2014,3 +2014,30 @@ https://github.com/wanghuinet/luckread/actions/workflows/w06-deploy.yml
 
 Do not promote W06 deployment/runtime status before the controlled workflow produces execution evidence. Do not execute D1-03 migration as part of the deployment-shell step.
 
+
+
+## 2026-09-24 Superpowers continuation — W06 binding correction after failed deployment attempt
+
+- Deployment Run `35960753727` = **FAILURE** before npm install, TypeScript verification, or Wrangler deployment.
+- Failure cause was isolated to the checked-out candidate `eb9f33dda3e9892f1814d34bbe4c8327a1ba2dde`: its `workers/W06-governance/wrangler.jsonc` contained the incorrect D1-03 UUID ending `...b0d7f` instead of the admitted canonical UUID `...b0d736`.
+- No Cloudflare Worker was created or mutated by Run `35960753727`; the failure occurred at the pre-deployment physical-binding assertion.
+- Canonical UUID correction committed on main as `9e56be9e86776616188d0467644a75efed6f81bb`.
+- Current source delta from the already admitted W06 source `eb9f33dda3e9892f1814d34bbe4c8327a1ba2dde` is limited to `workers/W06-governance/wrangler.jsonc`.
+- `Ensure Feature Inventory` Run `35960908774` = SUCCESS at `9e56be9e...`.
+- `Mapping 0 Structural Gate` Run `35960908827` = SUCCESS at `9e56be9e...`.
+- `Security Hardening Gate` Run `35960908886` = SUCCESS at `9e56be9e...`.
+- Deployment workflow admission was tightened to permit evidence inheritance only for this exact configuration-only delta; the already verified AUTH-013 persistence-schema and W06 source evidence are inherited from `eb9f33...` rather than rerun.
+- The W06 deployment workflow correction is committed at `138422a65ea503c6b91ee87045d0b8b06020cd81`.
+
+### Current cursor
+
+**Manual controlled W06 deployment at source `9e56be9e86776616188d0467644a75efed6f81bb` → Cloudflare Worker/version evidence → `/health` smoke evidence → D1-03 AuditEvent schema/migration admission.**
+
+Manual trigger URL:
+https://github.com/wanghuinet/luckread/actions/workflows/w06-deploy.yml
+
+Required inputs:
+- `source_sha = 9e56be9e86776616188d0467644a75efed6f81bb`
+- `confirm = DEPLOY`
+
+Do not execute D1-03 migration before successful W06 deployment and `/health` evidence.
