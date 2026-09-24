@@ -63,6 +63,13 @@ jobs:
           echo "QUEUE_ID=$queue_id"
           echo "DLQ_ID=$dlq_id"
 
+      - name: Cross-check worker consumer identity with Wrangler
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 queues consumer worker list "$QUEUE_NAME" --json > wrangler-consumers.json
+          echo "Observed Wrangler worker consumers:"
+          cat wrangler-consumers.json
+
       - name: Verify the live W06 queue consumer binding
         run: |
           set -euo pipefail
