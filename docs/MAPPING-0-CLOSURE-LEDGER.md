@@ -2245,3 +2245,27 @@ Correction committed on `main`:
 
 Next state: **TODO_VERIFY_EXTERNAL**.
 Required next action: rerun W06 Audit Event Source CI against the corrected `main` head. Do not deploy W06 runtime until the complete source CI is green.
+
+
+## 2026-09-24 Superpowers continuation — W06 Source CI restored to GREEN
+
+Current main source/evidence checkpoint:
+- Current main before this ledger update: `0638746d35d95a5765318a95f1c7c56ff9944c75`.
+- W06 Audit Event Source CI Run `35982576756` = **SUCCESS**.
+- W06 source TypeScript = PASS.
+- W06 runtime shell TypeScript = PASS.
+- AuditEvent constructor/persistence/runtime test suite = PASS.
+- The previously isolated canonical `requestId` fixture defect is closed by `e2bd914f4193f6babaff7a51eb63fc22461555f2`.
+- No Contract/Blueprint/Entity authority was changed by the correction.
+- No duplicate D1 migration or other remote mutation was caused by the source-CI correction.
+
+Evidence inheritance remains valid:
+- W06 D1-03 remote AuditEvent schema/migration evidence Run `35975461648` = **PASS_VERIFIED**.
+- W06 Worker version upload evidence Run `35964557298` = **PASS_VERIFIED** for version upload/binding resolution only.
+- The Cloudflare message `No targets deployed for luckread-w06` means HTTP `/health` reachability is still **NOT_PROVEN**; it is not a source-code failure.
+
+### Current cursor
+
+**W06 controlled deployment → Cloudflare Worker/version + binding evidence → determine the admitted runtime-target/smoke evidence path without adding an unauthorized public route → runtime persistence evidence → identity.account_state_changed publication → cache/session side-effect binding → E2E security/integration evidence → AUTH-013 Evidence Registry promotion.**
+
+Deployment must use the current GitHub `main` source and the existing controlled W06 deployment workflow. Do not repeat Source CI, D1-03 migration, or Cloudflare inventory unless an authoritative input changes.
