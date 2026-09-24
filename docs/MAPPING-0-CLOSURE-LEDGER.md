@@ -1907,3 +1907,20 @@ Disposition:
 **AUTH-013 → establish/recover canonical W06 Audit/Event runtime binding → bind existing cache/session side-effect authorities → implement end-to-end transition side effects → security/integration evidence.**
 
 Do not repeat the verified D1-01 migration or W02 13-test transition-kernel slice unless an input/evidence scope changes.
+
+## 2026-09-24 Superpowers continuation — W06 AuditEvent source boundary verified
+
+- Current implementation head: `39ab1ad059977ffbb00d03826758219442c4f648`.
+- W06 source boundary admitted under `CC-MAPPING-0-AUTH-013-W06-RUNTIME-BINDING-AND-IMPLEMENTATION-ADMISSION-2026-09-24`.
+- Canonical source boundary: `workers/W06-governance/`.
+- W06 source implementation is limited to canonical immutable AuditEvent construction for `identity.account_state_changed`; it does not persist to D1-03, publish events, mutate cache/session/deindex state, or create a physical Worker.
+- W06 Audit Event Source CI run `35948540401` = SUCCESS; TypeScript check and all 3 source tests passed.
+- Physical W06 Worker name/resource and D1-03 UUID remain `BLOCKED_EXTERNAL / NOT_ESTABLISHED`; no physical resource is inferred from `workers/W06-media`.
+- Contract CI on the W06 source head exposed an existing validator boundary defect: `scripts/payload-contract-reconciliation-check.mjs` treated `ENT-USER-F-ACCOUNT-STATE` and `ENT-USER-F-ACCOUNT-STATE-VERSION` as Payload-native despite `payloadNative=false`.
+- This validator was corrected in commit `0cd9ae614d9f408e296498e2145c21f8195fedf4` to reconcile only Payload-native fields and explicitly record non-Payload fields as `NON_PAYLOAD`; no W01 Payload field or Contract semantics were changed.
+- Contract CI for `0cd9ae614d9f408e296498e2145c21f8195fedf4` is pending verification; no PASS is claimed until the run completes.
+
+### Current cursor
+**Contract CI verification of the non-Payload field ownership correction → W06 physical Worker/D1 binding admission → W06 AuditEvent persistence/publication → cache/session side-effect binding → end-to-end security/integration evidence → AUTH-013 Evidence Registry promotion.**
+
+Do not repeat the verified W06 source tests, AUTH-013 D1-01 migration, or W02 13/13 transition-kernel tests unless authoritative inputs or tested scope change.
