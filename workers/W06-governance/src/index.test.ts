@@ -97,6 +97,28 @@ describe('W06 runtime', () => {
     expect(prepare).not.toHaveBeenCalled()
   })
 
+  it('rejects non-canonical resource and correlation identifiers', async () => {
+    const { db, prepare } = createDb(true)
+    const runtime = await import('./index')
+
+    const response = await runtime.default.fetch(
+      new Request('https://w06.internal/internal/audit-events/account-state-changed', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          ...eventInput,
+          eventId: 'event.invalid',
+          requestId: 'request-runtime-1',
+        }),
+      }),
+      { D1_03: db },
+    )
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: 'INVALID_AUDIT_EVENT' })
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
   it('fails closed when AuditEvent persistence fails', async () => {
     const { db } = createDb(false)
     const runtime = await import('./index')
