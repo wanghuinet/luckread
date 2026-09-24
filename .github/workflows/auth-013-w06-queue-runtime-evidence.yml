@@ -180,10 +180,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          endpoint="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$DLQ_ID/purge"
-          curl -fsS             -X POST             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "$endpoint" > purge-result.json
-
-          jq -e '.success == true' purge-result.json
+          npx --yes wrangler@4.116.0 queues purge "$DLQ_NAME" --force
 
           metrics="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$DLQ_ID/metrics"
           for _ in $(seq 1 30); do
