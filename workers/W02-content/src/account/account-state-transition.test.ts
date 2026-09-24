@@ -80,9 +80,9 @@ describe('AUTH-013 account-state transition kernel', () => {
   it('requires L7 approval for ACTIVE -> BANNED', async () => {
     const fake = fakeDb({ state: 'ACTIVE', version: 7 })
 
-    await expect(applyAccountStateTransition(fake.db, input({ to: 'BANNED', permission: 'user.ban', approvalLevel: null }))).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    await expect(applyAccountStateTransition(fake.db, input({ to: 'BANNED', permission: 'user.ban', actor: { id: 'admin-1', type: 'admin' }, approvalLevel: null }))).rejects.toMatchObject({ code: 'FORBIDDEN' })
 
-    const result = await applyAccountStateTransition(fake.db, input({ to: 'BANNED', permission: 'user.ban', approvalLevel: 'L7' }))
+    const result = await applyAccountStateTransition(fake.db, input({ to: 'BANNED', permission: 'user.ban', actor: { id: 'admin-1', type: 'admin' }, approvalLevel: 'L7' }))
     expect(result).toEqual({ from: 'ACTIVE', to: 'BANNED', accountStateVersion: 8 })
   })
 
@@ -151,6 +151,7 @@ describe('AUTH-013 account-state transition kernel', () => {
         expectedVersion: 2,
         actor: { id: 'job:account-lifecycle', type: 'job' },
         permission: 'system.job',
+        preconditionSatisfied: true,
       }),
     )
 
