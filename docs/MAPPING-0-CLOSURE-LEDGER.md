@@ -2402,3 +2402,24 @@ A minimum future AUTH-013 event contract target is documented for the authority 
 **Resolve Q1/Q2/Q3 authority → admit smallest Contract delta → reconciliation → implement producer/consumer → source CI → controlled runtime evidence → real transition→W06 persistence → cache/session/deindex side-effect evidence → E2E security/integration → Evidence Registry promotion.**
 
 This was documentation/change-control only. No runtime mutation, deployment, migration, or workflow execution was triggered.
+
+
+## 2026-09-24 Superpowers continuation — AUTH-013 recommended transport profile drafted
+
+Current main checkpoint before this ledger update: `98e74bc67734232ba9387aaae18def804f78d2883`.
+
+The existing event/Saga/Worker-D1 contracts and current runtime tree were reconciled with current Cloudflare Queue capabilities. The authority Decision Material now contains a **PROPOSED / NOT_AUTHORIZED** implementation profile:
+
+- Q1 recommended: W02/D1-01 authoritative transaction + producer-local durable event intent + controlled publisher + Queue; W06 remains D1-03 AuditEvent writer.
+- Q2 recommended: W06 as the narrowly scoped AUTH-013 Queue consumer rather than assigning a nonexistent current W10 implementation by inference.
+- Q3 recommended: separate security principal type from operational role so `operator` is represented explicitly rather than coerced into `admin` or `service`.
+
+Cloudflare Queue documentation confirms existing Workers can be configured as producers/consumers through Wrangler bindings and that queues provide at-least-once asynchronous delivery; this does not make Queue publication atomic with a D1 transaction. citeturn969585search0turn969585search5
+
+This recommendation is intentionally not marked GREEN or implemented. It requires explicit Change Control acceptance because the current canonical D1 Master assigns Outbox/Inbox operational records to D1-03 and the Worker Master identifies W10 as the generic async boundary.
+
+### Current cursor
+
+**Approve/reject the recommended Q1/Q2/Q3 profile → admit the minimum Contract delta → reconcile → implement W02 durable event intent + Queue producer and W06 scoped consumer → source CI → controlled runtime evidence → real transition→AuditEvent persistence → side-effect evidence → E2E → Evidence Registry promotion.**
+
+No runtime code, migration, Worker, D1, queue resource, or public API was changed in this Slice.
