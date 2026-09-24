@@ -94,7 +94,8 @@ jobs:
             errors: [],
             messages: [],
           }
-          fs.writeFileSync(path, JSON.stringify(evidence, null, 2) + '\\n')
+          fs.writeFileSync(path, JSON.stringify(evidence, null, 2) + '\n')
+          JSON.parse(fs.readFileSync(path, 'utf8'))
           console.log(JSON.stringify({
             endpoint,
             databaseId: process.env.EXPECTED_DB_ID,
