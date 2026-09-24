@@ -2154,3 +2154,30 @@ https://github.com/wanghuinet/luckread/actions/workflows/w06-audit-event-d1-03-e
 Current cursor:
 
 **Read-only D1-03 AuditEvent evidence → W06 runtime persistence integration → identity.account_state_changed publication → cache/session side-effect binding → E2E security/integration evidence → AUTH-013 Evidence Registry promotion.**
+
+
+## 2026-09-24 Superpowers continuation — W06 runtime persistence integration admitted for CI verification
+
+Latest implementation head: `0e66ffe8a13b7581051b686c095fad63bfb03588`.
+
+Runtime slice committed on `main`:
+- `workers/W06-governance/src/index.ts` now exposes the admitted internal AUTH-013 account-state audit persistence boundary.
+- `POST /internal/audit-events/account-state-changed` parses and validates canonical AuditActor fields, constructs the canonical immutable `identity.account_state_changed` AuditEvent, and calls `persistAuditEvent(env.D1_03, event)`.
+- Invalid input fails with `400 INVALID_AUDIT_EVENT`.
+- D1 persistence failure fails closed with `503 AUDIT_EVENT_PERSISTENCE_FAILED`.
+- `/health` now reports `auditPersistence: enabled`.
+- Runtime tests were added at `workers/W06-governance/src/index.test.ts`.
+- W06 Source CI was updated to execute the runtime integration test.
+- W06 Deploy admission was updated to admit the runtime persistence slice from previously deployed source `fc560a42f7ab61b6e51a5b288d239430292d7e17`, while retaining the explicit W06-only allowlist and carrying forward the already-verified D1-03 schema evidence.
+- The AuditEvent constructor comment was synchronized with the now-admitted runtime persistence boundary.
+
+Verification disposition:
+- W06 D1-03 remote schema/migration evidence Run `35975461648` = **PASS_VERIFIED** and remains inherited; no repeat execution required.
+- W06 runtime persistence source slice = **TODO_VERIFY** pending Source CI for the current implementation head.
+- No remote D1 mutation was performed by this runtime source change.
+- No W06 production deployment is claimed for this runtime slice yet.
+- No `identity.account_state_changed` producer in W02 has been claimed; publication remains the next dependent slice after runtime persistence source/deployment evidence.
+
+Current cursor:
+
+**W06 runtime persistence Source CI → controlled W06 runtime deployment admission → runtime persistence evidence → identity.account_state_changed publication → cache/session side-effect binding → E2E security/integration evidence → AUTH-013 Evidence Registry promotion.**
