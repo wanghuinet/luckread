@@ -6,6 +6,8 @@ on:
     paths:
       - 'workers/W02-content/src/account/**'
       - 'contracts/state-machines/account.json'
+      - 'workers/W02-content/wrangler.jsonc'
+      - 'workers/W02-content/src/index.ts'
       - '.github/workflows/w02-auth-013-runtime-source-verification.yml'
 
 jobs:
@@ -33,7 +35,7 @@ jobs:
       - name: Run AUTH-013 source tests
         run: |
           set -o pipefail
-          npx vitest run workers/W02-content/src/account/account-state-transition.test.ts 2>&1 | tee artifacts/mapping-0/auth-013-runtime-source/test-output.txt
+          npx vitest run workers/W02-content/src/account/account-state-transition.test.ts workers/W02-content/src/account/publication-journal-publisher.test.ts 2>&1 | tee artifacts/mapping-0/auth-013-runtime-source/test-output.txt
 
       - name: Capture AUTH-013 source provenance
         run: |
@@ -42,7 +44,7 @@ jobs:
             echo "source_sha=${GITHUB_SHA}"
             echo "worker=W02"
             echo "persistence=D1-01/users"
-            echo "test=workers/W02-content/src/account/account-state-transition.test.ts"
+            echo "test=account-state-transition + publication-journal-publisher"
             echo "typescript_check=PASS"
             echo "scope=SOURCE_IMPLEMENTATION_ONLY"
           } > artifacts/mapping-0/auth-013-runtime-source/provenance.txt
