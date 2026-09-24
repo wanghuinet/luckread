@@ -1,0 +1,60 @@
+name: W06 Governance Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source commit to deploy
+        required: true
+        type: string
+      confirm:
+        description: Type DEPLOY to permit this controlled W06 deployment
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirm == 'DEPLOY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact implementation commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify W06 physical binding configuration
+        working-directory: workers/W06-governance
+        run: |
+          test -f wrangler.jsonc
+          node - <<'NODE'
+          const fs = require('fs')
+          const text = fs.readFileSync('wrangler.jsonc', 'utf8')
+          const required = [
+            '"name": "luckread-w06"',
+            '"binding": "D1_03"',
+            '"database_id": "bda1d247-a371-4244-91ae-aef96034db7f"'
+          ]
+          for (const value of required) {
+            if (!text.includes(value)) throw new Error(`Missing required binding assertion: ${value}`)
+          }
+          NODE
+
+      - name: TypeScript verification
+        working-directory: workers/W06-governance
+        run: npx --yes typescript@5.9.3 --noEmit
+
+      - name: Deploy W06 with pinned Wrangler
+        working-directory: workers/W06-governance
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
