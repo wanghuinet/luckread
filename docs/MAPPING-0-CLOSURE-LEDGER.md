@@ -2694,3 +2694,35 @@ Current cursor:
 
 Manual Queue provisioning workflow:
 `https://github.com/wanghuinet/luckread/actions/workflows/auth-013-queue-resource-provisioning.yml`
+
+
+## 2026-09-24 Superpowers continuation — AUTH-013 controlled W06 Queue Slice deployment admission
+
+The main-branch Queue Slice implementation remains the authoritative source for this gate. No previously verified AUTH-013 transition/runtime evidence was rerun.
+
+A scoped W06 deployment admission workflow was added:
+- Workflow: `.github/workflows/auth-013-w06-queue-slice-deploy.yml`
+- Admission baseline: `0e6596ac3f7aa109d4c4f68a0e897f5a35986042`, the pre-Queue-Slice main checkpoint.
+- The admission compares the requested source SHA against that exact baseline and rejects any path outside the twelve known AUTH-013 Queue Slice files.
+- It verifies the source SHA is an ancestor of current `main`.
+- It verifies the W06 D1-03 binding and the AUTH-013 Queue/DLQ consumer configuration before deploying.
+- It performs TypeScript verification and uses pinned Wrangler `4.116.0`.
+- This workflow does not alter Worker/D1 topology and does not bypass the existing W06 deployment workflow; it is a scoped admission path for this exact transport slice.
+
+Implementation/control commit:
+`ea55e9935a66d93553217d072eafc9d15ee0f95f`
+
+Cloudflare Queue provisioning remains an external manual gate. Current Wrangler documentation confirms `wrangler queues list` and `wrangler queues create <NAME>` are the supported commands for queue inventory/creation. citeturn355089search0turn355089search2
+
+### Current cursor
+
+**Manual Queue + DLQ provisioning → controlled W02 Queue-producer deployment → controlled W06 Queue-consumer deployment → real Queue delivery → D1-03 AuditEvent evidence → side-effect convergence → E2E → Evidence Registry promotion.**
+
+Manual Queue provisioning workflow:
+`https://github.com/wanghuinet/luckread/actions/workflows/auth-013-queue-resource-provisioning.yml`
+
+Controlled W02 deployment workflow:
+`https://github.com/wanghuinet/luckread/actions/workflows/w02-deploy.yml`
+
+Controlled W06 Queue Slice deployment workflow:
+`https://github.com/wanghuinet/luckread/actions/workflows/auth-013-w06-queue-slice-deploy.yml`
