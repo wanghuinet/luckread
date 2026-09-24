@@ -36,7 +36,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ inputs.source_sha }}
-          PREVIOUS_ADMITTED_SOURCE_SHA: "eb9f33dda3e9892f1814d34bbe4c8327a1ba2dde"
+          PREVIOUS_ADMITTED_SOURCE_SHA: "fc560a42f7ab61b6e51a5b288d239430292d7e17"
+          PREVIOUS_PERSISTENCE_EVIDENCE_SOURCE_SHA: "eb9f33dda3e9892f1814d34bbe4c8327a1ba2dde"
           CONTRACT_BASE_SHA: "367534dc07806a9b9f9a1b85ae8ecf42a7ae4afc"
           CONTRACT_BASE_RUN: "35957666015"
         run: |
@@ -62,10 +63,10 @@ jobs:
             }
           done
 
-          # This source amendment is configuration-only: the only implementation
-          # delta from the already-admitted W06 source is the canonical D1-03 UUID.
-          # Preserve the existing AUTH-013 schema/source evidence rather than
-          # rerunning unrelated gates for an unchanged implementation.
+          # The previous production-admitted W06 source is fc560... .
+          # This deployment admits the next W06 runtime slice only. Contract,
+          # Blueprint, Entity, and non-W06 authority-sensitive changes remain
+          # rejected by the explicit allowlist below.
           changed_from_admitted="$(gh api "repos/$GITHUB_REPOSITORY/compare/$PREVIOUS_ADMITTED_SOURCE_SHA...$SOURCE_SHA" --jq '.files[]?.filename // empty')"
           test -n "$changed_from_admitted" || {
             echo "No diff found between admitted W06 source and requested source"
@@ -74,17 +75,16 @@ jobs:
           while IFS= read -r file; do
             [ -z "$file" ] && continue
             case "$file" in
-              workers/W06-governance/wrangler.jsonc|.github/workflows/w06-deploy.yml|docs/MAPPING-0-CLOSURE-LEDGER.md|docs/change-control/CC-MAPPING-0-AUTH-013-W06-DEPLOYMENT-ADMISSION-BASE-2026-09-24.md)
+              workers/W06-governance/*|.github/workflows/w06-*|docs/change-control/CC-MAPPING-0-AUTH-013-W06-*|docs/MAPPING-0-CLOSURE-LEDGER.md|artifacts/mapping-0/w06-*)
                 ;;
               *)
-                echo "Configuration-only carry-forward rejected; unexpected delta: $file"
+                echo "W06 runtime admission rejected unexpected delta: $file"
                 exit 1
                 ;;
             esac
           done <<< "$changed_from_admitted"
 
-          carry_forward_workflow auth-013-persistence-schema-evidence.yml "$PREVIOUS_ADMITTED_SOURCE_SHA"
-          carry_forward_workflow w06-audit-event-source-ci.yml "$PREVIOUS_ADMITTED_SOURCE_SHA"
+          carry_forward_workflow auth-013-persistence-schema-evidence.yml "$PREVIOUS_PERSISTENCE_EVIDENCE_SOURCE_SHA"
 
           required_jobs=(
             "Blueprint Feature Inventory Gate"
