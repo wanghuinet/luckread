@@ -1,0 +1,47 @@
+name: AUTH-013 Journal Migration Static Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/migration/AUTH-013-publication-journal.v1.json'
+      - 'workers/W02-content/migrations/0003_auth_013_publication_journal.sql'
+      - 'scripts/auth-013-journal-migration-static-audit.mjs'
+      - '.github/workflows/auth-013-journal-migration-static-verification.yml'
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source commit to statically verify
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - name: Install SQLite
+        run: sudo apt-get update && sudo apt-get install -y sqlite3
+      - name: Run AUTH-013 journal static audit
+        run: node scripts/auth-013-journal-migration-static-audit.mjs
+      - name: Capture audit provenance
+        run: |
+          mkdir -p artifacts/mapping-0/auth-013-journal-migration
+          {
+            echo "workflow=AUTH-013 Journal Migration Static Verification"
+            echo "source_sha=${{ inputs.source_sha || github.sha }}"
+            echo "migration=MIG-AUTH-013-PUBLICATION-JOURNAL-V1"
+            echo "scope=SOURCE_SCHEMA_ONLY"
+          } > artifacts/mapping-0/auth-013-journal-migration/provenance.txt
+      - name: Upload static audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-013-journal-static-${{ github.run_id }}
+          path: artifacts/mapping-0/auth-013-journal-migration/
+          if-no-files-found: error
+          retention-days: 14
