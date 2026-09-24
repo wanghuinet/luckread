@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   deploy:
@@ -30,6 +31,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      - name: Verify required admission gates for the exact source SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          for workflow in contract-ci.yml mapping-0-structural-ci.yml ensure-feature-inventory.yml auth-013-persistence-schema-evidence.yml; do
+            conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --commit "$SOURCE_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
+            test "$conclusion" = "success" || {
+              echo "Required gate $workflow is not SUCCESS for $SOURCE_SHA (observed: ${conclusion:-none})"
+              exit 1
+            }
+          done
 
       - name: Verify W06 physical binding configuration
         working-directory: workers/W06-governance
