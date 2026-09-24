@@ -2441,3 +2441,21 @@ Therefore Q3 remains `UNRESOLVED`, but its Change-Control scope is now limited t
 ### Current cursor
 
 **Resolve Q1 durable publication boundary + Q2 consumer ownership + Q3 principal/role representation → smallest Contract delta → reconciliation → implementation → CI → runtime evidence → real transition→AuditEvent persistence → side effects → E2E → Evidence Registry.**
+
+
+## 2026-09-24 Superpowers continuation — AUTH-013 authority matrix made decision-ready
+
+Current main checkpoint before this ledger update: `26a8465f18ca21d37a3d6fa1125f3671308e205e`.
+
+No new authoritative decision was found in the current main history. The AUTH-013 event/actor Decision Material was therefore refined into an atomic approval matrix rather than selecting a value by inference.
+
+Decision-ready proposed profile:
+- Q1 = A: W02/D1-01-local durable event intent, classified as a publication journal and reconciled to D1-03 Outbox semantics.
+- Q2 = B: W06 as the narrowly scoped AUTH-013 Queue consumer.
+- Q3 = C: keep Common Actor principal class separate and carry `PLATFORM_OPERATOR` as the explicit operational role.
+
+These are **PROPOSED / NOT_AUTHORIZED** values, not implementation approval. Any different authority decision must be recorded explicitly before the corresponding Contract delta is created.
+
+The next gate is now a single explicit Authority Decision with all three values, e.g. `Q1=A; Q2=B; Q3=C`. Until then AUTH-013 remains BLOCKED_NOT_GREEN / IMPLEMENTATION_NOT_AUTHORIZED.
+
+No runtime code, migration, Worker/D1/Queue resource, deployment, or CI was changed or triggered by this slice.
