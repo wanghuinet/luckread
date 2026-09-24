@@ -74,7 +74,7 @@ jobs:
           while IFS= read -r file; do
             [ -z "$file" ] && continue
             case "$file" in
-              workers/W06-governance/wrangler.jsonc|.github/workflows/w06-deploy.yml|docs/MAPPING-0-CLOSURE-LEDGER.md)
+              workers/W06-governance/wrangler.jsonc|.github/workflows/w06-deploy.yml|docs/MAPPING-0-CLOSURE-LEDGER.md|docs/change-control/CC-MAPPING-0-AUTH-013-W06-DEPLOYMENT-ADMISSION-BASE-2026-09-24.md)
                 ;;
               *)
                 echo "Configuration-only carry-forward rejected; unexpected delta: $file"
