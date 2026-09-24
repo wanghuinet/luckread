@@ -2505,3 +2505,24 @@ Not changed:
 The authority gate is now closed. AUTH-013 is no longer blocked on Q1/Q2/Q3; it remains **implementation-in-progress / not GREEN** until executable and runtime evidence is produced.
 
 Do not rerun inherited W02 Transition Kernel, W06 Source CI, D1-03 schema evidence, Cloudflare inventory, or W06 upload evidence unless an authoritative input changes.
+
+
+## 2026-09-24 Superpowers continuation — AUTH-013 Contract CI admission hardening
+
+Latest main checkpoint:
+- `2c46dff543e170b210dc2b482f5d3d1398a4e8ec` — `ci(contracts): run event contract admission in matrix`
+- `c8d0a2ca04f0f9e5d223cdb18cb04519b2a30236` — `ci(contracts): admit versioned event schemas to Contract CI`
+
+A CI governance gap was closed: the canonical Contract CI now validates the `events` contract domain, and the workflow matrix explicitly includes `events`. This makes the newly admitted AUTH-013 event schema part of the actual contract admission gate rather than documentation-only.
+
+Current external evidence state:
+- Combined commit status queried for `2c46dff...` currently returns no status records through the connected GitHub API surface.
+- Therefore Contract CI is **TODO_VERIFY_EXTERNAL**, not GREEN and not assumed to have passed.
+- No runtime implementation, D1 migration, Queue resource, Worker deployment or remote mutation was performed in this slice.
+
+### Current cursor
+
+**Verify Contract CI GREEN on latest main → reconcile any contract failure → admit D1-01 journal migration → implement W02 atomic transition+journal → Queue producer/resource → W06 consumer/idempotency → source CI → controlled deployment → real transition/E2E evidence.**
+
+Manual workflow URL when needed:
+`https://github.com/wanghuinet/luckread/actions/workflows/contract-ci.yml`
