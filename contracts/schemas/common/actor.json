@@ -7,6 +7,11 @@
   "properties": {
     "actorId": { "$ref": "./resource-id.json" },
     "actorType": { "enum": ["user", "service", "admin", "system", "job"] },
+    "operationalRole": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{2,63}$",
+      "description": "Optional operational role. It is contextual role metadata and never establishes authorization by itself."
+    },
     "layer": { "type": "string", "pattern": "^L[0-8]$" },
     "sessionId": { "$ref": "./resource-id.json" },
     "impersonatingActorId": { "$ref": "./resource-id.json" }
@@ -14,6 +19,13 @@
   "required": ["actorId", "actorType"],
   "additionalProperties": false,
   "x-luckread": {
-    "note": "impersonatingActorId MUST be set whenever an admin acts on behalf of a user; both identities are audited."
+    "note": "impersonatingActorId MUST be set whenever an admin acts on behalf of a user; both identities are audited.",
+    "operationalRole-is-not-authority": true,
+    "auth-013": {
+      "operator-representation": {
+        "actorType": "user",
+        "operationalRole": "PLATFORM_OPERATOR"
+      }
+    }
   }
 }
