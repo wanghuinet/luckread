@@ -44,8 +44,8 @@ export interface AccountStateChangedAuditInput {
  * Builds the canonical immutable AuditEvent record for an accepted
  * AUTH-013 account-state transition.
  *
- * Persistence/publication remains outside this pure constructor until the
- * physical W06/D1-03 runtime binding is admitted.
+ * Persistence/publication remains outside this pure constructor; the admitted
+ * W06 runtime boundary invokes this constructor before D1-03 persistence.
  */
 export function buildAccountStateChangedAuditEvent(
   input: AccountStateChangedAuditInput,
