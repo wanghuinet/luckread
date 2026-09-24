@@ -42,10 +42,10 @@ jobs:
         run: npm ci
 
       - name: Typecheck W06 source
-        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck workers/W06-governance/src/audit-event.ts
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/audit-event.ts workers/W06-governance/src/audit-event-persistence.ts
 
       - name: Typecheck W06 runtime shell
         run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/index.ts
 
       - name: Run W06 audit event tests
-        run: npx vitest@3.2.4 run workers/W06-governance/src/audit-event.test.ts
+        run: npx vitest@3.2.4 run workers/W06-governance/src/audit-event.test.ts workers/W06-governance/src/audit-event-persistence.test.ts
