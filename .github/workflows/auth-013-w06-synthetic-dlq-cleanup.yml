@@ -1,0 +1,134 @@
+name: AUTH-013 W06 Synthetic DLQ Probe Cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_probe_id:
+        description: Exact synthetic probe ID to identify and remove
+        required: true
+        type: string
+        default: auth013-w06-queue-runtime-36031500951-1
+      confirm:
+        description: Type CLEAN to execute targeted cleanup
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    if: ${{ inputs.confirm == 'CLEAN' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      DLQ_NAME: luckread-auth013-account-state-dlq
+      EXPECTED_PROBE_ID: ${{ inputs.expected_probe_id }}
+
+    steps:
+      - name: Validate Cloudflare credentials
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$EXPECTED_PROBE_ID"
+
+      - name: Resolve physical DLQ identity
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues"
+          curl -fsS             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "$api?per_page=100" > queues.json
+
+          dlq_id="$(jq -r --arg name "$DLQ_NAME" '.result[] | select(.queue_name == $name) | .queue_id' queues.json | head -n 1)"
+          test -n "$dlq_id"
+          echo "DLQ_ID=$dlq_id" >> "$GITHUB_ENV"
+          echo "DLQ_ID=$dlq_id"
+
+      - name: Fail closed unless the DLQ contains only the bounded cleanup candidate
+        run: |
+          set -euo pipefail
+
+          metrics="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$DLQ_ID/metrics"
+          curl -fsS             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "$metrics" > dlq-metrics-before.json
+
+          backlog="$(jq -r '.result.backlog_count' dlq-metrics-before.json)"
+          echo "DLQ_BACKLOG_BEFORE=$backlog"
+
+          if [ "$backlog" = "0" ]; then
+            echo "DLQ already empty; no cleanup mutation required."
+            echo "AUTH_013_W06_SYNTHETIC_DLQ_CLEANUP=ALREADY_CLEAN"
+            exit 0
+          fi
+
+          test "$backlog" = "1"
+
+          peek_endpoint="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$DLQ_ID/messages/peek"
+          curl -fsS             -X POST             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             --data '{"batch_size":20}'             "$peek_endpoint" > dlq-peek.json
+
+          jq -e '.success == true' dlq-peek.json
+          message_count="$(jq '.result.messages | length' dlq-peek.json)"
+          test "$message_count" = "1"
+
+          probe_id="$(
+            jq -r '
+              .result.messages[0].body as $b
+              | if ($b | type) == "object" then
+                  ($b.probeId // ($b.body.probeId // ""))
+                elif ($b | type) == "string" then
+                  (try ($b | fromjson | (.probeId // (.body.probeId // ""))) catch "")
+                else
+                  ""
+                end
+            ' dlq-peek.json
+          )"
+
+          test "$probe_id" = "$EXPECTED_PROBE_ID"
+
+          ref="$(jq -r '.result.messages[0].ref // empty' dlq-peek.json)"
+          test -n "$ref"
+
+          echo "DLQ_PEEK_MESSAGE_COUNT=$message_count"
+          echo "DLQ_CANDIDATE_PROBE_ID_MATCH=PASS"
+          echo "DLQ_TARGET_REF_PRESENT=PASS"
+
+          printf '%s' "$ref" > dlq-target-ref.txt
+
+      - name: Purge only the confirmed synthetic probe ref
+        run: |
+          set -euo pipefail
+
+          ref="$(cat dlq-target-ref.txt)"
+          purge_endpoint="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$DLQ_ID/messages/purge"
+
+          jq -n --arg ref "$ref" '{refs:[$ref]}' > purge-body.json
+
+          curl -fsS             -X POST             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             --data @purge-body.json             "$purge_endpoint" > purge-result.json
+
+          jq -e '.success == true' purge-result.json
+          test "$(jq '.result.errors // [] | length' purge-result.json)" = "0"
+
+          echo "AUTH_013_W06_SYNTHETIC_DLQ_TARGETED_PURGE=PASS"
+
+      - name: Verify DLQ is empty after targeted cleanup
+        run: |
+          set -euo pipefail
+
+          metrics="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$DLQ_ID/metrics"
+          for _ in $(seq 1 30); do
+            curl -fsS               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               "$metrics" > dlq-after-cleanup.json
+
+            backlog="$(jq -r '.result.backlog_count' dlq-after-cleanup.json)"
+            echo "DLQ_BACKLOG_AFTER=$backlog"
+
+            if [ "$backlog" = "0" ]; then
+              echo "AUTH_013_W06_SYNTHETIC_DLQ_CLEANUP=PASS"
+              exit 0
+            fi
+
+            sleep 1
+          done
+
+          echo "DLQ targeted cleanup did not reach zero" >&2
+          exit 1
