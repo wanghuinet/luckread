@@ -1,0 +1,48 @@
+name: W06 Audit Event Source CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W06-governance/src/**'
+      - 'workers/W06-governance/package.json'
+      - 'workers/W06-governance/tsconfig.json'
+      - '.github/workflows/w06-audit-event-source-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - 'workers/W06-governance/src/**'
+      - 'workers/W06-governance/package.json'
+      - 'workers/W06-governance/tsconfig.json'
+      - '.github/workflows/w06-audit-event-source-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  w06-audit-event-source:
+    name: W06 Audit Event Source Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck W06 source
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck workers/W06-governance/src/audit-event.ts
+
+      - name: Run W06 audit event tests
+        run: npx vitest@3.2.4 run workers/W06-governance/src/audit-event.test.ts
