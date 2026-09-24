@@ -19,7 +19,7 @@ function input(overrides: Partial<AccountStateTransitionInput> = {}): AccountSta
 
 function fakeDb(
   initial: { state: string; version: number },
-  options: { failBatch?: boolean; missingUser?: boolean } = {},
+  options: { failBatch?: boolean; missingUser?: boolean; forceJournalConflict?: boolean } = {},
 ) {
   const row = { ...initial }
   let batchCalls = 0
