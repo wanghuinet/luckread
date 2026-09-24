@@ -1924,3 +1924,21 @@ Do not repeat the verified D1-01 migration or W02 13-test transition-kernel slic
 **Contract CI verification of the non-Payload field ownership correction → W06 physical Worker/D1 binding admission → W06 AuditEvent persistence/publication → cache/session side-effect binding → end-to-end security/integration evidence → AUTH-013 Evidence Registry promotion.**
 
 Do not repeat the verified W06 source tests, AUTH-013 D1-01 migration, or W02 13/13 transition-kernel tests unless authoritative inputs or tested scope change.
+
+## 2026-09-24 Superpowers continuation — W06 physical binding evidence gate formalized
+
+- Latest main at continuation start was `d6aa1b79d0bc6303deceb0bdfee3e0392a7e8cc3`.
+- Contract CI Run `35949063843` completed with overall **FAILURE**, but the former Payload reconciliation defect is **FIXED** and its gate is now **SUCCESS**.
+- Core contract gates on Run `35949063843` are green: Payload Contract Reconciliation, OpenAPI, State Machines, AuthZ, Common, Semantic Cross-Contract and Capability Contract Graph.
+- The remaining failed gates are downstream Five-Way Alignment and Strict Downstream R4/Evidence/R5; these remain implementation/evidence alignment gates and are not a new W06 contract-definition conflict.
+- A formal W06 external-binding evidence gate has been committed:
+  `docs/change-control/CC-MAPPING-0-AUTH-013-W06-PHYSICAL-BINDING-EVIDENCE-REQUEST-2026-09-24.md`
+- New head: `fd956fc000e194054fbacc756322421a664c4e1b`.
+- The exact external blocker is now narrowed to controlled Cloudflare inventory plus an explicit project binding decision for physical W06 Worker resource and physical D1-03 UUID.
+- The existing read-only inventory workflow remains the authorized evidence path:
+  https://github.com/wanghuinet/luckread/actions/workflows/cloudflare-resource-inventory.yml
+- No W06 Worker name, D1-03 UUID, Wrangler binding, deployment, or remote D1-03 mutation was invented or executed.
+- AUTH-013 D1-01 migration, W02 transition-kernel 13/13 tests, and W06 3/3 source tests remain inherited and are not re-run.
+
+### Current cursor
+**Controlled Cloudflare inventory → explicit W06/D1-03 physical binding decision → exact Wrangler binding → W06 deployment/smoke → AuditEvent persistence/publication → cache/session side-effect binding → E2E security/integration evidence → AUTH-013 Evidence Registry promotion.**
