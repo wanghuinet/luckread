@@ -4,6 +4,15 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-08-15",
   "workers_dev": false,
+  "triggers": { "crons": ["* * * * *"] },
+  "queues": {
+    "producers": [
+      {
+        "binding": "AUTH013_QUEUE",
+        "queue": "luckread-auth013-account-state"
+      }
+    ]
+  },
   "d1_databases": [
     {
       "binding": "D1_01",
