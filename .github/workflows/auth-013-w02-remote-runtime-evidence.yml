@@ -215,6 +215,18 @@ jobs:
                   staleAttempt,
                   checks,
                 })
+              } catch (error) {
+                return json({
+                  status: 'RUNTIME_EXCEPTION',
+                  error: {
+                    name: String(error?.name ?? 'Error'),
+                    message: String(error?.message ?? error),
+                    code: String(error?.code ?? ''),
+                    stack: String(error?.stack ?? ''),
+                  },
+                  testUserId,
+                  inserted,
+                }, 500)
               } finally {
                 if (inserted) {
                   await db.batch([
