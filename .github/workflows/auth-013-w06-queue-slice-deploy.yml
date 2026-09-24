@@ -1,0 +1,107 @@
+name: AUTH-013 W06 Queue Slice Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Exact AUTH-013 Queue Slice source commit to deploy"
+        required: true
+        type: string
+      confirm:
+        description: "Type DEPLOY to permit this controlled deployment"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirm == 'DEPLOY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify source is an ancestor of main
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+
+      - name: Verify exact AUTH-013 Queue Slice delta
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          QUEUE_SLICE_BASE_SHA: "0e6596ac3f7aa109d4c4f68a0e897f5a35986042"
+        run: |
+          set -euo pipefail
+          changed_files="$(git diff --name-only "$QUEUE_SLICE_BASE_SHA...$SOURCE_SHA")"
+          test -n "$changed_files"
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              .github/workflows/auth-013-queue-resource-provisioning.yml|
+              .github/workflows/w02-auth-013-runtime-source-verification.yml|
+              .github/workflows/w06-audit-event-source-ci.yml|
+              docs/MAPPING-0-CLOSURE-LEDGER.md|
+              workers/W02-content/src/account/publication-journal-publisher.ts|
+              workers/W02-content/src/account/publication-journal-publisher.test.ts|
+              workers/W02-content/src/index.ts|
+              workers/W02-content/wrangler.jsonc|
+              workers/W06-governance/src/auth-013-queue-consumer.ts|
+              workers/W06-governance/src/auth-013-queue-consumer.test.ts|
+              workers/W06-governance/src/index.ts|
+              workers/W06-governance/wrangler.jsonc)
+                ;;
+              *)
+                echo "AUTH-013 Queue Slice admission rejected unexpected delta: $file"
+                exit 1
+                ;;
+            esac
+          done <<< "$changed_files"
+          echo "AUTH013_W06_QUEUE_SLICE_ADMISSION_GREEN"
+
+      - name: Verify W06 D1-03 and Queue bindings
+        working-directory: workers/W06-governance
+        run: |
+          test -f wrangler.jsonc
+          node - <<'NODE'
+          const fs = require('fs')
+          const text = fs.readFileSync('wrangler.jsonc', 'utf8')
+          for (const value of [
+            '"name": "luckread-w06"',
+            '"binding": "D1_03"',
+            '"database_id": "bda1d247-a371-4244-91ae-aef96034db7f"',
+            '"queue": "luckread-auth013-account-state"',
+            '"max_batch_size": 10',
+            '"max_batch_timeout": 5',
+            '"max_retries": 5',
+            '"dead_letter_queue": "luckread-auth013-account-state-dlq"'
+          ]) {
+            if (!text.includes(value)) throw new Error('Missing binding assertion: ' + value)
+          }
+          NODE
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: TypeScript verification
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/index.ts
+
+      - name: Deploy W06 with pinned Wrangler
+        working-directory: workers/W06-governance
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
