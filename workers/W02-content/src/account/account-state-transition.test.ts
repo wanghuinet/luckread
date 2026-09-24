@@ -99,6 +99,113 @@ describe('AUTH-013 account-state transition kernel', () => {
     expect(fake.writes()).toBe(0)
   })
 
+  it('accepts user-owned UNREGISTERED -> PENDING_VERIFICATION without permission', async () => {
+    const fake = fakeDb({ state: 'UNREGISTERED', version: 1 })
+
+    const result = await applyAccountStateTransition(
+      fake.db,
+      input({
+        userId: '42',
+        to: 'PENDING_VERIFICATION',
+        expectedVersion: 1,
+        actor: { id: '42', type: 'user' },
+        permission: null,
+      }),
+    )
+
+    expect(result).toEqual({
+      from: 'UNREGISTERED',
+      to: 'PENDING_VERIFICATION',
+      accountStateVersion: 2,
+    })
+    expect(fake.row).toEqual({ state: 'PENDING_VERIFICATION', version: 2 })
+  })
+
+  it('accepts PENDING_VERIFICATION -> ACTIVE only when the verification precondition is proven', async () => {
+    const fake = fakeDb({ state: 'PENDING_VERIFICATION', version: 7 })
+
+    const result = await applyAccountStateTransition(
+      fake.db,
+      input({
+        to: 'ACTIVE',
+        actor: { id: '42', type: 'user' },
+        permission: null,
+        preconditionSatisfied: true,
+      }),
+    )
+
+    expect(result).toEqual({
+      from: 'PENDING_VERIFICATION',
+      to: 'ACTIVE',
+      accountStateVersion: 8,
+    })
+  })
+
+  it('accepts system-owned timeout deletion through the canonical system.job permission', async () => {
+    const fake = fakeDb({ state: 'PENDING_VERIFICATION', version: 2 })
+
+    const result = await applyAccountStateTransition(
+      fake.db,
+      input({
+        to: 'DELETED',
+        expectedVersion: 2,
+        actor: { id: 'job:account-lifecycle', type: 'job' },
+        permission: 'system.job',
+      }),
+    )
+
+    expect(result).toEqual({
+      from: 'PENDING_VERIFICATION',
+      to: 'DELETED',
+      accountStateVersion: 3,
+    })
+  })
+
+  it('accepts BANNED -> RESTORED only with admin actor, user.restore permission and L7 approval', async () => {
+    const fake = fakeDb({ state: 'BANNED', version: 4 })
+
+    const result = await applyAccountStateTransition(
+      fake.db,
+      input({
+        to: 'RESTORED',
+        expectedVersion: 4,
+        actor: { id: 'admin-1', type: 'admin' },
+        permission: 'user.restore',
+        approvalLevel: 'L7',
+      }),
+    )
+
+    expect(result).toEqual({
+      from: 'BANNED',
+      to: 'RESTORED',
+      accountStateVersion: 5,
+    })
+  })
+
+  it('rejects a concurrent compare-and-set race without mutating state', async () => {
+    const fake = fakeDb({ state: 'ACTIVE', version: 7 }, 0)
+
+    await expect(
+      applyAccountStateTransition(fake.db, input({ expectedVersion: 7 })),
+    ).rejects.toMatchObject({ code: 'CONFLICT' })
+
+    expect(fake.row).toEqual({ state: 'ACTIVE', version: 7 })
+    expect(fake.writes()).toBe(1)
+  })
+
+  it('rejects an operator transition when the actor type is not authorized', async () => {
+    const fake = fakeDb({ state: 'ACTIVE', version: 7 })
+
+    await expect(
+      applyAccountStateTransition(
+        fake.db,
+        input({ actor: { id: 'admin-1', type: 'admin' } }),
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+
+    expect(fake.writes()).toBe(0)
+  })
+
   it('rejects missing users without attempting a write', async () => {
     const db = {
       prepare() {
