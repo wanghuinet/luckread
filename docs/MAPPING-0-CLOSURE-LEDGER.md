@@ -2306,3 +2306,34 @@ Do not change Contract/Blueprint, add a Worker/D1, add W02→W06 direct Service 
 
 No repeat of W06 Source CI, D1-03 schema evidence, Cloudflare inventory, or already-verified W02 transition kernel unless an authoritative input changes.
 
+
+## 2026-09-24 Superpowers continuation — AUTH-013 transport boundary reconciliation
+
+Current main checkpoint: `b1f9a0d41af97d0ccc6a1e30305a005d28c61e2c`.
+
+Further repository/authority reconciliation completed without implementation changes:
+
+- Canonical `transitionAccountState` is confirmed as the sole admitted AUTH-013 operation.
+- Public API boundary is W01; authoritative business mutation is W02 / D1-01.
+- Existing W01 → W02 `W02_AUTH` Service Binding is already verified and remains the admitted W01-to-W02 transport boundary.
+- This does not constitute AUTH-013 runtime execution evidence and does not authorize W01 direct D1-01 writes.
+- W10 is confirmed as an async execution boundary with **no artificial Primary Task**. It therefore cannot be assigned AUTH-013 event-consumer ownership by inference.
+- The downstream event contract connecting the successful W02 state transition to W06 `identity.account_state_changed` persistence is still not present as an executable, versioned contract.
+- The account-state authority still admits actor type `operator`, while the canonical common AuditActor schema admits only `user | service | admin | system | job`. No normalization is authorized.
+
+### Current decision state
+
+- Q1 event publication transport = **UNRESOLVED**
+- Q2 consumer ownership = **UNRESOLVED**
+- Q3 actor normalization = **UNRESOLVED**
+- Q4 public operation transport = **RESOLVED at contract/topology level**
+- AUTH-013 downstream runtime integration = **BLOCKED_NOT_GREEN**
+
+No new Worker/D1, direct W02→W06 Service Binding, public route, actor mapping, or event schema is to be invented in implementation.
+
+### Current cursor
+
+**Explicit authority decision for the existing event boundary + actor representation → smallest admitted event contract/producer → source CI → controlled runtime evidence → real W02 transition→W06 AuditEvent persistence → cache/session/deindex side-effect evidence → E2E security/integration → AUTH-013 Evidence Registry promotion.**
+
+Already-verified W01→W02 transport, W02 transition kernel, W06 source CI, W06 D1-03 schema, and W06 Worker upload evidence remain inherited unless authoritative inputs change.
+
