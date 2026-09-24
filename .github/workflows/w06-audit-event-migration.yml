@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   migrate:
@@ -34,6 +35,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      - name: Verify W06 source CI admission
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow w06-audit-event-source-ci.yml --commit "$SOURCE_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
+          test "$conclusion" = "success" || {
+            echo "W06 source CI is not SUCCESS for $SOURCE_SHA (observed: ${conclusion:-none})"
+            exit 1
+          }
+          echo "W06 source CI admission: SUCCESS for $SOURCE_SHA"
 
       - name: Verify W06 D1-03 binding and migration source
         working-directory: workers/W06-governance
