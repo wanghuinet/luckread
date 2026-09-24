@@ -2181,3 +2181,26 @@ Verification disposition:
 Current cursor:
 
 **W06 runtime persistence Source CI → controlled W06 runtime deployment admission → runtime persistence evidence → identity.account_state_changed publication → cache/session side-effect binding → E2E security/integration evidence → AUTH-013 Evidence Registry promotion.**
+
+
+## 2026-09-24 Superpowers continuation — W06 runtime contract-boundary hardening
+
+Current implementation head: `9b92b650241d5eec4cee4402262ee522372df39d`.
+
+Before CI execution, the W06 runtime boundary was tightened to match the existing canonical common schemas without changing those schemas:
+- Resource IDs use the canonical `^[A-Za-z0-9][A-Za-z0-9_-]*$` shape and length bound.
+- Request IDs require the canonical `req_` prefix and length bound.
+- Trace IDs use the canonical allowed-character and length bound.
+- Actor, session, and impersonating actor IDs use canonical Resource ID validation.
+- Reason and user-agent length bounds match `audit-event.json`.
+- `occurredAt` must parse as a valid date-time string.
+- A runtime test now proves non-canonical identifiers fail closed before any D1 call.
+
+No Contract/Blueprint/schema authority was changed.
+
+Verification disposition:
+- Current W06 runtime slice remains **TODO_VERIFY_EXTERNAL** because the repository-side Actions source CI has not yet produced a run for the new source head.
+- No remote D1 mutation occurred.
+- The previously verified D1-03 schema evidence Run `35975461648` remains inherited.
+
+Required next action is manual Source CI dispatch against the current `main` source. After that result, proceed to the controlled W06 runtime deployment/evidence slice.
