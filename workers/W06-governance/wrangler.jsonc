@@ -8,7 +8,7 @@
     {
       "binding": "D1_03",
       "database_name": "secondary",
-      "database_id": "bda1d247-a371-4244-91ae-aef96034db7f",
+      "database_id": "bda1d247-a371-4244-91ae-aef674b0d736",
       "migrations_dir": "migrations"
     }
   ]
