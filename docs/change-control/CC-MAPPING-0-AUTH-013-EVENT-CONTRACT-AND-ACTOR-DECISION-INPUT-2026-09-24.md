@@ -326,3 +326,32 @@ The remaining contract question is narrower:
 No existing contract was found that authoritatively maps `PLATFORM_OPERATOR` to Common Actor `admin`, `service`, `user`, `system`, or `job`.
 
 Therefore Q3 remains **UNRESOLVED**, but the required Change-Control scope is now limited to **principal-class + operational-role representation**, not creation of a new operator role.
+
+
+## 12. Authority-ready atomic decision matrix
+
+This section is intentionally a decision aid, not an implementation authorization.
+
+| ID | Decision | Proposed default | Alternatives | Effect if approved |
+|---|---|---|---|---|
+| Q1 | Durable publication boundary | **A — W02/D1-01-local durable event intent**, classified as publication journal and reconciled to D1-03 operational Outbox semantics | B — explicitly approved D1-03 durable boundary via another already-authoritative mechanism; C — another existing durable platform mechanism | Authorizes exact producer durability model before any code |
+| Q2 | Consumer ownership | **B — W06 scoped AUTH-013 consumer** | A — W10 execution boundary after explicit task/event admission | Authorizes which existing Worker owns Queue consumption |
+| Q3 | Principal/role representation | **C — keep Common Actor principal class separate and carry `PLATFORM_OPERATOR` as explicit operational role** | A — add `operator` to Common Actor; B — explicit authoritative mapping to an existing Actor class | Resolves AuditEvent actor representation without silent privilege coercion |
+
+### Exact approval consequences
+
+**Q1-A** permits a bounded D1-01 publication-journal record to be written in the same authoritative account-state transaction. It does not permit a second account authority and does not make the journal an alternative business source of truth.
+
+**Q2-B** permits the existing W06 Worker to receive a narrowly scoped AUTH-013 queue consumer binding while retaining sole D1-03 AuditEvent write authority. It does not grant W06 generic async ownership.
+
+**Q3-C** requires the minimum Actor/Event Contract delta to represent both the security principal class and the `PLATFORM_OPERATOR` operational role. The principal class must still use an already-canonical class; no privilege expansion is implied.
+
+### Approval protocol
+
+An Authority Decision must explicitly state all three values, for example:
+
+Q1=A; Q2=B; Q3=C
+
+or identify a different permitted option for each question.
+
+Until all three are explicitly decided, AUTH-013 remains **BLOCKED_NOT_GREEN / IMPLEMENTATION_NOT_AUTHORIZED**.
