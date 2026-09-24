@@ -57,7 +57,7 @@ jobs:
           set -euo pipefail
           mkdir -p "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-evidence"
           node - <<'NODE'
-          const { writeFileSync } = require('node:fs')
+          const fs = require('node:fs')
           const path = 'artifacts/mapping-0/w06-audit-event-evidence/d1-query.json'
           const endpoint =
             `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/d1/database/${process.env.EXPECTED_DB_ID}/query`
@@ -68,6 +68,7 @@ jobs:
             { sql: 'SELECT COUNT(*) AS audit_events_count FROM audit_events;' },
             { sql: 'SELECT id,name,batch FROM d1_migrations ORDER BY id;' },
           ]
+          ;(async () => {
           const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -77,7 +78,7 @@ jobs:
             body: JSON.stringify({ batch }),
           })
           const body = await response.json()
-          writeFileSync(path, JSON.stringify(body, null, 2) + '\\n')
+          fs.writeFileSync(path, JSON.stringify(body, null, 2) + '\\n')
           if (!response.ok) throw new Error(`Cloudflare D1 HTTP ${response.status}`)
           if (!body.success) throw new Error(`Cloudflare D1 query failed: ${JSON.stringify(body.errors)}`)
           if (!Array.isArray(body.result) || body.result.length !== batch.length) {
@@ -89,6 +90,10 @@ jobs:
             queryCount: batch.length,
             success: body.success,
           }, null, 2))
+          })().catch((error) => {
+            console.error(error)
+            process.exit(1)
+          })
           NODE
 
       - name: Validate remote evidence
