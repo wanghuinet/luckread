@@ -1970,3 +1970,22 @@ Controlled Cloudflare read-only inventory is now captured against current main:
 
 Do not repeat Cloudflare inventory Run `35954361667` unless the controlled account/resource scope changes.
 
+## 2026-09-24 Superpowers continuation — W06 physical binding decision admitted
+
+A formal physical binding Change Control is now admitted:
+
+- Decision: `CC-MAPPING-0-AUTH-013-W06-PHYSICAL-BINDING-DECISION-2026-09-24`.
+- D1-03 physical UUID = `bda1d247-a371-4244-91ae-aef96034db7f`.
+- D1-04 physical UUID = `9bfb89a5-fbb5-45b1-a2ee-eab674b0d736`.
+- The selection is an explicit allocation decision over the two previously unassigned resources; it is not inferred from display names.
+- W06 physical Worker resource name = `luckread-w06`.
+- Because no W06 resource existed in the controlled inventory, `luckread-w06` is admitted for **controlled creation by deployment**, not treated as pre-existing evidence.
+- W06 source remains limited to the pure AuditEvent construction boundary; the new `src/index.ts` is a deployment/smoke shell only and performs no D1 mutation.
+- W06 Wrangler binding is now explicit to D1-03 UUID `bda1d247-a371-4244-91ae-aef96034db7f`.
+- No D1-03 migration or AuditEvent persistence schema has been introduced.
+
+Current cursor:
+**W06 controlled deployment + target/binding evidence → W06 smoke evidence → D1-03 AuditEvent schema/migration → persistence/publication → cache/session side-effect binding → E2E security/integration → AUTH-013 Evidence Registry promotion.**
+
+Do not repeat the 4-D1/2-Worker Cloudflare inventory unless account/resource scope changes. The latest controlled inventory Run `35956155450` = SUCCESS at head `171393342f276932aa940b5800e9ce5136a6692e` is inherited for this decision.
+
