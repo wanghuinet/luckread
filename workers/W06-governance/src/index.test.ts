@@ -3,7 +3,7 @@ import type { AuditEvent } from './audit-event'
 
 const eventInput = {
   eventId: 'evt-runtime-1',
-  requestId: 'req-runtime-1',
+  requestId: 'req_runtime-1',
   traceId: 'trace-runtime-1',
   actor: {
     actorId: 'admin-1',
@@ -55,7 +55,7 @@ describe('W06 runtime', () => {
     expect(prepare).toHaveBeenCalledTimes(1)
     expect(bind).toHaveBeenCalledWith(
       'evt-runtime-1',
-      'req-runtime-1',
+      'req_runtime-1',
       'trace-runtime-1',
       JSON.stringify(eventInput.actor),
       'identity.account_state_changed',
