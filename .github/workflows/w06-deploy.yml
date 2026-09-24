@@ -76,10 +76,11 @@ jobs:
             case "$file" in
               workers/W06-governance/wrangler.jsonc|.github/workflows/w06-deploy.yml)
                 ;;
-              *) {
-              echo "Configuration-only carry-forward rejected; unexpected delta: $file"
-              exit 1
-            }
+              *)
+                echo "Configuration-only carry-forward rejected; unexpected delta: $file"
+                exit 1
+                ;;
+            esac
           done <<< "$changed_from_admitted"
 
           carry_forward_workflow auth-013-persistence-schema-evidence.yml "$PREVIOUS_ADMITTED_SOURCE_SHA"
