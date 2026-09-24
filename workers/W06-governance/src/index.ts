@@ -33,7 +33,7 @@ function parseAccountStateChangedInput(value: unknown): AccountStateChangedAudit
   const actorRecord = actor as Record<string, unknown>
   if (
     typeof actorRecord.actorId !== 'string' ||
-    !actorRecord.actorId.trim() ||
+    !resourceIdPattern.test(actorRecord.actorId) ||
     typeof actorRecord.actorType !== 'string' ||
     !actorTypes.has(actorRecord.actorType)
   ) {
@@ -49,14 +49,15 @@ function parseAccountStateChangedInput(value: unknown): AccountStateChangedAudit
 
   if (
     actorRecord.sessionId !== undefined &&
-    (typeof actorRecord.sessionId !== 'string' || !actorRecord.sessionId.trim())
+    (typeof actorRecord.sessionId !== 'string' || !resourceIdPattern.test(actorRecord.sessionId))
   ) {
     throw new Error('INVALID_AUDIT_EVENT')
   }
 
   if (
     actorRecord.impersonatingActorId !== undefined &&
-    (typeof actorRecord.impersonatingActorId !== 'string' || !actorRecord.impersonatingActorId.trim())
+    (typeof actorRecord.impersonatingActorId !== 'string' ||
+      !resourceIdPattern.test(actorRecord.impersonatingActorId))
   ) {
     throw new Error('INVALID_AUDIT_EVENT')
   }
