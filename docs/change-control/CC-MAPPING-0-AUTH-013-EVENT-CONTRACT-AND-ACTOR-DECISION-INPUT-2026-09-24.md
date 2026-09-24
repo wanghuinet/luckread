@@ -203,3 +203,95 @@ Decision
 ```
 
 This document does not authorize implementation by itself.
+
+
+## 10. Superpowers recommended resolution profile — NOT YET AUTHORIZED
+
+The following is a technical recommendation for authority review, derived from the frozen Worker/D1 contracts, the platform Event Semantics contract, the Cross-Domain Saga contract, and the absence of an existing executable W10/Queue implementation.
+
+### Q1 recommended profile — producer-local durable intent + operational delivery records
+
+**Recommendation:** preserve W02 as the sole D1-01 account authority, but admit a minimal producer-local durable event-intent record in the same D1-01 transaction as the account-state version update. Treat that record as a publication journal for delivery correctness, not as a second business authority.
+
+Then:
+
+```text
+W02 / D1-01 authoritative transaction
+    ├─ users.account_state/version
+    └─ durable event intent
+            ↓
+controlled publisher
+            ↓
+Cloudflare Queue
+            ↓
+W06 consumer
+            ↓
+W06 / D1-03 AuditEvent + operational idempotency
+```
+
+Rationale:
+
+- A producer-local durable intent is the standard way to prevent the post-commit event-loss window for an authoritative transaction.
+- Cloudflare Queues provide explicit producer/consumer bindings and at-least-once delivery; they do not themselves make a D1 transaction atomic with publication. citeturn969585search0turn969585search5
+- Keeping the account-state mutation and its durable event intent in W02/D1-01 preserves the authoritative transaction boundary.
+- W06 remains the sole writer of AuditEvent in D1-03.
+- This does require an explicit Change-Control refinement because the current D1 Master describes Outbox as a D1-03 operational record.
+
+**Important:** this is a recommended interpretation of the frozen rules, not an implementation authorization.
+
+### Q2 recommended profile — W06 as the scoped consumer
+
+**Recommendation:** use the existing W06 Worker as the dedicated consumer for the AUTH-013 AuditEvent queue, rather than assigning the work to W10.
+
+Rationale:
+
+- W06 already owns D1-03 AuditEvent authority.
+- W10 has no Primary Task and no current executable Worker implementation in the repository.
+- The queue is a transport mechanism; a scoped W06 consumer does not make W06 a generic async Worker if its consumer scope is explicitly limited to governance/audit events.
+- Cloudflare supports an existing Worker as a queue consumer via Wrangler consumer binding. citeturn969585search0turn969585search1
+
+This still requires explicit authority admission because current Worker Master language identifies W10 as the generic Async/Queue/Job boundary.
+
+### Q3 recommended profile — separate principal type from operational role
+
+**Recommendation:** do not extend the canonical principal-class enum with `operator` and do not map `operator` to `admin` or `service` silently.
+
+Instead, refine the event/audit actor representation so that:
+
+- `actorType` describes the security principal class;
+- an explicit role/operational-role field carries `operator`;
+- the account state transition contract records the exact required role separately from principal type;
+- audit retains the actual actor identity plus the operational role that authorized the action.
+
+This preserves the identity/role separation principle already established in the account lifecycle contract and avoids widening privileges merely for audit serialization.
+
+This requires a bounded Contract Change-Control update to the actor/state-machine representation before implementation.
+
+### Recommended final shape
+
+```text
+W02
+  authoritative account transition
+        +
+  producer-local durable event intent
+        ↓
+Cloudflare Queue
+        ↓
+W06 scoped consumer
+        ↓
+idempotent AuditEvent persistence
+        ↓
+side-effect consumers / reconciliation
+```
+
+No W13, no D1-05, no W02→W06 direct binding, no public-route workaround, and no silent actor coercion.
+
+### Authority gate
+
+The recommended profile should remain **PROPOSED / NOT_AUTHORIZED** until the formal Change-Control decision explicitly accepts:
+
+1. producer-local durable intent as compatible with the D1-03 Outbox rule;
+2. W06 as the scoped AUTH-013 queue consumer;
+3. the actor principal-type / operational-role separation.
+
+Only after those three are accepted may the minimum Contract delta be written and implementation begin.
