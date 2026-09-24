@@ -104,8 +104,17 @@ jobs:
 
           jq -n --arg ref "$ref" '{refs:[$ref]}' > purge-body.json
 
-          curl -fsS             -X POST             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             --data @purge-body.json             "$purge_endpoint" > purge-result.json
+          http_status="$(curl -sS             -X POST             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             --data @purge-body.json             -o purge-result.json             -w "%{http_code}"             "$purge_endpoint" || true)"
+          echo "TARGETED_PURGE_HTTP_STATUS=$http_status"
 
+          if jq -e . purge-result.json >/dev/null 2>&1; then
+            jq '{success, errors: (.errors // [] | map({code, message})), messages: (.messages // []), result: {errors: (.result.errors // [] | map({code, message})), warnings: (.result.warnings // {})}}' purge-result.json
+          else
+            echo "TARGETED_PURGE_NON_JSON_RESPONSE=1"
+            sed -n '1,40p' purge-result.json
+          fi
+
+          test "$http_status" = "200"
           jq -e '.success == true' purge-result.json
           test "$(jq '.result.errors // [] | length' purge-result.json)" = "0"
 
