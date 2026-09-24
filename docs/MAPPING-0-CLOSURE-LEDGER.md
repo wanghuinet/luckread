@@ -2526,3 +2526,29 @@ Current external evidence state:
 
 Manual workflow URL when needed:
 `https://github.com/wanghuinet/luckread/actions/workflows/contract-ci.yml`
+
+## 2026-09-24 Superpowers continuation — AUTH-013 Slice 1 source admission current-head reconciliation
+
+Latest main source head for this checkpoint: `993739fbf595fa285402e06575190e0b7590a531`.
+
+Slice 1 source changes now present on main:
+- `contracts/migration/AUTH-013-publication-journal.v1.json`
+- `workers/W02-content/migrations/0003_auth_013_publication_journal.sql`
+- `scripts/auth-013-journal-migration-static-audit.mjs`
+- `.github/workflows/auth-013-journal-migration-static-verification.yml`
+- `.github/workflows/auth-013-publication-journal-migration.yml`
+- Slice 1 implementation-admission Change Control.
+
+Current external state:
+- Contract CI evidence for the admitted AUTH-013 event/actor delta remains valid by unchanged contract inputs; the latest core matrix on the pre-Slice source head was SUCCESS.
+- The new Journal static verification has not yet produced a current-head result in the observed check list; therefore it is **TODO_VERIFY_EXTERNAL**.
+- Controlled D1-01 publication-journal migration is **NOT_EXECUTED** and must not be marked GREEN until its manual workflow produces post-migration schema/index/migration-ledger evidence.
+
+Do not begin W02 atomic transition+journal implementation before the Journal static audit is GREEN and the controlled D1-01 migration evidence is captured.
+
+### Current cursor
+
+**AUTH-013 Journal static CI GREEN → controlled D1-01 publication-journal migration → post-migration schema/index evidence → W02 atomic transition+journal → Queue producer/resource → W06 consumer/idempotency → source CI → controlled deployment → real Account State transition → AuditEvent/side-effect E2E → Evidence Registry.**
+
+Manual remote migration workflow:
+`https://github.com/wanghuinet/luckread/actions/workflows/auth-013-publication-journal-migration.yml`
