@@ -2204,3 +2204,22 @@ Verification disposition:
 - The previously verified D1-03 schema evidence Run `35975461648` remains inherited.
 
 Required next action is manual Source CI dispatch against the current `main` source. After that result, proceed to the controlled W06 runtime deployment/evidence slice.
+
+
+## 2026-09-24 Superpowers continuation — W06 Source CI Run 35978449181 failure isolated
+
+Run `35978449181` = **FAILURE**, head `e6faf3dbd2bda48708fbe355ed5737a0ed8551dc`.
+
+Verified:
+- dependency installation = PASS
+- W06 AuditEvent source typecheck = PASS
+- failure is isolated to W06 runtime shell typecheck
+- exact TypeScript errors: `index.ts:109,111 — Type 'unknown' is not assignable to type 'number'`
+- runtime tests were skipped because typecheck failed
+- no remote D1 mutation occurred
+
+Correction committed on `main`:
+- `5c049e4ebc5c05a9c2dbcdc50e84e4f427c8aab0`
+- only narrows the already runtime-validated `beforeVersion` / `afterVersion` values to the canonical numeric input type.
+
+Next state: **TODO_VERIFY_EXTERNAL**. The source CI must be rerun against the corrected head; no deployment is admitted from the failed run.
