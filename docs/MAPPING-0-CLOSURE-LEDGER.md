@@ -2369,3 +2369,36 @@ No Contract/Blueprint authority was changed. No Worker/D1 was added. No direct W
 **Explicit authority decision for the existing event boundary + actor representation → admit the smallest AUTH-013 producer/consumer contract delta → implement → source CI → controlled runtime evidence → real W02 transition→W06 AuditEvent persistence → cache/session/deindex side-effect evidence → E2E security/integration → AUTH-013 Evidence Registry promotion.**
 
 Do not repeat already-green W02 transition, W06 source CI, D1-03 schema, inventory, or deployment-upload evidence unless an authoritative input changes.
+
+
+## 2026-09-24 Superpowers continuation — AUTH-013 event/actor authority decision material formalized
+
+Current main checkpoint before this ledger update: `cbe38afecd85269dbf972e4be0fa32e8d84a1746`.
+
+A focused authority decision material was added:
+`docs/change-control/CC-MAPPING-0-AUTH-013-EVENT-CONTRACT-AND-ACTOR-DECISION-INPUT-2026-09-24.md`
+
+The material formalizes exactly three unresolved authority decisions:
+
+1. **Q1 — Durable publication boundary / Outbox placement**
+   - The platform event contract is already authoritative.
+   - The missing decision is the concrete durable publication boundary compatible with W02/D1-01 authority and D1-03 operational Outbox ownership.
+   - No post-commit best-effort call is admitted as a substitute for durable event intent.
+
+2. **Q2 — Consumer ownership**
+   - W10 is the canonical async execution boundary but has no artificial Primary Task and no executable current implementation found.
+   - W06 remains the AuditEvent authority.
+   - No consumer ownership is assigned by inference.
+
+3. **Q3 — Actor normalization**
+   - Account state still permits `operator`.
+   - Canonical common Actor remains `user | service | admin | system | job`.
+   - No silent `operator` normalization is authorized.
+
+A minimum future AUTH-013 event contract target is documented for the authority decision, but no authoritative Contract/schema was changed and no runtime implementation was admitted.
+
+### Current cursor
+
+**Resolve Q1/Q2/Q3 authority → admit smallest Contract delta → reconciliation → implement producer/consumer → source CI → controlled runtime evidence → real transition→W06 persistence → cache/session/deindex side-effect evidence → E2E security/integration → Evidence Registry promotion.**
+
+This was documentation/change-control only. No runtime mutation, deployment, migration, or workflow execution was triggered.
