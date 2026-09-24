@@ -77,3 +77,13 @@ Do not create a fifth D1.
 ## 5. Manual inventory workflow URL
 
 https://github.com/wanghuinet/luckread/actions/workflows/cloudflare-resource-inventory.yml
+
+## Supersession note — 2026-09-24
+
+This inventory record remains the authoritative evidence for the Cloudflare resource set, but its provisional conclusion that physical D1-03 identity was not established is now superseded by:
+
+`CC-MAPPING-0-AUTH-013-W06-PHYSICAL-BINDING-DECISION-2026-09-24`
+
+The decision explicitly binds D1-03 to `bda1d247-a371-4244-91ae-aef96034db7f`, D1-04 to `9bfb89a5-fbb5-45b1-a2ee-eab674b0d736`, and admits `luckread-w06` for controlled creation by deployment.
+
+The inventory evidence itself is unchanged.
