@@ -1,0 +1,174 @@
+name: W06 AuditEvent D1-03 Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source commit containing the admitted W06 AuditEvent migration
+        required: true
+        type: string
+      database_name:
+        description: Cloudflare D1-03 display name bound by W06 wrangler.jsonc
+        required: true
+        type: string
+      confirm:
+        description: Type APPLY to permit remote D1 mutation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact migration source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify W06 D1-03 binding and migration source
+        working-directory: workers/W06-governance
+        shell: bash
+        env:
+          EXPECTED_DB_NAME: ${{ inputs.database_name }}
+          EXPECTED_DB_ID: bda1d247-a371-4244-91ae-aef96034db7f
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'));
+          const d = config.d1_databases?.find((x) => x.binding === 'D1_03');
+          if (!d) throw new Error('D1_03 binding missing');
+          if (d.database_name !== process.env.EXPECTED_DB_NAME) {
+            throw new Error('database_name input does not match W06 D1_03 binding');
+          }
+          if (d.database_id !== process.env.EXPECTED_DB_ID) {
+            throw new Error('W06 D1_03 binding does not match controlled target UUID');
+          }
+          console.log(JSON.stringify(d, null, 2));
+          NODE
+          test -f migrations/0001_audit_event.sql
+          test -z "$(git status --short)"
+
+      - name: Local migration syntax and invariant check
+        working-directory: workers/W06-governance
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y sqlite3
+          rm -f /tmp/w06-audit-event.sqlite
+          sqlite3 /tmp/w06-audit-event.sqlite < migrations/0001_audit_event.sql
+          sqlite3 -json /tmp/w06-audit-event.sqlite 'PRAGMA table_info("audit_events");' > /tmp/w06-audit-event-schema.json
+          sqlite3 -json /tmp/w06-audit-event.sqlite 'PRAGMA index_list("audit_events");' > /tmp/w06-audit-event-indexes.json
+          sqlite3 -json /tmp/w06-audit-event.sqlite "SELECT name, type FROM sqlite_master WHERE name LIKE 'audit_events_immutable_%' ORDER BY name;" > /tmp/w06-audit-event-triggers.json
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const schema = JSON.parse(fs.readFileSync('/tmp/w06-audit-event-schema.json', 'utf8'));
+          const columns = new Set(schema.map((r) => r.name));
+          for (const name of [
+            'event_id','request_id','trace_id','actor_json','action','target_type','target_id',
+            'before_json','after_json','reason','ip','user_agent','occurred_at'
+          ]) {
+            if (!columns.has(name)) throw new Error('Missing audit_events column: ' + name);
+          }
+          const indexes = JSON.parse(fs.readFileSync('/tmp/w06-audit-event-indexes.json', 'utf8'));
+          const triggers = JSON.parse(fs.readFileSync('/tmp/w06-audit-event-triggers.json', 'utf8'));
+          if (!triggers.some((r) => r.name === 'audit_events_immutable_update')) throw new Error('Missing immutable UPDATE trigger');
+          if (!triggers.some((r) => r.name === 'audit_events_immutable_delete')) throw new Error('Missing immutable DELETE trigger');
+          console.log(JSON.stringify({
+            W06_AUDIT_EVENT_MIGRATION_STATIC: 'PASS',
+            columns: [...columns],
+            indexes: indexes.map((r) => r.name),
+            triggers: triggers.map((r) => r.name)
+          }, null, 2));
+          NODE
+
+      - name: Preflight controlled remote target
+        working-directory: workers/W06-governance
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-migration"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'audit_events';" > "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-migration/preflight-table.json"
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const data = JSON.parse(fs.readFileSync(process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/w06-audit-event-migration/preflight-table.json', 'utf8'));
+          const rows = data?.[0]?.results ?? [];
+          if (rows.length) throw new Error('W06 fail-closed: audit_events already exists; stop rather than applying a duplicate migration');
+          console.log(JSON.stringify({ targetTablePresent: false }));
+          NODE
+
+      - name: Apply W06 AuditEvent migration remotely
+        working-directory: workers/W06-governance
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 d1 migrations apply "${{ inputs.database_name }}" --remote --config wrangler.jsonc
+
+      - name: Capture post-migration D1-03 evidence
+        working-directory: workers/W06-governance
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("audit_events");' > "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-migration/post-table.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("audit_events");' > "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-migration/post-indexes.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "SELECT name, type FROM sqlite_master WHERE name LIKE 'audit_events_immutable_%' ORDER BY name;" > "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-migration/post-triggers.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT COUNT(*) AS audit_events_count FROM audit_events;' > "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-migration/post-count.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM d1_migrations ORDER BY id;' > "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-migration/d1-migrations.json"
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const dir = process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/w06-audit-event-migration';
+          const schema = JSON.parse(fs.readFileSync(dir + '/post-table.json', 'utf8'))?.[0]?.results ?? [];
+          const names = new Set(schema.map((r) => r.name));
+          for (const name of [
+            'event_id','request_id','trace_id','actor_json','action','target_type','target_id',
+            'before_json','after_json','reason','ip','user_agent','occurred_at'
+          ]) {
+            if (!names.has(name)) throw new Error('Post-migration column missing: ' + name);
+          }
+          const count = JSON.parse(fs.readFileSync(dir + '/post-count.json', 'utf8'))?.[0]?.results?.[0]?.audit_events_count;
+          const triggers = JSON.parse(fs.readFileSync(dir + '/post-triggers.json', 'utf8'))?.[0]?.results ?? [];
+          if (count !== 0) throw new Error('Unexpected preexisting AuditEvent rows on zero-row initial migration target');
+          if (!triggers.some((r) => r.name === 'audit_events_immutable_update')) throw new Error('Post-migration immutable UPDATE trigger missing');
+          if (!triggers.some((r) => r.name === 'audit_events_immutable_delete')) throw new Error('Post-migration immutable DELETE trigger missing');
+          console.log(JSON.stringify({
+            W06_AUDIT_EVENT_MIGRATION: 'PASS',
+            auditEventsCount: count,
+            columns: [...names],
+            triggers: triggers.map((r) => r.name)
+          }, null, 2));
+          NODE
+
+      - name: Capture migration provenance
+        run: |
+          cat > "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-migration/provenance.txt" <<'EOF'
+          workflow=W06 AuditEvent D1-03 Migration
+          source_sha=${{ inputs.source_sha }}
+          database_name=${{ inputs.database_name }}
+          database_id=bda1d247-a371-4244-91ae-aef96034db7f
+          migration=0001_audit_event.sql
+          remote_mutation=true
+          scope=CONTROLLED_REMOTE_D1_ZERO_ROW_TARGET_ONLY
+          EOF
+
+      - name: Upload controlled migration evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: w06-audit-event-d1-03-migration-${{ github.run_id }}
+          path: ${{ github.workspace }}/artifacts/mapping-0/w06-audit-event-migration/
+          if-no-files-found: error
+          retention-days: 14
