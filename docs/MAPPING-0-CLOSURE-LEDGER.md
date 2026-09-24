@@ -2269,3 +2269,40 @@ Evidence inheritance remains valid:
 **W06 controlled deployment → Cloudflare Worker/version + binding evidence → determine the admitted runtime-target/smoke evidence path without adding an unauthorized public route → runtime persistence evidence → identity.account_state_changed publication → cache/session side-effect binding → E2E security/integration evidence → AUTH-013 Evidence Registry promotion.**
 
 Deployment must use the current GitHub `main` source and the existing controlled W06 deployment workflow. Do not repeat Source CI, D1-03 migration, or Cloudflare inventory unless an authoritative input changes.
+
+## 2026-09-24 Superpowers continuation — W06 runtime publication transport decision input
+
+Current main source/evidence checkpoint: `c7097155297fa1be3ba1397bf49e2e2c1f5aac21`.
+
+The W06 source/runtime persistence boundary and remote D1-03 AuditEvent schema evidence remain inherited as valid:
+- W06 Source CI Run `35982576756` = SUCCESS.
+- W06 D1-03 read-only evidence Run `35975461648` = PASS_VERIFIED.
+- W06 controlled deployment Run `35983760891` = SUCCESS for Worker/version upload and D1 binding resolution; Cloudflare still reported `No targets deployed for luckread-w06`, so HTTP reachability is NOT_PROVEN.
+
+The next integration gap was audited without changing Contract/Blueprint authority.
+
+Decision Material committed:
+`docs/change-control/CC-MAPPING-0-AUTH-013-W06-RUNTIME-PUBLICATION-TRANSPORT-DECISION-INPUT-2026-09-24.md`
+
+### Decision Material findings
+
+1. No executable W02 → `identity.account_state_changed` publication/transport path is currently established.
+2. No public `transitionAccountState` HTTP transport / W01 route wiring is currently established.
+3. The frozen Worker/D1 architecture requires cross-D1 mutation to use:
+   **authoritative transaction → outbox/versioned event → queue/authorized consumer → idempotent transition → reconciliation/evidence**.
+4. W10 is the canonical Async / Queue / Job execution Worker boundary.
+5. Therefore a direct synchronous W02 → W06 Service Binding must NOT be introduced by inference.
+6. A second independent authority gap exists: the account state machine permits actor type `operator`, while canonical AuditActor only permits `user | service | admin | system | job`. No silent `operator`→`admin/service` mapping is permitted.
+7. The decision material records four authority questions: publication transport, consumer ownership, actor normalization, and public operation transport.
+
+Current disposition:
+**AUTH-013 downstream runtime publication/integration = WAIT_AUTHORITY_DECISION / BLOCKED_NOT_GREEN.**
+
+Do not change Contract/Blueprint, add a Worker/D1, add W02→W06 direct Service Binding, or add a public route until the decision is explicitly resolved.
+
+### Current cursor
+
+**AUTH-013 authority decision on publication transport + actor alignment → implement the smallest admitted event path → source CI → controlled runtime deployment/evidence → real transition→AuditEvent persistence evidence → cache/session/deindex side-effect binding → E2E security/integration evidence → Evidence Registry promotion.**
+
+No repeat of W06 Source CI, D1-03 schema evidence, Cloudflare inventory, or already-verified W02 transition kernel unless an authoritative input changes.
+
