@@ -69,11 +69,21 @@ jobs:
           endpoint="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$QUEUE_ID/consumers"
           curl -fsS             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "$endpoint" > consumers.json
 
-          jq --arg worker "$W06_NAME" --arg queue "$QUEUE_NAME" --arg dlq "$DLQ_NAME" '
-            .result
-            | map(select(.script_name == $worker and .queue_name == $queue and .dead_letter_queue == $dlq))
-            | length
-          ' consumers.json | grep -qx '1'
+          echo "Observed Cloudflare Queue consumers:"
+          jq -c '.result[] | {type,script_name,queue_name,dead_letter_queue,settings}' consumers.json
+
+          worker_queue_count="$(jq --arg worker "$W06_NAME" --arg queue "$QUEUE_NAME" '
+            [.result[] | select(.script_name == $worker and .queue_name == $queue)] | length
+          ' consumers.json)"
+          dlq_match_count="$(jq --arg worker "$W06_NAME" --arg queue "$QUEUE_NAME" --arg dlq "$DLQ_NAME" '
+            [.result[] | select(.script_name == $worker and .queue_name == $queue and .dead_letter_queue == $dlq)] | length
+          ' consumers.json)"
+
+          echo "W06_QUEUE_CONSUMER_COUNT=$worker_queue_count"
+          echo "W06_QUEUE_DQL_EXACT_MATCH_COUNT=$dlq_match_count"
+
+          test "$worker_queue_count" = "1"
+          test "$dlq_match_count" = "1"
 
           echo "AUTH_013_W06_CONSUMER_BINDING=PASS"
 
