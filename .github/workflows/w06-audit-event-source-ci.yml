@@ -48,4 +48,4 @@ jobs:
         run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/index.ts
 
       - name: Run W06 audit event tests
-        run: npx vitest@3.2.4 run workers/W06-governance/src/audit-event.test.ts workers/W06-governance/src/audit-event-persistence.test.ts workers/W06-governance/src/index.test.ts
+        run: npx vitest@3.2.4 run workers/W06-governance/src/audit-event.test.ts workers/W06-governance/src/audit-event-persistence.test.ts workers/W06-governance/src/auth-013-queue-consumer.test.ts workers/W06-governance/src/index.test.ts
