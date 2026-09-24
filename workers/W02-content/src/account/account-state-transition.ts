@@ -29,12 +29,16 @@ export type AccountStateTransitionInput = {
   approvalLevel?: string | null
   preconditionSatisfied?: boolean
   now?: string
+  correlationId?: string
+  causationId?: string
 }
 
 export type AccountStateTransitionResult = {
   from: AccountState
   to: AccountState
   accountStateVersion: number
+  eventId: string
+  journalId: string
 }
 
 export class AccountStateTransitionError extends Error {
@@ -45,7 +49,8 @@ export class AccountStateTransitionError extends Error {
       | 'FORBIDDEN'
       | 'PRECONDITION_FAILED'
       | 'CONFLICT'
-      | 'INVALID_STATE',
+      | 'INVALID_STATE'
+      | 'JOURNAL_PERSISTENCE_FAILED',
     message: string,
   ) {
     super(message)
@@ -61,7 +66,40 @@ type TransitionRule = {
   requiresApproval?: boolean | string
 }
 
+type AccountStateChangedEvent = {
+  eventId: string
+  eventType: 'identity.account_state_changed'
+  schemaVersion: '1.0'
+  producer: 'W02'
+  resourceType: 'User'
+  resourceId: string
+  occurredAt: string
+  publishedAt: string
+  correlationId: string
+  causationId: string
+  idempotencyKey: string
+  attempt: 1
+  sourceVersion: number
+  actor: {
+    actorId: string
+    actorType: 'user' | 'service' | 'admin' | 'system' | 'job'
+    operationalRole?: 'PLATFORM_OPERATOR'
+  }
+  before: {
+    accountState: AccountState
+    accountStateVersion: number
+  }
+  after: {
+    accountState: AccountState
+    accountStateVersion: number
+  }
+  reason: string
+}
+
 const transitionRules = accountStateMachine['x-transitions'] as TransitionRule[]
+
+const EVENT_TYPE = 'identity.account_state_changed' as const
+const EVENT_SCHEMA_VERSION = '1.0' as const
 
 function assertInput(input: AccountStateTransitionInput): void {
   if (!input || typeof input.userId !== 'string' || input.userId.length === 0) {
@@ -75,6 +113,11 @@ function assertInput(input: AccountStateTransitionInput): void {
   }
   if (!input.actor || typeof input.actor.id !== 'string' || input.actor.id.length === 0) {
     throw new AccountStateTransitionError('INVALID_INPUT', 'actor id is required')
+  }
+  for (const [field, value] of [['correlationId', input.correlationId], ['causationId', input.causationId]] as const) {
+    if (value !== undefined && (value.length === 0 || value.length > 255)) {
+      throw new AccountStateTransitionError('INVALID_INPUT', field + ' must be 1-255 characters')
+    }
   }
 }
 
@@ -120,6 +163,58 @@ function assertRequirements(rule: TransitionRule, input: AccountStateTransitionI
   }
 }
 
+function buildActor(input: AccountStateTransitionInput): AccountStateChangedEvent['actor'] {
+  if (input.actor.type === 'operator') {
+    return {
+      actorId: input.actor.id,
+      actorType: 'user',
+      operationalRole: 'PLATFORM_OPERATOR',
+    }
+  }
+  return {
+    actorId: input.actor.id,
+    actorType: input.actor.type,
+  }
+}
+
+function buildEvent(
+  input: AccountStateTransitionInput,
+  from: AccountState,
+  nextVersion: number,
+  now: string,
+): AccountStateChangedEvent {
+  const eventId = crypto.randomUUID()
+  const correlationId = input.correlationId ?? eventId
+  const causationId = input.causationId ?? eventId
+  const idempotencyKey = 'auth013-' + input.userId + '-' + input.expectedVersion
+
+  return {
+    eventId,
+    eventType: EVENT_TYPE,
+    schemaVersion: EVENT_SCHEMA_VERSION,
+    producer: 'W02',
+    resourceType: 'User',
+    resourceId: input.userId,
+    occurredAt: now,
+    publishedAt: now,
+    correlationId,
+    causationId,
+    idempotencyKey,
+    attempt: 1,
+    sourceVersion: nextVersion,
+    actor: buildActor(input),
+    before: {
+      accountState: from,
+      accountStateVersion: input.expectedVersion,
+    },
+    after: {
+      accountState: input.to,
+      accountStateVersion: nextVersion,
+    },
+    reason: input.reason,
+  }
+}
+
 export async function applyAccountStateTransition(
   db: D1Database,
   input: AccountStateTransitionInput,
@@ -148,23 +243,66 @@ export async function applyAccountStateTransition(
   assertRequirements(rule, input)
 
   const now = input.now ?? new Date().toISOString()
-  const result = await db
+  const nextVersion = input.expectedVersion + 1
+  const event = buildEvent(input, from, nextVersion, now)
+  const journalId = crypto.randomUUID()
+  const payload = JSON.stringify(event)
+
+  const updateStatement = db
     .prepare(
       'UPDATE users SET account_state = ?, account_state_version = account_state_version + 1, updated_at = ? WHERE id = ? AND account_state = ? AND account_state_version = ?',
     )
     .bind(input.to, now, input.userId, from, input.expectedVersion)
-    .run()
 
-  if (result.meta?.changes !== 1) {
+  const journalStatement = db
+    .prepare(
+      'INSERT INTO auth_013_publication_journal (journal_id, event_id, event_type, schema_version, resource_id, source_version, payload, status, attempt, next_attempt_at, created_at, published_at, last_error_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    )
+    .bind(
+      journalId,
+      event.eventId,
+      event.eventType,
+      event.schemaVersion,
+      event.resourceId,
+      event.sourceVersion,
+      payload,
+      'PENDING',
+      1,
+      null,
+      now,
+      null,
+      null,
+    )
+
+  let batchResult: D1Result[]
+  try {
+    batchResult = await db.batch([updateStatement, journalStatement])
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (message.includes('UNIQUE constraint failed')) {
+      throw new AccountStateTransitionError(
+        'CONFLICT',
+        'account state changed concurrently; durable publication journal prevented duplicate publication',
+      )
+    }
+    throw new AccountStateTransitionError(
+      'JOURNAL_PERSISTENCE_FAILED',
+      'account state and durable publication journal transaction failed: ' + message,
+    )
+  }
+
+  if (batchResult[0]?.meta?.changes !== 1 || batchResult[1]?.meta?.changes !== 1) {
     throw new AccountStateTransitionError(
       'CONFLICT',
-      'account state changed concurrently; no transition was committed',
+      'account state transition did not commit exactly one state row and one publication journal row',
     )
   }
 
   return {
     from,
     to: input.to,
-    accountStateVersion: input.expectedVersion + 1,
+    accountStateVersion: nextVersion,
+    eventId: event.eventId,
+    journalId,
   }
 }
