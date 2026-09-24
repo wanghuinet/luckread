@@ -32,7 +32,12 @@ function fakeDb(
           return {
             first: async <T>() => {
               if (options.missingUser) return null
-              return { accountState: row.state, accountStateVersion: row.version } as T
+              const snapshot = { accountState: row.state, accountStateVersion: row.version } as T
+              if (options.forceJournalConflict) {
+                row.state = 'RESTRICTED'
+                row.version += 1
+              }
+              return snapshot
             },
             sql,
             args,
@@ -151,7 +156,7 @@ describe('AUTH-013 account-state transition kernel', () => {
     await expect(applyAccountStateTransition(fake.db, input({ expectedVersion: 7 }))).rejects.toMatchObject({ code: 'CONFLICT' })
 
     expect(fake.row).toEqual({ state: 'ACTIVE', version: 8 })
-    expect(fake.batchCalls()).toBe(1)
+    expect(fake.batchCalls()).toBe(0)
   })
 
   it('rolls back the in-memory state when the durable journal write fails', async () => {
@@ -303,7 +308,7 @@ describe('AUTH-013 account-state transition kernel', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT' })
 
     expect(fake.row).toEqual({ state: 'RESTRICTED', version: 8 })
-    expect(fake.batchCalls()).toBe(0)
+    expect(fake.batchCalls()).toBe(1)
   })
 
   it('rejects an operator transition when the actor type is not authorized', async () => {
