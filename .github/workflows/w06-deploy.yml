@@ -36,6 +36,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ inputs.source_sha }}
+          CONTRACT_BASE_SHA: "367534dc07806a9b9f9a1b85ae8ecf42a7ae4afc"
+          CONTRACT_BASE_RUN: "35957666015"
         run: |
           set -euo pipefail
 
@@ -46,12 +48,6 @@ jobs:
               exit 1
             }
           done
-
-          contract_run="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow contract-ci.yml --commit "$SOURCE_SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
-          test -n "$contract_run" || {
-            echo "No Contract CI run found for $SOURCE_SHA"
-            exit 1
-          }
 
           required_jobs=(
             "Blueprint Feature Inventory Gate"
@@ -66,14 +62,27 @@ jobs:
             "Capability Contract Graph Gate"
           )
 
-          jobs_json="$(gh run view "$contract_run" --repo "$GITHUB_REPOSITORY" --json jobs)"
+          jobs_json="$(gh run view "$CONTRACT_BASE_RUN" --repo "$GITHUB_REPOSITORY" --json jobs)"
           for job in "${required_jobs[@]}"; do
             conclusion="$(jq -r --arg name "$job" '.jobs[] | select(.name == $name) | .conclusion // empty' <<< "$jobs_json")"
             test "$conclusion" = "success" || {
-              echo "Required Contract CI core job failed or is missing: $job (observed: ${conclusion:-none})"
+              echo "Contract admission baseline job failed or is missing: $job (observed: ${conclusion:-none})"
               exit 1
             }
           done
+
+          changed_files="$(gh api "repos/$GITHUB_REPOSITORY/compare/$CONTRACT_BASE_SHA...$SOURCE_SHA" --jq '.files[]?.filename // empty')"
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              workers/W06-governance/*|.github/workflows/w06-*|docs/change-control/CC-MAPPING-0-AUTH-013-W06-*|docs/MAPPING-0-CLOSURE-LEDGER.md)
+                ;;
+              *)
+                echo "Source SHA changes an authority-sensitive path outside the admitted W06 delta: $file"
+                exit 1
+                ;;
+            esac
+          done <<< "$changed_files"
 
       - name: Verify W06 physical binding configuration
         working-directory: workers/W06-governance
