@@ -295,3 +295,34 @@ The recommended profile should remain **PROPOSED / NOT_AUTHORIZED** until the fo
 3. the actor principal-type / operational-role separation.
 
 Only after those three are accepted may the minimum Contract delta be written and implementation begin.
+
+
+## 11. Q3 narrowing after Principal/Role reconciliation
+
+Current authority inspection found an existing P0 Principal/Scope contract:
+
+`docs/168-GLOBAL-SCOPE-TENANT-ORGANIZATION-ISOLATION-CONTRACT-v1.0.md`
+
+It explicitly defines `PLATFORM_OPERATOR` as a supported Principal Type and requires:
+
+`Authentication → Principal → Active Scope → Domain Authorization → Action → Audit`
+
+It also explicitly distinguishes identity from scope and requires explicit approval, limited scope and full audit for Platform Operator special access.
+
+Separately, `docs/303` establishes that Identity and Role are distinct concepts and requires account-state transitions to record actor identity/type.
+
+### Result
+
+The unresolved Q3 issue is **not** whether an `operator` business role exists.
+
+That role/principal concept already exists as `PLATFORM_OPERATOR`.
+
+The remaining contract question is narrower:
+
+- Which canonical **security principal class** is emitted in Common Actor for a PLATFORM_OPERATOR-initiated transition?
+- Where is the `PLATFORM_OPERATOR` operational role retained so audit preserves the authorization context?
+- How is that representation kept consistent with the existing Common Actor schema without broadening authority?
+
+No existing contract was found that authoritatively maps `PLATFORM_OPERATOR` to Common Actor `admin`, `service`, `user`, `system`, or `job`.
+
+Therefore Q3 remains **UNRESOLVED**, but the required Change-Control scope is now limited to **principal-class + operational-role representation**, not creation of a new operator role.
