@@ -2726,3 +2726,28 @@ Controlled W02 deployment workflow:
 
 Controlled W06 Queue Slice deployment workflow:
 `https://github.com/wanghuinet/luckread/actions/workflows/auth-013-w06-queue-slice-deploy.yml`
+
+
+## 2026-09-24 — AUTH-013 Queue/DLQ physical resources provisioned
+
+Controlled external resource gate is now **PASS_VERIFIED**.
+
+- Workflow: `.github/workflows/auth-013-queue-resource-provisioning.yml`
+- Run `36022517655` = **SUCCESS** at head `bfd7aa2a7e8f203c5f15d6bb5ff26fdb85bc0bea`.
+- Cloudflare Queue created and verified: `luckread-auth013-account-state`.
+- Cloudflare DLQ created and verified: `luckread-auth013-account-state-dlq`.
+- Wrangler: `4.116.0`.
+- Verification emitted `AUTH-013_QUEUE_RESOURCES_GREEN`.
+- Credentials were supplied at job scope; no secret values are recorded here.
+
+This proves physical Queue/DLQ resource existence only. It does not prove W02 producer deployment, W06 consumer deployment, real message delivery, D1-03 AuditEvent persistence, or overall AUTH-013 GREEN.
+
+### Current cursor
+
+**Controlled W02 Queue-producer deployment → controlled W06 Queue-consumer deployment → real Queue delivery → D1-03 AuditEvent evidence → side-effect convergence → E2E → Evidence Registry promotion.**
+
+Controlled W02 deployment workflow:
+`https://github.com/wanghuinet/luckread/actions/workflows/w02-deploy.yml`
+
+Controlled W06 Queue Slice deployment workflow:
+`https://github.com/wanghuinet/luckread/actions/workflows/auth-013-w06-queue-slice-deploy.yml`
