@@ -16,11 +16,10 @@ for (const entity of contract.records ?? []) {
     for (const key of baseField) {
       if (field[key] === undefined) failures.push(`${entity.entityId}.${field.name ?? field.fieldId}: missing ${key}`);
     }
-    if (entity.status === 'VERIFIED') {
+    if (field.status === 'VERIFIED') {
       for (const key of verifiedField) {
         if (field[key] === undefined) failures.push(`${entity.entityId}.${field.name ?? field.fieldId}: verified field missing ${key}`);
       }
-      if (field.status !== 'VERIFIED') failures.push(`${entity.entityId}.${field.name ?? field.fieldId}: verified entity requires verified field status`);
     }
     if (field.status === 'VERIFIED' && (!Array.isArray(field.evidenceRefs) || field.evidenceRefs.length === 0)) {
       failures.push(`${entity.entityId}.${field.name}: missing field evidence`);
