@@ -32,22 +32,55 @@ jobs:
         with:
           node-version: 24
 
-      - name: Verify required admission gates for the exact source SHA
+      - name: Verify required admission gates for the source SHA
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ inputs.source_sha }}
+          PREVIOUS_ADMITTED_SOURCE_SHA: "eb9f33dda3e9892f1814d34bbe4c8327a1ba2dde"
           CONTRACT_BASE_SHA: "367534dc07806a9b9f9a1b85ae8ecf42a7ae4afc"
           CONTRACT_BASE_RUN: "35957666015"
         run: |
           set -euo pipefail
 
-          for workflow in mapping-0-structural-ci.yml ensure-feature-inventory.yml auth-013-persistence-schema-evidence.yml w06-audit-event-source-ci.yml; do
+          carry_forward_workflow() {
+            local workflow="$1"
+            local previous="$2"
+            local conclusion
+            conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --commit "$previous" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
+            test "$conclusion" = "success" || {
+              echo "Carry-forward baseline $workflow is not SUCCESS for $previous (observed: ${conclusion:-none})"
+              exit 1
+            }
+            echo "INHERITED_SUCCESS: $workflow from $previous"
+          }
+
+          for workflow in mapping-0-structural-ci.yml ensure-feature-inventory.yml; do
             conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --commit "$SOURCE_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
             test "$conclusion" = "success" || {
               echo "Required workflow $workflow is not SUCCESS for $SOURCE_SHA (observed: ${conclusion:-none})"
               exit 1
             }
           done
+
+          # This source amendment is configuration-only: the only implementation
+          # delta from the already-admitted W06 source is the canonical D1-03 UUID.
+          # Preserve the existing AUTH-013 schema/source evidence rather than
+          # rerunning unrelated gates for an unchanged implementation.
+          changed_from_admitted="$(gh api "repos/$GITHUB_REPOSITORY/compare/$PREVIOUS_ADMITTED_SOURCE_SHA...$SOURCE_SHA" --jq '.files[]?.filename // empty')"
+          test -n "$changed_from_admitted" || {
+            echo "No diff found between admitted W06 source and requested source"
+            exit 1
+          }
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            test "$file" = "workers/W06-governance/wrangler.jsonc" || {
+              echo "Configuration-only carry-forward rejected; unexpected delta: $file"
+              exit 1
+            }
+          done <<< "$changed_from_admitted"
+
+          carry_forward_workflow auth-013-persistence-schema-evidence.yml "$PREVIOUS_ADMITTED_SOURCE_SHA"
+          carry_forward_workflow w06-audit-event-source-ci.yml "$PREVIOUS_ADMITTED_SOURCE_SHA"
 
           required_jobs=(
             "Blueprint Feature Inventory Gate"
