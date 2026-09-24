@@ -2602,3 +2602,17 @@ Manual W02 Source CI workflow:
 
 After Source CI GREEN, controlled W02 deployment:
 `https://github.com/wanghuinet/luckread/actions/workflows/w02-deploy.yml`
+
+## 2026-09-24 — AUTH-013 Source CI failure correction
+
+Run `36005149649` was inspected. It checked out `bb2a68a36f0db8767b4f795605c8bf8136d4c8b8` and failed at **Typecheck W02**, before source tests.
+
+Exact compiler error:
+`workers/W02-content/src/account/account-state-transition.test.ts(296,60): TS2353 — forceJournalConflict does not exist in fakeDb option type.`
+
+This is a test-fixture typing defect only; no production AUTH-013 implementation or Contract was rejected by this run. Corrective commit:
+`141be1119690d98656ea3686025783b8f19c39fc``
+
+Correction: added `forceJournalConflict?: boolean` to the fakeDb options type. No runtime behavior changed.
+
+Current status remains **TODO_VERIFY_EXTERNAL** until the corrected commit receives a successful W02 Runtime Source CI result. No deployment is authorized yet.
