@@ -279,7 +279,24 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/mapping-0/auth-013-runtime
-          curl -sS --fail-with-body             -X POST             -H "x-auth013-probe-token: $PROBE_TOKEN"             http://127.0.0.1:8787/__auth013_remote_probe             > artifacts/mapping-0/auth-013-runtime/runtime-result.json
+          set +e
+          http_code=$(curl -sS -o artifacts/mapping-0/auth-013-runtime/runtime-result.json -w '%{http_code}'             -X POST             -H "x-auth013-probe-token: $PROBE_TOKEN"             http://127.0.0.1:8787/__auth013_remote_probe)
+          curl_exit=$?
+          set -e
+
+          echo "AUTH_013_REMOTE_PROBE_HTTP_STATUS=$http_code"
+          echo "AUTH_013_REMOTE_PROBE_CURL_EXIT=$curl_exit"
+          echo "--- runtime result ---"
+          cat artifacts/mapping-0/auth-013-runtime/runtime-result.json || true
+          echo "--- wrangler harness log ---"
+          cat auth-013-runtime-harness.log || true
+
+          if [ "$curl_exit" -ne 0 ]; then
+            exit "$curl_exit"
+          fi
+          if [ "$http_code" != "200" ]; then
+            exit 1
+          fi
 
           node - <<'NODE'
           const fs = require('node:fs');
