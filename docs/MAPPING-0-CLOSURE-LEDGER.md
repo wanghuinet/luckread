@@ -2423,3 +2423,21 @@ This recommendation is intentionally not marked GREEN or implemented. It require
 **Approve/reject the recommended Q1/Q2/Q3 profile → admit the minimum Contract delta → reconcile → implement W02 durable event intent + Queue producer and W06 scoped consumer → source CI → controlled runtime evidence → real transition→AuditEvent persistence → side-effect evidence → E2E → Evidence Registry promotion.**
 
 No runtime code, migration, Worker, D1, queue resource, or public API was changed in this Slice.
+
+
+## 2026-09-24 Superpowers continuation — AUTH-013 Q3 actor boundary narrowed
+
+Current main checkpoint before this ledger update: `d4e35b38e736cbad260726c40a0f12b0f3d25213`.
+
+A further read-only reconciliation confirmed that the canonical cross-cutting scope contract already defines `PLATFORM_OPERATOR` as an explicit Principal Type and separately models Authentication, Principal, Scope, Authorization and Audit.
+
+This narrows AUTH-013 Q3:
+- the `operator` concept is already represented in the architecture as `PLATFORM_OPERATOR`; no new role is needed;
+- the remaining decision is only how the Common Actor security-principal class and the operational `PLATFORM_OPERATOR` role are represented together at the AuditEvent boundary;
+- no authoritative existing mapping was found from `PLATFORM_OPERATOR` to Common Actor `admin`, `service`, `user`, `system`, or `job`.
+
+Therefore Q3 remains `UNRESOLVED`, but its Change-Control scope is now limited to **principal-class + operational-role representation** rather than creation of a new operator role.
+
+### Current cursor
+
+**Resolve Q1 durable publication boundary + Q2 consumer ownership + Q3 principal/role representation → smallest Contract delta → reconciliation → implementation → CI → runtime evidence → real transition→AuditEvent persistence → side effects → E2E → Evidence Registry.**
