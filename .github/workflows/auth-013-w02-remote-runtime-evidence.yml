@@ -1,0 +1,329 @@
+name: AUTH-013 W02 Remote Transition + Journal Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact admitted W02 AUTH-013 journal implementation commit
+        required: true
+        type: string
+      database_name:
+        description: Current Cloudflare display name for D1-01
+        required: true
+        type: string
+      confirm:
+        description: Type RUN to permit the controlled remote D1 code-path test
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  remote-codepath:
+    if: ${{ inputs.confirm == 'RUN' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact admitted implementation
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify exact admission inputs
+        run: |
+          set -euo pipefail
+          test "${{ inputs.source_sha }}" = "763a857759233c5a23d7bd733a72e0729b20a373"
+          test "${{ inputs.database_name }}" = "luckread"
+          test -f workers/W02-content/src/account/account-state-transition.ts
+          test -f workers/W02-content/migrations/0003_auth_013_publication_journal.sql
+          test -z "$(git status --short)"
+
+      - name: Create ephemeral remote D1 runtime harness
+        env:
+          PROBE_TOKEN: ${{ github.run_id }}-${{ github.run_attempt }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        run: |
+          set -euo pipefail
+          cat > .auth-013-runtime-harness.wrangler.jsonc <<EOF
+          {
+            "\$schema": "./node_modules/wrangler/config-schema.json",
+            "name": "luckread-auth013-runtime-evidence-harness",
+            "main": ".auth-013-runtime-harness.ts",
+            "compatibility_date": "2025-08-15",
+            "d1_databases": [
+              {
+                "binding": "D1_01",
+                "database_name": "${DATABASE_NAME}",
+                "database_id": "2f80471e-3756-49f9-8db1-7707a433ad64",
+                "remote": true
+              }
+            ],
+            "vars": {
+              "PROBE_TOKEN": "${PROBE_TOKEN}"
+            }
+          }
+          EOF
+
+          cat > .auth-013-runtime-harness.ts <<'EOF'
+          // Ephemeral CI-only harness. It is never committed to the repository.
+          // It invokes the admitted W02 transition kernel against the real D1-01
+          // binding and cleans the synthetic row/journal before returning evidence.
+          // @ts-nocheck
+          import { applyAccountStateTransition } from './workers/W02-content/src/account/account-state-transition.ts'
+
+          const json = (body: unknown, status = 200) =>
+            new Response(JSON.stringify(body, null, 2), {
+              status,
+              headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+            })
+
+          const PROBE_PATH = '/__auth013_remote_probe'
+
+          export default {
+            async fetch(request: Request, env: { D1_01: D1Database; PROBE_TOKEN: string }): Promise<Response> {
+              if (request.method !== 'POST') return new Response(null, { status: 405 })
+              if (new URL(request.url).pathname !== PROBE_PATH) return new Response(null, { status: 404 })
+              if (request.headers.get('x-auth013-probe-token') !== env.PROBE_TOKEN) return json({ error: 'DENY' }, 403)
+
+              const db = env.D1_01
+              const testUserId = 900013000 + (Date.now() % 1000000)
+              const testEmail = `auth013-runtime-${testUserId}@invalid.local`
+              const now = '2026-09-24T00:00:00.000Z'
+              let inserted = false
+
+              try {
+                const before = await db
+                  .prepare('SELECT COUNT(*) AS users_count FROM users')
+                  .first<{ users_count: number }>()
+                const beforeJournal = await db
+                  .prepare('SELECT COUNT(*) AS journal_count FROM auth_013_publication_journal')
+                  .first<{ journal_count: number }>()
+
+                if (Number(before?.users_count ?? -1) !== 0) {
+                  return json({ status: 'FAIL_CLOSED', reason: 'users_count_not_zero', observed: before?.users_count }, 409)
+                }
+                if (Number(beforeJournal?.journal_count ?? -1) !== 0) {
+                  return json({ status: 'FAIL_CLOSED', reason: 'journal_not_empty', observed: beforeJournal?.journal_count }, 409)
+                }
+
+                await db
+                  .prepare('INSERT INTO users (id, email, account_state, account_state_version) VALUES (?, ?, ?, ?)')
+                  .bind(testUserId, testEmail, 'ACTIVE', 1)
+                  .run()
+                inserted = true
+
+                const transition = await applyAccountStateTransition(db, {
+                  userId: String(testUserId),
+                  to: 'RESTRICTED',
+                  reason: 'AUTH-013 controlled remote evidence probe',
+                  expectedVersion: 1,
+                  actor: { id: 'auth013-evidence-operator', type: 'operator' },
+                  permission: 'user.restrict.limited',
+                  now,
+                  correlationId: 'auth013-remote-correlation-' + testUserId,
+                  causationId: 'auth013-remote-causation-' + testUserId,
+                })
+
+                const after = await db
+                  .prepare('SELECT id, account_state, account_state_version FROM users WHERE id = ?')
+                  .bind(testUserId)
+                  .first<Record<string, unknown>>()
+
+                const journal = await db
+                  .prepare('SELECT journal_id, event_id, event_type, schema_version, resource_id, source_version, payload, status, attempt, created_at, published_at, last_error_code FROM auth_013_publication_journal WHERE resource_id = ?')
+                  .bind(String(testUserId))
+                  .first<Record<string, unknown>>()
+
+                const staleAttempt = await applyAccountStateTransition(db, {
+                  userId: String(testUserId),
+                  to: 'RESTRICTED',
+                  reason: 'AUTH-013 stale If-Match evidence probe',
+                  expectedVersion: 1,
+                  actor: { id: 'auth013-evidence-operator', type: 'operator' },
+                  permission: 'user.restrict.limited',
+                  now,
+                }).then(
+                  () => ({ code: 'UNEXPECTED_SUCCESS' }),
+                  (error) => ({ code: error?.code ?? 'UNKNOWN', message: String(error?.message ?? error) }),
+                )
+
+                const afterStale = await db
+                  .prepare('SELECT id, account_state, account_state_version FROM users WHERE id = ?')
+                  .bind(testUserId)
+                  .first<Record<string, unknown>>()
+
+                const journalCount = await db
+                  .prepare('SELECT COUNT(*) AS journal_count FROM auth_013_publication_journal WHERE resource_id = ?')
+                  .bind(String(testUserId))
+                  .first<{ journal_count: number }>()
+
+                const event = JSON.parse(String(journal?.payload ?? 'null'))
+                const checks = {
+                  transitionReturnedVersion2: transition.accountStateVersion === 2,
+                  stateCommitted: after?.account_state === 'RESTRICTED' && Number(after?.account_state_version) === 2,
+                  journalCommitted: journal?.event_type === 'identity.account_state_changed' && Number(journal?.source_version) === 2,
+                  journalStatusPending: journal?.status === 'PENDING' && Number(journal?.attempt) === 1,
+                  journalEventMatchesResult: journal?.event_id === transition.eventId && journal?.journal_id === transition.journalId,
+                  eventBeforeAfterCorrect:
+                    event?.before?.accountState === 'ACTIVE' &&
+                    Number(event?.before?.accountStateVersion) === 1 &&
+                    event?.after?.accountState === 'RESTRICTED' &&
+                    Number(event?.after?.accountStateVersion) === 2,
+                  eventMetadataCorrect:
+                    event?.producer === 'W02' &&
+                    event?.eventType === 'identity.account_state_changed' &&
+                    event?.schemaVersion === '1.0' &&
+                    event?.resourceId === String(testUserId) &&
+                    event?.sourceVersion === 2 &&
+                    event?.actor?.actorId === 'auth013-evidence-operator',
+                  staleIfMatchRejected: staleAttempt.code === 'CONFLICT',
+                  staleIfMatchDidNotAdvanceState: afterStale?.account_state === 'RESTRICTED' && Number(afterStale?.account_state_version) === 2,
+                  staleIfMatchDidNotDuplicateJournal: Number(journalCount?.journal_count ?? -1) === 1,
+                }
+
+                for (const [name, ok] of Object.entries(checks)) {
+                  if (!ok) throw new Error('AUTH-013 runtime evidence check failed: ' + name)
+                }
+
+                return json({
+                  status: 'PASS',
+                  environment: 'CONTROLLED_REMOTE_D1_CODEPATH',
+                  database: 'luckread / D1-01',
+                  testUserId,
+                  transition,
+                  observedUser: after,
+                  observedJournal: {
+                    journal_id: journal?.journal_id,
+                    event_id: journal?.event_id,
+                    event_type: journal?.event_type,
+                    schema_version: journal?.schema_version,
+                    resource_id: journal?.resource_id,
+                    source_version: journal?.source_version,
+                    status: journal?.status,
+                    attempt: journal?.attempt,
+                    created_at: journal?.created_at,
+                    published_at: journal?.published_at,
+                    last_error_code: journal?.last_error_code,
+                  },
+                  event,
+                  staleAttempt,
+                  checks,
+                })
+              } finally {
+                if (inserted) {
+                  await db.batch([
+                    db.prepare('DELETE FROM auth_013_publication_journal WHERE resource_id = ?').bind(String(testUserId)),
+                    db.prepare('DELETE FROM users WHERE id = ?').bind(testUserId),
+                  ])
+                }
+
+                const cleanupUser = await db
+                  .prepare('SELECT COUNT(*) AS count FROM users WHERE id = ?')
+                  .bind(testUserId)
+                  .first<{ count: number }>()
+                const cleanupJournal = await db
+                  .prepare('SELECT COUNT(*) AS count FROM auth_013_publication_journal WHERE resource_id = ?')
+                  .bind(String(testUserId))
+                  .first<{ count: number }>()
+
+                if (Number(cleanupUser?.count ?? -1) !== 0 || Number(cleanupJournal?.count ?? -1) !== 0) {
+                  throw new Error('AUTH-013 evidence cleanup failed; controlled synthetic data remains')
+                }
+              }
+            },
+          }
+          EOF
+
+      - name: Validate Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+      - name: Start ephemeral remote Worker runtime
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 dev --remote --config .auth-013-runtime-harness.wrangler.jsonc --ip 127.0.0.1 --port 8787 > auth-013-runtime-harness.log 2>&1 &
+          echo $! > auth-013-runtime-harness.pid
+
+          ready=0
+          for _ in $(seq 1 90); do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8787/__auth013_remote_probe || true)
+            if [ "$code" != "000" ]; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            cat auth-013-runtime-harness.log
+            exit 1
+          fi
+
+      - name: Execute real W02 transition against remote D1-01
+        env:
+          PROBE_TOKEN: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/auth-013-runtime
+          curl -sS --fail-with-body             -X POST             -H "x-auth013-probe-token: $PROBE_TOKEN"             http://127.0.0.1:8787/__auth013_remote_probe             > artifacts/mapping-0/auth-013-runtime/runtime-result.json
+
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const result = JSON.parse(fs.readFileSync('artifacts/mapping-0/auth-013-runtime/runtime-result.json', 'utf8'));
+          if (result.status !== 'PASS') throw new Error('AUTH-013 remote runtime probe did not PASS');
+          for (const [name, ok] of Object.entries(result.checks || {})) {
+            if (!ok) throw new Error('AUTH-013 remote runtime assertion failed: ' + name);
+          }
+          console.log(JSON.stringify({
+            AUTH_013_REMOTE_RUNTIME: 'PASS',
+            environment: result.environment,
+            database: result.database,
+            testUserId: result.testUserId,
+            transition: result.transition,
+            checks: result.checks,
+          }, null, 2));
+          NODE
+
+      - name: Capture reproducible provenance
+        run: |
+          cat > artifacts/mapping-0/auth-013-runtime/provenance.txt <<'EOF'
+          workflow=AUTH-013 W02 Remote Transition + Journal Evidence
+          source_sha=${{ inputs.source_sha }}
+          database_name=${{ inputs.database_name }}
+          database_id=2f80471e-3756-49f9-8db1-7707a433ad64
+          environment=CONTROLLED_REMOTE_D1_CODEPATH
+          runtime=wrangler-dev-remote
+          production_public_route_unchanged=true
+          synthetic_row_cleanup_required=true
+          EOF
+          cat auth-013-runtime-harness.log >> artifacts/mapping-0/auth-013-runtime/wrangler-harness.log
+
+      - name: Upload AUTH-013 remote runtime evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-013-w02-remote-runtime-evidence-${{ github.run_id }}
+          path: artifacts/mapping-0/auth-013-runtime/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Cleanup ephemeral harness
+        if: ${{ always() }}
+        run: |
+          if [ -f auth-013-runtime-harness.pid ]; then
+            kill "$(cat auth-013-runtime-harness.pid)" 2>/dev/null || true
+          fi
+          rm -f .auth-013-runtime-harness.ts .auth-013-runtime-harness.wrangler.jsonc auth-013-runtime-harness.pid
