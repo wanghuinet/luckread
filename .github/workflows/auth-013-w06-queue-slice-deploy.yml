@@ -51,17 +51,28 @@ jobs:
           while IFS= read -r file; do
             [ -z "$file" ] && continue
             case "$file" in
-              .github/workflows/auth-013-queue-resource-provisioning.yml|
-              .github/workflows/w02-auth-013-runtime-source-verification.yml|
-              .github/workflows/w06-audit-event-source-ci.yml|
-              docs/MAPPING-0-CLOSURE-LEDGER.md|
-              workers/W02-content/src/account/publication-journal-publisher.ts|
-              workers/W02-content/src/account/publication-journal-publisher.test.ts|
-              workers/W02-content/src/index.ts|
-              workers/W02-content/wrangler.jsonc|
-              workers/W06-governance/src/auth-013-queue-consumer.ts|
-              workers/W06-governance/src/auth-013-queue-consumer.test.ts|
-              workers/W06-governance/src/index.ts|
+              .github/workflows/auth-013-queue-resource-provisioning.yml)
+                ;;
+              .github/workflows/w02-auth-013-runtime-source-verification.yml)
+                ;;
+              .github/workflows/w06-audit-event-source-ci.yml)
+                ;;
+              docs/MAPPING-0-CLOSURE-LEDGER.md)
+                ;;
+              workers/W02-content/src/account/publication-journal-publisher.ts)
+                ;;
+              workers/W02-content/src/account/publication-journal-publisher.test.ts)
+                ;;
+              workers/W02-content/src/index.ts)
+                ;;
+              workers/W02-content/wrangler.jsonc)
+                ;;
+              workers/W06-governance/src/auth-013-queue-consumer.ts)
+                ;;
+              workers/W06-governance/src/auth-013-queue-consumer.test.ts)
+                ;;
+              workers/W06-governance/src/index.ts)
+                ;;
               workers/W06-governance/wrangler.jsonc)
                 ;;
               *)
