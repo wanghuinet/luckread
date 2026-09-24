@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        domain: [common, enums, state-machines, authz, openapi]
+        domain: [common, enums, state-machines, authz, events, openapi]
     steps:
       - uses: actions/checkout@v4
         with:
