@@ -2119,3 +2119,38 @@ Current verification state:
 ### Current cursor
 
 **W06 persistence source CI → controlled D1-03 migration → persistence runtime integration → identity.account_state_changed publication → cache/session side-effect binding → E2E security/integration evidence → AUTH-013 Evidence Registry promotion.**
+
+
+## 2026-09-24 Superpowers continuation — W06 D1-03 AuditEvent remote migration executed; verification separated
+
+Run 35969414416 reached and successfully completed the controlled remote mutation step.
+
+Verified execution evidence:
+
+- W06 source CI admission = SUCCESS.
+- W06 D1-03 binding/source verification = SUCCESS.
+- Local migration syntax/invariant check = PASS.
+- Remote preflight confirmed audit_events table was absent.
+- Wrangler executed `0001_audit_event.sql` against remote `secondary`.
+- Cloudflare explicitly resolved the target as D1-03 UUID `bda1d247-a371-4244-91ae-aef96034db7f`.
+- Remote migration status for `0001_audit_event.sql` = SUCCESS.
+- The workflow's final post-migration evidence step failed before producing its evidence artifact; therefore the overall Run 35969414416 is FAILURE and must NOT be promoted to final Evidence Registry PASS.
+
+Important distinction:
+
+**The remote schema mutation happened successfully. The failure is in post-migration verification packaging, not in the migration application step.**
+
+Because the remote migration is now applied, the original fail-closed migration workflow must not be rerun as a duplicate mutation. A separate read-only evidence workflow has been added:
+
+- `.github/workflows/w06-audit-event-d1-03-evidence.yml`
+- source commit: `e9f0c431ed08cf37ea1e6f826021acb4f40d1b4e`
+
+This workflow performs no mutation and verifies the remote table, columns, immutable triggers, row count, and D1 migration history.
+
+Manual trigger URL:
+
+https://github.com/wanghuinet/luckread/actions/workflows/w06-audit-event-d1-03-evidence.yml
+
+Current cursor:
+
+**Read-only D1-03 AuditEvent evidence → W06 runtime persistence integration → identity.account_state_changed publication → cache/session side-effect binding → E2E security/integration evidence → AUTH-013 Evidence Registry promotion.**
