@@ -67,3 +67,16 @@ unless their authoritative inputs or tested scope change.
 ## 5. Next cursor
 
 **W06 physical Worker/D1 binding admission → W06 AuditEvent persistence/publication implementation → cache/session side-effect binding → end-to-end security/integration evidence → AUTH-013 Evidence Registry promotion.**
+
+## Supersession note — 2026-09-24
+
+The physical runtime binding previously marked `BLOCKED_EXTERNAL / NOT_ESTABLISHED` has now received an explicit Change Control decision:
+
+`CC-MAPPING-0-AUTH-013-W06-PHYSICAL-BINDING-DECISION-2026-09-24`
+
+Current disposition:
+- W06 physical Worker identity decision = **ADMITTED_FOR_CONTROLLED_CREATION** (`luckread-w06`).
+- D1-03 physical UUID = **ADMITTED** (`bda1d247-a371-4244-91ae-aef96034db7f`).
+- Wrangler binding is implemented in `workers/W06-governance/wrangler.jsonc`.
+- Deployment remains **NOT_EXECUTED** until the controlled workflow is manually dispatched and passes its exact-source admission gates.
+- D1-03 AuditEvent persistence remains **NOT_AUTHORIZED** until deployment/runtime binding evidence is captured.
