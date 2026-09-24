@@ -57,6 +57,7 @@ const DOMAIN_DIRS = {
   enums: 'enums',
   'state-machines': 'state-machines',
   authz: 'authz',
+  events: 'events',
 }
 
 async function validateJsonDomain(domain) {
@@ -248,6 +249,31 @@ async function checkAuthz() {
   }
 }
 
+/* ------------------------------------------------------------------ events */
+async function checkEvents() {
+  const { docs } = await validateJsonDomain('events')
+  const auth013 = docs.find((d) => d.id.endsWith('/identity-account-state-changed.v1.json'))
+  if (!auth013) {
+    fail('events: identity-account-state-changed.v1.json is required for admitted AUTH-013 event path')
+    return
+  }
+  const required = [
+    'eventId','eventType','schemaVersion','producer','resourceType','resourceId',
+    'occurredAt','publishedAt','correlationId','causationId','idempotencyKey',
+    'attempt','sourceVersion','actor','before','after','reason'
+  ]
+  for (const field of required) {
+    if (!auth013.doc.properties?.[field]) fail('events/identity-account-state-changed.v1.json: missing ' + field + ' property')
+  }
+  if (auth013.doc.properties?.eventType?.const !== 'identity.account_state_changed') fail('events/identity-account-state-changed.v1.json: eventType must be identity.account_state_changed')
+  if (auth013.doc.properties?.schemaVersion?.const !== '1.0') fail('events/identity-account-state-changed.v1.json: schemaVersion must be 1.0')
+  if (auth013.doc.properties?.producer?.const !== 'W02') fail('events/identity-account-state-changed.v1.json: producer must be W02')
+  if (auth013.doc.properties?.resourceType?.const !== 'User') fail('events/identity-account-state-changed.v1.json: resourceType must be User')
+  if (auth013.doc['x-luckread']?.['consumer-authority'] !== 'W06') fail('events/identity-account-state-changed.v1.json: consumer authority must be W06')
+  if (auth013.doc['x-luckread']?.delivery !== 'AT_LEAST_ONCE') fail('events/identity-account-state-changed.v1.json: delivery must be AT_LEAST_ONCE')
+  if (auth013.doc['x-luckread']?.['dead-letter-queue'] !== 'luckread-auth013-account-state-dlq') fail('events/identity-account-state-changed.v1.json: DLQ binding is not canonical')
+}
+
 /* ----------------------------------------------------------------- openapi */
 async function checkOpenApi() {
   const file = join(CONTRACTS_ROOT, 'openapi', 'v1', 'openapi.yaml')
@@ -276,7 +302,7 @@ async function checkOpenApi() {
 /* -------------------------------------------------------------------- main */
 const domain = process.argv[2]
 const runAll = !domain
-const supported = ['common', 'enums', 'state-machines', 'authz', 'openapi']
+const supported = ['common', 'enums', 'state-machines', 'authz', 'events', 'openapi']
 if (domain && !supported.includes(domain)) {
   console.error(`Unsupported Contract CI domain: ${domain} (supported: ${supported.join(', ')})`)
   process.exit(2)
@@ -286,6 +312,7 @@ const common = runAll || domain === 'common' ? await checkCommon() : null
 const { enumValues } = runAll || domain === 'enums' ? await checkEnums() : { enumValues: {} }
 if (runAll || domain === 'state-machines') await checkStateMachines(enumValues)
 if (runAll || domain === 'authz') await checkAuthz()
+if (runAll || domain === 'events') await checkEvents()
 if (runAll || domain === 'openapi') await checkOpenApi()
 
 if (errors.length > 0) {
