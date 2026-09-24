@@ -1,0 +1,31 @@
+name: W02 AUTH-013 Runtime Source Verification
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'workers/W02-content/src/account/**'
+      - 'contracts/state-machines/account.json'
+      - '.github/workflows/w02-auth-013-runtime-source-verification.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck W02
+        run: npx tsc -p workers/W02-content/tsconfig.json --noEmit
+
+      - name: Run AUTH-013 source tests
+        run: npx vitest run workers/W02-content/src/account/account-state-transition.test.ts
