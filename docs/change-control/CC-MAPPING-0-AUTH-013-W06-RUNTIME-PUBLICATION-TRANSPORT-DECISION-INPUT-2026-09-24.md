@@ -127,15 +127,19 @@ Possible outcomes must be explicitly authoritative; the implementation must not 
 
 ### Q4 — Public operation transport
 
-Where is the already-contracted `transitionAccountState` operation expected to terminate at runtime?
+**Resolved from existing authority; no new decision is required.**
 
-The canonical operation remains:
+The canonical operation is already bound to:
 
 - method: `POST`
 - path: `/v1/users/{userId}/account-state`
 - operationId: `transitionAccountState`
+- authoritative business Worker: W02 / D1-01
+- public API boundary: W01
 
-No public route is to be added by inference in this Decision Input.
+The existing W01 → W02 `W02_AUTH` Service Binding is already verified and remains the admitted transport boundary for the W01-to-W02 call. This does **not** prove the AUTH-013 operation itself has runtime evidence, and it does not authorize W01 direct D1-01 writes.
+
+No additional public route is to be added by inference.
 
 ## 6. Forbidden actions until the decision is resolved
 
@@ -149,7 +153,14 @@ No public route is to be added by inference in this Decision Input.
 - Do not change the frozen 12-Worker / 4-D1 topology.
 - Do not change the existing AUTH-013 Contract/Blueprint in this decision-input step.
 
-## 7. Current disposition
+## 7. Resolved / unresolved decision status
+
+- **Q1 Publication transport:** UNRESOLVED — an executable event/queue contract connecting the W02 authoritative transition to W06 AuditEvent persistence is not present.
+- **Q2 Consumer ownership:** UNRESOLVED — W10 is an execution boundary, but the Worker Master explicitly gives W10 no artificial Primary Task. Its use for AUTH-013 requires an explicit event/task contract rather than inference.
+- **Q3 Actor normalization:** UNRESOLVED — `operator` exists in the account-state transition authority but not in the canonical common AuditActor enum. No mapping is authorized.
+- **Q4 Public operation transport:** RESOLVED at contract/topology level — W01 public boundary → W02 authoritative operation via the already verified `W02_AUTH` binding. Runtime AUTH-013 execution evidence remains absent.
+
+## 8. Current disposition
 
 **AUTH-013 remains BLOCKED_NOT_GREEN for the downstream runtime publication/integration chain.**
 
