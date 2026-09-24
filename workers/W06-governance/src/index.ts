@@ -14,6 +14,9 @@ const json = (body: unknown, status = 200) =>
   })
 
 const actorTypes = new Set(['user', 'service', 'admin', 'system', 'job'])
+const resourceIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
+const requestIdPattern = /^req_[A-Za-z0-9_-]{1,123}$/
+const traceIdPattern = /^[A-Za-z0-9._:-]{1,128}$/
 
 function parseAccountStateChangedInput(value: unknown): AccountStateChangedAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -60,7 +63,9 @@ function parseAccountStateChangedInput(value: unknown): AccountStateChangedAudit
 
   if (
     typeof input.eventId !== 'string' ||
+    !resourceIdPattern.test(input.eventId) ||
     typeof input.userId !== 'string' ||
+    !resourceIdPattern.test(input.userId) ||
     typeof input.beforeState !== 'string' ||
     typeof input.afterState !== 'string' ||
     typeof input.occurredAt !== 'string' ||
@@ -71,11 +76,16 @@ function parseAccountStateChangedInput(value: unknown): AccountStateChangedAudit
   }
 
   if (
-    input.requestId !== undefined && typeof input.requestId !== 'string' ||
-    input.traceId !== undefined && typeof input.traceId !== 'string' ||
-    input.reason !== undefined && typeof input.reason !== 'string' ||
+    input.requestId !== undefined &&
+    (typeof input.requestId !== 'string' || !requestIdPattern.test(input.requestId)) ||
+    input.traceId !== undefined &&
+    (typeof input.traceId !== 'string' || !traceIdPattern.test(input.traceId)) ||
+    input.reason !== undefined &&
+    (typeof input.reason !== 'string' || input.reason.length > 2048) ||
     input.ip !== undefined && typeof input.ip !== 'string' ||
-    input.userAgent !== undefined && typeof input.userAgent !== 'string'
+    input.userAgent !== undefined &&
+    (typeof input.userAgent !== 'string' || input.userAgent.length > 1024) ||
+    Number.isNaN(Date.parse(input.occurredAt as string))
   ) {
     throw new Error('INVALID_AUDIT_EVENT')
   }
