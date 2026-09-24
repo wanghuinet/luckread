@@ -2223,3 +2223,25 @@ Correction committed on `main`:
 - only narrows the already runtime-validated `beforeVersion` / `afterVersion` values to the canonical numeric input type.
 
 Next state: **TODO_VERIFY_EXTERNAL**. The source CI must be rerun against the corrected head; no deployment is admitted from the failed run.
+
+
+## 2026-09-24 Superpowers continuation — W06 Source CI test-fixture alignment correction
+
+Run 35979560760 = **FAILURE**, source head `e6faf3dbd2bda48708fbe355ed5737a0ed8551dc`.
+
+Verified:
+- W06 source TypeScript = SUCCESS.
+- W06 runtime shell TypeScript = SUCCESS.
+- AuditEvent constructor tests = 3/3 SUCCESS.
+- AuditEvent persistence tests = 2/2 SUCCESS.
+- W06 runtime integration tests = 8/10 passed; 2 failed before D1 persistence execution.
+- Both failures returned HTTP 400 where the tests expected 201/503.
+- Root cause is the shared `eventInput.requestId` fixture using `req-runtime-1`, while the already-admitted runtime validator requires the canonical `req_` prefix.
+- This is a test-fixture alignment defect; no Contract/Blueprint/schema authority was changed and no remote D1 mutation occurred.
+
+Correction committed on `main`:
+- `e2bd914f4193f6babaff7a51eb63fc22461555f2`
+- Updated only `workers/W06-governance/src/index.test.ts` so the shared fixture uses `req_runtime-1`, and synchronized the expected D1 bind assertion.
+
+Next state: **TODO_VERIFY_EXTERNAL**.
+Required next action: rerun W06 Audit Event Source CI against the corrected `main` head. Do not deploy W06 runtime until the complete source CI is green.
