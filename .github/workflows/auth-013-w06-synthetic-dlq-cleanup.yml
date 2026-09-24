@@ -102,7 +102,7 @@ jobs:
           ref="$(cat dlq-target-ref.txt)"
           purge_endpoint="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$DLQ_ID/messages/purge"
 
-          jq -n --arg ref "$ref" '{refs:[$ref]}' > purge-body.json
+          jq -n --arg ref "$ref" '{refs:[{ref:$ref}]}' > purge-body.json
 
           http_status="$(curl -sS             -X POST             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             --data @purge-body.json             -o purge-result.json             -w "%{http_code}"             "$purge_endpoint" || true)"
           echo "TARGETED_PURGE_HTTP_STATUS=$http_status"
