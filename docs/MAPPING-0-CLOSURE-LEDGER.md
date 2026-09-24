@@ -1865,3 +1865,30 @@ Do not rerun the already verified 0/0 classification evidence unless the control
 - Static gate proves the migration rejects a non-empty `users` table and succeeds for an empty `users` table with the admitted defaults.
 - Added `.github/workflows/auth-013-migration-static-verification.yml` as a read-only CI gate. It never contacts or mutates Cloudflare D1.
 - Remote D1 migration remains unexecuted and requires the existing controlled `workflow_dispatch` path with `confirm=APPLY`.
+
+
+## 2026-09-24 Superpowers continuation — AUTH-013 D1 migration and W02 kernel evidence closed
+
+- Controlled remote D1-01 migration Run `35937873769` = **SUCCESS**.
+- Exact migration source commit: `b40ae46fe5862c77f935a54adf4bd7e91c69159a`.
+- Remote target: `luckread` / `2f80471e-3756-49f9-8db1-7707a433ad64`.
+- Migration `0002_auth_013_account_state.sql` is applied and post-schema verification passed.
+- `users.account_state` = TEXT NOT NULL DEFAULT `PENDING_VERIFICATION`.
+- `users.account_state_version` = INTEGER NOT NULL DEFAULT `1`.
+- Post-migration `users_count = 0`.
+- D1 evidence artifact: `10784305258`, digest `sha256:72c7b323a3a4713a74776a4560980178f8db4eb1691de722729039506d37cf1c`.
+- W02 transition-kernel source verification Run `35943346415` = **SUCCESS**.
+- Exact tested source commit: `d9c663f233329c7c65946026475b44b9d23427ca`.
+- TypeScript = PASS; AUTH-013 transition tests = **13/13 PASS**.
+- Runtime source evidence artifact: `10785334505`, digest `sha256:2a26d13e9f3612fd234fe5efc090e606be73d02a5db95778ee194d49a33a2a3e`.
+- Canonical evidence file: `artifacts/mapping-0/auth-013-runtime-source-implementation-evidence-2026-09-24.md`.
+- Mapping 0 structural/contract verification returned **SUCCESS** after correcting the field validators to respect per-field status and non-Payload lifecycle-field ownership.
+
+Disposition:
+- AUTH-013 persistence migration sub-gate: **PASS_VERIFIED**.
+- AUTH-013 W02 transition-kernel source sub-gate: **PASS_VERIFIED**.
+- AUTH-013 overall: **BLOCKED_NOT_GREEN**.
+- No public transport, audit/event, cache, token/session side-effect, deindex, or end-to-end security claim is promoted from these source-level results.
+
+### Current cursor
+**AUTH-013 → downstream transition side-effect/integration contracts and executable evidence; do not repeat D1 migration or W02 kernel unit tests unless inputs change.**
