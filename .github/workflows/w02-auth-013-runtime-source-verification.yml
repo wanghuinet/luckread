@@ -27,5 +27,31 @@ jobs:
       - name: Typecheck W02
         run: npx tsc -p workers/W02-content/tsconfig.json --noEmit
 
+      - name: Prepare AUTH-013 source evidence
+        run: mkdir -p artifacts/mapping-0/auth-013-runtime-source
+
       - name: Run AUTH-013 source tests
-        run: npx vitest run workers/W02-content/src/account/account-state-transition.test.ts
+        run: |
+          set -o pipefail
+          npx vitest run workers/W02-content/src/account/account-state-transition.test.ts 2>&1 | tee artifacts/mapping-0/auth-013-runtime-source/test-output.txt
+
+      - name: Capture AUTH-013 source provenance
+        run: |
+          {
+            echo "workflow=W02 AUTH-013 Runtime Source Verification"
+            echo "source_sha=${GITHUB_SHA}"
+            echo "worker=W02"
+            echo "persistence=D1-01/users"
+            echo "test=workers/W02-content/src/account/account-state-transition.test.ts"
+            echo "typescript_check=PASS"
+            echo "scope=SOURCE_IMPLEMENTATION_ONLY"
+          } > artifacts/mapping-0/auth-013-runtime-source/provenance.txt
+          git show -s --format='%H%n%s%n%aI' "${GITHUB_SHA}" > artifacts/mapping-0/auth-013-runtime-source/commit.txt
+
+      - name: Upload AUTH-013 source evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-013-runtime-source-${{ github.run_id }}
+          path: artifacts/mapping-0/auth-013-runtime-source/
+          if-no-files-found: error
+          retention-days: 14
