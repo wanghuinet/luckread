@@ -96,3 +96,22 @@ Do not create `luckread-w06`, select a D1 UUID, or create a Wrangler binding mer
 ## 6. Next cursor
 
 **Controlled Cloudflare inventory → explicit W06/D1-03 physical binding decision → add exact Wrangler binding → controlled W06 deployment/smoke → implement AuditEvent persistence/publication → bind cache/session side effects → E2E security/integration evidence → AUTH-013 Evidence Registry promotion.**
+
+## Supersession note — 2026-09-24
+
+The physical identity gate requested by this document has now been resolved by:
+
+`CC-MAPPING-0-AUTH-013-W06-PHYSICAL-BINDING-DECISION-2026-09-24`
+
+Resolved:
+- W06 physical resource identity = `luckread-w06` (controlled creation required; it did not pre-exist the inventory).
+- D1-03 physical UUID = `bda1d247-a371-4244-91ae-aef96034db7f`.
+
+The remaining gates are now:
+1. exact Wrangler binding verification;
+2. controlled W06 deployment;
+3. W06 smoke/runtime evidence;
+4. D1-03 AuditEvent schema/migration;
+5. persistence/publication and downstream side-effect evidence.
+
+This document no longer blocks the physical identity decision itself; it remains the traceability record for the evidence requirements.
