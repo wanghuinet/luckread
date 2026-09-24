@@ -2616,3 +2616,30 @@ This is a test-fixture typing defect only; no production AUTH-013 implementation
 Correction: added `forceJournalConflict?: boolean` to the fakeDb options type. No runtime behavior changed.
 
 Current status remains **TODO_VERIFY_EXTERNAL** until the corrected commit receives a successful W02 Runtime Source CI result. No deployment is authorized yet.
+
+## 2026-09-24 — AUTH-013 W02 Runtime Source CI GREEN
+
+Verified corrected main commit: `0781a4413eb1de477af521b8eaed739d31d4c0e9`.
+
+GitHub Actions Run `36008591915` — **SUCCESS**:
+- Workflow: `W02 AUTH-013 Runtime Source Verification`
+- Typecheck W02: PASS
+- Source test file: `workers/W02-content/src/account/account-state-transition.test.ts`
+- Tests: **14 passed / 14 total**
+- Runtime source evidence artifact: `10811706995`
+- Artifact digest: `sha256:715a66064db2a2804a2c7e800a7de0131de34b530b6d0c8dee91cc5b1ff9db07`
+
+The corrective change in `0781a4413eb1de477af521b8eaed739d31d4c0e9` is test-fixture-only: stale If-Match correctly asserts zero write-batch entry, and the forced concurrency scenario simulates a concurrent state change before the CAS batch so the runtime reaches the canonical conflict boundary. No AUTH-013 production implementation or contract change was made by this correction.
+
+Therefore **AUTH-013 W02 Runtime Source Verification = PASS_VERIFIED / SOURCE_IMPLEMENTATION_ONLY**. This does **not** promote AUTH-013 to overall GREEN.
+
+### Current cursor
+
+**W02 Source CI GREEN → controlled W02 deployment → real Account State transition + durable Journal evidence → Queue producer/resource → W06 consumer/idempotency → W06 deployment/runtime evidence → AuditEvent persistence → side-effect convergence → E2E → Evidence Registry promotion.**
+
+No repeated Journal migration, W02 kernel reconstruction, Mapping 0 closure, or previously verified W06 source/schema work is authorized unless authoritative inputs change.
+
+Controlled W02 deployment workflow:
+`https://github.com/wanghuinet/luckread/actions/workflows/w02-deploy.yml`
+
+Deployment remains a separate gate because the current production implementation was introduced by commit `763a857759233c5a23d7bd733a72e0729b20a373`; Source CI proves the source slice, not production deployment/runtime evidence.
