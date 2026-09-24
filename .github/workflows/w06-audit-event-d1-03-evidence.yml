@@ -52,14 +52,44 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          EXPECTED_DB_ID: bda1d247-a371-4244-91ae-aef96034db7f
         run: |
           set -euo pipefail
           mkdir -p "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-evidence"
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("audit_events");' > "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-evidence/table.json"
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("audit_events");' > "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-evidence/indexes.json"
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "SELECT name, type FROM sqlite_master WHERE name LIKE 'audit_events_immutable_%' ORDER BY name;" > "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-evidence/triggers.json"
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT COUNT(*) AS audit_events_count FROM audit_events;' > "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-evidence/count.json"
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM d1_migrations ORDER BY id;' > "${GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-evidence/d1-migrations.json"
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const path = 'artifacts/mapping-0/w06-audit-event-evidence/d1-query.json'
+          const endpoint =
+            `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/d1/database/${process.env.EXPECTED_DB_ID}/query`
+          const batch = [
+            { sql: 'PRAGMA table_info("audit_events");' },
+            { sql: 'PRAGMA index_list("audit_events");' },
+            { sql: "SELECT name, type FROM sqlite_master WHERE name LIKE 'audit_events_immutable_%' ORDER BY name;" },
+            { sql: 'SELECT COUNT(*) AS audit_events_count FROM audit_events;' },
+            { sql: 'SELECT id,name,batch FROM d1_migrations ORDER BY id;' },
+          ]
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ batch }),
+          })
+          const body = await response.json()
+          fs.writeFileSync(path, JSON.stringify(body, null, 2) + '\\n')
+          if (!response.ok) throw new Error(`Cloudflare D1 HTTP ${response.status}`)
+          if (!body.success) throw new Error(`Cloudflare D1 query failed: ${JSON.stringify(body.errors)}`)
+          if (!Array.isArray(body.result) || body.result.length !== batch.length) {
+            throw new Error('unexpected D1 query result batch length')
+          }
+          console.log(JSON.stringify({
+            endpoint,
+            databaseId: process.env.EXPECTED_DB_ID,
+            queryCount: batch.length,
+            success: body.success,
+          }, null, 2))
+          NODE
 
       - name: Validate remote evidence
         working-directory: workers/W06-governance
@@ -69,24 +99,50 @@ jobs:
           const fs = require('node:fs')
           const path = 'artifacts/mapping-0/w06-audit-event-evidence'
           const read = (f) => JSON.parse(fs.readFileSync(path + '/' + f, 'utf8'))
-          const schema = read('table.json')?.[0]?.results ?? []
+          const body = read('d1-query.json')
+          const results = body?.result ?? []
+          if (results.length !== 5) throw new Error('unexpected evidence result count: ' + results.length)
+          for (const [index, result] of results.entries()) {
+            if (result?.success !== true) throw new Error('D1 evidence query failed at index ' + index)
+          }
+
+          const schema = results[0]?.results ?? []
           const required = [
             'event_id','request_id','trace_id','actor_json','action','target_type','target_id',
             'before_json','after_json','reason','ip','user_agent','occurred_at'
           ]
           const names = new Set(schema.map((r) => r.name))
           for (const name of required) if (!names.has(name)) throw new Error('missing column: ' + name)
-          const count = read('count.json')?.[0]?.results?.[0]?.audit_events_count
+
+          const indexes = results[1]?.results ?? []
+          if (!indexes.some((r) => r.name === 'idx_audit_events_action_occurred_at')) {
+            throw new Error('missing action/occurred_at index')
+          }
+          if (!indexes.some((r) => r.name === 'idx_audit_events_target_occurred_at')) {
+            throw new Error('missing target/occurred_at index')
+          }
+
+          const triggers = results[2]?.results ?? []
+          if (!triggers.some((r) => r.name === 'audit_events_immutable_update')) {
+            throw new Error('missing immutable UPDATE trigger')
+          }
+          if (!triggers.some((r) => r.name === 'audit_events_immutable_delete')) {
+            throw new Error('missing immutable DELETE trigger')
+          }
+
+          const count = results[3]?.results?.[0]?.audit_events_count
           if (Number(count) !== 0) throw new Error('unexpected audit_events row count: ' + count)
-          const triggers = read('triggers.json')?.[0]?.results ?? []
-          if (!triggers.some((r) => r.name === 'audit_events_immutable_update')) throw new Error('missing immutable UPDATE trigger')
-          if (!triggers.some((r) => r.name === 'audit_events_immutable_delete')) throw new Error('missing immutable DELETE trigger')
-          const migrations = read('d1-migrations.json')?.[0]?.results ?? []
-          if (!migrations.some((r) => r.name === '0001_audit_event.sql')) throw new Error('migration history missing 0001_audit_event.sql')
+
+          const migrations = results[4]?.results ?? []
+          if (!migrations.some((r) => r.name === '0001_audit_event.sql')) {
+            throw new Error('migration history missing 0001_audit_event.sql')
+          }
+
           console.log(JSON.stringify({
             W06_AUDIT_EVENT_D1_03_EVIDENCE: 'PASS',
             auditEventsCount: Number(count),
             columns: [...names],
+            indexes: indexes.map((r) => r.name),
             triggers: triggers.map((r) => r.name),
             migrationApplied: '0001_audit_event.sql'
           }, null, 2))
