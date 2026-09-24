@@ -279,3 +279,44 @@ The prior controlled D1-01 migration evidence is also now verified:
 These two evidence chains close the AUTH-013 **persistence migration** and **W02 source-kernel verification** sub-gates.
 
 They do not close public HTTP transport, W01 integration, audit/event execution, cache invalidation, token/session side effects, deindex convergence, end-to-end security/integration tests, or Evidence Registry promotion. AUTH-013 therefore remains **BLOCKED_NOT_GREEN**.
+
+
+## 2026-09-25 Current-head reconciliation — AUTH-013 downstream event/audit slice
+
+Source-of-truth head: `df6f65bdd2a333cb13e33a464564987a5a7ec024`.
+
+The authority gate is now resolved and the approved minimum Contract Delta is present in the repository. The following current/inherited evidence is accepted without repeating unchanged work:
+
+- Authority decision `CC-MAPPING-0-AUTH-013-EVENT-ACTOR-TRANSPORT-AUTHORITY-2026-09-24`: **APPROVED**; Q1=A, Q2=B, Q3=C.
+- Canonical event contract: `contracts/events/identity-account-state-changed.v1.json` is present; Common Actor now carries optional `operationalRole`, with `operator` represented as `actorType=user` + `operationalRole=PLATFORM_OPERATOR`.
+- W02 controlled remote transition evidence Run `36015387059`: **SUCCESS** against real D1-01 `luckread`; observed ACTIVE → RESTRICTED, version 1 → 2, one durable publication-journal row, canonical event envelope, stale If-Match rejection, and cleanup of synthetic User/Journal data. This is runtime code-path evidence, not public HTTP evidence.
+- AUTH-013 Queue Resource Provisioning Run `36022517655`: **SUCCESS**. Cloudflare created and verified `luckread-auth013-account-state` and `luckread-auth013-account-state-dlq`.
+- W06 current-head controlled deployment Run `36024872342`: **SUCCESS** at this repository head. Cloudflare reported Worker `luckread-w06`, Version ID `83346e1d-d992-470c-b54f-40d715249084`, binding `env.D1_03 → secondary`, and active Queue consumer `luckread-auth013-account-state`.
+- W06 D1-03 remote schema evidence Run `35975461648`: **SUCCESS** and remains valid because the admitted AuditEvent schema/migration inputs did not change in the current W06 queue-slice delta.
+
+### Evidence boundary after the queue slice
+
+The W06 source/consumer, physical Queue/DLQ resources, D1-03 binding, and controlled deployment are now closed at their respective scopes.
+
+The remaining unclosed runtime claim is deliberately narrower:
+
+`W02 accepted transition → D1-01 durable journal → Queue delivery → W06 queue consumption → D1-03 AuditEvent persistence`
+
+No current evidence is promoted as proof that this full chain has executed on the real W02-to-W06 path. The repository does not add a public evidence-only route, and the current D1-03 AuditEvent table is immutable by contract; writing a synthetic positive test row and deleting it would violate the audit evidence boundary and contaminate the production evidence target. Therefore no destructive/irreversible runtime probe is introduced merely to manufacture GREEN.
+
+### Current status matrix
+
+- **AUTH-013 Authority Gate:** GREEN / APPROVED.
+- **W02 transition + D1-01 persistence:** PASS_VERIFIED.
+- **W02 durable publication journal code-path:** PASS_VERIFIED at controlled remote code-path scope.
+- **Queue + DLQ physical resources:** PASS_VERIFIED.
+- **W06 consumer code + binding + deployment:** PASS_VERIFIED at source/binding/deployment scope.
+- **W06 D1-03 schema/migration:** PASS_VERIFIED at remote schema scope.
+- **Real Queue delivery into W06 with D1-03 persistence:** **NOT_YET_VERIFIED**.
+- **Public W01 → W02 `transitionAccountState` runtime evidence:** NOT_YET_VERIFIED.
+- **Token/session/cache/deindex side-effect evidence:** NOT_YET_VERIFIED.
+- **Security/integration/E2E evidence and Evidence Registry promotion:** NOT_YET_VERIFIED.
+
+### Next cursor
+
+Do not repeat the passed infrastructure/code gates. The next implementation/evidence step is the **minimum safe proof of the approved W02 → Queue → W06 runtime transport and D1-03 persistence boundary**, without creating a public workaround or polluting the immutable AuditEvent target. AUTH-013 remains **BLOCKED_NOT_GREEN** until that boundary and the downstream lifecycle/security side-effects are evidenced.
