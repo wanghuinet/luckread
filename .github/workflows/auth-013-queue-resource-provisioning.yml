@@ -1,0 +1,66 @@
+name: AUTH-013 Queue Resource Provisioning
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type CREATE to create the AUTH-013 queue and DLQ if missing"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    if: ${{ inputs.confirm == 'CREATE' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate Cloudflare credentials
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+
+      - name: Install Wrangler
+        run: npm install --global wrangler@4.116.0
+
+      - name: Inspect existing queues
+        run: wrangler queues list --json > queues-before.json
+
+      - name: Create AUTH-013 queue if missing
+        run: |
+          if node -e "const fs=require('fs'); const x=JSON.parse(fs.readFileSync('queues-before.json','utf8')); process.exit(Array.isArray(x)&&x.some(q=>q.queue_name==='luckread-auth013-account-state')?0:1)"; then
+            echo "AUTH013_QUEUE_EXISTS=true"
+          else
+            wrangler queues create luckread-auth013-account-state
+          fi
+
+      - name: Create AUTH-013 DLQ if missing
+        run: |
+          if node -e "const fs=require('fs'); const x=JSON.parse(fs.readFileSync('queues-before.json','utf8')); process.exit(Array.isArray(x)&&x.some(q=>q.queue_name==='luckread-auth013-account-state-dlq')?0:1)"; then
+            echo "AUTH013_DLQ_EXISTS=true"
+          else
+            wrangler queues create luckread-auth013-account-state-dlq
+          fi
+
+      - name: Verify queue inventory
+        run: |
+          wrangler queues list --json > queues-after.json
+          node <<'NODE'
+          const fs = require('fs')
+          const queues = JSON.parse(fs.readFileSync('queues-after.json', 'utf8'))
+          const names = new Set(queues.map(q => q.queue_name))
+          for (const name of ['luckread-auth013-account-state', 'luckread-auth013-account-state-dlq']) {
+            if (!names.has(name)) throw new Error('Missing queue: ' + name)
+          }
+          console.log('AUTH-013_QUEUE_RESOURCES_GREEN')
+          NODE
