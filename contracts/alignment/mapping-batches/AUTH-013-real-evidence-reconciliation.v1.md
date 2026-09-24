@@ -251,3 +251,31 @@ The existing-user backfill semantics are intentionally **deferred under Decision
 ## 2026-09-23 backfill decision closure
 
 Decision `CC-MAPPING-0-AUTH-013-BACKFILL-DECISION-2026-09-23` selects **C**: do not invent initial lifecycle state/version for existing Users. Current repository evidence does not establish a complete authoritative source from which those values can be safely derived. This is now a recorded data-semantic gate, not an unresolved question to be rediscovered.
+
+
+## 2026-09-24 Runtime source evidence closure
+
+The following source-level implementation evidence is now independently verified and inherited without re-execution:
+
+- W02 account-state transition kernel: `workers/W02-content/src/account/account-state-transition.ts`.
+- Source verification workflow: `W02 AUTH-013 Runtime Source Verification`.
+- GitHub Actions Run `35943346415`: **SUCCESS**.
+- Exact tested commit: `d9c663f233329c7c65946026475b44b9d23427ca`.
+- TypeScript check: **PASS**.
+- Runtime source tests: **13/13 PASS**.
+- Evidence artifact: `10785334505` with digest `sha256:2a26d13e9f3612fd234fe5efc090e606be73d02a5db95778ee194d49a33a2a3e`.
+- Evidence file: `artifacts/mapping-0/auth-013-runtime-source-implementation-evidence-2026-09-24.md`.
+
+The kernel evidence proves state-machine transition validation, actor/permission enforcement, fail-closed approval/precondition checks, stale-version rejection, atomic compare-and-update, single version increment, and concurrency-race rejection.
+
+The prior controlled D1-01 migration evidence is also now verified:
+
+- Run `35937873769`: **SUCCESS**.
+- Migration `0002_auth_013_account_state.sql` applied remotely to D1-01.
+- Post-schema verification proves both lifecycle columns and their defaults/NOT NULL constraints.
+- Post-migration `users_count = 0`.
+- Migration evidence artifact: `10784305258`.
+
+These two evidence chains close the AUTH-013 **persistence migration** and **W02 source-kernel verification** sub-gates.
+
+They do not close public HTTP transport, W01 integration, audit/event execution, cache invalidation, token/session side effects, deindex convergence, end-to-end security/integration tests, or Evidence Registry promotion. AUTH-013 therefore remains **BLOCKED_NOT_GREEN**.
