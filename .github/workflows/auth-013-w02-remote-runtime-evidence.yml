@@ -142,7 +142,7 @@ jobs:
 
                 const staleAttempt = await applyAccountStateTransition(db, {
                   userId: String(testUserId),
-                  to: 'RESTRICTED',
+                  to: 'ACTIVE',
                   reason: 'AUTH-013 stale If-Match evidence probe',
                   expectedVersion: 1,
                   actor: { id: 'auth013-evidence-operator', type: 'operator' },
