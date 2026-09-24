@@ -61,34 +61,45 @@ jobs:
           const path = `${process.env.GITHUB_WORKSPACE}/artifacts/mapping-0/w06-audit-event-evidence/d1-query.json`
           const endpoint =
             `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/d1/database/${process.env.EXPECTED_DB_ID}/query`
-          const batch = [
-            { sql: 'PRAGMA table_info("audit_events");' },
-            { sql: 'PRAGMA index_list("audit_events");' },
-            { sql: "SELECT name, type FROM sqlite_master WHERE name LIKE 'audit_events_immutable_%' ORDER BY name;" },
-            { sql: 'SELECT COUNT(*) AS audit_events_count FROM audit_events;' },
-            { sql: 'SELECT id,name,batch FROM d1_migrations ORDER BY id;' },
+          const queries = [
+            'PRAGMA table_info("audit_events");',
+            'PRAGMA index_list("audit_events");',
+            "SELECT name, type FROM sqlite_master WHERE name LIKE 'audit_events_immutable_%' ORDER BY name;",
+            'SELECT COUNT(*) AS audit_events_count FROM audit_events;',
+            'SELECT id,name,batch FROM d1_migrations ORDER BY id;',
           ]
           ;(async () => {
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ batch }),
-          })
-          const body = await response.json()
-          fs.writeFileSync(path, JSON.stringify(body, null, 2) + '\\n')
-          if (!response.ok) throw new Error(`Cloudflare D1 HTTP ${response.status}`)
-          if (!body.success) throw new Error(`Cloudflare D1 query failed: ${JSON.stringify(body.errors)}`)
-          if (!Array.isArray(body.result) || body.result.length !== batch.length) {
-            throw new Error('unexpected D1 query result batch length')
+          const results = []
+          for (const sql of queries) {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ sql }),
+            })
+            const body = await response.json()
+            if (!response.ok) {
+              throw new Error(`Cloudflare D1 HTTP ${response.status}: ${JSON.stringify(body.errors ?? body)}`)
+            }
+            if (!body.success || !Array.isArray(body.result) || body.result.length !== 1) {
+              throw new Error(`Cloudflare D1 query failed: ${JSON.stringify(body.errors ?? body)}`)
+            }
+            results.push(body.result[0])
           }
+          const evidence = {
+            success: true,
+            result: results,
+            errors: [],
+            messages: [],
+          }
+          fs.writeFileSync(path, JSON.stringify(evidence, null, 2) + '\\n')
           console.log(JSON.stringify({
             endpoint,
             databaseId: process.env.EXPECTED_DB_ID,
-            queryCount: batch.length,
-            success: body.success,
+            queryCount: queries.length,
+            success: true,
           }, null, 2))
           })().catch((error) => {
             console.error(error)
