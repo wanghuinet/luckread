@@ -2579,3 +2579,26 @@ Current W02 runtime Source CI is **TODO_VERIFY_EXTERNAL** pending the new GitHub
 **W02 AUTH-013 Source CI GREEN → controlled W02 deployment → real Account State transition + journal evidence → Queue producer/resource → W06 consumer/idempotency → W06 deployment/runtime evidence → AuditEvent persistence → side-effect convergence → E2E → Evidence Registry promotion.**
 
 Do not repeat Journal migration, W02 kernel prior PASS evidence, W06 source/schema evidence, inventory, or Mapping 0 closure evidence unless authoritative inputs change.
+
+## 2026-09-24 Superpowers continuation — AUTH-013 W02 Source CI correction cursor
+
+Latest main implementation head: `e76dd1740186b109471f8a8b17c84dc0f0181655`.
+
+Previous W02 Runtime Source CI Run `36003304395` failed only because the newly added concurrency test fixture attempted a non-canonical `RESTRICTED -> RESTRICTED` transition. The runtime implementation itself typechecked successfully, and 13/14 tests passed.
+
+Correction commit `e76dd1740186b109471f8a8b17c84dc0f0181655` now uses a valid `ACTIVE -> RESTRICTED` transition with a forced journal uniqueness failure to test the intended conflict path. No production implementation change was made by the correction; it is test-fixture-only.
+
+Current external evidence:
+- W02 Runtime Source CI for the corrected head has **no observed check run yet** through the connected GitHub status surface.
+- Therefore W02 Source CI = **TODO_VERIFY_EXTERNAL**.
+- No W02 deployment is admitted until the corrected Source CI is GREEN.
+
+### Current cursor
+
+**Trigger/verify corrected W02 Runtime Source CI → update Ledger → controlled W02 deployment → real Account State transition + Journal evidence → Queue producer/resource → W06 consumer/idempotency → W06 runtime deployment → AuditEvent persistence → side effects → E2E → Evidence Registry.**
+
+Manual W02 Source CI workflow:
+`https://github.com/wanghuinet/luckread/actions/workflows/w02-auth-013-runtime-source-verification.yml`
+
+After Source CI GREEN, controlled W02 deployment:
+`https://github.com/wanghuinet/luckread/actions/workflows/w02-deploy.yml`
