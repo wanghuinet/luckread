@@ -2669,3 +2669,28 @@ Current AUTH-013 cursor:
 **Manual remote runtime evidence → Queue producer/resource → W06 scoped consumer/idempotency → W06 deployment/runtime evidence → AuditEvent persistence → side-effect convergence → E2E → Evidence Registry promotion.**
 
 The remote runtime workflow has not yet been executed; therefore AUTH-013 remains **BLOCKED_NOT_GREEN**.
+
+
+## 2026-09-24 Superpowers continuation — AUTH-013 Slice 2 Queue transport implementation
+
+Current implementation chain after remote runtime PASS:
+- Backup branch created before edits: `backup/auth-013-before-queue-slice-2026-09-24`.
+- W02 now has a durable publication-journal publisher that polls PENDING AUTH-013 journal rows, publishes the canonical event to `luckread-auth013-account-state`, and marks the journal row PUBLISHED only after Queue send succeeds.
+- Queue-send failure keeps the journal PENDING with bounded retry backoff.
+- Successful Queue send followed by journal-update failure is intentionally recoverable through consumer idempotency; W06 deduplicates by `eventId`.
+- W06 now has a scoped AUTH-013 Queue consumer that validates the canonical event envelope, preserves `PLATFORM_OPERATOR` operational role, persists AuditEvent to D1-03, and treats an existing eventId as a duplicate/no-op.
+- W02 and W06 Wrangler configurations now declare the AUTH-013 producer/consumer queue contract.
+- Controlled Queue/DLQ provisioning workflow added; no Cloudflare Queue resource mutation has been executed by this repository change.
+- W02 and W06 source tests were extended for publisher/consumer behavior.
+
+Current external gates:
+- AUTH-013 remote W02 transition + Journal evidence Run `36015387059` = SUCCESS / PASS_VERIFIED.
+- W02 source CI for the new publisher slice is awaiting the automatic push-triggered result.
+- W06 source CI for the new consumer slice is awaiting the automatic push-triggered result.
+- Queue/DLQ physical resource provisioning is NOT_EXECUTED until the controlled manual workflow is run.
+
+Current cursor:
+**W02/W06 Source CI GREEN → provision Queue + DLQ → controlled W02/W06 deployment → end-to-end real Queue delivery → W06 D1-03 AuditEvent evidence → side-effect convergence → E2E → Evidence Registry promotion.**
+
+Manual Queue provisioning workflow:
+`https://github.com/wanghuinet/luckread/actions/workflows/auth-013-queue-resource-provisioning.yml`
