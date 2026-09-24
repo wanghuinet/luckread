@@ -53,7 +53,15 @@ for (const collection of inventory.collections) {
   }
 
   const discoveredByName = new Map(collection.fields.map((f) => [f.name, f]))
-  const contractedByName = new Map(contractRecord.fields.map((f) => [f.name, f]))
+  // Only fields explicitly admitted as Payload-native are reconciled against
+  // the discovered Payload configuration. Contracted domain fields with
+  // payloadNative=false are authoritative outside Payload (for example,
+  // AUTH-013 account lifecycle state owned by W02/D1-01).
+  const contractedByName = new Map(
+    contractRecord.fields
+      .filter((f) => f.payloadNative !== false)
+      .map((f) => [f.name, f]),
+  )
   const fieldResults = []
 
   for (const discovered of collection.fields) {
@@ -86,8 +94,17 @@ for (const collection of inventory.collections) {
   }
 
   for (const contracted of contractRecord.fields) {
+    if (contracted.payloadNative === false) {
+      fieldResults.push({
+        name: contracted.name,
+        status: 'NON_PAYLOAD',
+        details: ['Entity field is contractually authoritative outside Payload; Payload reconciliation is not applicable'],
+      })
+      continue
+    }
+
     if (!discoveredByName.has(contracted.name)) {
-      fieldResults.push({ name: contracted.name, status: 'MISSING', details: ['Entity field contract declares a field absent from the discovered Payload configuration'] })
+      fieldResults.push({ name: contracted.name, status: 'MISSING', details: ['Entity field contract declares a Payload-native field absent from the discovered Payload configuration'] })
       failures.push(`MISSING Payload field: ${entity.entityId}.${contracted.name}`)
     }
   }
