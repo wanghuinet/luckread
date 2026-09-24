@@ -35,8 +35,8 @@ for (const r of contract.records ?? []) {
     const baseKeys = ['fieldId', 'name', 'type', 'nullable', 'status'];
     const verifiedKeys = ['lifecycle', 'classification', 'payloadNative', 'sourceRef', 'payloadConfigRef', 'apiExposure', 'adminExposure', 'eventExposure', 'migrationVersion', 'postgresqlPortability', 'evidenceRefs'];
     for (const k of baseKeys) if (f[k] === undefined) failures.push(`${r.entityId}.${f.name || f.fieldId || 'unknown'} missing ${k}`);
-    if (r.status === 'VERIFIED') {
-      for (const k of verifiedKeys) if (f[k] === undefined) failures.push(`${r.entityId}.${f.name || f.fieldId || 'unknown'} missing ${k}`);
+    if (f.status === 'VERIFIED') {
+      for (const k of verifiedKeys) if (f[k] === undefined) failures.push(`${r.entityId}.${f.name || f.fieldId || 'unknown'} verified field missing ${k}`);
     }
 
     if (fieldIds.has(f.fieldId)) failures.push(`duplicate fieldId: ${r.entityId}.${f.fieldId}`);
