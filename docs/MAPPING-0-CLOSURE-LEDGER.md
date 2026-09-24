@@ -1942,3 +1942,31 @@ Do not repeat the verified W06 source tests, AUTH-013 D1-01 migration, or W02 13
 
 ### Current cursor
 **Controlled Cloudflare inventory → explicit W06/D1-03 physical binding decision → exact Wrangler binding → W06 deployment/smoke → AuditEvent persistence/publication → cache/session side-effect binding → E2E security/integration evidence → AUTH-013 Evidence Registry promotion.**
+
+## 2026-09-24 Superpowers continuation — W06 physical inventory evidence closed
+
+Controlled Cloudflare read-only inventory is now captured against current main:
+
+- Source head: `014a65e78a9ae52a08a5cdd992a6a98a3f816eab`.
+- Workflow Run `35954361667` = **SUCCESS**.
+- Inventory artifact: `10789896356`.
+- Artifact ZIP SHA-256: `6790aa0f0f6f920fff3b06961e367d9c76e76d5a01bce3b92f1feb264ebbc69a`.
+- Cloudflare inventory counts: **4 D1 / 2 Workers**.
+- Existing Workers observed: `luckread-w01-payload`, `luckread-w02`.
+- No physical W06 Worker resource is present in this controlled inventory.
+- D1 resources observed:
+  - `luckread` → `2f80471e-3756-49f9-8db1-7707a433ad64` (D1-01 established)
+  - `luckreadpro` → `6c342634-97f6-4248-9f4a-85772af4f22c` (D1-02 established)
+  - `secondary` → `bda1d247-a371-4244-91ae-aef96034db7f`
+  - `unimportant` → `9bfb89a5-fbb5-45b1-a2ee-eab674b0d736`
+- Current repository evidence does **not** bind either `secondary` or `unimportant` to canonical D1-03.
+- Therefore inventory evidence is **PASS_VERIFIED**, but W06 physical Worker and D1-03 physical UUID remain **NOT_ESTABLISHED**.
+- No W06 Worker, Wrangler binding, or D1-03 mutation was created/inferred from the inventory.
+- Detailed evidence record: `docs/change-control/CC-MAPPING-0-AUTH-013-W06-PHYSICAL-BINDING-INVENTORY-RESULT-2026-09-24.md`.
+
+### Current cursor
+
+**AUTH-013 → explicit physical W06 Worker + D1-03 UUID authority decision → exact Wrangler binding → controlled W06 deployment/smoke → AuditEvent persistence/publication → cache/session side-effect binding → E2E security/integration evidence → AUTH-013 Evidence Registry promotion.**
+
+Do not repeat Cloudflare inventory Run `35954361667` unless the controlled account/resource scope changes.
+
