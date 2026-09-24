@@ -2041,3 +2041,56 @@ Required inputs:
 - `confirm = DEPLOY`
 
 Do not execute D1-03 migration before successful W06 deployment and `/health` evidence.
+
+
+## 2026-09-24 Superpowers continuation — W06 Worker version uploaded; AuditEvent persistence admitted at source
+
+Controlled W06 deployment Run 35964557298 = **SUCCESS** for source fc560a42f7ab61b6e51a5b288d239430292d7e17.
+
+Verified from the deployment log:
+
+- W06 admission gates = PASS.
+- W06 D1-03 physical binding assertion = PASS.
+- TypeScript verification = PASS.
+- Wrangler = 4.116.0.
+- Cloudflare resolved env.D1_03 (secondary) as a D1 Database.
+- W06 Worker luckread-w06 uploaded successfully.
+- Cloudflare Version ID = bb5cf8a7-f912-46df-8b60-c8f74c24fd8b.
+- Cloudflare reported "No targets deployed for luckread-w06"; therefore this run proves Worker version upload/binding resolution, but does not prove an HTTP /health target is reachable.
+
+No repeat of prior W06 source, Mapping 0, Feature Inventory, or AUTH-013 W02 evidence is required.
+
+### AuditEvent D1-03 source admission
+
+The following source artifacts are now on GitHub main:
+
+- workers/W06-governance/migrations/0001_audit_event.sql
+- .github/workflows/w06-audit-event-migration.yml
+- workers/W06-governance/migrations/README.md
+
+The migration is intentionally limited to the canonical AuditEvent schema boundary:
+
+- target D1 domain: D1-03;
+- target physical D1 UUID: bda1d247-a371-4244-91ae-aef96034db7f;
+- canonical table: audit_events;
+- immutable event record with JSON actor/before/after payloads;
+- action/length constraints derived from contracts/schemas/common/audit-event.json;
+- immutable UPDATE/DELETE database triggers;
+- action and target/time indexes.
+
+The controlled migration workflow is fail-closed when audit_events already exists and performs local SQLite invariant validation before any remote mutation.
+
+Source commits:
+- migration: 8fc582f2966174f14ddc8e916b4e43380d39b629
+- controlled migration workflow: ebb62baef17e01c57e588e200aa6c5bd44844ba5
+- migration README admission record: aebcdac17b0b535e9376ea252c5f40f861e62653
+
+**Remote D1-03 mutation has NOT been executed by these source commits.**
+
+### Current cursor
+
+**W06 source-level AuditEvent persistence → controlled D1-03 migration execution → persistence runtime integration → identity.account_state_changed publication → cache/session side-effect binding → E2E security/integration evidence → AUTH-013 Evidence Registry promotion.**
+
+For the remote migration, use the controlled workflow only after its source-level evidence is admitted. Manual trigger URL:
+
+https://github.com/wanghuinet/luckread/actions/workflows/w06-audit-event-migration.yml
