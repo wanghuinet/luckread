@@ -38,10 +38,39 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
-          for workflow in contract-ci.yml mapping-0-structural-ci.yml ensure-feature-inventory.yml auth-013-persistence-schema-evidence.yml; do
+
+          for workflow in mapping-0-structural-ci.yml ensure-feature-inventory.yml auth-013-persistence-schema-evidence.yml w06-audit-event-source-ci.yml; do
             conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --commit "$SOURCE_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
             test "$conclusion" = "success" || {
-              echo "Required gate $workflow is not SUCCESS for $SOURCE_SHA (observed: ${conclusion:-none})"
+              echo "Required workflow $workflow is not SUCCESS for $SOURCE_SHA (observed: ${conclusion:-none})"
+              exit 1
+            }
+          done
+
+          contract_run="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow contract-ci.yml --commit "$SOURCE_SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          test -n "$contract_run" || {
+            echo "No Contract CI run found for $SOURCE_SHA"
+            exit 1
+          }
+
+          required_jobs=(
+            "Blueprint Feature Inventory Gate"
+            "Contract Admission Gate (state-machines)"
+            "Contract Admission Gate (openapi)"
+            "Mapping 0 Structural/Contract Gate"
+            "Contract Admission Gate (authz)"
+            "Contract Admission Gate (common)"
+            "Semantic Cross-Contract Gate"
+            "Payload Contract Reconciliation Gate"
+            "Contract Admission Gate (enums)"
+            "Capability Contract Graph Gate"
+          )
+
+          jobs_json="$(gh run view "$contract_run" --repo "$GITHUB_REPOSITORY" --json jobs)"
+          for job in "${required_jobs[@]}"; do
+            conclusion="$(jq -r --arg name "$job" '.jobs[] | select(.name == $name) | .conclusion // empty' <<< "$jobs_json")"
+            test "$conclusion" = "success" || {
+              echo "Required Contract CI core job failed or is missing: $job (observed: ${conclusion:-none})"
               exit 1
             }
           done
