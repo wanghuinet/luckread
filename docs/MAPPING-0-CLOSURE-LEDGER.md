@@ -1989,3 +1989,28 @@ Current cursor:
 
 Do not repeat the 4-D1/2-Worker Cloudflare inventory unless account/resource scope changes. The latest controlled inventory Run `35956155450` = SUCCESS at head `171393342f276932aa940b5800e9ce5136a6692e` is inherited for this decision.
 
+## 2026-09-24 Superpowers continuation — W06 controlled deployment admission closed
+
+The W06 deployment candidate is now admitted at source scope:
+
+- Candidate source SHA: `eb9f33dda3e9892f1814d34bbe4c8327a1ba2dde`.
+- Mapping 0 Structural Gate Run `35958357483` = SUCCESS.
+- Feature Inventory Run `35958357443` = SUCCESS.
+- AUTH-013 Persistence Schema Evidence Run `35958357450` = SUCCESS.
+- W06 Audit Event Source CI Run `35958357489` = SUCCESS:
+  - source TypeScript = SUCCESS;
+  - runtime shell TypeScript = SUCCESS;
+  - AuditEvent tests = SUCCESS.
+- Contract admission is inherited from Run `35957666015` at base `367534dc07806a9b9f9a1b85ae8ecf42a7ae4afc`; all core Contract jobs succeeded and only downstream Five-Way/R4-Evidence-R5 failed.
+- The source delta contains only admitted W06 runtime/evidence files and W06 workflow files; no Contract/Blueprint/Entity authority input was changed.
+- Deployment admission record: `docs/change-control/CC-MAPPING-0-AUTH-013-W06-DEPLOYMENT-ADMISSION-BASE-2026-09-24.md`.
+
+### Current cursor
+
+**Manual controlled W06 deployment at `eb9f33dda3e9892f1814d34bbe4c8327a1ba2dde` → Cloudflare Worker/version evidence → /health smoke evidence → D1-03 AuditEvent schema/migration admission.**
+
+Manual trigger URL:
+https://github.com/wanghuinet/luckread/actions/workflows/w06-deploy.yml
+
+Do not promote W06 deployment/runtime status before the controlled workflow produces execution evidence. Do not execute D1-03 migration as part of the deployment-shell step.
+
