@@ -94,7 +94,7 @@ jobs:
           const required = [
             '"name": "luckread-w06"',
             '"binding": "D1_03"',
-            '"database_id": "bda1d247-a371-4244-91ae-aef96034db7f"'
+            '"database_id": "bda1d247-a371-4244-91ae-aef9607b0736"'
           ]
           for (const value of required) {
             if (!text.includes(value)) throw new Error(`Missing required binding assertion: ${value}`)
@@ -105,7 +105,7 @@ jobs:
         run: npm ci
 
       - name: TypeScript verification
-        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck workers/W06-governance/src/index.ts
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/index.ts
 
       - name: Deploy W06 with pinned Wrangler
         working-directory: workers/W06-governance
