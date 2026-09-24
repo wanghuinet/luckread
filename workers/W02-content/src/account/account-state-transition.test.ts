@@ -71,23 +71,23 @@ describe('AUTH-013 account-state transition kernel', () => {
   })
 
   it('requires the canonical permission for operator enforcement', async () => {
-    const fake = fakeDb({ state: 'ACTIVE', version: 1 })
+    const fake = fakeDb({ state: 'ACTIVE', version: 7 })
 
     await expect(applyAccountStateTransition(fake.db, input({ permission: 'user.freeze' }))).rejects.toMatchObject({ code: 'FORBIDDEN' })
     expect(fake.writes()).toBe(0)
   })
 
   it('requires L7 approval for ACTIVE -> BANNED', async () => {
-    const fake = fakeDb({ state: 'ACTIVE', version: 3 })
+    const fake = fakeDb({ state: 'ACTIVE', version: 7 })
 
     await expect(applyAccountStateTransition(fake.db, input({ to: 'BANNED', permission: 'user.ban', approvalLevel: null }))).rejects.toMatchObject({ code: 'FORBIDDEN' })
 
     const result = await applyAccountStateTransition(fake.db, input({ to: 'BANNED', permission: 'user.ban', approvalLevel: 'L7' }))
-    expect(result).toEqual({ from: 'ACTIVE', to: 'BANNED', accountStateVersion: 4 })
+    expect(result).toEqual({ from: 'ACTIVE', to: 'BANNED', accountStateVersion: 8 })
   })
 
   it('fails closed when a required lifecycle precondition is not proven', async () => {
-    const fake = fakeDb({ state: 'PENDING_VERIFICATION', version: 1 })
+    const fake = fakeDb({ state: 'PENDING_VERIFICATION', version: 7 })
 
     await expect(
       applyAccountStateTransition(
