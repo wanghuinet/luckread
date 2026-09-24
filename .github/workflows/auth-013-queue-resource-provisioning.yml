@@ -34,11 +34,11 @@ jobs:
         run: npm install --global wrangler@4.116.0
 
       - name: Inspect existing queues
-        run: wrangler queues list --json > queues-before.json
+        run: wrangler queues list > queues-before.txt
 
       - name: Create AUTH-013 queue if missing
         run: |
-          if node -e "const fs=require('fs'); const x=JSON.parse(fs.readFileSync('queues-before.json','utf8')); process.exit(Array.isArray(x)&&x.some(q=>q.queue_name==='luckread-auth013-account-state')?0:1)"; then
+          if grep -Fq 'luckread-auth013-account-state' queues-before.txt; then
             echo "AUTH013_QUEUE_EXISTS=true"
           else
             wrangler queues create luckread-auth013-account-state
@@ -46,7 +46,7 @@ jobs:
 
       - name: Create AUTH-013 DLQ if missing
         run: |
-          if node -e "const fs=require('fs'); const x=JSON.parse(fs.readFileSync('queues-before.json','utf8')); process.exit(Array.isArray(x)&&x.some(q=>q.queue_name==='luckread-auth013-account-state-dlq')?0:1)"; then
+          if grep -Fq 'luckread-auth013-account-state-dlq' queues-before.txt; then
             echo "AUTH013_DLQ_EXISTS=true"
           else
             wrangler queues create luckread-auth013-account-state-dlq
@@ -54,13 +54,8 @@ jobs:
 
       - name: Verify queue inventory
         run: |
-          wrangler queues list --json > queues-after.json
-          node <<'NODE'
-          const fs = require('fs')
-          const queues = JSON.parse(fs.readFileSync('queues-after.json', 'utf8'))
-          const names = new Set(queues.map(q => q.queue_name))
-          for (const name of ['luckread-auth013-account-state', 'luckread-auth013-account-state-dlq']) {
-            if (!names.has(name)) throw new Error('Missing queue: ' + name)
-          }
-          console.log('AUTH-013_QUEUE_RESOURCES_GREEN')
-          NODE
+          wrangler queues list > queues-after.txt
+          for name in luckread-auth013-account-state luckread-auth013-account-state-dlq; do
+            grep -Fq "$name" queues-after.txt || { echo "Missing queue: $name"; exit 1; }
+          done
+          echo "AUTH-013_QUEUE_RESOURCES_GREEN"
