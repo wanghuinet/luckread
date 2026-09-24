@@ -1,6 +1,7 @@
+import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
 
-interface Env { D1_01: D1Database }
+interface Env { D1_01: D1Database; AUTH013_QUEUE: Queue }
 
 type ResolveLayerRequest = {
   subjectId: string
@@ -39,5 +40,9 @@ export default {
       }
     }
     return new Response(null, { status: 404 })
+  },
+
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    await publishPendingAccountStateEvents(env)
   },
 }
