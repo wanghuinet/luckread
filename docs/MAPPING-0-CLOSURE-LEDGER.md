@@ -2459,3 +2459,49 @@ These are **PROPOSED / NOT_AUTHORIZED** values, not implementation approval. Any
 The next gate is now a single explicit Authority Decision with all three values, e.g. `Q1=A; Q2=B; Q3=C`. Until then AUTH-013 remains BLOCKED_NOT_GREEN / IMPLEMENTATION_NOT_AUTHORIZED.
 
 No runtime code, migration, Worker/D1/Queue resource, deployment, or CI was changed or triggered by this slice.
+
+
+## 2026-09-24 Superpowers continuation — AUTH-013 authority gate approved and minimum Contract Delta admitted
+
+Current main checkpoint after authority/contract admission commits:
+- Authority decision commit: `c6454118232b919454123fa770c1185deccf78fd`
+- Common Actor contract commit: `2ba3311d5b33422cabbf0621fdd73661e4f7b2f5`
+- Event contract commit: `788d8c0efa7edf8649810e56397389f468fc167c`
+- Minimum Contract Delta decision material: `a0fc47fe84918e34379b594907f2c0c000960421`
+
+### Authority decision
+
+User explicitly authorized Superpowers to make the remaining technical decision according to the canonical Blueprint/Worker/D1 contracts and large-scale platform engineering standards.
+
+Approved values:
+- Q1 = **A** — W02/D1-01-local durable publication journal, atomically committed with Account State.
+- Q2 = **B** — W06 scoped AUTH-013 Queue consumer.
+- Q3 = **C** — Common Actor security principal class remains separate from the operational role; PLATFORM_OPERATOR is represented as `actorType=user` + `operationalRole=PLATFORM_OPERATOR`.
+
+No new Worker/D1 is introduced. W10 retains generic async/queue/job responsibility without AUTH-013 Primary Task ownership.
+
+### Minimum Contract Delta
+
+Admitted:
+- bounded `operationalRole` field on Common Actor;
+- versioned `identity.account_state_changed.v1` event contract;
+- D1-01-local durable publication-journal boundary;
+- isolated AUTH-013 Queue + DLQ names;
+- W06 as the sole admitted active consumer;
+- at-least-once, per-resource ordering and consumer idempotency semantics.
+
+Not changed:
+- Worker count 12;
+- D1 count 4;
+- canonical Account State machine transition matrix;
+- W02/D1-01 business authority;
+- W06/D1-03 AuditEvent authority;
+- public operation topology.
+
+### Current cursor
+
+**Contract CI / reconciliation of the admitted delta → journal migration contract → W02 atomic transition+journal implementation → Queue producer → W06 scoped consumer/idempotency → source CI → controlled runtime evidence → real transition → AuditEvent/side-effect E2E → Evidence Registry.**
+
+The authority gate is now closed. AUTH-013 is no longer blocked on Q1/Q2/Q3; it remains **implementation-in-progress / not GREEN** until executable and runtime evidence is produced.
+
+Do not rerun inherited W02 Transition Kernel, W06 Source CI, D1-03 schema evidence, Cloudflare inventory, or W06 upload evidence unless an authoritative input changes.
