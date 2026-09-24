@@ -1892,3 +1892,18 @@ Disposition:
 
 ### Current cursor
 **AUTH-013 → downstream transition side-effect/integration contracts and executable evidence; do not repeat D1 migration or W02 kernel unit tests unless inputs change.**
+
+
+## 2026-09-24 Superpowers continuation — AUTH-013 side-effect integration boundary narrowed
+
+- Canonical Worker Master confirms W06 = Rights / Trust & Safety / Governance with D1-03 authority.
+- Canonical Audit Event schema is `contracts/schemas/common/audit-event.json`; its authoritative writer is W06 / D1-03.
+- Current repository evidence does not establish an executable W06 AuditEvent writer or an executable `identity.account_state_changed` producer.
+- Existing physical worker layout evidence records `workers/W06-media` as a mismatch against the canonical W06 responsibility; directory naming is not permitted to establish current Worker authority.
+- Therefore AUTH-013 side-effect implementation is **BLOCKED_PENDING_W06_RUNTIME_BINDING**, not because the W02 kernel is incomplete, but because the authoritative Audit/Event execution boundary is not yet evidence-bound.
+- Decision input: `docs/change-control/CC-MAPPING-0-AUTH-013-SIDE-EFFECT-INTEGRATION-DECISION-INPUT-2026-09-24.md`.
+
+### Current cursor
+**AUTH-013 → establish/recover canonical W06 Audit/Event runtime binding → bind existing cache/session side-effect authorities → implement end-to-end transition side effects → security/integration evidence.**
+
+Do not repeat the verified D1-01 migration or W02 13-test transition-kernel slice unless an input/evidence scope changes.
