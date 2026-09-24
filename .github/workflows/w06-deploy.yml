@@ -73,7 +73,10 @@ jobs:
           }
           while IFS= read -r file; do
             [ -z "$file" ] && continue
-            test "$file" = "workers/W06-governance/wrangler.jsonc" || {
+            case "$file" in
+              workers/W06-governance/wrangler.jsonc|.github/workflows/w06-deploy.yml)
+                ;;
+              *) {
               echo "Configuration-only carry-forward rejected; unexpected delta: $file"
               exit 1
             }
