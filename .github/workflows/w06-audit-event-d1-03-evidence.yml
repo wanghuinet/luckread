@@ -78,10 +78,10 @@ jobs:
           for (const name of required) if (!names.has(name)) throw new Error('missing column: ' + name)
           const count = read('count.json')?.[0]?.results?.[0]?.audit_events_count
           if (Number(count) !== 0) throw new Error('unexpected audit_events row count: ' + count)
-          const triggers = read('triggers')?.[0]?.results ?? []
+          const triggers = read('triggers.json')?.[0]?.results ?? []
           if (!triggers.some((r) => r.name === 'audit_events_immutable_update')) throw new Error('missing immutable UPDATE trigger')
           if (!triggers.some((r) => r.name === 'audit_events_immutable_delete')) throw new Error('missing immutable DELETE trigger')
-          const migrations = read('d1-migrations')?.[0]?.results ?? []
+          const migrations = read('d1-migrations.json')?.[0]?.results ?? []
           if (!migrations.some((r) => r.name === '0001_audit_event.sql')) throw new Error('migration history missing 0001_audit_event.sql')
           console.log(JSON.stringify({
             W06_AUDIT_EVENT_D1_03_EVIDENCE: 'PASS',
