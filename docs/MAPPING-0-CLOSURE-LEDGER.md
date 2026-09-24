@@ -2643,3 +2643,29 @@ Controlled W02 deployment workflow:
 `https://github.com/wanghuinet/luckread/actions/workflows/w02-deploy.yml`
 
 Deployment remains a separate gate because the current production implementation was introduced by commit `763a857759233c5a23d7bd733a72e0729b20a373`; Source CI proves the source slice, not production deployment/runtime evidence.
+
+## 2026-09-24 Superpowers continuation — AUTH-013 real remote transition evidence gate
+
+The AUTH-013 Journal physical persistence gate is already inherited as PASS_VERIFIED:
+
+- Journal static verification Run `36000971085` = SUCCESS.
+- Controlled D1-01 Journal migration Run `36000833449` = SUCCESS.
+- W02 source implementation admitted at `763a857759233c5a23d7bd733a72e0729b20a373`.
+- Controlled W02 deployment Run `36009755315` = SUCCESS for that exact implementation source.
+
+A new CI-only runtime evidence path is now admitted:
+
+- Workflow: `.github/workflows/auth-013-w02-remote-runtime-evidence.yml`.
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTH-013-REMOTE-RUNTIME-EVIDENCE-ADMISSION-2026-09-24.md`.
+- Environment class: `CONTROLLED_REMOTE_D1_CODEPATH`.
+- Method: ephemeral `wrangler dev --remote` harness invoking the exact admitted `applyAccountStateTransition()` source against real D1-01.
+- Safety gate: fail closed unless `users_count = 0` and the AUTH-013 publication journal is empty.
+- Probe scope: one synthetic User, one `ACTIVE -> RESTRICTED` transition, one stale-version rejection, exact Journal/event readback, mandatory cleanup.
+
+This workflow is evidence-only and does not create a production route or alter the Worker/D1 topology.
+
+Current AUTH-013 cursor:
+
+**Manual remote runtime evidence → Queue producer/resource → W06 scoped consumer/idempotency → W06 deployment/runtime evidence → AuditEvent persistence → side-effect convergence → E2E → Evidence Registry promotion.**
+
+The remote runtime workflow has not yet been executed; therefore AUTH-013 remains **BLOCKED_NOT_GREEN**.
