@@ -29,7 +29,7 @@ This Change Control now establishes the physical allocation for the frozen four-
 | Logical authority | Physical resource | Basis |
 |---|---|---|
 | D1-01 | `2f80471e-3756-49f9-8db1-7707a433ad64` | Existing admitted binding |
-| D1-02 | `6c342634-97f6-4244-91f9-4a85772af4f22c` | Existing admitted binding |
+| D1-02 | `6c342634-97f6-4248-9f4a-85772af4f22c` | Existing admitted binding |
 | D1-03 | `bda1d247-a371-4244-91ae-aef96034db7f` | **Explicit allocation decision**: first-created of the two remaining unassigned D1 resources |
 | D1-04 | `9bfb89a5-fbb5-45b1-a2ee-eab674b0d736` | **Explicit allocation decision**: second-created of the two remaining unassigned D1 resources |
 
