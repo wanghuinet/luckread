@@ -48,9 +48,11 @@ jobs:
           }
           NODE
 
+      - name: Install repository dependencies
+        run: npm ci
+
       - name: TypeScript verification
-        working-directory: workers/W06-governance
-        run: npx --yes typescript@5.9.3 --noEmit
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck workers/W06-governance/src/index.ts
 
       - name: Deploy W06 with pinned Wrangler
         working-directory: workers/W06-governance
