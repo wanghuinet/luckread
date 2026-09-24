@@ -79,18 +79,24 @@ jobs:
           echo "Observed Cloudflare Queue consumers:"
           jq -c '.result[] | {type,script_name,queue_name,dead_letter_queue,settings}' consumers.json
 
-          worker_queue_count="$(jq --arg worker "$W06_NAME" --arg queue "$QUEUE_NAME" '
-            [.result[] | select(.script_name == $worker and .queue_name == $queue)] | length
+          rest_queue_count="$(jq --arg queue "$QUEUE_NAME" '
+            [.result[] | select(.queue_name == $queue)] | length
           ' consumers.json)"
-          dlq_match_count="$(jq --arg worker "$W06_NAME" --arg queue "$QUEUE_NAME" --arg dlq "$DLQ_NAME" '
-            [.result[] | select(.script_name == $worker and .queue_name == $queue and .dead_letter_queue == $dlq)] | length
+          rest_dlq_match_count="$(jq --arg queue "$QUEUE_NAME" --arg dlq "$DLQ_NAME" '
+            [.result[] | select(.queue_name == $queue and .dead_letter_queue == $dlq)] | length
           ' consumers.json)"
 
-          echo "W06_QUEUE_CONSUMER_COUNT=$worker_queue_count"
-          echo "W06_QUEUE_DQL_EXACT_MATCH_COUNT=$dlq_match_count"
+          wrangler_worker_count="$(jq --arg worker "$W06_NAME" --arg dlq "$DLQ_NAME" '
+            [.[] | select(.script == $worker and .dead_letter_queue == $dlq)] | length
+          ' wrangler-consumers.json)"
 
-          test "$worker_queue_count" = "1"
-          test "$dlq_match_count" = "1"
+          echo "W06_QUEUE_REST_CONSUMER_COUNT=$rest_queue_count"
+          echo "W06_QUEUE_REST_DLQ_MATCH_COUNT=$rest_dlq_match_count"
+          echo "W06_QUEUE_WRANGLER_WORKER_COUNT=$wrangler_worker_count"
+
+          test "$rest_queue_count" = "1"
+          test "$rest_dlq_match_count" = "1"
+          test "$wrangler_worker_count" = "1"
 
           echo "AUTH_013_W06_CONSUMER_BINDING=PASS"
 
