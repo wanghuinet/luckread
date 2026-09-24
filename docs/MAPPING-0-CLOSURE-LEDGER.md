@@ -2094,3 +2094,28 @@ Source commits:
 For the remote migration, use the controlled workflow only after its source-level evidence is admitted. Manual trigger URL:
 
 https://github.com/wanghuinet/luckread/actions/workflows/w06-audit-event-migration.yml
+
+
+## 2026-09-24 Superpowers continuation — W06 AuditEvent persistence source boundary added
+
+The next source slice is now committed on main:
+
+- persistence boundary: workers/W06-governance/src/audit-event-persistence.ts
+- persistence tests: workers/W06-governance/src/audit-event-persistence.test.ts
+- source CI updated to typecheck the persistence boundary and run both AuditEvent test files.
+- persistence source commit: 7110a43d03edc971a21838d4557bbfaf45244c7d
+- persistence tests commit: 3af79183633f46539c887c35f887f9aaddb7bd09
+- source CI update commit: d7b56be0290dfe423a4db5800321dd741dc3bfc9
+
+The persistence boundary performs only an insert into audit_events using the canonical event representation. It does not change W02 authority, publish the account-state event, or implement cache/session side effects.
+
+Current verification state:
+
+- latest main = d7b56be0290dfe423a4db5800321dd741dc3bfc9
+- commit status = **PENDING**; no completed status evidence is available yet for this new source slice.
+- previously verified W06 deployment Run 35964557298 remains inherited.
+- remote D1-03 AuditEvent migration remains **NOT EXECUTED**.
+
+### Current cursor
+
+**W06 persistence source CI → controlled D1-03 migration → persistence runtime integration → identity.account_state_changed publication → cache/session side-effect binding → E2E security/integration evidence → AUTH-013 Evidence Registry promotion.**
