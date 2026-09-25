@@ -2854,3 +2854,32 @@ Corrective main commit: 87d628fc03bb776b5d32ea3c0f8fca49fe1e6882.
 Manual workflow: https://github.com/wanghuinet/luckread/actions/workflows/auth-013-positive-runtime-evidence.yml
 
 Do not repeat session-invalidation runtime evidence Run 36086834341; that sub-gate is already PASS_VERIFIED.
+
+
+## 2026-09-25 — AUTH-013 Positive Runtime Transport Evidence VERIFIED
+
+Current evidence-registration head: `bb31c799b06e396870e35bf010c2700730f40ad0`.
+
+- Positive Runtime Transport Run `36090709083` = **SUCCESS**.
+- Tested source head: `20735b3ddd12e0e33814dd57a85769ac9343acd9`.
+- The controlled runtime executed the real W02 `ACTIVE → RESTRICTED` transition against D1-01.
+- Durable AUTH-013 Journal publication was observed.
+- Queue `luckread-auth013-account-state` delivery and W06 consumer processing were observed.
+- Immutable D1-03 AuditEvent persistence was observed.
+- Synthetic W02 User/Journal records were cleaned; immutable AuditEvent evidence was retained.
+- Artifact `10845159205`, digest `sha256:b86b2263341753a1b61171f0e1b1ef819ea2cdffcc29baf2b36a78b4bab2ebc4`.
+- Evidence Registry record `EVD-AUTH013-POSITIVE-RUNTIME-TRANSPORT-001` is now **VERIFIED**.
+
+This closes the real transport/persistence sub-gate:
+
+`W02 transition → D1-01 Journal → Queue → W06 consumer → D1-03 AuditEvent`.
+
+Do not repeat this runtime probe unless an authoritative implementation input or tested scope changes.
+
+### Current cursor
+
+**AUTH-013 lifecycle side-effect convergence (authorization-cache/version propagation + feed/search/content projection/deindex semantics) → security/integration E2E evidence → final Evidence Registry reconciliation → evaluate AUTH-013 GREEN.**
+
+Current repository evidence does not establish an admitted executable W04 projection/deindex runtime or a separate canonical cache-invalidation runtime boundary for these side effects. Therefore no new Worker, Queue, D1 table, projection store, or public workaround is inferred or added merely to manufacture GREEN.
+
+AUTH-013 remains **BLOCKED_NOT_GREEN**.
