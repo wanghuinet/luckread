@@ -333,7 +333,7 @@ jobs:
         run: |
           set -euo pipefail
           node - <<'NODE'
-          const fs = require('node:fs');
+          import fs from 'node:fs';
           const path = 'artifacts/mapping-0/auth-013-positive-runtime/probe-identifiers.json';
           if (!fs.existsSync(path)) process.exit(0);
 
