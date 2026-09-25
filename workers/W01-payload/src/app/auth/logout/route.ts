@@ -71,5 +71,10 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
 
-  return json({}, 204)
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'cache-control': 'no-store',
+    },
+  })
 }
