@@ -54,6 +54,20 @@ function bytesToBase64Url(bytes: Uint8Array): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 }
 
+function encodeVersionedRefreshToken(tokenVersion: number, rawToken: string): string {
+  if (!Number.isInteger(tokenVersion) || tokenVersion < 0 || !rawToken) {
+    throw new SessionRuntimeError('INVALID_INPUT', 'refresh token version is invalid')
+  }
+  return 'v' + tokenVersion + '.' + rawToken
+}
+
+function parseRefreshTokenVersion(refreshToken: string): number | null {
+  const match = /^v(\d+)\.(.+)$/.exec(refreshToken)
+  if (!match) return null
+  const version = Number(match[1])
+  return Number.isSafeInteger(version) && version >= 0 ? version : null
+}
+
 function assertDeviceId(deviceId: string): void {
   if (typeof deviceId !== 'string' || deviceId.length < 1 || deviceId.length > 128) {
     throw new SessionRuntimeError('INVALID_INPUT', 'deviceId must be 1-128 characters')
@@ -99,7 +113,7 @@ export async function createSessionExtension(
     options.execute ??
     (async (database, sql, bindings) => database.prepare(sql).bind(...bindings).run())
 
-  const refreshToken = randomToken()
+  const refreshToken = encodeVersionedRefreshToken(tokenVersion, randomToken())
   const refreshCredentialHash = await hashToken(refreshToken)
   const sql = `
     INSERT INTO auth_session_state
@@ -179,7 +193,7 @@ async function rotateLoadedRefreshCredential(
   randomToken: () => string,
   hashToken: (token: string) => Promise<string>,
 ): Promise<{ refreshToken: string; refreshCredentialHash: string }> {
-  const refreshToken = randomToken()
+  const refreshToken = encodeVersionedRefreshToken(session.tokenVersion, randomToken())
   const refreshCredentialHash = await hashToken(refreshToken)
 
   const updateSql = `
@@ -225,8 +239,15 @@ export async function rotateRefreshCredential(
   }
 
   const hashToken = input.hashToken ?? DEFAULT_HASH_TOKEN
+  const credentialVersion = parseRefreshTokenVersion(input.refreshToken)
+  if (credentialVersion === null) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'invalid refresh credential')
+  }
   const refreshCredentialHash = await hashToken(input.refreshToken)
   const session = await loadRefreshSession(db, refreshCredentialHash)
+  if (credentialVersion !== session.tokenVersion) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'invalid refresh credential')
+  }
   assertRefreshSessionUsable(session, input.deviceId, input.now)
 
   const randomToken = input.randomToken ?? DEFAULT_RANDOM_TOKEN
@@ -408,6 +429,7 @@ export async function establishSessionFromAuthoritativeD1(
 
   return {
     ...extension,
+    tokenVersion: 1,
     nativeExpiresAt: context.session.expiresAt,
   }
 }
@@ -496,8 +518,16 @@ export async function refreshSessionFromAuthoritativeD1(
   }
 
   const hashToken = input.hashToken ?? DEFAULT_HASH_TOKEN
+  const credentialVersion = parseRefreshTokenVersion(input.refreshToken)
+  if (credentialVersion === null) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'invalid refresh credential')
+  }
   const refreshCredentialHash = await hashToken(input.refreshToken)
   const context = await loadAuthoritativeRefreshContext(db, refreshCredentialHash)
+
+  if (credentialVersion !== context.session.tokenVersion) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'invalid refresh credential')
+  }
 
   assertRefreshSessionUsable(context.session, input.deviceId, now)
 
@@ -527,6 +557,7 @@ export async function refreshSessionFromAuthoritativeD1(
     sessionId: context.session.sessionId,
     userId: context.session.userId,
     refreshToken: rotated.refreshToken,
+    tokenVersion: context.session.tokenVersion,
     layer: layerResolution.layer,
     nativeExpiresAt: context.session.nativeExpiresAt,
     email: context.email,
