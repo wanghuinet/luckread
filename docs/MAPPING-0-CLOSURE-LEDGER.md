@@ -2815,3 +2815,24 @@ Manual workflow:
 https://github.com/wanghuinet/luckread/actions/workflows/auth-013-session-invalidation-runtime-evidence.yml
 
 AUTH-013 remains **BLOCKED_NOT_GREEN**.
+
+
+## 2026-09-25 — AUTH-013 Session Invalidation Runtime Evidence VERIFIED
+
+Run 36086834341 is accepted as execution evidence for the admitted session-invalidation runtime slice.
+
+- Workflow: .github/workflows/auth-013-session-invalidation-runtime-evidence.yml
+- Tested main head: 196da842abbd83e695181843efdb9aeca3a49328
+- Run status: completed / success
+- Environment: CONTROLLED_REMOTE_D1_CODEPATH
+- Real D1-01 probe: ACTIVE to SUSPENDED
+- Verified: account_state = SUSPENDED, account_state_version = 2, target auth_session_state.revoked_at non-null, previously issued refresh credential rejected with UNAUTHENTICATED, and synthetic security/session records cleaned.
+- Evidence Registry record: EVD-AUTH013-SESSION-INVALIDATION-REMOTE-001 with status VERIFIED.
+
+This is an evidence-only reconciliation change and does not alter the tested implementation inputs. Previously verified W02 kernel, Journal, Queue/DLQ, W06 consumer/deployment, and session-invalidation source gates are inherited without re-execution.
+
+### Current cursor
+
+AUTH-013 lifecycle side-effect convergence (deindex/projection) -> security/E2E evidence -> final Evidence Registry reconciliation -> evaluate AUTH-013 GREEN.
+
+The session-invalidation runtime gate is closed and must not be rerun unless its authoritative implementation inputs change. AUTH-013 remains BLOCKED_NOT_GREEN because lifecycle side effects and final security/E2E closure are still outstanding.
