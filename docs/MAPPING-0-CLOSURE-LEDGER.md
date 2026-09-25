@@ -2883,3 +2883,25 @@ Do not repeat this runtime probe unless an authoritative implementation input or
 Current repository evidence does not establish an admitted executable W04 projection/deindex runtime or a separate canonical cache-invalidation runtime boundary for these side effects. Therefore no new Worker, Queue, D1 table, projection store, or public workaround is inferred or added merely to manufacture GREEN.
 
 AUTH-013 remains **BLOCKED_NOT_GREEN**.
+
+
+## 2026-09-25 — AUTH-013 Public Transport Dependency Reconciled
+
+Current main after dependency record: `2e0ce1561ce5882ae041e0f1dc02aab040084fe0`.
+
+A current-head inspection confirmed that the remaining public AUTH-013 transport cannot be safely admitted as a standalone route because the W02 transition kernel requires authoritative actor/permission/approval context and the repository does not yet contain verified W01 `authLogin/authRefresh` runtime evidence or an admitted trusted-principal propagation mechanism for this operation.
+
+Recorded Change Control:
+`docs/change-control/CC-MAPPING-0-AUTH-013-PUBLIC-TRANSPORT-DEPENDENCY-2026-09-25.md`.
+
+This is a dependency classification only. No API, Worker, D1, Contract, or authorization rule was changed.
+
+### Next cursor
+
+**E6 Runtime-003 — controlled `authLogin/authRefresh` runtime binding/evidence.**
+
+This is a direct prerequisite for public AUTH-013 security/integration E2E. Do not invent a parallel W01 authorization path and do not accept client-supplied actor/permission/approval fields.
+
+The independent Feed/Recommendation/Search lifecycle side-effect boundary remains unresolved until an executable W04 derived-projection/deindex runtime is formally admitted; the legacy `workers/W04-social` directory is not treated as canonical Worker authority.
+
+AUTH-013 remains **BLOCKED_NOT_GREEN**.
