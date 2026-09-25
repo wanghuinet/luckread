@@ -3,6 +3,7 @@ import { resolveGlobalLayer } from './authz/role-assignment.js'
 import {
   establishSessionFromAuthoritativeD1,
   refreshSessionFromAuthoritativeD1,
+  revokeSessionExtension,
 } from './session/session-runtime.js'
 
 interface Env { D1_01: D1Database; AUTH013_QUEUE: Queue }
