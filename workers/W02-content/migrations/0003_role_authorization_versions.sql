@@ -12,3 +12,24 @@ CREATE TABLE role_authorization_versions (
 
 CREATE INDEX role_authorization_versions_updated_at_idx
   ON role_authorization_versions(updated_at);
+
+CREATE TRIGGER role_authorization_versions_on_role_assignment_insert
+AFTER INSERT ON role_assignments
+BEGIN
+  INSERT INTO role_authorization_versions (subject_id, role_version, updated_at)
+  VALUES (NEW.subject_id, 1, CURRENT_TIMESTAMP)
+  ON CONFLICT(subject_id) DO UPDATE SET
+    role_version = role_authorization_versions.role_version + 1,
+    updated_at = CURRENT_TIMESTAMP;
+END;
+
+CREATE TRIGGER role_authorization_versions_on_role_assignment_change
+AFTER UPDATE OF status, valid_from, valid_until, subject_id, role_id, scope_type, scope_id
+ON role_assignments
+BEGIN
+  INSERT INTO role_authorization_versions (subject_id, role_version, updated_at)
+  VALUES (NEW.subject_id, 1, CURRENT_TIMESTAMP)
+  ON CONFLICT(subject_id) DO UPDATE SET
+    role_version = role_authorization_versions.role_version + 1,
+    updated_at = CURRENT_TIMESTAMP;
+END;
