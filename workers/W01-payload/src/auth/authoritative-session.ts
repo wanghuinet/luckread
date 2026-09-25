@@ -4,6 +4,7 @@ export type D1DatabaseLike = {
   prepare(sql: string): {
     bind(...values: unknown[]): {
       first<T = unknown>(): Promise<T | null>
+      run(): Promise<unknown>
     }
   }
 }
