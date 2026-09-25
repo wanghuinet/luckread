@@ -6,6 +6,13 @@ export const Users: CollectionConfig = {
     useAsTitle: 'email',
   },
   auth: true,
+  // AUTH-001 contract: account registration is anonymous/public. Keep the
+  // public boundary limited to creation; read/update/delete remain protected
+  // by Payload's default authenticated access control until explicit rules
+  // are defined at the canonical API boundary.
+  access: {
+    create: () => true,
+  },
   fields: [
     {
       name: 'username',
