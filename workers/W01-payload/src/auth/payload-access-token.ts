@@ -16,11 +16,15 @@ export async function issuePayloadAccessToken(input: {
   email: string
   sessionId: string
   expiresAt: string
+  tokenVersion: number
   now?: string
 }): Promise<{ token: string; exp: number; expiresIn: number }> {
   if (!input.payloadSecret) throw new Error('Payload secret is required')
   if (!input.userId || !input.email || !input.sessionId) {
     throw new Error('Payload access-token subject is incomplete')
+  }
+  if (!Number.isInteger(input.tokenVersion) || input.tokenVersion < 0) {
+    throw new Error('Payload access-token tokenVersion is invalid')
   }
 
   const nowSeconds = Math.floor(Date.parse(input.now ?? new Date().toISOString()) / 1000)
@@ -36,6 +40,7 @@ export async function issuePayloadAccessToken(input: {
     collection: 'users',
     email: input.email,
     sid: input.sessionId,
+    tokenVersion: input.tokenVersion,
     iat: nowSeconds,
     exp,
   })
