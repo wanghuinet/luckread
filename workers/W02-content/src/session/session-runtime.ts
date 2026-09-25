@@ -316,6 +316,223 @@ export async function establishAuthenticatedSession(
   return { ...extension, layer: layerResolution.layer }
 }
 
+type AuthoritativeSessionContext = {
+  session: NativeSessionAuthority
+  accountState: string
+}
+
+async function loadAuthoritativeLoginSession(
+  db: D1Database,
+  userId: string,
+  sessionId: string,
+): Promise<AuthoritativeSessionContext> {
+  if (!userId || !sessionId) {
+    throw new SessionRuntimeError('INVALID_INPUT', 'authoritative user and session ids are required')
+  }
+
+  try {
+    const row = await db
+      .prepare(
+        `
+        SELECT
+          s.id AS sessionId,
+          CAST(s._parent_id AS TEXT) AS userId,
+          s.created_at AS createdAt,
+          s.expires_at AS expiresAt,
+          u.account_state AS accountState
+        FROM users_sessions AS s
+        INNER JOIN users AS u
+          ON CAST(u.id AS TEXT) = CAST(s._parent_id AS TEXT)
+        WHERE s.id = ?
+          AND CAST(s._parent_id AS TEXT) = ?
+        LIMIT 1
+        `,
+      )
+      .bind(sessionId, userId)
+      .first<{
+        sessionId: string
+        userId: string
+        createdAt: string
+        expiresAt: string
+        accountState: string
+      }>()
+
+    if (!row || typeof row.accountState !== 'string' || row.accountState.length === 0) {
+      throw new SessionRuntimeError('UNAUTHENTICATED', 'native session or account state unavailable')
+    }
+
+    return {
+      session: {
+        sessionId: row.sessionId,
+        userId: row.userId,
+        createdAt: row.createdAt,
+        expiresAt: row.expiresAt,
+      },
+      accountState: row.accountState,
+    }
+  } catch (error) {
+    if (error instanceof SessionRuntimeError) throw error
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'native session or account state unavailable')
+  }
+}
+
+export async function establishSessionFromAuthoritativeD1(
+  db: D1Database,
+  input: {
+    sessionId: string
+    userId: string
+    deviceId: string
+    now?: string
+    resolveLayer?: LayerResolver
+    randomToken?: () => string
+    hashToken?: (token: string) => Promise<string>
+    execute?: MutationOptions['execute']
+  },
+): Promise<{ sessionId: string; refreshToken: string; layer: string; nativeExpiresAt: string }> {
+  const now = input.now ?? new Date().toISOString()
+  const context = await loadAuthoritativeLoginSession(db, input.userId, input.sessionId)
+  const extension = await establishAuthenticatedSession(
+    db,
+    context.session,
+    input.deviceId,
+    context.accountState,
+    now,
+    1,
+    {
+      resolveLayer: input.resolveLayer,
+      randomToken: input.randomToken,
+      hashToken: input.hashToken,
+      execute: input.execute,
+    },
+  )
+
+  return {
+    ...extension,
+    nativeExpiresAt: context.session.expiresAt,
+  }
+}
+
+type AuthoritativeRefreshResult = {
+  sessionId: string
+  userId: string
+  refreshToken: string
+  layer: string
+  nativeExpiresAt: string
+  email: string
+}
+
+async function loadAuthoritativeRefreshContext(
+  db: D1Database,
+  refreshCredentialHash: string,
+): Promise<{
+  session: SessionRecord
+  accountState: string
+  email: string
+}> {
+  try {
+    const row = await db
+      .prepare(
+        `
+        SELECT
+          a.session_id AS sessionId,
+          a.user_id AS userId,
+          a.device_id AS deviceId,
+          a.token_version AS tokenVersion,
+          a.refresh_credential_hash AS refreshCredentialHash,
+          a.revoked_at AS revokedAt,
+          a.last_seen_at AS lastSeenAt,
+          s.expires_at AS nativeExpiresAt,
+          u.account_state AS accountState,
+          u.email AS email
+        FROM auth_session_state AS a
+        INNER JOIN users_sessions AS s
+          ON s.id = a.session_id
+         AND CAST(s._parent_id AS TEXT) = a.user_id
+        INNER JOIN users AS u
+          ON CAST(u.id AS TEXT) = a.user_id
+        WHERE a.refresh_credential_hash = ?
+        LIMIT 1
+        `,
+      )
+      .bind(refreshCredentialHash)
+      .first<SessionRecord & { accountState: string; email: string }>()
+
+    if (
+      !row ||
+      typeof row.accountState !== 'string' ||
+      row.accountState.length === 0 ||
+      typeof row.email !== 'string' ||
+      row.email.length === 0
+    ) {
+      throw new SessionRuntimeError('UNAUTHENTICATED', 'invalid refresh credential')
+    }
+
+    return {
+      session: row,
+      accountState: row.accountState,
+      email: row.email,
+    }
+  } catch (error) {
+    if (error instanceof SessionRuntimeError) throw error
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'invalid refresh credential')
+  }
+}
+
+export async function refreshSessionFromAuthoritativeD1(
+  db: D1Database,
+  input: {
+    refreshToken: string
+    deviceId: string
+    now?: string
+    resolveLayer?: LayerResolver
+    randomToken?: () => string
+    hashToken?: (token: string) => Promise<string>
+  },
+): Promise<AuthoritativeRefreshResult> {
+  const now = input.now ?? new Date().toISOString()
+  assertDeviceId(input.deviceId)
+  if (typeof input.refreshToken !== 'string' || input.refreshToken.length < 1) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'invalid refresh credential')
+  }
+
+  const hashToken = input.hashToken ?? DEFAULT_HASH_TOKEN
+  const refreshCredentialHash = await hashToken(input.refreshToken)
+  const context = await loadAuthoritativeRefreshContext(db, refreshCredentialHash)
+
+  assertRefreshSessionUsable(context.session, input.deviceId, now)
+
+  const resolveLayer = input.resolveLayer ?? resolveGlobalLayer
+  let layerResolution: LayerResolution
+  try {
+    layerResolution = await resolveLayer(db, context.session.userId, context.accountState, now)
+  } catch {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'account authorization unavailable')
+  }
+
+  if (layerResolution.decision !== 'ALLOW' || !layerResolution.layer) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'account authorization denied')
+  }
+
+  const randomToken = input.randomToken ?? DEFAULT_RANDOM_TOKEN
+  const rotated = await rotateLoadedRefreshCredential(
+    db,
+    context.session,
+    refreshCredentialHash,
+    now,
+    randomToken,
+    hashToken,
+  )
+
+  return {
+    sessionId: context.session.sessionId,
+    userId: context.session.userId,
+    refreshToken: rotated.refreshToken,
+    layer: layerResolution.layer,
+    nativeExpiresAt: context.session.nativeExpiresAt,
+    email: context.email,
+  }
+}
+
 export async function refreshAuthenticatedSession(
   db: D1Database,
   input: {
