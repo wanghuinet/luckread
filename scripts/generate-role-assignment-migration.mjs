@@ -20,6 +20,13 @@ const expected = [
 ]
 
 if (contract.entityId !== 'ENT-ROLE-ASSIGNMENT') throw new Error('unexpected entity authority')
+const roleVersionRules = [
+  contract.rules?.revocation,
+  contract.rules?.authorizationVersion,
+].filter(Boolean)
+if (roleVersionRules.length !== 2 || !roleVersionRules.every((rule) => rule.includes('role_version'))) {
+  throw new Error('contract role_version semantics missing')
+}
 for (const [fieldId, name, type, nullable] of expected) {
   const field = contract.fields.find((candidate) => candidate.fieldId === fieldId)
   if (!field || field.name !== name || field.type !== type || field.nullable !== nullable) {
@@ -32,6 +39,15 @@ const sql = `-- GENERATED FILE
 -- Physical owner: D1-01 / W02 / T03
 -- Generator: scripts/generate-role-assignment-migration.mjs
 -- Do not hand-edit. Regenerate from the canonical Contract source.
+-- role_version authority is emitted from contract.rules.revocation + contract.rules.authorizationVersion.
+
+CREATE TABLE role_authorization_versions (
+  subject_id TEXT NOT NULL PRIMARY KEY,
+  role_version INTEGER NOT NULL CHECK (role_version >= 1),
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX role_authorization_versions_updated_at_idx ON role_authorization_versions(updated_at);
 
 CREATE TABLE role_assignments (
   id TEXT NOT NULL PRIMARY KEY,
