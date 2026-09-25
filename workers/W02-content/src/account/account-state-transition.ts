@@ -100,6 +100,12 @@ const transitionRules = accountStateMachine['x-transitions'] as TransitionRule[]
 
 const EVENT_TYPE = 'identity.account_state_changed' as const
 const EVENT_SCHEMA_VERSION = '1.0' as const
+const SESSION_INVALIDATION_STATES = new Set<AccountState>([
+  'SUSPENDED',
+  'BANNED',
+  'DELETION_PENDING',
+  'DELETED',
+])
 
 function assertInput(input: AccountStateTransitionInput): void {
   if (!input || typeof input.userId !== 'string' || input.userId.length === 0) {
@@ -274,9 +280,20 @@ export async function applyAccountStateTransition(
       null,
     )
 
+  const statements = [updateStatement, journalStatement]
+  if (SESSION_INVALIDATION_STATES.has(input.to)) {
+    statements.push(
+      db
+        .prepare(
+          'UPDATE auth_session_state SET revoked_at = COALESCE(revoked_at, ?), last_seen_at = ? WHERE user_id = ? AND revoked_at IS NULL',
+        )
+        .bind(now, now, input.userId),
+    )
+  }
+
   let batchResult: D1Result[]
   try {
-    batchResult = await db.batch([updateStatement, journalStatement])
+    batchResult = await db.batch(statements)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (message.includes('UNIQUE constraint failed')) {
@@ -291,10 +308,14 @@ export async function applyAccountStateTransition(
     )
   }
 
-  if (batchResult[0]?.meta?.changes !== 1 || batchResult[1]?.meta?.changes !== 1) {
+  if (
+    batchResult.length !== statements.length ||
+    batchResult[0]?.meta?.changes !== 1 ||
+    batchResult[1]?.meta?.changes !== 1
+  ) {
     throw new AccountStateTransitionError(
       'CONFLICT',
-      'account state transition did not commit exactly one state row and one publication journal row',
+      'account state transition did not commit the required state, journal, and security side-effect statements',
     )
   }
 
