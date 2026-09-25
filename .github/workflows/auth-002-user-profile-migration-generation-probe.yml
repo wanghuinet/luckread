@@ -1,6 +1,7 @@
 name: AUTH-002 User Profile Migration Generation Probe
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - superpowers/auth-002-user-schema-generation-v2-20260925
