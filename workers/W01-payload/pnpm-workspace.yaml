@@ -1,3 +1,10 @@
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - unrs-resolver
+  - workerd
+
+# pnpm 12+ compatibility; current AUTH-002 CI pins pnpm 11.
 allowBuilds:
   esbuild: true
   sharp: true
