@@ -54,7 +54,12 @@ async function callW02<T>(path: string, body: unknown): Promise<T> {
     }),
   )
 
-  const payload = (await response.json().catch(() => null)) as T | W02ErrorPayload | null
+  let payload: T | W02ErrorPayload | null = null
+  try {
+    payload = (await response.json()) as T | W02ErrorPayload
+  } catch {
+    payload = null
+  }
 
   if (!response.ok) {
     const code =
