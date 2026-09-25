@@ -131,6 +131,20 @@ async function createUser(label) {
     body: { email, username, password },
   })
   if (!response.ok) {
+    let orphanRecovered = false
+    try {
+      const rows = d1Rows(
+        `SELECT id,email FROM users WHERE email=${sqlString(email)} LIMIT 2`,
+      )
+      if (rows.length === 1 && String(rows[0]?.email ?? '') === email) {
+        context.createdUsers.push({ userId: String(rows[0].id), email })
+        orphanRecovered = true
+      } else if (rows.length > 1) {
+        context.cleanupErrors.push(`createUser(${label}) orphan lookup was ambiguous`)
+      }
+    } catch (error) {
+      context.cleanupErrors.push(`createUser(${label}) orphan lookup failed: ${safeError(error)}`)
+    }
     writeJson('runtime-create-user-diagnostic.json', {
       testId,
       operation: 'POST /api/users',
@@ -141,6 +155,7 @@ async function createUser(label) {
       cfRay: response.cfRay || null,
       message: response.data?.errors?.[0]?.message ?? response.data?.message ?? null,
       errorCount: Array.isArray(response.data?.errors) ? response.data.errors.length : null,
+      orphanRecoveredForCleanup: orphanRecovered,
       testedCommitSha: TESTED_COMMIT_SHA,
     })
     throw new Error(`createUser(${label}) failed with HTTP ${response.status}`)
