@@ -75,7 +75,7 @@ jobs:
           mkdir -p ../../artifacts/evidence/auth-002/orphan-cleanup
 
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT COUNT(*) AS user_count FROM users;' > ../../artifacts/evidence/auth-002/orphan-cleanup/preflight-user-count.json
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command "SELECT id,email,created_at FROM users WHERE email LIKE 'auth002-primary-%@example.com' ORDER BY created_at;" > ../../artifacts/evidence/auth-002/orphan-cleanup/candidates.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command "SELECT id,email,created_at FROM users ORDER BY created_at DESC LIMIT 10;" > ../../artifacts/evidence/auth-002/orphan-cleanup/candidates.json
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' > ../../artifacts/evidence/auth-002/orphan-cleanup/migrations.json
 
           node --input-type=module <<'NODE'
