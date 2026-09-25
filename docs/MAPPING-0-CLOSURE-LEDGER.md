@@ -2967,3 +2967,38 @@ NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
 NEXT required external action: manually dispatch the controlled profile migration workflow against the exact merged main SHA, then inspect the post-migration artifact before attempting AUTH-002 runtime evidence again.
 
 Do not rerun AUTH-002 Remote Runtime Evidence `36127160884` unchanged; its failure is explained by the current remote schema lag.
+
+
+## 2026-09-25 Superpowers continuation — AUTH-002 orphan-probe residue remediation
+
+Current source-of-truth head after remediation admission: `bbdc0bf909c7125f6cabdf016f055df123007807`.
+
+Run `36130718874` is retained as the authoritative failed preflight evidence: the controlled W01 profile migration gate stopped before any D1 mutation because the remote `users` table contained exactly one row.
+
+The antecedent AUTH-002 runtime evidence Run `36127160884` failed at `POST /api/users` with HTTP 500 before the probe received a User ID. The admitted probe creates synthetic primary users using the `auth002-primary-<run-id>-<random>@example.com` pattern; its original cleanup path could not recover a server-side-persisted User when the POST returned 500 before an ID was returned.
+
+Remediation admitted on current `main`:
+- `scripts/auth-002-session-runtime-probe-remote.mjs` now performs an exact-email D1 lookup after a failed create and adds an unreturned persisted synthetic User to the existing cleanup set.
+- `.github/workflows/auth-002-orphan-probe-user-cleanup.yml` provides a one-time, fail-closed cleanup gate for the known residue from Run `36127160884`.
+- `docs/change-control/CC-W01-AUTH-002-ORPHAN-CLEANUP-2026-09-25.md` records the narrow mutation boundary.
+
+The cleanup gate must prove all of the following before mutation:
+- target run is exactly `36127160884`;
+- remote `users` row count is exactly 1;
+- exactly one User matches the admitted AUTH-002 synthetic primary-user pattern;
+- its `created_at` falls inside the failed-run execution window;
+- migration history is exactly `20250929_111647` and `20260921_003203_MIG_AUTH_002_SESSION_V1`.
+
+No User profile backfill, Contract/Blueprint change, D1 topology change, or new authority is introduced by this remediation.
+
+### Current closure cursor
+
+**Execute AUTH-002 orphan cleanup → verify remote `users_count=0` → execute admitted W01 ENT-USER profile migration → verify six fields/index/migration history → only then continue AUTH-002 runtime evidence.**
+
+Inherited AUTH-013 state remains unchanged:
+- positive W02 → Journal → Queue → W06 → D1-03 transport/persistence = PASS_VERIFIED;
+- session invalidation runtime = PASS_VERIFIED;
+- remaining AUTH-013 lifecycle projection/cache convergence and final security/E2E evidence remain open;
+- E6 `authLogin/authRefresh` runtime evidence remains a prerequisite for public AUTH-013 transport.
+
+The failed Run `36127160884` must not be rerun unchanged, and the profile migration must not bypass its remote zero-row precondition.
