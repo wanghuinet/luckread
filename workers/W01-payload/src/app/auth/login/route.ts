@@ -26,6 +26,38 @@ const errorResponse = (status: number, code: string, message: string) =>
     status,
   )
 
+const classifyPayloadLoginFailure = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  const normalized = message.toLowerCase()
+
+  if (/invalid (?:email|password|credentials)|incorrect password|invalid credentials|password.*(?:invalid|incorrect)/.test(normalized)) {
+    return 'CREDENTIAL_REJECTED'
+  }
+  if (/user.*(?:not found|does not exist)|(?:email|identity).*(?:not found|does not exist)/.test(normalized)) {
+    return 'IDENTITY_NOT_FOUND'
+  }
+  if (/(?:sqlite|d1|database|sql|constraint|column|table|migration)/.test(normalized)) {
+    return 'D1_RUNTIME_OR_SCHEMA'
+  }
+  if (/(?:argon|bcrypt|scrypt|pbkdf|password.*hash|hash.*password|crypto)/.test(normalized)) {
+    return 'PASSWORD_HASH_RUNTIME'
+  }
+  if (/(?:adapter|collection|payload.*auth|auth.*configuration|config)/.test(normalized)) {
+    return 'PAYLOAD_AUTH_RUNTIME'
+  }
+  return 'UNKNOWN'
+}
+
+const sanitizePayloadLoginMessage = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  return message
+    .replace(/Bearer\s+[A-Za-z0-9._~-]+/gi, 'Bearer [REDACTED]')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[REDACTED_EMAIL]')
+    .replace(/(?:password|credential|token|secret)\s*[:=]\s*[^,;\s]+/gi, '$1=[REDACTED]')
+    .replace(/[A-Za-z0-9+/=_-]{48,}/g, '[REDACTED_LONG_VALUE]')
+    .slice(0, 240)
+}
+
 export async function POST(request: Request): Promise<Response> {
   let body: { identity?: unknown; credential?: unknown; deviceId?: unknown }
 
@@ -58,7 +90,16 @@ export async function POST(request: Request): Promise<Response> {
         password: body.credential,
       },
     })
-  } catch {
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: 'auth.login.payload_failure',
+        diagnosticCode: 'AUTH002_PAYLOAD_LOGIN_FAILURE',
+        errorName: error instanceof Error ? error.name : typeof error,
+        failureClass: classifyPayloadLoginFailure(error),
+        message: sanitizePayloadLoginMessage(error),
+      }),
+    )
     return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
   }
 
