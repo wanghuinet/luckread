@@ -2,6 +2,7 @@ import { getPayload } from 'payload'
 
 import config from '@payload-config'
 
+import { issuePayloadAccessToken } from '../../../auth/payload-access-token.js'
 import { establishSession, W02AuthClientError } from '../../../auth/w02-session-client.js'
 
 const json = (body: unknown, status = 200) =>
@@ -128,10 +129,19 @@ export async function POST(request: Request): Promise<Response> {
       deviceId: body.deviceId,
     })
 
+    const access = await issuePayloadAccessToken({
+      payloadSecret: payload.secret,
+      userId: String(nativeUser.id),
+      email: String(nativeUser.email ?? body.identity),
+      sessionId: nativeSid,
+      expiresAt: session.nativeExpiresAt,
+      tokenVersion: session.tokenVersion,
+    })
+
     return json({
-      accessToken: loginResult.token,
+      accessToken: access.token,
       refreshToken: session.refreshToken,
-      expiresIn: Math.max(0, loginResult.exp - Math.floor(Date.now() / 1000)),
+      expiresIn: access.expiresIn,
       layer: session.layer,
     })
   } catch (error) {
