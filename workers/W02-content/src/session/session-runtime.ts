@@ -409,7 +409,7 @@ export async function establishSessionFromAuthoritativeD1(
     hashToken?: (token: string) => Promise<string>
     execute?: MutationOptions['execute']
   },
-): Promise<{ sessionId: string; refreshToken: string; layer: string; nativeExpiresAt: string }> {
+): Promise<{ sessionId: string; refreshToken: string; tokenVersion: number; layer: string; nativeExpiresAt: string }> {
   const now = input.now ?? new Date().toISOString()
   const context = await loadAuthoritativeLoginSession(db, input.userId, input.sessionId)
   const extension = await establishAuthenticatedSession(
@@ -438,6 +438,7 @@ type AuthoritativeRefreshResult = {
   sessionId: string
   userId: string
   refreshToken: string
+  tokenVersion: number
   layer: string
   nativeExpiresAt: string
   email: string
