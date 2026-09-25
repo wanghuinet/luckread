@@ -43,13 +43,17 @@ jobs:
       - name: Validate exact admission inputs
         run: |
           set -euo pipefail
-          test "${{ inputs.source_sha }}" = "${{ github.sha }}" || true
+          test "${{ inputs.source_sha }}" = "6b28786fec3dc5cabb93b58f18292812119ea62e"
           test "${DATABASE_NAME}" = "luckread"
           test -f workers/W02-content/migrations/0001_role_assignments.sql
           test -f workers/W02-content/migrations/0003_role_authorization_versions.sql
           test -f workers/W02-content/src/authz/role-assignment.ts
           test -f workers/W02-content/src/authz/role-version.ts
           test -z "$(git status --short)"
+          node scripts/generate-role-assignment-migration.mjs
+          node scripts/generate-role-version-migration.mjs
+          git diff --exit-code -- workers/W02-content/migrations/0001_role_assignments.sql
+          git diff --exit-code -- workers/W02-content/migrations/0003_role_authorization_versions.sql
 
       - name: Validate controlled D1-01 binding
         working-directory: workers/W02-content
@@ -140,6 +144,20 @@ jobs:
                     status: 'FAIL_CLOSED',
                     reason: 'synthetic_user_id_already_exists',
                     testUserId,
+                  }, 409)
+                }
+
+                const beforeVersion = await db
+                  .prepare('SELECT COUNT(*) AS count FROM role_authorization_versions WHERE subject_id = ?')
+                  .bind(String(testUserId))
+                  .first<{ count: number }>()
+
+                if (Number(beforeVersion?.count ?? -1) !== 0) {
+                  return json({
+                    status: 'FAIL_CLOSED',
+                    reason: 'synthetic_subject_already_has_role_version',
+                    testUserId,
+                    count: beforeVersion?.count,
                   }, 409)
                 }
 
