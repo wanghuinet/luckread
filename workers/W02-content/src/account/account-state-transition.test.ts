@@ -24,6 +24,7 @@ function fakeDb(
   const row = { ...initial }
   let batchCalls = 0
   let lastJournal: Record<string, unknown> | null = null
+  let sessionRevocation: unknown[] | null = null
 
   const db = {
     prepare(sql: string) {
@@ -68,6 +69,10 @@ function fakeDb(
       row.state = nextState
       row.version += 1
 
+      if (statements.length === 3) {
+        sessionRevocation = statements[2].args
+      }
+
       const journalArgs = journal.args as unknown[]
       lastJournal = {
         journalId: journalArgs[0],
@@ -85,7 +90,7 @@ function fakeDb(
         lastErrorCode: journalArgs[12],
       }
 
-      return [{ meta: { changes: 1 } }, { meta: { changes: 1 } }]
+      return statements.map((_, index) => ({ meta: { changes: index < 2 ? 1 : 2 } }))
     },
   }
 
@@ -94,6 +99,7 @@ function fakeDb(
     row,
     batchCalls: () => batchCalls,
     journal: () => lastJournal,
+    sessionRevocation: () => sessionRevocation,
   }
 }
 
@@ -278,6 +284,43 @@ describe('AUTH-013 account-state transition kernel', () => {
 
     expect(result.accountStateVersion).toBe(3)
     expect(fake.row).toEqual({ state: 'DELETED', version: 3 })
+    expect(fake.sessionRevocation()).toEqual(['2026-09-24T12:00:00.000Z', '2026-09-24T12:00:00.000Z', '42'])
+  })
+
+  it('atomically revokes active session extensions when a token-invalidating state is entered', async () => {
+    const fake = fakeDb({ state: 'ACTIVE', version: 7 })
+
+    const result = await applyAccountStateTransition(
+      fake.db,
+      input({
+        to: 'SUSPENDED',
+        actor: { id: 'admin-1', type: 'admin' },
+        permission: 'user.suspend',
+      }),
+    )
+
+    expect(result.accountStateVersion).toBe(8)
+    expect(fake.sessionRevocation()).toEqual([
+      '2026-09-24T12:00:00.000Z',
+      '2026-09-24T12:00:00.000Z',
+      '42',
+    ])
+    expect(fake.batchCalls()).toBe(1)
+  })
+
+  it('does not add session revocation for a state whose contract keeps tokens valid', async () => {
+    const fake = fakeDb({ state: 'ACTIVE', version: 7 })
+
+    const result = await applyAccountStateTransition(
+      fake.db,
+      input({
+        to: 'FROZEN',
+        permission: 'user.freeze',
+      }),
+    )
+
+    expect(result.accountStateVersion).toBe(8)
+    expect(fake.sessionRevocation()).toBeNull()
   })
 
   it('accepts BANNED -> RESTORED only with admin actor, user.restore permission and L7 approval', async () => {
