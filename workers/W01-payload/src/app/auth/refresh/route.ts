@@ -73,6 +73,7 @@ export async function POST(request: Request): Promise<Response> {
       email: session.email,
       sessionId: session.sessionId,
       expiresAt: session.nativeExpiresAt,
+      tokenVersion: session.tokenVersion,
     })
 
     return json({
