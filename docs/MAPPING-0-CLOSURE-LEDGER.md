@@ -2836,3 +2836,21 @@ This is an evidence-only reconciliation change and does not alter the tested imp
 AUTH-013 lifecycle side-effect convergence (deindex/projection) -> security/E2E evidence -> final Evidence Registry reconciliation -> evaluate AUTH-013 GREEN.
 
 The session-invalidation runtime gate is closed and must not be rerun unless its authoritative implementation inputs change. AUTH-013 remains BLOCKED_NOT_GREEN because lifecycle side effects and final security/E2E closure are still outstanding.
+
+
+## 2026-09-25 — AUTH-013 Positive Runtime Harness Failure Classified and Corrected
+
+Run 36082194634 was inspected and classified as an Evidence Harness failure, not an AUTH-013 production-chain failure. The workflow completed credential/provenance validation but failed in its Node 24 harness path because the positive-runtime evidence workflow contained a CommonJS require('node:fs') in an ESM/top-level-await execution context; the intended W02 transition, Queue delivery, W06 consumer, and D1-03 persistence steps were not reached.
+
+Corrective main commit: 87d628fc03bb776b5d32ea3c0f8fca49fe1e6882.
+- Changed only .github/workflows/auth-013-positive-runtime-evidence.yml: CommonJS require('node:fs') -> ESM import from 'node:fs'.
+- No production source, Contract, Worker/D1 topology, Queue resource, or previously verified runtime evidence was changed.
+- The previous failed run remains historical failure evidence and is not rerun as if it were an implementation failure.
+
+### Current cursor
+
+**Manually re-run AUTH-013 Positive Runtime Transport Evidence against the corrected main → verify real W02 deployed transition → Queue delivery → W06 consumer → D1-03 AuditEvent persistence → then close lifecycle side effects/security E2E → final Evidence Registry reconciliation.**
+
+Manual workflow: https://github.com/wanghuinet/luckread/actions/workflows/auth-013-positive-runtime-evidence.yml
+
+Do not repeat session-invalidation runtime evidence Run 36086834341; that sub-gate is already PASS_VERIFIED.
