@@ -40,6 +40,14 @@ function dbFake(initial: SessionRecord | null, forcedUpdateChanges?: number) {
         run: async () => {
           writes += 1
           if (!row) return { meta: { changes: 0 } }
+
+          if (args.length === 3) {
+            const [revokedAt, lastSeenAt] = args as [string, string, string]
+            if (row.revokedAt) return { meta: { changes: 0 } }
+            row = { ...row, revokedAt, lastSeenAt }
+            return { meta: { changes: 1 } }
+          }
+
           const [nextHash, nextSeenAt, , expectedOldHash] = args as [string, string, string, string]
           if (row.refreshCredentialHash !== expectedOldHash) return { meta: { changes: 0 } }
           if (forcedUpdateChanges !== undefined) return { meta: { changes: forcedUpdateChanges } }
@@ -194,6 +202,9 @@ describe('session runtime foundation', () => {
     })
     const result = await revokeSessionExtension(fake.db, 'sid-1', NOW)
     expect(result).toEqual({ revoked: true })
+
+    const second = await revokeSessionExtension(fake.db, 'sid-1', NOW)
+    expect(second).toEqual({ revoked: false })
   })
 })
 
