@@ -302,6 +302,21 @@
       "result": "PASS",
       "status": "VERIFIED",
       "note": "Exact source commit 821e84f0 was checked out. Remote sqlite_master contains role_assignments plus the two no-overlap triggers; d1_migrations contains 0001_role_assignments.sql applied at 2026-09-22 22:35:06. Read-only queries report rows_written=0 and no remote DDL/DML in this verification workflow. Artifact 10722564546, sha256:52eee83b9580a2631835e992d318ef9f7effc3d33ef9e032a4d4ef9172fa6e4f."
+    },
+    {
+      "evidenceId": "EVD-AUTH013-SESSION-INVALIDATION-REMOTE-001",
+      "type": "SECURITY",
+      "claimId": "AUTH-013::SESSION-INVALIDATION-RUNTIME",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-013",
+      "source": "GitHub Actions AUTH-013 Session Invalidation Runtime Evidence against controlled remote D1-01",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36086834341",
+      "commitSha": "196da842abbd83e695181843efdb9aeca3a49328",
+      "timestamp": "2026-09-25T02:34:46Z",
+      "producer": "controlled remote D1 code-path runtime evidence",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "note": "Run 36086834341 completed successfully at the exact tested main head 196da842abbd83e695181843efdb9aeca3a49328. The controlled probe performed ACTIVE to SUSPENDED against real D1-01, verified account_state=SUSPENDED, account_state_version=2, target auth_session_state.revoked_at non-null, stale refresh rejection with UNAUTHENTICATED, synthetic session/security cleanup, provenance capture, evidence upload, and harness cleanup. This closes the session-invalidation runtime sub-gate only; AUTH-013 remains non-GREEN pending lifecycle side-effect convergence, E2E/security coverage, and final Evidence Registry reconciliation."
     }
   ]
 }
