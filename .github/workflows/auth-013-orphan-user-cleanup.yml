@@ -209,11 +209,10 @@ jobs:
           const preflight = JSON.parse(fs.readFileSync('cleanup-preflight.json', 'utf8'))
           const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
           const token = process.env.CLOUDFLARE_API_TOKEN
-          const dbId = process.env.D1_01_ID
           const userId = Number(preflight.expectedUserId)
           const journalId = String(preflight.journal.journal_id).replace(/'/g, "''")
 
-          async function query(sql) {
+          async function queryD1(dbId, sql) {
             const response = await fetch(
               `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${dbId}/query`,
               {
