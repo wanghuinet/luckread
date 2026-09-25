@@ -1,0 +1,39 @@
+name: AUTH-002 User Profile Migration Generation Probe
+
+on:
+  push:
+    branches:
+      - superpowers/auth-002-user-schema-generation-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.34.5 --activate
+      - name: Install W01 locked dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-workspace
+      - name: Generate additive User profile migration with Payload CLI
+        working-directory: workers/W01-payload
+        run: pnpm exec node ../../scripts/auth-002-user-profile-migration-generation-proof.mjs
+      - name: Upload generation evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: auth-002-user-profile-migration-generation-${{ github.run_id }}
+          path: artifacts/evidence/auth-002/user-profile-generation/
+          if-no-files-found: error
+          retention-days: 14
