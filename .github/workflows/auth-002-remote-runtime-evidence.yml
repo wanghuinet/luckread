@@ -101,12 +101,82 @@ jobs:
           writeFileSync('../../artifacts/evidence/auth-002/runtime/runtime-dependency.json', JSON.stringify(artifact, null, 2) + '\n')
           NODE
 
-      - name: Execute controlled remote AUTH-002 runtime evidence
+      - name: Capture W01 worker runtime diagnostics
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           NODE_OPTIONS: --no-deprecation
-        run: node scripts/auth-002-session-runtime-probe-remote.mjs
+        run: |
+          set +e
+          mkdir -p artifacts/evidence/auth-002/worker-diagnostic
+
+          npx --yes "wrangler@${WRANGLER_VERSION}" secret list \
+            --name luckread-w01-payload \
+            --format json \
+            > artifacts/evidence/auth-002/worker-diagnostic/secret-names.json 2>&1
+          secret_list_status=$?
+          printf '{"secretListExitCode":%s}\n' "${secret_list_status}" \
+            > artifacts/evidence/auth-002/worker-diagnostic/secret-list-status.json
+
+          tail_raw="artifacts/evidence/auth-002/worker-diagnostic/.tail-raw.log"
+          tail_sanitized="artifacts/evidence/auth-002/worker-diagnostic/worker-error-tail.json"
+          npx --yes "wrangler@${WRANGLER_VERSION}" tail luckread-w01-payload \
+            --format json \
+            --status error \
+            --sampling-rate 1 \
+            > "${tail_raw}" 2>&1 &
+          tail_pid=$!
+
+          sleep 5
+          node scripts/auth-002-session-runtime-probe-remote.mjs
+          probe_status=$?
+
+          sleep 4
+          kill "${tail_pid}" >/dev/null 2>&1 || true
+          wait "${tail_pid}" >/dev/null 2>&1 || true
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const raw = readFileSync('artifacts/evidence/auth-002/worker-diagnostic/.tail-raw.log', 'utf8')
+          const events = []
+          for (const line of raw.split(/\\r?\\n/)) {
+            const trimmed = line.trim()
+            if (!trimmed) continue
+            try {
+              const value = JSON.parse(trimmed)
+              events.push({
+                eventTimestamp: value.eventTimestamp ?? null,
+                outcome: value.outcome ?? null,
+                exceptions: Array.isArray(value.exceptions)
+                  ? value.exceptions.map((item) => ({
+                      name: item?.name ?? null,
+                      message: item?.message ?? null,
+                    }))
+                  : [],
+                logs: Array.isArray(value.logs)
+                  ? value.logs.map((item) => ({
+                      level: item?.level ?? null,
+                      message: item?.message ?? null,
+                    }))
+                  : [],
+              })
+            } catch {
+              // Keep only parseable structured Worker events in the evidence.
+            }
+          }
+          const artifact = {
+            worker: 'luckread-w01-payload',
+            deploymentHeadSha: process.env.DEPLOYMENT_HEAD_SHA,
+            deploymentRunId: Number(process.env.DEPLOYMENT_RUN_ID || 0),
+            capturedAt: new Date().toISOString(),
+            eventCount: events.length,
+            events,
+          }
+          writeFileSync('artifacts/evidence/auth-002/worker-diagnostic/worker-error-tail.json', JSON.stringify(artifact, null, 2) + '\\n')
+          NODE
+          rm -f "${tail_raw}"
+
+          exit "${probe_status}"
 
       - name: Validate runtime evidence package
         if: always()
@@ -119,4 +189,13 @@ jobs:
           name: auth-002-runtime-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/evidence/auth-002/runtime/
           if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload W01 worker runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-002-worker-runtime-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/evidence/auth-002/worker-diagnostic/
+          if-no-files-found: warn
           retention-days: 30
