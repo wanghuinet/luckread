@@ -64,6 +64,7 @@ export default {
         return json({
           sessionId: result.sessionId,
           refreshToken: result.refreshToken,
+          tokenVersion: result.tokenVersion,
           layer: result.layer,
           nativeExpiresAt: result.nativeExpiresAt,
         })
@@ -97,6 +98,7 @@ export default {
           sessionId: result.sessionId,
           userId: result.userId,
           refreshToken: result.refreshToken,
+          tokenVersion: result.tokenVersion,
           layer: result.layer,
           nativeExpiresAt: result.nativeExpiresAt,
           email: result.email,

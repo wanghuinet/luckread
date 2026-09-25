@@ -40,6 +40,14 @@ function dbFake(initial: SessionRecord | null, forcedUpdateChanges?: number) {
         run: async () => {
           writes += 1
           if (!row) return { meta: { changes: 0 } }
+
+          if (args.length === 3) {
+            const [revokedAt, lastSeenAt] = args as [string, string, string]
+            if (row.revokedAt) return { meta: { changes: 0 } }
+            row = { ...row, revokedAt, lastSeenAt }
+            return { meta: { changes: 1 } }
+          }
+
           const [nextHash, nextSeenAt, , expectedOldHash] = args as [string, string, string, string]
           if (row.refreshCredentialHash !== expectedOldHash) return { meta: { changes: 0 } }
           if (forcedUpdateChanges !== undefined) return { meta: { changes: forcedUpdateChanges } }
@@ -68,7 +76,7 @@ describe('session runtime foundation', () => {
       },
     })
 
-    expect(result).toEqual({ sessionId: 'sid-1', refreshToken: 'refresh-1' })
+    expect(result).toEqual({ sessionId: 'sid-1', refreshToken: 'v4.refresh-1' })
     expect(calls).toEqual(['insert'])
     expect(fake.getWrites()).toBe(0)
   })
@@ -82,7 +90,7 @@ describe('session runtime foundation', () => {
   })
 
   it('rotates a refresh credential with one authoritative read and one compare-and-update write', async () => {
-    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('refresh-1'))
+    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('v3.refresh-1'))
     const digest = Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('')
     const record: SessionRecord = {
       sessionId: 'sid-1',
@@ -96,7 +104,7 @@ describe('session runtime foundation', () => {
     }
     const fake = dbFake(record)
     const result = await rotateRefreshCredential(fake.db, {
-      refreshToken: 'refresh-1',
+      refreshToken: 'v3.refresh-1',
       deviceId: 'device-a',
       now: NOW,
       issueAccessToken: () => 'access-1',
@@ -106,7 +114,7 @@ describe('session runtime foundation', () => {
     expect(result).toEqual({
       sessionId: 'sid-1',
       accessToken: 'access-1',
-      refreshToken: 'refresh-2',
+      refreshToken: 'v3.refresh-2',
     })
     expect(fake.getReads()).toBe(1)
     expect(fake.getWrites()).toBe(1)
@@ -126,7 +134,7 @@ describe('session runtime foundation', () => {
     }
     const fake = dbFake(record)
     await expect(rotateRefreshCredential(fake.db, {
-      refreshToken: 'refresh-1',
+      refreshToken: 'v3.refresh-1',
       deviceId: 'device-b',
       now: NOW,
       issueAccessToken: () => 'access-1',
@@ -149,7 +157,7 @@ describe('session runtime foundation', () => {
       nativeExpiresAt: nativeSession({ expiresAt: '2026-09-22T12:59:59.999Z' }).expiresAt,
     })
     await expect(rotateRefreshCredential(fake.db, {
-      refreshToken: 'refresh-1',
+      refreshToken: 'v3.refresh-1',
       deviceId: 'device-a',
       now: NOW,
       issueAccessToken: () => 'access-1',
@@ -172,7 +180,7 @@ describe('session runtime foundation', () => {
     }, 0)
 
     await expect(rotateRefreshCredential(fake.db, {
-      refreshToken: 'refresh-1',
+      refreshToken: 'v3.refresh-1',
       deviceId: 'device-a',
       now: NOW,
       issueAccessToken: () => 'access-1',
@@ -194,6 +202,9 @@ describe('session runtime foundation', () => {
     })
     const result = await revokeSessionExtension(fake.db, 'sid-1', NOW)
     expect(result).toEqual({ revoked: true })
+
+    const second = await revokeSessionExtension(fake.db, 'sid-1', NOW)
+    expect(second).toEqual({ revoked: false })
   })
 })
 
@@ -219,7 +230,7 @@ describe('authenticated session orchestration', () => {
       },
     )
 
-    expect(result).toEqual({ sessionId: 'sid-1', refreshToken: 'refresh-1', layer: 'L2' })
+    expect(result).toEqual({ sessionId: 'sid-1', refreshToken: 'v4.refresh-1', layer: 'L2' })
     expect(calls).toEqual(['42:ACTIVE'])
   })
 
@@ -253,7 +264,7 @@ describe('authenticated session orchestration', () => {
     }
     const fake = dbFake(record)
     const result = await refreshAuthenticatedSession(fake.db, {
-      refreshToken: 'refresh-1',
+      refreshToken: 'v3.refresh-1',
       deviceId: 'device-a',
       accountState: 'ACTIVE',
       now: NOW,
@@ -267,7 +278,7 @@ describe('authenticated session orchestration', () => {
       },
     })
 
-    expect(result).toEqual({ sessionId: 'sid-1', accessToken: 'access-2', refreshToken: 'refresh-2', layer: 'L3' })
+    expect(result).toEqual({ sessionId: 'sid-1', accessToken: 'access-2', refreshToken: 'v3.refresh-2', layer: 'L3' })
   })
   it('does not mint or rotate when authoritative layer resolution denies', async () => {
     const hash = 'old-hash'
@@ -285,7 +296,7 @@ describe('authenticated session orchestration', () => {
     let issueCount = 0
 
     await expect(refreshAuthenticatedSession(fake.db, {
-      refreshToken: 'refresh-1',
+      refreshToken: 'v3.refresh-1',
       deviceId: 'device-a',
       accountState: 'ACTIVE',
       now: NOW,
