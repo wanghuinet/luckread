@@ -43,8 +43,12 @@ jobs:
 
       - name: Verify RoleAssignment migration artifact
         run: node scripts/generate-role-assignment-migration.mjs
-      - name: Assert generated migration is committed
+      - name: Assert generated RoleAssignment migration is committed
         run: git diff --exit-code -- workers/W02-content/migrations/0001_role_assignments.sql
+      - name: Verify role_version migration artifact
+        run: node scripts/generate-role-version-migration.mjs
+      - name: Assert generated role_version migration is committed
+        run: git diff --exit-code -- workers/W02-content/migrations/0003_role_authorization_versions.sql
       - name: Apply D1-01 migration remotely
         working-directory: workers/W02-content
         env:
@@ -60,7 +64,7 @@ jobs:
         run: |
           mkdir -p ../../artifacts/mapping-0
           npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
-            --command "SELECT type, name, sql FROM sqlite_master WHERE name = 'role_assignments' OR name LIKE 'role_assignments_%' ORDER BY type, name;" \
+            --command "SELECT type, name, sql FROM sqlite_master WHERE name = 'role_assignments' OR name LIKE 'role_assignments_%' OR name = 'role_authorization_versions' OR name LIKE 'role_authorization_versions_%' ORDER BY type, name;" \
             > ../../artifacts/mapping-0/w02-role-assignment-remote-schema.txt
           npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
             --command "SELECT name FROM sqlite_master WHERE type='table' AND name='d1_migrations';" \
@@ -72,6 +76,10 @@ jobs:
             --command "SELECT COUNT(*) AS role_assignment_rows FROM role_assignments;" \
             > ../../artifacts/mapping-0/w02-role-assignment-remote-row-count.txt
 
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --config wrangler.jsonc \
+            --command "SELECT COUNT(*) AS role_version_rows, MIN(role_version) AS min_role_version, MAX(role_version) AS max_role_version FROM role_authorization_versions;" \
+            > ../../artifacts/mapping-0/w02-role-version-remote-row-count.txt
+
       - name: Write controlled provenance
         run: |
           cat > artifacts/mapping-0/w02-role-assignment-remote-provenance.txt <<'EOF'
@@ -82,7 +90,7 @@ jobs:
           database_id=2f80471e-3756-49f9-8db1-7707a433ad64
           remote_mutation=true
           post_migration_remote_readback=true
-          verification_scope=role_assignments schema, D1 migration ledger, row-count
+          verification_scope=role_assignments schema, role_authorization_versions schema, D1 migration ledger, row-count
           EOF
 
       - name: Upload controlled remote evidence

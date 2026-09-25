@@ -8,6 +8,7 @@ on:
       - 'contracts/authz/**'
       - 'contracts/entity/AUTHZ-role-assignment-authority.v1.json'
       - 'scripts/generate-role-assignment-migration.mjs'
+      - 'scripts/generate-role-version-migration.mjs'
       - '.github/workflows/w02-role-assignment-verification.yml'
   pull_request:
     paths:
@@ -37,9 +38,13 @@ jobs:
         run: npm ci
       - name: Typecheck W02
         run: npx tsc -p workers/W02-content/tsconfig.json --noEmit
-      - name: Verify generated migration
-        run: node scripts/generate-role-assignment-migration.mjs
-      - name: Assert migration artifact is committed
-        run: git diff --exit-code -- workers/W02-content/migrations/0001_role_assignments.sql
+      - name: Verify generated migrations
+        run: |
+          node scripts/generate-role-assignment-migration.mjs
+          node scripts/generate-role-version-migration.mjs
+      - name: Assert generated migrations are committed
+        run: |
+          git diff --exit-code -- workers/W02-content/migrations/0001_role_assignments.sql
+          git diff --exit-code -- workers/W02-content/migrations/0003_role_authorization_versions.sql
       - name: Run W02 authorization and session tests
-        run: npx vitest run workers/W02-content/src/authz/role-assignment.test.ts workers/W02-content/src/authz/authorization-decision.test.ts workers/W02-content/src/session/session-runtime.test.ts
+        run: npx vitest run workers/W02-content/src/authz/role-assignment.test.ts workers/W02-content/src/authz/role-version.test.ts workers/W02-content/src/authz/authorization-decision.test.ts workers/W02-content/src/session/session-runtime.test.ts
