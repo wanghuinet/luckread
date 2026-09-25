@@ -208,7 +208,7 @@ jobs:
           test "$http_code" = "200"
 
           node - <<'NODE'
-          const fs = require('node:fs');
+          import fs from 'node:fs';
           const result = JSON.parse(fs.readFileSync('artifacts/mapping-0/auth-013-positive-runtime/transition.json', 'utf8'));
           if (result.status !== 'PASS') throw new Error('Positive W02 transition did not PASS');
           if (result.transition?.to !== 'RESTRICTED') throw new Error('Unexpected transition target');
