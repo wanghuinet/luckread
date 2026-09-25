@@ -1,4 +1,4 @@
-import { REST_POST } from '@payloadcms/next/routes'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
@@ -40,34 +40,29 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
   }
 
-  const nativeLogout = REST_POST(config)
-  let nativeResponse: Response
-  try {
-    nativeResponse = await nativeLogout(
-      new Request(new URL('/api/users/logout', request.url), {
-        method: 'POST',
-        headers: request.headers,
-      }),
-      {
-        params: Promise.resolve({
-          slug: ['users', 'logout'],
-        }),
-      },
-    )
-  } catch {
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
-  }
-
-  if (!nativeResponse.ok) {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
-  }
-
   try {
     await revokeSession({ sessionId: user._sid })
   } catch (error) {
     if (error instanceof W02AuthClientError) {
       return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
     }
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
+  }
+
+  try {
+    const context = await getCloudflareContext({ async: true })
+    const env = context.env as unknown as { D1?: D1Database }
+    if (!env.D1) {
+      return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
+    }
+
+    await env.D1
+      .prepare(
+        'DELETE FROM users_sessions WHERE CAST(id AS TEXT) = ? AND CAST(_parent_id AS TEXT) = ?',
+      )
+      .bind(String(user._sid), String(user.id))
+      .run()
+  } catch {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
 
