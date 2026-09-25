@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 
 import config from '@payload-config'
 
+import { type D1DatabaseLike } from '../../../auth/authoritative-session.js'
 import { revokeSession, W02AuthClientError } from '../../../auth/w02-session-client.js'
 
 const json = (body: unknown, status = 200) =>
@@ -51,7 +52,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const context = await getCloudflareContext({ async: true })
-    const env = context.env as unknown as { D1?: D1Database }
+    const env = context.env as unknown as { D1?: D1DatabaseLike }
     if (!env.D1) {
       return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
     }
