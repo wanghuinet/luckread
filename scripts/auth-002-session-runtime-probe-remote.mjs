@@ -229,7 +229,7 @@ let logoutArtifact
 let extensionArtifact
 
 try {
-  if (dependency.payload !== '3.87.1' || dependency.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.87.1') {
+  if (dependency.dependencies?.payload !== '3.87.1' || dependency.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.87.1') {
     throw new Error('W01 dependency contract mismatch')
   }
   const lockText = readFileSync(`${WORKER_PATH}/pnpm-lock.yaml`, 'utf8')
