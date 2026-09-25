@@ -74,6 +74,33 @@ jobs:
           test -n "${CLOUDFLARE_ACCOUNT_ID}"
           node scripts/auth-session-schema-evidence-probe.mjs --gate1
 
+      - name: Capture W01 dependency provenance
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/evidence/auth-002/runtime
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          import { execFileSync } from 'node:child_process'
+          const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
+          const lockfile = readFileSync('pnpm-lock.yaml')
+          const testedCommitSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+          const gitVersion = execFileSync('git', ['--version'], { encoding: 'utf8' }).trim()
+          const artifact = {
+            repository: 'wanghuinet/luckread',
+            testedCommitSha,
+            workerPath: 'workers/W01-payload',
+            payloadVersion: packageJson.dependencies?.payload,
+            d1AdapterVersion: packageJson.dependencies?.['@payloadcms/db-d1-sqlite'],
+            nodeVersion: process.version,
+            lockfileReference: 'workers/W01-payload/pnpm-lock.yaml',
+            lockfileSha256: createHash('sha256').update(lockfile).digest('hex'),
+            gitVersion,
+          }
+          writeFileSync('../../artifacts/evidence/auth-002/runtime/runtime-dependency.json', JSON.stringify(artifact, null, 2) + '\\n')
+          NODE
+
       - name: Execute controlled remote AUTH-002 runtime evidence
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
