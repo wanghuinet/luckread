@@ -70,7 +70,7 @@ const requiredStopConditions = [
 ]
 const stops = new Set((matrix.stopConditions ?? []).map((x) => String(x).toLowerCase()))
 for (const condition of requiredStopConditions) {
-  if (!stops.has(condition)) fail(`missing mandatory stop condition: ${condition}`)
+  if (!stops.has(condition.toLowerCase())) fail(`missing mandatory stop condition: ${condition}`)
 }
 
 console.log('AUTH-002_PROMOTION_MATRIX_VALIDATION_PASS')
