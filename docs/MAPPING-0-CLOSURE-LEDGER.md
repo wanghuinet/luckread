@@ -3002,3 +3002,34 @@ Inherited AUTH-013 state remains unchanged:
 - E6 `authLogin/authRefresh` runtime evidence remains a prerequisite for public AUTH-013 transport.
 
 The failed Run `36127160884` must not be rerun unchanged, and the profile migration must not bypass its remote zero-row precondition.
+
+
+## 2026-09-25 — AUTH-002 ENT-USER Profile Migration REMOTE VERIFIED
+
+Controlled execution Run `36195829989` completed successfully against source `ee13889020063edcf01e38629780381d6f26654d`.
+
+Verified remote D1-01 / `luckread` facts:
+- preflight `users_count = 0`;
+- migration `20260925_111503_MIG_ENT_USER_PROFILE_V1` applied exactly once (id=3, batch=3);
+- all six canonical ENT-USER fields are present: `username`, `display_name`, `bio`, `avatar`, `locale`, `timezone`;
+- unique index `users_username_idx` is present;
+- provenance binds tested/source SHA to `luckread` and `CONTROLLED_REMOTE_D1`;
+- evidence artifact: `auth-002-user-profile-migration-36195829989`, artifact ID `10889878248`.
+
+Acceptance:
+- `W01-ENT-USER-PROFILE-MIGRATION-REMOTE-001 = PASS_VERIFIED`.
+- The remote migration is complete and must not be repeated.
+- This closes the remote schema lag that blocked the prior AUTH-002 runtime probe; Run `36127160884` must not be repeated against the old schema state.
+- AUTH-002 runtime evidence remains a separate executable gate; no runtime PASS is inferred from migration evidence.
+
+### Current closure cursor
+
+**AUTH-002 controlled remote runtime evidence → Evidence Registry reconciliation → AUTH-002/E6 decision gate; then resume remaining AUTH-013 lifecycle/security closure.**
+
+Required execution pairing for the existing runtime workflow:
+- deployed W01 source: `d64d7527564239a487a6e0ad6dceb1b5e8dac3b9`;
+- successful binding/deployment Run: `35819898556`;
+- database: `luckread`;
+- deployment provenance must continue to bind exactly to that successful W01/W02 deployment run.
+
+No Contract/Blueprint/Worker/D1 topology was changed by this evidence reconciliation.
