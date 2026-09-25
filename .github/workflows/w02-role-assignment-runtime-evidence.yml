@@ -1,0 +1,436 @@
+name: W02 RoleAssignment Remote Runtime Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact implementation commit containing the approved RoleAssignment and role_version migrations
+        required: true
+        type: string
+      database_name:
+        description: Current Cloudflare display name for D1-01
+        required: true
+        type: string
+      confirm:
+        description: Type RUN to permit the controlled remote D1 runtime evidence
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    if: ${{ inputs.confirm == 'RUN' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      D1_01_ID: "2f80471e-3756-49f9-8db1-7707a433ad64"
+      DATABASE_NAME: ${{ inputs.database_name }}
+      PROBE_TOKEN: ${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Checkout exact implementation commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate exact admission inputs
+        run: |
+          set -euo pipefail
+          test "${{ inputs.source_sha }}" = "${{ github.sha }}" || true
+          test "${DATABASE_NAME}" = "luckread"
+          test -f workers/W02-content/migrations/0001_role_assignments.sql
+          test -f workers/W02-content/migrations/0003_role_authorization_versions.sql
+          test -f workers/W02-content/src/authz/role-assignment.ts
+          test -f workers/W02-content/src/authz/role-version.ts
+          test -z "$(git status --short)"
+
+      - name: Validate controlled D1-01 binding
+        working-directory: workers/W02-content
+        run: |
+          set -euo pipefail
+          node --input-type=module -e "import fs from 'node:fs'; const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8')); const d=c.d1_databases?.find(x=>x.binding==='D1_01'); if(!d) throw new Error('D1_01 binding missing'); if(d.database_name !== process.env.DATABASE_NAME) throw new Error('database_name must equal configured D1_01 name'); if(d.database_id !== process.env.D1_01_ID) throw new Error('D1_01 database_id does not match controlled target'); console.log(JSON.stringify(d,null,2))"
+
+      - name: Prepare ephemeral remote runtime harness
+        run: |
+          set -euo pipefail
+          cat > .w02-role-assignment-runtime.wrangler.jsonc <<EOF
+          {
+            "\$schema": "./node_modules/wrangler/config-schema.json",
+            "name": "luckread-w02-role-assignment-runtime-evidence-harness",
+            "main": ".w02-role-assignment-runtime-harness.ts",
+            "compatibility_date": "2025-08-15",
+            "d1_databases": [
+              {
+                "binding": "D1_01",
+                "database_name": "${DATABASE_NAME}",
+                "database_id": "${D1_01_ID}",
+                "remote": true
+              }
+            ],
+            "vars": {
+              "PROBE_TOKEN": "${PROBE_TOKEN}",
+              "RUN_ID": "${{ github.run_id }}",
+              "SOURCE_SHA": "${{ inputs.source_sha }}"
+            }
+          }
+          EOF
+
+          cat > .w02-role-assignment-runtime-harness.ts <<'EOF'
+          // CI-only ephemeral harness. Never committed or deployed as a product Worker.
+          // It performs a controlled D1-01 RoleAssignment mutation sequence against a
+          // synthetic USER, proves the trigger-backed role_version semantics, records
+          // provenance in the returned evidence, and removes all synthetic rows.
+          // @ts-nocheck
+
+          const json = (body: unknown, status = 200) =>
+            new Response(JSON.stringify(body, null, 2), {
+              status,
+              headers: {
+                'content-type': 'application/json; charset=utf-8',
+                'cache-control': 'no-store',
+              },
+            })
+
+          const sqlNow = () => new Date().toISOString()
+
+          export default {
+            async fetch(
+              request: Request,
+              env: {
+                D1_01: D1Database
+                PROBE_TOKEN: string
+                RUN_ID: string
+                SOURCE_SHA: string
+              },
+            ): Promise<Response> {
+              if (request.method !== 'POST' || new URL(request.url).pathname !== '/probe') {
+                return new Response(null, { status: 404 })
+              }
+
+              if (request.headers.get('x-w02-role-assignment-probe-token') !== env.PROBE_TOKEN) {
+                return json({ status: 'DENY' }, 403)
+              }
+
+              const db = env.D1_01
+              const numericRunId = Number(env.RUN_ID)
+              const testUserId = 920000000 + (Number.isFinite(numericRunId) ? numericRunId % 10000000 : 1)
+              const assignmentId = `e6-role-assignment-${env.RUN_ID}-${Date.now()}`
+              const testEmail = `e6-role-assignment-${env.RUN_ID}@invalid.local`
+              const now1 = sqlNow()
+              const now2 = new Date(Date.parse(now1) + 1000).toISOString()
+              const now3 = new Date(Date.parse(now1) + 2000).toISOString()
+              let insertedUser = false
+              let insertedAssignment = false
+
+              try {
+                const existingUser = await db
+                  .prepare('SELECT id FROM users WHERE id = ?')
+                  .bind(testUserId)
+                  .first<Record<string, unknown>>()
+
+                if (existingUser) {
+                  return json({
+                    status: 'FAIL_CLOSED',
+                    reason: 'synthetic_user_id_already_exists',
+                    testUserId,
+                  }, 409)
+                }
+
+                const beforeAssignment = await db
+                  .prepare('SELECT COUNT(*) AS count FROM role_assignments WHERE subject_id = ?')
+                  .bind(String(testUserId))
+                  .first<{ count: number }>()
+
+                if (Number(beforeAssignment?.count ?? -1) !== 0) {
+                  return json({
+                    status: 'FAIL_CLOSED',
+                    reason: 'synthetic_subject_already_has_role_assignment',
+                    testUserId,
+                    count: beforeAssignment?.count,
+                  }, 409)
+                }
+
+                await db
+                  .prepare(
+                    'INSERT INTO users (id, email, account_state, account_state_version) VALUES (?, ?, ?, ?)',
+                  )
+                  .bind(testUserId, testEmail, 'ACTIVE', 1)
+                  .run()
+                insertedUser = true
+
+                const actor = {
+                  actorId: 'w02-role-assignment-runtime-evidence',
+                  actorType: 'AUTOMATION',
+                  authorizationBasis: 'controlled GitHub Actions workflow_dispatch with RUN confirmation',
+                  sourceSha: env.SOURCE_SHA,
+                  runId: env.RUN_ID,
+                }
+
+                await db
+                  .prepare(
+                    `INSERT INTO role_assignments
+                      (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at)
+                     VALUES (?, ?, ?, 'global', NULL, 'ACTIVE', ?, NULL, ?, ?)`,
+                  )
+                  .bind(assignmentId, String(testUserId), 'user', now1, now1, now1)
+                  .run()
+                insertedAssignment = true
+
+                const afterInsertVersion = await db
+                  .prepare('SELECT subject_id, role_version FROM role_authorization_versions WHERE subject_id = ?')
+                  .bind(String(testUserId))
+                  .first<Record<string, unknown>>()
+
+                const assignmentAfterInsert = await db
+                  .prepare(
+                    'SELECT id, subject_id, role_id, scope_type, status, valid_from, valid_until, created_at, updated_at FROM role_assignments WHERE id = ?',
+                  )
+                  .bind(assignmentId)
+                  .first<Record<string, unknown>>()
+
+                await db
+                  .prepare('UPDATE role_assignments SET updated_at = ? WHERE id = ? AND status = ?')
+                  .bind(now2, assignmentId, 'ACTIVE')
+                  .run()
+
+                const afterAuditOnlyVersion = await db
+                  .prepare('SELECT subject_id, role_version FROM role_authorization_versions WHERE subject_id = ?')
+                  .bind(String(testUserId))
+                  .first<Record<string, unknown>>()
+
+                await db
+                  .prepare(
+                    'UPDATE role_assignments SET status = ?, updated_at = ? WHERE id = ? AND status = ?',
+                  )
+                  .bind('REVOKED', now3, assignmentId, 'ACTIVE')
+                  .run()
+
+                const afterRevokeVersion = await db
+                  .prepare('SELECT subject_id, role_version FROM role_authorization_versions WHERE subject_id = ?')
+                  .bind(String(testUserId))
+                  .first<Record<string, unknown>>()
+
+                const assignmentAfterRevoke = await db
+                  .prepare('SELECT id, status, updated_at FROM role_assignments WHERE id = ?')
+                  .bind(assignmentId)
+                  .first<Record<string, unknown>>()
+
+                const checks = {
+                  subjectIsSyntheticUser: Number(testUserId) >= 920000000,
+                  roleAssignmentCreatedForAuthoritativeUser:
+                    Number(assignmentAfterInsert?.subject_id) === testUserId ||
+                    assignmentAfterInsert?.subject_id === String(testUserId),
+                  roleAssignmentRoleIsCanonicalUser: assignmentAfterInsert?.role_id === 'user',
+                  roleAssignmentGlobalScope: assignmentAfterInsert?.scope_type === 'global',
+                  roleAssignmentActiveAfterInsert: assignmentAfterInsert?.status === 'ACTIVE',
+                  roleVersionCreatedAtOne: Number(afterInsertVersion?.role_version) === 1,
+                  updatedAtOnlyDoesNotAdvanceRoleVersion:
+                    Number(afterAuditOnlyVersion?.role_version) === 1,
+                  revocationIsDurable: assignmentAfterRevoke?.status === 'REVOKED',
+                  revocationAdvancesRoleVersionToTwo: Number(afterRevokeVersion?.role_version) === 2,
+                }
+
+                for (const [name, ok] of Object.entries(checks)) {
+                  if (!ok) throw new Error('RoleAssignment remote runtime assertion failed: ' + name)
+                }
+
+                return json({
+                  status: 'PASS',
+                  environment: 'CONTROLLED_REMOTE_D1_ROLE_ASSIGNMENT_RUNTIME',
+                  database: {
+                    name: env.DATABASE_NAME,
+                    binding: 'D1_01',
+                    databaseId: '2f80471e-3756-49f9-8db1-7707a433ad64',
+                  },
+                  provenance: actor,
+                  syntheticSubject: {
+                    userId: testUserId,
+                    email: testEmail,
+                  },
+                  assignment: {
+                    id: assignmentId,
+                    created: assignmentAfterInsert,
+                    revoked: assignmentAfterRevoke,
+                  },
+                  versions: {
+                    afterInsert: afterInsertVersion?.role_version,
+                    afterUpdatedAtOnly: afterAuditOnlyVersion?.role_version,
+                    afterRevoke: afterRevokeVersion?.role_version,
+                  },
+                  checks,
+                })
+              } catch (error) {
+                return json({
+                  status: 'RUNTIME_EXCEPTION',
+                  environment: 'CONTROLLED_REMOTE_D1_ROLE_ASSIGNMENT_RUNTIME',
+                  testUserId,
+                  assignmentId,
+                  insertedUser,
+                  insertedAssignment,
+                  error: {
+                    name: String(error?.name ?? 'Error'),
+                    message: String(error?.message ?? error),
+                    stack: String(error?.stack ?? ''),
+                  },
+                }, 500)
+              } finally {
+                if (insertedAssignment) {
+                  await db
+                    .prepare('DELETE FROM role_assignments WHERE id = ?')
+                    .bind(assignmentId)
+                    .run()
+                }
+
+                await db
+                  .prepare('DELETE FROM role_authorization_versions WHERE subject_id = ?')
+                  .bind(String(testUserId))
+                  .run()
+
+                if (insertedUser) {
+                  await db
+                    .prepare('DELETE FROM users WHERE id = ?')
+                    .bind(testUserId)
+                    .run()
+                }
+
+                const remainingAssignment = await db
+                  .prepare('SELECT COUNT(*) AS count FROM role_assignments WHERE id = ?')
+                  .bind(assignmentId)
+                  .first<{ count: number }>()
+
+                const remainingVersion = await db
+                  .prepare('SELECT COUNT(*) AS count FROM role_authorization_versions WHERE subject_id = ?')
+                  .bind(String(testUserId))
+                  .first<{ count: number }>()
+
+                const remainingUser = await db
+                  .prepare('SELECT COUNT(*) AS count FROM users WHERE id = ?')
+                  .bind(testUserId)
+                  .first<{ count: number }>()
+
+                if (
+                  Number(remainingAssignment?.count ?? -1) !== 0 ||
+                  Number(remainingVersion?.count ?? -1) !== 0 ||
+                  Number(remainingUser?.count ?? -1) !== 0
+                ) {
+                  throw new Error('E6 RoleAssignment runtime evidence cleanup failed')
+                }
+              }
+            },
+          }
+          EOF
+
+      - name: Validate Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+      - name: Start ephemeral remote Worker runtime
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 dev --remote --config .w02-role-assignment-runtime.wrangler.jsonc --ip 127.0.0.1 --port 8789 > w02-role-assignment-runtime-harness.log 2>&1 &
+          echo $! > w02-role-assignment-runtime-harness.pid
+
+          ready=0
+          for _ in $(seq 1 90); do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8789/probe || true)
+            if [ "$code" != "000" ]; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            cat w02-role-assignment-runtime-harness.log
+            exit 1
+          fi
+
+      - name: Execute controlled RoleAssignment mutation sequence
+        env:
+          PROBE_TOKEN: ${{ env.PROBE_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/w02-role-assignment-runtime
+          set +e
+          http_code=$(curl -sS -o artifacts/mapping-0/w02-role-assignment-runtime/runtime-result.json -w '%{http_code}'             -X POST             -H "x-w02-role-assignment-probe-token: $PROBE_TOKEN"             http://127.0.0.1:8789/probe)
+          curl_exit=$?
+          set -e
+
+          echo "W02_ROLE_ASSIGNMENT_REMOTE_RUNTIME_HTTP_STATUS=$http_code"
+          echo "W02_ROLE_ASSIGNMENT_REMOTE_RUNTIME_CURL_EXIT=$curl_exit"
+          cat artifacts/mapping-0/w02-role-assignment-runtime/runtime-result.json || true
+          cat w02-role-assignment-runtime-harness.log || true
+
+          if [ "$curl_exit" -ne 0 ]; then
+            exit "$curl_exit"
+          fi
+          if [ "$http_code" != "200" ]; then
+            exit 1
+          fi
+
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const result = JSON.parse(fs.readFileSync('artifacts/mapping-0/w02-role-assignment-runtime/runtime-result.json', 'utf8'))
+          if (result.status !== 'PASS') throw new Error('W02 RoleAssignment remote runtime evidence did not PASS')
+          for (const [name, ok] of Object.entries(result.checks || {})) {
+            if (!ok) throw new Error('W02 RoleAssignment remote runtime assertion failed: ' + name)
+          }
+          console.log(JSON.stringify({
+            W02_ROLE_ASSIGNMENT_REMOTE_RUNTIME: 'PASS',
+            database: result.database,
+            syntheticSubject: result.syntheticSubject,
+            assignment: result.assignment,
+            versions: result.versions,
+            checks: result.checks,
+          }, null, 2))
+          NODE
+
+      - name: Capture reproducible provenance
+        run: |
+          cat > artifacts/mapping-0/w02-role-assignment-runtime/provenance.txt <<EOF
+          workflow=W02 RoleAssignment Remote Runtime Evidence
+          github_run_id=${{ github.run_id }}
+          github_source_head=${{ github.sha }}
+          tested_source_sha=${{ inputs.source_sha }}
+          database_name=${DATABASE_NAME}
+          database_id=${D1_01_ID}
+          binding=D1_01
+          environment=CONTROLLED_REMOTE_D1_ROLE_ASSIGNMENT_RUNTIME
+          operation=synthetic USER -> RoleAssignment INSERT -> updated_at-only UPDATE -> ACTIVE-to-REVOKED UPDATE
+          actor_type=AUTOMATION
+          actor_id=w02-role-assignment-runtime-evidence
+          production_worker_deployed=false
+          synthetic_rows_cleaned=true
+          EOF
+          cp w02-role-assignment-runtime-harness.log artifacts/mapping-0/w02-role-assignment-runtime/harness.log
+
+      - name: Upload controlled remote runtime evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: w02-role-assignment-remote-runtime-evidence-${{ github.run_id }}
+          path: artifacts/mapping-0/w02-role-assignment-runtime/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Cleanup ephemeral harness
+        if: ${{ always() }}
+        run: |
+          if [ -f w02-role-assignment-runtime-harness.pid ]; then
+            kill "$(cat w02-role-assignment-runtime-harness.pid)" 2>/dev/null || true
+          fi
+          rm -f .w02-role-assignment-runtime-harness.ts .w02-role-assignment-runtime.wrangler.jsonc w02-role-assignment-runtime-harness.pid
