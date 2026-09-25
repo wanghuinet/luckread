@@ -1,6 +1,7 @@
 name: AUTH-002 Promotion Matrix
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
