@@ -282,18 +282,18 @@ export async function revokeSessionExtension(
 
   const sql = `
     UPDATE auth_session_state
-       SET revoked_at = COALESCE(revoked_at, ?),
+       SET revoked_at = ?,
            last_seen_at = ?
      WHERE session_id = ?
+       AND revoked_at IS NULL
   `
 
   try {
-    await db.prepare(sql).bind(now, now, sessionId).run()
+    const result = await db.prepare(sql).bind(now, now, sessionId).run()
+    return { revoked: result.meta?.changes === 1 }
   } catch {
     throw new SessionRuntimeError('CONFLICT', 'session revocation failed')
   }
-
-  return { revoked: true }
 }
 
 
