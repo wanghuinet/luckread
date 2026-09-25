@@ -13,6 +13,7 @@ type W02ErrorPayload = {
 export type EstablishSessionResult = {
   sessionId: string
   refreshToken: string
+  tokenVersion: number
   layer: string
   nativeExpiresAt: string
 }
@@ -21,6 +22,7 @@ export type RefreshSessionResult = {
   sessionId: string
   userId: string
   refreshToken: string
+  tokenVersion: number
   layer: string
   nativeExpiresAt: string
   email: string
