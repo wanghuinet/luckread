@@ -1,0 +1,95 @@
+name: AUTH-002 Remote Runtime Evidence
+
+on:
+  workflow_run:
+    workflows:
+      - W01 W02 Auth Binding Deploy
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tested_commit:
+        description: Exact W01/W02 deployment commit to test
+        required: true
+        type: string
+      w01_base_url:
+        description: Controlled W01 URL
+        required: true
+        default: https://luckread-w01-payload.wanghui-79b.workers.dev
+        type: string
+      database_name:
+        description: Controlled D1 database name
+        required: true
+        default: luckread
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  W01_BASE_URL: ${{ github.event_name == 'workflow_run' && 'https://luckread-w01-payload.wanghui-79b.workers.dev' || inputs.w01_base_url }}
+  DATABASE_NAME: ${{ github.event_name == 'workflow_run' && 'luckread' || inputs.database_name }}
+  DEPLOYMENT_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || 0 }}
+  DEPLOYMENT_HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.tested_commit }}
+
+jobs:
+  runtime-evidence:
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact deployed source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.tested_commit }}
+          fetch-depth: 0
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Enable pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Install locked W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-workspace
+
+      - name: Verify runtime evidence admission
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${DEPLOYMENT_HEAD_SHA}"
+          test -n "${CLOUDFLARE_API_TOKEN}"
+          test -n "${CLOUDFLARE_ACCOUNT_ID}"
+          node scripts/auth-session-schema-evidence-probe.mjs --gate1
+
+      - name: Execute controlled remote AUTH-002 runtime evidence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NODE_OPTIONS: --no-deprecation
+        run: node scripts/auth-002-session-runtime-probe-remote.mjs
+
+      - name: Validate runtime evidence package
+        if: always()
+        run: node scripts/auth-session-runtime-evidence-validate.mjs
+
+      - name: Upload AUTH-002 runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-002-runtime-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/evidence/auth-002/runtime/
+          if-no-files-found: error
+          retention-days: 30
