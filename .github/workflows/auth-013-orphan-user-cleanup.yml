@@ -134,7 +134,7 @@ jobs:
               },
               null,
               2,
-            ) + '\\n',
+            ) + '\n',
           )
           NODE
 
@@ -263,7 +263,7 @@ jobs:
               },
               null,
               2,
-            ) + '\\n',
+            ) + '\n',
           )
           console.log(fs.readFileSync('cleanup-result.json', 'utf8'))
           NODE
