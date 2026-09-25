@@ -118,6 +118,7 @@ const concurrencyCases = []
 const context = {
   createdUsers: [],
   sessions: [],
+  roleAssignments: [],
   cleanupErrors: [],
 }
 
@@ -192,6 +193,109 @@ async function captureUserAuthState(user, label) {
   }
   writeJson(`runtime-user-auth-state-${label}.json`, artifact)
   return artifact
+}
+
+async function preparePositiveAuthSubject(user, label) {
+  const now = nowIso()
+  const roleAssignmentId = `auth002-${TEST_RUN_ID}-${label}-${randomBytes(6).toString('hex')}`
+
+  const before = d1Rows(
+    `SELECT id,email,account_state,account_state_version
+     FROM users
+     WHERE CAST(id AS TEXT)=${sqlString(user.userId)}
+     LIMIT 1`,
+  )[0]
+
+  if (!before?.id || String(before.email ?? '') !== user.email) {
+    throw new Error(`preparePositiveAuthSubject(${label}) user identity not found`)
+  }
+
+  d1Json(
+    `UPDATE users
+       SET account_state='ACTIVE',
+           account_state_version=COALESCE(account_state_version, 0) + 1
+     WHERE CAST(id AS TEXT)=${sqlString(user.userId)}`,
+  )
+
+  const assignments = d1Rows(
+    `SELECT id,subject_id,role_id,scope_type,status
+     FROM role_assignments
+     WHERE CAST(subject_id AS TEXT)=${sqlString(user.userId)}`,
+  )
+  if (assignments.length !== 0) {
+    throw new Error(`preparePositiveAuthSubject(${label}) synthetic user already has role assignments`)
+  }
+
+  d1Json(
+    `INSERT INTO role_assignments
+      (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at)
+     VALUES (
+       ${sqlString(roleAssignmentId)},
+       ${sqlString(user.userId)},
+       'user',
+       'global',
+       NULL,
+       'ACTIVE',
+       ${sqlString(now)},
+       NULL,
+       ${sqlString(now)},
+       ${sqlString(now)}
+     )`,
+  )
+  context.roleAssignments.push(roleAssignmentId)
+
+  const after = d1Rows(
+    `SELECT id,email,account_state,account_state_version
+     FROM users
+     WHERE CAST(id AS TEXT)=${sqlString(user.userId)}
+     LIMIT 1`,
+  )[0]
+  const assignment = d1Rows(
+    `SELECT id,subject_id,role_id,scope_type,status,valid_from,valid_until
+     FROM role_assignments
+     WHERE id=${sqlString(roleAssignmentId)}
+     LIMIT 1`,
+  )[0]
+
+  if (String(after?.account_state ?? '') !== 'ACTIVE') {
+    throw new Error(`preparePositiveAuthSubject(${label}) account state was not activated`)
+  }
+  if (
+    String(assignment?.subject_id ?? '') !== user.userId ||
+    String(assignment?.role_id ?? '') !== 'user' ||
+    String(assignment?.scope_type ?? '') !== 'global' ||
+    String(assignment?.status ?? '') !== 'ACTIVE'
+  ) {
+    throw new Error(`preparePositiveAuthSubject(${label}) canonical role assignment was not established`)
+  }
+
+  writeJson(`runtime-auth-fixture-${label}.json`, {
+    testId,
+    operation: 'controlled positive-auth fixture',
+    environmentClass: 'CONTROLLED_REMOTE_D1',
+    userId: user.userId,
+    email: user.email,
+    precondition: {
+      accountState: before.account_state ?? null,
+      accountStateVersion: Number(before.account_state_version ?? 0),
+      roleAssignmentCountBefore: assignments.length,
+    },
+    activated: {
+      accountState: String(after.account_state),
+      accountStateVersion: Number(after.account_state_version ?? 0),
+    },
+    roleAssignment: {
+      id: String(assignment.id),
+      subjectId: String(assignment.subject_id),
+      roleId: String(assignment.role_id),
+      scopeType: String(assignment.scope_type),
+      status: String(assignment.status),
+      validFrom: String(assignment.valid_from),
+    },
+    testedCommitSha: TESTED_COMMIT_SHA,
+  })
+
+  return { roleAssignmentId, accountState: String(after.account_state) }
 }
 
 async function login(user, deviceId) {
@@ -291,6 +395,14 @@ function bumpTokenVersion(sessionId) {
 }
 
 async function cleanup() {
+  for (const roleAssignmentId of context.roleAssignments) {
+    try {
+      d1Json(`DELETE FROM role_assignments WHERE id=${sqlString(roleAssignmentId)}`)
+    } catch (error) {
+      context.cleanupErrors.push(`cleanup role assignment ${roleAssignmentId}: ${safeError(error)}`)
+    }
+  }
+
   for (const user of context.createdUsers) {
     try {
       const rows = d1Rows(
@@ -362,6 +474,7 @@ try {
 
   const primary = await createUser('primary')
   await captureUserAuthState(primary, 'primary')
+  await preparePositiveAuthSubject(primary, 'primary')
   const primaryLogin = await login(primary, 'device-primary')
   const primaryMe = await getMe(primaryLogin.accessToken)
   assertStatus(primaryMe, 200, 'primary /api/users/me')
@@ -494,6 +607,7 @@ try {
 
   const otherUser = await createUser('other')
   await captureUserAuthState(otherUser, 'other')
+  await preparePositiveAuthSubject(otherUser, 'other')
   const wrongBindingLogin = await login(primary, 'device-wrong-user')
   const wrongBindingSession = loadSessionForUser(primary.userId)
   changeExtensionUser(wrongBindingSession.sessionId, otherUser.userId)
