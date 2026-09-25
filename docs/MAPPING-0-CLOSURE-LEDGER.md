@@ -2932,3 +2932,38 @@ After the workflow completes, accept or diagnose the supplied GitHub Actions run
 **W02 RoleAssignment D1-01 remote migration/readback → role_version mutation/invalidation runtime → controlled authLogin/authRefresh E2E evidence → AUTH-013 public transport/security E2E.**
 
 AUTH-013 remains **BLOCKED_NOT_GREEN**.
+
+
+## 2026-09-25 Superpowers continuation — AUTH-002 ENT-USER profile migration execution gate
+
+Current authoritative source before this change: `80e33466c1ca5130677c09a7953f80fb0c238c1f`.
+
+Observed runtime blocker, inherited without re-execution:
+- AUTH-002 Remote Runtime Evidence Run `36127160884` = FAILURE at the real W01 Worker.
+- `POST /api/users` failed with HTTP 500 before native session creation.
+- The same run's Gate-1 remote evidence accepted the existing `users`, `users_sessions`, and `auth_session_state` schema, but migration history contained only `20250929_111647` and `20260921_003203_MIG_AUTH_002_SESSION_V1`.
+- Current W01 source already requires the six authoritative ENT-USER fields: `username`, `displayName`, `bio`, `avatar`, `locale`, `timezone`.
+
+Generated source evidence:
+- AUTH-002 User Profile Migration Generation Probe Run `36128304194` = SUCCESS.
+- Generated migration: `20260925_111503_MIG_ENT_USER_PROFILE_V1`.
+- Generation artifact: `10860713434`.
+- Generated migration is additive only: six `users` columns plus `users_username_idx`; no Payload baseline table recreation and no `auth_session_state` schema changes.
+
+Implementation admission:
+- Backup branch: `backup/main-before-auth002-user-profile-migration-20260925` created from the authoritative pre-change main head.
+- Working branch: `superpowers/auth-002-user-profile-migration-admission-20260925`.
+- Added the exact generated migration and registered it in `workers/W01-payload/src/migrations/index.ts`.
+- Added source admission guard: `scripts/auth-002-user-profile-migration-admission.mjs`.
+- Added Change Control: `docs/change-control/CC-W01-ENT-USER-PROFILE-MIGRATION-2026-09-25.md` with narrow execution admission.
+- Added controlled manual workflow: `.github/workflows/w01-ent-user-profile-migration-execution.yml`.
+
+Safety boundary:
+- No remote D1 mutation has been performed by this change.
+- Remote execution is blocked unless the exact merged source SHA is supplied, `database_name=luckread`, confirmation is `APPLY_ENT_USER_PROFILE_MIGRATION`, the remote `users` row count is exactly zero, all six target columns are absent, and migration history is exactly the two already-applied migrations.
+
+NEXT_ITEM_ID: `W01-ENT-USER-PROFILE-MIGRATION-REMOTE-001`
+NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
+NEXT required external action: manually dispatch the controlled profile migration workflow against the exact merged main SHA, then inspect the post-migration artifact before attempting AUTH-002 runtime evidence again.
+
+Do not rerun AUTH-002 Remote Runtime Evidence `36127160884` unchanged; its failure is explained by the current remote schema lag.
