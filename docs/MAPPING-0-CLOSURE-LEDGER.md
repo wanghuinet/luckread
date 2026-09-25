@@ -2905,3 +2905,30 @@ This is a direct prerequisite for public AUTH-013 security/integration E2E. Do n
 The independent Feed/Recommendation/Search lifecycle side-effect boundary remains unresolved until an executable W04 derived-projection/deindex runtime is formally admitted; the legacy `workers/W04-social` directory is not treated as canonical Worker authority.
 
 AUTH-013 remains **BLOCKED_NOT_GREEN**.
+
+
+## 2026-09-25 — E6 RoleAssignment Remote Migration Evidence Workflow Ready
+
+Workflow repair commit: `f10b34d7eeb6d0e992552726fe76afc2bb11dae2`.
+
+The controlled workflow `.github/workflows/w02-role-assignment-migration.yml` had a Node 24 ESM compatibility defect in its D1-01 target-binding preflight (`require('fs')`). It is now corrected to use an explicit ESM `node:fs` import. No migration SQL, authority, Worker, D1 target, or Contract semantics changed.
+
+The workflow has no remaining `require()` usage.
+
+### Exact manual execution inputs
+
+- `source_sha` = `77a996ac1932b7b9b53264b79e4352d6626c5cc0`
+- `database_name` = `luckread`
+- `confirm` = `APPLY`
+
+Execution must use the workflow's existing controlled target guard for D1-01 UUID `2f80471e-3756-49f9-8db1-7707a433ad64`.
+
+This is the next execution gate. Do not rerun already verified W01/W02 deployment or AUTH-013 transport evidence.
+
+After the workflow completes, accept or diagnose the supplied GitHub Actions run only; do not infer remote migration success from source code or the workflow definition.
+
+### Current cursor
+
+**W02 RoleAssignment D1-01 remote migration/readback → role_version mutation/invalidation runtime → controlled authLogin/authRefresh E2E evidence → AUTH-013 public transport/security E2E.**
+
+AUTH-013 remains **BLOCKED_NOT_GREEN**.
