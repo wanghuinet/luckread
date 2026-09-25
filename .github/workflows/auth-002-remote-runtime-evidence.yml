@@ -98,7 +98,7 @@ jobs:
             lockfileSha256: createHash('sha256').update(lockfile).digest('hex'),
             gitVersion,
           }
-          writeFileSync('../../artifacts/evidence/auth-002/runtime/runtime-dependency.json', JSON.stringify(artifact, null, 2) + '\\n')
+          writeFileSync('../../artifacts/evidence/auth-002/runtime/runtime-dependency.json', JSON.stringify(artifact, null, 2) + '\n')
           NODE
 
       - name: Execute controlled remote AUTH-002 runtime evidence
