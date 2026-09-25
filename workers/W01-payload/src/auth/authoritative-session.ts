@@ -1,5 +1,13 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 
+export type D1DatabaseLike = {
+  prepare(sql: string): {
+    bind(...values: unknown[]): {
+      first<T = unknown>(): Promise<T | null>
+    }
+  }
+}
+
 type SessionBoundUser = {
   id?: string | number
   _sid?: string
@@ -52,7 +60,7 @@ export async function isAuthoritativeSessionActive(
 
   try {
     const context = await getCloudflareContext({ async: true })
-    const env = context.env as unknown as { D1?: D1Database }
+    const env = context.env as unknown as { D1?: D1DatabaseLike }
     if (!env.D1) return false
 
     const row = await env.D1
