@@ -702,6 +702,11 @@ try {
     'runtime-negative-security.json',
     'runtime-concurrency.json',
   ]
+  for (const label of ['primary', 'other']) {
+    if (readJsonSafe(`runtime-user-auth-state-${label}.json`)) {
+      allFiles.push(`runtime-user-auth-state-${label}.json`)
+    }
+  }
 
   if (!readJsonSafe('runtime-create-user-diagnostic.json')) {
     writeJson('runtime-create-user-diagnostic.json', {
