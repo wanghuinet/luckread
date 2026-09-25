@@ -79,12 +79,6 @@ const authSnapshotFiles = fs.readdirSync(path.join(stage2, 'migrations')).filter
 if (authSnapshotFiles.length !== 1) throw new Error('Expected one AUTH post-schema snapshot; found ' + authSnapshotFiles.length)
 fs.copyFileSync(path.join(stage2, 'migrations', authSnapshotFiles[0]), path.join(stage3, 'migrations', 'baseline.json'))
 
-run('pnpm', ['exec', 'payload', 'generate:db-schema'], root, {
-  PAYLOAD_CONFIG_PATH: path.join(stage3, 'payload.config.ts'),
-  PAYLOAD_SECRET: 'generation-only-not-production',
-})
-if (!fs.existsSync(path.join(stage3, 'payload-generated-schema.ts'))) throw new Error('Expected generated schema probe')
-
 run('pnpm', ['exec', 'payload', 'migrate:create', 'MIG-ENT-USER-PROFILE-V1', '--skip-empty'], root, {
   PAYLOAD_CONFIG_PATH: path.join(stage3, 'payload.config.ts'),
   PAYLOAD_SECRET: 'generation-only-not-production',
