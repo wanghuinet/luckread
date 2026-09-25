@@ -20,6 +20,7 @@ permissions:
 env:
   EXPECTED_RUN_ID: "36082802465"
   D1_01_ID: "2f80471e-3756-49f9-8db1-7707a433ad64"
+  D1_03_ID: "bda1d247-a371-4244-91ae-aef96034db7f"
   DATABASE_NAME: "luckread"
 
 jobs:
@@ -61,7 +62,7 @@ jobs:
           const token = process.env.CLOUDFLARE_API_TOKEN
           const dbId = process.env.D1_01_ID
 
-          async function query(sql) {
+          async function queryD1(dbId, sql) {
             const response = await fetch(
               `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${dbId}/query`,
               {
@@ -80,7 +81,8 @@ jobs:
             return body.result?.[0]?.results ?? []
           }
 
-          const users = await query(
+          const users = await queryD1(
+            process.env.D1_01_ID,
             `SELECT id,email,created_at,account_state,account_state_version
              FROM users
              WHERE id = ${expectedUserId}
@@ -95,7 +97,8 @@ jobs:
             throw new Error(`cleanup blocked: target email mismatch`)
           }
 
-          const journalRows = await query(
+          const journalRows = await queryD1(
+            process.env.D1_01_ID,
             `SELECT journal_id,event_id,event_type,resource_id,status,attempt
              FROM auth_013_publication_journal
              WHERE resource_id = '${expectedUserId}'
@@ -105,12 +108,17 @@ jobs:
             throw new Error(`cleanup blocked: expected exactly one AUTH-013 journal row for target user, got ${journalRows.length}`)
           }
 
-          const auditRows = await query(
+          const auditRows = await queryD1(
+            process.env.D1_03_ID,
             `SELECT COUNT(*) AS count
              FROM audit_events
              WHERE target_id = '${expectedUserId}'
              AND action = 'identity.account_state_changed'`,
           )
+          const retainedAuditEventCount = Number(auditRows[0]?.count ?? 0)
+          if (retainedAuditEventCount < 1) {
+            throw new Error(`cleanup blocked: expected at least one immutable D1-03 audit event, got ${retainedAuditEventCount}`)
+          }
 
           fs.writeFileSync(
             'cleanup-preflight.json',
@@ -121,7 +129,7 @@ jobs:
                 expectedEmail,
                 user,
                 journal: journalRows[0],
-                retainedAuditEventCount: Number(auditRows[0]?.count ?? 0),
+                retainedAuditEventCount,
                 preflight: 'PASS',
               },
               null,
@@ -224,11 +232,16 @@ jobs:
             return body.result?.[0]?.results ?? []
           }
 
-          const userRows = await query(`SELECT COUNT(*) AS count FROM users WHERE id = ${userId}`)
-          const journalRows = await query(
+          const userRows = await queryD1(
+            process.env.D1_01_ID,
+            `SELECT COUNT(*) AS count FROM users WHERE id = ${userId}`,
+          )
+          const journalRows = await queryD1(
+            process.env.D1_01_ID,
             `SELECT COUNT(*) AS count FROM auth_013_publication_journal WHERE journal_id = '${journalId}'`,
           )
-          const auditRows = await query(
+          const auditRows = await queryD1(
+            process.env.D1_03_ID,
             `SELECT COUNT(*) AS count
              FROM audit_events
              WHERE target_id = '${userId}'
