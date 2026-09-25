@@ -3,7 +3,7 @@ name: AUTH-002 User Profile Migration Generation Probe
 on:
   push:
     branches:
-      - superpowers/auth-002-user-schema-generation-20260925
+      - superpowers/auth-002-user-schema-generation-v2-20260925
 
 permissions:
   contents: read
