@@ -132,7 +132,7 @@ export async function POST(request: Request): Promise<Response> {
     const access = await issuePayloadAccessToken({
       payloadSecret: payload.secret,
       userId: String(nativeUser.id),
-      email: String(nativeUser.email ?? body.identity),
+      email: String(body.identity).toLowerCase().trim(),
       sessionId: nativeSid,
       expiresAt: session.nativeExpiresAt,
       tokenVersion: session.tokenVersion,
