@@ -46,6 +46,28 @@ jobs:
         run: |
           node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8')); const b=(c.services||[]).find(x=>x.binding==='W02_AUTH'); if(!b || b.service!=='luckread-w02') throw new Error('W02_AUTH binding mismatch'); console.log(JSON.stringify(b));"
 
+      - name: Ensure W01 PAYLOAD_SECRET runtime secret
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/mapping-0
+          secret_list="$(npx --yes wrangler@4.116.0 secret list --name luckread-w01-payload --format json)"
+          has_payload_secret="$(printf '%s' "$secret_list" | node --input-type=module -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const parsed=JSON.parse(data); const names=new Set(Array.isArray(parsed) ? parsed.map(item => item?.name) : []); process.stdout.write(names.has("PAYLOAD_SECRET") ? "true" : "false"); })')"
+          if [ "$has_payload_secret" != "true" ]; then
+            openssl rand -hex 32 | npx --yes wrangler@4.116.0 secret put PAYLOAD_SECRET --name luckread-w01-payload >/dev/null
+            action="generated_and_put"
+          else
+            action="already_present"
+          fi
+          verify_list="$(npx --yes wrangler@4.116.0 secret list --name luckread-w01-payload --format json)"
+          verified="$(printf '%s' "$verify_list" | node --input-type=module -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const parsed=JSON.parse(data); const names=new Set(Array.isArray(parsed) ? parsed.map(item => item?.name) : []); process.stdout.write(names.has("PAYLOAD_SECRET") ? "true" : "false"); })')"
+          test "$verified" = "true"
+          ACTION="$action" node -e "const fs=require('fs'); fs.writeFileSync('../../artifacts/mapping-0/w01-payload-secret-provenance.json', JSON.stringify({worker:'luckread-w01-payload',secretName:'PAYLOAD_SECRET',action:process.env.ACTION,verified:true,secretValueExposed:false}, null, 2)+'\\n')"
+          cat ../../artifacts/mapping-0/w01-payload-secret-provenance.json
+
       - name: Build W01 application without database migration
         working-directory: workers/W01-payload
         run: pnpm exec opennextjs-cloudflare build
