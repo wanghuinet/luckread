@@ -61,7 +61,7 @@ jobs:
 
       - name: Install locked W01 dependencies
         working-directory: workers/W01-payload
-        run: pnpm install --frozen-lockfile --ignore-workspace
+        run: pnpm install --frozen-lockfile
 
       - name: Verify runtime evidence admission
         env:
