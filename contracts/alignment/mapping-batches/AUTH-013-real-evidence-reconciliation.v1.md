@@ -355,3 +355,26 @@ The repository already contains the approved W02 durable publication publisher a
 3. D1-03 `audit_events` remains immutable; no evidence workflow may fabricate-and-delete a positive AuditEvent row merely to obtain GREEN.
 
 AUTH-013 remains **BLOCKED_NOT_GREEN** until the positive publication/persistence boundary and the separately contracted lifecycle/security side effects are evidenced.
+
+## 2026-09-25 Positive runtime evidence cursor
+
+A new CI-only evidence workflow is now admitted in the repository:
+
+`.github/workflows/auth-013-positive-runtime-evidence.yml`
+
+It executes the approved positive boundary:
+
+`W02 transition kernel against real D1-01 → durable publication journal → already-deployed W02 scheduled publisher → AUTH-013 Queue → already-deployed W06 consumer → D1-03 AuditEvent`.
+
+The workflow adds no public route, Worker, D1, Service Binding, or Contract.
+
+Safety boundary:
+- exact previously deployed W02 source/version are required and validated;
+- W02 is not redeployed by this evidence workflow;
+- synthetic W02 User and publication-journal records are removed after the evidence window;
+- the immutable D1-03 AuditEvent produced by the real queue-consumer path is intentionally retained;
+- no AuditEvent row is directly inserted or deleted by the workflow.
+
+The workflow checks the transition result, journal publication, matching D1-03 AuditEvent, canonical actor role, and before/after state/version.
+
+This opens the controlled evidence path for the still-unverified positive publication/persistence boundary; AUTH-013 remains **BLOCKED_NOT_GREEN** until the evidence passes and the downstream lifecycle/security gates are also verified.
