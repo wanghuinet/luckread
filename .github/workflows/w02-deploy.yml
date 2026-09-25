@@ -29,10 +29,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Verify RoleAssignment migration artifact
-        run: node scripts/generate-role-assignment-migration.mjs
-      - name: Assert generated migration is committed
-        run: git diff --exit-code -- workers/W02-content/migrations/0001_role_assignments.sql
+      - name: Verify RoleAssignment migration artifacts
+        run: |
+          node scripts/generate-role-assignment-migration.mjs
+          node scripts/generate-role-version-migration.mjs
+      - name: Assert generated migrations are committed
+        run: |
+          git diff --exit-code -- workers/W02-content/migrations/0001_role_assignments.sql
+          git diff --exit-code -- workers/W02-content/migrations/0003_role_authorization_versions.sql
       - name: Deploy W02 with pinned Wrangler
         working-directory: workers/W02-content
         env:
