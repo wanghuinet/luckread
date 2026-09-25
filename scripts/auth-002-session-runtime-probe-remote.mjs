@@ -166,6 +166,34 @@ async function createUser(label) {
   return { userId: String(userId), email, password, username }
 }
 
+async function captureUserAuthState(user, label) {
+  const rows = d1Rows(
+    `SELECT id,email,
+      CASE WHEN hash IS NOT NULL AND length(hash) > 0 THEN 1 ELSE 0 END AS hash_present,
+      CASE WHEN salt IS NOT NULL AND length(salt) > 0 THEN 1 ELSE 0 END AS salt_present,
+      COALESCE(login_attempts, 0) AS login_attempts,
+      CASE WHEN lock_until IS NOT NULL THEN 1 ELSE 0 END AS lock_until_present
+     FROM users WHERE CAST(id AS TEXT)=${sqlString(user.userId)} LIMIT 1`,
+  )
+  const row = rows[0]
+  const artifact = {
+    testId,
+    operation: 'remote D1 user auth state pre-login',
+    label,
+    userId: user.userId,
+    userExists: Boolean(row?.id),
+    emailMatches: String(row?.email ?? '') === user.email,
+    hashPresent: Number(row?.hash_present ?? 0) === 1,
+    saltPresent: Number(row?.salt_present ?? 0) === 1,
+    loginAttempts: Number(row?.login_attempts ?? 0),
+    lockUntilPresent: Number(row?.lock_until_present ?? 0) === 1,
+    secretValuesRedacted: true,
+    testedCommitSha: TESTED_COMMIT_SHA,
+  }
+  writeJson(`runtime-user-auth-state-${label}.json`, artifact)
+  return artifact
+}
+
 async function login(user, deviceId) {
   const response = await request('/auth/login', {
     method: 'POST',
@@ -309,6 +337,7 @@ try {
   writeFileSync(`${GATE1_DIR}/schema.json`, `${JSON.stringify(gate1, null, 2)}\n`)
 
   const primary = await createUser('primary')
+  await captureUserAuthState(primary, 'primary')
   const primaryLogin = await login(primary, 'device-primary')
   const primaryMe = await getMe(primaryLogin.accessToken)
   assertStatus(primaryMe, 200, 'primary /api/users/me')
@@ -440,6 +469,7 @@ try {
   })
 
   const otherUser = await createUser('other')
+  await captureUserAuthState(otherUser, 'other')
   const wrongBindingLogin = await login(primary, 'device-wrong-user')
   const wrongBindingSession = loadSessionForUser(primary.userId)
   changeExtensionUser(wrongBindingSession.sessionId, otherUser.userId)
