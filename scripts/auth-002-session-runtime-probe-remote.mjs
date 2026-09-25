@@ -195,6 +195,48 @@ async function captureUserAuthState(user, label) {
 }
 
 async function login(user, deviceId) {
+  const nativeResponse = await request('/api/users/login', {
+    method: 'POST',
+    body: { email: user.email, password: user.password },
+  })
+  writeJson('runtime-native-payload-login.json', {
+    testId,
+    operation: 'POST /api/users/login',
+    status: nativeResponse.status,
+    contentType: nativeResponse.contentType,
+    requestId: nativeResponse.requestId,
+    cfRay: nativeResponse.cfRay,
+    successShape: Boolean(nativeResponse.data?.token && nativeResponse.data?.user?.id),
+    errorCode: nativeResponse.data?.errors?.[0]?.name ?? nativeResponse.data?.error?.code ?? null,
+    errorMessage: typeof nativeResponse.data?.errors?.[0]?.message === 'string'
+      ? nativeResponse.data.errors[0].message.slice(0, 160)
+      : typeof nativeResponse.data?.error?.message === 'string'
+        ? nativeResponse.data.error.message.slice(0, 160)
+        : null,
+    secretsRedacted: true,
+    testedCommitSha: TESTED_COMMIT_SHA,
+  })
+  if (nativeResponse.status !== 200) {
+    throw new Error(`native Payload login failed: HTTP ${nativeResponse.status}`)
+  }
+
+  const response = await request('/auth/login', {
+    method: 'POST',
+    body: { identity: user.email, credential: user.password, deviceId },
+  })
+  assertStatus(response, 200, `login ${deviceId}`)
+  if (!response.data?.accessToken || !response.data?.refreshToken) {
+    throw new Error(`login ${deviceId} returned no auth pair`)
+  }
+  return {
+    accessToken: response.data.accessToken,
+    refreshToken: response.data.refreshToken,
+    layer: response.data.layer,
+    expiresIn: response.data.expiresIn,
+  }
+}
+
+
   const response = await request('/auth/login', {
     method: 'POST',
     body: { identity: user.email, credential: user.password, deviceId },
@@ -693,6 +735,7 @@ try {
   writeJson('extension-correlation.json', extensionArtifact)
 
   const allFiles = [
+    'runtime-native-payload-login.json',
     'runtime-dependency.json',
     'runtime-create-user-diagnostic.json',
     'runtime-session-creation.json',
