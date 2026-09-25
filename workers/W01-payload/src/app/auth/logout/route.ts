@@ -42,7 +42,10 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    await revokeSession({ sessionId: user._sid })
+    const revocation = await revokeSession({ sessionId: user._sid })
+    if (!revocation.revoked) {
+      return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
+    }
   } catch (error) {
     if (error instanceof W02AuthClientError) {
       return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
