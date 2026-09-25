@@ -21,15 +21,20 @@ on:
         required: true
         default: luckread
         type: string
+      deployment_run_id:
+        description: Successful W01 W02 Auth Binding Deploy workflow run ID
+        required: true
+        type: string
 
 permissions:
   contents: read
+  actions: read
 
 env:
   WRANGLER_VERSION: 4.116.0
   W01_BASE_URL: ${{ github.event_name == 'workflow_run' && 'https://luckread-w01-payload.wanghui-79b.workers.dev' || inputs.w01_base_url }}
   DATABASE_NAME: ${{ github.event_name == 'workflow_run' && 'luckread' || inputs.database_name }}
-  DEPLOYMENT_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || 0 }}
+  DEPLOYMENT_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.deployment_run_id }}
   DEPLOYMENT_HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.tested_commit }}
 
 jobs:
@@ -72,6 +77,15 @@ jobs:
           test "$(git rev-parse HEAD)" = "${DEPLOYMENT_HEAD_SHA}"
           test -n "${CLOUDFLARE_API_TOKEN}"
           test -n "${CLOUDFLARE_ACCOUNT_ID}"
+          test -n "${DEPLOYMENT_RUN_ID}"
+          deployment_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}")"
+          DEPLOYMENT_JSON="${deployment_json}" DEPLOYMENT_HEAD_SHA="${DEPLOYMENT_HEAD_SHA}" node --input-type=module <<'NODE'
+          const data = JSON.parse(process.env.DEPLOYMENT_JSON)
+          if (data.name !== 'W01 W02 Auth Binding Deploy') throw new Error('runtime evidence admission: deployment run is not W01 W02 Auth Binding Deploy')
+          if (data.conclusion !== 'success') throw new Error('runtime evidence admission: deployment run conclusion is not success')
+          if (data.head_branch !== 'main') throw new Error('runtime evidence admission: deployment run is not on main')
+          if (data.head_sha !== process.env.DEPLOYMENT_HEAD_SHA) throw new Error('runtime evidence admission: deployment head SHA does not equal tested deployment head SHA')
+          NODE
           node scripts/auth-session-schema-evidence-probe.mjs --gate1
 
       - name: Capture W01 dependency provenance
