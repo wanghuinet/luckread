@@ -68,7 +68,7 @@ describe('session runtime foundation', () => {
       },
     })
 
-    expect(result).toEqual({ sessionId: 'sid-1', refreshToken: 'refresh-1' })
+    expect(result).toEqual({ sessionId: 'sid-1', refreshToken: 'v4.refresh-1' })
     expect(calls).toEqual(['insert'])
     expect(fake.getWrites()).toBe(0)
   })
@@ -96,7 +96,7 @@ describe('session runtime foundation', () => {
     }
     const fake = dbFake(record)
     const result = await rotateRefreshCredential(fake.db, {
-      refreshToken: 'refresh-1',
+      refreshToken: 'v3.refresh-1',
       deviceId: 'device-a',
       now: NOW,
       issueAccessToken: () => 'access-1',
@@ -106,7 +106,7 @@ describe('session runtime foundation', () => {
     expect(result).toEqual({
       sessionId: 'sid-1',
       accessToken: 'access-1',
-      refreshToken: 'refresh-2',
+      refreshToken: 'v3.refresh-2',
     })
     expect(fake.getReads()).toBe(1)
     expect(fake.getWrites()).toBe(1)
@@ -267,7 +267,7 @@ describe('authenticated session orchestration', () => {
       },
     })
 
-    expect(result).toEqual({ sessionId: 'sid-1', accessToken: 'access-2', refreshToken: 'refresh-2', layer: 'L3' })
+    expect(result).toEqual({ sessionId: 'sid-1', accessToken: 'access-2', refreshToken: 'v3.refresh-2', layer: 'L3' })
   })
   it('does not mint or rotate when authoritative layer resolution denies', async () => {
     const hash = 'old-hash'
