@@ -41,13 +41,21 @@ async function request(path, { method = 'GET', body, token, timeoutMs = 20_000 }
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
+    const rawBody = await response.text()
     let data = null
     try {
-      data = await response.json()
+      data = rawBody ? JSON.parse(rawBody) : null
     } catch {
-      data = null
+      data = rawBody || null
     }
-    return { status: response.status, ok: response.ok, data }
+    return {
+      status: response.status,
+      ok: response.ok,
+      data,
+      contentType: response.headers.get('content-type') || '',
+      requestId: response.headers.get('x-request-id') || '',
+      cfRay: response.headers.get('cf-ray') || '',
+    }
   } finally {
     clearTimeout(timeout)
   }
@@ -122,7 +130,21 @@ async function createUser(label) {
     method: 'POST',
     body: { email, username, password },
   })
-  if (!response.ok) throw new Error(`createUser(${label}) failed with HTTP ${response.status}`)
+  if (!response.ok) {
+    writeJson('runtime-create-user-diagnostic.json', {
+      testId,
+      operation: 'POST /api/users',
+      label,
+      status: response.status,
+      contentType: response.contentType,
+      requestId: response.requestId || null,
+      cfRay: response.cfRay || null,
+      message: response.data?.errors?.[0]?.message ?? response.data?.message ?? null,
+      errorCount: Array.isArray(response.data?.errors) ? response.data.errors.length : null,
+      testedCommitSha: TESTED_COMMIT_SHA,
+    })
+    throw new Error(`createUser(${label}) failed with HTTP ${response.status}`)
+  }
   const userId = response.data?.doc?.id ?? response.data?.id
   if (userId === undefined || userId === null) throw new Error(`createUser(${label}) did not return a user id`)
   context.createdUsers.push({ userId: String(userId), email })
@@ -627,6 +649,7 @@ try {
 
   const allFiles = [
     'runtime-dependency.json',
+    'runtime-create-user-diagnostic.json',
     'runtime-session-creation.json',
     'runtime-validation.json',
     'runtime-logout.json',
@@ -634,6 +657,21 @@ try {
     'runtime-negative-security.json',
     'runtime-concurrency.json',
   ]
+
+  if (!readJsonSafe('runtime-create-user-diagnostic.json')) {
+    writeJson('runtime-create-user-diagnostic.json', {
+      testId,
+      operation: 'POST /api/users',
+      status: null,
+      contentType: '',
+      requestId: null,
+      cfRay: null,
+      message: null,
+      errorCount: null,
+      disposition: 'NOT_TRIGGERED',
+      testedCommitSha: TESTED_COMMIT_SHA,
+    })
+  }
 
   if (!readJsonSafe('runtime-negative-security.json')) {
     writeJson('runtime-negative-security.json', {
