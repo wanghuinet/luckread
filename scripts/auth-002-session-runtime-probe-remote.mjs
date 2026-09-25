@@ -235,24 +235,6 @@ async function login(user, deviceId) {
     expiresIn: response.data.expiresIn,
   }
 }
-
-
-  const response = await request('/auth/login', {
-    method: 'POST',
-    body: { identity: user.email, credential: user.password, deviceId },
-  })
-  assertStatus(response, 200, `login ${deviceId}`)
-  if (!response.data?.accessToken || !response.data?.refreshToken) {
-    throw new Error(`login ${deviceId} returned no auth pair`)
-  }
-  return {
-    accessToken: response.data.accessToken,
-    refreshToken: response.data.refreshToken,
-    layer: response.data.layer,
-    expiresIn: response.data.expiresIn,
-  }
-}
-
 function loadSessionForUser(userId) {
   const rows = d1Rows(
     `SELECT id,_parent_id,created_at,expires_at FROM users_sessions WHERE CAST(_parent_id AS TEXT)=${sqlString(userId)} ORDER BY created_at DESC LIMIT 1`,
