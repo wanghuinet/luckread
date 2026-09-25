@@ -2771,3 +2771,17 @@ No duplicate Queue/DLQ testing is authorized from this point.
 The current-head W02 publisher implementation/configuration is present, but current-head production Worker deployment evidence has not yet been captured.
 
 AUTH-013 remains **BLOCKED_NOT_GREEN**.
+
+
+## AUTH-013 positive runtime cursor — 2026-09-25
+
+The W02 deployment is PASS_VERIFIED from run 36079773839 at source 7d506c253b6f686d36e1acea28dd4593f099b777, version 564369b1-7d97-4d08-baba-277b47ccba7d.
+
+A CI-only positive runtime evidence workflow has been admitted. It verifies the real path:
+W02 transition → D1-01 journal → deployed W02 publisher → AUTH-013 Queue → W06 consumer → D1-03 AuditEvent.
+
+It does not repeat passed W02 deployment, W06 Queue runtime, DLQ cleanup, or schema evidence.
+
+The immutable D1-03 AuditEvent produced by the real consumer path is retained; only synthetic W02 user and journal evidence records are cleaned.
+
+AUTH-013 remains BLOCKED_NOT_GREEN pending this positive runtime result plus lifecycle/security/E2E evidence.
