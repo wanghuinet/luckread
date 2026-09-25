@@ -320,3 +320,38 @@ No current evidence is promoted as proof that this full chain has executed on th
 ### Next cursor
 
 Do not repeat the passed infrastructure/code gates. The next implementation/evidence step is the **minimum safe proof of the approved W02 → Queue → W06 runtime transport and D1-03 persistence boundary**, without creating a public workaround or polluting the immutable AuditEvent target. AUTH-013 remains **BLOCKED_NOT_GREEN** until that boundary and the downstream lifecycle/security side-effects are evidenced.
+
+
+## 2026-09-25 W06 Queue runtime evidence closure
+
+Current authoritative `main` head: `77495115614791e506e915090cb6a1302f83b046`.
+
+Inherited controlled runtime evidence:
+
+- W06 Synthetic DLQ Probe Cleanup Run `36078065163`: **SUCCESS**. The previously confirmed synthetic probe was removed by targeted DLQ ref purge; post-cleanup DLQ backlog verified empty.
+- W06 Queue Consumer Runtime Evidence Run `36078197917`: **SUCCESS**. All runtime steps passed, including:
+  - W06 deployment/source admission;
+  - physical Queue/DLQ identity;
+  - Wrangler/live consumer identity cross-check;
+  - live W06 Queue consumer binding;
+  - fail-closed empty precondition;
+  - synthetic invalid AUTH-013 envelope delivery;
+  - Queue → W06 Consumer → Retry → DLQ runtime reachability;
+  - targeted synthetic probe cleanup;
+  - evidence verdict.
+
+This closes the **W06 Queue runtime consumer evidence** sub-gate as **PASS_VERIFIED** and it must not be re-executed merely for repetition.
+
+The positive production-path boundary remains unverified:
+
+`W02 accepted transition → D1-01 durable journal → W02 Queue publisher → AUTH-013 Queue → W06 consumer → D1-03 AuditEvent persistence`.
+
+The repository already contains the approved W02 durable publication publisher and Queue binding on current `main`, but no current-head controlled W02 deployment evidence is yet recorded for that producer slice.
+
+### Current next cursor
+
+1. Controlled W02 deployment from exact current `main` source `77495115614791e506e915090cb6a1302f83b046`.
+2. Only after that deployment is PASS_VERIFIED may a real end-to-end transport evidence run be admitted.
+3. D1-03 `audit_events` remains immutable; no evidence workflow may fabricate-and-delete a positive AuditEvent row merely to obtain GREEN.
+
+AUTH-013 remains **BLOCKED_NOT_GREEN** until the positive publication/persistence boundary and the separately contracted lifecycle/security side effects are evidenced.
