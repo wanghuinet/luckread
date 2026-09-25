@@ -1,0 +1,409 @@
+name: AUTH-013 Positive Runtime Transport Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      w02_source_sha:
+        description: "Exact W02 source already deployed to luckread-w02"
+        required: true
+        type: string
+      w02_version_id:
+        description: "Cloudflare W02 version ID from the admitted deployment"
+        required: true
+        type: string
+      confirm:
+        description: "Type RUN to execute the controlled positive runtime evidence"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  positive-runtime:
+    if: ${{ inputs.confirm == 'RUN' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      D1_01_ID: "2f80471e-3756-49f9-8db1-7707a433ad64"
+      D1_03_ID: "bda1d247-a371-4244-91ae-aef96034db7f"
+      W02_NAME: "luckread-w02"
+      W06_NAME: "luckread-w06"
+      QUEUE_NAME: "luckread-auth013-account-state"
+      EXPECTED_W02_SOURCE_SHA: "7d506c253b6f686d36e1acea28dd4593f099b777"
+      EXPECTED_W02_VERSION_ID: "564369b1-7d97-4d08-baba-277b47ccba7d"
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - name: Checkout evidence source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate exact deployed W02 provenance
+        shell: bash
+        env:
+          INPUT_W02_SOURCE_SHA: ${{ inputs.w02_source_sha }}
+          INPUT_W02_VERSION_ID: ${{ inputs.w02_version_id }}
+        run: |
+          set -euo pipefail
+          test "$INPUT_W02_SOURCE_SHA" = "$EXPECTED_W02_SOURCE_SHA"
+          test "$INPUT_W02_VERSION_ID" = "$EXPECTED_W02_VERSION_ID"
+          git merge-base --is-ancestor "$INPUT_W02_SOURCE_SHA" HEAD
+          test -f workers/W02-content/src/account/account-state-transition.ts
+          test -f workers/W02-content/src/account/publication-journal-publisher.ts
+          test -f workers/W02-content/wrangler.jsonc
+          test -f workers/W06-governance/src/auth-013-queue-consumer.ts
+          echo "AUTH013_W02_DEPLOYED_SOURCE_ADMISSION=PASS"
+          echo "AUTH013_W02_DEPLOYED_VERSION_ID=$INPUT_W02_VERSION_ID"
+
+      - name: Validate Cloudflare credentials
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+
+      - name: Prepare remote runtime harness
+        run: |
+          set -euo pipefail
+          RUN_ID="${{ github.run_id }}"
+          cat > .auth-013-positive.wrangler.jsonc <<EOF
+          {
+            "$schema": "./node_modules/wrangler/config-schema.json",
+            "name": "luckread-auth013-positive-evidence-harness",
+            "main": ".auth-013-positive-harness.ts",
+            "compatibility_date": "2025-08-15",
+            "d1_databases": [
+              {
+                "binding": "D1_01",
+                "database_name": "luckread",
+                "database_id": "$D1_01_ID",
+                "remote": true
+              }
+            ],
+            "vars": {
+              "RUN_ID": "$RUN_ID"
+            }
+          }
+          EOF
+
+          cat > .auth-013-positive-harness.ts <<'EOF'
+          // CI-only ephemeral harness. It invokes the admitted W02 transition kernel
+          // against real D1-01. The resulting event is intentionally allowed to
+          // traverse the already-deployed W02 publisher -> Queue -> W06 consumer
+          // path. The immutable D1-03 AuditEvent is NOT deleted by this evidence run.
+          // @ts-nocheck
+          import { applyAccountStateTransition } from './workers/W02-content/src/account/account-state-transition.ts'
+
+          const json = (body: unknown, status = 200) =>
+            new Response(JSON.stringify(body, null, 2), {
+              status,
+              headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+            })
+
+          export default {
+            async fetch(request: Request, env: { D1_01: D1Database; RUN_ID: string }): Promise<Response> {
+              if (request.method !== 'POST' || new URL(request.url).pathname !== '/probe') {
+                return new Response(null, { status: 404 })
+              }
+
+              const db = env.D1_01
+              const runId = env.RUN_ID
+              const userId = 910000000 + (Number(runId) % 50000000)
+              const email = `auth013-positive-${runId}@invalid.local`
+              const now = new Date().toISOString()
+              const correlationId = `auth013-positive-${runId}`
+              const causationId = `auth013-positive-${runId}`
+
+              const existing = await db.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first()
+              if (existing) {
+                return json({ status: 'FAIL_CLOSED', reason: 'synthetic_user_id_already_exists', userId }, 409)
+              }
+
+              await db
+                .prepare(
+                  'INSERT INTO users (id, email, account_state, account_state_version) VALUES (?, ?, ?, ?)',
+                )
+                .bind(userId, email, 'ACTIVE', 1)
+                .run()
+
+              try {
+                const transition = await applyAccountStateTransition(db, {
+                  userId: String(userId),
+                  to: 'RESTRICTED',
+                  reason: `AUTH-013 controlled positive runtime evidence / run ${runId}`,
+                  expectedVersion: 1,
+                  actor: { id: `auth013-positive-${runId}`, type: 'operator' },
+                  permission: 'user.restrict.limited',
+                  now,
+                  correlationId,
+                  causationId,
+                })
+
+                const journal = await db
+                  .prepare(
+                    'SELECT journal_id,event_id,event_type,schema_version,resource_id,source_version,status,attempt,published_at FROM auth_013_publication_journal WHERE journal_id = ?',
+                  )
+                  .bind(transition.journalId)
+                  .first<Record<string, unknown>>()
+
+                return json({
+                  status: 'PASS',
+                  userId,
+                  email,
+                  runId,
+                  transition,
+                  journal,
+                  syntheticAuditRetention: 'D1-03 audit_events row is intentionally retained because the table is immutable',
+                })
+              } catch (error) {
+                return json(
+                  {
+                    status: 'RUNTIME_EXCEPTION',
+                    userId,
+                    error: {
+                      name: String(error?.name ?? 'Error'),
+                      message: String(error?.message ?? error),
+                      code: String(error?.code ?? ''),
+                    },
+                  },
+                  500,
+                )
+              }
+            },
+          }
+          EOF
+
+      - name: Start remote W02 transition harness
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 dev --remote --config .auth-013-positive.wrangler.jsonc --ip 127.0.0.1 --port 8788 > auth-013-positive-harness.log 2>&1 &
+          echo $! > auth-013-positive-harness.pid
+
+          ready=0
+          for _ in $(seq 1 90); do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8788/probe || true)
+            if [ "$code" != "000" ]; then ready=1; break; fi
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            cat auth-013-positive-harness.log
+            exit 1
+          fi
+
+      - name: Execute real W02 transition against D1-01
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/auth-013-positive-runtime
+          http_code=$(curl -sS -o artifacts/mapping-0/auth-013-positive-runtime/transition.json -w '%{http_code}' -X POST http://127.0.0.1:8788/probe)
+          echo "AUTH013_POSITIVE_TRANSITION_HTTP_STATUS=$http_code"
+          cat artifacts/mapping-0/auth-013-positive-runtime/transition.json
+          test "$http_code" = "200"
+
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const result = JSON.parse(fs.readFileSync('artifacts/mapping-0/auth-013-positive-runtime/transition.json', 'utf8'));
+          if (result.status !== 'PASS') throw new Error('Positive W02 transition did not PASS');
+          if (result.transition?.to !== 'RESTRICTED') throw new Error('Unexpected transition target');
+          if (result.transition?.accountStateVersion !== 2) throw new Error('Unexpected account_state_version');
+          if (!result.transition?.eventId || !result.transition?.journalId || !result.userId) {
+            throw new Error('Missing transition evidence identifiers');
+          }
+          fs.writeFileSync(
+            'artifacts/mapping-0/auth-013-positive-runtime/probe-identifiers.json',
+            JSON.stringify({
+              runId: result.runId,
+              userId: result.userId,
+              eventId: result.transition.eventId,
+              journalId: result.transition.journalId,
+              w02SourceSha: process.env.EXPECTED_W02_SOURCE_SHA,
+              w02VersionId: process.env.EXPECTED_W02_VERSION_ID
+            }, null, 2) + '\n'
+          );
+          NODE
+
+      - name: Wait for D1-01 journal publication and D1-03 AuditEvent
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+
+          const ids = JSON.parse(fs.readFileSync('artifacts/mapping-0/auth-013-positive-runtime/probe-identifiers.json', 'utf8'));
+          const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+          const d1_01 = process.env.D1_01_ID;
+          const d1_03 = process.env.D1_03_ID;
+
+          const sqlLiteral = (value) => JSON.stringify(String(value));
+
+          async function query(dbId, sql) {
+            const response = await fetch(
+              `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${dbId}/query`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ sql }),
+              },
+            );
+            const body = await response.json();
+            if (!response.ok || body.success !== true) {
+              throw new Error(`D1 query failed: ${response.status} ${JSON.stringify(body)}`);
+            }
+            return body.result?.[0]?.results ?? [];
+          }
+
+          const journalSql = `SELECT journal_id,event_id,event_type,schema_version,resource_id,source_version,status,attempt,published_at,last_error_code FROM auth_013_publication_journal WHERE journal_id = ${sqlLiteral(ids.journalId)} LIMIT 1`;
+          const auditSql = `SELECT event_id,request_id,trace_id,actor_json,action,target_type,target_id,before_json,after_json,reason,occurred_at FROM audit_events WHERE event_id = ${sqlLiteral(ids.eventId)} LIMIT 1`;
+
+          let published = null;
+          let audit = null;
+          for (let attempt = 1; attempt <= 30; attempt++) {
+            const journalRows = await query(d1_01, journalSql);
+            const auditRows = await query(d1_03, auditSql);
+            published = journalRows[0] ?? null;
+            audit = auditRows[0] ?? null;
+
+            console.log(JSON.stringify({
+              attempt,
+              journalStatus: published?.status ?? null,
+              journalPublishedAt: published?.published_at ?? null,
+              auditFound: Boolean(audit),
+            }));
+
+            if (published?.status === 'PUBLISHED' && published?.published_at && audit) break;
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
+
+          if (!published || published.status !== 'PUBLISHED' || !published.published_at) {
+            throw new Error(`AUTH-013 journal did not reach PUBLISHED: ${JSON.stringify(published)}`);
+          }
+          if (!audit) {
+            throw new Error('AUTH-013 D1-03 AuditEvent was not observed before timeout');
+          }
+
+          const actor = JSON.parse(audit.actor_json);
+          const before = JSON.parse(audit.before_json);
+          const after = JSON.parse(audit.after_json);
+
+          const checks = {
+            journalEventIdMatches: published.event_id === ids.eventId,
+            journalTypeCanonical: published.event_type === 'identity.account_state_changed',
+            journalResourceMatches: published.resource_id === String(ids.userId),
+            journalSourceVersion2: Number(published.source_version) === 2,
+            journalPublished: published.status === 'PUBLISHED' && Boolean(published.published_at),
+            auditEventIdMatches: audit.event_id === ids.eventId,
+            auditActionCanonical: audit.action === 'identity.account_state_changed',
+            auditTargetUser: audit.target_type === 'User',
+            auditTargetMatches: audit.target_id === String(ids.userId),
+            auditActorOperatorRole: actor.actorType === 'user' && actor.operationalRole === 'PLATFORM_OPERATOR',
+            auditBeforeMatches: before.account_state === 'ACTIVE' && Number(before.account_state_version) === 1,
+            auditAfterMatches: after.account_state === 'RESTRICTED' && Number(after.account_state_version) === 2,
+            auditReasonBounded: typeof audit.reason === 'string' && audit.reason.startsWith('AUTH-013 controlled positive runtime evidence / run '),
+          };
+
+          for (const [name, ok] of Object.entries(checks)) {
+            if (!ok) throw new Error(`AUTH-013 positive runtime assertion failed: ${name}`);
+          }
+
+          fs.writeFileSync(
+            'artifacts/mapping-0/auth-013-positive-runtime/downstream-evidence.json',
+            JSON.stringify({ ids, published, audit, actor, before, after, checks }, null, 2) + '\n'
+          );
+
+          console.log(JSON.stringify({
+            AUTH_013_POSITIVE_RUNTIME: 'PASS',
+            boundary: 'W02 transition -> D1-01 journal -> W02 deployed publisher -> Queue -> W06 consumer -> D1-03 AuditEvent',
+            checks,
+            retainedAuditEvent: ids.eventId,
+          }, null, 2));
+          NODE
+
+      - name: Remove only synthetic W02 user and journal records
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const path = 'artifacts/mapping-0/auth-013-positive-runtime/probe-identifiers.json';
+          if (!fs.existsSync(path)) process.exit(0);
+
+          const ids = JSON.parse(fs.readFileSync(path, 'utf8'));
+          const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+
+          const sqlLiteral = (value) => JSON.stringify(String(value));
+          async function query(sql) {
+            const response = await fetch(
+              `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${process.env.D1_01_ID}/query`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ sql }),
+              },
+            );
+            const body = await response.json();
+            if (!response.ok || body.success !== true) throw new Error(`D1 cleanup failed: ${response.status} ${JSON.stringify(body)}`);
+            return body.result?.[0]?.results ?? [];
+          }
+
+          await query(`DELETE FROM auth_013_publication_journal WHERE journal_id = ${sqlLiteral(ids.journalId)}`);
+          await query(`DELETE FROM users WHERE id = ${Number(ids.userId)}`);
+
+          const userRemaining = await query(`SELECT COUNT(*) AS count FROM users WHERE id = ${Number(ids.userId)}`);
+          const journalRemaining = await query(`SELECT COUNT(*) AS count FROM auth_013_publication_journal WHERE journal_id = ${sqlLiteral(ids.journalId)}`);
+
+          if (Number(userRemaining[0]?.count ?? -1) !== 0) throw new Error('Synthetic user cleanup failed');
+          if (Number(journalRemaining[0]?.count ?? -1) !== 0) throw new Error('Synthetic journal cleanup failed');
+
+          console.log(JSON.stringify({
+            SYNTHETIC_W02_USER_CLEANUP: 'PASS',
+            SYNTHETIC_W02_JOURNAL_CLEANUP: 'PASS',
+            RETAINED_IMMUTABLE_D1_03_AUDIT_EVENT: ids.eventId,
+          }, null, 2));
+          NODE
+
+      - name: Capture provenance
+        run: |
+          cat > artifacts/mapping-0/auth-013-positive-runtime/provenance.txt <<EOF
+          workflow=AUTH-013 Positive Runtime Transport Evidence
+          github_run_id=${{ github.run_id }}
+          github_source_head=${{ github.sha }}
+          w02_deployed_source_sha=${{ inputs.w02_source_sha }}
+          w02_deployed_version_id=${{ inputs.w02_version_id }}
+          w02_worker=luckread-w02
+          w06_worker=luckread-w06
+          d1_01=luckread / $D1_01_ID
+          d1_03=secondary / $D1_03_ID
+          queue=$QUEUE_NAME
+          positive_boundary=W02 transition -> D1-01 journal -> W02 deployed scheduled publisher -> Queue -> W06 consumer -> D1-03 AuditEvent
+          audit_cleanup=forbidden; immutable AuditEvent retained
+          EOF
+
+      - name: Upload positive runtime evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-013-positive-runtime-evidence-${{ github.run_id }}
+          path: artifacts/mapping-0/auth-013-positive-runtime/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Cleanup ephemeral harness
+        if: ${{ always() }}
+        run: |
+          if [ -f auth-013-positive-harness.pid ]; then
+            kill "$(cat auth-013-positive-harness.pid)" 2>/dev/null || true
+          fi
+          rm -f .auth-013-positive-harness.ts .auth-013-positive.wrangler.jsonc auth-013-positive-harness.pid
