@@ -2785,3 +2785,33 @@ It does not repeat passed W02 deployment, W06 Queue runtime, DLQ cleanup, or sch
 The immutable D1-03 AuditEvent produced by the real consumer path is retained; only synthetic W02 user and journal evidence records are cleaned.
 
 AUTH-013 remains BLOCKED_NOT_GREEN pending this positive runtime result plus lifecycle/security/E2E evidence.
+
+## 2026-09-25 Superpowers continuation — AUTH-013 session invalidation source gate and runtime evidence admission
+
+Current source implementation:
+- `7761fddebc2e10a8dbf9b5542b446459f4cef2fb` — atomically revokes `auth_session_state` rows when Account State enters one of the four canonical token-invalidating states: `SUSPENDED`, `BANNED`, `DELETION_PENDING`, `DELETED`.
+- `7cce820c9e824efaa70a37264178b52cecdcb44c` — adds source coverage for transactional session invalidation and verifies that token-valid states such as `FROZEN` do not add the revocation statement.
+
+Source evidence:
+- W02 RoleAssignment Verification Run `36084255391` = SUCCESS.
+- Security Hardening Gate Run `36084255453` = SUCCESS.
+- W02 AUTH-013 Runtime Source Verification Run `36084336632` = SUCCESS.
+- Typecheck, AUTH-013 account-state tests, publication-journal tests, evidence upload all passed.
+- Therefore the new session-invalidation source slice is `PASS_VERIFIED / SOURCE_IMPLEMENTATION_ONLY`.
+
+Controlled runtime evidence was admitted without changing topology:
+- Workflow: `.github/workflows/auth-013-session-invalidation-runtime-evidence.yml`
+- Admission document: `docs/change-control/CC-MAPPING-0-AUTH-013-SESSION-INVALIDATION-RUNTIME-EVIDENCE-ADMISSION-2026-09-25.md`
+- Environment: `CONTROLLED_REMOTE_D1_CODEPATH`
+- Probe: synthetic `ACTIVE -> SUSPENDED` transition with one real D1-01 `users_sessions` row and one `auth_session_state` row.
+- Required assertions: `account_state = SUSPENDED`, `account_state_version = 2`, `revoked_at` non-null, stale refresh rejected with `UNAUTHENTICATED`, and synthetic record cleanup.
+- The workflow has **NOT_EXECUTED** status until a manual dispatch succeeds. No PASS is inferred from source CI.
+
+### Current cursor
+
+**Execute controlled session-invalidation runtime evidence → verify real D1-01 revocation + stale-refresh rejection → then close remaining lifecycle side effects (deindex/projection convergence) and E2E/security evidence → reconcile Evidence Registry → evaluate AUTH-013 GREEN.**
+
+Manual workflow:
+https://github.com/wanghuinet/luckread/actions/workflows/auth-013-session-invalidation-runtime-evidence.yml
+
+AUTH-013 remains **BLOCKED_NOT_GREEN**.
