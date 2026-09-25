@@ -20,7 +20,7 @@ const run = (cmd, args, cwd, env = {}) => execFileSync(cmd, args, {
 
 const show = (sha, rel) => run('git', ['show', sha + ':' + rel], repoRoot)
 
-const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'luckread-user-profile-generation-'))
+const fixture = fs.mkdtempSync(path.join(root, '.user-profile-generation-'))
 const stage1 = path.join(fixture, 'stage1')
 const stage2 = path.join(fixture, 'stage2')
 const stage3 = path.join(fixture, 'stage3')
