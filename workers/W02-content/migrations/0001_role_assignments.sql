@@ -3,6 +3,7 @@
 -- Physical owner: D1-01 / W02 / T03
 -- Generator: scripts/generate-role-assignment-migration.mjs
 -- Do not hand-edit. Regenerate from the canonical Contract source.
+
 CREATE TABLE role_assignments (
   id TEXT NOT NULL PRIMARY KEY,
   subject_id TEXT NOT NULL,
