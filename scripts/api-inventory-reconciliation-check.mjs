@@ -39,6 +39,34 @@ function isDiscoveryDraftCanonicalPolicy(op) {
   return op?.['x-luckread-contract-status'] === 'DISCOVERY_DRAFT';
 }
 
+function collectAlternateOperationSources(directory) {
+  const sources = new Map();
+
+  for (const file of fs.readdirSync(directory).filter((f) => f.endsWith('.json') && !f.endsWith('-operation-policy.v1.json')).sort()) {
+    const source = path.join(directory, file);
+    const doc = readJson(source);
+    if (!doc) continue;
+
+    const visit = (value) => {
+      if (!value || typeof value !== 'object') return;
+      if (Array.isArray(value)) {
+        for (const item of value) visit(item);
+        return;
+      }
+      if (typeof value.operationId === 'string') {
+        const list = sources.get(value.operationId) ?? [];
+        list.push(path.relative(root, source));
+        sources.set(value.operationId, list);
+      }
+      for (const nested of Object.values(value)) visit(nested);
+    };
+
+    visit(doc);
+  }
+
+  return sources;
+}
+
 function addPolicyOperation(op, source) {
   if (!op?.operationId) {
     failures.push({ code: 'MISSING_OPERATION_ID', source });
@@ -178,6 +206,7 @@ function parseCanonicalInventory(file, openapiByMethodPath) {
 
 const { operations: openapiOps, byMethodPath: openapiByMethodPath } = parseOpenApiOperations(openapiSpec);
 const canonicalInventoryRecords = parseCanonicalInventory(inventoryBaseline, openapiByMethodPath);
+const alternateOperationSources = collectAlternateOperationSources(inventoryDir);
 
 if (!fs.existsSync(inventoryDir)) {
   failures.push({ code: 'MISSING_API_INVENTORY_DIRECTORY' });
@@ -258,7 +287,16 @@ for (const [id] of inventory) {
 
   const detailedPolicy = policyInventory.get(id);
   if (!detailedPolicy || effectiveDetailedPolicyStatus(detailedPolicy) === 'MISSING') {
-    finding('MISSING_POLICY_OPERATION', id, 'non-discovery canonical operation has no active detailed domain operation policy');
+    const alternateSources = alternateOperationSources.get(id) ?? [];
+    if (alternateSources.length > 0) {
+      finding(
+        'POLICY_SOURCE_PRESENT_NOT_NORMALIZED',
+        id,
+        `authoritative operation contract exists outside detailed domain operation policy: ${alternateSources.join(', ')}`,
+      );
+    } else {
+      finding('MISSING_POLICY_OPERATION', id, 'non-discovery canonical operation has no active detailed domain operation policy or alternate operation contract');
+    }
   }
 }
 
@@ -307,6 +345,7 @@ const incompleteCodes = new Set([
   'OPENAPI_POLICY_MISSING_OPERATIONS_ARRAY',
   'MISSING_POLICY',
   'MISSING_POLICY_OPERATION',
+  'POLICY_SOURCE_PRESENT_NOT_NORMALIZED',
   'MISSING_DOMAIN',
   'MISSING_OPERATIONS_ARRAY',
   'INVALID_INVENTORY_ENDPOINT',
@@ -341,7 +380,7 @@ const report = {
   findings,
   matches,
   evidenceSemantics: { pass: ['PASS','N/A'], incomplete: ['MISSING','ABSENT'], invalid: ['unknown_or_unsupported'] },
-  rule: 'PASS requires zero structural conflicts, zero unresolved required inventory/OpenAPI/policy membership, zero required detailed policy coverage gaps, and zero incomplete/invalid evidence. Explicit DISCOVERY_DRAFT and MISSING operation-policy statuses remain pending and do not silently become contract evidence. N/A is valid only when explicitly declared by the operation contract.',
+  rule: 'PASS requires zero structural conflicts, zero unresolved required inventory/OpenAPI/policy membership, zero missing required detailed policy coverage, zero alternate-policy normalization gaps, and zero incomplete/invalid evidence. Explicit DISCOVERY_DRAFT and MISSING operation-policy statuses remain pending and do not silently become contract evidence. N/A is valid only when explicitly declared by the operation contract.',
 };
 const evidenceDir = path.join(root, 'artifacts', 'api-inventory');
 fs.mkdirSync(evidenceDir, { recursive: true });
