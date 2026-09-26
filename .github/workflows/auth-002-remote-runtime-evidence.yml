@@ -86,10 +86,11 @@ jobs:
           test -n "${CLOUDFLARE_API_TOKEN}"
           test -n "${CLOUDFLARE_ACCOUNT_ID}"
           if [ -z "${DEPLOYMENT_RUN_ID}" ]; then
-            deployment_runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/w01-w02-binding-deploy.yml/runs?branch=main&status=success&per_page=100")"
-            DEPLOYMENT_RUNS_JSON="${deployment_runs_json}" DEPLOYMENT_HEAD_SHA="${DEPLOYMENT_HEAD_SHA}" GITHUB_REPOSITORY="${GITHUB_REPOSITORY}" node --input-type=module > /tmp/auth-002-deployment-run-id <<'NODE'
+            gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/w01-w02-binding-deploy.yml/runs?branch=main&status=success&per_page=100" > /tmp/auth-002-deployment-runs.json
+            DEPLOYMENT_HEAD_SHA="${DEPLOYMENT_HEAD_SHA}" GITHUB_REPOSITORY="${GITHUB_REPOSITORY}" node --input-type=module > /tmp/auth-002-deployment-run-id <<'NODE'
           import { execFileSync } from 'node:child_process'
-          const data = JSON.parse(process.env.DEPLOYMENT_RUNS_JSON)
+          import { readFileSync } from 'node:fs'
+          const data = JSON.parse(readFileSync('/tmp/auth-002-deployment-runs.json', 'utf8'))
           const sha = process.env.DEPLOYMENT_HEAD_SHA
           const repo = process.env.GITHUB_REPOSITORY
           const expectedArtifact = `w01-w02-binding-deployment-${sha}`
@@ -113,12 +114,9 @@ jobs:
               break
             }
           }
-          if (!process.stdout.isTTY) {
-            // stdout is intentionally used as the selected run-id channel.
-          }
           NODE
-            DEPLOYMENT_RUN_ID="$(cat /tmp/auth-002-deployment-run-id)"
-            rm -f /tmp/auth-002-deployment-run-id
+            DEPLOYMENT_RUN_ID="$(cat /tmp/auth-002-deployment-run-id")
+            rm -f /tmp/auth-002-deployment-runs.json /tmp/auth-002-deployment-run-id
             if [ -z "${DEPLOYMENT_RUN_ID}" ]; then
               throw="runtime evidence admission: no successful W01 W02 Auth Binding Deploy run contains artifact w01-w02-binding-deployment-${DEPLOYMENT_HEAD_SHA}"
               echo "${throw}" >&2
