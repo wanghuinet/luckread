@@ -19,6 +19,8 @@ Implementation admission is now GREEN at source-implementation scope after the e
 - RoleAssignment migration source: `workers/W02-content/migrations/0001_role_assignments.sql`.
 - Migration generation guard: `scripts/generate-role-assignment-migration.mjs`.
 - Resolver: `workers/W02-content/src/authz/role-assignment.ts`.
-- Internal resolution endpoint: `POST /internal/authz/resolve-layer`; no public W02 auth endpoint is introduced by this implementation.
+- Internal resolution endpoint: `POST /internal/authz/resolve-layer`.
+- Internal session endpoints: `POST /internal/auth/session/establish`, `/refresh`, `/revoke`, `/validate`.
+- These are Service Binding internal transports only; no public W02 auth endpoint is introduced.
 - W01 transport binding: `W02_AUTH` → `luckread-w02`; deployment evidence remains pending.
 
