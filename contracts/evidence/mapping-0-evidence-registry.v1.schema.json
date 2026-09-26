@@ -9,6 +9,7 @@
     "version": {"const": "1.0"},
     "status": {"enum": ["NOT_GREEN", "GREEN"]},
     "sourceOfTruth": {"const": "docs/176-EVIDENCE-REGISTRY-ACCEPTANCE-TRACEABILITY-CONTRACT-v1.0.md"},
+    "testedCommitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "records": {
       "type": "array",
       "items": {
