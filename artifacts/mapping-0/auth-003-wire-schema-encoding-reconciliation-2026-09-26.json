@@ -3,7 +3,7 @@
   "evidenceType": "MAPPING_0_AUTH_003_WIRE_SCHEMA_ENCODING_RECONCILIATION",
   "generatedAt": "2026-09-26",
   "repository": "wanghuinet/luckread",
-  "currentMain": "0850abaefb0392ee994271ce251a24b478d1dffc",
+  "currentMain": "3a84cd2d53c3bba3d869a30cc6e6ce47db1102b5",
   "taskId": "M0-AUTH-003-WIRE-SCHEMA-ENCODING-001",
   "status": "PASS_VERIFIED_SOURCE_RECONCILIATION",
   "encodedSources": [
@@ -23,7 +23,8 @@
     "dtoRecordsJson": "PASS / 5 AUTH-003 DTO records; remove is no-body",
     "sharedPersistenceMappingJson": "PASS / canonical operations and DTO refs reconciled",
     "openApiSourceStructure": "PASS / credentials paths, CredentialId parameter and Credential schema present",
-    "contractCiStatus": "FAILURE_OBSERVED / Run 36224807854 / core semantic+structural admission gates PASS; Five-Way Alignment NOT_GREEN due pre-existing Mapping 0 blockers"
+    "contractCiStatus": "OBSERVED / Run 36225053795 / core contract gates PASS; Five-Way NOT_GREEN and Strict R4/Evidence/R5 NOT_GREEN due existing Mapping 0/Evidence blockers",
+    "fieldWireReconciliation": "PASS_VERIFIED_SOURCE_ONLY / CC-MAPPING-0-AUTH-003-FIELD-WIRE-PROJECTION-RECONCILIATION-2026-09-26"
   },
   "runtimeBoundary": {
     "workerChanges": false,
@@ -33,21 +34,10 @@
     "entityPromotion": false
   },
   "nextAction": {
-    "id": "M0-AUTH-003-CONTRACT-CI-VALIDATION-001",
-    "state": "FAIL_NOT_AUTH003_BLOCKED",
-    "workflowRun": "https://github.com/wanghuinet/luckread/actions/runs/36224807854",
-    "reconcileRun": "https://github.com/wanghuinet/luckread/actions/runs/36224807855",
-    "objective": "Record Contract CI result without promoting AUTH-003 beyond wire/schema closure.",
-    "result": {
-      "auth003SpecificFindings": 0,
-      "semanticCrossContractGate": "PASS",
-      "mapping0StructuralContractGate": "PASS",
-      "capabilityContractGraphGate": "PASS",
-      "fiveWayAlignment": "NOT_GREEN",
-      "fiveWayBlockers": 450,
-      "canonicalFeatureCount": 449,
-      "blockingMappingRecords": 449
-    },
-    "provenanceRule": "The Five-Way NOT_GREEN result is retained as a Mapping 0 gate outcome and is not attributed to AUTH-003 wire schema."
+    "id": "M0-AUTH-003-FIELD-WIRE-RECONCILIATION-001",
+    "state": "PASS_VERIFIED_SOURCE_ONLY / BLOCKED_RUNTIME_PERSISTENCE",
+    "artifact": "artifacts/mapping-0/auth-003-field-wire-reconciliation-2026-09-26.json",
+    "workflowRun": "https://github.com/wanghuinet/luckread/actions/runs/36225053795",
+    "objective": "Preserve explicit AUTH-003 wire↔field reconciliation while keeping runtime, persistence, Evidence Registry and Mapping 0 GREEN gates closed."
   }
 }
