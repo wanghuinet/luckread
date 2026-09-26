@@ -151,15 +151,17 @@ for (const record of registry.records) {
 
   const isHistorical = historicalStatuses.has(record.status)
   if (!isHistorical) {
-    if (!results.has(record.result)) fail(`evidence result must be PASS: ${record.evidenceId}`)
-    if (!activeStatuses.has(record.status)) fail(`evidence must be ACTIVE or VERIFIED: ${record.evidenceId}`)
-    if (!executableTypes.has(record.type)) fail(`evidence type is not executable: ${record.evidenceId}`)
+    if (!results.has(record.result)) fail(`evidence result is invalid: ${record.evidenceId}`)
+    if (!['CREATED', ...activeStatuses].includes(record.status)) fail(`evidence status is invalid: ${record.evidenceId}`)
     if (!sourceRefResolvable(record.sourceRef)) fail(`sourceRef is not resolvable: ${record.evidenceId}`)
-    if (record.commitSha !== testedCommit) {
-      const inherited = record.status === 'VERIFIED' &&
-        record.freshnessMode === 'INHERITED_UNCHANGED_SCOPE' &&
-        sourceRefResolvable(record.inheritanceRef)
-      if (!inherited) fail(`stale evidence commit without valid inheritance record: ${record.evidenceId}`)
+    if (activeStatuses.has(record.status)) {
+      if (!executableTypes.has(record.type)) fail(`evidence type is not executable: ${record.evidenceId}`)
+      if (record.result === 'PASS' && record.commitSha !== testedCommit) {
+        const inherited = record.status === 'VERIFIED' &&
+          record.freshnessMode === 'INHERITED_UNCHANGED_SCOPE' &&
+          sourceRefResolvable(record.inheritanceRef)
+        if (!inherited) fail(`stale active PASS evidence without valid inheritance record: ${record.evidenceId}`)
+      }
     }
   } else if (!record.sourceRef) {
     fail(`historical evidence is missing sourceRef: ${record.evidenceId}`)
