@@ -1,0 +1,62 @@
+{
+  "version": "1.0.0",
+  "evidenceType": "MAPPING_0_AUTH_003_FIELD_WIRE_PROJECTION_RECONCILIATION",
+  "generatedAt": "2026-09-26",
+  "repository": "wanghuinet/luckread",
+  "currentMain": "3a84cd2d53c3bba3d869a30cc6e6ce47db1102b5",
+  "taskId": "M0-AUTH-003-FIELD-WIRE-RECONCILIATION-001",
+  "status": "PASS_VERIFIED_SOURCE_ONLY",
+  "authorityRefs": [
+    "docs/change-control/CC-MAPPING-0-AUTH-003-WIRE-PROJECTION-AUTHORITY-2026-09-26.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-003-FIELD-WIRE-PROJECTION-RECONCILIATION-2026-09-26.md",
+    "contracts/api/AUTH-003-credential-management-contract.v1.json",
+    "contracts/entity/AUTH-003-credential-field-contract.v1.json"
+  ],
+  "decision": {
+    "publicProjection": [
+      "credentialId",
+      "kind",
+      "active"
+    ],
+    "fieldExposure": {
+      "kind": "AUTH003_CREDENTIAL_PROJECTION_ONLY",
+      "active": "AUTH003_CREDENTIAL_PROJECTION_ONLY"
+    },
+    "protectedFields": [
+      "id",
+      "identityId",
+      "valueHash",
+      "normalizedValue",
+      "verifiedAt",
+      "createdAt",
+      "updatedAt"
+    ],
+    "entityPromotion": false
+  },
+  "ci": {
+    "workflowRun": "https://github.com/wanghuinet/luckread/actions/runs/36225053795",
+    "semanticCrossContract": "PASS",
+    "openApi": "PASS",
+    "authz": "PASS",
+    "common": "PASS",
+    "events": "PASS",
+    "stateMachines": "PASS",
+    "mapping0StructuralContract": "PASS",
+    "payloadContractReconciliation": "PASS",
+    "capabilityContractGraph": "PASS",
+    "fiveWayAlignment": "NOT_GREEN / 450 existing Mapping 0 blockers",
+    "strictR4EvidenceR5": "NOT_GREEN / canonical Mapping 0 and Evidence Registry remain blocked"
+  },
+  "runtimeBoundary": {
+    "workerChanges": false,
+    "d1Changes": false,
+    "migrationExecution": false,
+    "runtimeImplementationAdmission": false,
+    "evidenceRegistryPromotion": false,
+    "mapping0GreenPromotion": false
+  },
+  "nextAction": {
+    "state": "BLOCKED_ON_RUNTIME_PERSISTENCE_AND_MAPPING0",
+    "note": "AUTH-003 wire and field authority are reconciled. Further AUTH-003 promotion requires persistence, runtime normalization/uniqueness evidence, security/E2E evidence and final Mapping 0 reconciliation."
+  }
+}
