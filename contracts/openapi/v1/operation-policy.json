@@ -954,7 +954,7 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "search",
+      "operationId": "searchContent",
       "auth": {
         "mode": "permission"
       },
