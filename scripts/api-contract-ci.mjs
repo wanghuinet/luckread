@@ -25,8 +25,22 @@ async function load(file) {
 
 const apiDir = join(root, 'api')
 const evidenceDir = join(root, 'evidence')
-const apiFiles = await jsonFiles(apiDir)
-const evidenceFiles = await jsonFiles(evidenceDir)
+const apiCandidates = await jsonFiles(apiDir)
+const apiFiles = []
+for (const file of apiCandidates) {
+  const doc = await load(file)
+  if (doc && Array.isArray(doc.operations) && doc.operations.length > 0 && doc.greenEvidence && typeof doc.greenEvidence === 'object') {
+    apiFiles.push(file)
+  }
+}
+const evidenceCandidates = await jsonFiles(evidenceDir)
+const evidenceFiles = []
+for (const file of evidenceCandidates) {
+  const doc = await load(file)
+  if (doc && Array.isArray(doc.requiredEvidence) && doc.requiredEvidence.length > 0 && (typeof doc.contract === 'string' || Array.isArray(doc.contract))) {
+    evidenceFiles.push(file)
+  }
+}
 const apiIds = new Map()
 const apiPaths = new Map()
 
@@ -70,8 +84,14 @@ for (const file of evidenceFiles) {
   else {
     const refs = Array.isArray(doc.contract) ? doc.contract : doc.contract.split(/\s*\+\s*/).map((value) => value.trim()).filter(Boolean)
     for (const contract of refs) {
-      if (!apiFiles.some((filePath) => filePath.replace(`${root}/`, '') === contract)) fail(`${rel}: contract reference does not resolve to an API contract: ${contract}`)
-      else { const list = evidenceByContract.get(contract) ?? []; list.push(rel); evidenceByContract.set(contract, list) }
+      const normalized = contract.replace(/^contracts\//, '')
+      if (!apiFiles.some((filePath) => filePath.replace(root + '/', '') === normalized)) {
+        fail(`${rel}: contract reference does not resolve to an API contract: ${contract}`)
+      } else {
+        const list = evidenceByContract.get(normalized) ?? []
+        list.push(rel)
+        evidenceByContract.set(normalized, list)
+      }
     }
   }
   const required = doc.requiredEvidence
