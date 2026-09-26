@@ -48,6 +48,7 @@ const evidenceRegistryRelPath = 'contracts/evidence/mapping-0-evidence-registry.
 // Mapping 0 inheritance rule.
 const evidenceGovernanceRelPaths = new Set([
   '.github/workflows/contract-ci.yml',
+  '.github/workflows/auth-002-remote-runtime-evidence.yml',
   'contracts/evidence/mapping-0-evidence-registry.v1.schema.json',
   'scripts/mapping-0-evidence-registry-check.mjs',
   'scripts/mapping-0-evidence-registry-final-check.mjs'
