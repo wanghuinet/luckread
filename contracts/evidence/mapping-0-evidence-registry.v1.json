@@ -256,7 +256,9 @@
       "producer": "Payload 3.87.1 native database runtime probe",
       "result": "PASS",
       "status": "VERIFIED",
-      "note": "Fresh controlled remote E4.5 execution on current main verified payload.db.upsert(payload-preferences): upsert returned a document; no upsert error; stored row present; stored value matched; cleanup succeeded; payload.db.upsert was not aliased to payload.db.updateOne. GitHub Actions job e4-5 completed successfully on run 35789608705, check run 106954669883, with artifact 10722065060 (sha256:68961bbab2d3303d47a7b2d667fc8166593cc050e7c5aa63683c0472b1bb8c)."
+      "note": "Fresh controlled remote E4.5 execution on current main verified payload.db.upsert(payload-preferences): upsert returned a document; no upsert error; stored row present; stored value matched; cleanup succeeded; payload.db.upsert was not aliased to payload.db.updateOne. GitHub Actions job e4-5 completed successfully on run 35789608705, check run 106954669883, with artifact 10722065060 (sha256:68961bbab2d3303d47a7b2d667fc8166593cc050e7c5aa63683c0472b1bb8c).",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-002-E4-5-D1-ADAPTER-REGRESSION-2026-09-20.md"
     },
     {
       "evidenceId": "EVD-AUTH002-B12-ROLEASSIGNMENT-MIGRATION-REMOTE-001",
@@ -271,7 +273,9 @@
       "producer": "Wrangler 4.116.0 remote D1 migration workflow",
       "result": "PASS",
       "status": "VERIFIED",
-      "note": "Exact implementation commit 821e84f0 was checked out. Generator verification passed and 0001_role_assignments.sql was applied successfully to D1-01 UUID 2f80471e-3756-49f9-8db1-7707a433ad64. This evidence proves remote RoleAssignment schema mutation at the tested implementation commit; later current-main commits do not modify the RoleAssignment migration/source inputs."
+      "note": "Exact implementation commit 821e84f0 was checked out. Generator verification passed and 0001_role_assignments.sql was applied successfully to D1-01 UUID 2f80471e-3756-49f9-8db1-7707a433ad64. This evidence proves remote RoleAssignment schema mutation at the tested implementation commit; later current-main commits do not modify the RoleAssignment migration/source inputs.",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "evidenceId": "EVD-AUTH002-B13-W02-DEPLOYMENT-REMOTE-001",
@@ -286,7 +290,9 @@
       "producer": "Wrangler 4.116.0 controlled W02 deployment workflow",
       "result": "PASS",
       "status": "VERIFIED",
-      "note": "Exact implementation commit 821e84f0 was checked out. Wrangler uploaded luckread-w02 successfully and reported Current Version ID e905b498-47b5-41d6-b77d-aa7be5a36b6b. This proves a concrete W02 deployment for the tested implementation source; it does not prove W01 Service Binding deployment."
+      "note": "Exact implementation commit 821e84f0 was checked out. Wrangler uploaded luckread-w02 successfully and reported Current Version ID e905b498-47b5-41d6-b77d-aa7be5a36b6b. This proves a concrete W02 deployment for the tested implementation source; it does not prove W01 Service Binding deployment.",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "evidenceId": "EVD-AUTH002-B14-ROLEASSIGNMENT-REMOTE-READONLY-001",
@@ -301,7 +307,9 @@
       "producer": "Wrangler 4.116.0 remote D1 read-only verification",
       "result": "PASS",
       "status": "VERIFIED",
-      "note": "Exact source commit 821e84f0 was checked out. Remote sqlite_master contains role_assignments plus the two no-overlap triggers; d1_migrations contains 0001_role_assignments.sql applied at 2026-09-22 22:35:06. Read-only queries report rows_written=0 and no remote DDL/DML in this verification workflow. Artifact 10722564546, sha256:52eee83b9580a2631835e992d318ef9f7effc3d33ef9e032a4d4ef9172fa6e4f."
+      "note": "Exact source commit 821e84f0 was checked out. Remote sqlite_master contains role_assignments plus the two no-overlap triggers; d1_migrations contains 0001_role_assignments.sql applied at 2026-09-22 22:35:06. Read-only queries report rows_written=0 and no remote DDL/DML in this verification workflow. Artifact 10722564546, sha256:52eee83b9580a2631835e992d318ef9f7effc3d33ef9e032a4d4ef9172fa6e4f.",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "evidenceId": "EVD-AUTH013-SESSION-INVALIDATION-REMOTE-001",
@@ -316,7 +324,9 @@
       "producer": "controlled remote D1 code-path runtime evidence",
       "result": "PASS",
       "status": "VERIFIED",
-      "note": "Run 36086834341 completed successfully at the exact tested main head 196da842abbd83e695181843efdb9aeca3a49328. The controlled probe performed ACTIVE to SUSPENDED against real D1-01, verified account_state=SUSPENDED, account_state_version=2, target auth_session_state.revoked_at non-null, stale refresh rejection with UNAUTHENTICATED, synthetic session/security cleanup, provenance capture, evidence upload, and harness cleanup. This closes the session-invalidation runtime sub-gate only; AUTH-013 remains non-GREEN pending lifecycle side-effect convergence, E2E/security coverage, and final Evidence Registry reconciliation."
+      "note": "Run 36086834341 completed successfully at the exact tested main head 196da842abbd83e695181843efdb9aeca3a49328. The controlled probe performed ACTIVE to SUSPENDED against real D1-01, verified account_state=SUSPENDED, account_state_version=2, target auth_session_state.revoked_at non-null, stale refresh rejection with UNAUTHENTICATED, synthetic session/security cleanup, provenance capture, evidence upload, and harness cleanup. This closes the session-invalidation runtime sub-gate only; AUTH-013 remains non-GREEN pending lifecycle side-effect convergence, E2E/security coverage, and final Evidence Registry reconciliation.",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "evidenceId": "EVD-AUTH013-POSITIVE-RUNTIME-TRANSPORT-001",
@@ -331,7 +341,9 @@
       "producer": "controlled remote D1 code-path runtime evidence with deployed W02 publisher and W06 Queue consumer",
       "result": "PASS",
       "status": "VERIFIED",
-      "note": "Run 36090709083 completed successfully on exact main head 20735b3ddd12e0e33814dd57a85769ac9343acd9. The controlled probe executed a real W02 ACTIVE→RESTRICTED transition against D1-01, verified durable Journal publication, Queue delivery through luckread-auth013-account-state, W06 consumer processing, and immutable D1-03 AuditEvent persistence. Synthetic W02 User and Journal records were cleaned; the AuditEvent was retained as immutable runtime evidence. Workflow artifact 10845159205, sha256:b86b2263341753a1b61171f0e1b1ef819ea2cdffcc29baf2b36a78b4bab2ebc4. This closes the positive W02→D1-01 Journal→Queue→W06→D1-03 transport/persistence sub-gate only; AUTH-013 remains non-GREEN pending lifecycle side-effect convergence, security/E2E evidence, and final registry reconciliation."
+      "note": "Run 36090709083 completed successfully on exact main head 20735b3ddd12e0e33814dd57a85769ac9343acd9. The controlled probe executed a real W02 ACTIVE→RESTRICTED transition against D1-01, verified durable Journal publication, Queue delivery through luckread-auth013-account-state, W06 consumer processing, and immutable D1-03 AuditEvent persistence. Synthetic W02 User and Journal records were cleaned; the AuditEvent was retained as immutable runtime evidence. Workflow artifact 10845159205, sha256:b86b2263341753a1b61171f0e1b1ef819ea2cdffcc29baf2b36a78b4bab2ebc4. This closes the positive W02→D1-01 Journal→Queue→W06→D1-03 transport/persistence sub-gate only; AUTH-013 remains non-GREEN pending lifecycle side-effect convergence, security/E2E evidence, and final registry reconciliation.",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "evidenceId": "EVD-AUTH002-B15-PERSISTENCE-SCHEMA-REMOTE-001",
