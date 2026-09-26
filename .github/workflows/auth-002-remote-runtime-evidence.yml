@@ -128,11 +128,12 @@ jobs:
             echo "Runtime evidence admission: auto-discovered W01 W02 Auth Binding Deploy run ${DEPLOYMENT_RUN_ID} by exact source artifact for SHA ${DEPLOYMENT_HEAD_SHA}"
           fi
           test -n "${DEPLOYMENT_RUN_ID}"
-          deployment_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}")"
-          artifact_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}/artifacts?per_page=100")"
-          DEPLOYMENT_JSON="${deployment_json}" ARTIFACT_JSON="${artifact_json}" DEPLOYMENT_HEAD_SHA="${DEPLOYMENT_HEAD_SHA}" node --input-type=module <<'NODE'
-          const data = JSON.parse(process.env.DEPLOYMENT_JSON)
-          const artifacts = JSON.parse(process.env.ARTIFACT_JSON)
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}" > /tmp/auth-002-deployment.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}/artifacts?per_page=100" > /tmp/auth-002-artifacts.json
+          DEPLOYMENT_HEAD_SHA="${DEPLOYMENT_HEAD_SHA}" node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const data = JSON.parse(readFileSync('/tmp/auth-002-deployment.json', 'utf8'))
+          const artifacts = JSON.parse(readFileSync('/tmp/auth-002-artifacts.json', 'utf8'))
           if (data.name !== 'W01 W02 Auth Binding Deploy') throw new Error('runtime evidence admission: deployment run is not W01 W02 Auth Binding Deploy')
           if (data.conclusion !== 'success') throw new Error('runtime evidence admission: deployment run conclusion is not success')
           if (data.head_branch !== 'main') throw new Error('runtime evidence admission: deployment run is not on main')
@@ -143,6 +144,7 @@ jobs:
           }
           console.log(`Runtime evidence admission: deployment run ${data.id} SUCCESS on main; deployed source artifact=${expectedArtifact}; workflow run head_sha=${data.head_sha}; source admission is bound to exact artifact name`)
           NODE
+          rm -f /tmp/auth-002-deployment.json /tmp/auth-002-artifacts.json
           node scripts/auth-session-schema-evidence-probe.mjs --gate1
 
       - name: Capture W01 dependency provenance
