@@ -1,16 +1,233 @@
 {
-  "version":"1.3",
-  "status":"CONTRACTED_NOT_VERIFIED",
-  "promotion":"NOT_GREEN",
-  "purpose":"Stable migration manifest for AUTH-002 through AUTH-006. Defines migration identity and required postconditions without claiming execution.",
-  "sourceRefs":["contracts/migration/AUTH-002-006-migration-gate.v1.md","contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json","contracts/persistence/AUTH-002-006-persistence-closure-contract.v1.md","contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json","contracts/entity/AUTH-002-006-canonical-field-authority.v1.json"],
-  "globalRules":{"ordered":true,"deterministic":true,"destructiveChangesRequireRecoveryContract":true,"executionRequiresIsolatedVerification":true,"promotionRequiresRemoteD1SchemaEvidence":true,"evidenceMustReferenceExactTestedCommitSha":true,"noMigrationExecutionClaimFromManifest":true},
-  "migrations":[
-    {"migrationId":"MIG-AUTH-002-SESSION-V1","featureId":"AUTH-002","entities":["ENT-SESSION"],"fieldContracts":["contracts/entity/AUTH-002-session-field-contract.v1.json","contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json"],"schemaMappingRef":"contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json#AUTH-002","nativePersistenceOwner":"Payload users.sessions[]; native id/createdAt/expiresAt are authoritative and MUST NOT be duplicated by extension migration","extensionPersistence":{"table":"auth_session_state","columns":["session_id","user_id","device_id","token_version","refresh_credential_hash","revoked_at","last_seen_at"],"indexes":["auth_session_state_user_id_idx","auth_session_state_device_id_idx","auth_session_state_token_version_idx","auth_session_state_revoked_at_idx"],"uniqueness":["session_id"],"forbiddenColumns":["raw_access_token","raw_refresh_token","password"]}},"requiredPostconditions":["physical auth_session_state table exists","session_id is TEXT NOT NULL PRIMARY KEY","user_id is TEXT NOT NULL","device_id is TEXT NOT NULL","token_version is INTEGER NOT NULL","refresh_credential_hash is TEXT NOT NULL","revoked_at is nullable TEXT","last_seen_at is nullable TEXT","required extension indexes present","no forbidden secret columns","native users.sessions[] shape unchanged","native createdAt/expiresAt remain authoritative and are not duplicated","session_id relationship remains logical to users.sessions[].id"],"requiredChecks":["empty-schema","expected-pre-schema","migration-apply","post-schema","native-session-shape-unchanged","extension-schema-exact-match","native-createdAt-expiresAt-not-duplicated","secret-non-persistence","runtime-write-read-revoke","concurrency"],"status":"NOT_EXECUTED"},
-    {"migrationId":"MIG-AUTH-003-CREDENTIAL-V1","featureId":"AUTH-003","entities":["ENT-IDENTITY","ENT-CREDENTIAL"],"fieldContracts":["contracts/entity/AUTH-003-identity-field-contract.v1.json","contracts/entity/AUTH-003-credential-field-contract.v1.json"],"schemaMappingRef":"contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json#AUTH-003","requiredPostconditions":["canonical identity fields exist","versioned normalized representations exist","authoritative uniqueness constraints exist","secret-derived material is protected","credential lifecycle state is persisted"],"requiredChecks":["field-contract-complete","empty-schema","migration-apply","post-schema","normalization-uniqueness-negative-tests","enumeration-resistance"],"status":"NOT_EXECUTED"},
-    {"migrationId":"MIG-AUTH-004-PASSWORD-RECOVERY-V1","featureId":"AUTH-004","entities":["ENT-CREDENTIAL","ENT-VERIFICATION","ENT-SESSION"],"fieldContracts":["contracts/entity/AUTH-003-credential-field-contract.v1.json","contracts/entity/AUTH-004-password-recovery-field-contract.v1.json","contracts/entity/AUTH-002-session-field-contract.v1.json"],"schemaMappingRef":"contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json#AUTH-004","requiredPostconditions":["recovery challenge persisted","purpose persisted","token derived representation only","expiry persisted","single-use consumption persisted","successful reset revokes affected sessions"],"requiredChecks":["field-contract-complete","migration-apply","post-schema","expired-token-negative","replay-negative","raw-secret-absence","session-revocation"],"status":"NOT_EXECUTED"},
-    {"migrationId":"MIG-AUTH-005-VERIFICATION-V1","featureId":"AUTH-005","entities":["ENT-VERIFICATION","ENT-CREDENTIAL","ENT-IDENTITY"],"fieldContracts":["contracts/entity/AUTH-005-verification-field-contract.v1.json","contracts/entity/AUTH-003-credential-field-contract.v1.json","contracts/entity/AUTH-003-identity-field-contract.v1.json"],"schemaMappingRef":"contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json#AUTH-005","requiredPostconditions":["verification challenge persisted","identity and channel bound","purpose bound","token derived representation only","expiry persisted","single-use consumption persisted","credential lifecycle update is authoritative"],"requiredChecks":["field-contract-complete","migration-apply","post-schema","wrong-purpose-negative","expired-negative","replay-negative","concurrent-consumption"],"status":"NOT_EXECUTED"},
-    {"migrationId":"MIG-AUTH-006-PASSKEY-V1","featureId":"AUTH-006","entities":["ENT-CREDENTIAL","ENT-VERIFICATION","ENT-IDENTITY"],"fieldContracts":["contracts/entity/AUTH-006-passkey-field-contract.v1.json","contracts/entity/AUTH-005-verification-field-contract.v1.json","contracts/entity/AUTH-003-identity-field-contract.v1.json"],"schemaMappingRef":"contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json#AUTH-006","requiredPostconditions":["credential owner persisted","public key persisted","RP ID binding persisted","authenticator state persisted","challenge state persisted","private key absent"],"requiredChecks":["field-contract-complete","migration-apply","post-schema","credential-ownership-negative","challenge-replay-negative","signature-verification","private-key-absence"],"status":"NOT_EXECUTED"}
+  "version": "1.3",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "promotion": "NOT_GREEN",
+  "purpose": "Stable migration manifest for AUTH-002 through AUTH-006. Defines migration identity and required postconditions without claiming execution.",
+  "sourceRefs": [
+    "contracts/migration/AUTH-002-006-migration-gate.v1.md",
+    "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
+    "contracts/persistence/AUTH-002-006-persistence-closure-contract.v1.md",
+    "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
+    "contracts/entity/AUTH-002-006-canonical-field-authority.v1.json",
+    "docs/change-control/CC-AUTH-004-PAYLOAD-NATIVE-REVERSION-2026-09-26.md"
   ],
-  "evidenceRequirements":{"requiredPerMigration":["repo","environment","migrationId","exactCommitSha","preSchemaSnapshot","postSchemaSnapshot","expectedPostconditions","actualPostconditions","testResult"],"missingEvidenceMeans":"NOT_VERIFIED","emptyEvidenceRegistryMeans":"FAIL","staleCommitMeans":"FAIL"}
+  "globalRules": {
+    "ordered": true,
+    "deterministic": true,
+    "destructiveChangesRequireRecoveryContract": true,
+    "executionRequiresIsolatedVerification": true,
+    "promotionRequiresRemoteD1SchemaEvidence": true,
+    "evidenceMustReferenceExactTestedCommitSha": true,
+    "noMigrationExecutionClaimFromManifest": true
+  },
+  "migrations": [
+    {
+      "migrationId": "MIG-AUTH-002-SESSION-V1",
+      "featureId": "AUTH-002",
+      "entities": [
+        "ENT-SESSION"
+      ],
+      "fieldContracts": [
+        "contracts/entity/AUTH-002-session-field-contract.v1.json",
+        "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json"
+      ],
+      "schemaMappingRef": "contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json#AUTH-002",
+      "nativePersistenceOwner": "Payload users.sessions[]; native id/createdAt/expiresAt are authoritative and MUST NOT be duplicated by extension migration",
+      "extensionPersistence": {
+        "table": "auth_session_state",
+        "columns": [
+          "session_id",
+          "user_id",
+          "device_id",
+          "token_version",
+          "refresh_credential_hash",
+          "revoked_at",
+          "last_seen_at"
+        ],
+        "indexes": [
+          "auth_session_state_user_id_idx",
+          "auth_session_state_device_id_idx",
+          "auth_session_state_token_version_idx",
+          "auth_session_state_revoked_at_idx"
+        ],
+        "uniqueness": [
+          "session_id"
+        ],
+        "forbiddenColumns": [
+          "raw_access_token",
+          "raw_refresh_token",
+          "password"
+        ]
+      },
+      "requiredPostconditions": [
+        "physical auth_session_state table exists",
+        "session_id is TEXT NOT NULL PRIMARY KEY",
+        "user_id is TEXT NOT NULL",
+        "device_id is TEXT NOT NULL",
+        "token_version is INTEGER NOT NULL",
+        "refresh_credential_hash is TEXT NOT NULL",
+        "revoked_at is nullable TEXT",
+        "last_seen_at is nullable TEXT",
+        "required extension indexes present",
+        "no forbidden secret columns",
+        "native users.sessions[] shape unchanged",
+        "native createdAt/expiresAt remain authoritative and are not duplicated",
+        "session_id relationship remains logical to users.sessions[].id"
+      ],
+      "requiredChecks": [
+        "empty-schema",
+        "expected-pre-schema",
+        "migration-apply",
+        "post-schema",
+        "native-session-shape-unchanged",
+        "extension-schema-exact-match",
+        "native-createdAt-expiresAt-not-duplicated",
+        "secret-non-persistence",
+        "runtime-write-read-revoke",
+        "concurrency"
+      ],
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "migrationId": "MIG-AUTH-003-CREDENTIAL-V1",
+      "featureId": "AUTH-003",
+      "entities": [
+        "ENT-IDENTITY",
+        "ENT-CREDENTIAL"
+      ],
+      "fieldContracts": [
+        "contracts/entity/AUTH-003-identity-field-contract.v1.json",
+        "contracts/entity/AUTH-003-credential-field-contract.v1.json"
+      ],
+      "schemaMappingRef": "contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json#AUTH-003",
+      "requiredPostconditions": [
+        "canonical identity fields exist",
+        "versioned normalized representations exist",
+        "authoritative uniqueness constraints exist",
+        "secret-derived material is protected",
+        "credential lifecycle state is persisted"
+      ],
+      "requiredChecks": [
+        "field-contract-complete",
+        "empty-schema",
+        "migration-apply",
+        "post-schema",
+        "normalization-uniqueness-negative-tests",
+        "enumeration-resistance"
+      ],
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "migrationId": "MIG-AUTH-004-PASSWORD-RECOVERY-V1",
+      "featureId": "AUTH-004",
+      "implementationMode": "PAYLOAD_NATIVE",
+      "entities": [
+        "ENT-CREDENTIAL",
+        "ENT-SESSION"
+      ],
+      "fieldContracts": [
+        "contracts/entity/AUTH-004-password-recovery-field-contract.v1.json"
+      ],
+      "schemaMappingRef": "contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json#AUTH-004",
+      "nativePersistenceOwner": "Payload users auth; resetPasswordToken/resetPasswordExpiration are native recovery fields",
+      "migrationRequired": false,
+      "status": "NOT_REQUIRED_NATIVE",
+      "requiredPostconditions": [
+        "native users recovery fields remain authoritative",
+        "no custom AUTH-004 recovery table is created",
+        "native reset operation consumes valid recovery state",
+        "successful native reset/change follows Payload session invalidation semantics"
+      ],
+      "requiredChecks": [
+        "native-route-runtime",
+        "expired-token-negative",
+        "replay-negative",
+        "secret-non-return",
+        "session-revocation"
+      ]
+    },
+    {
+      "migrationId": "MIG-AUTH-005-VERIFICATION-V1",
+      "featureId": "AUTH-005",
+      "entities": [
+        "ENT-VERIFICATION",
+        "ENT-CREDENTIAL",
+        "ENT-IDENTITY"
+      ],
+      "fieldContracts": [
+        "contracts/entity/AUTH-005-verification-field-contract.v1.json",
+        "contracts/entity/AUTH-003-credential-field-contract.v1.json",
+        "contracts/entity/AUTH-003-identity-field-contract.v1.json"
+      ],
+      "schemaMappingRef": "contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json#AUTH-005",
+      "requiredPostconditions": [
+        "verification challenge persisted",
+        "identity and channel bound",
+        "purpose bound",
+        "token derived representation only",
+        "expiry persisted",
+        "single-use consumption persisted",
+        "credential lifecycle update is authoritative"
+      ],
+      "requiredChecks": [
+        "field-contract-complete",
+        "migration-apply",
+        "post-schema",
+        "wrong-purpose-negative",
+        "expired-negative",
+        "replay-negative",
+        "concurrent-consumption"
+      ],
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "migrationId": "MIG-AUTH-006-PASSKEY-V1",
+      "featureId": "AUTH-006",
+      "entities": [
+        "ENT-CREDENTIAL",
+        "ENT-VERIFICATION",
+        "ENT-IDENTITY"
+      ],
+      "fieldContracts": [
+        "contracts/entity/AUTH-006-passkey-field-contract.v1.json",
+        "contracts/entity/AUTH-005-verification-field-contract.v1.json",
+        "contracts/entity/AUTH-003-identity-field-contract.v1.json"
+      ],
+      "schemaMappingRef": "contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json#AUTH-006",
+      "requiredPostconditions": [
+        "credential owner persisted",
+        "public key persisted",
+        "RP ID binding persisted",
+        "authenticator state persisted",
+        "challenge state persisted",
+        "private key absent"
+      ],
+      "requiredChecks": [
+        "field-contract-complete",
+        "migration-apply",
+        "post-schema",
+        "credential-ownership-negative",
+        "challenge-replay-negative",
+        "signature-verification",
+        "private-key-absence"
+      ],
+      "status": "NOT_EXECUTED"
+    }
+  ],
+  "evidenceRequirements": {
+    "requiredPerMigration": [
+      "repo",
+      "environment",
+      "migrationId",
+      "exactCommitSha",
+      "preSchemaSnapshot",
+      "postSchemaSnapshot",
+      "expectedPostconditions",
+      "actualPostconditions",
+      "testResult"
+    ],
+    "missingEvidenceMeans": "NOT_VERIFIED",
+    "emptyEvidenceRegistryMeans": "FAIL",
+    "staleCommitMeans": "FAIL"
+  }
 }
