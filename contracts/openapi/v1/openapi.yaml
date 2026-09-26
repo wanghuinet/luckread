@@ -2411,7 +2411,240 @@ paths:
                   type: string
                   minLength: 43
                   maxLength: 512
-                  format: byte
+                  contentEncoding: base64url
+                  pattern: '^[A-Za-z0-9_-]+
+                newPassword:
+                  type: string
+                  minLength: 15
+                  maxLength: 128
+                  format: password
+                  description: Unicode password; spaces are allowed; no composition-class rule; compromised/common-password screening is enforced.
+      responses:
+        '204':
+          description: Password reset confirmed; no response body.
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '409': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    ContentId:
+      name: contentId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    MediaId:
+      name: mediaId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    IpId:
+      name: ipId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    CredentialId:
+      name: credentialId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, minLength: 1, maxLength: 256 }
+    IdempotencyKeyRequired:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 256 }
+    IfMatchRequired:
+      name: If-Match
+      in: header
+      required: true
+      schema: { $ref: '#/components/schemas/ETag' }
+  responses:
+    Unauthenticated:
+      description: Authentication required.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ValidationFailed:
+      description: Validation failed.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: Rate limited.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PermissionDenied:
+      description: Permission denied.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InvalidState:
+      description: Invalid lifecycle transition.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PreconditionFailed:
+      description: If-Match does not match current ETag.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PreconditionRequired:
+      description: If-Match is required for this operation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    UnsupportedMediaType:
+      description: Unsupported media type.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InvalidCursor:
+      description: Invalid cursor.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ClientError:
+      description: Client error.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    ResourceId:
+      type: string
+      minLength: 1
+      maxLength: 128
+    Credential:
+      type: object
+      required: [credentialId, kind, active]
+      additionalProperties: false
+      properties:
+        credentialId:
+          $ref: '#/components/schemas/ResourceId'
+        kind:
+          type: string
+          enum: [username, email, phone]
+        active:
+          type: boolean
+    Cursor:
+      $ref: '../../schemas/common/cursor.json'
+    RequestId:
+      $ref: '../../schemas/common/request-id.json'
+    TraceId:
+      $ref: '../../schemas/common/trace-id.json'
+    ETag:
+      type: string
+      minLength: 1
+      maxLength: 256
+    AccountState:
+      $ref: '../../enums/account-state.json'
+    ContentState:
+      $ref: '../../enums/content-state.json'
+    ErrorResponse:
+      $ref: '../../schemas/common/error-response.json'
+    ListResponse:
+      $ref: '../../schemas/common/list-response.json'
+    User:
+      type: object
+      required: [id, username, accountState, layer]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        accountState: { $ref: '#/components/schemas/AccountState' }
+        layer: { type: string, pattern: '^L[0-8]$' }
+    Content:
+      type: object
+      required: [id, state, version, etag]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        state: { $ref: '#/components/schemas/ContentState' }
+        version: { type: integer, minimum: 1 }
+        etag: { $ref: '#/components/schemas/ETag' }
+    ContentInput:
+      type: object
+      required: [title, bodyRef]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 512 }
+        bodyRef: { type: string, description: R2 object reference }
+    Media:
+      type: object
+      required: [id, mimeType, size, checksum, status]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        mimeType: { type: string }
+        size: { type: integer, minimum: 1 }
+        checksum: { type: string }
+        status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
+    Comment:
+      type: object
+      required: [id, body, state]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        body: { type: string }
+        state: { enum: [PENDING, PUBLISHED, REJECTED] }
+    InteractionTarget:
+      type: object
+      required: [targetType, targetId]
+      properties:
+        targetType: { enum: [content, comment, creator, ip] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    Creator:
+      type: object
+      required: [id, userId, displayName]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        userId: { $ref: '#/components/schemas/ResourceId' }
+        displayName: { type: string }
+    IP:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    Organization:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+ }
+
                   description: Opaque base64url recovery token without padding; single-use, time-bound and purpose-bound.
                 newPassword:
                   type: string
