@@ -39,7 +39,7 @@ if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.87.1') {
 // Treat either form as native authentication enabled; do not require the
 // narrower shorthand `auth: true` because W01 intentionally supplies
 // collection-level native recovery/token-response options.
-if (!/\\bauth\\s*:\\s*(?:true|\\{)/.test(users)) {
+if (!(users.includes('auth: true') || users.includes('auth: {'))) {
   fail('W01 Users collection does not enable native auth')
 }
 if (!config.includes('sqliteD1Adapter')) fail('W01 Payload D1 adapter is not configured')
