@@ -637,6 +637,16 @@ try {
     disposition: tokenVersionAttempt.status === 401 ? 'VERIFIED' : 'CONTRACT_RUNTIME_GAP',
   })
 
+  const tokenVersionAccessAttempt = await getMe(tokenVersionLogin.accessToken)
+  negativeCases.push({
+    case: 'stale access tokenVersion invalidation',
+    expected: '401_UNAUTHENTICATED',
+    actual: tokenVersionAccessAttempt.status,
+    passed: tokenVersionAccessAttempt.status === 401,
+    disposition: tokenVersionAccessAttempt.status === 401 ? 'VERIFIED' : 'CONTRACT_RUNTIME_GAP',
+  })
+
+
   const concurrentLogin = await login(primary, 'device-concurrent-refresh')
   const refreshResponses = await Promise.all(
     Array.from({ length: 4 }, () =>
