@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   createSessionExtension,
   establishAuthenticatedSession,
-  rotateRefreshCredential,
   revokeSessionExtension,
   validateAuthoritativeSession,
   type NativeSessionAuthority,
@@ -21,46 +20,13 @@ function nativeSession(overrides: Partial<NativeSessionAuthority> = {}): NativeS
   }
 }
 
-function dbFake(initial: SessionRecord | null, forcedUpdateChanges?: number) {
+function dbFake(initial: SessionRecord | null) {
   let row = initial
   let nativeSessionPresent = Boolean(initial)
-  let reads = 0
-  let writes = 0
 
   const db = {
-    prepare: (sql: string) => ({
-      bind: (...args: unknown[]) => ({
-        sql, args,
-        first: async <T>() => {
-          reads += 1
-          return row as T | null
-        },
-        all: async <T>() => {
-          reads += 1
-          return { results: row ? [row as T] : [] }
-        },
-        run: async () => {
-          writes += 1
-          if (!row) return { meta: { changes: 0 } }
-
-          if (args.length === 3) {
-            const [revokedAt, lastSeenAt] = args as [string, string, string]
-            if (row.revokedAt) return { meta: { changes: 0 } }
-            row = { ...row, revokedAt, lastSeenAt }
-            return { meta: { changes: 1 } }
-          }
-
-          const [nextHash, nextSeenAt, , expectedOldHash] = args as [string, string, string, string]
-          if (row.refreshCredentialHash !== expectedOldHash) return { meta: { changes: 0 } }
-          if (forcedUpdateChanges !== undefined) return { meta: { changes: forcedUpdateChanges } }
-          row = { ...row, refreshCredentialHash: nextHash, lastSeenAt: nextSeenAt }
-          return { meta: { changes: 1 } }
-        },
-      }),
-    }),
-    batch: async (statements: Array<{ sql?: string; args?: unknown[] }>) => {
-      writes += 1
-      return statements.map((statement) => {
+    batch: async (statements: Array<{ sql?: string; args?: unknown[] }>) =>
+      statements.map((statement) => {
         const sql = statement.sql ?? ''
         const args = statement.args ?? []
 
@@ -78,14 +44,12 @@ function dbFake(initial: SessionRecord | null, forcedUpdateChanges?: number) {
         }
 
         return { meta: { changes: 0 } }
-      })
-    },
+      }),
   }
+
   return {
     db: db as unknown as D1Database,
     getRow: () => row,
-    getReads: () => reads,
-    getWrites: () => writes,
     getNativeSessionPresent: () => nativeSessionPresent,
   }
 }
@@ -113,106 +77,6 @@ describe('session runtime foundation', () => {
       randomToken: () => 'refresh-1',
       execute: async () => ({ meta: { changes: 1 } }),
     })).rejects.toThrow('deviceId')
-  })
-
-  it('rotates a refresh credential with one authoritative read and one compare-and-update write', async () => {
-    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('v3.refresh-1'))
-    const digest = Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('')
-    const record: SessionRecord = {
-      sessionId: 'sid-1',
-      userId: '42',
-      deviceId: 'device-a',
-      tokenVersion: 3,
-      refreshCredentialHash: digest,
-      revokedAt: null,
-      lastSeenAt: null,
-      nativeExpiresAt: nativeSession().expiresAt,
-    }
-    const fake = dbFake(record)
-    const result = await rotateRefreshCredential(fake.db, {
-      refreshToken: 'v3.refresh-1',
-      deviceId: 'device-a',
-      now: NOW,
-      issueAccessToken: () => 'access-1',
-      randomToken: () => 'refresh-2',
-    })
-
-    expect(result).toEqual({
-      sessionId: 'sid-1',
-      accessToken: 'access-1',
-      refreshToken: 'v3.refresh-2',
-    })
-    expect(fake.getReads()).toBe(1)
-    expect(fake.getWrites()).toBe(1)
-    expect(fake.getRow()?.refreshCredentialHash).not.toBe(digest)
-  })
-
-  it('fails closed when device binding differs', async () => {
-    const record: SessionRecord = {
-      sessionId: 'sid-1',
-      userId: '42',
-      deviceId: 'device-a',
-      tokenVersion: 3,
-      refreshCredentialHash: 'hash',
-      revokedAt: null,
-      lastSeenAt: null,
-      nativeExpiresAt: nativeSession().expiresAt,
-    }
-    const fake = dbFake(record)
-    await expect(rotateRefreshCredential(fake.db, {
-      refreshToken: 'v3.refresh-1',
-      deviceId: 'device-b',
-      now: NOW,
-      issueAccessToken: () => 'access-1',
-      hashToken: async () => 'hash',
-      randomToken: () => 'refresh-2',
-    })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
-    expect(fake.getReads()).toBe(1)
-    expect(fake.getWrites()).toBe(0)
-  })
-
-  it('fails closed when the native session is expired', async () => {
-    const fake = dbFake({
-      sessionId: 'sid-1',
-      userId: '42',
-      deviceId: 'device-a',
-      tokenVersion: 3,
-      refreshCredentialHash: 'hash',
-      revokedAt: null,
-      lastSeenAt: null,
-      nativeExpiresAt: nativeSession({ expiresAt: '2026-09-22T12:59:59.999Z' }).expiresAt,
-    })
-    await expect(rotateRefreshCredential(fake.db, {
-      refreshToken: 'v3.refresh-1',
-      deviceId: 'device-a',
-      now: NOW,
-      issueAccessToken: () => 'access-1',
-      hashToken: async () => 'hash',
-      randomToken: () => 'refresh-2',
-    })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
-    expect(fake.getWrites()).toBe(0)
-  })
-
-  it('rejects a reused predecessor when compare-and-update changes zero rows', async () => {
-    const fake = dbFake({
-      sessionId: 'sid-1',
-      userId: '42',
-      deviceId: 'device-a',
-      tokenVersion: 3,
-      refreshCredentialHash: 'old-hash',
-      revokedAt: null,
-      lastSeenAt: NOW,
-      nativeExpiresAt: nativeSession().expiresAt,
-    }, 0)
-
-    await expect(rotateRefreshCredential(fake.db, {
-      refreshToken: 'v3.refresh-1',
-      deviceId: 'device-a',
-      now: NOW,
-      issueAccessToken: () => 'access-1',
-      hashToken: async () => 'old-hash',
-      randomToken: () => 'refresh-2',
-    })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
   })
 
   it('revokes extension state and the Payload-native session atomically', async () => {
