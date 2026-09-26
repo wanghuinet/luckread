@@ -111,10 +111,12 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "user.credential.manage"
+      ],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
@@ -453,7 +455,9 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "user.credential.read"
+      ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
@@ -1460,10 +1464,12 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "user.credential.manage"
+      ],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
@@ -2137,10 +2143,12 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "user.credential.manage"
+      ],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
