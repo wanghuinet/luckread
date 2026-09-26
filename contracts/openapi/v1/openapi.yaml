@@ -172,6 +172,7 @@ paths:
       operationId: authSessionRevoke
       parameters:
         - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
         '204':
           description: Session revoked or already-revoked owned session.
