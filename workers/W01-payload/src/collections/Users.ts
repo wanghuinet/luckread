@@ -13,6 +13,7 @@ export const Users: CollectionConfig = {
       minRequestInterval: 15000,
     },
     removeTokenFromResponses: true,
+    // AUTH-004 remains contract/evidence gated; native capability is the implementation baseline.
   },
   // AUTH-001 contract: account registration is anonymous/public. Keep the
   // public boundary limited to creation; read/update/delete remain protected
