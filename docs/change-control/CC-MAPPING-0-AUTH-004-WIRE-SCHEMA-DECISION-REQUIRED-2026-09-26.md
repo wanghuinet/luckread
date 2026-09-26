@@ -185,9 +185,27 @@ Retention is 24 hours under the common schema.
 
 The common contract does **not** establish that every AUTH-004 operation requires the header. Whether the header is mandatory for each of the three AUTH-004 operations remains a feature-specific authority decision.
 
+### 9.4 Lifecycle/security inheritance
+
+From `docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md`, AUTH-004 may inherit the following lifecycle/security constraints as authority inputs:
+
+- current-credential verification is rate-limited;
+- password-reset requests create a durable operation/token boundary and do not reveal account existence;
+- password-reset requests are rate-limited;
+- reset tokens expire and are stored safely without raw-token logging;
+- expired or wrong-use reset tokens are rejected;
+- reset-token consumption is single-use and concurrent double-consumption is denied;
+- password replacement invalidates the old credential and keeps secret material out of telemetry.
+
+These constraints do not determine public request field names, token wire format, HTTP status/body, per-error code mapping, delivery metadata, or per-operation Idempotency-Key requirements. They therefore reduce the unresolved authority set without closing the feature-specific wire schema.
+
 ### 9.3 Observability inheritance
 
 The Unified Error/State contract requires external errors to remain correlatable through `requestId`, `correlationId`, `traceId`, and `operationId` where applicable. These are cross-cutting observability constraints and do not define additional AUTH-004 business fields.
+
+## 10.1 Lifecycle reconciliation result
+
+The L5/L6 registry is now an explicit supporting authority for lifecycle/security behavior. Its rate-limit and token-lifecycle claims are admitted as constraints; no numeric rate limit, anti-abuse scope/action, public response field, or HTTP mapping is inferred from them.
 
 ## 10. Remaining AUTH-004 wire decisions
 
