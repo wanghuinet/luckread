@@ -1,0 +1,48 @@
+{
+  "artifactId": "AUTH-005-DTO-ID-CONFLICT-2026-09-26",
+  "version": "1.0",
+  "status": "BLOCKED_DECISION_REQUIRED",
+  "currentMain": "584e585b09465aa6f14099adc9b5018b72a7eff8",
+  "backupBranch": "backup/main-before-auth005-dto-id-conflict-20260926",
+  "featureId": "AUTH-005",
+  "conflictType": "DTO_IDENTIFIER_SOURCE_CONFLICT",
+  "variants": {
+    "apiContract": {
+      "source": "contracts/api/AUTH-005-identity-verification-contract.v1.json",
+      "ids": [
+        "DTO-AUTH-005-VERIFICATION-REQUEST",
+        "DTO-AUTH-005-VERIFICATION-CONFIRM",
+        "DTO-AUTH-005-VERIFICATION-RESPONSE",
+        "DTO-AUTH-005-VERIFICATION-REVOKE"
+      ]
+    },
+    "sharedPersistenceMapping": {
+      "source": "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
+      "ids": [
+        "DTO-AUTH-005-VERIFICATION-REQUEST",
+        "DTO-AUTH-005-VERIFICATION-RESPONSE",
+        "DTO-AUTH-005-VERIFICATION-CONFIRM-REQUEST",
+        "DTO-AUTH-005-VERIFICATION-CONFIRM-RESPONSE",
+        "DTO-AUTH-005-VERIFICATION-REVOKE-REQUEST",
+        "DTO-AUTH-005-VERIFICATION-REVOKE-RESPONSE"
+      ]
+    },
+    "historicalOpenApiReconciliation": {
+      "source": "contracts/alignment/mapping-batches/AUTH-003-006-openapi-operation-reconciliation.v1.md",
+      "ids": [
+        "DTO-AUTH-005-VERIFICATION-REQUEST",
+        "DTO-AUTH-005-VERIFICATION-RESPONSE",
+        "DTO-AUTH-005-VERIFICATION-CONFIRM-REQUEST",
+        "DTO-AUTH-005-VERIFICATION-CONFIRM-RESPONSE",
+        "DTO-AUTH-005-VERIFICATION-REVOKE-REQUEST",
+        "DTO-AUTH-005-VERIFICATION-REVOKE-RESPONSE"
+      ]
+    }
+  },
+  "authorityDecision": null,
+  "prohibitedAutoResolution": true,
+  "openApiPromotion": false,
+  "dtoPromotion": false,
+  "runtimeAdmission": false,
+  "mapping0Promotion": false
+}

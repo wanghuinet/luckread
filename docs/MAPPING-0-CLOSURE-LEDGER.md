@@ -3211,3 +3211,14 @@ Validate the encoded AUTH-003 wire/API/DTO/Mapping chain at current `main`. Pres
 - Decision state: `BLOCKED_ON_EXPLICIT_AUTHORITY_DECISION`.
 - Change Control: `CC-MAPPING-0-AUTH-004-DTO-ID-CONFLICT-2026-09-26`.
 - Machine artifact: `artifacts/mapping-0/auth-004-dto-id-conflict-2026-09-26.json`.
+
+
+## 2026-09-26 AUTH-005 DTO identifier conflict
+
+- Current main before record: `584e585b09465aa6f14099adc9b5018b72a7eff8`
+- Backup branch: `backup/main-before-auth005-dto-id-conflict-20260926`
+- Existing AUTH-005 feature API contract and shared mapping/reconciliation artifacts use different DTO identifier sets for confirm/revoke.
+- No automatic normalization was performed.
+- Decision state: `BLOCKED_ON_EXPLICIT_AUTHORITY_DECISION`.
+- Change Control: `CC-MAPPING-0-AUTH-005-DTO-ID-CONFLICT-2026-09-26`.
+- Machine artifact: `artifacts/mapping-0/auth-005-dto-id-conflict-2026-09-26.json`.
