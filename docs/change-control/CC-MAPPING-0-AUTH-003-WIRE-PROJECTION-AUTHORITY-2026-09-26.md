@@ -134,3 +134,7 @@ No new idempotency semantics are introduced beyond the existing canonical error 
 
 Next gate:
 encode this exact authority into the canonical AUTH-003 API contract, OpenAPI, and DTO registry; then reconcile the AUTH-003 persistence mapping operation/DTO references. Runtime and persistence evidence remain separate downstream gates.
+
+## Operational policy boundary — 2026-09-26
+
+The AUTH-003 wire schema is closed, but the repository has no separate authority for D1/resource, event, queue or anti-abuse budgets for these four operations. Therefore the corresponding Operation Policy entries remain `DISCOVERY_DRAFT`, retaining only the already-established authentication, permission and Idempotency-Key requirements. No inferred budget is admitted as contract authority.
