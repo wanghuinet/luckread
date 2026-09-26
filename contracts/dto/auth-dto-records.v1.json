@@ -64,9 +64,67 @@
       "responseStatus": 204,
       "dtoRequired": false
     }
+    {
+      "dtoId": "DTO-AUTH-003-CREDENTIAL-LIST-RESPONSE",
+      "kind": "response",
+      "featureId": "AUTH-003",
+      "operationId": "authCredentialList",
+      "schemaRef": "#/paths/~1auth~1credentials/get/responses/200/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-003-CREDENTIAL-ADD-REQUEST",
+      "kind": "request",
+      "featureId": "AUTH-003",
+      "operationId": "authCredentialAdd",
+      "schemaRef": "#/paths/~1auth~1credentials/post/requestBody/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_REQUEST_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-003-CREDENTIAL-ADD-RESPONSE",
+      "kind": "response",
+      "featureId": "AUTH-003",
+      "operationId": "authCredentialAdd",
+      "schemaRef": "#/paths/~1auth~1credentials/post/responses/201/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-003-CREDENTIAL-REPLACE-REQUEST",
+      "kind": "request",
+      "featureId": "AUTH-003",
+      "operationId": "authCredentialReplace",
+      "schemaRef": "#/paths/~1auth~1credentials~1{credentialId}/put/requestBody/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_REQUEST_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-003-CREDENTIAL-REPLACE-RESPONSE",
+      "kind": "response",
+      "featureId": "AUTH-003",
+      "operationId": "authCredentialReplace",
+      "schemaRef": "#/paths/~1auth~1credentials~1{credentialId}/put/responses/200/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    }
+  ],
+  "noBodyOperations": [
+    {
+      "featureId": "AUTH-002",
+      "operationId": "authLogout",
+      "responseStatus": 204,
+      "dtoRequired": false
+    },
+    {
+      "featureId": "AUTH-003",
+      "operationId": "authCredentialRemove",
+      "responseStatus": 204,
+      "dtoRequired": false
+    }
   ],
   "unresolvedFeatures": [
-    "AUTH-003",
     "AUTH-004",
     "AUTH-005"
   ],
