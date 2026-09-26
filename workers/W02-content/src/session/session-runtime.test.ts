@@ -25,6 +25,9 @@ function dbFake(initial: SessionRecord | null) {
   let nativeSessionPresent = Boolean(initial)
 
   const db = {
+    prepare: (sql: string) => ({
+      bind: (...args: unknown[]) => ({ sql, args }),
+    }),
     batch: async (statements: Array<{ sql?: string; args?: unknown[] }>) =>
       statements.map((statement) => {
         const sql = statement.sql ?? ''
