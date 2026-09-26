@@ -3198,3 +3198,16 @@ Next cursor:
 
 Objective:
 Validate the encoded AUTH-003 wire/API/DTO/Mapping chain at current `main`. Preserve the fail-closed R4/Evidence gates. Do not rerun AUTH-002 Runtime Evidence Run `36219132123` unchanged.
+
+
+## 2026-09-26 AUTH-004 DTO identifier conflict
+
+- Current main: `424062142a4bb9df6333c60be389bdd66fb24b5b`
+- Backup branch: `backup/main-before-auth004-dto-id-conflict-20260926`
+- A concrete AUTH-004 DTO identity conflict was surfaced and preserved as decision material.
+- Feature API contract uses `DTO-AUTH-004-PASSWORD-RESET-CONFIRM` / `DTO-AUTH-004-PASSWORD-RESET-RESPONSE`.
+- Shared persistence mapping and historical OpenAPI reconciliation use `DTO-AUTH-004-PASSWORD-RESET-CONFIRM-REQUEST` / `DTO-AUTH-004-PASSWORD-RESET-CONFIRM-RESPONSE`.
+- No automatic normalization was performed. No API/OpenAPI/DTO semantics were changed.
+- Decision state: `BLOCKED_ON_EXPLICIT_AUTHORITY_DECISION`.
+- Change Control: `CC-MAPPING-0-AUTH-004-DTO-ID-CONFLICT-2026-09-26`.
+- Machine artifact: `artifacts/mapping-0/auth-004-dto-id-conflict-2026-09-26.json`.

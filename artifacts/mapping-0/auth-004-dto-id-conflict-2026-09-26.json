@@ -1,0 +1,38 @@
+{
+  "artifactId": "AUTH-004-DTO-ID-CONFLICT-2026-09-26",
+  "version": "1.0",
+  "status": "BLOCKED_DECISION_REQUIRED",
+  "currentMain": "424062142a4bb9df6333c60be389bdd66fb24b5b",
+  "backupBranch": "backup/main-before-auth004-dto-id-conflict-20260926",
+  "featureId": "AUTH-004",
+  "conflictType": "DTO_IDENTIFIER_SOURCE_CONFLICT",
+  "variants": {
+    "apiContract": {
+      "source": "contracts/api/AUTH-004-password-recovery-contract.v1.json",
+      "ids": [
+        "DTO-AUTH-004-PASSWORD-RESET-CONFIRM",
+        "DTO-AUTH-004-PASSWORD-RESET-RESPONSE"
+      ]
+    },
+    "sharedPersistenceMapping": {
+      "source": "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
+      "ids": [
+        "DTO-AUTH-004-PASSWORD-RESET-CONFIRM-REQUEST",
+        "DTO-AUTH-004-PASSWORD-RESET-CONFIRM-RESPONSE"
+      ]
+    },
+    "historicalOpenApiReconciliation": {
+      "source": "contracts/alignment/mapping-batches/AUTH-003-006-openapi-operation-reconciliation.v1.md",
+      "ids": [
+        "DTO-AUTH-004-PASSWORD-RESET-CONFIRM-REQUEST",
+        "DTO-AUTH-004-PASSWORD-RESET-CONFIRM-RESPONSE"
+      ]
+    }
+  },
+  "authorityDecision": null,
+  "prohibitedAutoResolution": true,
+  "runtimeAdmission": false,
+  "openApiPromotion": false,
+  "dtoPromotion": false,
+  "mapping0Promotion": false
+}
