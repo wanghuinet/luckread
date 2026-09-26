@@ -21,6 +21,21 @@
       ]
     },
     {
+      "operationId": "authSessionRevoke",
+      "method": "DELETE",
+      "path": "/v1/auth/sessions/{sessionId}",
+      "openapiPath": "/auth/sessions/{sessionId}",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/auth/sessions/{sessionId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "deleteCommentsCommentId",
       "method": "DELETE",
       "path": "/v1/comments/{commentId}",
@@ -375,6 +390,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/audit/events",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authSessionList",
+      "method": "GET",
+      "path": "/v1/auth/sessions",
+      "openapiPath": "/auth/sessions",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/auth/sessions",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
