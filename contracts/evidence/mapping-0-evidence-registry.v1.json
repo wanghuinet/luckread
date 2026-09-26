@@ -451,6 +451,22 @@
       "checkId": "108315624259",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36210439729",
       "note": "Controlled remote D1 evidence validates the users table, username/display_name/bio/avatar/locale/timezone columns, and users_username_idx. Provenance is CONTROLLED_REMOTE_D1. This record is CREATED pending canonical Evidence Registry reconciliation."
+    },
+    {
+      "evidenceId": "EVD-AUTH013-PERSISTENCE-SCHEMA-REMOTE-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-013::PERSISTENCE_SCHEMA",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-013",
+      "source": "GitHub Actions AUTH-013 Persistence Schema Evidence against controlled remote D1",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36213786102/artifacts/10895984205",
+      "commitSha": "b66f6e57c852095983d571ad9d8e39fbfc2b8d70",
+      "timestamp": "2026-09-26T03:07:29.370Z",
+      "producer": "GitHub Actions AUTH-013 Persistence Schema Evidence",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "AUTH-013-PERSISTENCE-SCHEMA-REMOTE",
+      "workflowRef": ".github/workflows/auth-013-persistence-schema-evidence.yml"
     }
   ]
 }
