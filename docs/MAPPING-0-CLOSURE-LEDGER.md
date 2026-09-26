@@ -3157,12 +3157,33 @@ Source reconciliation result:
 - All edited JSON files pass structural parsing; OpenAPI source structure checks pass.
 - No Worker, D1, migration, runtime implementation, entity promotion or Evidence Registry promotion occurred.
 
-Contract CI status is **NOT_OBSERVED** for current main; no status check is claimed from source validation alone.
+Contract CI result is now **OBSERVED / NOT_GREEN for Mapping 0, not AUTH-003 wire failure**.
+
+Current main: `0850abaefb0392ee994271ce251a24b478d1dffc`
+Contract CI Run: https://github.com/wanghuinet/luckread/actions/runs/36224807854
+API Contract CI Run: https://github.com/wanghuinet/luckread/actions/runs/36224807856
+API Inventory Reconcile Run: https://github.com/wanghuinet/luckread/actions/runs/36224807855
+
+Observed result:
+- AUTH-003-specific findings in API inventory/policy reconciliation: **0**
+- Semantic Cross-Contract Gate: **PASS**
+- Mapping 0 Structural/Contract Gate: **PASS**
+- Capability Contract Graph Gate: **PASS**
+- Five-Way Alignment Admission Gate: **NOT_GREEN**
+- Five-Way blocker count: **450**
+- Canonical feature count: **449**
+- Blocking mapping records: **449**
+
+The Five-Way NOT_GREEN result is retained as an existing Mapping 0 gate outcome. It is not attributed to AUTH-003 wire schema encoding.
+
+Machine reconciliation artifact updated at:
+`artifacts/mapping-0/auth-003-wire-schema-encoding-reconciliation-2026-09-26.json`
+commit: `38c77b890fbb981e3fd4244fc21a0e050101876b`
 
 Operational policy boundary: AUTH-003 Operation Policy entries remain `DISCOVERY_DRAFT` because no explicit authority for resource/D1, event, queue or anti-abuse budgets was found. Only the already-established authentication, permission and Idempotency-Key rules are carried forward.
 
 Next cursor:
-`M0-AUTH-003-CONTRACT-CI-VALIDATION-001` / `WAIT_CI_RESULT`
+`M0-AUTH-003-CONTRACT-CI-VALIDATION-001` / `FAIL_NOT_AUTH003_BLOCKED`
 
 Objective:
 Validate the encoded AUTH-003 wire/API/DTO/Mapping chain at current `main`. Preserve the fail-closed R4/Evidence gates. Do not rerun AUTH-002 Runtime Evidence Run `36219132123` unchanged.
