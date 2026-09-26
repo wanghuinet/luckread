@@ -1,11 +1,16 @@
 import type { CollectionConfig } from 'payload'
 
+import { rejectNativePasswordRecovery } from '../auth/reject-native-password-recovery'
+
 export const Users: CollectionConfig = {
   slug: 'users',
   admin: {
     useAsTitle: 'email',
   },
   auth: true,
+  hooks: {
+    beforeOperation: [rejectNativePasswordRecovery],
+  },
   // AUTH-001 contract: account registration is anonymous/public. Keep the
   // public boundary limited to creation; read/update/delete remain protected
   // by Payload's default authenticated access control until explicit rules
