@@ -235,8 +235,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/block-mute.v1.json",
-      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
+      "x-luckread-source": "contracts/api/block-mute.v1.json"
     },
     {
       "operationId": "unlike",
@@ -263,8 +262,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/block-mute.v1.json",
-      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
+      "x-luckread-source": "contracts/api/block-mute.v1.json"
     },
     {
       "operationId": "removeIpMember",
@@ -540,8 +538,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/revision.v1.json",
-      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
+      "x-luckread-source": "contracts/api/revision.v1.json"
     },
     {
       "operationId": "getContentRevision",
@@ -555,8 +552,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/revision.v1.json",
-      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
+      "x-luckread-source": "contracts/api/revision.v1.json"
     },
     {
       "operationId": "getCreatorAnalytics",
@@ -700,8 +696,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/feed-delivery.v1.json",
-      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
+      "x-luckread-source": "contracts/api/feed-delivery.v1.json"
     },
     {
       "operationId": "getFollowingFeed",
@@ -1038,8 +1033,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
-      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
     },
     {
       "operationId": "getSubscriptions",
@@ -1588,8 +1582,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
-      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
     },
     {
       "operationId": "postContentContentIdUnpublish",
@@ -1642,8 +1635,7 @@
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/revision.v1.json",
-      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
+      "x-luckread-source": "contracts/api/revision.v1.json"
     },
     {
       "operationId": "transitionContentState",
@@ -1720,8 +1712,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
-      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
     },
     {
       "operationId": "postGalleries",
@@ -1748,8 +1739,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/block-mute.v1.json",
-      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
+      "x-luckread-source": "contracts/api/block-mute.v1.json"
     },
     {
       "operationId": "like",
@@ -1776,8 +1766,7 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/block-mute.v1.json",
-      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
+      "x-luckread-source": "contracts/api/block-mute.v1.json"
     },
     {
       "operationId": "postIpAssets",
