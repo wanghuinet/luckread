@@ -648,6 +648,253 @@
       "evidence": {
         "status": "MISSING"
       }
+    },
+    {
+      "operationId": "authPasswordChange",
+      "method": "POST",
+      "path": "/auth/password/change",
+      "visibility": "public_authenticated",
+      "capability": "password_change",
+      "contractStatus": "CONTRACTED_PARTIAL",
+      "auth": {
+        "mode": "authenticated",
+        "subject": "current_user"
+      },
+      "authorization": {
+        "required": true,
+        "accountState": "active",
+        "scope": "self"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 2,
+        "d1WriteMax": 2,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 64,
+        "rpcMax": 0,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "taskType": "security_audit_or_session_revocation_projection"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "identity",
+          "device",
+          "session",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "key": "Idempotency-Key",
+        "semantic": "same-key-same-canonical-payload-returns-first-result"
+      },
+      "security": [
+        "no_account_enumeration",
+        "credential_never_returned",
+        "credential_never_logged",
+        "cross_account_change_denied",
+        "successful_change_revokes_affected_sessions"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "inventory": "MISSING",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "MISSING",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "authPasswordResetRequest",
+      "method": "POST",
+      "path": "/auth/password/reset/request",
+      "visibility": "public",
+      "capability": "password_recovery_request",
+      "contractStatus": "CONTRACTED_PARTIAL",
+      "auth": {
+        "mode": "public",
+        "subject": "anonymous"
+      },
+      "authorization": {
+        "required": false,
+        "accountState": "N/A",
+        "scope": "anonymous"
+      },
+      "resource": {
+        "class": "BOUNDED_COMPOSITION",
+        "d1ReadMax": 2,
+        "d1WriteMax": 2,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 4,
+        "rpcMax": 0,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": false,
+        "requiresIdempotency": false
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "taskType": "password_recovery_delivery"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "identity",
+          "device",
+          "account",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "security": [
+        "no_account_enumeration",
+        "uniform_recovery_request_semantics",
+        "delivery_metadata_not_public",
+        "recovery_token_not_public"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "inventory": "MISSING",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "MISSING",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "authPasswordResetConfirm",
+      "method": "POST",
+      "path": "/auth/password/reset/confirm",
+      "visibility": "public",
+      "capability": "password_recovery_confirm",
+      "contractStatus": "CONTRACTED_PARTIAL",
+      "auth": {
+        "mode": "recovery_credential",
+        "subject": "recovery_token"
+      },
+      "authorization": {
+        "required": false,
+        "accountState": "recovery_token_valid",
+        "scope": "token-bound"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 2,
+        "d1WriteMax": 2,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 64,
+        "rpcMax": 0,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": false,
+        "requiresIdempotency": false
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "taskType": "security_audit_or_session_revocation_projection"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "token",
+          "account",
+          "device",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "security": [
+        "single_use_recovery_token",
+        "replay_denied",
+        "wrong_purpose_token_denied",
+        "successful_reset_revokes_affected_sessions",
+        "credential_never_returned"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "inventory": "MISSING",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "MISSING",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     }
   ]
 }
