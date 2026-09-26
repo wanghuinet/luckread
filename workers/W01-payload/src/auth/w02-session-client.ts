@@ -107,7 +107,11 @@ export const refreshSession = (body: {
 export const revokeSession = (body: { sessionId: string }) =>
   callW02<{ revoked: boolean }>('/internal/auth/session/revoke', body)
 
-export const validateSession = async (body: { sessionId: string; userId: string }) => {
+export const validateSession = async (body: {
+  sessionId: string
+  userId: string
+  tokenVersion: number
+}) => {
   const result = await callW02<{ active: boolean }>('/internal/auth/session/validate', body)
   return result.active
 }

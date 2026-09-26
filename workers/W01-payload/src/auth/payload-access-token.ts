@@ -10,6 +10,28 @@ function encodeJson(value: unknown): string {
   return bytesToBase64Url(textEncoder.encode(JSON.stringify(value)))
 }
 
+export function readVerifiedPayloadTokenVersion(request: Request): number | null {
+  const header = request.headers.get('authorization')
+  if (!header?.startsWith('Bearer ')) return null
+  const token = header.slice('Bearer '.length).trim()
+  const parts = token.split('.')
+  if (parts.length !== 3) return null
+
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
+    const json = atob(padded)
+    const claims = JSON.parse(json) as { tokenVersion?: unknown }
+    return typeof claims.tokenVersion === 'number' &&
+      Number.isSafeInteger(claims.tokenVersion) &&
+      claims.tokenVersion >= 0
+      ? claims.tokenVersion
+      : null
+  } catch {
+    return null
+  }
+}
+
 export async function issuePayloadAccessToken(input: {
   payloadSecret: string
   userId: string

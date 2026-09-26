@@ -119,13 +119,16 @@ export default {
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/validate') {
-      const body = await readJsonBody<{ sessionId?: unknown; userId?: unknown }>(request)
+      const body = await readJsonBody<{ sessionId?: unknown; userId?: unknown; tokenVersion?: unknown }>(request)
       if (
         !body ||
         typeof body.sessionId !== 'string' ||
         body.sessionId.length === 0 ||
         typeof body.userId !== 'string' ||
-        body.userId.length === 0
+        body.userId.length === 0 ||
+        typeof body.tokenVersion !== 'number' ||
+        !Number.isSafeInteger(body.tokenVersion) ||
+        body.tokenVersion < 0
       ) {
         return json({ active: false }, 400)
       }
@@ -134,6 +137,7 @@ export default {
         const result = await validateAuthoritativeSession(env.D1_01, {
           sessionId: body.sessionId,
           userId: body.userId,
+          tokenVersion: body.tokenVersion,
         })
         return json(result)
       } catch {

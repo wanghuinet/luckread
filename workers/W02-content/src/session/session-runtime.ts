@@ -440,6 +440,7 @@ export async function validateAuthoritativeSession(
   input: {
     userId: string
     sessionId: string
+    tokenVersion: number
     now?: string
   },
 ): Promise<{ active: boolean }> {
@@ -457,6 +458,7 @@ export async function validateAuthoritativeSession(
           CAST(s._parent_id AS TEXT) AS userId,
           s.expires_at AS expiresAt,
           a.user_id AS extensionUserId,
+          a.token_version AS tokenVersion,
           a.revoked_at AS revokedAt,
           u.account_state AS accountState
         FROM users_sessions AS s
@@ -475,6 +477,7 @@ export async function validateAuthoritativeSession(
         userId: string
         expiresAt: string
         extensionUserId: string
+        tokenVersion: number
         revokedAt: string | null
         accountState: string
       }>()
@@ -483,6 +486,7 @@ export async function validateAuthoritativeSession(
     if (String(row.sessionId) !== String(input.sessionId)) return { active: false }
     if (String(row.userId) !== String(input.userId)) return { active: false }
     if (String(row.extensionUserId) !== String(input.userId)) return { active: false }
+    if (row.tokenVersion !== input.tokenVersion) return { active: false }
     if (row.accountState !== 'ACTIVE' || row.revokedAt) return { active: false }
     if (Number.isNaN(Date.parse(row.expiresAt)) || Date.parse(row.expiresAt) <= Date.parse(now)) {
       return { active: false }

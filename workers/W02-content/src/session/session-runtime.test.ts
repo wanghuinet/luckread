@@ -111,6 +111,7 @@ describe('authoritative session validation', () => {
       userId: string
       expiresAt: string
       extensionUserId: string
+      tokenVersion: number
       revokedAt: string | null
       accountState: string
     } | null = {
@@ -118,6 +119,7 @@ describe('authoritative session validation', () => {
       userId: '42',
       expiresAt: '2026-09-22T14:00:00.000Z',
       extensionUserId: '42',
+      tokenVersion: 3,
       revokedAt: null,
       accountState: 'ACTIVE',
     }
@@ -133,8 +135,16 @@ describe('authoritative session validation', () => {
     await expect(validateAuthoritativeSession(db, {
       sessionId: 'sid-1',
       userId: '42',
+      tokenVersion: 3,
       now: NOW,
     })).resolves.toEqual({ active: true })
+
+    await expect(validateAuthoritativeSession(db, {
+      sessionId: 'sid-1',
+      userId: '42',
+      tokenVersion: 4,
+      now: NOW,
+    })).resolves.toEqual({ active: false })
 
     row = { ...row!, revokedAt: NOW }
 

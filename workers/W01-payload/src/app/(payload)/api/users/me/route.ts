@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 
 import config from '@payload-config'
 
+import { readVerifiedPayloadTokenVersion } from '../../../../../auth/payload-access-token.js'
 import { validateSession } from '../../../../../auth/w02-session-client.js'
 
 const unauthorized = () =>
@@ -31,10 +32,14 @@ export async function GET(request: Request): Promise<Response> {
     return unauthorized()
   }
 
+  const tokenVersion = readVerifiedPayloadTokenVersion(request)
+  if (tokenVersion === null) return unauthorized()
+
   try {
     const active = await validateSession({
       sessionId: String(user._sid),
       userId: String(user.id),
+      tokenVersion,
     })
     if (!active) return unauthorized()
   } catch {
