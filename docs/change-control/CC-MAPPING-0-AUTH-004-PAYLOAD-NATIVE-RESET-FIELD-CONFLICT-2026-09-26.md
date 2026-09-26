@@ -124,3 +124,13 @@ Until this conflict is resolved:
 - No migration execution may be claimed.
 - No Mapping-0 GREEN may be claimed from this Change Control.
 - No Payload-core modification may be introduced without explicit change-control authorization.
+
+## 9. Supported configuration boundary audit
+
+Payload v3.87.1 sanitizes an auth-enabled collection by appending the complete built-in `authCollectionEndpoints` set, which includes both `POST /forgot-password` and `POST /reset-password`.
+
+The collection-level `endpoints: false` switch disables the collection endpoint surface as a whole; it is not a per-auth-operation switch and would also suppress the collection's normal REST endpoints.
+
+No repository evidence has yet established a supported Payload configuration knob that disables only the native forgot/reset handlers while retaining the rest of the local authentication surface.
+
+This narrows the current decision material: the canonical AUTH-004 boundary cannot be assumed to be achieved by a simple per-operation Payload configuration flag.
