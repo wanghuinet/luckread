@@ -152,7 +152,8 @@ export async function revokeSessionExtension(
     .prepare(`
       UPDATE auth_session_state
          SET revoked_at = ?,
-             last_seen_at = ?
+             last_seen_at = ?,
+             token_version = token_version + 1
        WHERE session_id = ?
          AND revoked_at IS NULL
     `)
