@@ -5,7 +5,7 @@
 - Feature: AUTH-002
 - Gate: E6 Native Session Runtime Evidence
 - Parent: CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21
-- Current main: `6f4aab68e3e9d7f487046331aef36b9f551d5114`
+- Current main: `19b99d2175d684fb18fdcc7fae1709520d6fa8a7`
 
 ## Implemented scope
 
@@ -96,3 +96,13 @@ Until those gates pass, E6 remains NOT_GREEN.
 ## 2026-09-26 boundary correction
 
 The runtime bridge remains internal W01→W02 Service Binding transport only. The `/internal/auth/session/validate` operation is not a public API operationId and is not added to public OpenAPI. W02 remains the sole D1 authority for the native Payload session correlation plus `auth_session_state` authorization state. W01 retains only Payload-native authentication and the public API projection boundary.
+
+
+### 2026-09-26 tokenVersion validation boundary correction
+
+- W01 `/api/users/me` still authenticates exclusively through Payload native `payload.auth()`.
+- After Payload has accepted the bearer token, W01 reads the already-issued access JWT's `tokenVersion` claim and sends that value to W02; the claim is not used as a replacement signature verifier.
+- W02 `/internal/auth/session/validate` now requires a non-negative safe-integer `tokenVersion`.
+- W02 compares the presented `tokenVersion` with authoritative `auth_session_state.token_version`; mismatch fails closed.
+- This closes the existing AUTH-002 requirement that session validation participate in server-controlled token-version invalidation without adding another session authority.
+- Exact implementation commit: `19b99d2175d684fb18fdcc7fae1709520d6fa8a7`.
