@@ -40,6 +40,9 @@ try {
 } catch (error) {
   fail(`cannot resolve current commit: ${error.message}`)
 }
+const hex40 = /^[0-9a-f]{40}$/
+const evidenceRegistryRelPath = 'contracts/evidence/mapping-0-evidence-registry.v1.json'
+const testedCommit = registry?.testedCommitSha || currentCommit
 
 if (!registry || !schema || !featureInventory || !canonicalMapping) {
   console.error('MAPPING_0_EVIDENCE_FINAL_RED')
@@ -52,6 +55,26 @@ if (schema.$id !== 'https://luckread.com/contracts/evidence/mapping-0-evidence-r
 }
 if (registry.version !== '1.0') fail(`registry version mismatch: ${registry.version ?? 'missing'}`)
 if (registry.status !== 'GREEN') fail(`canonical Evidence Registry status is ${registry.status ?? 'missing'}`)
+if (!hex40.test(testedCommit)) fail(`invalid testedCommitSha: ${testedCommit ?? 'missing'}`)
+if (registry.status === 'GREEN' && !registry.testedCommitSha) fail('GREEN Evidence Registry must declare testedCommitSha')
+if (registry.testedCommitSha) {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', testedCommit, currentCommit], { stdio: 'ignore' })
+  } catch {
+    fail(`testedCommitSha is not an ancestor of current HEAD: ${testedCommit}`)
+  }
+  try {
+    const changedAfterAnchor = execFileSync('git', ['diff', '--name-only', `${testedCommit}..${currentCommit}`], { encoding: 'utf8' })
+      .split('\n')
+      .map((value) => value.trim())
+      .filter(Boolean)
+    for (const file of changedAfterAnchor) {
+      if (file !== evidenceRegistryRelPath) fail(`non-registry change after testedCommitSha: ${file}`)
+    }
+  } catch (error) {
+    fail(`cannot validate post-anchor changes: ${error.message}`)
+  }
+}
 if (registry.sourceOfTruth !== 'docs/176-EVIDENCE-REGISTRY-ACCEPTANCE-TRACEABILITY-CONTRACT-v1.0.md') fail('registry sourceOfTruth mismatch')
 if (canonicalMapping.status !== 'GREEN') fail(`canonical Mapping 0 status is ${canonicalMapping.status ?? 'missing'}`)
 if (!Array.isArray(registry.records) || registry.records.length === 0) fail('canonical Evidence Registry must contain non-empty records')
@@ -86,7 +109,6 @@ const results = new Set(['PASS'])
 const activeStatuses = new Set(['ACTIVE', 'VERIFIED'])
 const historicalStatuses = new Set(['SUPERSEDED', 'EXPIRED', 'INVALIDATED'])
 const executableTypes = new Set(['CODE', 'UNIT_TEST', 'INTEGRATION_TEST', 'CL', 'CI', 'SMOKE', 'DEPLOYMENT', 'OBSERVABILITY', 'PERFORMANCE', 'SECURITY', 'USER_ACCEPTANCE'])
-const hex40 = /^[0-9a-f]{40}$/
 
 const cleanSourceRef = (sourceRef) => sourceRef
   .replace(/#L\d+(?:-L\d+)?$/, '')
@@ -119,7 +141,7 @@ for (const record of registry.records) {
 
   const isHistorical = historicalStatuses.has(record.status)
   if (!isHistorical) {
-    if (record.commitSha !== currentCommit) fail(`stale evidence commit: ${record.evidenceId}`)
+    if (record.commitSha !== testedCommit) fail(`stale evidence commit: ${record.evidenceId}`)
     if (!results.has(record.result)) fail(`evidence result must be PASS: ${record.evidenceId}`)
     if (!activeStatuses.has(record.status)) fail(`evidence must be ACTIVE or VERIFIED: ${record.evidenceId}`)
     if (!executableTypes.has(record.type)) fail(`evidence type is not executable: ${record.evidenceId}`)
@@ -147,7 +169,7 @@ for (const featureId of featureIds) {
     executableTypes.has(record.type) &&
     record.result === 'PASS' &&
     activeStatuses.has(record.status) &&
-    record.commitSha === currentCommit
+    record.commitSha === testedCommit
   )
   if (!executablePass) fail(`Feature has no current executable PASS evidence: ${featureId}`)
 }
@@ -164,4 +186,4 @@ if (failures.length) {
   process.exit(1)
 }
 
-console.log(`MAPPING_0_EVIDENCE_FINAL_GREEN: records=${registry.records.length}; features=${featureIds.size}; claims=${claims.size}; commit=${currentCommit}`)
+console.log(`MAPPING_0_EVIDENCE_FINAL_GREEN: records=${registry.records.length}; features=${featureIds.size}; claims=${claims.size}; testedCommit=${testedCommit}; head=${currentCommit}`)
