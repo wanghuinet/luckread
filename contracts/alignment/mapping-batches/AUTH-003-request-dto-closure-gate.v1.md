@@ -2,7 +2,7 @@
 
 ## Status
 
-`BLOCKED_NOT_GREEN`
+`PASS_VERIFIED — REQUEST WIRE SCHEMA CLOSED; RUNTIME NOT GREEN`
 
 ## Purpose
 
@@ -82,3 +82,11 @@ Close the public request projection decision for `DTO-AUTH-003-CREDENTIAL-ADD-RE
 ## Evidence boundary
 
 This is contract/audit evidence only. It does not claim runtime, D1, migration, integration, security-E2E, or GREEN evidence.
+
+## Accepted decision — 2026-09-26
+
+DTO-AUTH-003-CREDENTIAL-ADD-REQUEST = { kind, value }, both required, with kind in username|email|phone and value a non-empty string; unknown properties are rejected.
+
+DTO-AUTH-003-CREDENTIAL-REPLACE-REQUEST = { value }; credential kind is immutable for the selected credentialId; unknown properties are rejected.
+
+The domain normalization/validation rules remain the existing AUTH-003 contract. No runtime authorization is implied.
