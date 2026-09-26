@@ -118,7 +118,7 @@ for (const featureId of featureIds) {
 
 const evidenceIds = new Set()
 const claims = new Map()
-const results = new Set(['PASS'])
+const results = new Set(['PASS', 'FAIL', 'BLOCKED', 'NOT_APPLICABLE'])
 const activeStatuses = new Set(['ACTIVE', 'VERIFIED'])
 const historicalStatuses = new Set(['SUPERSEDED', 'EXPIRED', 'INVALIDATED'])
 const executableTypes = new Set(['CODE', 'UNIT_TEST', 'INTEGRATION_TEST', 'CL', 'CI', 'SMOKE', 'DEPLOYMENT', 'OBSERVABILITY', 'PERFORMANCE', 'SECURITY', 'USER_ACCEPTANCE'])
