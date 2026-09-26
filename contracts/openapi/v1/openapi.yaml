@@ -122,6 +122,62 @@ paths:
           description: Logged out; token version incremented.
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+  /auth/sessions:
+    get:
+      tags: [Auth]
+      summary: List current user's sessions
+      operationId: authSessionList
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Current user's sessions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 50
+                    items:
+                      type: object
+                      required: [sessionId, createdAt, expiresAt]
+                      properties:
+                        sessionId:
+                          $ref: '#/components/schemas/ResourceId'
+                        deviceId:
+                          $ref: '#/components/schemas/ResourceId'
+                        createdAt:
+                          type: string
+                          format: date-time
+                        expiresAt:
+                          type: string
+                          format: date-time
+                        lastSeenAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                  nextCursor:
+                    type: string
+                    nullable: true
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /auth/sessions/{sessionId}:
+    delete:
+      tags: [Auth]
+      summary: Revoke one current user's session
+      operationId: authSessionRevoke
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '204':
+          description: Session revoked or already-revoked owned session.
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
   /users/me:
     get:
       tags: [Users]
@@ -2172,6 +2228,11 @@ components:
       schema: { $ref: '#/components/schemas/ResourceId' }
     IpId:
       name: ipId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    SessionId:
+      name: sessionId
       in: path
       required: true
       schema: { $ref: '#/components/schemas/ResourceId' }
