@@ -237,6 +237,7 @@ describe('session runtime foundation', () => {
 })
 
 
+describe('authoritative session validation', () => {
   it('validates native session plus authoritative extension state', async () => {
     let row: {
       sessionId: string
@@ -276,7 +277,7 @@ describe('session runtime foundation', () => {
       now: NOW,
     })).resolves.toEqual({ active: false })
   })
-
+})
 
 describe('authenticated session orchestration', () => {
   it('requires an authoritative account state and binds an allowed layer before issuing refresh state', async () => {
