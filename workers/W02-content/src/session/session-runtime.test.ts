@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   createSessionExtension,
   establishAuthenticatedSession,
-  refreshAuthenticatedSession,
   rotateRefreshCredential,
   revokeSessionExtension,
   type NativeSessionAuthority,
