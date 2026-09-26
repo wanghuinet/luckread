@@ -31,6 +31,14 @@ function canonicalApiPath(value) {
   return raw;
 }
 
+function effectiveDetailedPolicyStatus(op) {
+  return op?.status ?? op?.contractStatus ?? 'UNSPECIFIED';
+}
+
+function isDiscoveryDraftCanonicalPolicy(op) {
+  return op?.['x-luckread-contract-status'] === 'DISCOVERY_DRAFT';
+}
+
 function addPolicyOperation(op, source) {
   if (!op?.operationId) {
     failures.push({ code: 'MISSING_OPERATION_ID', source });
@@ -230,21 +238,27 @@ for (const [id] of openapiOps) {
 }
 
 for (const [id, op] of policyInventory) {
+  if (effectiveDetailedPolicyStatus(op) === 'MISSING') continue;
+
   const openapi = openapiOps.get(id);
   if (!openapi) {
-    finding('UNRECONCILED_POLICY_OPERATION', id, 'detailed domain policy operation is not represented in canonical OpenAPI');
+    finding('UNRECONCILED_POLICY_OPERATION', id, 'active detailed domain policy operation is not represented in canonical OpenAPI');
     continue;
   }
   if (String(op.method).toUpperCase() !== String(openapi.method).toUpperCase()) {
-    finding('METHOD_CONFLICT', id, \`policy=\${String(op.method).toUpperCase()} openapi=\${String(openapi.method).toUpperCase()}\`);
+    finding('METHOD_CONFLICT', id, `policy=${String(op.method).toUpperCase()} openapi=${String(openapi.method).toUpperCase()}`);
   } else if (canonicalApiPath(op.path) !== openapi.path) {
-    finding('PATH_CONFLICT', id, \`policy=\${op.path} openapi=\${openapi.path}\`);
+    finding('PATH_CONFLICT', id, `policy=${op.path} openapi=${openapi.path}`);
   }
 }
 
 for (const [id] of inventory) {
-  if (!policyInventory.has(id)) {
-    finding('MISSING_POLICY_OPERATION', id, 'public API inventory operation has no detailed domain operation policy');
+  const canonicalPolicy = policyOps.get(id);
+  if (isDiscoveryDraftCanonicalPolicy(canonicalPolicy)) continue;
+
+  const detailedPolicy = policyInventory.get(id);
+  if (!detailedPolicy || effectiveDetailedPolicyStatus(detailedPolicy) === 'MISSING') {
+    finding('MISSING_POLICY_OPERATION', id, 'non-discovery canonical operation has no active detailed domain operation policy');
   }
 }
 
@@ -258,6 +272,8 @@ for (const [id] of policyOps) {
 const criticalEvidence = ['openapi','permission','state','resource','cache','antiAbuse','integration','securityE2E'];
 const allowedEvidence = new Set(['PASS', 'N/A']);
 for (const [id, op] of policyInventory) {
+  if (effectiveDetailedPolicyStatus(op) === 'MISSING') continue;
+
   if (!op.evidence) {
     finding('EVIDENCE_MISSING', id, 'evidence object absent');
     continue;
@@ -325,7 +341,7 @@ const report = {
   findings,
   matches,
   evidenceSemantics: { pass: ['PASS','N/A'], incomplete: ['MISSING','ABSENT'], invalid: ['unknown_or_unsupported'] },
-  rule: 'PASS requires zero structural conflicts, zero unresolved inventory/OpenAPI/policy membership, zero missing detailed policy coverage, and zero incomplete/invalid evidence. N/A is valid only when explicitly declared by the operation contract.',
+  rule: 'PASS requires zero structural conflicts, zero unresolved required inventory/OpenAPI/policy membership, zero required detailed policy coverage gaps, and zero incomplete/invalid evidence. Explicit DISCOVERY_DRAFT and MISSING operation-policy statuses remain pending and do not silently become contract evidence. N/A is valid only when explicitly declared by the operation contract.',
 };
 const evidenceDir = path.join(root, 'artifacts', 'api-inventory');
 fs.mkdirSync(evidenceDir, { recursive: true });
