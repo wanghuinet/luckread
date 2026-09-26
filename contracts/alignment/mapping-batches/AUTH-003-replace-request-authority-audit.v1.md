@@ -2,7 +2,7 @@
 
 ## Status
 
-`BLOCKED_NOT_GREEN`
+`PASS_VERIFIED — REPLACE WIRE SCHEMA CLOSED; RUNTIME NOT GREEN`
 
 ## Scope
 
@@ -77,3 +77,11 @@ Therefore:
 ## Evidence boundary
 
 This artifact is contract/audit evidence only. It does not constitute runtime, D1, migration, concurrency, security-E2E, or Mapping-0 verification.
+
+## Accepted decision — 2026-09-26
+
+credentialId is now bound to the canonical opaque ResourceId API shape and is not a direct exposure of a persistence primary key.
+
+Replace accepts only a non-empty value; kind is immutable for the selected credential. Unknown properties are rejected.
+
+Runtime, D1 and uniqueness/security execution evidence remain separate downstream gates.
