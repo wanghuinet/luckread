@@ -3090,6 +3090,26 @@ Machine-readable reconciliation:
 `artifacts/mapping-0/auth-002-r4-entity-persistence-reconciliation-2026-09-26.json`
 
 ### Current closure cursor
-`M0-AUTH-002-R4-CROSS-ENTITY-DEPENDENCY-RECONCILIATION-001` / `WAIT_DEPENDENCY_EVIDENCE`
+`M0-AUTH-002-R4-CROSS-ENTITY-DEPENDENCY-RECONCILIATION-001` / `PASS_VERIFIED`
 
-The next issue is the shared ownership dependency: determine, from explicit authority only, whether AUTH-002 may rely on the canonical Identity/Credential entities governed by AUTH-003 while keeping the existing mapping contract intact. No entity promotion is performed in this step.
+Decision record:
+`docs/change-control/CC-MAPPING-0-AUTH-002-003-SHARED-ENTITY-AUTHORITY-2026-09-26.md`
+
+Machine-readable reconciliation:
+`artifacts/mapping-0/auth-002-r4-cross-entity-dependency-reconciliation-2026-09-26.json`
+
+Result:
+- AUTH-003 governs canonical `ENT-IDENTITY` and `ENT-CREDENTIAL` entity/field authority.
+- AUTH-002 retains its existing `ENT-IDENTITY`, `ENT-CREDENTIAL`, `ENT-SESSION` dependency references.
+- No ownership transfer, entity deletion, entity creation, or promotion by inference occurred.
+- `ENT-IDENTITY` and `ENT-CREDENTIAL` remain `PROPOSED / NOT_VERIFIED`.
+- `ENT-SESSION` remains `PROPOSED / IMPLEMENTED / CONTRACTED_NOT_VERIFIED`.
+- AUTH-002 Feature→Entity→Persistence registry remains `BLOCKED`; R4, Five-Way and Mapping 0 remain not green.
+
+Next cursor:
+`M0-AUTH-002-R4-ENTITY-DEPENDENCY-EVIDENCE-001` / `WAIT_ENTITY_EVIDENCE`
+
+Objective:
+Close entity-specific persistence/runtime evidence for `ENT-IDENTITY` and `ENT-CREDENTIAL` under AUTH-003 ownership before any AUTH-002 R4 promotion.
+
+Do not rerun AUTH-002 Runtime Evidence Run `36219132123` unchanged.
