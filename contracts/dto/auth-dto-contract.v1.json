@@ -88,13 +88,6 @@
       "status": "NO_BODY_DTO"
     },
     {
-      "featureId": "AUTH-004",
-      "operationId": null,
-      "requestDtoId": null,
-      "responseDtoId": null,
-      "status": "UNRESOLVED_NO_CANONICAL_OPERATION_EVIDENCE"
-    },
-    {
       "featureId": "AUTH-005",
       "operationId": null,
       "requestDtoId": null,
@@ -149,6 +142,51 @@
         "ENT-USER"
       ],
       "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "AUTH-004",
+      "operationId": "authPasswordChange",
+      "requestDtoId": "DTO-AUTH-004-PASSWORD-CHANGE-REQUEST",
+      "responseDtoId": null,
+      "requestSchemaRef": "#/paths/~1auth~1password~1change/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": null,
+      "responseStatus": 204,
+      "errorSchemaRef": "#/components/schemas/ErrorResponse",
+      "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-VERIFICATION"
+      ],
+      "status": "NO_BODY_DTO"
+    },
+    {
+      "featureId": "AUTH-004",
+      "operationId": "authPasswordResetRequest",
+      "requestDtoId": "DTO-AUTH-004-PASSWORD-RESET-REQUEST",
+      "responseDtoId": null,
+      "requestSchemaRef": "#/paths/~1auth~1password~1reset~1request/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": null,
+      "responseStatus": 202,
+      "errorSchemaRef": "#/components/schemas/ErrorResponse",
+      "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-VERIFICATION"
+      ],
+      "status": "NO_BODY_DTO"
+    },
+    {
+      "featureId": "AUTH-004",
+      "operationId": "authPasswordResetConfirm",
+      "requestDtoId": "DTO-AUTH-004-PASSWORD-RESET-CONFIRM",
+      "responseDtoId": null,
+      "requestSchemaRef": "#/paths/~1auth~1password~1reset~1confirm/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": null,
+      "responseStatus": 204,
+      "errorSchemaRef": "#/components/schemas/ErrorResponse",
+      "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-VERIFICATION"
+      ],
+      "status": "NO_BODY_DTO"
     }
   ],
   "bindingRules": {
