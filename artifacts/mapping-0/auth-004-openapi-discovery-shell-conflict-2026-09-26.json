@@ -5,7 +5,7 @@
   "repository": "wanghuinet/luckread",
   "sourceHead": "e9257c3ce9a6cdaf497a49a32fdf526267fc2161",
   "controlId": "CC-MAPPING-0-AUTH-004-OPENAPI-DISCOVERY-SHELL-CONFLICT-2026-09-26",
-  "status": "BLOCKED_DECISION_REQUIRED",
+  "status": "PASS_VERIFIED_AUTHORITY_ONLY",
   "featureId": "AUTH-004",
   "featureContract": {
     "authPasswordChange": "POST /auth/password/change",
@@ -25,5 +25,42 @@
     "disposition of discovery aliases"
   ],
   "doesNotAuthorizeOpenApiPromotion": true,
-  "runtimeAdmission": false
+  "runtimeAdmission": false,
+  "authorityDecision": {
+    "decisionId": "CC-MAPPING-0-AUTH-004-OPENAPI-DISCOVERY-SHELL-CONFLICT-2026-09-26",
+    "result": "FEATURE_API_CONTRACT_IS_CANONICAL_ROUTE_OPERATION_SOURCE",
+    "canonicalOperations": [
+      {
+        "operationId": "authPasswordChange",
+        "method": "POST",
+        "path": "/auth/password/change"
+      },
+      {
+        "operationId": "authPasswordResetRequest",
+        "method": "POST",
+        "path": "/auth/password/reset/request"
+      },
+      {
+        "operationId": "authPasswordResetConfirm",
+        "method": "POST",
+        "path": "/auth/password/reset/confirm"
+      }
+    ],
+    "discoveryAliases": [
+      {
+        "operationId": "postAccountPasswordChange",
+        "method": "POST",
+        "path": "/account/password/change"
+      },
+      {
+        "operationId": "postAccountRecovery",
+        "method": "POST",
+        "path": "/account/recovery"
+      }
+    ],
+    "aliasDisposition": "RETAIN_HISTORICAL_DISCOVERY_ONLY",
+    "doesNotModifyOpenApi": true,
+    "wireSchemaStillBlocked": true,
+    "runtimeAdmission": false
+  }
 }

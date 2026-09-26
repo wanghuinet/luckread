@@ -3241,3 +3241,12 @@ Validate the encoded AUTH-003 wire/API/DTO/Mapping chain at current `main`. Pres
 - Existing OpenAPI/API Inventory contains `postAccountPasswordChange` and `postAccountRecovery` under `/account/*`, explicitly marked `DISCOVERY_DRAFT` with no admitted schemas.
 - This is retained as Decision Material; no route or operation is auto-renamed or deleted.
 - Status: `BLOCKED_DECISION_REQUIRED`.
+
+
+## 2026-09-26 AUTH-004 public route/operation authority decision
+
+- Control: `CC-MAPPING-0-AUTH-004-OPENAPI-DISCOVERY-SHELL-CONFLICT-2026-09-26`.
+- Canonical route/operation authority is the feature-specific AUTH-004 API contract: `authPasswordChange`, `authPasswordResetRequest`, `authPasswordResetConfirm` under `/auth/password/*`.
+- Existing `postAccountPasswordChange` and `postAccountRecovery` remain historical `DISCOVERY_DRAFT` aliases only and are not canonical AUTH-004 operations.
+- No OpenAPI route or schema was modified. Exact wire schema remains blocked.
+- Result: `PASS_VERIFIED_AUTHORITY_ONLY`.

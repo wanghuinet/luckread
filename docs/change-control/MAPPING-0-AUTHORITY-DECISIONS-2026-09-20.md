@@ -235,3 +235,25 @@ Reconciliation state:
 - AUTH-005 DTO identifier source conflict: `PASS_VERIFIED_VOCABULARY_ONLY`.
 - OpenAPI/DTO Registry promotion: still blocked until exact wire schemas and canonical OpenAPI admission exist.
 - Mapping 0 remains `NOT_GREEN`.
+
+
+### 14. AUTH-004 public route/operation authority
+Control: `CC-MAPPING-0-AUTH-004-OPENAPI-DISCOVERY-SHELL-CONFLICT-2026-09-26`
+
+Decision:
+- The feature-specific AUTH-004 API contract is the authoritative target source for the canonical public route and operation decomposition.
+- Canonical AUTH-004 operations:
+  - `authPasswordChange` — `POST /auth/password/change`
+  - `authPasswordResetRequest` — `POST /auth/password/reset/request`
+  - `authPasswordResetConfirm` — `POST /auth/password/reset/confirm`
+- Existing `postAccountPasswordChange` (`POST /account/password/change`) and `postAccountRecovery` (`POST /account/recovery`) are retained as historical/discovery aliases only because their OpenAPI entries are explicitly `DISCOVERY_DRAFT` and sourced from the API inventory discovery surface.
+- The discovery aliases MUST NOT be promoted as canonical AUTH-004 operationIds, DTO bindings, or Mapping-0 edges.
+- No OpenAPI route is added, removed, or renamed by this decision. It establishes authority for the next controlled OpenAPI reconciliation step.
+
+Reconciliation state:
+- Route/operation authority conflict: `PASS_VERIFIED_AUTHORITY_ONLY`.
+- Exact AUTH-004 wire schema: still blocked.
+- Canonical OpenAPI promotion: pending explicit wire-schema admission.
+- DTO registry promotion: pending canonical OpenAPI admission.
+- Runtime/persistence/evidence: separately blocked.
+- Mapping 0: remains `NOT_GREEN`.

@@ -1,7 +1,7 @@
 # Change Control: AUTH-004 OpenAPI Discovery Shell Conflict — 2026-09-26
 
 - Change Control ID: `CC-MAPPING-0-AUTH-004-OPENAPI-DISCOVERY-SHELL-CONFLICT-2026-09-26`
-- Status: `OPEN_DECISION_REQUIRED / NO_AUTHORITY_CHANGED`
+- Status: `APPROVED_RECONCILIATION / AUTHORITY_ONLY`
 - Parent checkpoint: `e9257c3ce9a6cdaf497a49a32fdf526267fc2161`
 - Backup: `backup/main-before-auth004-openapi-discovery-conflict-20260926`
 
@@ -65,3 +65,12 @@ This control does not:
 `BLOCKED_DECISION_REQUIRED`
 
 The discovery shell is retained as decision material. No automatic normalization is authorized.
+
+
+## Decision outcome
+
+The feature-specific AUTH-004 API contract is the authoritative target source for canonical route and operation decomposition. The existing `postAccountPasswordChange` and `postAccountRecovery` entries remain historical/discovery aliases only; both remain `DISCOVERY_DRAFT` and are not promoted into the canonical AUTH-004 operation set.
+
+This decision does not modify the OpenAPI document. Exact request/response schemas remain a separate gate.
+
+Result: `PASS_VERIFIED_AUTHORITY_ONLY`.
