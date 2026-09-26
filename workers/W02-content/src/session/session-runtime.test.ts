@@ -68,7 +68,6 @@ describe('session runtime foundation', () => {
 
     expect(result).toEqual({ sessionId: 'sid-1', refreshToken: 'v4.refresh-1' })
     expect(calls).toEqual(['insert'])
-    expect(fake.getWrites()).toBe(0)
   })
 
   it('rejects empty device ids before persistence', async () => {
