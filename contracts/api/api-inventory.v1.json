@@ -48,7 +48,11 @@
         "POST /v1/auth/logout",
         "POST /v1/auth/refresh",
         "POST /v1/auth/register",
-        "POST /v1/auth/revoke"
+        "POST /v1/auth/revoke",
+        "GET /v1/auth/credentials",
+        "POST /v1/auth/credentials",
+        "PUT /v1/auth/credentials/{credentialId}",
+        "DELETE /v1/auth/credentials/{credentialId}"
       ]
     },
     "users_accounts": {
