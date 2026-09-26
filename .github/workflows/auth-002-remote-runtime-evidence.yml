@@ -87,41 +87,30 @@ jobs:
           test -n "${CLOUDFLARE_ACCOUNT_ID}"
           if [ -z "${DEPLOYMENT_RUN_ID}" ]; then
             gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/w01-w02-binding-deploy.yml/runs?branch=main&status=success&per_page=100" > /tmp/auth-002-deployment-runs.json
-            DEPLOYMENT_HEAD_SHA="${DEPLOYMENT_HEAD_SHA}" GITHUB_REPOSITORY="${GITHUB_REPOSITORY}" node --input-type=module > /tmp/auth-002-deployment-run-id <<'NODE'
-          import { execFileSync } from 'node:child_process'
-          import { readFileSync } from 'node:fs'
-          const data = JSON.parse(readFileSync('/tmp/auth-002-deployment-runs.json', 'utf8'))
-          const sha = process.env.DEPLOYMENT_HEAD_SHA
-          const repo = process.env.GITHUB_REPOSITORY
-          const expectedArtifact = `w01-w02-binding-deployment-${sha}`
-          const candidates = (data.workflow_runs ?? [])
-            .filter((run) =>
-              run?.name === 'W01 W02 Auth Binding Deploy' &&
-              run?.head_branch === 'main' &&
-              run?.conclusion === 'success'
+            selected_run_id=""
+            while IFS= read -r run_id; do
+              artifact_names="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" --jq '.artifacts[].name')"
+              if printf '%s\n' "${artifact_names}" | grep -Fqx "w01-w02-binding-deployment-${DEPLOYMENT_HEAD_SHA}"; then
+                selected_run_id="${run_id}"
+                break
+              fi
+            done < <(
+              jq -r '
+                .workflow_runs[]
+                | select(
+                    .name == "W01 W02 Auth Binding Deploy"
+                    and .head_branch == "main"
+                    and .conclusion == "success"
+                  )
+                | .id
+              ' /tmp/auth-002-deployment-runs.json
             )
-            .sort((a, b) => String(b?.created_at ?? '').localeCompare(String(a?.created_at ?? '')))
-          for (const run of candidates) {
-            const artifacts = JSON.parse(execFileSync('gh', [
-              'api',
-              `repos/${repo}/actions/runs/${run.id}/artifacts?per_page=100`,
-            ], { encoding: 'utf8' }))
-            const matchedArtifact = (artifacts.artifacts ?? []).find(
-              (artifact) => artifact?.name === expectedArtifact && artifact?.expired_at == null
-            )
-            if (matchedArtifact) {
-              process.stdout.write(String(run.id))
-              break
-            }
-          }
-          NODE
-            DEPLOYMENT_RUN_ID="$(cat /tmp/auth-002-deployment-run-id")
-            rm -f /tmp/auth-002-deployment-runs.json /tmp/auth-002-deployment-run-id
-            if [ -z "${DEPLOYMENT_RUN_ID}" ]; then
-              throw="runtime evidence admission: no successful W01 W02 Auth Binding Deploy run contains artifact w01-w02-binding-deployment-${DEPLOYMENT_HEAD_SHA}"
-              echo "${throw}" >&2
+            rm -f /tmp/auth-002-deployment-runs.json
+            if [ -z "${selected_run_id}" ]; then
+              echo "runtime evidence admission: no successful W01 W02 Auth Binding Deploy run contains artifact w01-w02-binding-deployment-${DEPLOYMENT_HEAD_SHA}" >&2
               exit 1
             fi
+            DEPLOYMENT_RUN_ID="${selected_run_id}"
             echo "DEPLOYMENT_RUN_ID=${DEPLOYMENT_RUN_ID}" >> "${GITHUB_ENV}"
             echo "Runtime evidence admission: auto-discovered W01 W02 Auth Binding Deploy run ${DEPLOYMENT_RUN_ID} by exact source artifact for SHA ${DEPLOYMENT_HEAD_SHA}"
           fi
