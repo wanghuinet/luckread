@@ -175,7 +175,7 @@ for (const featureId of featureIds) {
 }
 
 for (const [claimKey, records] of claims) {
-  if (!records.some((record) => executableTypes.has(record.type) && activeStatuses.has(record.status) && record.result === 'PASS' && record.commitSha === currentCommit)) {
+  if (!records.some((record) => executableTypes.has(record.type) && activeStatuses.has(record.status) && record.result === 'PASS' && record.commitSha === testedCommit)) {
     fail(`claim has no current executable PASS evidence: ${claimKey}`)
   }
 }
