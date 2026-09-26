@@ -3222,3 +3222,13 @@ Validate the encoded AUTH-003 wire/API/DTO/Mapping chain at current `main`. Pres
 - Decision state: `BLOCKED_ON_EXPLICIT_AUTHORITY_DECISION`.
 - Change Control: `CC-MAPPING-0-AUTH-005-DTO-ID-CONFLICT-2026-09-26`.
 - Machine artifact: `artifacts/mapping-0/auth-005-dto-id-conflict-2026-09-26.json`.
+
+
+## 2026-09-26 AUTH-004/005 DTO vocabulary authority reconciliation
+
+- Decision Control: `CC-MAPPING-0-AUTH-004-005-DTO-VOCABULARY-AUTHORITY-2026-09-26`.
+- Feature-specific API contracts are authoritative target sources for AUTH-004/005 public DTO vocabulary; persistence/reconciliation suffix variants are downstream stale aliases.
+- AUTH-004 and AUTH-005 identifier-source conflicts are now `PASS_VERIFIED_VOCABULARY_ONLY`.
+- No OpenAPI path, DTO registry record, request/response schema or runtime implementation was added.
+- Canonical DTO registry remains blocked by its existing OpenAPI-admission rule.
+- Mapping 0 remains `NOT_GREEN`.

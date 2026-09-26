@@ -1,7 +1,7 @@
 {
   "artifactId": "AUTH-004-DTO-ID-CONFLICT-2026-09-26",
   "version": "1.0",
-  "status": "BLOCKED_DECISION_REQUIRED",
+  "status": "PASS_VERIFIED_VOCABULARY_ONLY",
   "currentMain": "424062142a4bb9df6333c60be389bdd66fb24b5b",
   "backupBranch": "backup/main-before-auth004-dto-id-conflict-20260926",
   "featureId": "AUTH-004",
@@ -29,7 +29,23 @@
       ]
     }
   },
-  "authorityDecision": null,
+  "authorityDecision": {
+    "decisionId": "CC-MAPPING-0-AUTH-004-005-DTO-VOCABULARY-AUTHORITY-2026-09-26",
+    "result": "FEATURE_API_CONTRACT_IS_TARGET_VOCABULARY_SOURCE",
+    "canonicalIds": [
+      "DTO-AUTH-004-PASSWORD-CHANGE-REQUEST",
+      "DTO-AUTH-004-PASSWORD-CHANGE-RESPONSE",
+      "DTO-AUTH-004-PASSWORD-RESET-REQUEST",
+      "DTO-AUTH-004-PASSWORD-RESET-CONFIRM",
+      "DTO-AUTH-004-PASSWORD-RESET-RESPONSE"
+    ],
+    "staleAliases": [
+      "DTO-AUTH-004-PASSWORD-RESET-CONFIRM-REQUEST",
+      "DTO-AUTH-004-PASSWORD-RESET-CONFIRM-RESPONSE"
+    ],
+    "doesNotPromoteOpenApiOrDtoRegistry": true,
+    "runtimeAdmission": false
+  },
   "prohibitedAutoResolution": true,
   "runtimeAdmission": false,
   "openApiPromotion": false,

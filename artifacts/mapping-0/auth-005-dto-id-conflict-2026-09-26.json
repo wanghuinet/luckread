@@ -1,7 +1,7 @@
 {
   "artifactId": "AUTH-005-DTO-ID-CONFLICT-2026-09-26",
   "version": "1.0",
-  "status": "BLOCKED_DECISION_REQUIRED",
+  "status": "PASS_VERIFIED_VOCABULARY_ONLY",
   "currentMain": "584e585b09465aa6f14099adc9b5018b72a7eff8",
   "backupBranch": "backup/main-before-auth005-dto-id-conflict-20260926",
   "featureId": "AUTH-005",
@@ -39,7 +39,24 @@
       ]
     }
   },
-  "authorityDecision": null,
+  "authorityDecision": {
+    "decisionId": "CC-MAPPING-0-AUTH-004-005-DTO-VOCABULARY-AUTHORITY-2026-09-26",
+    "result": "FEATURE_API_CONTRACT_IS_TARGET_VOCABULARY_SOURCE",
+    "canonicalIds": [
+      "DTO-AUTH-005-VERIFICATION-REQUEST",
+      "DTO-AUTH-005-VERIFICATION-CONFIRM",
+      "DTO-AUTH-005-VERIFICATION-RESPONSE",
+      "DTO-AUTH-005-VERIFICATION-REVOKE"
+    ],
+    "staleAliases": [
+      "DTO-AUTH-005-VERIFICATION-CONFIRM-REQUEST",
+      "DTO-AUTH-005-VERIFICATION-CONFIRM-RESPONSE",
+      "DTO-AUTH-005-VERIFICATION-REVOKE-REQUEST",
+      "DTO-AUTH-005-VERIFICATION-REVOKE-RESPONSE"
+    ],
+    "doesNotPromoteOpenApiOrDtoRegistry": true,
+    "runtimeAdmission": false
+  },
   "prohibitedAutoResolution": true,
   "openApiPromotion": false,
   "dtoPromotion": false,

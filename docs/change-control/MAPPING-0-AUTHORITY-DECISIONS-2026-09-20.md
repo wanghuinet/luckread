@@ -216,3 +216,22 @@ Reconciliation state:
 - `PASS_VERIFIED` for RoleAssignment authority.
 - E6-LAYER-001 may advance from authority-input blockage to deterministic resolver specification.
 - Runtime implementation remains separately gated by the existing E6 implementation-admission control.
+
+
+### 13. AUTH-004 / AUTH-005 DTO vocabulary source authority
+Control: `CC-MAPPING-0-AUTH-004-005-DTO-VOCABULARY-AUTHORITY-2026-09-26`
+
+Decision:
+- The feature-specific API contracts are the authoritative **target vocabulary source** for AUTH-004 and AUTH-005 public DTO identifiers.
+- Shared persistence/API mappings and historical reconciliation artifacts are downstream mapping inputs; they MUST NOT define or rename the public DTO vocabulary.
+- AUTH-004 target vocabulary is exactly the identifiers declared by `contracts/api/AUTH-004-password-recovery-contract.v1.json`: `DTO-AUTH-004-PASSWORD-CHANGE-REQUEST`, `DTO-AUTH-004-PASSWORD-CHANGE-RESPONSE`, `DTO-AUTH-004-PASSWORD-RESET-REQUEST`, `DTO-AUTH-004-PASSWORD-RESET-CONFIRM`, `DTO-AUTH-004-PASSWORD-RESET-RESPONSE`.
+- AUTH-005 target vocabulary is exactly the identifiers declared by `contracts/api/AUTH-005-identity-verification-contract.v1.json`: `DTO-AUTH-005-VERIFICATION-REQUEST`, `DTO-AUTH-005-VERIFICATION-CONFIRM`, `DTO-AUTH-005-VERIFICATION-RESPONSE`, `DTO-AUTH-005-VERIFICATION-REVOKE`.
+- Competing `*-REQUEST` / `*-RESPONSE` suffix variants found in persistence/reconciliation artifacts are stale downstream aliases requiring reconciliation; they are not promoted as additional canonical public DTO identifiers.
+- This decision resolves identifier source authority only. It does not invent schemas, add OpenAPI paths, promote DTO registry records, authorize runtime implementation, or establish runtime/persistence evidence.
+- The canonical DTO registry remains governed by its existing rule: only operations present in the verified OpenAPI contract may be bound.
+
+Reconciliation state:
+- AUTH-004 DTO identifier source conflict: `PASS_VERIFIED_VOCABULARY_ONLY`.
+- AUTH-005 DTO identifier source conflict: `PASS_VERIFIED_VOCABULARY_ONLY`.
+- OpenAPI/DTO Registry promotion: still blocked until exact wire schemas and canonical OpenAPI admission exist.
+- Mapping 0 remains `NOT_GREEN`.

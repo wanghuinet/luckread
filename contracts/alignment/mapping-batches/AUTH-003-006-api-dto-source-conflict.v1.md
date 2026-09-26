@@ -2,77 +2,62 @@
 
 ## Status
 
-`BLOCKED_NOT_GREEN`
+`PARTIALLY_RECONCILED_NOT_GREEN`
 
-## Finding
+## Authority chain
 
-The current mapping layer contains operation IDs and DTO IDs for AUTH-003 through AUTH-006, but the canonical DTO contract explicitly states that its bindings are authoritative only for operations actually present in the current OpenAPI contract. AUTH-003/004/005 are currently recorded as unresolved in that DTO contract.
+`Blueprint -> feature API contract -> canonical OpenAPI -> DTO registry -> Entity/Field authority -> Mapping`
 
-At the same time, feature-specific API contracts and contractual mapping deltas define additional operations for AUTH-003 through AUTH-006.
+The feature API contract is authoritative for operation and DTO target vocabulary. Persistence mappings and historical reconciliation artifacts are downstream mapping inputs and may contain stale aliases, but they do not define public API vocabulary.
 
-Therefore the existing persistence mapping MUST NOT promote those operation/DTO references to canonical Mapping-0 bindings until the API authority chain is reconciled.
+## AUTH-003
 
-## Concrete conflict
+AUTH-003 operation and wire-schema authority was resolved separately:
+- canonical operations: `authCredentialList`, `authCredentialAdd`, `authCredentialReplace`, `authCredentialRemove`;
+- wire projection is closed at source-contract level;
+- runtime/persistence/evidence remain downstream blockers.
 
-### AUTH-003
+## AUTH-004
 
-Persistence mapping currently references legacy-style operation IDs such as:
+Feature API contract target DTO vocabulary:
+- `DTO-AUTH-004-PASSWORD-CHANGE-REQUEST`
+- `DTO-AUTH-004-PASSWORD-CHANGE-RESPONSE`
+- `DTO-AUTH-004-PASSWORD-RESET-REQUEST`
+- `DTO-AUTH-004-PASSWORD-RESET-CONFIRM`
+- `DTO-AUTH-004-PASSWORD-RESET-RESPONSE`
 
-- `authUsernameCreate`
-- `authUsernameChange`
-- `authEmailAdd`
-- `authEmailChange`
-- `authPhoneAdd`
-- `authPhoneChange`
+Stale downstream aliases:
+- `DTO-AUTH-004-PASSWORD-RESET-CONFIRM-REQUEST`
+- `DTO-AUTH-004-PASSWORD-RESET-CONFIRM-RESPONSE`
 
-The feature-specific contractual mapping delta instead defines the canonical credential-management operations:
+Identifier source authority is resolved; exact reset-confirm wire schema remains separately blocked.
 
-- `authCredentialList`
-- `authCredentialAdd`
-- `authCredentialReplace`
-- `authCredentialRemove`
+## AUTH-005
 
-The DTO contract currently has no canonical AUTH-003 operation binding.
+Feature API contract target DTO vocabulary:
+- `DTO-AUTH-005-VERIFICATION-REQUEST`
+- `DTO-AUTH-005-VERIFICATION-CONFIRM`
+- `DTO-AUTH-005-VERIFICATION-RESPONSE`
+- `DTO-AUTH-005-VERIFICATION-REVOKE`
 
-### AUTH-004
+Stale downstream aliases:
+- `DTO-AUTH-005-VERIFICATION-CONFIRM-REQUEST`
+- `DTO-AUTH-005-VERIFICATION-CONFIRM-RESPONSE`
+- `DTO-AUTH-005-VERIFICATION-REVOKE-REQUEST`
+- `DTO-AUTH-005-VERIFICATION-REVOKE-RESPONSE`
 
-The feature-specific API contract defines:
+Identifier source authority is resolved; exact request/response wire schemas remain separately blocked.
 
-- `authPasswordChange`
-- `authPasswordResetRequest`
-- `authPasswordResetConfirm`
+## AUTH-006
 
-The DTO layer must bind these through the authoritative API/OpenAPI chain before promotion.
+AUTH-006 vocabulary was previously resolved by explicit authority decision and is not reopened.
 
-### AUTH-005
+## Canonical DTO registry rule
 
-The mapping layer references verification operations and DTO IDs, but canonical DTO binding must first be reconciled against the authoritative API/OpenAPI source.
+`contracts/dto/auth-dto-contract.v1.json` remains sourced from canonical OpenAPI. No AUTH-004/005 DTO registry record is added until the corresponding operation exists in OpenAPI with an authoritative schema reference.
 
-### AUTH-006
+This reconciliation does not add OpenAPI routes, invent fields, promote persistence aliases, authorize runtime implementation, or create Evidence Registry claims.
 
-The mapping layer references passkey operations and DTO IDs, but canonical DTO binding must first be reconciled against the authoritative API/OpenAPI source.
+## Closure state
 
-## Required resolution
-
-One and only one authority chain must be selected and made internally consistent:
-
-`Blueprint -> API contract/OpenAPI -> DTO registry -> Entity/Field authority -> Mapping`
-
-If a feature-specific API contract is authoritative, its operations must be represented in the canonical API/OpenAPI source and then bound in the DTO contract. If OpenAPI remains authoritative, feature-specific operation IDs that are absent from OpenAPI must remain non-canonical and must not be mapped as verified.
-
-## Prohibited shortcut
-
-Do NOT rename Mapping rows merely to make them match another contract. Do NOT copy DTO IDs into the DTO registry without corresponding canonical operation/schema evidence. Do NOT mark AUTH-003–AUTH-006 GREEN based on contractual deltas alone.
-
-## Closure criteria
-
-- AUTH-003 canonical operations resolved;
-- AUTH-004 canonical operations resolved;
-- AUTH-005 canonical operations resolved;
-- AUTH-006 canonical operations resolved;
-- canonical DTO records exist for all promoted operations;
-- mapping rows use the canonical operation/DTO IDs;
-- Mapping-0 detects no stale operation or DTO references;
-- runtime and persistence evidence remain separate downstream gates.
-
-Until all criteria pass, status remains `BLOCKED_NOT_GREEN`.
+AUTH-004/005 identifier-source conflicts are `PASS_VERIFIED_VOCABULARY_ONLY`; OpenAPI/wire-schema/DTO promotion and Mapping 0 GREEN remain blocked.
