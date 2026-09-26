@@ -1,7 +1,7 @@
 # CC-MAPPING-0-AUTH-004-AUTH-014-RECOVERY-BOUNDARY-CONFLICT-2026-09-26
 
 - Scope: AUTH-004 / AUTH-014 recovery boundary
-- Status: DECISION_REQUIRED
+- Status: PASS_VERIFIED_SCOPE_BOUNDARY_ONLY
 - Implementation authorization: false
 - OpenAPI promotion: false
 - DTO registry promotion: false
@@ -60,19 +60,22 @@ Do not:
 
 A boundary decision must explicitly establish one of the following, with evidence and provenance:
 
-### Option A — AUTH-014 is decomposed into AUTH-004
+### Decision — AUTH-004 and AUTH-014 remain distinct feature scopes
 
-Record that the account-recovery inventory route is a historical/discovery representation of the AUTH-004 recovery surface, define the exact admitted equivalence/boundary, and preserve the existing AUTH-004 operation vocabulary as canonical.
+The authoritative Blueprint and Feature Inventory identify:
 
-### Option B — AUTH-014 is a distinct capability
+- AUTH-004 = password reset/change;
+- AUTH-014 = account recovery.
 
-Freeze the distinct purpose of AUTH-014, its canonical operation set, DTO vocabulary, authorization/state semantics, and its non-overlap boundary with AUTH-004.
+The current B01 reconciliation likewise models AUTH-014 as a separate Recovery capability. Existing AUTH-004 route authority separately establishes that `postAccountRecovery` is not a canonical AUTH-004 operation and remains a discovery/historical alias.
 
-### Option C — Historical/discovery route only
+Decision:
 
-Record that `postAccountRecovery` remains a discovery/inventory artifact with no canonical feature binding until a later explicit contract decision.
-
-No option is selected by this control.
+- AUTH-014 remains a distinct feature scope from AUTH-004.
+- No equivalence or decomposition from AUTH-014 into the three AUTH-004 operations is admitted.
+- `postAccountRecovery` / `POST /v1/account/recovery` remains an unbound inventory/discovery route for AUTH-014.
+- AUTH-014 still has no canonical operationId, DTO schema, OpenAPI admission, or runtime authorization from this decision.
+- The non-overlap boundary is now frozen at the feature-scope level only; operation/API closure for AUTH-014 remains a separate future authority task.
 
 ## 5. Interaction with existing AUTH-004 decisions
 
@@ -84,7 +87,7 @@ This control does not alter the already-resolved AUTH-004 route/operation author
 
 It also does not close the existing AUTH-004 Wire Schema decision gate or Operation Policy authority gap.
 
-Until the boundary is decided, AUTH-004 and AUTH-014 must remain separate decision subjects for Mapping-0 purposes.
+The feature-scope boundary is now decided. AUTH-004 and AUTH-014 remain separate Mapping-0 decision subjects. This decision does not close AUTH-004 Wire Schema or Operation Policy, and does not authorize any AUTH-014 API/DTO promotion.
 
 ## 6. Current authoritative inputs
 
@@ -100,13 +103,21 @@ Until the boundary is decided, AUTH-004 and AUTH-014 must remain separate decisi
 
 ## 7. Provenance
 
-- Current main reviewed: `b25f9c2499e431470b6d3823dec94acf2c45685e`
-- Backup branch: `backup/main-before-auth004-auth014-recovery-boundary-20260926`
+- Source decision inputs reviewed at current main: `742fdb68866599c54b9ba52ba45c291f7a8558d9`
+- Backup branch: `backup/main-before-auth004-auth014-boundary-decision-20260926`
+- Supporting authority: `docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md`, `contracts/alignment/feature-inventory.v1.json`, `contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json`.
 - Existing AUTH-004 route authority decision remains unchanged.
-- No OpenAPI, DTO, runtime, persistence, or evidence promotion is performed by this record.
+- No OpenAPI, DTO, runtime, persistence, or evidence promotion is performed by this decision.
 
 ## 8. Result
 
-`AUTH-004 / AUTH-014 RECOVERY BOUNDARY = DECISION_REQUIRED`
+`AUTH-004 / AUTH-014 FEATURE-SCOPE BOUNDARY = PASS_VERIFIED_SCOPE_BOUNDARY_ONLY`
 
-This control is decision material only. It intentionally preserves the conflict instead of auto-merging, renaming, or promoting either recovery surface.
+The repository now has an explicit feature-scope boundary between AUTH-004 and AUTH-014. This removes the ambiguity without inventing an AUTH-014 operation contract.
+
+Remaining independent blockers:
+- AUTH-004 Wire Schema = `DECISION_REQUIRED`
+- AUTH-004 Operation Policy = `DECISION_REQUIRED`
+- AUTH-014 canonical API/DTO/persistence/runtime/evidence closure remains open.
+
+No runtime or public-schema promotion is authorized by this record.
