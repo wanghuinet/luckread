@@ -54,9 +54,9 @@ function collectAlternateOperationSources(directory) {
         return;
       }
       if (typeof value.operationId === 'string') {
-        const list = sources.get(value.operationId) ?? [];
-        list.push(path.relative(root, source));
-        sources.set(value.operationId, list);
+        const list = new Set(sources.get(value.operationId) ?? []);
+        list.add(path.relative(root, source));
+        sources.set(value.operationId, [...list].sort());
       }
       for (const nested of Object.values(value)) visit(nested);
     };
@@ -379,8 +379,11 @@ const report = {
   failures,
   findings,
   matches,
+  alternatePolicySources: [...alternateOperationSources.entries()]
+    .map(([operationId, sources]) => ({ operationId, sources }))
+    .sort((a, b) => a.operationId.localeCompare(b.operationId)),
   evidenceSemantics: { pass: ['PASS','N/A'], incomplete: ['MISSING','ABSENT'], invalid: ['unknown_or_unsupported'] },
-  rule: 'PASS requires zero structural conflicts, zero unresolved required inventory/OpenAPI/policy membership, zero missing required detailed policy coverage, zero alternate-policy normalization gaps, and zero incomplete/invalid evidence. Explicit DISCOVERY_DRAFT and MISSING operation-policy statuses remain pending and do not silently become contract evidence. N/A is valid only when explicitly declared by the operation contract.',
+  rule: 'PASS requires zero structural conflicts, zero unresolved required inventory/OpenAPI/policy membership, zero missing required detailed policy coverage, zero alternate-policy normalization gaps, and zero incomplete/invalid evidence. alternatePolicySources is informational authority-trace evidence only; it does not promote an operation to Green. Explicit DISCOVERY_DRAFT and MISSING operation-policy statuses remain pending and do not silently become contract evidence. N/A is valid only when explicitly declared by the operation contract.',
 };
 const evidenceDir = path.join(root, 'artifacts', 'api-inventory');
 fs.mkdirSync(evidenceDir, { recursive: true });
