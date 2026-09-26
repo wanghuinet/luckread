@@ -10,6 +10,7 @@ function encodeJson(value: unknown): string {
   return bytesToBase64Url(textEncoder.encode(JSON.stringify(value)))
 }
 
+// Payload's native auth() must succeed before this non-verifying claim read is used.
 export function readVerifiedPayloadTokenVersion(request: Request): number | null {
   const header = request.headers.get('authorization')
   if (!header?.startsWith('Bearer ')) return null
