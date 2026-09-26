@@ -1,6 +1,6 @@
 # AUTH-003–AUTH-006 Next Closure Queue v1
 
-Status: `EXECUTION_QUEUE_FROZEN / NOT_GREEN`
+Status: `EXECUTION_QUEUE_FROZEN / AUTH-003 WIRE CLOSED; DOWNSTREAM EVIDENCE PENDING`
 
 ## Purpose
 
@@ -101,7 +101,7 @@ The work may be prepared in parallel, but promotion remains per-feature and fail
 
 ## Current batch disposition
 
-`AUTH-003: BLOCKED_ON_EXPLICIT_WIRE_PROJECTION`
+`AUTH-003: WIRE_SCHEMA_CLOSED / RUNTIME_PERSISTENCE_BLOCKED`
 
 `AUTH-004: BLOCKED_ON_EXPLICIT_WIRE_CONTRACT`
 
@@ -114,3 +114,7 @@ The work may be prepared in parallel, but promotion remains per-feature and fail
 ## Next concrete action
 
 Resolve the smallest authoritative decision set for AUTH-003 first. Do not modify canonical OpenAPI until the exact public wire projection and status/error semantics are explicitly contracted.
+
+## 2026-09-26 AUTH-003 wire closure
+
+The explicit public wire-schema authority has been accepted and encoded in the canonical API contract, OpenAPI, API Inventory source and DTO registry. The remaining AUTH-003 blockers are D1 persistence, runtime implementation, normalization/uniqueness execution evidence, security-E2E evidence, durable Evidence Registry binding and final Mapping-0 reconciliation.
