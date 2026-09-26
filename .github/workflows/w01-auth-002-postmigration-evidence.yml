@@ -106,17 +106,37 @@ jobs:
           const migrationRows = rows(migration);
           const catalogRows = rows(catalog);
           const userRows = rows(users);
+          const targetMigration = '20260925_111503_MIG_ENT_USER_PROFILE_V1';
+          const targetColumns = ['username', 'display_name', 'bio', 'avatar', 'locale', 'timezone'];
 
           if (!migrationRows.some(r => r?.name === '20250929_111647')) {
             errors.push('migration-status: approved baseline migration 20250929_111647 not found');
           }
+          if (!migrationRows.some(r => r?.name === targetMigration)) {
+            errors.push(`migration-status: target migration ${targetMigration} not found`);
+          }
           if (!catalogRows.some(r => r?.type === 'table' && r?.name === 'users')) {
             errors.push('catalog: users table not found');
+          }
+          if (!catalogRows.some(r => r?.type === 'index' && r?.name === 'users_username_idx')) {
+            errors.push('catalog: users_username_idx not found');
           }
           if (userRows.length === 0) {
             errors.push('users-schema: PRAGMA table_info("users") returned no columns');
           }
+          for (const column of targetColumns) {
+            if (!userRows.some(r => r?.name === column)) {
+              errors.push(`users-schema: target column ${column} not found`);
+            }
+          }
 
+          console.log(JSON.stringify({
+            targetMigration,
+            targetColumns,
+            targetMigrationPresent: migrationRows.some(r => r?.name === targetMigration),
+            usernameIndexPresent: catalogRows.some(r => r?.type === 'index' && r?.name === 'users_username_idx'),
+            presentTargetColumns: targetColumns.filter(column => userRows.some(r => r?.name === column))
+          }, null, 2));
           console.log('AUTH-002_POST_MIGRATION_EVIDENCE_VALIDATION=' + (errors.length ? 'FAIL' : 'PASS'));
           if (errors.length) {
             for (const e of errors) console.error('AUTH-002_EVIDENCE_ERROR=' + e);
