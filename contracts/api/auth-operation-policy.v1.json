@@ -487,13 +487,15 @@
       "path": "/auth/credentials",
       "visibility": "public_authenticated",
       "capability": "credential_management",
-      "contractStatus": "MISSING",
+      "contractStatus": "CONTRACTED_PARTIAL",
       "auth": {
         "mode": "authenticated",
         "subject": "current_user"
       },
       "authorization": {
-        "status": "MISSING"
+        "required": true,
+        "permission": "user.credential.read",
+        "scope": "self"
       },
       "resource": {
         "status": "MISSING"
@@ -516,11 +518,26 @@
       "idempotency": {
         "required": false
       },
-      "security": {
-        "status": "MISSING"
-      },
+      "security": [
+        "credential_values_never_appear_in_logs",
+        "credential_values_never_appear_in_public_api_projections",
+        "normalized_values_never_appear_in_public_api_projections",
+        "credential_hashes_never_appear_in_public_api_projections",
+        "cross_account_credential_management_is_denied",
+        "error_semantics_do_not_confirm_protected_account_existence",
+        "authorization_is_evaluated_before_mutation",
+        "uniqueness_is_enforced_under_concurrency"
+      ],
       "evidence": {
-        "status": "MISSING"
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "MISSING",
+        "cache": "MISSING",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
       }
     },
     {
@@ -529,13 +546,15 @@
       "path": "/auth/credentials",
       "visibility": "public_authenticated",
       "capability": "credential_management",
-      "contractStatus": "MISSING",
+      "contractStatus": "CONTRACTED_PARTIAL",
       "auth": {
         "mode": "authenticated",
         "subject": "current_user"
       },
       "authorization": {
-        "status": "MISSING"
+        "required": true,
+        "permission": "user.credential.manage",
+        "scope": "self"
       },
       "resource": {
         "status": "MISSING"
@@ -556,13 +575,30 @@
         "status": "MISSING"
       },
       "idempotency": {
-        "required": true
+        "required": true,
+        "key": "Idempotency-Key",
+        "semantic": "same-request-replay-must-not-create-second-credential"
       },
-      "security": {
-        "status": "MISSING"
-      },
+      "security": [
+        "credential_values_never_appear_in_logs",
+        "credential_values_never_appear_in_public_api_projections",
+        "normalized_values_never_appear_in_public_api_projections",
+        "credential_hashes_never_appear_in_public_api_projections",
+        "cross_account_credential_management_is_denied",
+        "error_semantics_do_not_confirm_protected_account_existence",
+        "authorization_is_evaluated_before_mutation",
+        "uniqueness_is_enforced_under_concurrency"
+      ],
       "evidence": {
-        "status": "MISSING"
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "MISSING",
+        "cache": "MISSING",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
       }
     },
     {
@@ -571,13 +607,15 @@
       "path": "/auth/credentials/{credentialId}",
       "visibility": "public_authenticated",
       "capability": "credential_management",
-      "contractStatus": "MISSING",
+      "contractStatus": "CONTRACTED_PARTIAL",
       "auth": {
         "mode": "authenticated",
         "subject": "current_user"
       },
       "authorization": {
-        "status": "MISSING"
+        "required": true,
+        "permission": "user.credential.manage",
+        "scope": "self"
       },
       "resource": {
         "status": "MISSING"
@@ -598,13 +636,30 @@
         "status": "MISSING"
       },
       "idempotency": {
-        "required": true
+        "required": true,
+        "key": "Idempotency-Key",
+        "semantic": "same-request-replay-must-not-create-second-authoritative-replacement"
       },
-      "security": {
-        "status": "MISSING"
-      },
+      "security": [
+        "credential_values_never_appear_in_logs",
+        "credential_values_never_appear_in_public_api_projections",
+        "normalized_values_never_appear_in_public_api_projections",
+        "credential_hashes_never_appear_in_public_api_projections",
+        "cross_account_credential_management_is_denied",
+        "error_semantics_do_not_confirm_protected_account_existence",
+        "authorization_is_evaluated_before_mutation",
+        "uniqueness_is_enforced_under_concurrency"
+      ],
       "evidence": {
-        "status": "MISSING"
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "MISSING",
+        "cache": "MISSING",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
       }
     },
     {
@@ -613,13 +668,15 @@
       "path": "/auth/credentials/{credentialId}",
       "visibility": "public_authenticated",
       "capability": "credential_management",
-      "contractStatus": "MISSING",
+      "contractStatus": "CONTRACTED_PARTIAL",
       "auth": {
         "mode": "authenticated",
         "subject": "current_user"
       },
       "authorization": {
-        "status": "MISSING"
+        "required": true,
+        "permission": "user.credential.manage",
+        "scope": "self"
       },
       "resource": {
         "status": "MISSING"
@@ -640,13 +697,30 @@
         "status": "MISSING"
       },
       "idempotency": {
-        "required": true
+        "required": true,
+        "key": "Idempotency-Key",
+        "semantic": "same-request-replay-must-not-repeat-credential-removal"
       },
-      "security": {
-        "status": "MISSING"
-      },
+      "security": [
+        "credential_values_never_appear_in_logs",
+        "credential_values_never_appear_in_public_api_projections",
+        "normalized_values_never_appear_in_public_api_projections",
+        "credential_hashes_never_appear_in_public_api_projections",
+        "cross_account_credential_management_is_denied",
+        "error_semantics_do_not_confirm_protected_account_existence",
+        "authorization_is_evaluated_before_mutation",
+        "uniqueness_is_enforced_under_concurrency"
+      ],
       "evidence": {
-        "status": "MISSING"
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "MISSING",
+        "cache": "MISSING",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
       }
     }
   ]
