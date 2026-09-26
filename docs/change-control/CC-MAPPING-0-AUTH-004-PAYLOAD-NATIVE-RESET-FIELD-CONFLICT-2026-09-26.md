@@ -397,4 +397,42 @@ W02 MUST enforce the canonical AUTH-004 password policy independently of Payload
 Any future Payload version upgrade that changes the local credential algorithm requires a separate Change Control reconciliation before changing this representation.
 
 This decision does not change the logical Worker ownership: W02/D1-01 remains the authoritative credential writer, and W01 remains the API/Payload edge.
+## 17. Implementation boundary decisions after runtime-surface review — 2026-09-26
+
+The repository has enough existing transport infrastructure to preserve the canonical boundary without adding a new cross-worker mechanism:
+
+- W01 already has the governed W02_AUTH service binding to luckread-w02.
+- W01 already uses this binding through the existing w02-session-client pattern for session/auth operations.
+- Therefore future AUTH-004 public routes SHALL use the existing W01 → W02 HTTP Service Binding pattern; no new Worker-to-Worker transport is admitted.
+
+Two platform primitives are not currently evidenced as implemented for AUTH-004 and MUST NOT be invented ad hoc:
+
+1. Password-change idempotency persistence.
+   - Common contract requires same Idempotency-Key + same canonical payload to return the first result and different payload reuse to fail with IDEMPOTENCY_KEY_REUSE_CONFLICT.
+   - No existing repository runtime implementation of this dedupe primitive was found.
+   - Decision: do not create an AUTH-004-specific idempotency table or alternate dedupe system inside this feature as an architectural workaround.
+   - authPasswordChange runtime implementation remains blocked until the applicable common idempotency mechanism is evidence-bound and compatible with the existing D1-01 write budget.
+
+2. Password-recovery delivery queue/consumer.
+   - authPasswordResetRequest contract requires asynchronous recovery delivery.
+   - Current W02 wrangler configuration exposes AUTH013_QUEUE for account-state publication; no admitted password-recovery delivery queue/consumer was found.
+   - Decision: do not repurpose the AUTH013 account-state queue for password recovery and do not create a new queue/consumer solely inside AUTH-004 without a separate admitted infrastructure decision.
+   - authPasswordResetRequest end-to-end runtime implementation therefore remains blocked at the delivery boundary even though the recovery persistence contract is decided.
+
+The approved AUTH-004 physical recovery persistence boundary is nevertheless fixed for implementation design:
+
+- physical table: auth_password_recovery
+- recovery_id: TEXT PRIMARY KEY
+- identity_id: TEXT NOT NULL
+- purpose: TEXT NOT NULL, canonical value password_reset
+- token_hash: TEXT NOT NULL, UNIQUE
+- issued_at: TEXT NOT NULL
+- expires_at: TEXT NOT NULL
+- consumed_at: TEXT NULL
+- invalidated_at: TEXT NULL
+- required indexes: identity_id, purpose, token_hash, issued_at, expires_at, consumed_at, invalidated_at
+
+This physical design is an explicit Change Control decision, not inferred runtime evidence. Real D1 schema evidence and migration execution remain separate promotion gates.
+
+authPasswordResetConfirm may proceed only after the above recovery table migration and the credential/session write transaction are admitted and its D1 resource-budget semantics are verified. No GREEN claim is made from this design decision.
 
