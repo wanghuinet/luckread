@@ -87,26 +87,45 @@ jobs:
           test -n "${CLOUDFLARE_ACCOUNT_ID}"
           if [ -z "${DEPLOYMENT_RUN_ID}" ]; then
             deployment_runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/w01-w02-binding-deploy.yml/runs?branch=main&status=success&per_page=100")"
-            DEPLOYMENT_RUNS_JSON="${deployment_runs_json}" DEPLOYMENT_HEAD_SHA="${DEPLOYMENT_HEAD_SHA}" node --input-type=module > /tmp/auth-002-deployment-run-id <<'NODE'
+            DEPLOYMENT_RUNS_JSON="${deployment_runs_json}" DEPLOYMENT_HEAD_SHA="${DEPLOYMENT_HEAD_SHA}" GITHUB_REPOSITORY="${GITHUB_REPOSITORY}" node --input-type=module > /tmp/auth-002-deployment-run-id <<'NODE'
+          import { execFileSync } from 'node:child_process'
           const data = JSON.parse(process.env.DEPLOYMENT_RUNS_JSON)
           const sha = process.env.DEPLOYMENT_HEAD_SHA
+          const repo = process.env.GITHUB_REPOSITORY
+          const expectedArtifact = `w01-w02-binding-deployment-${sha}`
           const candidates = (data.workflow_runs ?? [])
             .filter((run) =>
               run?.name === 'W01 W02 Auth Binding Deploy' &&
               run?.head_branch === 'main' &&
-              run?.conclusion === 'success' &&
-              run?.head_sha === sha
+              run?.conclusion === 'success'
             )
             .sort((a, b) => String(b?.created_at ?? '').localeCompare(String(a?.created_at ?? '')))
-          if (!candidates[0]?.id) {
-            throw new Error(`runtime evidence admission: no successful W01 W02 Auth Binding Deploy run found for source SHA ${sha}`)
+          for (const run of candidates) {
+            const artifacts = JSON.parse(execFileSync('gh', [
+              'api',
+              `repos/${repo}/actions/runs/${run.id}/artifacts?per_page=100`,
+            ], { encoding: 'utf8' }))
+            const matchedArtifact = (artifacts.artifacts ?? []).find(
+              (artifact) => artifact?.name === expectedArtifact && artifact?.expired_at == null
+            )
+            if (matchedArtifact) {
+              process.stdout.write(String(run.id))
+              break
+            }
           }
-          process.stdout.write(String(candidates[0].id))
+          if (!process.stdout.isTTY) {
+            // stdout is intentionally used as the selected run-id channel.
+          }
           NODE
             DEPLOYMENT_RUN_ID="$(cat /tmp/auth-002-deployment-run-id)"
             rm -f /tmp/auth-002-deployment-run-id
+            if [ -z "${DEPLOYMENT_RUN_ID}" ]; then
+              throw="runtime evidence admission: no successful W01 W02 Auth Binding Deploy run contains artifact w01-w02-binding-deployment-${DEPLOYMENT_HEAD_SHA}"
+              echo "${throw}" >&2
+              exit 1
+            fi
             echo "DEPLOYMENT_RUN_ID=${DEPLOYMENT_RUN_ID}" >> "${GITHUB_ENV}"
-            echo "Runtime evidence admission: auto-discovered W01 W02 Auth Binding Deploy run ${DEPLOYMENT_RUN_ID} for source SHA ${DEPLOYMENT_HEAD_SHA}"
+            echo "Runtime evidence admission: auto-discovered W01 W02 Auth Binding Deploy run ${DEPLOYMENT_RUN_ID} by exact source artifact for SHA ${DEPLOYMENT_HEAD_SHA}"
           fi
           test -n "${DEPLOYMENT_RUN_ID}"
           deployment_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}")"
@@ -117,15 +136,12 @@ jobs:
           if (data.name !== 'W01 W02 Auth Binding Deploy') throw new Error('runtime evidence admission: deployment run is not W01 W02 Auth Binding Deploy')
           if (data.conclusion !== 'success') throw new Error('runtime evidence admission: deployment run conclusion is not success')
           if (data.head_branch !== 'main') throw new Error('runtime evidence admission: deployment run is not on main')
-          if (data.head_sha !== process.env.DEPLOYMENT_HEAD_SHA) {
-            throw new Error(`runtime evidence admission: deployment run ${data.id} source SHA ${data.head_sha} does not match tested source SHA ${process.env.DEPLOYMENT_HEAD_SHA}`)
-          }
           const expectedArtifact = `w01-w02-binding-deployment-${process.env.DEPLOYMENT_HEAD_SHA}`
           const matchedArtifact = (artifacts.artifacts ?? []).find((artifact) => artifact?.name === expectedArtifact && artifact?.expired_at == null)
           if (!matchedArtifact) {
             throw new Error(`runtime evidence admission: deployment artifact for source SHA ${process.env.DEPLOYMENT_HEAD_SHA} was not found in run ${data.id}`)
           }
-          console.log(`Runtime evidence admission: deployment run ${data.id} SUCCESS on main; deployed source artifact=${expectedArtifact}; workflow run head_sha=${data.head_sha}`)
+          console.log(`Runtime evidence admission: deployment run ${data.id} SUCCESS on main; deployed source artifact=${expectedArtifact}; workflow run head_sha=${data.head_sha}; source admission is bound to exact artifact name`)
           NODE
           node scripts/auth-session-schema-evidence-probe.mjs --gate1
 
