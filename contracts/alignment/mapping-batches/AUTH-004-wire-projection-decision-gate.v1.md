@@ -13,6 +13,7 @@ The following artifacts are authoritative inputs for this gate:
 - `contracts/entity/AUTH-004-password-recovery-field-contract.v1.json`
 - `contracts/alignment/mapping-batches/AUTH-004-real-evidence-reconciliation.v1.md`
 - `contracts/alignment/mapping-batches/AUTH-003-006-openapi-promotion-input.v1.md`
+- `docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md`
 
 The API contract currently establishes three operations and their authorization boundaries, but does not establish complete request/response field schemas. fileciteturn13file0
 
@@ -76,6 +77,20 @@ Freeze:
 The canonical API contract requires single-use, time-bounded, purpose-bound recovery tokens; raw tokens must not be persisted or logged; passwords must not be returned or logged; successful password change/reset revokes affected sessions; and account enumeration resistance is required. fileciteturn13file0 fileciteturn14file0
 
 These invariants are constraints on the eventual wire contract. They do not authorize inventing DTO fields.
+
+### 4.1 Lifecycle authority inherited from the Identity & Session Instance Registry
+
+The L5/L6 registry is an additional authoritative lifecycle input for AUTH-004. It explicitly establishes these execution-level claims:
+
+- current-credential verification is rate-limited;
+- password-reset requests create a durable operation/token boundary and must not reveal account existence;
+- password-reset requests are rate-limited;
+- reset tokens expire and are stored safely without logging the raw token;
+- expired or wrong-use reset tokens are rejected;
+- reset-token consumption is single-use and concurrent double-consumption is denied;
+- password replacement invalidates the old credential and must keep secret material out of telemetry.
+
+These claims freeze lifecycle/security behavior only. They do **not** authorize public field names, token wire representation, HTTP status codes, response bodies, error-code mappings, delivery metadata, or per-operation Idempotency-Key requirements. The latter remain explicit AUTH-004 wire/policy decisions.
 
 ## 5. Promotion gate
 
