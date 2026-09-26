@@ -31,9 +31,9 @@ The minimum admitted W01↔W02 runtime bridge is now present on `main`.
 
 - `workers/W01-payload/src/app/auth/logout/route.ts`
   - authenticates the current native Payload session;
-  - invokes the existing Payload REST logout operation to remove the native session;
-  - then records durable extension revocation in W02;
-  - returns 204 only after both stages succeed.
+  - authenticates the current native Payload session at the public edge;
+  - delegates both durable extension revocation and the corresponding native `users_sessions` deletion to W02;
+  - returns 204 after the W02 authoritative mutation succeeds; repeated logout remains a successful no-op.
 
 ### W02 authoritative session boundary
 
@@ -48,6 +48,7 @@ The minimum admitted W01↔W02 runtime bridge is now present on `main`.
   - `/internal/auth/session/establish`
   - `/internal/auth/session/refresh`
   - `/internal/auth/session/revoke`
+  - `/internal/auth/session/validate` (internal W01 session-authority validation for protected Payload API projection)
 
 These are Service Binding internal transports only; no new public Worker or D1 domain was introduced.
 
@@ -58,6 +59,7 @@ These are Service Binding internal transports only; no new public Worker or D1 d
 - No new Worker or D1 database was introduced.
 - Existing D1-01 RoleAssignment / role_version evidence remains inherited.
 - The generated Payload catch-all route was not modified.
+- W01 no longer performs direct D1 reads/writes for authoritative session state in logout or `/api/users/me`.
 - No cache is used as an authorization authority.
 
 ## Exact implementation commits
@@ -89,3 +91,8 @@ Required next evidence:
 5. Evidence Registry binding and AUTH-002 promotion-matrix reconciliation.
 
 Until those gates pass, E6 remains NOT_GREEN.
+
+
+## 2026-09-26 boundary correction
+
+The runtime bridge remains internal W01→W02 Service Binding transport only. The `/internal/auth/session/validate` operation is not a public API operationId and is not added to public OpenAPI. W02 remains the sole D1 authority for the native Payload session correlation plus `auth_session_state` authorization state. W01 retains only Payload-native authentication and the public API projection boundary.
