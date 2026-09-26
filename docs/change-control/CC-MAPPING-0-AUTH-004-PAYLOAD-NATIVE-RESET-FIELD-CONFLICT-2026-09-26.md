@@ -269,4 +269,20 @@ Change Control decision
 → Mapping 0 / downstream gates.
 
 A failing upstream gate does not authorize a later step.
+## 14. Current W02 canonical implementation status
+
+The current W02 repository state confirms ownership infrastructure but does not contain an AUTH-004 password-recovery implementation:
+
+- workers/W02-content/src/index.ts currently exposes internal session establish/refresh/revoke and authz layer routes; no canonical AUTH-004 password change/reset-request/reset-confirm route is present.
+- workers/W02-content/migrations currently contain role-assignment, AUTH-013 account-state/publication-journal, and role-authorization-version migrations; no MIG-AUTH-004-PASSWORD-RECOVERY-V1 implementation is present.
+- Repository search found the AUTH-004 persistence fields only in contract/change-control material, not as an existing W02 runtime implementation.
+
+This is a current code-state finding, not an authorization to begin implementation.
+
+It confirms the present boundary is:
+
+W01 = existing Payload local-auth surface with native recovery behavior that is currently uncontained.
+W02/D1-01 = canonical AUTH-004 ownership, but AUTH-004 runtime implementation is not yet present.
+
+Therefore the project is not currently in a state where a canonical AUTH-004 runtime path can be proven end-to-end. The next implementation gate must separately admit W01 native-recovery containment and W02 canonical recovery implementation.
 
