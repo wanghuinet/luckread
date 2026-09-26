@@ -89,7 +89,7 @@
         "POST /v1/content/{contentId}/shares",
         "POST /v1/content/{contentId}/unpublish",
         "POST /v1/contents",
-        "POST /v1/contents/{contentId}/revisions/{revisionId}",
+        "POST /v1/contents/{contentId}/revisions/{revisionId}/rollback",
         "POST /v1/contents/{contentId}/state",
         "POST /v1/galleries",
         "POST /v1/posts"
