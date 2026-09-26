@@ -479,7 +479,24 @@
       "status": "VERIFIED",
       "checkId": "AUTH-013-PERSISTENCE-SCHEMA-REMOTE",
       "workflowRef": ".github/workflows/auth-013-persistence-schema-evidence.yml"
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B22-GATE1-SCHEMA-REMOTE-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-002::D1-SCHEMA",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "GitHub Actions AUTH-002 Session Schema Evidence against controlled Cloudflare D1",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36217784262/artifacts/10898185990",
+      "commitSha": "5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55",
+      "timestamp": "2026-09-26T04:26:12.973Z",
+      "producer": "AUTH-002 Session Schema Evidence / run 36217784262 / job 108337108231",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36217784262",
+      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "note": "Controlled remote D1 Gate-1 evidence against database luckread. Read-only migration history and schema/catalog probes completed successfully; manifest binds evidence to GITHUB_SHA 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55. Remote payload_migrations is queryable and includes 20250929_111647, 20260921_003203_MIG_AUTH_002_SESSION_V1, and 20260925_111503_MIG_ENT_USER_PROFILE_V1. auth_session_state schema/indexes were captured successfully. This verifies the Gate-1 D1 schema evidence claim only; AUTH-002 overall remains NOT_GREEN."
     }
   ],
-  "testedCommitSha": "b66f6e57c852095983d571ad9d8e39fbfc2b8d70"
+  "testedCommitSha": "5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55"
 }
