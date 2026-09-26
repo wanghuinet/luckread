@@ -5,7 +5,15 @@ export const Users: CollectionConfig = {
   admin: {
     useAsTitle: 'email',
   },
-  auth: true,
+  auth: {
+    // Use Payload's native authentication/recovery pipeline. Keep recovery
+    // policy at the collection boundary instead of introducing a parallel
+    // W02 password-recovery subsystem.
+    forgotPassword: {
+      minRequestInterval: 15000,
+    },
+    removeTokenFromResponses: true,
+  },
   // AUTH-001 contract: account registration is anonymous/public. Keep the
   // public boundary limited to creation; read/update/delete remain protected
   // by Payload's default authenticated access control until explicit rules
