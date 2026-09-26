@@ -150,3 +150,26 @@ Therefore the canonical AUTH-004 implementation boundary is W02 / D1-01, not the
 The remaining W01 issue is an exposure/containment decision: Payload's built-in recovery endpoints and raw-token persistence exist inside the W01 Payload surface and must not be allowed to become the canonical AUTH-004 recovery path.
 
 No new Worker, D1 domain, or ownership edge is created by this clarification.
+
+## 11. Supported containment mechanism now confirmed at Payload v3.87.1 source level
+
+A supported collection-level boundary is now confirmed and narrows the decision material without selecting the final architecture track:
+
+1. `forgotPassword` calls Payload's `buildBeforeOperation` with operation `forgotPassword` before generating or persisting the native reset token.
+2. `resetPassword` calls the same `buildBeforeOperation` with operation `resetPassword` before querying or consuming the native raw-token fields.
+3. Payload's `OperationMap` and `operationToHookOperation` explicitly include both operations in the collection `beforeOperation` hook contract.
+4. The hook runner awaits each registered `beforeOperation` hook and propagates a thrown error; the native operation therefore cannot continue after a fail-closed hook rejection.
+5. The Payload documentation confirms collection-level `beforeOperation` hooks are supported extension points, while `endpoints: false` disables the entire collection endpoint surface rather than only password-recovery routes.
+
+Source anchors:
+
+- `packages/payload/src/auth/operations/forgotPassword.ts` at Payload v3.87.1
+- `packages/payload/src/auth/operations/resetPassword.ts` at Payload v3.87.1
+- `packages/payload/src/collections/operations/utilities/buildBeforeOperation.ts` at Payload v3.87.1
+- `packages/payload/src/collections/operations/utilities/types.ts` at Payload v3.87.1
+- Payload collection configuration / hooks documentation
+
+This establishes that the repository has a supported, fail-closed interception point for the native recovery operations without requiring `endpoints: false` or a Payload-core fork.
+
+This is **decision material only**. It does not yet authorize implementation, does not select Track A/B/C, and does not establish that the hook has been installed in W01. The remaining decision is whether the admitted integration boundary should explicitly install this fail-closed guard and how that boundary is reconciled with the canonical W02/D1-01 AUTH-004 flow and any retained legacy columns.
+
