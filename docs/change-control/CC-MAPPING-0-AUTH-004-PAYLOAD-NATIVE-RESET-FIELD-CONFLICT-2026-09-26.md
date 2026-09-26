@@ -197,4 +197,76 @@ Any future implementation admission must specify, at minimum:
 5. the runtime evidence proving neither canonical nor accidentally reachable native recovery paths persist raw reset tokens.
 
 Until those items are explicitly admitted, the Change Control remains BLOCKED_DECISION_REQUIRED.
+## 13. Minimum implementation and acceptance packet for a future admission
+
+This section is a decision/acceptance packet only. It does not authorize implementation.
+
+### 13.1 Minimum W01 containment surface
+
+If the decision admits a fail-closed native recovery boundary, the smallest repository surface to inspect/change is expected to be:
+
+- workers/W01-payload/src/collections/Users.ts
+- workers/W01-payload/src/payload.config.ts only if the chosen hook wiring requires shared construction/configuration
+- a focused W01 hook/helper module if keeping security policy out of the collection declaration is preferred
+- W01 tests covering native forgot/reset interception
+
+No Payload core file is required by the currently confirmed mechanism.
+
+### 13.2 Required native-operation behavior
+
+For both native operations:
+
+- forgotPassword
+- resetPassword
+
+the containment guard must fail closed before the Payload native operation can generate, persist, query, or consume resetPasswordToken.
+
+The guard must not forward the caller into the Payload native recovery implementation.
+
+The guard must not create or return the canonical AUTH-004 recovery token itself.
+
+The canonical recovery flow remains the W02/D1-01 AUTH-004 boundary.
+
+### 13.3 Required negative evidence
+
+Admission should require executable evidence for at least:
+
+1. native forgot-password request cannot persist reset_password_token;
+2. native reset-password request cannot consume a Payload native reset token;
+3. canonical AUTH-004 stores only tokenHash/derived recovery material;
+4. raw recovery token is absent from D1 persistence after reset-request;
+5. raw recovery token is absent from application logs/test artifacts;
+6. expired token is rejected;
+7. replayed token is rejected;
+8. wrong-purpose token is rejected;
+9. successful password reset invalidates the affected sessions;
+10. canonical W02 flow remains reachable through the admitted API boundary.
+
+### 13.4 Legacy-column decision requirement
+
+The existing users.reset_password_token and users.reset_password_expiration columns are a separate schema decision.
+
+The decision must explicitly classify them as one of:
+
+- retained legacy/inert columns with proof they are unreachable and remain unpopulated by the canonical runtime;
+- superseded columns with an admitted migration/removal sequence; or
+- another explicitly approved authority state.
+
+No implementation may infer this classification from mere absence of application references.
+
+### 13.5 Gate ordering
+
+After an explicit Change Control decision, the expected order remains:
+
+Change Control decision
+→ contract/reconciliation update if required
+→ W01 containment implementation
+→ W02/D1-01 AUTH-004 implementation
+→ migration
+→ isolated runtime/persistence tests
+→ exact-commit evidence
+→ Evidence Registry admission
+→ Mapping 0 / downstream gates.
+
+A failing upstream gate does not authorize a later step.
 
