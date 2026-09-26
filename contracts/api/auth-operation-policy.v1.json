@@ -483,58 +483,171 @@
     },
     {
       "operationId": "authCredentialList",
+      "method": "GET",
+      "path": "/auth/credentials",
+      "visibility": "public_authenticated",
+      "capability": "credential_management",
+      "contractStatus": "MISSING",
       "auth": {
         "mode": "authenticated",
         "subject": "current_user"
       },
-      "permissions": [
-        "user.credential.read"
-      ],
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/AUTH-003-credential-management-contract.v1.json",
-      "idempotencyRequired": false
+      "authorization": {
+        "status": "MISSING"
+      },
+      "resource": {
+        "status": "MISSING"
+      },
+      "cache": {
+        "status": "MISSING"
+      },
+      "retry": {
+        "status": "MISSING"
+      },
+      "event": {
+        "status": "MISSING"
+      },
+      "queue": {
+        "status": "MISSING"
+      },
+      "antiAbuse": {
+        "status": "MISSING"
+      },
+      "idempotency": {
+        "required": false
+      },
+      "security": {
+        "status": "MISSING"
+      },
+      "evidence": {
+        "status": "MISSING"
+      }
     },
     {
       "operationId": "authCredentialAdd",
+      "method": "POST",
+      "path": "/auth/credentials",
+      "visibility": "public_authenticated",
+      "capability": "credential_management",
+      "contractStatus": "MISSING",
       "auth": {
         "mode": "authenticated",
         "subject": "current_user"
       },
-      "permissions": [
-        "user.credential.manage"
-      ],
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/AUTH-003-credential-management-contract.v1.json",
-      "idempotencyRequired": true,
-      "idempotencyKey": "Idempotency-Key"
+      "authorization": {
+        "status": "MISSING"
+      },
+      "resource": {
+        "status": "MISSING"
+      },
+      "cache": {
+        "status": "MISSING"
+      },
+      "retry": {
+        "status": "MISSING"
+      },
+      "event": {
+        "status": "MISSING"
+      },
+      "queue": {
+        "status": "MISSING"
+      },
+      "antiAbuse": {
+        "status": "MISSING"
+      },
+      "idempotency": {
+        "required": true
+      },
+      "security": {
+        "status": "MISSING"
+      },
+      "evidence": {
+        "status": "MISSING"
+      }
     },
     {
       "operationId": "authCredentialReplace",
+      "method": "PUT",
+      "path": "/auth/credentials/{credentialId}",
+      "visibility": "public_authenticated",
+      "capability": "credential_management",
+      "contractStatus": "MISSING",
       "auth": {
         "mode": "authenticated",
         "subject": "current_user"
       },
-      "permissions": [
-        "user.credential.manage"
-      ],
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/AUTH-003-credential-management-contract.v1.json",
-      "idempotencyRequired": true,
-      "idempotencyKey": "Idempotency-Key"
+      "authorization": {
+        "status": "MISSING"
+      },
+      "resource": {
+        "status": "MISSING"
+      },
+      "cache": {
+        "status": "MISSING"
+      },
+      "retry": {
+        "status": "MISSING"
+      },
+      "event": {
+        "status": "MISSING"
+      },
+      "queue": {
+        "status": "MISSING"
+      },
+      "antiAbuse": {
+        "status": "MISSING"
+      },
+      "idempotency": {
+        "required": true
+      },
+      "security": {
+        "status": "MISSING"
+      },
+      "evidence": {
+        "status": "MISSING"
+      }
     },
     {
       "operationId": "authCredentialRemove",
+      "method": "DELETE",
+      "path": "/auth/credentials/{credentialId}",
+      "visibility": "public_authenticated",
+      "capability": "credential_management",
+      "contractStatus": "MISSING",
       "auth": {
         "mode": "authenticated",
         "subject": "current_user"
       },
-      "permissions": [
-        "user.credential.manage"
-      ],
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/AUTH-003-credential-management-contract.v1.json",
-      "idempotencyRequired": true,
-      "idempotencyKey": "Idempotency-Key"
+      "authorization": {
+        "status": "MISSING"
+      },
+      "resource": {
+        "status": "MISSING"
+      },
+      "cache": {
+        "status": "MISSING"
+      },
+      "retry": {
+        "status": "MISSING"
+      },
+      "event": {
+        "status": "MISSING"
+      },
+      "queue": {
+        "status": "MISSING"
+      },
+      "antiAbuse": {
+        "status": "MISSING"
+      },
+      "idempotency": {
+        "required": true
+      },
+      "security": {
+        "status": "MISSING"
+      },
+      "evidence": {
+        "status": "MISSING"
+      }
     }
   ]
 }
