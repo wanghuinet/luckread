@@ -369,3 +369,32 @@ After this decision:
 Required sequence remains:
 
 Decision → W01 containment → W02 AUTH-004 implementation → contract/implementation reconciliation → isolated schema/migration preparation → separate migration authorization → runtime evidence → Evidence Registry admission → Mapping-0/downstream promotion.
+## 16. Password credential compatibility decision — 2026-09-26
+
+AUTH-004 password change/reset MUST remain compatible with the existing Payload local-login verifier while Payload remains pinned at v3.87.1.
+
+Decision:
+
+- The logical AUTH-004 passwordHash remains the credential authority.
+- Its current physical compatibility representation is the existing Payload users.hash + users.salt fields.
+- W02 / D1-01 is the authoritative writer for password credential changes.
+- W01 Payload local authentication remains a reader/verifier of that same credential material.
+- No second password hash table or alternate login credential authority is created.
+
+For Payload v3.87.1, the compatibility algorithm is fixed to the currently verified implementation:
+
+- cryptographically random 32-byte salt;
+- salt stored as lowercase hexadecimal;
+- PBKDF2-HMAC-SHA256;
+- 25,000 iterations;
+- derived length 512 bytes;
+- derived hash stored as lowercase hexadecimal.
+
+This compatibility choice exists to preserve the already-deployed Payload local-login behavior. It does not authorize using the Payload native forgot/reset operations.
+
+W02 MUST enforce the canonical AUTH-004 password policy independently of Payload's native recovery validator before generating the compatible hash/salt representation.
+
+Any future Payload version upgrade that changes the local credential algorithm requires a separate Change Control reconciliation before changing this representation.
+
+This decision does not change the logical Worker ownership: W02/D1-01 remains the authoritative credential writer, and W01 remains the API/Payload edge.
+
