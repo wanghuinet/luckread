@@ -36,10 +36,56 @@
     },
     {
       "featureId": "AUTH-003",
-      "operationId": null,
+      "operationId": "authCredentialList",
+      "requestDtoId": null,
+      "responseDtoId": "DTO-AUTH-003-CREDENTIAL-LIST-RESPONSE",
+      "requestSchemaRef": null,
+      "responseSchemaRef": "#/paths/~1auth~1credentials/get/responses/200/content/application~1json/schema",
+      "entityIds": [
+        "ENT-IDENTITY",
+        "ENT-CREDENTIAL"
+      ],
+      "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "AUTH-003",
+      "operationId": "authCredentialAdd",
+      "requestDtoId": "DTO-AUTH-003-CREDENTIAL-ADD-REQUEST",
+      "responseDtoId": "DTO-AUTH-003-CREDENTIAL-ADD-RESPONSE",
+      "requestSchemaRef": "#/paths/~1auth~1credentials/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": "#/paths/~1auth~1credentials/post/responses/201/content/application~1json/schema",
+      "entityIds": [
+        "ENT-IDENTITY",
+        "ENT-CREDENTIAL"
+      ],
+      "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "AUTH-003",
+      "operationId": "authCredentialReplace",
+      "requestDtoId": "DTO-AUTH-003-CREDENTIAL-REPLACE-REQUEST",
+      "responseDtoId": "DTO-AUTH-003-CREDENTIAL-REPLACE-RESPONSE",
+      "requestSchemaRef": "#/paths/~1auth~1credentials~1{credentialId}/put/requestBody/content/application~1json/schema",
+      "responseSchemaRef": "#/paths/~1auth~1credentials~1{credentialId}/put/responses/200/content/application~1json/schema",
+      "entityIds": [
+        "ENT-IDENTITY",
+        "ENT-CREDENTIAL"
+      ],
+      "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "AUTH-003",
+      "operationId": "authCredentialRemove",
       "requestDtoId": null,
       "responseDtoId": null,
-      "status": "UNRESOLVED_NO_CANONICAL_OPERATION_EVIDENCE"
+      "requestSchemaRef": "#/paths/~1auth~1credentials~1{credentialId}/parameters/0/schema",
+      "responseSchemaRef": null,
+      "entityIds": [
+        "ENT-IDENTITY",
+        "ENT-CREDENTIAL"
+      ],
+      "responseStatus": 204,
+      "status": "NO_BODY_DTO"
     },
     {
       "featureId": "AUTH-004",
