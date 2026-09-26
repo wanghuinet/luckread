@@ -65,7 +65,7 @@
       "entityIds": [
         "ENT-SESSION"
       ],
-      "status": "RESERVED_PENDING_OPENAPI_PATH"
+      "status": "CONTRACT_BOUND"
     },
     {
       "featureId": "AUTH-010",
@@ -77,7 +77,7 @@
       "entityIds": [
         "ENT-SESSION"
       ],
-      "status": "RESERVED_PENDING_OPENAPI_PATH"
+      "status": "CONTRACT_BOUND"
     },
     {
       "featureId": "AUTH-011",
