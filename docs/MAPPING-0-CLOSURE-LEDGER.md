@@ -3352,3 +3352,38 @@ Result:
 - Rate-limit and reset-token lifecycle constraints are admitted without inventing numeric limits, anti-abuse scopes/actions, public DTO fields, HTTP statuses, or Idempotency-Key requirements.
 - The unresolved feature-specific wire decision set is unchanged in kind, but reduced by explicit lifecycle authority coverage.
 - No OpenAPI, DTO Registry, runtime, persistence, or Evidence promotion occurred.
+
+
+## 2026-09-26 — AUTH-004 authority decision and reconciliation admission
+
+Authority decision:
+- AUTH-004 public wire and operation-policy authority is resolved.
+- Canonical operations remain `authPasswordChange`, `authPasswordResetRequest`, and `authPasswordResetConfirm`.
+- Canonical public paths remain `/auth/password/change`, `/auth/password/reset/request`, and `/auth/password/reset/confirm`.
+- The accepted wire policy is encoded in `contracts/api/AUTH-004-password-recovery-contract.v1.json`.
+- The accepted operation policy is encoded in `contracts/api/auth-operation-policy.v1.json`.
+- Canonical OpenAPI, API inventory, consolidated operation policy, and DTO registry are now reconciled on `contract/auth004-reconciliation-20260926`.
+- DTOs for the three operations are bound to the canonical OpenAPI request schemas; all three successful responses are explicitly no-body.
+
+Validation observed:
+- API Contract CI: PASS.
+- Canonical OpenAPI RC synchronization step: PASS; its automatic Contract CI dispatch substep is not the contract validation result.
+- Contract Semantic CI: PASS on the final reconciliation head.
+- OpenAPI, common, authz, events, state-machine and structural/contract admission gates: PASS on the observed Contract CI.
+- Capability Contract Graph: PASS.
+- Five-Way Alignment and Strict R4/Evidence/R5 remain downstream Mapping-0 gates and do not become GREEN from this reconciliation.
+
+Implementation boundary:
+- No Worker/D1 runtime implementation was admitted.
+- No AUTH-004 runtime evidence was created or promoted.
+- No AUTH-002 runtime evidence was rerun.
+- Mapping 0 remains NOT_GREEN until the existing Five-Way and downstream evidence blockers are independently closed.
+
+Current continuation:
+`M0-AUTH-004-RECONCILIATION-AND-DOWNSTREAM-ADMISSION-001` / `TODO_VERIFY`
+
+Source decision:
+`docs/decisions/2026-09-26-password-recovery.md`
+
+Reconciliation PR:
+`PR #21` — https://github.com/wanghuinet/luckread/pull/21
