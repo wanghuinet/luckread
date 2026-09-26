@@ -3295,3 +3295,25 @@ Current continuation:
 `M0-AUTH-004-WIRE-AND-OPERATION-POLICY-AUTHORITY-001` / `WAIT_AUTHORITY_DECISION`
 
 The next accepted authority artifact must fill the remaining policy fields for all three canonical AUTH-004 operations, with explicit N/A where applicable.
+
+
+## 2026-09-26 — AUTH-004 common wire inheritance reconciliation
+
+Source head: `0753842b62da0cf9a48df693b6b0dfead66f566e`.
+Reconciliation commit: `e7f6d2efff5a96f66a72993425544f93ee1e9690`.
+Backup branch: `backup/main-before-auth004-common-wire-inheritance-20260926`.
+
+Control:
+`CC-MAPPING-0-AUTH-004-WIRE-SCHEMA-DECISION-REQUIRED-2026-09-26`
+
+Result:
+- Platform Unified Error/State Contract is now explicitly inherited by AUTH-004 for the public error envelope and cross-cutting retry/error semantics.
+- Common `Idempotency-Key` syntax and same-key/same-payload vs same-key/different-payload semantics are explicitly inherited when an AUTH-004 operation is later declared idempotent.
+- This does not decide whether any AUTH-004 operation is idempotent-required.
+- Remaining AUTH-004 feature-specific wire decisions are limited to request/response shape, password/recovery token representations, success status/body, per-error HTTP/code mapping, per-operation idempotency applicability, and public recovery/session result projections.
+- No OpenAPI, DTO Registry, runtime, persistence, or Evidence promotion occurred.
+
+Current continuation:
+`M0-AUTH-004-WIRE-AND-OPERATION-POLICY-AUTHORITY-001` / `WAIT_AUTHORITY_DECISION`
+
+Do not rerun AUTH-002 Runtime Evidence `36219132123` unchanged.
