@@ -3,7 +3,7 @@
   "evidenceType": "MAPPING_0_AUTH_003_WIRE_SCHEMA_ENCODING_RECONCILIATION",
   "generatedAt": "2026-09-26",
   "repository": "wanghuinet/luckread",
-  "currentMain": "af3d010b887653ebd439fd5aa7e272462ecf72e2",
+  "currentMain": "8b4814bd73804f95b02e985b67b9c1a213f2209a",
   "taskId": "M0-AUTH-003-WIRE-SCHEMA-ENCODING-001",
   "status": "PASS_VERIFIED_SOURCE_RECONCILIATION",
   "encodedSources": [
