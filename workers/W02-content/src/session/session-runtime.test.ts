@@ -36,7 +36,7 @@ function dbFake(initial: SessionRecord | null) {
         if (sql.includes('UPDATE auth_session_state')) {
           if (!row || row.revokedAt) return { meta: { changes: 0 } }
           const [revokedAt, lastSeenAt] = args as [string, string, string]
-          row = { ...row, revokedAt, lastSeenAt }
+          row = { ...row, revokedAt, lastSeenAt, tokenVersion: row.tokenVersion + 1 }
           return { meta: { changes: 1 } }
         }
 
@@ -95,6 +95,7 @@ describe('session runtime foundation', () => {
     const result = await revokeSessionExtension(fake.db, 'sid-1', NOW)
     expect(result).toEqual({ revoked: true })
     expect(fake.getRow()?.revokedAt).toBe(NOW)
+    expect(fake.getRow()?.tokenVersion).toBe(4)
     expect(fake.getNativeSessionPresent()).toBe(false)
 
     const second = await revokeSessionExtension(fake.db, 'sid-1', NOW)
