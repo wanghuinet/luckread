@@ -110,6 +110,16 @@ const activeStatuses = new Set(['ACTIVE', 'VERIFIED'])
 const historicalStatuses = new Set(['SUPERSEDED', 'EXPIRED', 'INVALIDATED'])
 const executableTypes = new Set(['CODE', 'UNIT_TEST', 'INTEGRATION_TEST', 'CL', 'CI', 'SMOKE', 'DEPLOYMENT', 'OBSERVABILITY', 'PERFORMANCE', 'SECURITY', 'USER_ACCEPTANCE'])
 
+const evidenceIsFreshForAdmission = (record) => {
+  if (!executableTypes.has(record?.type)) return false
+  if (record?.result !== 'PASS') return false
+  if (!activeStatuses.has(record?.status)) return false
+  if (record?.commitSha === testedCommit) return true
+  return record?.status === 'VERIFIED' &&
+    record?.freshnessMode === 'INHERITED_UNCHANGED_SCOPE' &&
+    sourceRefResolvable(record?.inheritanceRef)
+}
+
 const cleanSourceRef = (sourceRef) => sourceRef
   .replace(/#L\d+(?:-L\d+)?$/, '')
   .replace(/:L\d+(?:-L\d+)?$/, '')
@@ -141,11 +151,16 @@ for (const record of registry.records) {
 
   const isHistorical = historicalStatuses.has(record.status)
   if (!isHistorical) {
-    if (record.commitSha !== testedCommit) fail(`stale evidence commit: ${record.evidenceId}`)
     if (!results.has(record.result)) fail(`evidence result must be PASS: ${record.evidenceId}`)
     if (!activeStatuses.has(record.status)) fail(`evidence must be ACTIVE or VERIFIED: ${record.evidenceId}`)
     if (!executableTypes.has(record.type)) fail(`evidence type is not executable: ${record.evidenceId}`)
     if (!sourceRefResolvable(record.sourceRef)) fail(`sourceRef is not resolvable: ${record.evidenceId}`)
+    if (record.commitSha !== testedCommit) {
+      const inherited = record.status === 'VERIFIED' &&
+        record.freshnessMode === 'INHERITED_UNCHANGED_SCOPE' &&
+        sourceRefResolvable(record.inheritanceRef)
+      if (!inherited) fail(`stale evidence commit without valid inheritance record: ${record.evidenceId}`)
+    }
   } else if (!record.sourceRef) {
     fail(`historical evidence is missing sourceRef: ${record.evidenceId}`)
   }
@@ -165,17 +180,12 @@ for (const featureId of featureIds) {
     fail(`Feature has no evidence records: ${featureId}`)
     continue
   }
-  const executablePass = featureEvidence.some((record) =>
-    executableTypes.has(record.type) &&
-    record.result === 'PASS' &&
-    activeStatuses.has(record.status) &&
-    record.commitSha === testedCommit
-  )
+  const executablePass = featureEvidence.some((record) => evidenceIsFreshForAdmission(record))
   if (!executablePass) fail(`Feature has no current executable PASS evidence: ${featureId}`)
 }
 
 for (const [claimKey, records] of claims) {
-  if (!records.some((record) => executableTypes.has(record.type) && activeStatuses.has(record.status) && record.result === 'PASS' && record.commitSha === testedCommit)) {
+  if (!records.some((record) => evidenceIsFreshForAdmission(record))) {
     fail(`claim has no current executable PASS evidence: ${claimKey}`)
   }
 }
