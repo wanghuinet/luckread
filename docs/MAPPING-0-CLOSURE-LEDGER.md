@@ -3121,12 +3121,27 @@ Finding:
 - The next admissible upstream gate is the explicit AUTH-003 public Wire Schema authority; no D1/runtime implementation is admitted before that gate.
 
 Next cursor:
-`M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001` / `WAIT_AUTHORITY_DECISION`
+`M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001` / `PASS_VERIFIED`
+
+Decision record:
+`docs/change-control/CC-MAPPING-0-AUTH-003-WIRE-PROJECTION-AUTHORITY-2026-09-26.md`
+
+Machine-readable authority record:
+`artifacts/mapping-0/auth-003-wire-projection-authority-2026-09-26.json`
+
+Decision result:
+- Public credential resource locator is opaque `credentialId` using canonical `ResourceId`; it is not a direct Payload/database key exposure.
+- Public credential projection is exactly `credentialId`, `kind`, `active`.
+- Add request requires `kind` + `value`; Replace requires `value` and forbids kind changes.
+- List uses the canonical cursor envelope with default 50 / max 100 and deterministic ordering `createdAt DESC, credentialId DESC`.
+- Success status: list 200, add 201, replace 200, remove 204.
+- Canonical error envelope/codes remain mandatory; no domain-local error vocabulary is introduced.
+- Add/Replace/Remove retain required `Idempotency-Key`.
+
+No Worker, D1, migration, runtime implementation, entity promotion, Evidence Registry promotion, or Mapping-0 GREEN promotion occurred.
+
+Next cursor:
+`M0-AUTH-003-WIRE-SCHEMA-ENCODING-001` / `TODO_FIX`
 
 Objective:
-Resolve the smallest explicit AUTH-003 public wire projection/request-response/status-error authority set, then re-enter the downstream DTO/OpenAPI/runtime/persistence evidence chain.
-
-Do not invent DTO fields or HTTP semantics.
-Do not create or execute an AUTH-003 migration from guessed physical names.
-Do not promote `ENT-IDENTITY` or `ENT-CREDENTIAL`.
-Do not rerun AUTH-002 Runtime Evidence Run `36219132123` unchanged.
+Encode the accepted AUTH-003 wire authority into the canonical API contract, OpenAPI and DTO registry, then reconcile the shared AUTH-002..006 persistence/API/entity/field mapping references.
