@@ -4,6 +4,7 @@ import {
   establishSessionFromAuthoritativeD1,
   refreshSessionFromAuthoritativeD1,
   revokeSessionExtension,
+  validateAuthoritativeSession,
 } from './session/session-runtime.js'
 
 interface Env { D1_01: D1Database; AUTH013_QUEUE: Queue }
@@ -114,6 +115,26 @@ export default {
             message: status === 401 ? 'authentication denied' : status === 400 ? 'invalid session request' : 'authentication service unavailable',
           },
         }, status)
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/session/validate') {
+      const body = await readJsonBody<{ sessionId?: unknown; userId?: unknown }>(request)
+      if (
+        !body ||
+        typeof body.sessionId !== 'string' ||
+        body.sessionId.length === 0 ||
+        typeof body.userId !== 'string' ||
+        body.userId.length === 0
+      ) {
+        return json({ active: false }, 400)
+      }
+
+      try {
+        const result = await validateAuthoritativeSession(env.D1_01, body)
+        return json(result)
+      } catch {
+        return json({ active: false }, 503)
       }
     }
 
