@@ -116,7 +116,7 @@ function parseOpenApiOperations(file) {
     } else {
       operations.set(currentOperationId, operation);
     }
-    const key = \`\${operation.method} \${operation.path}\`;
+    const key = `${operation.method} ${operation.path}`;
     if (byMethodPath.has(key)) {
       failures.push({ code: 'DUPLICATE_METHOD_PATH', operationId: currentOperationId, source: 'openapi' });
     } else {
@@ -159,7 +159,7 @@ function parseCanonicalInventory(file, openapiByMethodPath) {
 
   for (const [domain, group] of Object.entries(baseline.domains)) {
     if (!Array.isArray(group?.endpoint_groups)) {
-      failures.push({ code: 'MISSING_OPERATIONS_ARRAY', source: \`\${path.relative(root, file)}#\${domain}\` });
+      failures.push({ code: 'MISSING_OPERATIONS_ARRAY', source: `${path.relative(root, file)}#${domain}` });
       continue;
     }
     for (const raw of group.endpoint_groups) {
@@ -169,13 +169,13 @@ function parseCanonicalInventory(file, openapiByMethodPath) {
         continue;
       }
       const [, method, versionedPath] = match;
-      const key = \`\${method} \${versionedPath}\`;
+      const key = `${method} ${versionedPath}`;
       if (records.has(key)) {
-        failures.push({ code: 'DUPLICATE_METHOD_PATH', operationId: null, source: \`\${path.relative(root, file)}#\${key}\` });
+        failures.push({ code: 'DUPLICATE_METHOD_PATH', operationId: null, source: `${path.relative(root, file)}#${key}` });
         continue;
       }
 
-      const openapi = openapiByMethodPath.get(\`\${method} \${canonicalApiPath(versionedPath)}\`);
+      const openapi = openapiByMethodPath.get(`${method} ${canonicalApiPath(versionedPath)}`);
       if (!openapi) {
         records.set(key, {
           operationId: null,
@@ -204,7 +204,7 @@ function parseCanonicalInventory(file, openapiByMethodPath) {
 
   for (const record of records.values()) {
     if (!record.operationId) {
-      finding('UNRECONCILED_INVENTORY_OPERATION', null, \`inventory endpoint is not represented in canonical OpenAPI paths: \${record.method} \${record.path}\`);
+      finding('UNRECONCILED_INVENTORY_OPERATION', null, `inventory endpoint is not represented in canonical OpenAPI paths: ${record.method} ${record.path}`);
     }
   }
 
@@ -263,9 +263,9 @@ for (const [, record] of canonicalInventoryRecords) {
   const inventoryMethod = String(record.method).toUpperCase();
   const openapiMethod = String(openapi.method).toUpperCase();
   if (inventoryMethod !== openapiMethod) {
-    finding('METHOD_CONFLICT', record.operationId, \`inventory=\${inventoryMethod} openapi=\${openapiMethod}\`);
+    finding('METHOD_CONFLICT', record.operationId, `inventory=${inventoryMethod} openapi=${openapiMethod}`);
   } else if (canonicalApiPath(record.path) !== openapi.path) {
-    finding('PATH_CONFLICT', record.operationId, \`inventory=\${record.path} openapi=\${openapi.path}\`);
+    finding('PATH_CONFLICT', record.operationId, `inventory=${record.path} openapi=${openapi.path}`);
   } else {
     matches.push({
       operationId: record.operationId,
@@ -359,7 +359,7 @@ for (const [id, op] of policyInventory) {
     if (value === undefined || value === null || value === 'MISSING') {
       finding('EVIDENCE_INCOMPLETE', id, field);
     } else if (!allowedEvidence.has(value)) {
-      finding('EVIDENCE_INVALID', id, \`\${field}=\${String(value)}\`);
+      finding('EVIDENCE_INVALID', id, `${field}=${String(value)}`);
     }
   }
 }
