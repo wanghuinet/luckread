@@ -104,7 +104,10 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
   }
 
-  if (!loginResult.token || !loginResult.user?.id || !loginResult.exp) {
+  // Payload is configured with removeTokenFromResponses: true because the
+  // public contract uses the W02-backed access/refresh pair. The native login
+  // token itself is therefore intentionally absent from the Local API result.
+  if (!loginResult.user?.id) {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication runtime is unavailable')
   }
 
