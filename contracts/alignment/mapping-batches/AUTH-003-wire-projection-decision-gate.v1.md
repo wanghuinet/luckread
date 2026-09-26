@@ -1,6 +1,6 @@
 # AUTH-003 Wire Projection Decision Gate v1
 
-Status: `DECISION_GATE_CLOSED / BLOCKED_NOT_GREEN`
+Status: `DECISION_GATE_CLOSED / PASS_VERIFIED — WIRE SCHEMA CLOSED; RUNTIME NOT GREEN`
 
 ## Purpose
 
@@ -61,3 +61,17 @@ This is intentional. Entity/persistence fields, generated types, historical docu
 ## Next execution step
 
 Resolve the explicit AUTH-003 public projection and wire-schema contract. Once approved, encode it in the canonical AUTH-003 API contract, then promote the exact schemas into OpenAPI and reconcile Mapping-0 against the resulting canonical DTO registry.
+
+## Accepted decision — 2026-09-26
+
+The explicit AUTH-003 public wire authority is now closed under the recorded Change Control.
+
+- Public locator: opaque credentialId using canonical ResourceId; no direct internal Payload/database ID exposure.
+- Public projection: credentialId, kind, active only.
+- Add: required kind + value; unknown properties rejected.
+- Replace: required value; kind changes forbidden; unknown properties rejected.
+- List: canonical cursor envelope, default 50, max 100, deterministic createdAt DESC, credentialId DESC ordering.
+- Success: list 200, add 201, replace 200, remove 204.
+- Errors: canonical ErrorResponse and canonical error codes only.
+
+OpenAPI/DTO promotion is encoded; runtime, persistence and security-E2E evidence remain downstream.
