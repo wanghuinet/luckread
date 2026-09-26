@@ -3141,7 +3141,26 @@ Decision result:
 No Worker, D1, migration, runtime implementation, entity promotion, Evidence Registry promotion, or Mapping-0 GREEN promotion occurred.
 
 Next cursor:
-`M0-AUTH-003-WIRE-SCHEMA-ENCODING-001` / `TODO_FIX`
+`M0-AUTH-003-WIRE-SCHEMA-ENCODING-001` / `PASS_VERIFIED_SOURCE_RECONCILIATION`
+
+Decision/encoding records:
+`docs/change-control/CC-MAPPING-0-AUTH-003-WIRE-PROJECTION-AUTHORITY-2026-09-26.md`
+`artifacts/mapping-0/auth-003-wire-projection-authority-2026-09-26.json`
+`artifacts/mapping-0/auth-003-wire-schema-encoding-reconciliation-2026-09-26.json`
+
+Source reconciliation result:
+- AUTH-003 API contract now carries the accepted wire schema.
+- Canonical OpenAPI contains the four AUTH-003 operations and the opaque `credentialId` / `Credential` representations.
+- API Inventory source and Auth Operation Policy contain the four canonical operations.
+- DTO Registry and DTO Records bind the canonical operations; Remove is explicitly no-body 204.
+- Shared AUTH-002..006 mapping now uses the canonical AUTH-003 operation IDs and DTO IDs.
+- All edited JSON files pass structural parsing; OpenAPI source structure checks pass.
+- No Worker, D1, migration, runtime implementation, entity promotion or Evidence Registry promotion occurred.
+
+Contract CI status is **NOT_OBSERVED** for current main; no status check is claimed from source validation alone.
+
+Next cursor:
+`M0-AUTH-003-CONTRACT-CI-VALIDATION-001` / `WAIT_CI_RESULT`
 
 Objective:
-Encode the accepted AUTH-003 wire authority into the canonical API contract, OpenAPI and DTO registry, then reconcile the shared AUTH-002..006 persistence/API/entity/field mapping references.
+Validate the encoded AUTH-003 wire/API/DTO/Mapping chain at current `main`. Preserve the fail-closed R4/Evidence gates. Do not rerun AUTH-002 Runtime Evidence Run `36219132123` unchanged.
