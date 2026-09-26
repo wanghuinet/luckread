@@ -137,3 +137,77 @@ Until the above decision is explicitly approved:
 `AUTH-004 = BLOCKED_DECISION_REQUIRED`
 
 This record closes the provenance/decision boundary only. It does not close the wire schema.
+
+
+## 9. Cross-cutting public-wire inheritance reconciliation — 2026-09-26
+
+Two current platform contracts are authoritative cross-cutting inputs for AUTH-004, but neither supplies feature-specific field names or success/error HTTP mappings.
+
+### 9.1 Unified error envelope
+
+From `docs/166-UNIFIED-ERROR-AND-STATE-TAXONOMY-CONTRACT-v1.0.md`:
+
+Every external error uses the stable envelope:
+
+- `requestId`
+- `code`
+- `category`
+- `severity`
+- `message`
+- `userSafeReason`
+- `retryable`
+- `retryAfter`
+- `operationId` (nullable)
+- `detailsRef` (nullable)
+
+AUTH-004 therefore MUST use the platform error envelope and public error vocabulary. Password/reset secrets, private resource existence in enumeration-sensitive flows, and internal security/infrastructure information remain non-public.
+
+This freezes the **envelope and cross-cutting semantics**, not the AUTH-004-specific mapping of individual failures to HTTP statuses/codes.
+
+### 9.2 Idempotency-Key representation
+
+From `contracts/schemas/common/idempotency-key.json`:
+
+When an operation contract requires an Idempotency-Key, the public header value is:
+
+- header: `Idempotency-Key`
+- type: string
+- minimum length: 16
+- maximum length: 255
+- pattern: `^[A-Za-z0-9_-]+$`
+
+The common semantic is:
+
+- same key + same payload MUST return the first response;
+- same key + different payload MUST produce `IDEMPOTENCY_KEY_REUSE_CONFLICT`.
+
+Retention is 24 hours under the common schema.
+
+The common contract does **not** establish that every AUTH-004 operation requires the header. Whether the header is mandatory for each of the three AUTH-004 operations remains a feature-specific authority decision.
+
+### 9.3 Observability inheritance
+
+The Unified Error/State contract requires external errors to remain correlatable through `requestId`, `correlationId`, `traceId`, and `operationId` where applicable. These are cross-cutting observability constraints and do not define additional AUTH-004 business fields.
+
+## 10. Remaining AUTH-004 wire decisions
+
+After this source-only reconciliation, the unresolved feature-specific wire inputs are limited to:
+
+- exact request field names/types/formats;
+- requiredness/nullability;
+- password-policy reference and validation semantics;
+- recovery identifier and token public representations;
+- success status/body for each operation;
+- per-error HTTP/code mapping;
+- whether each operation requires `Idempotency-Key`;
+- if required, the exact operation-specific replay outcome beyond the common key semantic;
+- public recovery-delivery metadata;
+- public session-invalidation result, if any.
+
+No feature-specific value is inferred by this reconciliation.
+
+## 11. Result
+
+`AUTH-004 COMMON WIRE INHERITANCE = PASS_VERIFIED_SOURCE_ONLY`
+
+`AUTH-004 FEATURE-SPECIFIC WIRE SCHEMA = DECISION_REQUIRED`
