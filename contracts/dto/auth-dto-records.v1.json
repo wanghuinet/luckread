@@ -39,32 +39,6 @@
       "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
     },
     {
-      "dtoId": "DTO-AUTH-013-ACCOUNT-STATE-TRANSITION-REQUEST",
-      "kind": "request",
-      "featureId": "AUTH-013",
-      "operationId": "transitionAccountState",
-      "schemaRef": "#/paths/~1users~1{userId}~1account-state/post/requestBody/content/application~1json/schema",
-      "fieldAuthority": "OPENAPI_REQUEST_SCHEMA",
-      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
-    },
-    {
-      "dtoId": "DTO-AUTH-013-ACCOUNT-STATE-TRANSITION-RESPONSE",
-      "kind": "response",
-      "featureId": "AUTH-013",
-      "operationId": "transitionAccountState",
-      "schemaRef": "#/paths/~1users~1{userId}~1account-state/post/responses/200/content/application~1json/schema",
-      "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
-      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
-    }
-  ],
-  "noBodyOperations": [
-    {
-      "featureId": "AUTH-002",
-      "operationId": "authLogout",
-      "responseStatus": 204,
-      "dtoRequired": false
-    }
-    {
       "dtoId": "DTO-AUTH-003-CREDENTIAL-LIST-RESPONSE",
       "kind": "response",
       "featureId": "AUTH-003",
@@ -106,6 +80,24 @@
       "featureId": "AUTH-003",
       "operationId": "authCredentialReplace",
       "schemaRef": "#/paths/~1auth~1credentials~1{credentialId}/put/responses/200/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-013-ACCOUNT-STATE-TRANSITION-REQUEST",
+      "kind": "request",
+      "featureId": "AUTH-013",
+      "operationId": "transitionAccountState",
+      "schemaRef": "#/paths/~1users~1{userId}~1account-state/post/requestBody/content/application~1json/schema",
+      "fieldAuthority": "OPENAPI_REQUEST_SCHEMA",
+      "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
+    },
+    {
+      "dtoId": "DTO-AUTH-013-ACCOUNT-STATE-TRANSITION-RESPONSE",
+      "kind": "response",
+      "featureId": "AUTH-013",
+      "operationId": "transitionAccountState",
+      "schemaRef": "#/paths/~1users~1{userId}~1account-state/post/responses/200/content/application~1json/schema",
       "fieldAuthority": "OPENAPI_RESPONSE_SCHEMA",
       "runtimeStatus": "NOT_IMPLEMENTED_EVIDENCE"
     }
