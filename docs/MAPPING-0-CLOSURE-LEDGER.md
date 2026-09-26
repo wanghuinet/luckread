@@ -3317,3 +3317,22 @@ Current continuation:
 `M0-AUTH-004-WIRE-AND-OPERATION-POLICY-AUTHORITY-001` / `WAIT_AUTHORITY_DECISION`
 
 Do not rerun AUTH-002 Runtime Evidence `36219132123` unchanged.
+
+
+## 2026-09-26 — AUTH-004 lifecycle authority reconciliation
+
+Source head: `c82d3ade1403397224d8fb3cce22808b2e087697`.
+Reconciliation commit: `9d9cf6edabb211464d013577bdde79f9df63f257`.
+Backup branch: `backup/main-before-auth004-lifecycle-reconciliation-20260926`.
+
+Control:
+`CC-MAPPING-0-AUTH-004-WIRE-SCHEMA-DECISION-REQUIRED-2026-09-26`
+
+Result:
+- The L5/L6 Identity & Session Instance Registry is now explicitly admitted as lifecycle authority input for AUTH-004.
+- Password-reset durability, account-enumeration resistance, rate limiting, token expiry, wrong-use rejection, single-use consumption, concurrent double-consumption denial, old-credential invalidation, and secret-safe telemetry behavior are inherited as lifecycle/security constraints.
+- These inherited claims do not decide public request/response field names, token wire representation, HTTP status/body, error-code mapping, recovery-delivery metadata, or AUTH-004-specific Idempotency-Key requirements.
+- No OpenAPI, DTO Registry, runtime, persistence, or Evidence promotion occurred.
+
+Current continuation:
+`M0-AUTH-004-WIRE-AND-OPERATION-POLICY-AUTHORITY-001` / `WAIT_AUTHORITY_DECISION`
