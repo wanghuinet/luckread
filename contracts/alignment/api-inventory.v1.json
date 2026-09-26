@@ -488,8 +488,8 @@
     {
       "operationId": "getContentRevision",
       "method": "GET",
-      "path": "/v1/contents/{contentId}/revisions/{revisionId}",
-      "openapiPath": "/contents/{contentId}/revisions/{revisionId}",
+      "path": "/v1/contents/{contentId}/revisions/{revisionId}/rollback",
+      "openapiPath": "/contents/{contentId}/revisions/{revisionId}/rollback",
       "domain": "content",
       "status": "DISCOVERED",
       "featureIds": [],
