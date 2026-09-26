@@ -2329,6 +2329,104 @@ paths:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
 
+
+  /auth/password/change:
+    post:
+      tags: [Auth]
+      summary: Change the authenticated user's password
+      operationId: authPasswordChange
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              additionalProperties: false
+              properties:
+                currentPassword:
+                  type: string
+                  minLength: 1
+                  format: password
+                newPassword:
+                  type: string
+                  minLength: 15
+                  maxLength: 128
+                  format: password
+                  description: Unicode password; spaces are allowed; no composition-class rule; compromised/common-password screening is enforced.
+      responses:
+        '204':
+          description: Password changed; no response body.
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /auth/password/reset/request:
+    post:
+      tags: [Auth]
+      summary: Request a password recovery operation
+      security: []
+      operationId: authPasswordResetRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier]
+              additionalProperties: false
+              properties:
+                identifier:
+                  type: string
+                  minLength: 1
+                  maxLength: 320
+      responses:
+        '202':
+          description: Recovery request accepted; no response body and no account-existence or delivery metadata.
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /auth/password/reset/confirm:
+    post:
+      tags: [Auth]
+      summary: Confirm a password recovery operation
+      security: []
+      operationId: authPasswordResetConfirm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recoveryToken, newPassword]
+              additionalProperties: false
+              properties:
+                recoveryToken:
+                  type: string
+                  minLength: 43
+                  maxLength: 512
+                  format: byte
+                  description: Opaque base64url recovery token without padding; single-use, time-bound and purpose-bound.
+                newPassword:
+                  type: string
+                  minLength: 15
+                  maxLength: 128
+                  format: password
+                  description: Unicode password; spaces are allowed; no composition-class rule; compromised/common-password screening is enforced.
+      responses:
+        '204':
+          description: Password reset confirmed; no response body.
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '409': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
 components:
   securitySchemes:
     bearerAuth:
