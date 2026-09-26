@@ -250,7 +250,7 @@
       "subjectType": "FEATURE",
       "subjectId": "AUTH-002",
       "source": "GitHub Actions W01 D1 Adapter Regression E4.5 against controlled Cloudflare D1",
-      "sourceRef": "artifacts/evidence/auth-002/adapter-regression/adapter-regression.json",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/35789608705",
       "commitSha": "77b29511b86b22e28e226a61fe8a4410f06c486c",
       "timestamp": "2026-09-22T21:59:15Z",
       "producer": "Payload 3.87.1 native database runtime probe",
@@ -478,7 +478,9 @@
       "result": "PASS",
       "status": "VERIFIED",
       "checkId": "AUTH-013-PERSISTENCE-SCHEMA-REMOTE",
-      "workflowRef": ".github/workflows/auth-013-persistence-schema-evidence.yml"
+      "workflowRef": ".github/workflows/auth-013-persistence-schema-evidence.yml",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "evidenceId": "EVD-AUTH002-B22-GATE1-SCHEMA-REMOTE-001",
