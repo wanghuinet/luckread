@@ -53,16 +53,19 @@
       "entityName": "Session",
       "domainId": "D1-01",
       "entityStatus": "PROPOSED",
-      "implementationRef": "",
+      "implementationRef": "workers/W02-content/src/session/session-runtime.ts",
       "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
-      "adapter": "D1 / @payloadcms/db-d1-sqlite boundary TBD",
-      "migrationRefs": [],
+      "adapter": "Payload native users.sessions[] + auth_session_state extension through W01/W02 E6 bridge",
+      "migrationRefs": [
+        "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
+        "https://github.com/wanghuinet/luckread/actions/runs/36217784262"
+      ],
       "fieldContractRef": "contracts/entity/AUTH-002-session-field-contract.v1.json",
       "persistenceContractRef": "contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json",
       "evidenceRefs": [
-        "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/AUTH-002-session-field-contract.v1.json",
-        "contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json"
+        "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
+        "artifacts/mapping-0/auth-002-e6-runtime-evidence-reconciliation-2026-09-26.json",
+        "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
       ]
     },
     {
