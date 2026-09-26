@@ -27,13 +27,27 @@ export async function GET(request: Request): Promise<Response> {
     canSetHeaders: false,
   })
 
-  const user = authResult.user as { id?: string | number; _sid?: string } | null
+  const user = authResult.user as { id?: string | number; _sid?: string; sessions?: Array<{ id?: string | number }> } | null
   if (!user?.id || !user._sid) {
+    console.error(JSON.stringify({
+      event: 'auth.me.payload_auth_rejected',
+      hasUser: Boolean(user),
+      hasUserId: Boolean(user?.id),
+      hasSessionId: Boolean(user?._sid),
+      sessionCount: Array.isArray(user?.sessions) ? user.sessions.length : null,
+    }))
     return unauthorized()
   }
 
   const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (tokenVersion === null) return unauthorized()
+  if (tokenVersion === null) {
+    console.error(JSON.stringify({
+      event: 'auth.me.token_version_claim_missing',
+      hasUserId: Boolean(user.id),
+      hasSessionId: Boolean(user._sid),
+    }))
+    return unauthorized()
+  }
 
   try {
     const active = await validateSession({
@@ -41,8 +55,23 @@ export async function GET(request: Request): Promise<Response> {
       userId: String(user.id),
       tokenVersion,
     })
-    if (!active) return unauthorized()
-  } catch {
+    if (!active) {
+      console.error(JSON.stringify({
+        event: 'auth.me.w02_session_rejected',
+        hasUserId: Boolean(user.id),
+        hasSessionId: Boolean(user._sid),
+        tokenVersion,
+      }))
+      return unauthorized()
+    }
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'auth.me.w02_session_error',
+      hasUserId: Boolean(user.id),
+      hasSessionId: Boolean(user._sid),
+      tokenVersion,
+      errorName: error instanceof Error ? error.name : typeof error,
+    }))
     return unauthorized()
   }
 
