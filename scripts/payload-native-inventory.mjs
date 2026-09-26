@@ -48,7 +48,13 @@ const parseCollection = (sourceFile, exportName) => {
   if (!fieldsProperty || !ts.isPropertyAssignment(fieldsProperty)) blocked(`${sourceFile}:${exportName} has no static fields array`)
 
   const slug = literal(slugProperty.initializer, `${sourceFile}:${exportName}.slug`)
-  const auth = authProperty && ts.isPropertyAssignment(authProperty) ? Boolean(literal(authProperty.initializer, `${sourceFile}:${exportName}.auth`)) : false
+  const auth = (() => {
+    if (!authProperty || !ts.isPropertyAssignment(authProperty)) return false
+    if (authProperty.initializer.kind === ts.SyntaxKind.TrueKeyword) return true
+    if (authProperty.initializer.kind === ts.SyntaxKind.FalseKeyword) return false
+    if (ts.isObjectLiteralExpression(authProperty.initializer)) return true
+    blocked(`${sourceFile}:${exportName}.auth must be a static boolean or object literal`)
+  })()
 
   if (!ts.isArrayLiteralExpression(fieldsProperty.initializer)) blocked(`${sourceFile}:${exportName}.fields must be a static array; spreads/helpers are not admitted`)
 
