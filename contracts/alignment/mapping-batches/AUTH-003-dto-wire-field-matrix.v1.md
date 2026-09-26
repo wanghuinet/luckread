@@ -1,6 +1,6 @@
 # AUTH-003 DTO Wire-Field Matrix v1
 
-Status: `BLOCKED_NOT_GREEN`
+Status: `PASS_VERIFIED — WIRE SCHEMA CLOSED; RUNTIME NOT GREEN`
 
 ## Purpose
 
@@ -109,3 +109,8 @@ What is still missing before OpenAPI promotion:
 `NO_MAPPING_PROMOTION`
 
 Reason: the repository currently provides field authority and security rules but does not yet provide the explicit public wire projection needed to safely create canonical DTO/OpenAPI schemas.
+## Accepted wire projection — 2026-09-26
+
+credentialId, kind, and active are the only public credential-item fields. Input value, normalizedValue, valueHash, identityId, verifiedAt, createdAt and updatedAt remain non-public.
+
+The request/response schemas, list envelope, pagination, success statuses and canonical error semantics are encoded in the AUTH-003 API contract and OpenAPI.
