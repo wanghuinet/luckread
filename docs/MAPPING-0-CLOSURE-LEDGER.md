@@ -3182,8 +3182,19 @@ commit: `38c77b890fbb981e3fd4244fc21a0e050101876b`
 
 Operational policy boundary: AUTH-003 Operation Policy entries remain `DISCOVERY_DRAFT` because no explicit authority for resource/D1, event, queue or anti-abuse budgets was found. Only the already-established authentication, permission and Idempotency-Key rules are carried forward.
 
+Field↔Wire reconciliation result:
+- Current main: `3a84cd2d53c3bba3d869a30cc6e6ce47db1102b5`
+- Contract CI Run: https://github.com/wanghuinet/luckread/actions/runs/36225053795
+- AUTH-003 Field↔Wire reconciliation: **PASS_VERIFIED_SOURCE_ONLY**
+- `kind` and `active` are public only through the AUTH-003 credential projection.
+- Internal/secret credential fields remain non-public.
+- Semantic, OpenAPI, AuthZ, Common, Events, State-Machines, Payload Reconciliation, Mapping 0 Structural and Capability Graph gates passed.
+- Five-Way remains NOT_GREEN with 450 existing Mapping 0 blockers.
+- Strict R4/Evidence/R5 remains blocked; this reconciliation does not promote runtime, D1 or Evidence Registry status.
+- Machine artifact: `artifacts/mapping-0/auth-003-field-wire-reconciliation-2026-09-26.json` (commit `c1be49d3271bf4386d07f769766c0d132c2169d0`).
+
 Next cursor:
-`M0-AUTH-003-CONTRACT-CI-VALIDATION-001` / `FAIL_NOT_AUTH003_BLOCKED`
+`M0-AUTH-003-FIELD-WIRE-RECONCILIATION-001` / `PASS_VERIFIED_SOURCE_ONLY / BLOCKED_RUNTIME_PERSISTENCE`
 
 Objective:
 Validate the encoded AUTH-003 wire/API/DTO/Mapping chain at current `main`. Preserve the fail-closed R4/Evidence gates. Do not rerun AUTH-002 Runtime Evidence Run `36219132123` unchanged.
