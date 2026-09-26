@@ -3232,3 +3232,12 @@ Validate the encoded AUTH-003 wire/API/DTO/Mapping chain at current `main`. Pres
 - No OpenAPI path, DTO registry record, request/response schema or runtime implementation was added.
 - Canonical DTO registry remains blocked by its existing OpenAPI-admission rule.
 - Mapping 0 remains `NOT_GREEN`.
+
+
+## 2026-09-26 AUTH-004 OpenAPI discovery shell conflict
+
+- Control: `CC-MAPPING-0-AUTH-004-OPENAPI-DISCOVERY-SHELL-CONFLICT-2026-09-26`.
+- Feature API contract defines `authPasswordChange`, `authPasswordResetRequest`, `authPasswordResetConfirm` under `/auth/password/*`.
+- Existing OpenAPI/API Inventory contains `postAccountPasswordChange` and `postAccountRecovery` under `/account/*`, explicitly marked `DISCOVERY_DRAFT` with no admitted schemas.
+- This is retained as Decision Material; no route or operation is auto-renamed or deleted.
+- Status: `BLOCKED_DECISION_REQUIRED`.
