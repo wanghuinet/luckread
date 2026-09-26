@@ -107,6 +107,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "authCredentialRemove",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
       "operationId": "authSessionRevoke",
       "auth": {
         "mode": "authenticated"
@@ -424,6 +437,19 @@
     },
     {
       "operationId": "getAuditEvents",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "authCredentialList",
       "auth": {
         "mode": "permission"
       },
@@ -1430,6 +1456,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "authCredentialAdd",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
       "operationId": "authLogin",
       "auth": {
         "mode": "public"
@@ -2082,6 +2121,19 @@
     },
     {
       "operationId": "postUsersUserIdFollow",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "authCredentialReplace",
       "auth": {
         "mode": "permission"
       },

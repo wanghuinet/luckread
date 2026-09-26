@@ -37,22 +37,22 @@
       "required": true,
       "endpoint_groups": [
         "DELETE /v1/account/sessions/{sessionId}",
+        "DELETE /v1/auth/credentials/{credentialId}",
         "DELETE /v1/auth/sessions/{sessionId}",
         "GET /v1/account/sessions",
+        "GET /v1/auth/credentials",
         "GET /v1/auth/sessions",
         "GET /v1/users/me",
         "PATCH /v1/users/me",
         "POST /v1/account/password/change",
         "POST /v1/account/recovery",
+        "POST /v1/auth/credentials",
         "POST /v1/auth/login",
         "POST /v1/auth/logout",
         "POST /v1/auth/refresh",
         "POST /v1/auth/register",
         "POST /v1/auth/revoke",
-        "GET /v1/auth/credentials",
-        "POST /v1/auth/credentials",
-        "PUT /v1/auth/credentials/{credentialId}",
-        "DELETE /v1/auth/credentials/{credentialId}"
+        "PUT /v1/auth/credentials/{credentialId}"
       ]
     },
     "users_accounts": {
