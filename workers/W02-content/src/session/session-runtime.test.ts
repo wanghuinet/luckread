@@ -22,12 +22,14 @@ function nativeSession(overrides: Partial<NativeSessionAuthority> = {}): NativeS
 
 function dbFake(initial: SessionRecord | null, forcedUpdateChanges?: number) {
   let row = initial
+  let nativeSessionPresent = Boolean(initial)
   let reads = 0
   let writes = 0
 
   const db = {
-    prepare: () => ({
+    prepare: (sql: string) => ({
       bind: (...args: unknown[]) => ({
+        sql, args,
         first: async <T>() => {
           reads += 1
           return row as T | null
@@ -55,12 +57,36 @@ function dbFake(initial: SessionRecord | null, forcedUpdateChanges?: number) {
         },
       }),
     }),
-    batch: async () => {
+    batch: async (statements: Array<{ sql?: string; args?: unknown[] }>) => {
       writes += 1
-      return []
+      return statements.map((statement) => {
+        const sql = statement.sql ?? ''
+        const args = statement.args ?? []
+
+        if (sql.includes('UPDATE auth_session_state')) {
+          if (!row || row.revokedAt) return { meta: { changes: 0 } }
+          const [revokedAt, lastSeenAt] = args as [string, string, string]
+          row = { ...row, revokedAt, lastSeenAt }
+          return { meta: { changes: 1 } }
+        }
+
+        if (sql.includes('DELETE FROM users_sessions')) {
+          if (!nativeSessionPresent) return { meta: { changes: 0 } }
+          nativeSessionPresent = false
+          return { meta: { changes: 1 } }
+        }
+
+        return { meta: { changes: 0 } }
+      })
     },
   }
-  return { db: db as unknown as D1Database, getRow: () => row, getReads: () => reads, getWrites: () => writes }
+  return {
+    db: db as unknown as D1Database,
+    getRow: () => row,
+    getReads: () => reads,
+    getWrites: () => writes,
+    getNativeSessionPresent: () => nativeSessionPresent,
+  }
 }
 
 describe('session runtime foundation', () => {
@@ -188,7 +214,7 @@ describe('session runtime foundation', () => {
     })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
   })
 
-  it('revokes an extension record idempotently', async () => {
+  it('revokes extension state and the Payload-native session atomically', async () => {
     const fake = dbFake({
       sessionId: 'sid-1',
       userId: '42',
@@ -201,6 +227,8 @@ describe('session runtime foundation', () => {
     })
     const result = await revokeSessionExtension(fake.db, 'sid-1', NOW)
     expect(result).toEqual({ revoked: true })
+    expect(fake.getRow()?.revokedAt).toBe(NOW)
+    expect(fake.getNativeSessionPresent()).toBe(false)
 
     const second = await revokeSessionExtension(fake.db, 'sid-1', NOW)
     expect(second).toEqual({ revoked: false })
