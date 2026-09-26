@@ -483,331 +483,58 @@
     },
     {
       "operationId": "authCredentialList",
-      "method": "GET",
-      "path": "/auth/credentials",
-      "visibility": "public_authenticated",
-      "capability": "credential_management",
-      "contractStatus": "CONTRACTED_PARTIAL",
       "auth": {
         "mode": "authenticated",
         "subject": "current_user"
       },
-      "authorization": {
-        "required": true,
-        "permission": "user.credential.read",
-        "scope": "self"
-      },
-      "resource": {
-        "class": "BOUNDED_READ",
-        "d1ReadMax": 1,
-        "d1WriteMax": 0,
-        "d1ReadRowsMax": 100,
-        "d1WriteRowsMax": 0,
-        "rpcMax": 0,
-        "outboundMax": 0
-      },
-      "cache": {
-        "mode": "PRIVATE_NO_SHARED_CACHE",
-        "shared": false,
-        "authorizationBoundary": true
-      },
-      "retry": {
-        "maxAttempts": 1,
-        "clientRetrySafe": true,
-        "requiresIdempotency": false
-      },
-      "event": {
-        "syncConsumersMax": 0,
-        "asyncEventsMax": 0,
-        "fanoutMax": 0
-      },
-      "queue": {
-        "enqueueMax": 0
-      },
-      "antiAbuse": {
-        "required": true,
-        "scopes": [
-          "account",
-          "endpoint"
-        ],
-        "actions": [
-          "ALLOW",
-          "THROTTLE",
-          "BLOCK"
-        ]
-      },
-      "idempotency": {
-        "required": false
-      },
-      "security": [
-        "self_scope_only",
-        "credential_values_never_logged",
-        "credential_never_returned",
-        "normalized_values_never_returned",
-        "credential_hashes_never_returned",
-        "no_account_enumeration"
+      "permissions": [
+        "user.credential.read"
       ],
-      "evidence": {
-        "openapi": "PASS",
-        "inventory": "PASS",
-        "permission": "PASS",
-        "state": "MISSING",
-        "resource": "PASS",
-        "cache": "PASS",
-        "antiAbuse": "MISSING",
-        "integration": "MISSING",
-        "securityE2E": "MISSING"
-      }
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/AUTH-003-credential-management-contract.v1.json",
+      "idempotencyRequired": false
     },
     {
       "operationId": "authCredentialAdd",
-      "method": "POST",
-      "path": "/auth/credentials",
-      "visibility": "public_authenticated",
-      "capability": "credential_management",
-      "contractStatus": "CONTRACTED_PARTIAL",
       "auth": {
         "mode": "authenticated",
         "subject": "current_user"
       },
-      "authorization": {
-        "required": true,
-        "permission": "user.credential.manage",
-        "scope": "self"
-      },
-      "resource": {
-        "class": "SINGLE_AUTHORITATIVE_WRITE",
-        "d1ReadMax": 2,
-        "d1WriteMax": 1,
-        "d1ReadRowsMax": 8,
-        "d1WriteRowsMax": 4,
-        "rpcMax": 1,
-        "outboundMax": 0
-      },
-      "cache": {
-        "mode": "NO_STORE",
-        "shared": false,
-        "authorizationBoundary": false
-      },
-      "retry": {
-        "maxAttempts": 1,
-        "clientRetrySafe": true,
-        "requiresIdempotency": true
-      },
-      "event": {
-        "syncConsumersMax": 0,
-        "asyncEventsMax": 0,
-        "fanoutMax": 0
-      },
-      "queue": {
-        "enqueueMax": 0
-      },
-      "antiAbuse": {
-        "required": true,
-        "scopes": [
-          "account",
-          "endpoint",
-          "identity"
-        ],
-        "actions": [
-          "ALLOW",
-          "THROTTLE",
-          "CHALLENGE",
-          "BLOCK"
-        ]
-      },
-      "idempotency": {
-        "required": true,
-        "key": "Idempotency-Key",
-        "semantic": "same-request-replay-must-not-create-second-credential"
-      },
-      "security": [
-        "self_scope_only",
-        "credential_values_never_logged",
-        "credential_never_returned",
-        "normalized_values_never_returned",
-        "credential_hashes_never_returned",
-        "no_account_enumeration",
-        "uniqueness_conflict_not_identity_disclosure",
-        "authorization_before_mutation"
+      "permissions": [
+        "user.credential.manage"
       ],
-      "evidence": {
-        "openapi": "PASS",
-        "inventory": "PASS",
-        "permission": "PASS",
-        "state": "MISSING",
-        "resource": "PASS",
-        "cache": "PASS",
-        "antiAbuse": "MISSING",
-        "integration": "MISSING",
-        "securityE2E": "MISSING"
-      }
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/AUTH-003-credential-management-contract.v1.json",
+      "idempotencyRequired": true,
+      "idempotencyKey": "Idempotency-Key"
     },
     {
       "operationId": "authCredentialReplace",
-      "method": "PUT",
-      "path": "/auth/credentials/{credentialId}",
-      "visibility": "public_authenticated",
-      "capability": "credential_management",
-      "contractStatus": "CONTRACTED_PARTIAL",
       "auth": {
         "mode": "authenticated",
         "subject": "current_user"
       },
-      "authorization": {
-        "required": true,
-        "permission": "user.credential.manage",
-        "scope": "self"
-      },
-      "resource": {
-        "class": "SINGLE_AUTHORITATIVE_WRITE",
-        "d1ReadMax": 2,
-        "d1WriteMax": 1,
-        "d1ReadRowsMax": 8,
-        "d1WriteRowsMax": 4,
-        "rpcMax": 1,
-        "outboundMax": 0
-      },
-      "cache": {
-        "mode": "NO_STORE",
-        "shared": false,
-        "authorizationBoundary": false
-      },
-      "retry": {
-        "maxAttempts": 1,
-        "clientRetrySafe": true,
-        "requiresIdempotency": true
-      },
-      "event": {
-        "syncConsumersMax": 0,
-        "asyncEventsMax": 0,
-        "fanoutMax": 0
-      },
-      "queue": {
-        "enqueueMax": 0
-      },
-      "antiAbuse": {
-        "required": true,
-        "scopes": [
-          "account",
-          "endpoint",
-          "identity"
-        ],
-        "actions": [
-          "ALLOW",
-          "THROTTLE",
-          "CHALLENGE",
-          "BLOCK"
-        ]
-      },
-      "idempotency": {
-        "required": true,
-        "key": "Idempotency-Key",
-        "semantic": "same-request-replay-must-not-create-second-credential"
-      },
-      "security": [
-        "self_scope_only",
-        "credential_values_never_logged",
-        "credential_never_returned",
-        "normalized_values_never_returned",
-        "credential_hashes_never_returned",
-        "no_account_enumeration",
-        "uniqueness_conflict_not_identity_disclosure",
-        "authorization_before_mutation",
-        "kind_change_forbidden"
+      "permissions": [
+        "user.credential.manage"
       ],
-      "evidence": {
-        "openapi": "PASS",
-        "inventory": "PASS",
-        "permission": "PASS",
-        "state": "MISSING",
-        "resource": "PASS",
-        "cache": "PASS",
-        "antiAbuse": "MISSING",
-        "integration": "MISSING",
-        "securityE2E": "MISSING"
-      }
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/AUTH-003-credential-management-contract.v1.json",
+      "idempotencyRequired": true,
+      "idempotencyKey": "Idempotency-Key"
     },
     {
       "operationId": "authCredentialRemove",
-      "method": "DELETE",
-      "path": "/auth/credentials/{credentialId}",
-      "visibility": "public_authenticated",
-      "capability": "credential_management",
-      "contractStatus": "CONTRACTED_PARTIAL",
       "auth": {
         "mode": "authenticated",
         "subject": "current_user"
       },
-      "authorization": {
-        "required": true,
-        "permission": "user.credential.manage",
-        "scope": "self"
-      },
-      "resource": {
-        "class": "SINGLE_AUTHORITATIVE_WRITE",
-        "d1ReadMax": 1,
-        "d1WriteMax": 1,
-        "d1ReadRowsMax": 2,
-        "d1WriteRowsMax": 2,
-        "rpcMax": 0,
-        "outboundMax": 0
-      },
-      "cache": {
-        "mode": "INVALIDATE_PRIVATE",
-        "shared": false,
-        "authorizationBoundary": true
-      },
-      "retry": {
-        "maxAttempts": 1,
-        "clientRetrySafe": true,
-        "requiresIdempotency": true
-      },
-      "event": {
-        "syncConsumersMax": 0,
-        "asyncEventsMax": 0,
-        "fanoutMax": 0
-      },
-      "queue": {
-        "enqueueMax": 0
-      },
-      "antiAbuse": {
-        "required": true,
-        "scopes": [
-          "account",
-          "endpoint"
-        ],
-        "actions": [
-          "ALLOW",
-          "BLOCK"
-        ]
-      },
-      "idempotency": {
-        "required": true,
-        "key": "Idempotency-Key",
-        "semantic": "repeated-remove-is-successful-no-op"
-      },
-      "security": [
-        "self_scope_only",
-        "credential_values_never_logged",
-        "credential_never_returned",
-        "normalized_values_never_returned",
-        "credential_hashes_never_returned",
-        "no_account_enumeration",
-        "uniqueness_conflict_not_identity_disclosure",
-        "authorization_before_mutation"
+      "permissions": [
+        "user.credential.manage"
       ],
-      "evidence": {
-        "openapi": "PASS",
-        "inventory": "PASS",
-        "permission": "PASS",
-        "state": "MISSING",
-        "resource": "PASS",
-        "cache": "PASS",
-        "antiAbuse": "MISSING",
-        "integration": "MISSING",
-        "securityE2E": "MISSING"
-      }
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/AUTH-003-credential-management-contract.v1.json",
+      "idempotencyRequired": true,
+      "idempotencyKey": "Idempotency-Key"
     }
   ]
 }
