@@ -104,23 +104,23 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
   }
 
-  // Payload is configured with removeTokenFromResponses: true because the
-  // public contract uses the W02-backed access/refresh pair. The native login
-  // token itself is therefore intentionally absent from the Local API result.
-  if (!loginResult.user?.id) {
+  // Payload's native login token is intentionally not exposed by the public
+  // collection response, but the Local API result still contains it internally.
+  // Re-authenticate that exact native token to obtain Payload's canonical _sid
+  // instead of inferring a session from the sessions[] ordering.
+  if (!loginResult.token || !loginResult.user?.id || !loginResult.exp) {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication runtime is unavailable')
   }
 
-  // Payload's native login operation has already created the session and returns
-  // the current user's native sessions array. Reuse that result directly rather
-  // than performing a second JWT authentication/database read just to recover sid.
-  const nativeUser = loginResult.user as
-    | ((typeof loginResult.user) & {
-        sessions?: Array<{ id?: string | number }>
-      })
-    | null
-  const nativeSessions = Array.isArray(nativeUser?.sessions) ? nativeUser.sessions : []
-  const nativeSid = nativeSessions.at(-1)?.id
+  const authResult = await payload.auth({
+    headers: new Headers({
+      Authorization: 'Bearer ' + loginResult.token,
+    }),
+    canSetHeaders: false,
+  })
+
+  const nativeUser = authResult.user as (typeof loginResult.user & { _sid?: string }) | null
+  const nativeSid = nativeUser?._sid
 
   if (!nativeSid || !nativeUser?.id) {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Native session binding is unavailable')
