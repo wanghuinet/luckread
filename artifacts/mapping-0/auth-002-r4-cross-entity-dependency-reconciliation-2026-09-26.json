@@ -1,0 +1,56 @@
+{
+  "version": "1.0.0",
+  "evidenceType": "MAPPING_0_AUTH_002_R4_CROSS_ENTITY_DEPENDENCY_RECONCILIATION",
+  "generatedAt": "2026-09-26",
+  "repository": "wanghuinet/luckread",
+  "assessmentBaseMain": "3f9f2fff3b1b6bbc30d3a05b971332c54fabd4bf",
+  "featureId": "AUTH-002",
+  "control": "CC-MAPPING-0-AUTH-002-003-SHARED-ENTITY-AUTHORITY-2026-09-26",
+  "decision": {
+    "status": "PASS_VERIFIED",
+    "auth003EntityAuthority": [
+      "ENT-IDENTITY",
+      "ENT-CREDENTIAL"
+    ],
+    "auth002DependencyRefsRetained": [
+      "ENT-IDENTITY",
+      "ENT-CREDENTIAL",
+      "ENT-SESSION"
+    ],
+    "ownershipSemantics": "AUTH-003 governs canonical Identity/Credential entity and field authority; AUTH-002 consumes those entities as shared dependencies and does not become their owner.",
+    "noPromotionByInference": true
+  },
+  "remainingVerification": {
+    "ENT-IDENTITY": {
+      "catalogStatus": "PROPOSED",
+      "persistenceStatus": "NOT_VERIFIED"
+    },
+    "ENT-CREDENTIAL": {
+      "catalogStatus": "PROPOSED",
+      "persistenceStatus": "NOT_VERIFIED"
+    },
+    "ENT-SESSION": {
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "IMPLEMENTED",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED"
+    }
+  },
+  "gateResult": {
+    "dependencyReconciliation": "PASS_VERIFIED",
+    "auth002RegistryStatus": "BLOCKED",
+    "r4": "BLOCKED",
+    "fiveWay": "NOT_GREEN",
+    "mapping0": "NOT_GREEN"
+  },
+  "nextAction": {
+    "id": "M0-AUTH-002-R4-ENTITY-DEPENDENCY-EVIDENCE-001",
+    "state": "WAIT_ENTITY_EVIDENCE",
+    "objective": "Close entity-specific persistence/runtime evidence for ENT-IDENTITY and ENT-CREDENTIAL under AUTH-003 ownership before any AUTH-002 R4 promotion.",
+    "prohibited": [
+      "Do not remove existing AUTH-002 entityRefs.",
+      "Do not promote ENT-IDENTITY or ENT-CREDENTIAL from contract-only evidence.",
+      "Do not mark AUTH-002 registry VERIFIED.",
+      "Do not rerun AUTH-002 Runtime Evidence Run 36219132123 unchanged."
+    ]
+  }
+}
