@@ -36,6 +36,7 @@ const features = Array.isArray(featureInventory.features)
     : []
 const featureIds = new Set(features.map((feature) => feature.featureId).filter(Boolean))
 const currentCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+const testedCommit = registry?.testedCommitSha || currentCommit
 
 if (schema.$id !== 'https://luckread.com/contracts/evidence/mapping-0-evidence-registry.v1.schema.json') {
   fail('canonical registry schema $id mismatch')
@@ -62,6 +63,14 @@ const sourceRefLooksResolvable = (sourceRef) => {
   return allowed.some((prefix) => clean.startsWith(prefix))
 }
 
+const evidenceIsAdmittedCurrent = (record) => {
+  if (record?.result !== 'PASS' || !['ACTIVE', 'VERIFIED'].includes(record?.status)) return false
+  if (record?.commitSha === testedCommit) return true
+  return record?.status === 'VERIFIED' &&
+    record?.freshnessMode === 'INHERITED_UNCHANGED_SCOPE' &&
+    sourceRefLooksResolvable(record?.inheritanceRef)
+}
+
 for (const record of registry.records) {
   if (!record || typeof record !== 'object') { failures.push('record must be an object'); continue }
   for (const field of ['evidenceId', 'type', 'claimId', 'subjectType', 'subjectId', 'source', 'sourceRef', 'commitSha', 'timestamp', 'producer', 'result', 'status']) {
@@ -77,8 +86,8 @@ for (const record of registry.records) {
   if (!statuses.has(record.status)) failures.push(`invalid status: ${record.evidenceId}`)
   if (!sourceRefLooksResolvable(record.sourceRef)) failures.push(`sourceRef is not repository/URL resolvable: ${record.evidenceId}`)
   if (record.status === 'ACTIVE' || record.status === 'VERIFIED') {
-    if (record.result === 'PASS' && record.commitSha !== currentCommit) {
-      failures.push(`active PASS evidence is stale for current commit: ${record.evidenceId}`)
+    if (record.result === 'PASS' && !evidenceIsAdmittedCurrent(record)) {
+      failures.push(`active PASS evidence is stale without valid inheritance record: ${record.evidenceId}`)
     }
   }
   const key = `${record.subjectId}::${record.claimId}`
