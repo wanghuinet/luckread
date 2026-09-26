@@ -2,8 +2,8 @@
 
 - Feature: `AUTH-004`
 - Scope: W01 Payload native authentication persistence versus AUTH-004 recovery-token persistence rules
-- Status: `BLOCKED_DECISION_REQUIRED`
-- Implementation authorization: `false`
+- Status: `DECISION_APPROVED`
+- Implementation authorization: `true` (W01 containment + W02 AUTH-004 implementation only)
 - Runtime authorization: `false`
 - Mapping-0 promotion: `false`
 
@@ -82,7 +82,7 @@ The unresolved question is:
 
 > What is the admitted integration boundary that prevents the canonical AUTH-004 flow from using Payload's raw-token reset implementation, while preserving the required W01 local-auth capabilities and avoiding an unauthorized Payload-core fork?
 
-No automatic answer is admitted by this Change Control.
+No automatic answer was admitted before decision. The decision is recorded in Section 15 below.
 
 ## 5. Required decision material
 
@@ -97,13 +97,13 @@ Before implementation or migration execution, resolve all of the following:
 
 ## 6. Candidate resolution tracks (decision material only)
 
-These are not decisions:
+These were candidate resolution tracks before decision; Section 15 selects the admitted track.
 
 - **Track A — Isolate native recovery**: keep Payload local auth for login/session capability, but explicitly prevent the native forgot/reset endpoints and operations from being the canonical recovery surface.
 - **Track B — Adapt at the W01 boundary**: use supported Payload extension/configuration points to route canonical AUTH-004 recovery through a separate persistence model while preventing the built-in raw-token path.
 - **Track C — Payload-core modification/fork**: modify or maintain a controlled fork of Payload authentication internals. This has higher governance/maintenance impact and therefore requires explicit architecture/change-control admission before use.
 
-The repository MUST NOT choose among these tracks by inference.
+The repository MUST follow the decision recorded in Section 15; Track B and Track C are not admitted by this Change Control.
 
 ## 7. Evidence anchors
 
@@ -116,7 +116,7 @@ The repository MUST NOT choose among these tracks by inference.
 
 ## 8. Gate impact
 
-Until this conflict is resolved:
+The conflict is resolved at the architecture/change-control level by Section 15, but implementation and runtime evidence remain gated:
 
 - AUTH-004 persistence remains `CONTRACTED_NOT_VERIFIED`.
 - AUTH-004 Evidence Registry admission remains blocked.
@@ -179,7 +179,7 @@ The current W01 repository state has **not** installed the fail-closed hook boun
 - workers/W01-payload/src/collections/Users.ts sets auth: true but declares no hooks.beforeOperation guard.
 - workers/W01-payload/src/payload.config.ts does not install a recovery-specific collection hook or endpoint-level blocker.
 - The existing W01 native migration still creates users.reset_password_token and users.reset_password_expiration.
-- Therefore the repository currently has a confirmed supported interception mechanism, but the protection is **not yet implemented or authorized**.
+- Therefore the repository currently has a confirmed supported interception mechanism, but the protection is **not yet implemented; implementation is now authorized under Section 15**.
 
 This distinction is deliberate:
 
@@ -203,7 +203,7 @@ This section is a decision/acceptance packet only. It does not authorize impleme
 
 ### 13.1 Minimum W01 containment surface
 
-If the decision admits a fail-closed native recovery boundary, the smallest repository surface to inspect/change is expected to be:
+Under the approved Track A decision, the smallest repository surface to inspect/change is:
 
 - workers/W01-payload/src/collections/Users.ts
 - workers/W01-payload/src/payload.config.ts only if the chosen hook wiring requires shared construction/configuration
@@ -277,7 +277,7 @@ The current W02 repository state confirms ownership infrastructure but does not 
 - workers/W02-content/migrations currently contain role-assignment, AUTH-013 account-state/publication-journal, and role-authorization-version migrations; no MIG-AUTH-004-PASSWORD-RECOVERY-V1 implementation is present.
 - Repository search found the AUTH-004 persistence fields only in contract/change-control material, not as an existing W02 runtime implementation.
 
-This is a current code-state finding, not an authorization to begin implementation.
+This is a current code-state finding; implementation authorization is now governed by Section 15.
 
 It confirms the present boundary is:
 
@@ -286,3 +286,86 @@ W02/D1-01 = canonical AUTH-004 ownership, but AUTH-004 runtime implementation is
 
 Therefore the project is not currently in a state where a canonical AUTH-004 runtime path can be proven end-to-end. The next implementation gate must separately admit W01 native-recovery containment and W02 canonical recovery implementation.
 
+
+## 15. Final Change Control Decision — 2026-09-26
+
+### 15.1 Decision
+
+Track A — Isolate Payload native recovery is APPROVED.
+
+The canonical password recovery system is W02 / D1-01 under AUTH-004.
+
+Payload native forgotPassword and resetPassword operations are not authoritative and MUST NOT serve as the canonical recovery path.
+
+W01 SHALL retain Payload local-auth capabilities required by the existing architecture, but SHALL fail closed before the native recovery operations can generate, persist, query, or consume resetPasswordToken.
+
+### 15.2 Exact containment boundary
+
+The approved containment mechanism is the existing supported Payload v3.87.1 collection beforeOperation hook boundary.
+
+For both operations — forgotPassword and resetPassword — the W01 hook MUST reject the native operation before native reset-token processing begins.
+
+The native operation MUST NOT be allowed to continue after the guard rejects it.
+
+The native route MUST NOT be adapted to become an alternative implementation of AUTH-004.
+
+No Payload-core modification or fork is approved.
+
+For the native endpoints, the rejection should use a non-recovery public error surface; the implementation should prefer a not-found style response where supported, with no reset-token, delivery, account-existence, or persistence metadata disclosed.
+
+### 15.3 Canonical flow
+
+The canonical flow is:
+
+public /auth/password/* boundary → W01 API/gateway boundary → W02 Identity / Account / Authorization → D1-01 authoritative persistence → AUTH-004 recovery state machine and session invalidation.
+
+W01 Payload native /forgot-password and /reset-password are containment-only legacy surfaces and MUST NOT enter this canonical flow.
+
+### 15.4 Native columns decision
+
+The existing Payload columns users.reset_password_token and users.reset_password_expiration are approved as retained legacy/inert columns for the initial containment phase.
+
+They are not part of AUTH-004 authority.
+
+They MUST remain unpopulated by the canonical recovery path.
+
+A later removal migration is not required to unblock the first AUTH-004 runtime implementation; removal becomes a separate destructive Change Control item only if repository/runtime evidence later justifies it.
+
+This is deliberately the least-destructive migration choice because Payload auth:true currently expects these native fields in its generated authentication schema, while the approved hook prevents the native recovery operations from using them.
+
+### 15.5 W02 implementation authorization
+
+W02 implementation is authorized only for the already-contracted AUTH-004 operations and persistence rules.
+
+The implementation MUST use recoveryId, identityId, purpose=password_reset, tokenHash, issuedAt, expiresAt, consumedAt, and invalidatedAt together with the canonical credential/session contracts.
+
+Raw recovery tokens MUST NOT be persisted or logged.
+
+Successful password reset/change MUST perform the required session invalidation according to the existing session lifecycle contract.
+
+### 15.6 Explicitly not approved
+
+This Change Control does NOT approve:
+
+- Payload-core fork/modification;
+- W01 becoming the authoritative recovery persistence owner;
+- storing the raw recovery token in users.reset_password_token;
+- exposing Payload native recovery as an alias for AUTH-004;
+- creating a new Worker or D1 domain;
+- bypassing Mapping-0 / Evidence Registry / runtime gates;
+- claiming GREEN from this decision alone.
+
+### 15.7 Promotion state after decision
+
+After this decision:
+
+- W01 containment implementation: AUTHORIZED
+- W02 AUTH-004 implementation: AUTHORIZED
+- AUTH-004 migration execution: NOT YET AUTHORIZED
+- production/remote runtime execution: NOT YET AUTHORIZED
+- Evidence Registry admission: NOT YET AUTHORIZED
+- Mapping-0 promotion: NOT GREEN / NOT AUTHORIZED
+
+Required sequence remains:
+
+Decision → W01 containment → W02 AUTH-004 implementation → contract/implementation reconciliation → isolated schema/migration preparation → separate migration authorization → runtime evidence → Evidence Registry admission → Mapping-0/downstream promotion.
