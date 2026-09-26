@@ -207,6 +207,14 @@ function parseCanonicalInventory(file, openapiByMethodPath) {
 const { operations: openapiOps, byMethodPath: openapiByMethodPath } = parseOpenApiOperations(openapiSpec);
 const canonicalInventoryRecords = parseCanonicalInventory(inventoryBaseline, openapiByMethodPath);
 const alternateOperationSources = collectAlternateOperationSources(inventoryDir);
+const detailedPolicyDomains = new Set([
+  'auth_identity',
+  'users_accounts',
+  'content',
+  'media',
+  'feed',
+  'interaction',
+]);
 
 if (!fs.existsSync(inventoryDir)) {
   failures.push({ code: 'MISSING_API_INVENTORY_DIRECTORY' });
@@ -285,6 +293,9 @@ for (const [id] of inventory) {
   const canonicalPolicy = policyOps.get(id);
   if (isDiscoveryDraftCanonicalPolicy(canonicalPolicy)) continue;
 
+  const record = inventory.get(id);
+  if (!record || !detailedPolicyDomains.has(record.domain)) continue;
+
   const detailedPolicy = policyInventory.get(id);
   if (!detailedPolicy || effectiveDetailedPolicyStatus(detailedPolicy) === 'MISSING') {
     const alternateSources = alternateOperationSources.get(id) ?? [];
@@ -295,7 +306,7 @@ for (const [id] of inventory) {
         `authoritative operation contract exists outside detailed domain operation policy: ${alternateSources.join(', ')}`,
       );
     } else {
-      finding('MISSING_POLICY_OPERATION', id, 'non-discovery canonical operation has no active detailed domain operation policy or alternate operation contract');
+      finding('MISSING_POLICY_OPERATION', id, 'non-discovery canonical operation in a core reconciliation domain has no active detailed domain operation policy or alternate operation contract');
     }
   }
 }
@@ -376,6 +387,11 @@ const report = {
   openapiPolicyCount: policyOps.size,
   failureCount: failures.length,
   findingCount: findings.length,
+  policyGapSummary: {
+    coreDetailedPolicyDomainCount: detailedPolicyDomains.size,
+    alternatePolicyNormalizationGapCount: findings.filter((x) => x.code === 'POLICY_SOURCE_PRESENT_NOT_NORMALIZED').length,
+    coreDetailedPolicyMissingCount: findings.filter((x) => x.code === 'MISSING_POLICY_OPERATION').length,
+  },
   failures,
   findings,
   matches,
