@@ -3,7 +3,7 @@
   "evidenceType": "MAPPING_0_AUTH_003_WIRE_SCHEMA_ENCODING_RECONCILIATION",
   "generatedAt": "2026-09-26",
   "repository": "wanghuinet/luckread",
-  "currentMain": "8b4814bd73804f95b02e985b67b9c1a213f2209a",
+  "currentMain": "6116e76e498d3ffa6608f14c9c05a84343a9d561",
   "taskId": "M0-AUTH-003-WIRE-SCHEMA-ENCODING-001",
   "status": "PASS_VERIFIED_SOURCE_RECONCILIATION",
   "encodedSources": [
@@ -17,7 +17,7 @@
   ],
   "structuralChecks": {
     "auth003ApiContractJson": "PASS",
-    "authOperationPolicyJson": "PASS / 4 AUTH-003 operations",
+    "authOperationPolicyJson": "PASS / 4 AUTH-003 operations; operational budgets remain explicitly unclaimed",
     "apiInventoryJson": "PASS / 4 AUTH-003 endpoint groups",
     "dtoContractJson": "PASS / 4 AUTH-003 operation bindings",
     "dtoRecordsJson": "PASS / 5 AUTH-003 DTO records; remove is no-body",
