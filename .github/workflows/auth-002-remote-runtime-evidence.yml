@@ -35,7 +35,9 @@ env:
   W01_BASE_URL: ${{ github.event_name == 'workflow_run' && 'https://luckread-w01-payload.wanghui-79b.workers.dev' || inputs.w01_base_url }}
   DATABASE_NAME: ${{ github.event_name == 'workflow_run' && 'luckread' || inputs.database_name }}
   DEPLOYMENT_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.deployment_run_id }}
-  DEPLOYMENT_HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.tested_commit }}
+  # On workflow_run, resolve the exact deployed source from the deployment artifact name.
+  # The deployment run head can differ because deployment is explicitly parameterized by source_sha.
+  DEPLOYMENT_HEAD_SHA: ${{ github.event_name == 'workflow_run' && '' || inputs.tested_commit }}
 
 jobs:
   runtime-evidence:
@@ -47,10 +49,69 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Resolve exact deployed source SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_run" ]; then
+            test -n "${DEPLOYMENT_HEAD_SHA}"
+            exit 0
+          fi
+
+          test -n "${DEPLOYMENT_RUN_ID}"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}" > /tmp/auth-002-deployment.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}/artifacts?per_page=100" > /tmp/auth-002-artifacts.json
+
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from 'node:fs'
+
+          const deployment = JSON.parse(readFileSync('/tmp/auth-002-deployment.json', 'utf8'))
+          const artifacts = JSON.parse(readFileSync('/tmp/auth-002-artifacts.json', 'utf8'))
+
+          if (deployment.name !== 'W01 W02 Auth Binding Deploy') {
+            throw new Error('runtime evidence admission: deployment run is not W01 W02 Auth Binding Deploy')
+          }
+          if (deployment.conclusion !== 'success') {
+            throw new Error('runtime evidence admission: deployment run conclusion is not success')
+          }
+          if (deployment.head_branch !== 'main') {
+            throw new Error('runtime evidence admission: deployment run is not on main')
+          }
+
+          const prefix = 'w01-w02-binding-deployment-'
+          const matches = (artifacts.artifacts ?? []).filter(
+            (artifact) =>
+              typeof artifact?.name === 'string' &&
+              artifact.name.startsWith(prefix) &&
+              artifact?.expired_at == null,
+          )
+
+          if (matches.length !== 1) {
+            throw new Error(
+              `runtime evidence admission: expected exactly one live deployment source artifact in run ${deployment.id}; found ${matches.length}`,
+            )
+          }
+
+          const sourceSha = matches[0].name.slice(prefix.length)
+          if (!/^[0-9a-f]{40}$/.test(sourceSha)) {
+            throw new Error(
+              `runtime evidence admission: deployment artifact source SHA is invalid: ${sourceSha}`,
+            )
+          }
+
+          appendFileSync(process.env.GITHUB_ENV, `DEPLOYMENT_HEAD_SHA=${sourceSha}\n`)
+          console.log(
+            `Runtime evidence admission: deployment run ${deployment.id} SUCCESS on main; source SHA resolved from deployment artifact name=${sourceSha}; workflow run head_sha=${deployment.head_sha}`,
+          )
+          NODE
+
+          rm -f /tmp/auth-002-deployment.json /tmp/auth-002-artifacts.json
+
       - name: Checkout exact deployed source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.tested_commit }}
+          ref: ${{ env.DEPLOYMENT_HEAD_SHA }}
           fetch-depth: 0
 
       - name: Setup Node 24
