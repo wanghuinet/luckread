@@ -29,3 +29,22 @@ This change does not establish AUTH-004 runtime, persistence, security-E2E, or M
 Pre-change backup branch:
 
 `backup/pre-payload-native-cleanup-20260926`
+
+
+## Contract reconciliation completed
+
+The canonical AUTH-004 implementation boundary is now explicitly Payload-native:
+
+- `authPasswordResetRequest` maps to Payload `forgotPassword`.
+- `authPasswordResetConfirm` maps to Payload `resetPassword`.
+- `authPasswordChange` maps to authenticated Payload password update semantics.
+- `resetPasswordToken` and `resetPasswordExpiration` are Payload-managed native recovery fields.
+- No custom AUTH-004 recovery table or migration is required.
+- The previous custom `tokenHash/recoveryId/consumedAt/invalidatedAt` persistence design is retained only as historical proposed design inside the AUTH-004 field contract; it is not an implementation admission.
+- AUTH-004 remains evidence-gated and NOT_GREEN.
+
+The migration manifest contained a pre-existing JSON structural error in the AUTH-002..006 manifest. While making the AUTH-004 native reconciliation, that syntax error was corrected without changing the other migration definitions.
+
+## Current implementation rule
+
+`Payload native capability > thin adapter if necessary > custom subsystem only by explicit later Change Control.`
