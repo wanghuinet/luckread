@@ -151,6 +151,7 @@ describe('authoritative session validation', () => {
     await expect(validateAuthoritativeSession(db, {
       sessionId: 'sid-1',
       userId: '42',
+      tokenVersion: 3,
       now: NOW,
     })).resolves.toEqual({ active: false })
   })
