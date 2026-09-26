@@ -3159,6 +3159,8 @@ Source reconciliation result:
 
 Contract CI status is **NOT_OBSERVED** for current main; no status check is claimed from source validation alone.
 
+Operational policy boundary: AUTH-003 Operation Policy entries remain `DISCOVERY_DRAFT` because no explicit authority for resource/D1, event, queue or anti-abuse budgets was found. Only the already-established authentication, permission and Idempotency-Key rules are carried forward.
+
 Next cursor:
 `M0-AUTH-003-CONTRACT-CI-VALIDATION-001` / `WAIT_CI_RESULT`
 
