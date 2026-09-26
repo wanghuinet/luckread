@@ -3033,3 +3033,43 @@ Required execution pairing for the existing runtime workflow:
 - deployment provenance must continue to bind exactly to that successful W01/W02 deployment run.
 
 No Contract/Blueprint/Worker/D1 topology was changed by this evidence reconciliation.
+
+
+## 2026-09-26 Superpowers continuation — AUTH-002 E6 Runtime evidence reconciliation
+
+Source-of-fact runtime evidence:
+- AUTH-002 E6 Runtime-003 workflow run `36219132123` / job `108340930519` = SUCCESS.
+- Tested source commit = `5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55`.
+- Controlled target = `luckread` / `CONTROLLED_REMOTE_D1`.
+- Deployment provenance = run `36218476233`, exact deployment head `5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55`.
+- Runtime probe result: Gate-1 accepted, negative-security suite passed, concurrency suite passed.
+- Runtime validator emitted `AUTH-002_RUNTIME_EVIDENCE_VALIDATION_PASS`.
+- The canonical Evidence Registry already contains the resulting EVD-AUTH002-B23/B24/B25/B26 records as `VERIFIED`.
+
+Evidence inheritance:
+- Current `main` at review was `5be6f348e780dcd70937f1cf90918984c550745b`.
+- The tested runtime commit is an ancestor of current `main`.
+- Post-tested-commit changes are limited to the admitted evidence/CI governance files:
+  - `.github/workflows/auth-002-remote-runtime-evidence.yml`
+  - `contracts/evidence/mapping-0-evidence-registry.v1.json`
+  - `scripts/mapping-0-evidence-registry-final-check.mjs`
+- Therefore the runtime result is reusable under `INHERITED_UNCHANGED_SCOPE`; no E6 Runtime rerun is required.
+- Detailed machine-readable reconciliation: `artifacts/mapping-0/auth-002-e6-runtime-evidence-reconciliation-2026-09-26.json`.
+
+Related closure evidence already verified:
+- ENT-USER profile migration run `36195829989` = PASS_VERIFIED; all six canonical profile fields and `users_username_idx` were applied to D1-01.
+- W02 deployment and W01→W02 `W02_AUTH` Service Binding are already PASS_VERIFIED and are not re-executed here.
+
+Promotion boundary:
+- AUTH-002 remains `NOT_GREEN`.
+- Canonical Mapping remains `NOT_GREEN`.
+- Strict R4 Feature→Entity→Persistence remains blocked.
+- `contracts/capability/feature-entity-persistence-registry.v1.json` still records AUTH-002 as `BLOCKED`.
+- AUTH-002 still references `ENT-IDENTITY`, `ENT-CREDENTIAL`, and `ENT-SESSION`; ENT-IDENTITY and ENT-CREDENTIAL remain `PROPOSED / CONTRACT_ONLY`, while ENT-SESSION remains `PROPOSED / CONTRACTED_NOT_VERIFIED`.
+- No promotion is made from runtime evidence alone.
+
+### Current closure cursor
+`M0-AUTH-002-R4-ENTITY-PERSISTENCE-RECONCILIATION-001` / `TODO_FIX`
+
+Objective:
+Reconcile the existing AUTH-002 Feature→Entity→Persistence registry using explicit authority and already-admitted evidence only. Do not infer Identity/Credential ownership, create duplicate entities, or promote Mapping 0.
