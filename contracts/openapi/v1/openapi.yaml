@@ -122,6 +122,130 @@ paths:
           description: Logged out; token version incremented.
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+  /auth/credentials:
+    get:
+      tags: [Auth]
+      summary: List current user's credentials
+      operationId: authCredentialList
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Current user's credentials using the canonical cursor-paginated envelope; deterministic order is createdAt DESC, credentialId DESC.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [items, nextCursor, hasMore]
+                    additionalProperties: false
+                    properties:
+                      items:
+                        type: array
+                        maxItems: 100
+                        items:
+                          $ref: '#/components/schemas/Credential'
+                      nextCursor:
+                        anyOf:
+                          - $ref: '#/components/schemas/Cursor'
+                          - type: 'null'
+                      hasMore:
+                        type: boolean
+                  requestId:
+                    $ref: '#/components/schemas/RequestId'
+                  traceId:
+                    $ref: '#/components/schemas/TraceId'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '422': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    post:
+      tags: [Auth]
+      summary: Add a credential for the current user
+      operationId: authCredentialAdd
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, value]
+              additionalProperties: false
+              properties:
+                kind:
+                  type: string
+                  enum: [username, email, phone]
+                value:
+                  type: string
+                  minLength: 1
+      responses:
+        '201':
+          description: Credential added.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Credential' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/ClientError' }
+        '422': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/credentials/{credentialId}:
+    parameters:
+      - $ref: '#/components/parameters/CredentialId'
+    put:
+      tags: [Auth]
+      summary: Replace a credential value for the current user
+      operationId: authCredentialReplace
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              additionalProperties: false
+              properties:
+                value:
+                  type: string
+                  minLength: 1
+      responses:
+        '200':
+          description: Credential replaced.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Credential' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ClientError' }
+        '422': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    delete:
+      tags: [Auth]
+      summary: Remove a credential from the current user
+      operationId: authCredentialRemove
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '204':
+          description: Credential removed or already-retired for the current user.
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ClientError' }
+        '422': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
   /auth/sessions:
     get:
       tags: [Auth]
@@ -2237,6 +2361,11 @@ components:
       in: path
       required: true
       schema: { $ref: '#/components/schemas/ResourceId' }
+    CredentialId:
+      name: credentialId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
     Cursor:
       name: cursor
       in: query
@@ -2263,6 +2392,11 @@ components:
       required: true
       schema: { $ref: '#/components/schemas/ETag' }
   responses:
+    Unauthenticated:
+      description: Authentication required.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
     ValidationFailed:
       description: Validation failed.
       content:
@@ -2318,6 +2452,24 @@ components:
       type: string
       minLength: 1
       maxLength: 128
+    Credential:
+      type: object
+      required: [credentialId, kind, active]
+      additionalProperties: false
+      properties:
+        credentialId:
+          $ref: '#/components/schemas/ResourceId'
+        kind:
+          type: string
+          enum: [username, email, phone]
+        active:
+          type: boolean
+    Cursor:
+      $ref: '../../schemas/common/cursor.json'
+    RequestId:
+      $ref: '../../schemas/common/request-id.json'
+    TraceId:
+      $ref: '../../schemas/common/trace-id.json'
     ETag:
       type: string
       minLength: 1
