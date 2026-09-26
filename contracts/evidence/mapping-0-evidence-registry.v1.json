@@ -417,6 +417,40 @@
       "checkId": "108297766573",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36204417344",
       "note": "Remote concurrency suite passed: one successful successor with three denials in a four-way refresh race, concurrent logout safety, and validation after revocation. Tested/deployed source was 7d2736072ac936e004060d14dd01f7fc836c4771; current main is db7cf1ea6a2eeb746b4499cd1257b3d3ebd0b97e, so this is CREATED, not VERIFIED."
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B20-ENT-USER-PROFILE-MIGRATION-REMOTE-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-002::ENT-USER-PROFILE-MIGRATION",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "GitHub Actions W01 AUTH-002 Post-Migration Evidence Capture against controlled Cloudflare D1",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36210439729/artifacts/10895128130",
+      "commitSha": "1e49e88b986d1191940f858472afe9decb594592",
+      "timestamp": "2026-09-26T02:03:19Z",
+      "producer": "Wrangler 4.116.0 remote D1 read-only post-migration evidence capture",
+      "result": "PASS",
+      "status": "CREATED",
+      "checkId": "108315624259",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36210439729",
+      "note": "Controlled remote D1 evidence proves payload_migrations contains 20260925_111503_MIG_ENT_USER_PROFILE_V1. The migration execution workflow run 36210226491 was correctly blocked before mutation because the target migration already existed remotely; no second mutation was executed. This record is CREATED pending canonical Evidence Registry reconciliation."
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B21-ENT-USER-PROFILE-SCHEMA-REMOTE-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-002::ENT-USER-PROFILE-SCHEMA",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "GitHub Actions W01 AUTH-002 Post-Migration Evidence Capture against controlled Cloudflare D1",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36210439729/artifacts/10895128130",
+      "commitSha": "1e49e88b986d1191940f858472afe9decb594592",
+      "timestamp": "2026-09-26T02:03:19Z",
+      "producer": "Wrangler 4.116.0 remote D1 read-only catalog/schema evidence capture",
+      "result": "PASS",
+      "status": "CREATED",
+      "checkId": "108315624259",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36210439729",
+      "note": "Controlled remote D1 evidence validates the users table, username/display_name/bio/avatar/locale/timezone columns, and users_username_idx. Provenance is CONTROLLED_REMOTE_D1. This record is CREATED pending canonical Evidence Registry reconciliation."
     }
   ]
 }
