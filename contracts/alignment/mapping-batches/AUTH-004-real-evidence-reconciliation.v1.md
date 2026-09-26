@@ -21,23 +21,23 @@
 
 ## 2. Missing canonical traceability
 
-- Canonical API operation ID(s) for password change/reset lifecycle: missing or not fully bound.
+- Canonical API operation IDs are now bound by `contracts/api/AUTH-004-password-recovery-contract.v1.json`.
 - Request/response DTO IDs: missing.
-- Credential entity/field IDs: missing.
-- Recovery-token entity/field persistence mapping: missing.
+- Credential/session entity references are now bound for the native implementation mapping; runtime field/schema evidence remains missing.
+- Recovery-token persistence mapping now points to Payload-native `resetPasswordToken` / `resetPasswordExpiration`; actual D1 runtime schema evidence remains missing.
 - Permission/scoped authorization mapping for authenticated password change: missing.
 - Account recovery authorization boundary: missing.
 - Account/session invalidation semantics after password change/reset: incomplete.
 - Event IDs for password change/reset and credential rotation: missing.
 - Worker/runtime implementation evidence: missing.
-- D1 domain/table/column/migration evidence: unresolved.
+- D1 domain is `D1-01`; AUTH-004 custom migration is explicitly `NOT_REQUIRED_NATIVE`, while physical schema/runtime evidence remains unresolved.
 - Executed security tests for replay, expiry, enumeration resistance, and credential non-disclosure: missing.
 - Integration/E2E execution evidence: missing.
 - Evidence Registry IDs bound to `AUTH-004`: missing.
 
 ## 3. Evidence interpretation rules
 
-The existence of Payload authentication support, a registry validation-unit name, or a generic user collection does not prove password reset/change implementation. No password, recovery-token, handler, persistence table, permission, lifecycle transition, or test result is promoted from inference.
+The Payload-native implementation boundary is now explicitly recorded in code and contract mapping. This is implementation evidence, not runtime/security proof. No runtime result, D1 schema result, permission result, lifecycle result, or test result is promoted from static configuration alone.
 
 ## 4. Security gate
 
