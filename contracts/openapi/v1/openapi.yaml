@@ -485,7 +485,7 @@ paths:
     get:
       tags: [Search]
       summary: Search content
-      operationId: search
+      operationId: searchContent
       parameters:
         - name: q
           in: query
@@ -796,6 +796,14 @@ paths:
       responses:
         '200': { description: Content revision. }
         '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /contents/{contentId}/revisions/{revisionId}/rollback:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+      - name: revisionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
     post:
       tags: [Contents]
       summary: Roll back content to a revision by creating a new revision
