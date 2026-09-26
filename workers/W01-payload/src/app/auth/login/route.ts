@@ -108,15 +108,16 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication runtime is unavailable')
   }
 
-  const authResult = await payload.auth({
-    headers: new Headers({
-      Authorization: `Bearer ${loginResult.token}`,
-    }),
-    canSetHeaders: false,
-  })
-
-  const nativeUser = authResult.user as (typeof loginResult.user & { _sid?: string }) | null
-  const nativeSid = nativeUser?._sid
+  // Payload's native login operation has already created the session and returns
+  // the current user's native sessions array. Reuse that result directly rather
+  // than performing a second JWT authentication/database read just to recover sid.
+  const nativeUser = loginResult.user as
+    | ((typeof loginResult.user) & {
+        sessions?: Array<{ id?: string | number }>
+      })
+    | null
+  const nativeSessions = Array.isArray(nativeUser?.sessions) ? nativeUser.sessions : []
+  const nativeSid = nativeSessions.at(-1)?.id
 
   if (!nativeSid || !nativeUser?.id) {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Native session binding is unavailable')
@@ -124,7 +125,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const session = await establishSession({
-      sessionId: nativeSid,
+      sessionId: String(nativeSid),
       userId: String(nativeUser.id),
       deviceId: body.deviceId,
     })
