@@ -310,7 +310,8 @@ async function login(user, deviceId) {
     contentType: nativeResponse.contentType,
     requestId: nativeResponse.requestId,
     cfRay: nativeResponse.cfRay,
-    successShape: Boolean(nativeResponse.data?.token && nativeResponse.data?.user?.id),
+    nativeLoginSuccess: nativeResponse.status === 200 && Boolean(nativeResponse.data?.user?.id),
+    tokenOmittedByCollectionPolicy: nativeResponse.status === 200 && !nativeResponse.data?.token,
     errorCode: nativeResponse.data?.errors?.[0]?.name ?? nativeResponse.data?.error?.code ?? null,
     errorMessage: typeof nativeResponse.data?.errors?.[0]?.message === 'string'
       ? nativeResponse.data.errors[0].message.slice(0, 160)
