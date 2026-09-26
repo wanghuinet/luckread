@@ -3250,3 +3250,26 @@ Validate the encoded AUTH-003 wire/API/DTO/Mapping chain at current `main`. Pres
 - Existing `postAccountPasswordChange` and `postAccountRecovery` remain historical `DISCOVERY_DRAFT` aliases only and are not canonical AUTH-004 operations.
 - No OpenAPI route or schema was modified. Exact wire schema remains blocked.
 - Result: `PASS_VERIFIED_AUTHORITY_ONLY`.
+
+
+## 2026-09-26 — AUTH-004 / AUTH-014 recovery feature-scope boundary
+
+Source decision head before this control: `742fdb68866599c54b9ba52ba45c291f7a8558d9`.
+Decision commit: `d2b6b54bc6eba09bf46dc4e4995c2ca3b8b4596a`.
+Backup branch: `backup/main-before-auth004-auth014-boundary-decision-20260926`.
+
+Decision Control:
+`CC-MAPPING-0-AUTH-004-AUTH-014-RECOVERY-BOUNDARY-CONFLICT-2026-09-26`
+
+Result:
+- AUTH-004 and AUTH-014 are authoritative distinct feature scopes.
+- AUTH-004 remains the canonical password reset/change feature with its already-frozen three operation IDs.
+- `postAccountRecovery` / `POST /v1/account/recovery` remains an unbound inventory/discovery route for AUTH-014.
+- No AUTH-014 operationId, DTO schema, OpenAPI admission, runtime handler, persistence mapping, or Evidence PASS is invented by this decision.
+- The feature-scope ambiguity is resolved only; AUTH-014 operation/API closure remains open.
+- AUTH-004 Wire Schema and Operation Policy remain independently blocked.
+
+Current continuation:
+`M0-AUTH-004-WIRE-AND-OPERATION-POLICY-AUTHORITY-001` / `WAIT_AUTHORITY_DECISION`
+
+Do not rerun AUTH-002 Runtime Evidence `36219132123` unchanged.
