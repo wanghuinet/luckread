@@ -59,14 +59,36 @@
     {
       "entityId": "ENT-SESSION",
       "catalogStatus": "PROPOSED",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
-      "schemaEvidenceRefs": [],
-      "migrationEvidenceRefs": [],
-      "payloadNativeEvidenceRefs": [],
-      "extensionEvidenceRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-content/src/session/session-runtime.ts",
+        "workers/W02-content/src/index.ts",
+        "workers/W01-payload/src/app/auth/login/route.ts",
+        "workers/W01-payload/src/app/auth/refresh/route.ts",
+        "workers/W01-payload/src/app/auth/logout/route.ts"
+      ],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
+        "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
+        "artifacts/mapping-0/auth-002-e6-runtime-evidence-reconciliation-2026-09-26.json"
+      ],
+      "migrationEvidenceRefs": [
+        "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
+        "https://github.com/wanghuinet/luckread/actions/runs/36217784262",
+        "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
+      ],
+      "payloadNativeEvidenceRefs": [
+        "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
+      ],
+      "extensionEvidenceRefs": [
+        "workers/W02-content/src/session/session-runtime.ts",
+        "workers/W02-content/src/session/session-runtime.test.ts",
+        "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
+      ],
       "blockers": [
-        "No concrete implementation evidence recorded."
+        "ENT-SESSION catalog status remains PROPOSED until final Mapping 0 entity/persistence admission.",
+        "AUTH-002 Feature→Entity→Persistence registry remains BLOCKED.",
+        "Final Five-Way/R4 Mapping 0 validation remains NOT_GREEN."
       ],
       "status": "BLOCKED"
     },
