@@ -327,6 +327,56 @@ type AuthoritativeRefreshResult = {
   email: string
 }
 
+function assertRefreshSessionUsable(session: SessionRecord, deviceId: string, now: string): void {
+  if (session.deviceId !== deviceId) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'invalid refresh credential')
+  }
+  if (session.revokedAt) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'invalid refresh credential')
+  }
+  if (typeof session.nativeExpiresAt !== 'string') {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'invalid session')
+  }
+  assertNotExpired(session.nativeExpiresAt, now)
+}
+
+async function rotateLoadedRefreshCredential(
+  db: D1Database,
+  session: SessionRecord,
+  expectedRefreshCredentialHash: string,
+  now: string,
+  randomToken: () => string,
+  hashToken: (token: string) => Promise<string>,
+): Promise<{ refreshToken: string; refreshCredentialHash: string }> {
+  const refreshToken = encodeVersionedRefreshToken(session.tokenVersion, randomToken())
+  const refreshCredentialHash = await hashToken(refreshToken)
+
+  const updateSql = `
+    UPDATE auth_session_state
+       SET refresh_credential_hash = ?,
+           last_seen_at = ?
+     WHERE session_id = ?
+       AND refresh_credential_hash = ?
+       AND revoked_at IS NULL
+  `
+
+  let updateResult: { meta?: { changes?: number } }
+  try {
+    updateResult = await db
+      .prepare(updateSql)
+      .bind(refreshCredentialHash, now, session.sessionId, expectedRefreshCredentialHash)
+      .run()
+  } catch {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'invalid refresh credential')
+  }
+
+  if (updateResult.meta?.changes !== 1) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'invalid refresh credential')
+  }
+
+  return { refreshToken, refreshCredentialHash }
+}
+
 async function loadAuthoritativeRefreshContext(
   db: D1Database,
   refreshCredentialHash: string,
