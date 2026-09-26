@@ -137,7 +137,7 @@ export async function POST(request: Request): Promise<Response> {
       payloadSecret: payload.secret,
       userId: String(nativeUser.id),
       email: String(body.identity).toLowerCase().trim(),
-      sessionId: nativeSid,
+      sessionId: String(nativeSid),
       expiresAt: session.nativeExpiresAt,
       tokenVersion: session.tokenVersion,
     })
