@@ -468,5 +468,6 @@
       "checkId": "AUTH-013-PERSISTENCE-SCHEMA-REMOTE",
       "workflowRef": ".github/workflows/auth-013-persistence-schema-evidence.yml"
     }
-  ]
+  ],
+  "testedCommitSha": "b66f6e57c852095983d571ad9d8e39fbfc2b8d70"
 }
