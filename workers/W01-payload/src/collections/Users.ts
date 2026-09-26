@@ -9,9 +9,7 @@ export const Users: CollectionConfig = {
     // Use Payload's native authentication/recovery pipeline. Keep recovery
     // policy at the collection boundary instead of introducing a parallel
     // W02 password-recovery subsystem.
-    forgotPassword: {
-      minRequestInterval: 15000,
-    },
+    forgotPassword: {},
     removeTokenFromResponses: true,
     // AUTH-004 remains contract/evidence gated; native capability is the implementation baseline.
   },
