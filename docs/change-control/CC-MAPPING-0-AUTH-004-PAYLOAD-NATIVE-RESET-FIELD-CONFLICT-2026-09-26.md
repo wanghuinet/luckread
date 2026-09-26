@@ -134,3 +134,19 @@ The collection-level `endpoints: false` switch disables the collection endpoint 
 No repository evidence has yet established a supported Payload configuration knob that disables only the native forgot/reset handlers while retaining the rest of the local authentication surface.
 
 This narrows the current decision material: the canonical AUTH-004 boundary cannot be assumed to be achieved by a simple per-operation Payload configuration flag.
+
+## 10. Inherited canonical Worker authority
+
+Existing resolved Worker ownership is authoritative for current implementation binding:
+
+- W01 = Public API / Gateway / Developer & Admin API Boundary; no direct authoritative D1 ownership.
+- W02 = Identity / Account / Authorization; D1-01 identity/account/authorization authority.
+- W01 must route authoritative identity/account operations to the owning Worker and must not become the business authorization/session/database owner.
+
+These values are inherited from the resolved `M0-B01-WORKER-OWNERSHIP-RECONCILIATION-AUDIT-2026-09-20` and the active Worker Master / Worker × D1 Binding Mapping.
+
+Therefore the canonical AUTH-004 implementation boundary is W02 / D1-01, not the W01 Payload implementation surface. This does **not** authorize AUTH-004 runtime implementation; it only fixes the ownership boundary already established by the active architecture.
+
+The remaining W01 issue is an exposure/containment decision: Payload's built-in recovery endpoints and raw-token persistence exist inside the W01 Payload surface and must not be allowed to become the canonical AUTH-004 recovery path.
+
+No new Worker, D1 domain, or ownership edge is created by this clarification.
