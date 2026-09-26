@@ -12,6 +12,7 @@ const findings = [];
 const matches = [];
 const inventory = new Map();
 const policyInventory = new Map();
+const alternateOperationDefinitions = new Map();
 
 function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
@@ -54,9 +55,15 @@ function collectAlternateOperationSources(directory) {
         return;
       }
       if (typeof value.operationId === 'string') {
+        const sourcePath = path.relative(root, source);
         const list = new Set(sources.get(value.operationId) ?? []);
-        list.add(path.relative(root, source));
+        list.add(sourcePath);
         sources.set(value.operationId, [...list].sort());
+        if (typeof value.method === 'string' && typeof value.path === 'string') {
+          const defs = alternateOperationDefinitions.get(value.operationId) ?? [];
+          defs.push({ source: sourcePath, method: value.method.toUpperCase(), path: value.path });
+          alternateOperationDefinitions.set(value.operationId, defs);
+        }
       }
       for (const nested of Object.values(value)) visit(nested);
     };
@@ -289,6 +296,17 @@ for (const [id, op] of policyInventory) {
   }
 }
 
+function hasNormalizedAlternatePolicySource(id, record, canonicalPolicy) {
+  const source = canonicalPolicy?.['x-luckread-source'];
+  if (!source) return false;
+  const candidates = alternateOperationDefinitions.get(id) ?? [];
+  const selected = candidates.filter((candidate) => candidate.source === source);
+  if (selected.length !== 1) return false;
+  const candidate = selected[0];
+  return candidate.method === String(record.method).toUpperCase() &&
+    canonicalApiPath(candidate.path) === canonicalApiPath(record.path);
+}
+
 for (const [id] of inventory) {
   const canonicalPolicy = policyOps.get(id);
   if (isDiscoveryDraftCanonicalPolicy(canonicalPolicy)) continue;
@@ -299,7 +317,16 @@ for (const [id] of inventory) {
   const detailedPolicy = policyInventory.get(id);
   if (!detailedPolicy || effectiveDetailedPolicyStatus(detailedPolicy) === 'MISSING') {
     const alternateSources = alternateOperationSources.get(id) ?? [];
-    if (alternateSources.length > 0) {
+    if (hasNormalizedAlternatePolicySource(id, record, canonicalPolicy)) {
+      continue;
+    }
+    if (canonicalPolicy?.['x-luckread-source'] && alternateSources.length > 0) {
+      finding(
+        'POLICY_SOURCE_NORMALIZATION_CONFLICT',
+        id,
+        `declared source-of-authority does not uniquely match canonical method/path: ${canonicalPolicy['x-luckread-source']}`,
+      );
+    } else if (alternateSources.length > 0) {
       finding(
         'POLICY_SOURCE_PRESENT_NOT_NORMALIZED',
         id,
@@ -347,6 +374,7 @@ const conflictCodes = new Set([
   'MISSING_METHOD_OR_PATH',
   'METHOD_CONFLICT',
   'PATH_CONFLICT',
+  'POLICY_SOURCE_NORMALIZATION_CONFLICT',
 ]);
 const incompleteCodes = new Set([
   'MISSING_API_INVENTORY_DIRECTORY',
@@ -390,6 +418,10 @@ const report = {
   policyGapSummary: {
     coreDetailedPolicyDomainCount: detailedPolicyDomains.size,
     alternatePolicyNormalizationGapCount: findings.filter((x) => x.code === 'POLICY_SOURCE_PRESENT_NOT_NORMALIZED').length,
+    normalizedPolicySourceCount: [...policyOps.entries()].filter(([id, op]) => {
+      const record = inventory.get(id);
+      return record && hasNormalizedAlternatePolicySource(id, record, op);
+    }).length,
     coreDetailedPolicyMissingCount: findings.filter((x) => x.code === 'MISSING_POLICY_OPERATION').length,
   },
   failures,
