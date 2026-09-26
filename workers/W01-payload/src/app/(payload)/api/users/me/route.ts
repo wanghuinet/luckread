@@ -3,7 +3,7 @@ import { getPayload } from 'payload'
 
 import config from '@payload-config'
 
-import { isAuthoritativeSessionActive } from '../../../../../auth/authoritative-session.js'
+import { validateSession } from '../../../../../auth/w02-session-client.js'
 
 const unauthorized = () =>
   new Response(
@@ -27,7 +27,17 @@ export async function GET(request: Request): Promise<Response> {
   })
 
   const user = authResult.user as { id?: string | number; _sid?: string } | null
-  if (!user || !(await isAuthoritativeSessionActive(request, user))) {
+  if (!user?.id || !user._sid) {
+    return unauthorized()
+  }
+
+  try {
+    const active = await validateSession({
+      sessionId: String(user._sid),
+      userId: String(user.id),
+    })
+    if (!active) return unauthorized()
+  } catch {
     return unauthorized()
   }
 
