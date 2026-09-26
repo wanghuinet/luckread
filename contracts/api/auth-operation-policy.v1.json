@@ -14,17 +14,81 @@
       "visibility": "public",
       "capability": "account_registration",
       "contractStatus": "CONTRACTED_PARTIAL",
-      "auth": { "mode": "public", "subject": "anonymous" },
-      "authorization": { "required": false, "accountState": "N/A", "scope": "N/A" },
-      "resource": { "class": "SINGLE_AUTHORITATIVE_WRITE", "d1ReadMax": 2, "d1WriteMax": 1, "d1ReadRowsMax": 8, "d1WriteRowsMax": 4, "rpcMax": 1, "outboundMax": 0 },
-      "cache": { "mode": "NO_STORE", "shared": false, "authorizationBoundary": false },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": true, "requiresIdempotency": true },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 1, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 1, "taskType": "verification_or_welcome" },
-      "antiAbuse": { "required": true, "scopes": ["ip", "identity", "device", "endpoint", "global"], "actions": ["ALLOW", "THROTTLE", "CHALLENGE", "BLOCK"] },
-      "idempotency": { "required": true, "key": "Idempotency-Key", "semantic": "same-request-replay-must-not-create-second-account" },
-      "security": ["no_account_enumeration", "credential_never_returned", "uniqueness_conflict_not_identity_disclosure", "consent_required"],
-      "evidence": { "openapi": "PASS", "inventory": "PASS", "permission": "PASS", "state": "MISSING", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "auth": {
+        "mode": "public",
+        "subject": "anonymous"
+      },
+      "authorization": {
+        "required": false,
+        "accountState": "N/A",
+        "scope": "N/A"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 2,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 4,
+        "rpcMax": 1,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "taskType": "verification_or_welcome"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "identity",
+          "device",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "key": "Idempotency-Key",
+        "semantic": "same-request-replay-must-not-create-second-account"
+      },
+      "security": [
+        "no_account_enumeration",
+        "credential_never_returned",
+        "uniqueness_conflict_not_identity_disclosure",
+        "consent_required"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     },
     {
       "operationId": "authLogin",
@@ -33,17 +97,83 @@
       "visibility": "public",
       "capability": "credential_authentication",
       "contractStatus": "CONTRACTED_PARTIAL",
-      "auth": { "mode": "public", "subject": "anonymous" },
-      "authorization": { "required": false, "accountState": "evaluated_after_identity", "scope": "N/A" },
-      "resource": { "class": "BOUNDED_COMPOSITION", "d1ReadMax": 2, "d1WriteMax": 1, "d1ReadRowsMax": 8, "d1WriteRowsMax": 4, "rpcMax": 1, "outboundMax": 0 },
-      "cache": { "mode": "NO_STORE", "shared": false, "authorizationBoundary": false },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": false, "requiresIdempotency": false },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 1, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 1, "taskType": "risk_or_security_audit" },
-      "antiAbuse": { "required": true, "scopes": ["ip", "identity", "device", "account", "endpoint", "global"], "actions": ["ALLOW", "THROTTLE", "CHALLENGE", "BLOCK"] },
-      "idempotency": { "required": false, "semantic": "authentication-attempts-are-not-idempotent" },
-      "security": ["no_account_enumeration", "credential_never_logged", "credential_never_returned", "constant_failure_semantics", "risk_challenge_before_expensive_work", "refresh_rotation_required"],
-      "evidence": { "openapi": "PASS", "inventory": "PASS", "permission": "PASS", "state": "MISSING", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "auth": {
+        "mode": "public",
+        "subject": "anonymous"
+      },
+      "authorization": {
+        "required": false,
+        "accountState": "evaluated_after_identity",
+        "scope": "N/A"
+      },
+      "resource": {
+        "class": "BOUNDED_COMPOSITION",
+        "d1ReadMax": 2,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 4,
+        "rpcMax": 1,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": false,
+        "requiresIdempotency": false
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "taskType": "risk_or_security_audit"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "identity",
+          "device",
+          "account",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false,
+        "semantic": "authentication-attempts-are-not-idempotent"
+      },
+      "security": [
+        "no_account_enumeration",
+        "credential_never_logged",
+        "credential_never_returned",
+        "constant_failure_semantics",
+        "risk_challenge_before_expensive_work",
+        "refresh_rotation_required"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     },
     {
       "operationId": "authLogout",
@@ -52,17 +182,75 @@
       "visibility": "public_authenticated",
       "capability": "session_revoke_current",
       "contractStatus": "CONTRACTED_PARTIAL",
-      "auth": { "mode": "authenticated", "subject": "current_user" },
-      "authorization": { "required": true, "permission": "user.session.revoke", "scope": "self" },
-      "resource": { "class": "SINGLE_AUTHORITATIVE_WRITE", "d1ReadMax": 0, "d1WriteMax": 1, "d1ReadRowsMax": 0, "d1WriteRowsMax": 2, "rpcMax": 0, "outboundMax": 0 },
-      "cache": { "mode": "NO_STORE", "shared": false, "authorizationBoundary": false },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": true, "requiresIdempotency": true },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 1, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 1, "taskType": "session_revocation_projection" },
-      "antiAbuse": { "required": true, "scopes": ["account", "session", "endpoint"], "actions": ["ALLOW", "BLOCK"] },
-      "idempotency": { "required": true, "semantic": "repeated-revoke-is-successful-no-op" },
-      "security": ["revocation_cannot_be_overridden_by_cache", "revocation_propagation_bounded", "session_secret_not_returned"],
-      "evidence": { "openapi": "PASS", "inventory": "PASS", "permission": "PASS", "state": "N/A", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "auth": {
+        "mode": "authenticated",
+        "subject": "current_user"
+      },
+      "authorization": {
+        "required": true,
+        "permission": "user.session.revoke",
+        "scope": "self"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 0,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 0,
+        "d1WriteRowsMax": 2,
+        "rpcMax": 0,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "taskType": "session_revocation_projection"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "session",
+          "endpoint"
+        ],
+        "actions": [
+          "ALLOW",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "semantic": "repeated-revoke-is-successful-no-op"
+      },
+      "security": [
+        "revocation_cannot_be_overridden_by_cache",
+        "revocation_propagation_bounded",
+        "session_secret_not_returned"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "N/A",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     },
     {
       "operationId": "authRefresh",
@@ -71,17 +259,76 @@
       "visibility": "public_authenticated",
       "capability": "token_refresh",
       "contractStatus": "CONTRACTED_PARTIAL",
-      "auth": { "mode": "refresh_credential", "subject": "session" },
-      "authorization": { "required": true, "permission": "user.session.refresh", "scope": "self" },
-      "resource": { "class": "SINGLE_AUTHORITATIVE_WRITE", "d1ReadMax": 1, "d1WriteMax": 1, "d1ReadRowsMax": 4, "d1WriteRowsMax": 2, "rpcMax": 0, "outboundMax": 0 },
-      "cache": { "mode": "NO_STORE", "shared": false, "authorizationBoundary": false },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": false, "requiresIdempotency": false },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 0, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 0 },
-      "antiAbuse": { "required": true, "scopes": ["session", "account", "device", "endpoint"], "actions": ["ALLOW", "THROTTLE", "BLOCK"] },
-      "idempotency": { "required": false },
-      "security": ["refresh_token_rotation", "reuse_detection", "revoked_session_denied", "old_refresh_token_invalidated"],
-      "evidence": { "openapi": "MISSING", "inventory": "PASS", "permission": "MISSING", "state": "MISSING", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "auth": {
+        "mode": "refresh_credential",
+        "subject": "session"
+      },
+      "authorization": {
+        "required": true,
+        "permission": "user.session.refresh",
+        "scope": "self"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 1,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 4,
+        "d1WriteRowsMax": 2,
+        "rpcMax": 0,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": false,
+        "requiresIdempotency": false
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "session",
+          "account",
+          "device",
+          "endpoint"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "security": [
+        "refresh_token_rotation",
+        "reuse_detection",
+        "revoked_session_denied",
+        "old_refresh_token_invalidated"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "inventory": "PASS",
+        "permission": "MISSING",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     },
     {
       "operationId": "authSessionList",
@@ -90,17 +337,72 @@
       "visibility": "public_authenticated",
       "capability": "session_management",
       "contractStatus": "CONTRACTED_PARTIAL",
-      "auth": { "mode": "authenticated", "subject": "current_user" },
-      "authorization": { "required": true, "permission": "user.session.read", "scope": "self" },
-      "resource": { "class": "BOUNDED_READ", "d1ReadMax": 1, "d1WriteMax": 0, "d1ReadRowsMax": 50, "d1WriteRowsMax": 0, "rpcMax": 0, "outboundMax": 0 },
-      "cache": { "mode": "PRIVATE_NO_SHARED_CACHE", "shared": false, "authorizationBoundary": true },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": true, "requiresIdempotency": false },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 0, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 0 },
-      "antiAbuse": { "required": true, "scopes": ["account", "endpoint"], "actions": ["ALLOW", "THROTTLE", "BLOCK"] },
-      "idempotency": { "required": false },
-      "security": ["self_scope_only", "revoked_sessions_not_hidden_by_stale_cache"],
-      "evidence": { "openapi": "MISSING", "inventory": "PASS", "permission": "MISSING", "state": "MISSING", "resource": "PASS", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "auth": {
+        "mode": "authenticated",
+        "subject": "current_user"
+      },
+      "authorization": {
+        "required": true,
+        "permission": "user.session.read",
+        "scope": "self"
+      },
+      "resource": {
+        "class": "BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 50,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "PRIVATE_NO_SHARED_CACHE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": false
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "endpoint"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "security": [
+        "self_scope_only",
+        "revoked_sessions_not_hidden_by_stale_cache"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "MISSING",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     },
     {
       "operationId": "authSessionRevoke",
@@ -109,17 +411,75 @@
       "visibility": "public_authenticated",
       "capability": "session_management",
       "contractStatus": "CONTRACTED_PARTIAL",
-      "auth": { "mode": "authenticated", "subject": "current_user" },
-      "authorization": { "required": true, "permission": "user.session.revoke", "scope": "self" },
-      "resource": { "class": "SINGLE_AUTHORITATIVE_WRITE", "d1ReadMax": 1, "d1WriteMax": 1, "d1ReadRowsMax": 1, "d1WriteRowsMax": 2, "rpcMax": 0, "outboundMax": 0 },
-      "cache": { "mode": "INVALIDATE_PRIVATE", "shared": false, "authorizationBoundary": true },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": true, "requiresIdempotency": true },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 1, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 1, "taskType": "session_revocation_projection" },
-      "antiAbuse": { "required": true, "scopes": ["account", "session", "endpoint"], "actions": ["ALLOW", "BLOCK"] },
-      "idempotency": { "required": true, "semantic": "repeated-revoke-is-successful-no-op" },
-      "security": ["self_scope_only", "cannot_revoke_other_account", "revocation_wins_over_cache"],
-      "evidence": { "openapi": "MISSING", "inventory": "PASS", "permission": "MISSING", "state": "MISSING", "resource": "PASS", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "auth": {
+        "mode": "authenticated",
+        "subject": "current_user"
+      },
+      "authorization": {
+        "required": true,
+        "permission": "user.session.revoke",
+        "scope": "self"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 1,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 1,
+        "d1WriteRowsMax": 2,
+        "rpcMax": 0,
+        "outboundMax": 0
+      },
+      "cache": {
+        "mode": "INVALIDATE_PRIVATE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "taskType": "session_revocation_projection"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "session",
+          "endpoint"
+        ],
+        "actions": [
+          "ALLOW",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "semantic": "repeated-revoke-is-successful-no-op"
+      },
+      "security": [
+        "self_scope_only",
+        "cannot_revoke_other_account",
+        "revocation_wins_over_cache"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "MISSING",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     }
   ]
 }
