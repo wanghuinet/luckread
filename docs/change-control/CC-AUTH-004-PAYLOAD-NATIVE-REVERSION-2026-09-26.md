@@ -10,7 +10,7 @@ The implementation baseline is the existing W01 Payload `Users` collection with 
 
 - W01 `Users.ts` now uses Payload's native `auth` configuration.
 - Native `forgotPassword` keeps its built-in recovery flow.
-- Native `forgotPassword.minRequestInterval` is configured to 15 seconds.
+- Native `forgotPassword` uses Payload 3.87.1's supported configuration surface; no unsupported custom `minRequestInterval` option is declared.
 - Payload auth responses are configured with `removeTokenFromResponses: true` to avoid returning auth tokens from authentication responses.
 - No Payload core fork.
 - No W02 recovery table or custom recovery migration.
@@ -48,3 +48,7 @@ The migration manifest contained a pre-existing JSON structural error in the AUT
 ## Current implementation rule
 
 `Payload native capability > thin adapter if necessary > custom subsystem only by explicit later Change Control.`
+
+## CI compatibility correction
+
+The first native implementation attempt declared `forgotPassword.minRequestInterval`. Payload 3.87.1's `IncomingAuthType` does not expose that option, so the unsupported setting was removed from W01 rather than adding a custom throttling subsystem. This correction keeps AUTH-004 on the Payload-native path; request throttling/rate-limiting remains a separate runtime/evidence concern if the product contract later requires it.
