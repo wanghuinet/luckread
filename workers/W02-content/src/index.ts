@@ -131,7 +131,10 @@ export default {
       }
 
       try {
-        const result = await validateAuthoritativeSession(env.D1_01, body)
+        const result = await validateAuthoritativeSession(env.D1_01, {
+          sessionId: body.sessionId,
+          userId: body.userId,
+        })
         return json(result)
       } catch {
         return json({ active: false }, 503)
