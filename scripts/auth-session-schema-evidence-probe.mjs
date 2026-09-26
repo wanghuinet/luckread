@@ -34,7 +34,14 @@ if (pkg.dependencies?.payload !== '3.87.1') {
 if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.87.1') {
   fail(`W01 @payloadcms/db-d1-sqlite dependency must be exactly 3.87.1, found ${pkg.dependencies?.['@payloadcms/db-d1-sqlite'] ?? 'missing'}`)
 }
-if (!users.includes('auth: true')) fail('W01 Users collection does not enable native auth')
+
+// Payload supports native auth as a boolean or as an auth-options object.
+// Treat either form as native authentication enabled; do not require the
+// narrower shorthand `auth: true` because W01 intentionally supplies
+// collection-level native recovery/token-response options.
+if (!/\\bauth\\s*:\\s*(?:true|\\{)/.test(users)) {
+  fail('W01 Users collection does not enable native auth')
+}
 if (!config.includes('sqliteD1Adapter')) fail('W01 Payload D1 adapter is not configured')
 if (!config.includes('push: false')) fail('W01 Payload migration safety requires push: false')
 if (!config.includes('migrationDir')) fail('W01 Payload migrationDir is not configured')
