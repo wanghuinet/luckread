@@ -1,0 +1,46 @@
+{
+  "version": "1.0.0",
+  "evidenceType": "MAPPING_0_AUTH_003_WIRE_SCHEMA_ENCODING_RECONCILIATION",
+  "generatedAt": "2026-09-26",
+  "repository": "wanghuinet/luckread",
+  "currentMain": "af3d010b887653ebd439fd5aa7e272462ecf72e2",
+  "taskId": "M0-AUTH-003-WIRE-SCHEMA-ENCODING-001",
+  "status": "PASS_VERIFIED_SOURCE_RECONCILIATION",
+  "encodedSources": [
+    "contracts/api/AUTH-003-credential-management-contract.v1.json",
+    "contracts/openapi/v1/openapi.yaml",
+    "contracts/api/api-inventory.v1.json",
+    "contracts/api/auth-operation-policy.v1.json",
+    "contracts/dto/auth-dto-contract.v1.json",
+    "contracts/dto/auth-dto-records.v1.json",
+    "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json"
+  ],
+  "structuralChecks": {
+    "auth003ApiContractJson": "PASS",
+    "authOperationPolicyJson": "PASS / 4 AUTH-003 operations",
+    "apiInventoryJson": "PASS / 4 AUTH-003 endpoint groups",
+    "dtoContractJson": "PASS / 4 AUTH-003 operation bindings",
+    "dtoRecordsJson": "PASS / 5 AUTH-003 DTO records; remove is no-body",
+    "sharedPersistenceMappingJson": "PASS / canonical operations and DTO refs reconciled",
+    "openApiSourceStructure": "PASS / credentials paths, CredentialId parameter and Credential schema present",
+    "contractCiStatus": "NOT_OBSERVED"
+  },
+  "runtimeBoundary": {
+    "workerChanges": false,
+    "d1Changes": false,
+    "migrationExecution": false,
+    "runtimeImplementationAdmission": false,
+    "entityPromotion": false
+  },
+  "nextAction": {
+    "id": "M0-AUTH-003-CONTRACT-CI-VALIDATION-001",
+    "state": "WAIT_CI_RESULT",
+    "workflow": "https://github.com/wanghuinet/luckread/actions/workflows/contract-ci.yml",
+    "objective": "Validate the encoded AUTH-003 wire/API/DTO/Mapping chain at current main; preserve R4/Evidence fail-closed outcomes.",
+    "prohibited": [
+      "Do not rerun AUTH-002 Runtime Evidence Run 36219132123.",
+      "Do not execute an AUTH-003 migration.",
+      "Do not admit runtime implementation from source validation alone."
+    ]
+  }
+}
