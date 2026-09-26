@@ -234,7 +234,9 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/block-mute.v1.json",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
     },
     {
       "operationId": "unlike",
@@ -260,7 +262,9 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/block-mute.v1.json",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
     },
     {
       "operationId": "removeIpMember",
@@ -535,7 +539,9 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/revision.v1.json",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
     },
     {
       "operationId": "getContentRevision",
@@ -548,7 +554,9 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/revision.v1.json",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
     },
     {
       "operationId": "getCreatorAnalytics",
@@ -691,7 +699,9 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/feed-delivery.v1.json",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
     },
     {
       "operationId": "getFollowingFeed",
@@ -1027,7 +1037,9 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
     },
     {
       "operationId": "getSubscriptions",
@@ -1575,7 +1587,9 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
     },
     {
       "operationId": "postContentContentIdUnpublish",
@@ -1627,7 +1641,9 @@
       "auditRequired": true,
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/revision.v1.json",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
     },
     {
       "operationId": "transitionContentState",
@@ -1703,7 +1719,9 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
     },
     {
       "operationId": "postGalleries",
@@ -1729,7 +1747,9 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/block-mute.v1.json",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
     },
     {
       "operationId": "like",
@@ -1755,7 +1775,9 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/block-mute.v1.json",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL"
     },
     {
       "operationId": "postIpAssets",
