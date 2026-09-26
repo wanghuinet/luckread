@@ -37,8 +37,15 @@ export async function POST(request: Request): Promise<Response> {
   })
 
   const user = authResult.user as { id?: string | number; _sid?: string } | null
+  // authLogout is contractually idempotent: an already-revoked/expired current
+  // session is a successful no-op rather than an authentication failure.
   if (!user?.id || !user._sid) {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'cache-control': 'no-store',
+      },
+    })
   }
 
   try {
