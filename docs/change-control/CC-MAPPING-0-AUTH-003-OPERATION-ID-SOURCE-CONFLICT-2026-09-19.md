@@ -84,3 +84,7 @@ Acceptance boundary:
 - Operation vocabulary conflict: `PASS_VERIFIED`.
 - Wire Schema / OpenAPI / DTO admission: unchanged and still blocked.
 - No runtime, persistence, Worker, D1, or Mapping promotion is authorized by this reconciliation alone.
+
+## 2026-09-26 Wire-schema admission reconciliation
+
+The previously selected canonical operation set is now admitted through the explicit AUTH-003 wire-schema decision and encoded in OpenAPI/DTO/API Inventory/Operation Policy. The operationId conflict is fully closed; the remaining downstream gates are runtime, persistence and executable evidence.
