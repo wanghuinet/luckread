@@ -172,4 +172,29 @@ Source anchors:
 This establishes that the repository has a supported, fail-closed interception point for the native recovery operations without requiring `endpoints: false` or a Payload-core fork.
 
 This is **decision material only**. It does not yet authorize implementation, does not select Track A/B/C, and does not establish that the hook has been installed in W01. The remaining decision is whether the admitted integration boundary should explicitly install this fail-closed guard and how that boundary is reconciled with the canonical W02/D1-01 AUTH-004 flow and any retained legacy columns.
+## 12. Current W01 containment status
+
+The current W01 repository state has **not** installed the fail-closed hook boundary described above:
+
+- workers/W01-payload/src/collections/Users.ts sets auth: true but declares no hooks.beforeOperation guard.
+- workers/W01-payload/src/payload.config.ts does not install a recovery-specific collection hook or endpoint-level blocker.
+- The existing W01 native migration still creates users.reset_password_token and users.reset_password_expiration.
+- Therefore the repository currently has a confirmed supported interception mechanism, but the protection is **not yet implemented or authorized**.
+
+This distinction is deliberate:
+
+- **Capability confirmed:** Payload v3.87.1 exposes an awaited beforeOperation interception before native forgot/reset token processing.
+- **Project containment absent:** current W01 code does not yet use that interception.
+- **Canonical AUTH-004 owner unchanged:** W02 / D1-01 remains the authoritative implementation boundary.
+- **Implementation gate unchanged:** no runtime or migration work is authorized by this finding alone.
+
+Any future implementation admission must specify, at minimum:
+
+1. the exact W01 hook behavior for forgotPassword and resetPassword;
+2. the failure semantics proving the native operation cannot continue;
+3. the relationship between the W01 guard and the canonical W02 AUTH-004 endpoints;
+4. whether retained native reset columns are legacy/inert and how that is proven;
+5. the runtime evidence proving neither canonical nor accidentally reachable native recovery paths persist raw reset tokens.
+
+Until those items are explicitly admitted, the Change Control remains BLOCKED_DECISION_REQUIRED.
 
