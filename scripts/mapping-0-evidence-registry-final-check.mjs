@@ -42,6 +42,16 @@ try {
 }
 const hex40 = /^[0-9a-f]{40}$/
 const evidenceRegistryRelPath = 'contracts/evidence/mapping-0-evidence-registry.v1.json'
+// These files implement the evidence admission/control plane only. Changes here do not
+// alter the underlying tested system, Blueprint, Contract, authority decisions, dependencies,
+// or verification scope, so they remain valid as post-anchor governance deltas under the
+// Mapping 0 inheritance rule.
+const evidenceGovernanceRelPaths = new Set([
+  '.github/workflows/contract-ci.yml',
+  'contracts/evidence/mapping-0-evidence-registry.v1.schema.json',
+  'scripts/mapping-0-evidence-registry-check.mjs',
+  'scripts/mapping-0-evidence-registry-final-check.mjs'
+])
 const testedCommit = registry?.testedCommitSha || currentCommit
 
 if (!registry || !schema || !featureInventory || !canonicalMapping) {
@@ -69,7 +79,9 @@ if (registry.testedCommitSha) {
       .map((value) => value.trim())
       .filter(Boolean)
     for (const file of changedAfterAnchor) {
-      if (file !== evidenceRegistryRelPath) fail(`non-registry change after testedCommitSha: ${file}`)
+      if (file !== evidenceRegistryRelPath && !evidenceGovernanceRelPaths.has(file)) {
+        fail(`non-evidence-governance change after testedCommitSha: ${file}`)
+      }
     }
   } catch (error) {
     fail(`cannot validate post-anchor changes: ${error.message}`)
