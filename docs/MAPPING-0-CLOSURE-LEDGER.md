@@ -3336,3 +3336,19 @@ Result:
 
 Current continuation:
 `M0-AUTH-004-WIRE-AND-OPERATION-POLICY-AUTHORITY-001` / `WAIT_AUTHORITY_DECISION`
+
+
+## 2026-09-26 — AUTH-004 Wire Decision Control lifecycle-input sync
+
+Source head: `b9936a496c5241b1750072a8c71a7201564934c6`.
+Control-sync commit: `3cb135eb96b28c5089df349234e4c11c4fb32c43`.
+Backup branch: `backup/main-before-auth004-wire-cc-lifecycle-sync-20260926`.
+
+Control:
+`CC-MAPPING-0-AUTH-004-WIRE-SCHEMA-DECISION-REQUIRED-2026-09-26`
+
+Result:
+- The existing AUTH-004 Wire Decision Control now records the L5/L6 lifecycle/security authority inheritance.
+- Rate-limit and reset-token lifecycle constraints are admitted without inventing numeric limits, anti-abuse scopes/actions, public DTO fields, HTTP statuses, or Idempotency-Key requirements.
+- The unresolved feature-specific wire decision set is unchanged in kind, but reduced by explicit lifecycle authority coverage.
+- No OpenAPI, DTO Registry, runtime, persistence, or Evidence promotion occurred.
