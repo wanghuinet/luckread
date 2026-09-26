@@ -3073,3 +3073,23 @@ Promotion boundary:
 
 Objective:
 Reconcile the existing AUTH-002 Feature→Entity→Persistence registry using explicit authority and already-admitted evidence only. Do not infer Identity/Credential ownership, create duplicate entities, or promote Mapping 0.
+
+
+## 2026-09-26 Superpowers continuation — AUTH-002 R4 Entity/Persistence reconciliation
+
+Evidence indexing correction completed without promotion:
+- `ENT-SESSION` implementation evidence is now bound to the admitted W01/W02 source files and controlled Gate-1/E6 Runtime evidence.
+- `ENT-SESSION` remains catalog `PROPOSED` and persistence `CONTRACTED_NOT_VERIFIED`; this is deliberate fail-closed status, not an implementation absence.
+- `ENT-IDENTITY` remains `PROPOSED / NOT_VERIFIED`.
+- `ENT-CREDENTIAL` remains `PROPOSED / NOT_VERIFIED`.
+- AUTH-002 persistence semantics remain `MIXED`: native Payload `users.sessions[]` owns native session identity/createdAt/expiresAt, while `auth_session_state` owns the contracted extension dimensions. The later `AUTH-002-minimum-session-extension-persistence-contract.v1.1.json` supersedes the older full-session persistence contract.
+
+No authoritative decision was found that permits removing `ENT-IDENTITY` or `ENT-CREDENTIAL` from the existing AUTH-002 Feature→Entity mapping. Therefore no registry rewrite or status promotion is justified by inference.
+
+Machine-readable reconciliation:
+`artifacts/mapping-0/auth-002-r4-entity-persistence-reconciliation-2026-09-26.json`
+
+### Current closure cursor
+`M0-AUTH-002-R4-CROSS-ENTITY-DEPENDENCY-RECONCILIATION-001` / `WAIT_DEPENDENCY_EVIDENCE`
+
+The next issue is the shared ownership dependency: determine, from explicit authority only, whether AUTH-002 may rely on the canonical Identity/Credential entities governed by AUTH-003 while keeping the existing mapping contract intact. No entity promotion is performed in this step.
