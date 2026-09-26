@@ -3380,10 +3380,19 @@ Implementation boundary:
 - Mapping 0 remains NOT_GREEN until the existing Five-Way and downstream evidence blockers are independently closed.
 
 Current continuation:
-`M0-AUTH-004-RECONCILIATION-AND-DOWNSTREAM-ADMISSION-001` / `TODO_VERIFY`
+`M0-AUTH-004-R4-EXECUTABLE-EVIDENCE-DEPENDENCY-001` / `BLOCKED_EXTERNAL`
 
 Source decision:
 `docs/decisions/2026-09-26-password-recovery.md`
 
 Reconciliation PR:
 `PR #21` — https://github.com/wanghuinet/luckread/pull/21
+
+
+### AUTH-004 R4 executable-evidence boundary
+
+The AUTH-004 contract/API/DTO/OpenAPI reconciliation is complete at the admitted contract layer. The remaining R4 blocker is executable persistence/runtime evidence, not public-wire authority.
+
+Current authoritative field contract requires real D1 schema and migration evidence plus expired-token, replay, wrong-purpose, secret-absence and session-invalidation negative/security tests. No runtime implementation or evidence promotion is inferred from contract existence.
+
+Do not rerun the completed AUTH-004 wire/semantic reconciliation unless its authoritative inputs change. Do not promote Feature→Entity→Persistence to VERIFIED without admissible executable evidence.
