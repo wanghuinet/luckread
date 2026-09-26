@@ -3107,9 +3107,26 @@ Result:
 - AUTH-002 Feature→Entity→Persistence registry remains `BLOCKED`; R4, Five-Way and Mapping 0 remain not green.
 
 Next cursor:
-`M0-AUTH-002-R4-ENTITY-DEPENDENCY-EVIDENCE-001` / `WAIT_ENTITY_EVIDENCE`
+`M0-AUTH-002-R4-ENTITY-DEPENDENCY-EVIDENCE-001` / `BLOCKED_EXTERNAL / UPSTREAM_AUTHORITY`
+
+Decision record:
+`docs/change-control/CC-MAPPING-0-AUTH-002-R4-ENTITY-EVIDENCE-DEPENDENCY-2026-09-26.md`
+
+Machine-readable reconciliation:
+`artifacts/mapping-0/auth-002-r4-entity-evidence-dependency-2026-09-26.json`
+
+Finding:
+- No current admissible remote D1/migration/runtime evidence exists for `ENT-IDENTITY` or `ENT-CREDENTIAL`.
+- Existing AUTH-003 runtime evidence is historical/expired or blocked and cannot be inherited.
+- The next admissible upstream gate is the explicit AUTH-003 public Wire Schema authority; no D1/runtime implementation is admitted before that gate.
+
+Next cursor:
+`M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001` / `WAIT_AUTHORITY_DECISION`
 
 Objective:
-Close entity-specific persistence/runtime evidence for `ENT-IDENTITY` and `ENT-CREDENTIAL` under AUTH-003 ownership before any AUTH-002 R4 promotion.
+Resolve the smallest explicit AUTH-003 public wire projection/request-response/status-error authority set, then re-enter the downstream DTO/OpenAPI/runtime/persistence evidence chain.
 
+Do not invent DTO fields or HTTP semantics.
+Do not create or execute an AUTH-003 migration from guessed physical names.
+Do not promote `ENT-IDENTITY` or `ENT-CREDENTIAL`.
 Do not rerun AUTH-002 Runtime Evidence Run `36219132123` unchanged.
