@@ -3273,3 +3273,25 @@ Current continuation:
 `M0-AUTH-004-WIRE-AND-OPERATION-POLICY-AUTHORITY-001` / `WAIT_AUTHORITY_DECISION`
 
 Do not rerun AUTH-002 Runtime Evidence `36219132123` unchanged.
+
+
+## 2026-09-26 — AUTH-004 Operation Policy authority-input matrix
+
+Source head: `1227ec82c495a372d191b151d5b45ebf46cb5649`.
+Decision-control refinement commit: `dea98f2c511321b9913d49d22d3b24a132dfcf21`.
+Backup branch: `backup/main-before-auth004-authority-input-matrix-20260926`.
+
+Control:
+`CC-MAPPING-0-AUTH-004-OPERATION-POLICY-AUTHORITY-GAP-2026-09-26`
+
+Result:
+- Existing AUTH-004 policy gap is now decomposed field-by-field.
+- Operation IDs/routes, auth mode, established permission boundary, recovery security invariants, and evidence gate dimensions are already frozen.
+- Resource/D1, cache, retry, exact idempotency semantics, anti-abuse scope/actions, event/queue and operation-policy security admission remain decision-required.
+- No AUTH-004 values were copied from neighboring operations.
+- `contracts/api/auth-operation-policy.v1.json` was not promoted or populated by inference.
+
+Current continuation:
+`M0-AUTH-004-WIRE-AND-OPERATION-POLICY-AUTHORITY-001` / `WAIT_AUTHORITY_DECISION`
+
+The next accepted authority artifact must fill the remaining policy fields for all three canonical AUTH-004 operations, with explicit N/A where applicable.
