@@ -996,7 +996,7 @@
       ]
     },
     {
-      "operationId": "search",
+      "operationId": "searchContent",
       "method": "GET",
       "path": "/v1/search",
       "openapiPath": "/search",
