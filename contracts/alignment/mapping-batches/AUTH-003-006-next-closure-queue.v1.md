@@ -1,6 +1,6 @@
 # AUTH-003–AUTH-006 Next Closure Queue v1
 
-Status: `EXECUTION_QUEUE_FROZEN / AUTH-003 WIRE CLOSED; DOWNSTREAM EVIDENCE PENDING`
+Status: `EXECUTION_QUEUE_FROZEN / AUTH-003 WIRE CLOSED; AUTH-004 NEXT`
 
 ## Purpose
 
@@ -113,7 +113,7 @@ The work may be prepared in parallel, but promotion remains per-feature and fail
 
 ## Next concrete action
 
-Resolve the smallest authoritative decision set for AUTH-003 first. Do not modify canonical OpenAPI until the exact public wire projection and status/error semantics are explicitly contracted.
+AUTH-003 wire closure is already recorded as closed. Do not reopen or repeat its wire-authority work unless an authoritative input changes. The next closure unit is AUTH-004: resolve the smallest explicit wire-schema and API-authority decision set. Do not modify canonical OpenAPI until the exact public wire contract and route/operation authority are explicitly resolved.
 
 ## 2026-09-26 AUTH-003 wire closure
 
