@@ -106,7 +106,7 @@ if (registry.status === 'GREEN') {
   if (canonicalMapping.status !== 'GREEN') failures.push(`Evidence Registry cannot be GREEN while canonical Mapping 0 is ${canonicalMapping.status ?? 'missing'}`)
   const greenFeatures = (canonicalMapping.records ?? []).filter((record) => record.status === 'GREEN')
   for (const record of greenFeatures) {
-    const supported = [...claims.keys()].some((key) => key.startsWith(`${record.featureId}::`) && (claims.get(key) ?? []).some((evidence) => evidence.result === 'PASS' && ['ACTIVE', 'VERIFIED'].includes(evidence.status) && evidence.commitSha === currentCommit))
+    const supported = [...claims.keys()].some((key) => key.startsWith(`${record.featureId}::`) && (claims.get(key) ?? []).some((evidence) => evidenceIsAdmittedCurrent(evidence)))
     if (!supported) failures.push(`GREEN Feature has no current executable PASS evidence: ${record.featureId}`)
   }
 }
