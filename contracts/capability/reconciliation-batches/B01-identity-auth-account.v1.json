@@ -180,24 +180,37 @@
         "l8": "Existing identity registry coverage; API/DTO/security evidence incomplete"
       },
       "existingContracts": [
-        "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"
+        "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md",
+        "contracts/api/AUTH-004-password-recovery-contract.v1.json",
+        "contracts/entity/AUTH-004-password-recovery-field-contract.v1.json"
       ],
-      "apiRefs": [],
+      "apiRefs": [
+        "authPasswordChange",
+        "authPasswordResetRequest",
+        "authPasswordResetConfirm"
+      ],
       "pageRefs": [],
       "dtoRefs": [],
-      "dataRefs": [],
+      "dataRefs": [
+        "ENT-CREDENTIAL",
+        "ENT-SESSION"
+      ],
       "permissionRefs": [],
       "entitlementRefs": [],
       "stateRefs": [],
       "eventRefs": [],
-      "workerRefs": [],
-      "d1Domain": "UNRESOLVED",
+      "workerRefs": [
+        "W01-payload"
+      ],
+      "d1Domain": "D1-01",
       "testRefs": [],
       "evidenceRefs": [],
       "reconciliationState": "PARTIAL",
       "blockers": [
-        "canonical recovery/change API mapping missing",
-        "single-use token evidence missing"
+        "DTO/schema projection remains not fully admitted",
+        "runtime/security E2E evidence missing",
+        "D1 native schema/runtime evidence missing",
+        "Mapping-0 closure evidence missing"
       ]
     },
     {
