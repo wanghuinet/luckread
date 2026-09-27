@@ -63,7 +63,8 @@ paths:
                 identity: { type: string }
                 credential: { type: string, format: password }
                 username: { type: string }
-                consent: { type: object }
+                consent:
+                  $ref: '#/components/schemas/AuthRegistrationConsent'
       responses:
         '201':
           description: Registered. Account enters PENDING_VERIFICATION.
@@ -2565,6 +2566,13 @@ components:
       type: string
       minLength: 1
       maxLength: 256
+    AuthRegistrationConsent:
+      type: object
+      required: [purpose, policyVersion]
+      properties:
+        purpose: { type: string, enum: [ACCOUNT_REGISTRATION] }
+        policyVersion: { type: string }
+      additionalProperties: false
     AccountState:
       $ref: '../../enums/account-state.json'
     ContentState:
