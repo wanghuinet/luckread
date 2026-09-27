@@ -152,13 +152,14 @@
     "schemaPostcheckRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "runtimeEvidenceStatus": "ADMITTED_PASS_VERIFIED",
     "runtimeEvidenceRunId": "36299334577",
-    "runtimeEvidenceArtifactId": "10924573167"
+    "runtimeEvidenceArtifactId": "10924573167",
+    "runtimeEvidenceSourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7"
   },
   "nextGate": "Reconcile admitted AUTH-003 runtime/persistence evidence to ENT-IDENTITY/ENT-CREDENTIAL physical mapping and Mapping 0 decision material; do not mark Mapping 0 GREEN.",
   "runtimeEvidenceAdmission": {
     "workflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
     "runId": "36299334577",
-    "sourceSha": "5dff85d47578eb1dcaa57a53b0a072dfe2a80d88",
+    "sourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
     "databaseName": "luckread",
     "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
     "artifactId": "10924573167",
@@ -174,6 +175,14 @@
       "concurrentLoserIsGenericConflict",
       "oneAuthoritativeNormalizedOwner",
       "syntheticRowsRemainBounded"
-    ]
+    ],
+    "provenanceCorrection": {
+      "correctedAt": "2026-09-27",
+      "reason": "Runtime evidence run 36299334577 tested exact implementation source 419bb7fd...; prior admission commit accidentally copied current main SHA into the sourceSha metadata field.",
+      "runtimeRunId": "36299334577",
+      "runtimeTestedSourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+      "currentMainSha": "7f0bab266fcea439941274ab97a2ea53cc6a3596",
+      "rerunRequired": false
+    }
   }
 }
