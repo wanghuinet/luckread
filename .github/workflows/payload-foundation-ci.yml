@@ -40,6 +40,17 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Generate Payload types (diagnostic)
+        working-directory: workers/W01-payload
+        run: pnpm run generate:types:payload
+
+      - name: Upload generated Payload types (diagnostic)
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth001-generated-payload-types-${{ github.run_id }}
+          path: workers/W01-payload/src/payload-types.ts
+          if-no-files-found: error
+
       - name: Typecheck W01
         working-directory: workers/W01-payload
         run: pnpm exec tsc --noEmit
