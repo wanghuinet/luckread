@@ -14,6 +14,9 @@
       "visibility": "public",
       "capability": "account_registration",
       "contractStatus": "CONTRACTED_PARTIAL",
+      "wire": {
+        "requiredFields": ["identityType", "identity", "credential", "username", "consent"]
+      },
       "auth": {
         "mode": "public",
         "subject": "anonymous"
