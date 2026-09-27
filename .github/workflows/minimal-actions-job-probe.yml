@@ -1,0 +1,17 @@
+name: Minimal Actions Job Probe
+
+on:
+  push:
+    branches:
+      - 'diagnostic/**'
+    paths:
+      - '.github/workflows/minimal-actions-job-probe.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ACTIONS_MINIMAL_JOB_PROBE_OK
