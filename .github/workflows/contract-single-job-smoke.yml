@@ -9,6 +9,7 @@ permissions:
   contents: read
 
 jobs:
+  # trigger-only diagnostic revision
   smoke:
     name: Contract Common Smoke
     runs-on: ubuntu-latest
