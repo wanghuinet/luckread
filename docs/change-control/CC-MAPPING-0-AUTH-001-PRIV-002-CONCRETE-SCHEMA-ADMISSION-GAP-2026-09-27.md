@@ -2,7 +2,7 @@
 
 ## Status
 
-`EXTERNAL_AUTHORITY_DECISION_REQUIRED / CONCRETE_CONTRACT_BLOCKED`
+`CONCRETE_CONTRACT_ADMITTED / RUNTIME_BLOCKED`
 
 ## Scope
 
@@ -67,3 +67,24 @@ The exhaustive current-head search is now frozen by:
 No new repository authority was found for the remaining concrete values. This converts the gate from an open-ended re-audit into a single explicit authority-decision dependency.
 
 The remaining values MUST be admitted by one canonical PRIV-002 contract/change-control decision before AUTH-001 runtime authorization.
+
+
+## 2026-09-27 concrete admission result
+
+The decision packet has been converted into a concrete contract admission without inventing a physical table/column layout.
+
+| Decision item | Admitted value | State |
+|---|---|---|
+| canonical consent entity ID | `ENT-CONSENT` | CONTRACTED |
+| consent record field contract | `contracts/entity/PRIV-002-consent-field-contract.v1.json` | CONTRACTED |
+| consent persistence semantics | `contracts/persistence/PRIV-002-consent-persistence-contract.v1.json` | CONTRACTED |
+| consent purpose for AUTH-001 | `ACCOUNT_REGISTRATION` | CONTRACTED |
+| consent state | `GRANTED / REVOKED / RESTRICTED_PROCESSING` | CONTRACTED |
+| legal basis | `CONSENT` | CONTRACTED |
+| policy version | immutable string per consent record | CONTRACTED |
+| retention class | `LEGAL_AUDIT`, server-governed | CONTRACTED |
+| retentionUntil | server-calculated from applicable lifecycle retention policy; client cannot select | CONTRACTED |
+| withdrawal event | `privacy.consent_withdrawn` v1.0 | CONTRACTED |
+| AUTH-001 envelope binding | `consent_record_id -> ENT-CONSENT.id` | CONTRACTED |
+
+The remaining gaps are implementation/evidence gaps only: runtime, physical persistence, withdrawal propagation and security/privacy E2E evidence. They do not reopen the concrete schema decision.
