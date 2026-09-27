@@ -1,13 +1,13 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "39499206428f7c4395b1e0bd4cd12f68f1dea3ae",
-  "backupBranch": "backup/pre-auth001-idempotency-seam-reconcile-20260927",
+  "sourceHead": "e6eba323ad6c6abbad156b404643c515808fb541",
+  "backupBranch": "backup/post-auth001-native-email-reconcile-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "BLOCKED_AUTH001_PHONE_CONSENT_WRITER_BOUNDARY",
-    "objective": "Resolve the remaining AUTH-001 registration authority gaps—phone durable source, consent persistence, and writer/transaction boundary—before authorizing authRegister runtime.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-NATIVE-AUTH-IDENTITY-BOUNDARY-2026-09-27.md",
+    "state": "BLOCKED_AUTH001_CONSENT_WRITER_BOUNDARY",
+    "objective": "Resolve the remaining AUTH-001 registration authority gaps—canonical consent persistence and writer/transaction boundary—before authorizing authRegister runtime.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-NATIVE-EMAIL-REGISTRATION-DECISION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
     "nextGate": "AUTH-001::resolve phone durable source + canonical consent persistence + registration writer/transaction boundary; reuse the already-closed canonical idempotency semantics; only then authorize the smallest registration runtime slice.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
@@ -27,7 +27,8 @@
     "auth002Auth003SharedEntityAuthority": true,
     "auth003PhysicalMapping": true,
     "auth001RegisterWireRequiredness": true,
-    "auth001IdempotencySemantics": true
+    "auth001IdempotencySemantics": true,
+    "auth001NativeEmailEntry": true
   },
   "historicalOnlyCursors": [
     "M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001 / WAIT_AUTHORITY_DECISION",
@@ -155,16 +156,16 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Active W01 Users.ts uses Payload native auth without a custom phone strategy, while AUTH-001 still permits phone registration. Username/consent wire requiredness is reconciled; canonical idempotency semantics are closed but its AUTH-001 transactional binding remains unresolved. Phone durable source, consent persistence, and registration writer/consistency semantics remain blocked, so runtime remains unauthorized.",
-    "currentMainSha": "39499206428f7c4395b1e0bd4cd12f68f1dea3ae",
+    "reason": "Active W01 Users.ts uses Payload native auth without a custom phone strategy. AUTH-001 identity entry is now constrained to email; phone remains under AUTH-003/AUTH-005. Username/consent wire requiredness is reconciled; canonical idempotency semantics are closed but its AUTH-001 transactional binding remains unresolved. Consent persistence and registration writer/consistency semantics remain blocked, so runtime remains unauthorized.",
+    "currentMainSha": "e6eba323ad6c6abbad156b404643c515808fb541",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
-    "payloadWireCompatibilityStatus": "USERNAME_AND_CONSENT_REQUIREDNESS_RECONCILED_REMAINING_GATES_BLOCKED",
-    "phoneSourceStatus": "BLOCKED",
+    "payloadWireCompatibilityStatus": "USERNAME_CONSENT_AND_IDENTITY_ENTRY_RECONCILED_REMAINING_GATES_BLOCKED",
+    "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
     "idempotencySourceStatus": "CANONICAL_SEMANTICS_CLOSED_BINDING_BLOCKED",
     "atomicityStatus": "BLOCKED",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED"
   },
-  "nextGate": "AUTH-001::resolve phone durable source + canonical consent persistence + registration writer/transaction boundary; reuse the already-closed canonical idempotency semantics; only then authorize the smallest admitted registration runtime slice.",
+  "nextGate": "AUTH-001::resolve canonical consent persistence + registration writer/transaction boundary; reuse the already-closed canonical idempotency semantics; only then authorize the smallest admitted registration runtime slice.",
   "runtimeEvidenceAdmission": {
     "list": {
       "workflow": ".github/workflows/w02-auth-003-credential-list-runtime-evidence.yml",
@@ -211,11 +212,12 @@
     "docs/change-control/CC-MAPPING-0-AUTH-001-PAYLOAD-NATIVE-CAPABILITY-RECONCILIATION-2026-09-27.md",
     "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTER-WIRE-RECONCILIATION-2026-09-27.md",
     "docs/change-control/CC-MAPPING-0-AUTH-001-IDEMPOTENCY-CANONICAL-SEAM-RECONCILIATION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-NATIVE-EMAIL-REGISTRATION-DECISION-2026-09-27.md",
     "docs/change-control/CC-MAPPING-0-USER-001-PAYLOAD-API-FIELD-RECONCILIATION-2026-09-27.md"
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
-    "mainSha": "39499206428f7c4395b1e0bd4cd12f68f1dea3ae",
+    "mainSha": "e6eba323ad6c6abbad156b404643c515808fb541",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
