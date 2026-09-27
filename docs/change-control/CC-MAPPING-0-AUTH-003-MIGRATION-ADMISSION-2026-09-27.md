@@ -46,7 +46,7 @@ The migration creates exactly two AUTH-003 tables in D1-01.
 | createdAt | created_at | TEXT NOT NULL |
 | updatedAt | updated_at | TEXT NOT NULL |
 
-Authoritative uniqueness is (kind, normalized_value). normalized_value is separately indexed but not globally unique because the frozen AUTH-003 operation contract defines uniqueness scope as kind + normalizedValue.
+Authoritative uniqueness is (kind, normalized_value). The unique constraints on user_id and the normalized identity fields provide their required indexes without redundant secondary indexes. normalized_value is indexed as the second component of the admitted (kind, normalized_value) unique index.
 
 ## Security boundary
 The migration stores no raw credential value in auth_credentials.
@@ -65,7 +65,7 @@ The migration is therefore schema-only. Existing Payload users.email / users.use
 ## Required postconditions
 1. auth_identities exists with the exact admitted columns and constraints.
 2. auth_credentials exists with the exact admitted columns, FK and uniqueness boundary.
-3. Required secondary indexes exist for fields marked indexed by the entity contracts.
+3. Required indexes exist, with uniqueness constraints serving as the index for identity unique fields and no redundant duplicate indexes.
 4. No password, raw credential, raw recovery token, or raw verification token column is introduced.
 5. Existing Payload users schema is unchanged by this migration.
 6. Migration ledger records exactly 0004_auth_003_credentials.sql.
