@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "764972cfa0f23efbac951f1da20c9bda9d6a71f7",
-  "backupBranch": "backup/pre-auth003-physical-identity-reconcile-20260927",
+  "sourceHead": "673262550648e49db1e030d7d14161743a2c01da",
+  "backupBranch": "backup/pre-auth003-admission-batch-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
     "state": "BLOCKED_RUNTIME_PERSISTENCE_IMPLEMENTATION_ADMISSION_REQUIRED",
@@ -11,7 +11,7 @@
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
     "nextGate": "AUTH-003 operation-policy authority + D1-01 schema/migration evidence -> smallest runtime/persistence vertical slice",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
-    "physicalBinding": "W02/D1-01 physical target NOT_ESTABLISHED",
+    "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED"
   },
   "alreadyClosed": {
@@ -44,7 +44,7 @@
     "Use the AUTH-003 runtime/persistence admission packet as the single input checklist; do not reopen closed wire/API/DTO work.",
     "Do not assign the existing W01-PAYLOAD-D1-BINDING physical database to W02/D1-01 by inference.",
     "Treat W02 -> D1-01 as the closed logical owner chain; keep physical Worker/D1 binding as a separate gate.",
-    "Treat luckread-w02 and D1-01 target UUID 2f80471e-... as explicit authority inputs; do not reinterpret or reassign the target.",
+    "Treat luckread-w02 and D1-01 target UUID 2f80471e-... as explicit authority inputs; do not reinterpret or reassign the target. Physical target identity is closed; current-SHA deployment correctness remains a separate gate.",
     "Do not inherit AUTH-003 runtime correctness from earlier W02 deployment evidence; same-SHA evidence is required."
   ],
   "previousSourceHead": "1fec1cebb79243baba9f22e59e715b5e3335fabc",
@@ -66,5 +66,18 @@
     "finding": "No AUTH-003-specific authoritative source supplies resource/cache/retry/event/queue/anti-abuse values. Neighbor-domain operation policies are reference-only and are not admitted as AUTH-003 authority.",
     "decision": "KEEP_AUTH003_OPERATION_POLICY_FIELDS_BLOCKED",
     "historicalResourceBudgetDisposition": "The edge-first-worker-topology resource defaults are explicitly historical and tied to the superseded W01-W13/P01-P08 topology. They are not current 12-Worker operation-policy authority and cannot be imported into AUTH-003."
+  },
+  "evidenceChannel": {
+    "workflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
+    "mode": "READONLY",
+    "status": "READY_MANUAL_RUN",
+    "captures": [
+      "sqlite_master",
+      "table_list",
+      "d1_migrations_presence",
+      "d1_migrations",
+      "provenance"
+    ],
+    "schemaEvidence": "PENDING_CAPTURE_AND_REVIEW"
   }
 }
