@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "1fec1cebb79243baba9f22e59e715b5e3335fabc",
+  "sourceHead": "764972cfa0f23efbac951f1da20c9bda9d6a71f7",
   "backupBranch": "backup/pre-auth003-physical-identity-reconcile-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
