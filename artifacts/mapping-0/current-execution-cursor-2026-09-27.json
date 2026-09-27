@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "673fc9d14fef33d618fb2121c3f5304cf46ae926",
+  "sourceHead": "7c9f1fbf41791f56cd23e2ee27ded09f883b956a",
   "backupBranch": "backup/pre-auth003-postmigration-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
@@ -50,7 +50,7 @@
     "Treat 36296831559 as execution checkpoint only; final schema correctness requires a later read-only exact-SHA postcheck.",
     "Do not promote AUTH-003 persistence status from the migration execution log alone."
   ],
-  "previousSourceHead": "2c222fdea5fb4f287069c0833a96226265a7f7fa",
+  "previousSourceHead": "673fc9d14fef33d618fb2121c3f5304cf46ae926",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
@@ -102,8 +102,8 @@
     "postcheckWorkflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
     "postcheckRequired": true,
     "migrationWorkflow": ".github/workflows/w02-auth-003-migration-evidence.yml",
-    "workflowCommit": "673fc9d14fef33d618fb2121c3f5304cf46ae926",
-    "postcheckValidation": "Expected AUTH-003 tables/columns/indexes/FK and migration ledger are validated read-only; no DDL/DML."
+    "workflowCommit": "7c9f1fbf41791f56cd23e2ee27ded09f883b956a",
+    "postcheckValidation": "Expected AUTH-003 tables/columns/indexes/FK and migration ledger are validated read-only; AUTH-003 FK admission uses PRAGMA foreign_key_check(auth_credentials); no DDL/DML."
   },
   "decisionInput": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md",
