@@ -1,0 +1,14 @@
+name: Minimal Actions Scheduler Probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Scheduler Probe
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ACTIONS_SCHEDULER_PROBE_OK
