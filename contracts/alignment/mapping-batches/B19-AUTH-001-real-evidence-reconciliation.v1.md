@@ -207,3 +207,14 @@ The reconciliation must decide, without adding an unnecessary parallel account m
 4. the interaction of these fields with the existing Payload-native password boundary and AUTH-001 idempotency semantics.
 
 Mapping 0 remains NOT_GREEN.
+
+
+## 2026-09-27 native-auth identity boundary
+
+Current-source inspection further narrows the registration mismatch. W01 `Users.ts` uses Payload native `auth: true` without an admitted custom phone authentication strategy. The repository's Payload reference creation path is email/password based, while AUTH-001 wire permits `identityType=phone`.
+
+Therefore phone registration cannot currently be treated as a pure Payload-native User creation path. No fake email, username substitution, hidden phone field, custom auth strategy, or parallel User/auth system is authorized by inference.
+
+This finding is coupled with the already-recorded username-required-vs-wire-optional mismatch, missing consent persistence authority, missing AUTH-001 durable idempotency authority, and unresolved registration atomic-vs-eventual consistency model.
+
+Authoritative control: `docs/change-control/CC-MAPPING-0-AUTH-001-NATIVE-AUTH-IDENTITY-BOUNDARY-2026-09-27.md`.
