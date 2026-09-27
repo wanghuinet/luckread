@@ -73,7 +73,7 @@ export function normalizeCredentialValue(kind: CredentialKind, value: unknown): 
   }
 
   if (kind === 'phone') {
-    if (!/^\\+[1-9][0-9]{1,14}$/.test(trimmed)) {
+    if (!/^\+[1-9][0-9]{1,14}$/.test(trimmed)) {
       throw new CredentialAddError('INVALID_INPUT', 'credential value is invalid')
     }
     return trimmed
