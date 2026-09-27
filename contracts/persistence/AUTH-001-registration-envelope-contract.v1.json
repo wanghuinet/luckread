@@ -6,6 +6,7 @@
   "status": "CONTRACTED_PARTIAL",
   "sourceOfTruth": "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-WRITER-BOUNDARY-2026-09-27.md",
   "canonicalIdempotencySource": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
+  "canonicalRegistrationResponseSource": "contracts/openapi/v1/openapi.yaml#/paths/~1auth~1register/post/responses/201/content/application~1json/schema",
   "scope": "registration-local internal record at W01",
   "transactionBoundary": "same W01 Payload transaction as native User creation",
   "retentionHours": 24,
@@ -41,6 +42,28 @@
       "requiredWhen": "state=COMPLETED",
       "source": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
     },
+    "committed_response": {
+      "type": "object",
+      "required": [
+        "userId",
+        "accountState"
+      ],
+      "properties": {
+        "userId": {
+          "$ref": "contracts/openapi/v1/openapi.yaml#/components/schemas/ResourceId",
+          "canonicalDestination": "ENT-USER.id",
+          "securityRule": "immutable cross-domain authority"
+        },
+        "accountState": {
+          "$ref": "contracts/enums/account-state.json",
+          "canonicalDestination": "users.account_state",
+          "initialValue": "PENDING_VERIFICATION",
+          "initialVersion": 1
+        }
+      },
+      "requiredWhen": "state=COMPLETED",
+      "description": "Lossless logical representation of the canonical AUTH-001 201 response body required for deterministic replay."
+    },
     "created_at": {
       "type": "string",
       "format": "date-time",
@@ -58,17 +81,12 @@
     "same key + same payload + IN_PROGRESS returns IDEMPOTENCY_IN_PROGRESS",
     "same key + different payload returns IDEMPOTENCY_KEY_REUSE_CONFLICT",
     "expired key is treated as a new request",
-    "the envelope write shares the same transaction as the protected registration User write"
+    "the envelope write shares the same transaction as the protected registration User write",
+    "a COMPLETED replay returns HTTP 201 and the exact committed_response body {userId, accountState} from the first successful registration",
+    "accountState in committed_response is sourced from users.account_state; the admitted initial value is PENDING_VERIFICATION with account_state_version 1",
+    "HTTP 201 is a deterministic operation-level response status from the canonical authRegister contract and does not require a second persisted status field"
   ],
   "blockedBindings": {
-    "committedResponseProjection": {
-      "status": "BLOCKED",
-      "requiredSemantics": [
-        "User ID",
-        "HTTP status / registration result status"
-      ],
-      "reason": "writer-boundary control requires replayable committed response identity/status but does not freeze exact persistence field names or structure"
-    },
     "consentBinding": {
       "status": "BLOCKED",
       "reason": "PRIV-002 concrete consent entity/field/schema/retention contract is not yet admitted"
