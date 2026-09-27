@@ -133,6 +133,20 @@ describe('credential-list', () => {
       limit: 101,
       requestId: 'req-6',
     })).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
+
+    const invalidTimestampCursor = Buffer.from(JSON.stringify({
+      v: 1,
+      endpoint: 'authCredentialList',
+      ordering: CREDENTIAL_LIST_ORDERING,
+      createdAt: 'not-a-date',
+      credentialId: 'cred-9',
+    })).toString('base64url')
+
+    await expect(listCredentials(db, {
+      actorUserId: 'user-1',
+      cursor: invalidTimestampCursor,
+      requestId: 'req-8',
+    })).rejects.toMatchObject({ code: 'INVALID_CURSOR' })
   })
 
   it('is structurally self-scoped: no target user identifier is accepted', async () => {
