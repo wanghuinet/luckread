@@ -2152,6 +2152,41 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "authPasswordChange",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [
+        "user.credential.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authPasswordResetRequest",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authPasswordResetConfirm",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
     }
   ]
 }

@@ -778,6 +778,13 @@
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "queue": {
+        "enqueueMax": 0
       }
     },
     {
@@ -838,6 +845,10 @@
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
       }
     },
     {
@@ -896,6 +907,13 @@
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": false
+      },
+      "queue": {
+        "enqueueMax": 0
       }
     }
   ]
