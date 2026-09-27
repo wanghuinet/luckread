@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "5dff85d47578eb1dcaa57a53b0a072dfe2a80d88",
-  "backupBranch": "backup/pre-auth003-runtime-evidence-admission-20260927",
+  "sourceHead": "5aa2e7c087b3276976995a5ad9b064ad60f08199",
+  "backupBranch": "backup/pre-auth003-credential-normalized-uniqueness-conflict-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
-    "state": "BLOCKED_AUTH003_ENTITY_MAPPING_RECONCILIATION_REQUIRED",
+    "state": "BLOCKED_AUTH003_CONTRACT_SEMANTICS_DECISION_REQUIRED",
     "objective": "Admit the actual remote MIG-AUTH-003-CREDENTIAL-V1 execution through read-only exact-SHA post-schema, migration-ledger, and provenance evidence before runtime implementation.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-003 admitted runtime/security evidence -> reconcile ENT-IDENTITY / ENT-CREDENTIAL physical mapping -> decision admission; no Mapping 0 GREEN",
+    "nextGate": "Resolve ENT-CREDENTIAL normalizedValue uniqueness semantics conflict: field contract unique=true vs canonical composite uniqueness (kind, normalizedValue); then reconcile entity mapping without code/schema change.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED"
@@ -184,5 +184,16 @@
       "currentMainSha": "7f0bab266fcea439941274ab97a2ea53cc6a3596",
       "rerunRequired": false
     }
+  },
+  "contractDecisionBlocker": {
+    "issueId": "CC-AUTH003-NORMALIZED-UNIQUENESS-SEMANTICS-2026-09-27",
+    "status": "BLOCKED_DECISION_REQUIRED",
+    "fieldId": "ENT-CREDENTIAL-F-NORMALIZED-VALUE",
+    "fieldContract": "contracts/entity/AUTH-003-credential-field-contract.v1.json",
+    "contractDelta": "contracts/alignment/mapping-batches/AUTH-003-contractual-mapping-delta.v1.md",
+    "migration": "workers/W02-content/migrations/0004_auth_003_credentials.sql",
+    "conflict": "Field contract declares normalizedValue unique=true, while canonical AUTH-003 uniqueness is (kind, normalizedValue) and the executed migration creates auth_credentials_kind_normalized_value_uq on that composite.",
+    "runtimeScope": "Run 36299334577 proved one-winner uniqueness for concurrent email claims; it did not prove a global normalizedValue uniqueness constraint across different credential kinds.",
+    "disposition": "Do not alter migration, code, or field contract until the authority decision is recorded."
   }
 }

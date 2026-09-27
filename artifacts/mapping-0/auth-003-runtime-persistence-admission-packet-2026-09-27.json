@@ -1,9 +1,9 @@
 {
   "version": "1.0.0",
   "controlId": "CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27",
-  "sourceHead": "5dff85d47578eb1dcaa57a53b0a072dfe2a80d88",
-  "backupBranch": "backup/pre-auth003-runtime-evidence-admission-20260927",
-  "status": "SCHEMA_EVIDENCE_ADMITTED / REMOTE_MIGRATION_EXECUTED / POSTCHECK_VERIFIED / RUNTIME_SECURITY_VERIFIED / ENTITY_MAPPING_RECONCILIATION_REQUIRED",
+  "sourceHead": "5aa2e7c087b3276976995a5ad9b064ad60f08199",
+  "backupBranch": "backup/pre-auth003-credential-normalized-uniqueness-conflict-20260927",
+  "status": "SCHEMA_EVIDENCE_ADMITTED / REMOTE_MIGRATION_EXECUTED / POSTCHECK_VERIFIED / RUNTIME_SECURITY_VERIFIED / CONTRACT_SEMANTICS_BLOCKED",
   "scope": "AUTH-003 credential-management runtime/persistence admission",
   "establishedInputs": {
     "operations": [
@@ -259,13 +259,17 @@
     "Controlled remote runtime evidence run 36299334577 executed against that exact source SHA and D1-01 luckread; unit and runtime jobs both passed.",
     "Runtime/security checks passed for normalization/uniqueness, deterministic idempotency/replay, idempotency conflict, cross-account denial, public projection, concurrency one-winner semantics and fixture cleanup.",
     "Production Worker deployment was false; evidence harness was ephemeral and controlled.",
-    "ENT-IDENTITY and ENT-CREDENTIAL promotion remains a separate reconciliation/decision gate; runtime PASS does not itself promote entities or Mapping 0 GREEN."
+    "Physical field-to-column alignment is observed for ENT-IDENTITY and ENT-CREDENTIAL from the admitted migration and remote schema evidence.",
+    "AUTH-003 contractual mapping delta defines canonical persistence uniqueness as (kind, normalizedValue).",
+    "AUTH-003 credential field contract currently declares ENT-CREDENTIAL-F-NORMALIZED-VALUE unique=true without expressing the composite key semantics.",
+    "The executed migration and runtime evidence implement/prove composite uniqueness, not global normalizedValue uniqueness across credential kinds.",
+    "This is a contract-semantics conflict and must remain BLOCKED pending authoritative decision. No implementation or migration change is authorized from this observation."
   ],
   "nextAdmissibleSequence": [
-    "Register the exact runtime/security evidence under the canonical Evidence Registry with run/artifact/source provenance.",
-    "Reconcile the admitted physical schema plus runtime behavior against the frozen ENT-IDENTITY / ENT-CREDENTIAL field/ownership contract.",
-    "Prepare explicit decision material for entity promotion and Mapping 0 status; do not infer additional schema or transport.",
-    "Only after the entity/mapping gate is independently satisfied may a later control admit further feature work."
+    "Record the authoritative decision for ENT-CREDENTIAL-F-NORMALIZED-VALUE uniqueness semantics.",
+    "If the contract semantics are reconciled without schema change, update only the governing contract/mapping evidence as authorized.",
+    "Re-run only the specific contract/mapping validator required by that decision; do not rerun remote runtime/schema evidence unless the authoritative decision changes the persisted behavior.",
+    "Only after the contract conflict is closed may ENT-IDENTITY / ENT-CREDENTIAL promotion and Mapping 0 decision material proceed."
   ],
   "forbiddenUntilInputs": [
     "re-executing MIG-AUTH-003-CREDENTIAL-V1",
@@ -383,5 +387,17 @@
     "runtimeTestedSourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
     "currentMainSha": "7f0bab266fcea439941274ab97a2ea53cc6a3596",
     "rerunRequired": false
+  },
+  "contractDecisionBlocker": {
+    "issueId": "CC-AUTH003-NORMALIZED-UNIQUENESS-SEMANTICS-2026-09-27",
+    "status": "BLOCKED_DECISION_REQUIRED",
+    "fieldId": "ENT-CREDENTIAL-F-NORMALIZED-VALUE",
+    "fieldContract": "contracts/entity/AUTH-003-credential-field-contract.v1.json",
+    "contractDelta": "contracts/alignment/mapping-batches/AUTH-003-contractual-mapping-delta.v1.md",
+    "migration": "workers/W02-content/migrations/0004_auth_003_credentials.sql",
+    "canonicalSemantics": "(kind, normalizedValue)",
+    "declaredFieldSemantics": "normalizedValue unique=true",
+    "runtimeEvidenceRunId": "36299334577",
+    "disposition": "No code/schema change until authority decision."
   }
 }
