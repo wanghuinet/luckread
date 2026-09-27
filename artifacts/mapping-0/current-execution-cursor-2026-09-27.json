@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "9d5f805d7f58bee85a2b8d51a244250a49a8f927",
-  "backupBranch": "backup/post-auth003-identity-gap-reconcile-20260927",
+  "sourceHead": "5d35d0609538d314b856531788151a1988093896",
+  "backupBranch": "backup/pre-auth001-identity-authority-reconcile-20260927",
   "currentCursor": {
     "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
-    "state": "BLOCKED_AUTH003_IDENTITY_MATERIALIZATION_AUTHORITY",
-    "objective": "Resolve the explicit upstream User→Identity materialization authority before any ENT-IDENTITY implementation is admitted.",
+    "state": "BLOCKED_AUTH001_USER_IDENTITY_FIELD_AUTHORITY",
+    "objective": "Resolve AUTH-001 registration to ENT-IDENTITY/ENT-CREDENTIAL field authority before admitting any shared identity materialization implementation.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-IDENTITY-MATERIALIZATION-AUTHORITY-GAP-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-003::identity materialization authority decision; then smallest ENT-IDENTITY runtime slice.",
+    "nextGate": "AUTH-001::registration identity/entity mapping reconciliation; then smallest shared identity materialization slice.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -153,9 +153,9 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "AUTH-003 credential persistence/runtime and physical field mapping are reconciled. The remaining blocker is a contract-level User→Identity materialization authority gap; no implementation is authorized until that authority is explicitly closed.",
-    "previousCursorSourceHead": "2bec29720de290a49eae4cf7d7ee74e23034f29e",
-    "currentMainSha": "9d5f805d7f58bee85a2b8d51a244250a49a8f927",
+    "reason": "B01 establishes ENT-USER.id as immutable cross-domain authority. AUTH-003 credential persistence/runtime is complete for its admitted slice, but the remaining identity materialization gap belongs at AUTH-001 registration because the current AUTH-001 DTO does not yet bind identity-bearing request fields to ENT-IDENTITY/ENT-CREDENTIAL.",
+    "previousCursorSourceHead": "9d5f805d7f58bee85a2b8d51a244250a49a8f927",
+    "currentMainSha": "5d35d0609538d314b856531788151a1988093896",
     "remoteMigrationReexecution": "FORBIDDEN",
     "schemaPostcheckRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "runtimeEvidenceStatus": "AUTH003_CREDENTIAL_SLICE_PASS_VERIFIED",
@@ -166,7 +166,7 @@
     ],
     "entityEvidenceBindingStatus": "ENT-CREDENTIAL_BOUND_NOT_PROMOTED__ENT-IDENTITY_BLOCKED"
   },
-  "nextGate": "AUTH-003::identity materialization authority decision; then smallest ENT-IDENTITY runtime slice.",
+  "nextGate": "AUTH-001::registration identity/entity mapping reconciliation; then smallest shared identity materialization slice.",
   "runtimeEvidenceAdmission": {
     "list": {
       "workflow": ".github/workflows/w02-auth-003-credential-list-runtime-evidence.yml",
@@ -205,7 +205,7 @@
       "ENT-IDENTITY",
       "ENT-CREDENTIAL"
     ],
-    "reason": "ENT-CREDENTIAL credential slice is evidenced but not promoted; ENT-IDENTITY lacks explicit upstream materialization authority and production lifecycle evidence. Mapping 0 / Five-Way remains NOT_GREEN.",
+    "reason": "ENT-CREDENTIAL credential slice is evidenced but not promoted; ENT-IDENTITY physical mapping is evidenced but its field/materialization authority must be resolved through AUTH-001 registration. Mapping 0 / Five-Way remains NOT_GREEN.",
     "evidenceRegistryStatus": "NOT_GREEN",
     "fiveWayStatus": "NOT_GREEN"
   }

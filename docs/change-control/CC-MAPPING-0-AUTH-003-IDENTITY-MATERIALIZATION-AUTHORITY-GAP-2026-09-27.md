@@ -18,25 +18,27 @@ Freeze the smallest remaining authority gap before implementing any ENT-IDENTITY
 
 ## Closed facts
 
-- `ENT-IDENTITY.userId -> auth_identities.user_id` is physically admitted.
+- The B01 foundation contract states that **User ID is immutable and authoritative across all domains**. Therefore the canonical source for `ENT-IDENTITY.userId` is `ENT-USER.id`; no second User-ID authority may be invented.
+- `ENT-IDENTITY.userId -> auth_identities.user_id` is physically admitted on D1-01.
+- The canonical account-creation entry point is AUTH-001 `authRegister`; its contract is public, idempotent, anti-abuse protected and bounded to one authoritative account-creation write.
+- The current AUTH-001 DTO contract binds only `ENT-USER`. It does not yet authorize a concrete AUTH-001 -> ENT-IDENTITY / ENT-CREDENTIAL field mapping.
 - `ENT-IDENTITY` remains PROPOSED.
 - Existing Payload `users.email` and `users.username` must not be silently collapsed into the frozen ENT-IDENTITY model.
 - AUTH-003 wire/API/DTO authority is closed and must not be reopened.
 - AUTH-004 remains Payload-native; no password-recovery implementation is introduced by this control.
 
-## Required authority input before implementation
+## Remaining authority decision belongs to AUTH-001
 
-The next implementation admission must explicitly settle, using authoritative project contracts:
+ENT-IDENTITY should **not** receive a standalone materialization service from AUTH-003. The remaining decision is an AUTH-001 registration mapping gap because `authRegister` is the canonical account-creation boundary and the current registration reconciliation explicitly leaves the following links unresolved:
 
-- canonical upstream owner for `ENT-IDENTITY.userId`;
-- source/ownership for username, email and phone;
-- exact normalization and versioning source;
-- whether identity materialization occurs synchronously during an existing authoritative user lifecycle event or through an already-authorized asynchronous path;
-- conflict/reconciliation behavior when upstream User state and `auth_identities` diverge;
-- idempotency and concurrency requirements for first materialization;
-- exact Worker/D1 ownership and operation budget.
+- `authRegister.identityType / identity -> ENT-IDENTITY` field mapping;
+- optional registration `username -> ENT-IDENTITY` field mapping;
+- separation of the registration `credential` (password) from username/email/phone credential identity state;
+- initial normalization/version source for the identity-side fields;
+- subsequent maintenance semantics when AUTH-003 changes login identifiers without exceeding the admitted AUTH-003 single-authoritative-write budget;
+- divergence/reconciliation rules between `ENT-USER` and `auth_identities`.
 
-No choice is inferred from current Payload Users fields or from the synthetic runtime harness.
+These questions require the AUTH-001 contract/evidence chain to be reconciled before any ENT-IDENTITY runtime implementation is admitted. No choice is inferred from Payload Users fields or from the synthetic runtime harness.
 
 ## Non-goals
 
@@ -51,4 +53,7 @@ No choice is inferred from current Payload Users fields or from the synthetic ru
 
 ## Next gate
 
-Resolve this authority packet under Change Control. Only then admit the smallest ENT-IDENTITY materialization/runtime implementation and its exact-SHA evidence.
+The next governed slice is **AUTH-001 registration identity/entity mapping reconciliation**. Only after AUTH-001 explicitly closes the User→Identity/credential field authority may the smallest shared materialization implementation be admitted.
+
+AUTH-003 credential runtime remains closed and must not be reworked merely to manufacture identity authority.
+
