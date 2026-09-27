@@ -1,6 +1,6 @@
 # CC-MAPPING-0-AUTH-003-D1-READONLY-SCHEMA-EVIDENCE-CHANNEL-2026-09-27
 
-Status: **EVIDENCE-CHANNEL-READY / NOT_EVIDENCE / NOT_GREEN**
+Status: **SUPERSEDED — EVIDENCE ADMITTED BY CC-MAPPING-0-AUTH-003-D1-SCHEMA-EVIDENCE-ADMISSION-2026-09-27**
 
 ## Scope
 
@@ -43,3 +43,8 @@ AUTH-003 operation-policy authority remains unresolved. No resource/cache/retry/
 ## Next gate
 
 Run the read-only workflow against the exact current AUTH-003 source SHA and review the resulting artifact. Only after schema authority is established may implementation admission be reconsidered.
+
+
+## Disposition after run 36295541846
+
+The read-only evidence channel was executed successfully against exact source SHA `ce308e202ff737e236f3bf35f30097e9e4e3b42c`. The resulting artifact was admitted by `CC-MAPPING-0-AUTH-003-D1-SCHEMA-EVIDENCE-ADMISSION-2026-09-27`. This channel is therefore no longer a pending evidence-capture gate. The remaining gate is migration admission because the captured remote state contains no separately evidenced ENT-IDENTITY/ENT-CREDENTIAL persistence structure and no `MIG-AUTH-003-CREDENTIAL-V1` execution.
