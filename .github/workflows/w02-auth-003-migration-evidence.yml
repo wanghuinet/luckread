@@ -97,6 +97,7 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT name,type,tbl_name,sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND (name LIKE 'auth_identities%' OR name LIKE 'auth_credentials%') ORDER BY type,name;"             > ../../artifacts/mapping-0/auth-003-migration-evidence/post_schema.txt
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT id,name,applied_at FROM d1_migrations WHERE name='$EXPECTED_MIGRATION';"             > ../../artifacts/mapping-0/auth-003-migration-evidence/post_migration_ledger.txt
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "PRAGMA foreign_key_check;"             > ../../artifacts/mapping-0/auth-003-migration-evidence/foreign_key_check.txt
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "PRAGMA foreign_key_check(auth_credentials);"             > ../../artifacts/mapping-0/auth-003-migration-evidence/auth_credentials_foreign_key_check.txt
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT sql FROM sqlite_master WHERE type='table' AND name='users';"             > ../../artifacts/mapping-0/auth-003-migration-evidence/post_users_schema.txt
           printf '%s\n' \
             "AUTH-003 Migration Evidence" \
@@ -120,12 +121,13 @@ jobs:
           test -s ../../artifacts/mapping-0/auth-003-migration-evidence/post_schema.txt
           test -s ../../artifacts/mapping-0/auth-003-migration-evidence/post_migration_ledger.txt
           test -s ../../artifacts/mapping-0/auth-003-migration-evidence/foreign_key_check.txt
+          test -s ../../artifacts/mapping-0/auth-003-migration-evidence/auth_credentials_foreign_key_check.txt
           test -s ../../artifacts/mapping-0/auth-003-migration-evidence/provenance.txt
           test -s ../../artifacts/mapping-0/auth-003-migration-evidence/pre_users_schema.txt
           test -s ../../artifacts/mapping-0/auth-003-migration-evidence/post_users_schema.txt
           cmp -s ../../artifacts/mapping-0/auth-003-migration-evidence/pre_users_schema.txt ../../artifacts/mapping-0/auth-003-migration-evidence/post_users_schema.txt
           grep -F "$EXPECTED_MIGRATION" ../../artifacts/mapping-0/auth-003-migration-evidence/post_migration_ledger.txt
-          grep -F '"results": []' ../../artifacts/mapping-0/auth-003-migration-evidence/foreign_key_check.txt
+          grep -F '"results": []' ../../artifacts/mapping-0/auth-003-migration-evidence/auth_credentials_foreign_key_check.txt
           grep -F "source_sha=$SOURCE_SHA" ../../artifacts/mapping-0/auth-003-migration-evidence/provenance.txt
 
       - name: Upload evidence
