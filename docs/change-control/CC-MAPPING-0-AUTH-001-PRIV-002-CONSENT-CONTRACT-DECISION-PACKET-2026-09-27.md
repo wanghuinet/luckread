@@ -2,7 +2,7 @@
 
 ## Status
 
-`EXTERNAL_AUTHORITY_DECISION_REQUIRED / AUTH-001_IMPLEMENTATION_BLOCKED`
+`CONTRACT_ADMITTED / AUTH-001_RUNTIME_PRECONDITIONS_RECONCILED`
 
 ## Purpose
 
@@ -73,3 +73,20 @@ Therefore the only remaining Contract blocker before the smallest registration r
 ## Non-authorizations
 
 This packet does not create an Entity ID, Field ID, enum, retention duration, migration, API, runtime handler, or infrastructure resource.
+
+
+## Decision outcome
+
+A minimal concrete contract has now been admitted from the reconciled semantic authorities. The admission intentionally stops at the logical contract boundary:
+
+- `ENT-CONSENT` is the canonical entity ID;
+- registration consent is `ACCOUNT_REGISTRATION`;
+- legal basis is `CONSENT`;
+- initial state is `GRANTED`;
+- policy version is immutable;
+- retention class is `LEGAL_AUDIT`;
+- retentionUntil is server-calculated by the global lifecycle retention policy;
+- withdrawal uses `REVOKED` + `withdrawnAt` + `privacy.consent_withdrawn` v1.0;
+- AUTH-001 envelope stores `consent_record_id`.
+
+No physical table, column, migration or runtime implementation is implied by this decision packet.
