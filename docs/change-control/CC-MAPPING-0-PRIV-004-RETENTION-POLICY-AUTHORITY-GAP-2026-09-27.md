@@ -2,7 +2,7 @@
 
 ## Status
 
-`GAP_NARROWED / POLICY_INSTANCE_BLOCKED`
+`AUTHORITY_RECONCILED / POLICY_INSTANCE_INPUT_REQUIRED`
 
 ## Purpose
 
@@ -51,6 +51,10 @@ PRIV-004 后续变更必须至少冻结：
 ## 2026-09-27 authority-contract reconciliation
 
 The minimum PRIV-004 Policy Config Authority shape is now admitted by `contracts/privacy/PRIV-004-retention-policy-authority.v1.json` and the companion decision packet. The concrete gap is narrowed to the first approved policy instance; no duration or jurisdiction-specific rule has been invented.
+
+## 2026-09-27 policy-instance admission packet
+
+The remaining runtime blocker is now represented by `artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json` and its change-control companion. The packet does not choose a duration or legal rule; it defines the exact fields and evidence required to admit the first approved policy instance.
 
 ## Next Gate
 
