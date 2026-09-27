@@ -1,6 +1,6 @@
 # Change Control: AUTH-003 Remote Runtime/Security Evidence Admission — 2026-09-27
 
-- Current authoritative main before this admission: `5dff85d47578eb1dcaa57a53b0a072dfe2a80d88`.
+- Admission record originally created after runtime execution; provenance corrected below. Current main at correction sequence: `f1853d3ee29f6f0cf84e8991096be062ea56c98b`.
 - Backup branch: `backup/pre-auth003-runtime-evidence-admission-20260927`.
 - Scope: admit only the already-executed controlled remote AUTH-003 credential-add runtime/security evidence.
 - No remote migration, schema mutation, production Worker deployment, or new transport is introduced.
@@ -32,3 +32,7 @@ Their status is `VERIFIED` and provenance is bound to the exact tested implement
 ## Remaining gate
 
 Runtime/security admission does **not** promote ENT-IDENTITY or ENT-CREDENTIAL and does **not** make Mapping 0 GREEN. The next gate is physical-field/ownership reconciliation against the frozen entity contract, followed by explicit decision material.
+
+## Provenance correction
+
+The runtime workflow run `36299334577` checked out and executed exact implementation source `419bb7fd887af0c30412bead50f8196ec6446bb7`. The later admission/main SHA must not be substituted for the tested source SHA.
