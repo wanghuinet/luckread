@@ -36,3 +36,16 @@ This control does not invent a new API, entity, migration, Worker, D1 domain, op
 - Do not promote ENT-IDENTITY or ENT-CREDENTIAL.
 - Do not implement AUTH-003 runtime/persistence without the required implementation/change-control admission.
 - Do not promote Mapping 0 or the Feature→Entity→Persistence registry to GREEN.
+
+
+## 2026-09-28 — historical cursor supersession note
+
+This control records an earlier AUTH-003 continuation checkpoint and remains valid as historical governance evidence.
+
+For current work selection, its "continuation cursor" statement is superseded by the dedicated authoritative cursor:
+`artifacts/mapping-0/current-execution-cursor-2026-09-27.json`
+
+The active current state is:
+`AUTH-001-REGISTRATION-CLOSURE / BLOCKED_PRIV004_POLICY_INSTANCE`
+
+No AUTH-003 runtime/evidence rerun, entity promotion, or Mapping 0 promotion is authorized by this note.
