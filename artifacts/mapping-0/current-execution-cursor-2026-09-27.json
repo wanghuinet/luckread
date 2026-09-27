@@ -167,8 +167,8 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Development-only PRIV-004 deterministic test instance is admitted and the current Contract Admission DEVELOPMENT gate is PASS_VERIFIED; production retention authority and production runtime remain fail-closed.",
-    "currentMainSha": "350a561be59617ffb2626c2f0af7451cad6eabb5",
+    "reason": "Development-only PRIV-004 deterministic test instance is admitted; current main Guard is PASS_VERIFIED and Contract Admission DEVELOPMENT is PASS_VERIFIED on the same current main.",
+    "currentMainSha": "e5d94ccb1c0fe6eceb39db2027cb23305fb63aa0",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_CONTRACT_PRECONDITIONS_RECONCILED_RUNTIME_PENDING",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -264,8 +264,8 @@
   },
   "contractAdmission": {
     "workflow": ".github/workflows/contract-admission-v2.yml",
-    "runId": 36356226141,
-    "sourceSha": "8181df2ac1265f7a5cd64225f8f95a03ef95a067",
+    "runId": 36356876475,
+    "sourceSha": "e5d94ccb1c0fe6eceb39db2027cb23305fb63aa0",
     "mode": "DEVELOPMENT",
     "status": "PASS_VERIFIED",
     "applicableJobsSuccessful": [

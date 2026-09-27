@@ -115,8 +115,8 @@ Development/integration implementation may proceed only when both conditions are
 
 Observed Contract Admission evidence:
 - workflow: `.github/workflows/contract-admission-v2.yml`
-- run: `36356226141`
-- source: `8181df2ac1265f7a5cd64225f8f95a03ef95a067`
+- run: `36356876475`
+- source: `e5d94ccb1c0fe6eceb39db2027cb23305fb63aa0`
 - applicable DEVELOPMENT gates: PASS_VERIFIED
 - FULL-only R4/Evidence/Five-Way/OpenAPI stages remain outside this development admission.
 
