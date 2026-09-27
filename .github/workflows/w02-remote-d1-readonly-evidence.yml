@@ -123,8 +123,3 @@ jobs:
           path: artifacts/mapping-0/auth-003-d1-schema/
           if-no-files-found: error
           retention-days: 30
-     - name: Upload evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: w02-remote-d1-readonly-evidence-${{ inputs.source_sha }}
-          path: artifacts/mapping-0/w02-remote-d1-readonly-provenance.txt
