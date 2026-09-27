@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "f02d1815e0100ce3934197c81689a5ff2ebe527b",
-  "backupBranch": "backup/post-auth001-payload-native-capability-20260927",
+  "sourceHead": "383bfa64c65c58231bf84ac58fc7968bb35b9873",
+  "backupBranch": "backup/post-user-profile-auto-mapping-reconcile-20260927",
   "currentCursor": {
     "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
     "state": "BLOCKED_AUTH001_NATIVE_AUTH_IDENTITY_BOUNDARY",
@@ -56,7 +56,7 @@
     "Treat 36296831559 as execution checkpoint only; final schema correctness requires a later read-only exact-SHA postcheck.",
     "Do not promote AUTH-003 persistence status from the migration execution log alone."
   ],
-  "previousSourceHead": "7f508d76527ffa1a1740e749a6727c52514e4080",
+  "previousSourceHead": "f02d1815e0100ce3934197c81689a5ff2ebe527b",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
@@ -154,7 +154,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "Active W01 Users.ts uses Payload native auth without a custom phone strategy, while AUTH-001 permits phone registration. Combined with required username vs optional wire, missing consent authority, missing durable idempotency authority and unresolved consistency semantics, runtime remains unauthorized.",
-    "currentMainSha": "f02d1815e0100ce3934197c81689a5ff2ebe527b",
+    "currentMainSha": "383bfa64c65c58231bf84ac58fc7968bb35b9873",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "BLOCKED",
     "phoneSourceStatus": "BLOCKED",
@@ -206,11 +206,12 @@
     "fiveWayStatus": "NOT_GREEN"
   },
   "supportingControls": [
-    "docs/change-control/CC-MAPPING-0-AUTH-001-PAYLOAD-NATIVE-CAPABILITY-RECONCILIATION-2026-09-27.md"
+    "docs/change-control/CC-MAPPING-0-AUTH-001-PAYLOAD-NATIVE-CAPABILITY-RECONCILIATION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-USER-001-PAYLOAD-API-FIELD-RECONCILIATION-2026-09-27.md"
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
-    "mainSha": "f02d1815e0100ce3934197c81689a5ff2ebe527b",
+    "mainSha": "383bfa64c65c58231bf84ac58fc7968bb35b9873",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
