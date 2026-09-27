@@ -165,3 +165,20 @@ Current blockers:
 - Mapping 0 / Five-Way remains globally NOT_GREEN.
 
 No wire-schema reopening, migration rerun, D1 mutation, or Mapping 0 GREEN promotion is authorized by this continuation.
+
+
+## 2026-09-28 — current execution cursor supersession
+
+The AUTH-003 continuation entries above are preserved as historical closure-queue traceability.
+
+For present Mapping 0 work selection, the dedicated cursor
+`artifacts/mapping-0/current-execution-cursor-2026-09-27.json`
+is the authoritative current execution source and supersedes the earlier AUTH-003 "Current authoritative continuation" wording.
+
+Current execution state:
+`AUTH-001-REGISTRATION-CLOSURE / BLOCKED_PRIV004_POLICY_INSTANCE`
+
+Current gate:
+admit the first approved `ACCOUNT_REGISTRATION / LEGAL_AUDIT` PRIV-004 policy instance with version, scope, effective period, deterministic rule, approval and provenance evidence.
+
+This supersession does not reopen or invalidate the AUTH-003 wire/runtime evidence already admitted, and it does not authorize any new AUTH-003 runtime rerun or Mapping 0 promotion.
