@@ -2,7 +2,7 @@
 
 ## Status
 
-`DECISION_INPUT_READY`
+`CAPABILITY_RECONCILED / IMPLEMENTATION_NOT_AUTHORIZED`
 
 ## Scope
 
@@ -50,7 +50,7 @@ This closes one capability uncertainty:
 
 A future username-first registration/authentication boundary can remain inside the existing Payload User/auth collection by using Payload's native `loginWithUsername` capability.
 
-This does **not** authorize enabling it yet because AUTH-001 public-wire semantics, phone registration semantics, and the W01↔W02 authoritative persistence contract remain unresolved.
+The capability question is now **closed**. Subsequent AUTH-001 wire and runtime controls determine whether and when that capability is actually enabled.
 
 ## AUTH-001 implications
 
@@ -64,12 +64,7 @@ The repository already has three converging inputs:
 
 No authoritative repository rule supports omitted username, username synthesis, or derivation from phone/email.
 
-Therefore the previous blocker is narrowed:
-
-- the blocker is **not** a missing Payload capability;
-- the blocker is the public-contract reconciliation between `authRegister.username` being optional and the frozen W01/ENT-USER username requirement.
-
-The cleanest native-compatible reconciliation input is to make `username` required on AUTH-001 rather than introducing synthesis logic. This document records that as a decision input, not as an already-approved API change.
+The later AUTH-001 wire reconciliation has already made `username` required on `authRegister`. This capability record is therefore historical capability authority, not a pending wire decision.
 
 ### Phone
 
@@ -98,11 +93,11 @@ This establishes the native side of the email branch, but it does not by itself 
 
 ## What remains blocked
 
-- AUTH-001 public `username` requiredness reconciliation;
 - phone durable source and supported registration semantics;
 - consent persistence authority;
 - AUTH-001 durable Idempotency-Key/replay authority;
-- atomic-vs-eventual consistency between W01 User creation and W02/D1-01 identity materialization.
+- atomic-vs-eventual consistency between W01 User creation and W02/D1-01 identity materialization;
+- AUTH-001 executable runtime and evidence admission.
 
 ## Non-authorizations
 
