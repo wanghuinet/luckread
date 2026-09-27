@@ -74,6 +74,13 @@
       "format": "date-time",
       "retention": "default 24h",
       "source": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+    },
+    "consent_record_id": {
+      "type": "string",
+      "canonicalEntity": "ENT-CONSENT",
+      "requiredWhen": "state=COMPLETED",
+      "source": "contracts/persistence/PRIV-002-consent-persistence-contract.v1.json",
+      "description": "Internal committed consent record identifier created in the same W01 registration transaction."
     }
   },
   "semanticRules": [
@@ -84,19 +91,28 @@
     "the envelope write shares the same transaction as the protected registration User write",
     "a COMPLETED replay returns HTTP 201 and the exact committed_response body {userId, accountState} from the first successful registration",
     "accountState in committed_response is sourced from users.account_state; the admitted initial value is PENDING_VERIFICATION with account_state_version 1",
-    "HTTP 201 is a deterministic operation-level response status from the canonical authRegister contract and does not require a second persisted status field"
+    "HTTP 201 is a deterministic operation-level response status from the canonical authRegister contract and does not require a second persisted status field",
+    "the registration envelope records consent_record_id for the committed ENT-CONSENT record",
+    "a COMPLETED replay does not create another consent record and reuses the first committed consent_record_id"
   ],
-  "blockedBindings": {
-    "consentBinding": {
-      "status": "BLOCKED",
-      "reason": "PRIV-002 concrete consent entity/field/schema/retention contract is not yet admitted"
-    }
-  },
+  "blockedBindings": {},
   "nonAuthorizations": [
     "No generic idempotency platform",
     "No new Worker/D1/Queue",
     "No runtime implementation",
     "No migration",
     "No Mapping 0 GREEN"
-  ]
+  ],
+  "consentBinding": {
+    "status": "CONTRACTED",
+    "entityId": "ENT-CONSENT",
+    "purpose": "ACCOUNT_REGISTRATION",
+    "legalBasis": "CONSENT",
+    "initialState": "GRANTED",
+    "policyVersionSource": "authRegister.request.consent.policyVersion",
+    "resourceBinding": "ENT-USER.id",
+    "ownerBinding": "ENT-USER.id",
+    "retentionClass": "LEGAL_AUDIT",
+    "retentionUntilRule": "SERVER_CALCULATED_FROM_APPLICABLE_RETENTION_POLICY"
+  }
 }
