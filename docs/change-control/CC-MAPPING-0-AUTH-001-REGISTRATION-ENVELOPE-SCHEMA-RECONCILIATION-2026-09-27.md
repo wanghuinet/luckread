@@ -2,13 +2,15 @@
 
 ## Status
 
-`IDEMPOTENCY_SCHEMA_RECONCILED / RESPONSE_AND_CONSENT_BINDINGS_BLOCKED`
+`RESPONSE_REPLAY_SCHEMA_RECONCILED / CONSENT_BINDING_BLOCKED`
 
 ## Decision
 
-The AUTH-001 registration envelope's idempotency subset is now concretely admitted by reusing the canonical P0 Idempotency Contract. No new idempotency semantics are introduced.
+The AUTH-001 registration envelope idempotency subset remains concretely admitted by the canonical P0 Idempotency Contract.
 
-### Frozen persistence fields
+The remaining replay-response blocker is now closed at the logical persistence-contract level by reusing the canonical AUTH-001 201 response shape and the already-admitted AUTH-013 User-state bindings.
+
+### Frozen idempotency fields
 
 - `idempotency_key`
 - `scope`
@@ -19,24 +21,28 @@ The AUTH-001 registration envelope's idempotency subset is now concretely admitt
 - `created_at`
 - `expires_at`
 
-### Frozen semantics
+### Frozen committed response projection
 
-- same key + same payload + COMPLETED returns the first registration result;
-- same key + same payload + IN_PROGRESS returns `IDEMPOTENCY_IN_PROGRESS`;
-- same key + different payload returns `IDEMPOTENCY_KEY_REUSE_CONFLICT`;
-- expired key is a new request;
-- the envelope is written in the same transaction as the protected Payload User creation;
-- default retention is 24 hours.
+The envelope MUST retain a lossless logical `committed_response` object with exactly:
 
-## Remaining envelope decisions
+- `userId` → `ENT-USER.id`
+- `accountState` → `users.account_state`
 
-Two concrete pieces remain blocked:
+Authoritative inputs:
 
-1. the exact persistence shape for the committed registration response identity/status required for replay;
-2. the concrete binding of request `consent` to the admitted PRIV-002 persistence contract.
+- `contracts/openapi/v1/openapi.yaml` — `authRegister` 201 response schema;
+- `docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-WRITE-BOUNDARY-2026-09-27.md` — `response.userId` and `response.accountState` field authority;
+- `docs/change-control/CC-MAPPING-0-AUTH-001-AUTH-013-INITIAL-PERSISTENCE-RECONCILIATION-2026-09-27.md` — initial `users.account_state=PENDING_VERIFICATION`, version 1;
+- `contracts/enums/account-state.json` — canonical AccountState values.
 
-The first cannot be invented from `response_digest` because replay must return the original User identity and status. The second cannot be invented while PRIV-002's canonical entity/field contract remains unadmitted.
+A `COMPLETED` replay returns the canonical HTTP `201` response with the original `committed_response` body. HTTP `201` is fixed by the canonical operation contract and therefore is derived, not a second persisted status field.
+
+This closes the logical replay-shape decision without inventing a physical table, column, index, constraint, or second API response model.
+
+### Remaining envelope blocker
+
+Only the concrete AUTH-001 request `consent` binding remains blocked because PRIV-002 still lacks an admitted canonical entity/schema/field/retention contract.
 
 ## Non-authorizations
 
-No collection/table, migration, runtime handler, consent schema, or new infrastructure is authorized by this reconciliation.
+No collection/table, migration, runtime handler, consent schema, new Worker/D1/Queue, or Mapping 0 GREEN promotion is authorized by this reconciliation.
