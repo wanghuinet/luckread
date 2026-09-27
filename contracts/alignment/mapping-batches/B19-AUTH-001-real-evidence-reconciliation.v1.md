@@ -294,3 +294,24 @@ Therefore the first W01 Payload User insert receives the admitted initial lifecy
 This closes **only the AUTH-001 initial lifecycle-persistence prerequisite**. AUTH-013 remains separately `BLOCKED_NOT_GREEN` for its downstream lifecycle/security/integration/Evidence Registry gates, and no verified AUTH-013 evidence is rerun.
 
 AUTH-001 remains blocked on PRIV-002 consent persistence authority, concrete registration-envelope schema/evidence, and the remaining runtime/security/evidence chain.
+
+
+## 2026-09-27 PRIV-002 semantic authority reconciliation
+
+PRIV-002 now has a reconciled semantic authority for the minimum consent behavior required by AUTH-001.
+
+Authoritative control:
+`docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-AUTHORITY-RECONCILIATION-2026-09-27.md`.
+
+The current authoritative inputs establish:
+
+- policy version is stored on a consent record and is immutable for that record;
+- actor/resource scope is authoritative;
+- duplicate submission is deterministic;
+- invalid policy versions are rejected;
+- withdrawal persists and consent history is retained;
+- authorized history reads are deterministic and immutable;
+- unauthorized mutation fails closed with no state change;
+- lifecycle/retention follows the existing server-governed retention contract rather than client-selected retention metadata.
+
+This closes only the **semantic** PRIV-002 authority gap. Concrete consent entity/schema, exact fields/enums, consent-specific retention binding/duration, and the AUTH-001 registration-envelope mapping remain blocked. No runtime or migration implementation is authorized.

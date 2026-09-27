@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0",
+  "featureId": "PRIV-002",
+  "status": "SEMANTIC_AUTHORITY_RECONCILED_CONCRETE_SCHEMA_BLOCKED",
+  "sourceHead": "a9ab038cdd43e620e3a129e5f2c5aedbe5a51b5d",
+  "authoritativeSources": [
+    "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md",
+    "docs/160-DATA-LIFECYCLE-RETENTION-ERASURE-CONTRACT-v1.0.md",
+    "docs/21-D21-ADVERTISING-PLATFORM-CONTRACT-v1.0.md",
+    "contracts/alignment/mapping-batches/PRIV-001-008-real-evidence-reconciliation.v1.md",
+    "contracts/capability/reconciliation-batches/AO-privacy-compliance.v1.json"
+  ],
+  "reconciledSemantics": [
+    "policy_version_stored",
+    "policy_version_immutable_per_record",
+    "actor_resource_scope_authoritative",
+    "duplicate_submission_deterministic",
+    "invalid_policy_version_rejected",
+    "withdrawal_persists",
+    "withdrawal_history_retained",
+    "authorized_history_query_deterministic",
+    "unauthorized_mutation_denied_without_state_change",
+    "retention_is_server_governed_and_uses_platform_lifecycle_authority"
+  ],
+  "blockedConcreteInputs": [
+    "consent_entity_or_table",
+    "exact_field_ids_and_names",
+    "consent_state_enum",
+    "legal_basis_vocabulary",
+    "consent_specific_retention_class_and_duration",
+    "withdrawal_event_schema",
+    "public_api_dto",
+    "AUTH-001_registration_envelope_binding"
+  ],
+  "noRuntimeAuthorized": true,
+  "noMigrationAuthorized": true
+}
