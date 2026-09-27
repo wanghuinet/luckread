@@ -3,8 +3,8 @@
 
 - Control ID: `CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27`
 - Status: `AUTHORITY INPUT REQUIRED / IMPLEMENTATION NOT AUTHORIZED`
-- Source main: `a587ccb7670e402c5fef300ac4f25e6705a846128`
-- Backup: `backup/pre-auth003-admission-packet-20260927`
+- Source main: `1b3406860d88c12160513caa01fbc99cfbdc4507`
+- Backup: `backup/pre-auth003-logical-ownership-reconcile-20260927`
 - Machine packet: `artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json`
 
 ## Purpose
@@ -77,3 +77,23 @@ This control does not reopen AUTH-003 wire/OpenAPI/DTO work and does not rerun:
 - AUTH-002 E6 runtime `36219132123`.
 
 Those remain inherited verified evidence.
+
+
+## Logical ownership reconciliation — 2026-09-27
+
+A separate authority reconciliation has now closed the logical ownership layer:
+
+- AUTH-003 logical Worker = `W02`
+- AUTH-003 logical D1 = `D1-01`
+- Logical entities = `ENT-IDENTITY`, `ENT-CREDENTIAL`
+
+The authority chain is the active Worker Master → Worker × D1 Binding → D1 Domain Master.
+
+This does **not** close physical runtime binding. The repository still does not establish the physical Worker identity/configuration for W02, nor an AUTH-003 execution target that may be assigned to the existing W01 Payload D1 binding. The existing `luckread` inventory record is explicitly `W01-PAYLOAD-D1-BINDING` and remains excluded from reassignment by inference.
+
+The AUTH-003 operation-policy resource/cache/retry/event/queue/anti-abuse authority remains unresolved.
+
+The AUTH-003 task edge also remains unresolved; W02 owns T01/T02/T03, but no authoritative source currently binds AUTH-003 to one of those tasks.
+
+Therefore the implementation gate is narrowed, not removed:
+`logical owner CLOSED → physical binding + operation-policy authority REQUIRED → implementation admission`.
