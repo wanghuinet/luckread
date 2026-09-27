@@ -5,11 +5,11 @@
   "backupBranch": "backup/pre-auth001-priv002-decision-packet-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "BLOCKED_AUTH001_CONSENT_BINDING",
-    "objective": "Complete the remaining AUTH-001 persistence contract: concrete PRIV-002 consent entity/schema/field/version/retention binding.",
+    "state": "READY_AUTH001_RUNTIME_PRECONDITIONS",
+    "objective": "All AUTH-001 contract dependencies are reconciled; prepare the smallest controlled registration runtime slice and its evidence admission.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-CONTRACT-DECISION-PACKET-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "PRIV-002::merge one canonical concrete consent contract/change-control decision for Entity/Field/state/purpose/policy-version/retention/withdrawal; then bind AUTH-001 consent and authorize the smallest registration runtime slice.",
+    "nextGate": "AUTH-001::authorize smallest registration runtime slice against Payload-native User + registration envelope + ENT-CONSENT contract, then produce controlled positive/negative/idempotency/security evidence.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -158,13 +158,13 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "AUTH-001 registration envelope idempotency fields/semantics and replayable committed response projection are now concretely admitted. Remaining persistence gate is the concrete PRIV-002 consent entity/schema/field/version/retention binding.",
+    "reason": "AUTH-001 registration envelope idempotency, replay response, AUTH-013 initial persistence and concrete PRIV-002 consent contract are now reconciled. Remaining work is runtime implementation and executable evidence.",
     "currentMainSha": "84793a33960961f8a91e50ec138fa287e8fa9e08",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
-    "payloadWireCompatibilityStatus": "USERNAME_CONSENT_AND_IDENTITY_ENTRY_RECONCILED_REMAINING_GATES_BLOCKED",
+    "payloadWireCompatibilityStatus": "AUTH001_CONTRACT_PRECONDITIONS_RECONCILED_RUNTIME_PENDING",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
-    "idempotencySourceStatus": "CANONICAL_SEMANTICS_AND_WRITER_BOUNDARY_AND_REPLAY_SHAPE_CLOSED_CONSENT_BINDING_BLOCKED",
-    "atomicityStatus": "EVENTUAL_CONSISTENCY_WRITER_BOUNDARY_RECONCILED",
+    "idempotencySourceStatus": "CLOSED",
+    "atomicityStatus": "W01_USER_ENVELOPE_CONSENT_SAME_TRANSACTION_W02_EVENTUAL_MATERIALIZATION",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED"
   },
   "nextGate": "AUTH-001::admit concrete PRIV-002 consent entity/schema/field/version/retention binding + concrete registration-envelope schema; then authorize the smallest registration runtime slice.",
@@ -221,7 +221,10 @@
     "docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-AUTHORITY-RECONCILIATION-2026-09-27.md",
     "docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONCRETE-SCHEMA-ADMISSION-GAP-2026-09-27.md",
     "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-SCHEMA-RECONCILIATION-2026-09-27.md",
-    "docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-CONTRACT-DECISION-PACKET-2026-09-27.md"
+    "docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-CONTRACT-DECISION-PACKET-2026-09-27.md",
+    "contracts/entity/PRIV-002-consent-field-contract.v1.json",
+    "contracts/persistence/PRIV-002-consent-persistence-contract.v1.json",
+    "contracts/events/privacy-consent-withdrawn.v1.json"
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
