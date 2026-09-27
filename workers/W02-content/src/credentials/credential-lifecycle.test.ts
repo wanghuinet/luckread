@@ -46,9 +46,12 @@ function fakeD1(seed: Row[]) {
             },
             async run() {
               if (sql.startsWith('UPDATE auth_credentials SET active = 0')) {
-                const [, id, identityId] = args as [string, string, string]
+                const [, id, identityId, userId] = args as [string, string, string, string]
                 const row = credentials.get(id)
-                if (!row || row.identity_id !== identityId || row.active !== 1) {
+                const activeCount = [...credentials.values()].filter(
+                  (candidate) => candidate.user_id === userId && candidate.active === 1,
+                ).length
+                if (!row || row.identity_id !== identityId || row.active !== 1 || activeCount <= 1) {
                   return { meta: { changes: 0 } }
                 }
                 row.active = 0
@@ -220,6 +223,23 @@ describe('AUTH-003 credential lifecycle', () => {
         now: NOW,
       }),
     ).rejects.toMatchObject({ code: 'CONFLICT' })
+  })
+
+  it('enforces only-active-credential safety in the authoritative update predicate', async () => {
+    const rowA = await seededRow('auth3-a', 'user-a', 'identity-a', 'email', 'first@example.invalid')
+    const rowB = await seededRow('auth3-b', 'user-a', 'identity-a', 'phone', '+14155552671')
+    const db = fakeD1([rowA, rowB])
+
+    await removeCredential(db, {
+      actorUserId: 'user-a',
+      credentialId: 'auth3-a',
+      idempotencyKey: 'remove-safe',
+      now: NOW,
+    })
+
+    const updateSql = db.calls.find((sql) => sql.startsWith('UPDATE auth_credentials SET active = 0'))
+    expect(updateSql).toContain('SELECT COUNT(*)')
+    expect(updateSql).toContain('active_i.user_id = ?')
   })
 
   it('removes an owned credential and makes replay harmless', async () => {
