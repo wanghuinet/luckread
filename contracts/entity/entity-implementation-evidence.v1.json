@@ -86,6 +86,22 @@
       "status": "BLOCKED"
     },
     {
+      "entityId": "ENT-CONSENT",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "schemaEvidenceRefs": [],
+      "migrationEvidenceRefs": [],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "PRIV-002 concrete consent contract is admitted, but runtime implementation and physical persistence evidence are not yet verified.",
+        "AUTH-001 registration consent transaction, withdrawal propagation, security/privacy E2E, and Evidence Registry admission remain pending.",
+        "Final Mapping 0 / Five-Way validation remains NOT_GREEN."
+      ],
+      "status": "BLOCKED"
+    },
+    {
       "entityId": "ENT-SESSION",
       "catalogStatus": "PROPOSED",
       "implementationStatus": "IMPLEMENTED",

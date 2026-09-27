@@ -1,0 +1,258 @@
+{
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureId": "PRIV-002",
+  "entityAuthority": {
+    "consentEntityId": "ENT-CONSENT",
+    "sourceRef": "contracts/entity/entity-catalog.v1.json",
+    "authorityRule": "This contract admits the canonical consent entity/field vocabulary for PRIV-002. Runtime/persistence verification remains a separate gate."
+  },
+  "fields": [
+    {
+      "fieldId": "ENT-CONSENT-F-ID",
+      "name": "id",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": true,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_IDENTIFIER",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-ACTOR-SUBJECT-ID",
+      "name": "actorSubjectId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "PRIVACY_SENSITIVE_IDENTIFIER",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-OWNER-SUBJECT-ID",
+      "name": "ownerSubjectId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "PRIVACY_SENSITIVE_IDENTIFIER",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-RESOURCE-ID",
+      "name": "resourceId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_RELATION",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-RESOURCE-TYPE",
+      "name": "resourceType",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "RESOURCE_SCOPE",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-PURPOSE",
+      "name": "purpose",
+      "type": "enum",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "allowedValues": [
+        "ACCOUNT_REGISTRATION"
+      ],
+      "lifecycle": "versioned",
+      "classification": "CONSENT_PURPOSE",
+      "apiExposure": "CONSENT_CONTEXT",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-STATE",
+      "name": "state",
+      "type": "enum",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "allowedValues": [
+        "GRANTED",
+        "REVOKED",
+        "RESTRICTED_PROCESSING"
+      ],
+      "lifecycle": "stateful",
+      "classification": "CONSENT_STATE",
+      "apiExposure": "CONSENT_STATE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-POLICY-VERSION",
+      "name": "policyVersion",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "POLICY_VERSION",
+      "apiExposure": "CONSENT_CONTEXT",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-LEGAL-BASIS",
+      "name": "legalBasis",
+      "type": "enum",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "allowedValues": [
+        "CONSENT"
+      ],
+      "lifecycle": "immutable",
+      "classification": "LEGAL_BASIS",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-CREATED-AT",
+      "name": "createdAt",
+      "type": "datetime",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "AUDIT_METADATA",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-UPDATED-AT",
+      "name": "updatedAt",
+      "type": "datetime",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "mutable",
+      "classification": "AUDIT_METADATA",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-WITHDRAWN-AT",
+      "name": "withdrawnAt",
+      "type": "datetime",
+      "nullable": true,
+      "required": false,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "write-once",
+      "classification": "CONSENT_WITHDRAWAL_METADATA",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-RETENTION-CLASS",
+      "name": "retentionClass",
+      "type": "enum",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "allowedValues": [
+        "LEGAL_AUDIT"
+      ],
+      "lifecycle": "policy-controlled",
+      "classification": "RETENTION_POLICY",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-RETENTION-UNTIL",
+      "name": "retentionUntil",
+      "type": "datetime",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "policy-controlled",
+      "classification": "RETENTION_METADATA",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-SOURCE-AUTHORITY",
+      "name": "sourceAuthority",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "AUDIT_METADATA",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-CONSENT-F-LEGAL-HOLD-REF",
+      "name": "legalHoldRef",
+      "type": "text",
+      "nullable": true,
+      "required": false,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "mutable",
+      "classification": "LEGAL_HOLD_METADATA",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    }
+  ],
+  "rules": {
+    "policyVersionImmutable": true,
+    "stateMustDistinguishRevokedAndRestrictedProcessing": true,
+    "legalBasisServerControlled": true,
+    "retentionClassServerControlled": true,
+    "retentionUntilServerControlled": true,
+    "clientCannotSelectRetention": true,
+    "unauthorizedMutationMustFailClosed": true,
+    "historyMustRemainImmutable": true,
+    "noPublicSensitiveIdentifiers": true
+  },
+  "registrationBinding": {
+    "auth001ConsentPurpose": "ACCOUNT_REGISTRATION",
+    "auth001LegalBasis": "CONSENT",
+    "auth001InitialState": "GRANTED",
+    "resourceBinding": "ENT-USER.id",
+    "ownerBinding": "ENT-USER.id"
+  },
+  "sourceRefs": [
+    "docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-AUTHORITY-RECONCILIATION-2026-09-27.md",
+    "docs/160-DATA-LIFECYCLE-RETENTION-ERASURE-CONTRACT-v1.0.md",
+    "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md",
+    "docs/21-D21-ADVERTISING-PLATFORM-CONTRACT-v1.0.md"
+  ]
+}

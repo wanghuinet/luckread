@@ -15,19 +15,43 @@
       "capability": "account_registration",
       "contractStatus": "CONTRACTED_PARTIAL",
       "wire": {
-        "requiredFields": ["identityType", "identity", "credential", "username", "consent"],
-        "identityType": ["email"]
+        "requiredFields": [
+          "identityType",
+          "identity",
+          "credential",
+          "username",
+          "consent"
+        ],
+        "identityType": [
+          "email"
+        ],
+        "consentSchemaRef": "#/components/schemas/AuthRegistrationConsent"
       },
       "consistency": {
         "registrationCommitAuthority": "W01_PAYLOAD",
-        "authoritativeCommitScope": ["ENT-USER", "AUTH-001_REGISTRATION_ENVELOPE"],
+        "authoritativeCommitScope": [
+          "ENT-USER",
+          "ENT-CONSENT",
+          "AUTH-001_REGISTRATION_ENVELOPE"
+        ],
         "completion": "AFTER_W01_TRANSACTION_COMMIT",
         "identityCredentialMaterialization": "EVENTUAL",
         "materializerAuthority": "W02_D1-01",
         "materializationSource": "AUTH-001_REGISTRATION_ENVELOPE + PAYLOAD_USERS_NATIVE_AUTH_SOURCE",
         "recovery": "W02_SCHEDULED_RECONCILIATION",
         "crossWorkerTransaction": false,
-        "crossD1Transaction": false
+        "crossD1Transaction": false,
+        "registrationConsentBinding": {
+          "consentEntityId": "ENT-CONSENT",
+          "purpose": "ACCOUNT_REGISTRATION",
+          "legalBasis": "CONSENT",
+          "initialState": "GRANTED",
+          "policyVersionSource": "request.consent.policyVersion",
+          "resourceBinding": "ENT-USER.id",
+          "ownerBinding": "ENT-USER.id",
+          "retentionClass": "LEGAL_AUDIT",
+          "retentionUntil": "SERVER_CALCULATED_FROM_APPLICABLE_RETENTION_POLICY"
+        }
       },
       "auth": {
         "mode": "public",
@@ -102,7 +126,8 @@
         "cache": "PASS",
         "antiAbuse": "MISSING",
         "integration": "MISSING",
-        "securityE2E": "MISSING"
+        "securityE2E": "MISSING",
+        "consentContract": "CONTRACT_ADMITTED_PENDING_RUNTIME_EVIDENCE"
       }
     },
     {

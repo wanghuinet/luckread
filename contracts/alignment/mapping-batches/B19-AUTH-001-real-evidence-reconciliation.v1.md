@@ -358,3 +358,22 @@ Authoritative decision packet:
 `docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-CONTRACT-DECISION-PACKET-2026-09-27.md`.
 
 No runtime, migration, or Mapping 0 promotion is authorized until that concrete authority decision is merged.
+
+
+## 2026-09-27 PRIV-002 concrete contract admission
+
+The remaining AUTH-001 consent contract gate is now reconciled by:
+
+- `ENT-CONSENT`;
+- `contracts/entity/PRIV-002-consent-field-contract.v1.json`;
+- `contracts/persistence/PRIV-002-consent-persistence-contract.v1.json`;
+- `contracts/events/privacy-consent-withdrawn.v1.json`;
+- AUTH-001 registration binding: `consent_record_id -> ENT-CONSENT.id`;
+- registration purpose `ACCOUNT_REGISTRATION`, legal basis `CONSENT`, initial state `GRANTED`;
+- `policyVersion` immutable;
+- `retentionClass=LEGAL_AUDIT`;
+- `retentionUntil` server-calculated from the applicable lifecycle retention policy;
+- withdrawal uses `REVOKED` + immutable history + `privacy.consent_withdrawn` event.
+
+This is **contract admission only**. Runtime, physical persistence, withdrawal propagation, security/privacy E2E and Evidence Registry admission remain open.
+

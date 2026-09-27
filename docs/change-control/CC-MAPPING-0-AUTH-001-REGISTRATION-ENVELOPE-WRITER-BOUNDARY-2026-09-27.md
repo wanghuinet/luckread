@@ -167,3 +167,19 @@ The remaining consent dependency is now explicitly tied to:
 The exhaustive current-head search found no canonical concrete consent entity/field/retention authority. No consent schema may be inferred from historical or neighboring contracts.
 
 After a canonical PRIV-002 decision is merged, the AUTH-001 envelope can bind request `consent` to that admitted contract without reopening the already-closed replay, idempotency, writer-boundary, or AUTH-013 initial-persistence decisions.
+
+
+## 2026-09-27 PRIV-002 concrete contract admission
+
+The writer-boundary consent dependency is now concretely admitted.
+
+AUTH-001 registration creates, in the same W01 transaction:
+
+1. Payload-native User;
+2. registration envelope;
+3. `ENT-CONSENT` record with purpose `ACCOUNT_REGISTRATION`, legal basis `CONSENT`, policyVersion from the request, initial state `GRANTED`, `retentionClass=LEGAL_AUDIT`, and server-calculated `retentionUntil`.
+
+The envelope persists `consent_record_id -> ENT-CONSENT.id` for deterministic replay/reconciliation.
+
+No physical schema is selected here. Physical persistence and runtime evidence remain separate gates.
+
