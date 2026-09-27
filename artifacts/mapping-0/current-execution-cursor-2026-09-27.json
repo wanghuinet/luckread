@@ -1,12 +1,12 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "05b32b7517ca15c3ac8999753a11198f88ddce53",
+  "sourceHead": "aaa422b0a307bb2661339dabe6b3e6a9185b025e",
   "backupBranch": "backup/pre-auth003-policy-task-authority-admission-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
     "state": "BLOCKED_REMOTE_MIGRATION_EVIDENCE_REQUIRED",
-    "objective": "Execute and admit the already-authorized MIG-AUTH-003-CREDENTIAL-V1 schema migration against D1-01, then advance to the smallest same-SHA AUTH-003 persistence/runtime slice.",
+    "objective": "Execute and admit the authorized MIG-AUTH-003-CREDENTIAL-V1 migration against D1-01, with exact-SHA pre/post schema and preservation evidence, before runtime implementation.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-MIGRATION-ADMISSION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
     "nextGate": "AUTH-003 migration evidence admission -> same-SHA persistence/security/runtime vertical slice",
@@ -47,7 +47,7 @@
     "Treat luckread-w02 and D1-01 target UUID 2f80471e-... as explicit authority inputs; do not reinterpret or reassign the target. Physical target identity is closed; current-SHA deployment correctness remains a separate gate.",
     "Do not inherit AUTH-003 runtime correctness from earlier W02 deployment evidence; same-SHA evidence is required."
   ],
-  "previousSourceHead": "4e4a2302c25c316a27545643f0f31eeeb09582a0",
+  "previousSourceHead": "2c222fdea5fb4f287069c0833a96226265a7f7fa",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
@@ -95,7 +95,8 @@
     "schemaEvidenceAdmission": "docs/change-control/CC-MAPPING-0-AUTH-003-D1-SCHEMA-EVIDENCE-ADMISSION-2026-09-27.md",
     "schemaEvidenceStatus": "PASS_VERIFIED_EVIDENCE_CAPTURE",
     "migrationAdmission": "docs/change-control/CC-MAPPING-0-AUTH-003-MIGRATION-ADMISSION-2026-09-27.md",
-    "migrationDesignStatus": "PASS_VERIFIED_DESIGN_ADMISSION"
+    "migrationDesignStatus": "PASS_VERIFIED_DESIGN_ADMISSION",
+    "remoteMigrationStatus": "NOT_EXECUTED"
   },
   "authoritySourcesChecked": [
     "contracts/api/auth-operation-policy.v1.json",
