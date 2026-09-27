@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "8a79a49fd546842d4ad1f706e323510caa2962cd",
+  "sourceHead": "f7aaf97871657f4e579e42415968a20b60d1ff5e",
   "backupBranch": "backup/pre-auth003-policy-task-authority-admission-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
@@ -84,7 +84,8 @@
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md",
     "taskEdge": "AUTH-003 -> T01 -> W02 -> D1-01",
     "taskEdgeStatus": "PASS_VERIFIED_LOGICAL_MAPPING",
-    "operationPolicyStatus": "CLOSED_AUTHORITY_ADMITTED"
+    "operationPolicyStatus": "CLOSED_AUTHORITY_ADMITTED",
+    "sourceHead": "f7aaf97871657f4e579e42415968a20b60d1ff5e"
   },
   "authoritySourcesChecked": [
     "contracts/api/auth-operation-policy.v1.json",
