@@ -71,6 +71,30 @@ jobs:
             --config wrangler.jsonc \
             --command "PRAGMA table_list;" \
             > ../../artifacts/mapping-0/auth-003-d1-schema/table_list.txt
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote \
+            --config wrangler.jsonc \
+            --command "PRAGMA table_info(auth_identities);" \
+            > ../../artifacts/mapping-0/auth-003-d1-schema/auth_identities_table_info.txt
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote \
+            --config wrangler.jsonc \
+            --command "PRAGMA table_info(auth_credentials);" \
+            > ../../artifacts/mapping-0/auth-003-d1-schema/auth_credentials_table_info.txt
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote \
+            --config wrangler.jsonc \
+            --command "PRAGMA index_list(auth_identities);" \
+            > ../../artifacts/mapping-0/auth-003-d1-schema/auth_identities_index_list.txt
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote \
+            --config wrangler.jsonc \
+            --command "PRAGMA index_list(auth_credentials);" \
+            > ../../artifacts/mapping-0/auth-003-d1-schema/auth_credentials_index_list.txt
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote \
+            --config wrangler.jsonc \
+            --command "PRAGMA foreign_key_list(auth_credentials);" \
+            > ../../artifacts/mapping-0/auth-003-d1-schema/auth_credentials_foreign_keys.txt
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote \
+            --config wrangler.jsonc \
+            --command "PRAGMA foreign_key_check;" \
+            > ../../artifacts/mapping-0/auth-003-d1-schema/foreign_key_check.txt
 
       - name: Read and persist remote migration ledger
         working-directory: workers/W02-content
@@ -107,6 +131,12 @@ jobs:
           set -euo pipefail
           test -s artifacts/mapping-0/auth-003-d1-schema/sqlite_master.txt
           test -s artifacts/mapping-0/auth-003-d1-schema/table_list.txt
+          test -s artifacts/mapping-0/auth-003-d1-schema/auth_identities_table_info.txt
+          test -s artifacts/mapping-0/auth-003-d1-schema/auth_credentials_table_info.txt
+          test -s artifacts/mapping-0/auth-003-d1-schema/auth_identities_index_list.txt
+          test -s artifacts/mapping-0/auth-003-d1-schema/auth_credentials_index_list.txt
+          test -s artifacts/mapping-0/auth-003-d1-schema/auth_credentials_foreign_keys.txt
+          test -s artifacts/mapping-0/auth-003-d1-schema/foreign_key_check.txt
           test -s artifacts/mapping-0/auth-003-d1-schema/d1_migrations_presence.txt
           test -s artifacts/mapping-0/auth-003-d1-schema/d1_migrations.txt
           test -s artifacts/mapping-0/auth-003-d1-schema/provenance.txt
@@ -115,6 +145,26 @@ jobs:
           grep -F "database_id=2f80471e-3756-49f9-8db1-7707a433ad64" artifacts/mapping-0/auth-003-d1-schema/provenance.txt
           grep -F "no_remote_ddl=true" artifacts/mapping-0/auth-003-d1-schema/provenance.txt
           grep -F "no_remote_dml=true" artifacts/mapping-0/auth-003-d1-schema/provenance.txt
+          grep -F '"name": "auth_identities"' artifacts/mapping-0/auth-003-d1-schema/sqlite_master.txt
+          grep -F '"name": "auth_credentials"' artifacts/mapping-0/auth-003-d1-schema/sqlite_master.txt
+          grep -F '"name": "auth_identities"' artifacts/mapping-0/auth-003-d1-schema/table_list.txt
+          grep -F '"name": "auth_credentials"' artifacts/mapping-0/auth-003-d1-schema/table_list.txt
+          grep -F '"name": "id"' artifacts/mapping-0/auth-003-d1-schema/auth_identities_table_info.txt
+          grep -F '"name": "user_id"' artifacts/mapping-0/auth-003-d1-schema/auth_identities_table_info.txt
+          grep -F '"name": "normalization_version"' artifacts/mapping-0/auth-003-d1-schema/auth_identities_table_info.txt
+          grep -F '"name": "id"' artifacts/mapping-0/auth-003-d1-schema/auth_credentials_table_info.txt
+          grep -F '"name": "identity_id"' artifacts/mapping-0/auth-003-d1-schema/auth_credentials_table_info.txt
+          grep -F '"name": "kind"' artifacts/mapping-0/auth-003-d1-schema/auth_credentials_table_info.txt
+          grep -F '"name": "value_hash"' artifacts/mapping-0/auth-003-d1-schema/auth_credentials_table_info.txt
+          grep -F '"name": "normalized_value"' artifacts/mapping-0/auth-003-d1-schema/auth_credentials_table_info.txt
+          grep -F '"name": "active"' artifacts/mapping-0/auth-003-d1-schema/auth_credentials_table_info.txt
+          grep -F '"name": "created_at"' artifacts/mapping-0/auth-003-d1-schema/auth_credentials_table_info.txt
+          grep -F '"name": "updated_at"' artifacts/mapping-0/auth-003-d1-schema/auth_credentials_table_info.txt
+          grep -F "auth_credentials_kind_normalized_value_uq" artifacts/mapping-0/auth-003-d1-schema/auth_credentials_index_list.txt
+          grep -F "auth_credentials_identity_id_idx" artifacts/mapping-0/auth-003-d1-schema/auth_credentials_index_list.txt
+          grep -F "auth_identities" artifacts/mapping-0/auth-003-d1-schema/auth_credentials_foreign_keys.txt
+          grep -F '"results": []' artifacts/mapping-0/auth-003-d1-schema/foreign_key_check.txt
+          grep -F '0004_auth_003_credentials.sql' artifacts/mapping-0/auth-003-d1-schema/d1_migrations.txt
 
       - name: Upload evidence
         uses: actions/upload-artifact@v4
