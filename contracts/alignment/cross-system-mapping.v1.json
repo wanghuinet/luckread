@@ -89,7 +89,9 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [
         "workers/W02-content/src/credentials/credential-add.ts",
-        "workers/W02-content/src/credentials/credential-add.test.ts"
+        "workers/W02-content/src/credentials/credential-add.test.ts",
+        "workers/W02-content/src/credentials/credential-list.ts",
+        "workers/W02-content/src/credentials/credential-lifecycle.ts"
       ],
       "evidence": [
         "artifacts/mapping-0/auth-003-wire-projection-authority-2026-09-26.json",
@@ -107,10 +109,14 @@
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
         "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
         "workers/W02-content/migrations/0004_auth_003_credentials.sql",
-        "workers/W02-content/src/credentials/credential-add.ts"
+        "workers/W02-content/src/credentials/credential-add.ts",
+        "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
+        "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
+        "contracts/evidence/mapping-0-evidence-registry.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-LIFECYCLE-EVIDENCE-ADMISSION-2026-09-27.md"
       ],
       "blockers": [
-        "Full AUTH-003 lifecycle runtime evidence for authCredentialList, authCredentialReplace and authCredentialRemove remains open.",
+        "Final AUTH-003 entity/field reconciliation and Entity promotion remain open; Mapping 0 / Five-Way remains globally NOT_GREEN.",
         "ENT-IDENTITY / ENT-CREDENTIAL catalog promotion remains BLOCKED pending complete lifecycle reconciliation.",
         "Mapping 0 / Five-Way remains globally NOT_GREEN."
       ]
