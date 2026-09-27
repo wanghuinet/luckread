@@ -137,6 +137,7 @@ jobs:
           test -s artifacts/mapping-0/auth-003-d1-schema/auth_credentials_index_list.txt
           test -s artifacts/mapping-0/auth-003-d1-schema/auth_credentials_foreign_keys.txt
           test -s artifacts/mapping-0/auth-003-d1-schema/foreign_key_check.txt
+          test -s artifacts/mapping-0/auth-003-d1-schema/auth_credentials_foreign_key_check.txt
           test -s artifacts/mapping-0/auth-003-d1-schema/d1_migrations_presence.txt
           test -s artifacts/mapping-0/auth-003-d1-schema/d1_migrations.txt
           test -s artifacts/mapping-0/auth-003-d1-schema/provenance.txt
@@ -163,7 +164,7 @@ jobs:
           grep -F "auth_credentials_kind_normalized_value_uq" artifacts/mapping-0/auth-003-d1-schema/auth_credentials_index_list.txt
           grep -F "auth_credentials_identity_id_idx" artifacts/mapping-0/auth-003-d1-schema/auth_credentials_index_list.txt
           grep -F "auth_identities" artifacts/mapping-0/auth-003-d1-schema/auth_credentials_foreign_keys.txt
-          grep -F '"results": []' artifacts/mapping-0/auth-003-d1-schema/foreign_key_check.txt
+          grep -F '"results": []' artifacts/mapping-0/auth-003-d1-schema/auth_credentials_foreign_key_check.txt
           grep -F '0004_auth_003_credentials.sql' artifacts/mapping-0/auth-003-d1-schema/d1_migrations.txt
 
       - name: Upload evidence
