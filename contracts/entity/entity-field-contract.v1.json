@@ -380,7 +380,7 @@
           "type": "text",
           "nullable": false,
           "required": true,
-          "unique": true,
+          "unique": false,
           "indexed": true,
           "classification": "AUTHENTICATION_IDENTIFIER",
           "apiExposure": "NEVER",
