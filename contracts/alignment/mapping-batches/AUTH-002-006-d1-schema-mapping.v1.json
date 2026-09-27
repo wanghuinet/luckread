@@ -103,7 +103,11 @@
         "https://github.com/wanghuinet/luckread/actions/runs/36296831559",
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
         "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
-        "artifacts/mapping-0/auth-003-logical-ownership-reconciliation-2026-09-27.json"
+        "artifacts/mapping-0/auth-003-logical-ownership-reconciliation-2026-09-27.json",
+        "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
+        "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-LIFECYCLE-EVIDENCE-ADMISSION-2026-09-27.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-ENTITY-FIELD-OWNERSHIP-RECONCILIATION-2026-09-27.md"
       ],
       "verifiedSourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435",
       "schemaEvidenceArtifact": {
@@ -117,8 +121,12 @@
         "remoteDdl": false,
         "remoteDml": false
       },
-      "mappingDisposition": "PHYSICAL_MAPPING_EVIDENCED_FOR_ADMITTED_AUTH003_SLICE",
-      "status": "BLOCKED_ON_FULL_LIFECYCLE_AND_MAPPING0"
+      "mappingDisposition": "PHYSICAL_MAPPING_AND_ADMITTED_CREDENTIAL_RUNTIME_RECONCILED",
+      "status": "BLOCKED_ON_IDENTITY_ENTITY_AUTHORITY_AND_MAPPING0",
+      "entityPromotionDisposition": {
+        "ENT-CREDENTIAL": "IMPLEMENTATION_AND_PERSISTENCE_RUNTIME_EVIDENCED_BUT_NOT_PROMOTED",
+        "ENT-IDENTITY": "SCHEMA_EVIDENCED_BUT_PRODUCTION_MATERIALIZATION_RUNTIME_NOT_EVIDENCED"
+      }
     },
     {
       "featureId": "AUTH-004",

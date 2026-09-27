@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "24099c9a3fc5c60eb09cb4c3c96f028e511b1376",
-  "backupBranch": "backup/pre-auth003-lifecycle-evidence-admission-20260927",
+  "sourceHead": "2bec29720de290a49eae4cf7d7ee74e23034f29e",
+  "backupBranch": "backup/pre-auth003-entity-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
-    "state": "BLOCKED_AUTH003_ENTITY_RECONCILIATION_AND_MAPPING0_PROMOTION",
-    "objective": "With AUTH-003 List/Add/Replace/Remove runtime evidence admitted, reconcile ENT-IDENTITY/ENT-CREDENTIAL field and ownership bindings without reopening wire/API/DTO authority.",
+    "state": "BLOCKED_AUTH003_IDENTITY_MATERIALIZATION_RUNTIME_AND_MAPPING0_PROMOTION",
+    "objective": "With AUTH-003 physical mapping and credential List/Add/Replace/Remove evidence reconciled, close the remaining identity-side implementation/ownership evidence without reopening wire/API/DTO authority.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-WIRE-SCHEMA-ENCODING-RECONCILIATION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-003::entity field/ownership reconciliation; then final Mapping 0 / Five-Way gate.",
+    "nextGate": "AUTH-003::ENT-IDENTITY materialization/runtime ownership slice; then final entity promotion and Mapping 0 / Five-Way gate.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -153,19 +153,20 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Main advanced only through AUTH-003 evidence admission documentation; cursor freshness is reconciled to the current main without changing runtime evidence or reopening any closed gate.",
-    "previousCursorSourceHead": "c96b39569c7505ade615b15e63d87f5afb8066cc",
-    "currentMainSha": "24099c9a3fc5c60eb09cb4c3c96f028e511b1376",
+    "reason": "AUTH-003 entity field/physical mapping is reconciled and credential runtime evidence is complete. The remaining blocker is explicit ENT-IDENTITY production materialization/runtime ownership evidence; no promotion is inferred from seeded fixtures.",
+    "previousCursorSourceHead": "24099c9a3fc5c60eb09cb4c3c96f028e511b1376",
+    "currentMainSha": "2bec29720de290a49eae4cf7d7ee74e23034f29e",
     "remoteMigrationReexecution": "FORBIDDEN",
     "schemaPostcheckRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
-    "runtimeEvidenceStatus": "AUTH003_LIST_AND_LIFECYCLE_PASS_VERIFIED",
+    "runtimeEvidenceStatus": "AUTH003_CREDENTIAL_SLICE_PASS_VERIFIED",
     "runtimeEvidenceRuns": [
+      "36299334577",
       "36307891924",
       "36308120758"
     ],
-    "entityEvidenceBindingStatus": "BOUND_NOT_PROMOTED"
+    "entityEvidenceBindingStatus": "ENT-CREDENTIAL_BOUND_NOT_PROMOTED__ENT-IDENTITY_BLOCKED"
   },
-  "nextGate": "AUTH-003::entity field/ownership reconciliation; then final Mapping 0 / Five-Way gate.",
+  "nextGate": "AUTH-003::ENT-IDENTITY materialization/runtime ownership slice; then final entity promotion and Mapping 0 / Five-Way gate.",
   "runtimeEvidenceAdmission": {
     "list": {
       "workflow": ".github/workflows/w02-auth-003-credential-list-runtime-evidence.yml",
@@ -204,7 +205,7 @@
       "ENT-IDENTITY",
       "ENT-CREDENTIAL"
     ],
-    "reason": "AUTH-003 List/Add/Replace/Remove runtime evidence is admitted; catalog promotion still requires final entity field/ownership reconciliation and Mapping 0 / Five-Way admission.",
+    "reason": "Credential implementation/persistence/runtime evidence is complete for the admitted AUTH-003 slice, but ENT-IDENTITY lacks independently evidenced production materialization/runtime ownership. Final entity promotion and Mapping 0 / Five-Way admission remain blocked.",
     "evidenceRegistryStatus": "NOT_GREEN",
     "fiveWayStatus": "NOT_GREEN"
   }

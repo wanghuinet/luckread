@@ -1,47 +1,86 @@
-# AUTH-003 Real Evidence Reconciliation v1.0
+# AUTH-003 Real Evidence Reconciliation v1.1
 
 - Feature: `AUTH-003`
 - Name: username/email/phone credentials
 - Status: `BLOCKED_NOT_GREEN`
 - Implementation authorization: `false`
 - Source of truth: `docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md`
-- Capability contract: `contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json`
-- Identity/session authority: `docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md`
-- Entity authority: `contracts/entity/entity-catalog.v1.json`
-- Field authority: `contracts/entity/entity-field-contract.v1.json`
 
-## 1. Confirmed contract evidence
+## 1. Closed authority chain
 
-1. The Blueprint and feature inventory define `AUTH-003` as username/email/phone credentials.
-2. The B01 reconciliation contract defines the canonical behavior as deterministic normalization, validation and association of accepted identifiers with an identity, while preventing protected account-existence disclosure.
-3. The identity/session registry contains identifier-related validation coverage, including email/phone binding and unbinding controls, but those are registry validation units rather than executed implementation evidence.
-4. `ENT-USER` is the only currently verified identity/account entity. `ENT-IDENTITY` and `ENT-CREDENTIAL` remain proposed.
-5. The current verified `ENT-USER` field contract does not establish canonical email or phone credential fields; its verified fields are username, displayName, bio, avatar, locale and timezone.
+The canonical AUTH-003 API, DTO and entity references are now explicit:
 
-## 2. Missing canonical traceability
+- `authCredentialList`
+- `authCredentialAdd`
+- `authCredentialReplace`
+- `authCredentialRemove`
+- `ENT-IDENTITY`
+- `ENT-CREDENTIAL`
 
-- API operation ID for the complete AUTH-003 lifecycle: missing.
-- Public/request DTO ID: missing.
-- Credential/identity entity IDs bound to this feature: missing.
-- Canonical email field ID: missing.
-- Canonical phone field ID: missing.
-- Normalized identifier persistence mapping: missing.
-- Permission/scoped authorization mapping for credential management: missing.
-- Lifecycle/state transition mapping for credential changes: incomplete.
-- Event ID for identifier binding/unbinding/change: missing.
-- Worker/runtime implementation evidence: missing.
-- D1 domain/table/column evidence: unresolved.
-- Executed security/integration tests: missing.
-- Evidence Registry IDs bound to AUTH-003: missing.
+The public credential projection remains exactly `credentialId`, `kind`, `active`. No protected credential material is admitted to public projection.
 
-## 3. Evidence interpretation rules
+## 2. Persistence reconciliation
 
-The presence of a registry validation-unit name, Payload authentication support, or a verified `users` collection does not prove that AUTH-003 is implemented. No identifier field, handler, persistence schema, permission mapping, or test result is promoted from inference.
+The controlled D1-01 target is `luckread`, UUID `2f80471e-3756-49f9-8db1-7707a433ad64`.
 
-## 4. Security gate
+The admitted AUTH-003 migration and exact-SHA read-only postcheck reconcile:
 
-AUTH-003 cannot become GREEN until deterministic normalization and uniqueness behavior is bound to canonical contracts and executable evidence, and protected account existence cannot be disclosed through credential-management error semantics. Credential material must remain outside public profile/API projections.
+- `ENT-IDENTITY -> auth_identities`
+- `ENT-CREDENTIAL -> auth_credentials`
 
-## 5. Exit criteria
+The field-to-column mappings and persistence constraints are recorded in:
 
-AUTH-003 may be promoted only after all required traceability fields are non-empty and authoritative, persistence is explicitly reconciled, implementation evidence exists, and integration/security tests produce durable evidence bound to a commit SHA. Until then the status remains `BLOCKED_NOT_GREEN`.
+- `contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json`
+- `docs/change-control/CC-MAPPING-0-AUTH-003-ENTITY-FIELD-OWNERSHIP-RECONCILIATION-2026-09-27.md`
+
+No table or column names are inferred.
+
+## 3. Runtime evidence disposition
+
+The following controlled runtime evidence is admitted and VERIFIED:
+
+- Add: run `36299334577`
+- List: run `36307891924`
+- Replace/Remove lifecycle: run `36308120758`
+
+These runs establish the executable credential slice under exact tested source provenance. No production Worker deployment occurred in these evidence probes.
+
+## 4. Entity disposition
+
+### ENT-CREDENTIAL
+
+Persistence and runtime evidence are complete for the admitted List/Add/Replace/Remove credential-management slice.
+
+Current canonical disposition:
+
+- catalog: `PROPOSED`
+- implementation evidence: `IMPLEMENTED`
+- persistence: `VERIFIED`
+- overall promotion: `BLOCKED`
+
+Reason: the credential entity has an explicit FK relationship to `ENT-IDENTITY`, while `ENT-IDENTITY` is still proposed. Entity promotion is fail-closed and cannot be inferred from dependency fixtures.
+
+### ENT-IDENTITY
+
+Physical schema/migration evidence is present, but there is no independently evidenced production identity materialization/CRUD lifecycle implementation.
+
+Current canonical disposition:
+
+- catalog: `PROPOSED`
+- implementation evidence: `BLOCKED`
+- persistence: `NOT_VERIFIED`
+- overall promotion: `BLOCKED`
+
+The AUTH-003 runtime probes seed `auth_identities` rows only as controlled prerequisites. Seeded fixtures are not treated as product identity lifecycle evidence.
+
+## 5. Security and lifecycle
+
+The admitted runtime evidence verifies self-scope, cross-account denial, public projection safety, generic credential conflicts, deterministic normalization/uniqueness handling, idempotent Replace replay, only-active credential removal protection and concurrent Remove one-winner behavior.
+
+## 6. Remaining gate
+
+The next governed implementation slice is **ENT-IDENTITY materialization/runtime ownership**.
+
+That slice must receive explicit change-control admission and exact runtime evidence. AUTH-003 wire/API/DTO authority remains closed and must not be reopened.
+
+Mapping 0 / Five-Way remains `NOT_GREEN`.

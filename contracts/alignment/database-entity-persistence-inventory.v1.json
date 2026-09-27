@@ -39,13 +39,24 @@
       "entityName": "Credential",
       "domainId": "D1-01",
       "entityStatus": "PROPOSED",
-      "implementationRef": "",
-      "persistenceStatus": "NOT_VERIFIED",
-      "adapter": "",
-      "migrationRefs": [],
+      "implementationRef": "workers/W02-content/src/credentials/credential-add.ts; workers/W02-content/src/credentials/credential-list.ts; workers/W02-content/src/credentials/credential-lifecycle.ts",
+      "persistenceStatus": "VERIFIED",
+      "adapter": "Cloudflare D1 (D1-01) / W02 native D1 binding",
+      "migrationRefs": [
+        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
+        "https://github.com/wanghuinet/luckread/actions/runs/36296831559",
+        "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
+      ],
       "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
       "evidenceRefs": [
-        "contracts/entity/entity-catalog.v1.json"
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/AUTH-003-credential-field-contract.v1.json",
+        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
+        "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
+        "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
+        "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
+        "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-ENTITY-FIELD-OWNERSHIP-RECONCILIATION-2026-09-27.md"
       ]
     },
     {
@@ -173,6 +184,7 @@
     "AUTH-002 Session persistence and migration are now contract-defined but remain unverified until actual schema, migration and runtime evidence exists.",
     "ENT-DEVICE-RECORD is still proposed; the physical device foreign-key target therefore cannot be promoted by inference.",
     "Entity completeness against the full Blueprint v2.0 domain inventory is not yet reconciled.",
-    "Step 03 remains NOT_GREEN until implementation, migration, authority and completeness evidence are reconciled."
+    "Step 03 remains NOT_GREEN until implementation, migration, authority and completeness evidence are reconciled.",
+    "ENT-IDENTITY remains PROPOSED because no production identity materialization/ownership implementation is independently evidenced; AUTH-003 credential runtime consumes pre-existing auth_identities rows."
   ]
 }
