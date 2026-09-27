@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "09b445ade0f3e937ad7a6d0c6c13a4cee013b7a4",
-  "backupBranch": "backup/pre-auth001-native-auth-identity-boundary-20260927",
+  "sourceHead": "7f508d76527ffa1a1740e749a6727c52514e4080",
+  "backupBranch": "backup/pre-auth001-username-native-capability-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
     "state": "BLOCKED_AUTH001_NATIVE_AUTH_IDENTITY_BOUNDARY",
     "objective": "Reconcile supported registration identity types with the existing Payload-native User/auth boundary before authorizing authRegister runtime.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-NATIVE-AUTH-IDENTITY-BOUNDARY-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::native-auth identity decision + username omission + phone source + consent + idempotency/replay + consistency semantics; then smallest admitted registration runtime slice.",
+    "nextGate": "AUTH-001::apply verified Payload-native capability to username-wire reconciliation; then resolve phone durable source + consent + idempotency/replay + registration writer boundary; only then authorize the smallest registration runtime slice.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -154,8 +154,8 @@
   },
   "currentHeadReconciliation": {
     "reason": "Active W01 Users.ts uses Payload native auth without a custom phone strategy, while AUTH-001 permits phone registration. Combined with required username vs optional wire, missing consent authority, missing durable idempotency authority and unresolved consistency semantics, runtime remains unauthorized.",
-    "currentMainSha": "09b445ade0f3e937ad7a6d0c6c13a4cee013b7a4",
-    "nativeAuthStatus": "PAYLOAD_NATIVE_NO_PHONE_STRATEGY_ADMITTED",
+    "currentMainSha": "7f508d76527ffa1a1740e749a6727c52514e4080",
+    "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "BLOCKED",
     "phoneSourceStatus": "BLOCKED",
     "idempotencySourceStatus": "BLOCKED",
@@ -204,5 +204,17 @@
     "reason": "ENT-CREDENTIAL remains evidenced but not promoted. ENT-IDENTITY remains blocked. AUTH-001 requires explicit identity-type/native-auth reconciliation before implementation.",
     "evidenceRegistryStatus": "NOT_GREEN",
     "fiveWayStatus": "NOT_GREEN"
+  },
+  "supportingControls": [
+    "docs/change-control/CC-MAPPING-0-AUTH-001-PAYLOAD-NATIVE-CAPABILITY-RECONCILIATION-2026-09-27.md"
+  ],
+  "currentSourceReconciliation": {
+    "reviewedAt": "2026-09-27",
+    "mainSha": "7f508d76527ffa1a1740e749a6727c52514e4080",
+    "payloadPackage": "workers/W01-payload/package.json",
+    "payloadVersion": "3.87.1",
+    "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
+    "implementationDisposition": "NO_CODE_CHANGE_AUTHORIZED_BY_CAPABILITY_CONTROL",
+    "staleEvidenceCorrection": "B19 old fields:[] observation is superseded by current active Users.ts source and must not be treated as current-head evidence."
   }
 }
