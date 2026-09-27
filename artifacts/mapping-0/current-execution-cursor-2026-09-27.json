@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "7c9f1fbf41791f56cd23e2ee27ded09f883b956a",
+  "sourceHead": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
   "backupBranch": "backup/pre-auth003-postmigration-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
-    "state": "BLOCKED_REMOTE_MIGRATION_POSTCHECK_EVIDENCE_REQUIRED",
+    "state": "BLOCKED_RUNTIME_PERSISTENCE_SECURITY_EVIDENCE_REQUIRED",
     "objective": "Admit the actual remote MIG-AUTH-003-CREDENTIAL-V1 execution through read-only exact-SHA post-schema, migration-ledger, and provenance evidence before runtime implementation.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-003 post-migration read-only evidence admission -> same-SHA persistence/security/runtime vertical slice",
+    "nextGate": "AUTH-003 same-SHA persistence/security/runtime vertical slice -> runtime/security evidence admission",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED"
@@ -50,7 +50,7 @@
     "Treat 36296831559 as execution checkpoint only; final schema correctness requires a later read-only exact-SHA postcheck.",
     "Do not promote AUTH-003 persistence status from the migration execution log alone."
   ],
-  "previousSourceHead": "673fc9d14fef33d618fb2121c3f5304cf46ae926",
+  "previousSourceHead": "7c9f1fbf41791f56cd23e2ee27ded09f883b956a",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
@@ -73,7 +73,7 @@
   "evidenceChannel": {
     "workflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
     "mode": "READONLY",
-    "status": "EXECUTION_OBSERVED_POSTCHECK_REQUIRED",
+    "status": "POSTMIGRATION_SCHEMA_EVIDENCE_ADMITTED",
     "captures": [
       "sqlite_master",
       "table_list",
@@ -88,22 +88,22 @@
       "provenance"
     ],
     "schemaEvidence": "CAPTURED_AND_ADMITTED",
-    "runId": "36295541846",
-    "artifactId": "10923578328",
-    "sourceSha": "ce308e202ff737e236f3bf35f30097e9e4e3b42c",
+    "runId": "36298629648",
+    "artifactId": "10924623571",
+    "sourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435",
     "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
     "migrationDesign": "ADMITTED",
     "executionRunId": "36296831559",
     "executionJobId": "108557122475",
     "executionSourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435",
-    "executionStatus": "REMOTE_DDL_APPLIED",
+    "executionStatus": "REMOTE_DDL_APPLIED_POSTMIGRATION_READONLY_EVIDENCE_VERIFIED",
     "executionConclusion": "REMOTE_DDL_EXECUTED_TRUE_POST_SCHEMA_EVIDENCE_NOT_ADMITTED",
     "executionEvidenceRef": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
     "postcheckWorkflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
-    "postcheckRequired": true,
+    "postcheckRequired": false,
     "migrationWorkflow": ".github/workflows/w02-auth-003-migration-evidence.yml",
     "workflowCommit": "7c9f1fbf41791f56cd23e2ee27ded09f883b956a",
-    "postcheckValidation": "Expected AUTH-003 tables/columns/indexes/FK and migration ledger are validated read-only; AUTH-003 FK admission uses PRAGMA foreign_key_check(auth_credentials); no DDL/DML."
+    "postcheckValidation": "PASS_VERIFIED: observed AUTH-003 schema, indexes, FK, migration ledger and provenance; auth_credentials table-scoped foreign_key_check returned empty; no DDL/DML."
   },
   "decisionInput": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md",
@@ -115,7 +115,7 @@
     "schemaEvidenceStatus": "PASS_VERIFIED_EVIDENCE_CAPTURE",
     "migrationAdmission": "docs/change-control/CC-MAPPING-0-AUTH-003-MIGRATION-ADMISSION-2026-09-27.md",
     "migrationDesignStatus": "PASS_VERIFIED_DESIGN_ADMISSION",
-    "remoteMigrationStatus": "EXECUTED_POSTCHECK_PENDING",
+    "remoteMigrationStatus": "POSTCHECK_VERIFIED",
     "executionReconciliation": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
     "executionRunId": "36296831559",
     "executionSourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435"
