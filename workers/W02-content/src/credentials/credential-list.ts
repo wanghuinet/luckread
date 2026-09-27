@@ -102,22 +102,31 @@ function decodeCursor(cursor: string): CursorPayload {
     throw new CredentialListError('INVALID_CURSOR', 'cursor is invalid')
   }
 
+  if (!payload || typeof payload !== 'object') {
+    throw new CredentialListError('INVALID_CURSOR', 'cursor is invalid')
+  }
+
+  const candidate = payload as Record<string, unknown>
   if (
-    !payload ||
-    typeof payload !== 'object' ||
-    (payload as Partial<CursorPayload>).v !== 1 ||
-    (payload as Partial<CursorPayload>).endpoint !== CREDENTIAL_LIST_ENDPOINT ||
-    (payload as Partial<CursorPayload>).ordering !== CREDENTIAL_LIST_ORDERING ||
-    typeof (payload as Partial<CursorPayload>).createdAt !== 'string' ||
-    typeof (payload as Partial<CursorPayload>).credentialId !== 'string' ||
-    (payload as Partial<CursorPayload>).createdAt.length === 0 ||
-    Number.isNaN(Date.parse((payload as Partial<CursorPayload>).createdAt)) ||
-    (payload as Partial<CursorPayload>).credentialId.length === 0
+    candidate.v !== 1 ||
+    candidate.endpoint !== CREDENTIAL_LIST_ENDPOINT ||
+    candidate.ordering !== CREDENTIAL_LIST_ORDERING ||
+    typeof candidate.createdAt !== 'string' ||
+    typeof candidate.credentialId !== 'string' ||
+    candidate.createdAt.length === 0 ||
+    Number.isNaN(Date.parse(candidate.createdAt)) ||
+    candidate.credentialId.length === 0
   ) {
     throw new CredentialListError('INVALID_CURSOR', 'cursor is invalid')
   }
 
-  return payload as CursorPayload
+  return {
+    v: 1,
+    endpoint: CREDENTIAL_LIST_ENDPOINT,
+    ordering: CREDENTIAL_LIST_ORDERING,
+    createdAt: candidate.createdAt,
+    credentialId: candidate.credentialId,
+  }
 }
 
 function assertLimit(limit: number | undefined): number {

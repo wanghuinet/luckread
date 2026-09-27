@@ -164,7 +164,7 @@ export async function addCredential(
   const credentialId = await deriveCredentialId(input.targetUserId, input.idempotencyKey)
   const now = input.now ?? new Date().toISOString()
 
-  let identity: IdentityRow | undefined
+  let identity: IdentityRow | null
 
   try {
     identity = await db
