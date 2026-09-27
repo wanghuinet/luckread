@@ -3398,3 +3398,31 @@ Next admissible upstream work:
 3. implementation/evidence admission under the resulting frozen inputs.
 
 Do not rerun AUTH-002 E6 runtime `36219132123` or W01 baseline migration evidence `35508571153` unchanged.
+
+
+## 2026-09-27 — dedicated current-execution cursor authority reconciliation
+
+Change Control:
+`docs/change-control/CC-MAPPING-0-CURSOR-AUTHORITY-LEDGER-RECONCILIATION-2026-09-27.md`
+
+The Ledger preserves earlier continuation records for historical traceability. Some older tail sections still contain an AUTH-003 continuation cursor from an earlier execution phase. That wording is historical and is not the current execution instruction.
+
+The dedicated cursor
+`artifacts/mapping-0/current-execution-cursor-2026-09-27.json`
+is explicitly marked `CURRENT_CURSOR_AUTHORITATIVE` and is the active work-selection source for the current phase.
+
+### Current authoritative continuation
+
+- Cursor: `AUTH-001-REGISTRATION-CLOSURE`
+- State: `BLOCKED_PRIV004_POLICY_INSTANCE`
+- Next gate: admit the first approved `ACCOUNT_REGISTRATION / LEGAL_AUDIT` PRIV-004 policy instance with version, scope, effective period, deterministic rule, approval and provenance evidence.
+- AUTH-001 runtime remains fail-closed until that policy instance is admitted.
+- Already-verified AUTH-002/AUTH-003 runtime evidence is inherited and must not be rerun unchanged.
+
+### Source-head rule
+
+The dedicated current-execution cursor already records its deliberate source reconciliation boundary. Governance-only commits do not require chasing that cursor to every later merge SHA.
+
+### Boundary
+
+This note does not change any Blueprint, Contract, API, DTO, Entity, Field, Worker, D1, Queue, migration, runtime, Evidence status, or Mapping 0 GREEN state. No PRIV-004 retention value is inferred.
