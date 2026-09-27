@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/persistence/AUTH-001-registration-envelope.v1.json",
+  "title": "AUTH-001 Registration Envelope",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PARTIAL",
+  "sourceOfTruth": "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-WRITER-BOUNDARY-2026-09-27.md",
+  "canonicalIdempotencySource": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
+  "scope": "registration-local internal record at W01",
+  "transactionBoundary": "same W01 Payload transaction as native User creation",
+  "retentionHours": 24,
+  "fields": {
+    "idempotency_key": {
+      "type": "string",
+      "source": "contracts/schemas/common/idempotency-key.json"
+    },
+    "scope": {
+      "type": "string",
+      "source": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+    },
+    "endpoint": {
+      "type": "string",
+      "source": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+    },
+    "payload_hash": {
+      "type": "string",
+      "encoding": "SHA-256 of normalized JSON payload",
+      "source": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "IN_PROGRESS",
+        "COMPLETED",
+        "FAILED"
+      ],
+      "source": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+    },
+    "response_digest": {
+      "type": "string",
+      "requiredWhen": "state=COMPLETED",
+      "source": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "source": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "retention": "default 24h",
+      "source": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+    }
+  },
+  "semanticRules": [
+    "same key + same payload + COMPLETED returns the first registration result without creating another User",
+    "same key + same payload + IN_PROGRESS returns IDEMPOTENCY_IN_PROGRESS",
+    "same key + different payload returns IDEMPOTENCY_KEY_REUSE_CONFLICT",
+    "expired key is treated as a new request",
+    "the envelope write shares the same transaction as the protected registration User write"
+  ],
+  "blockedBindings": {
+    "committedResponseProjection": {
+      "status": "BLOCKED",
+      "requiredSemantics": [
+        "User ID",
+        "HTTP status / registration result status"
+      ],
+      "reason": "writer-boundary control requires replayable committed response identity/status but does not freeze exact persistence field names or structure"
+    },
+    "consentBinding": {
+      "status": "BLOCKED",
+      "reason": "PRIV-002 concrete consent entity/field/schema/retention contract is not yet admitted"
+    }
+  },
+  "nonAuthorizations": [
+    "No generic idempotency platform",
+    "No new Worker/D1/Queue",
+    "No runtime implementation",
+    "No migration",
+    "No Mapping 0 GREEN"
+  ]
+}
