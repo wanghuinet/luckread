@@ -92,17 +92,22 @@
         "workers/W02-content/src/credentials/credential-add.test.ts"
       ],
       "evidence": [
-        "contracts/api/AUTH-003-credential-management-contract.v1.json",
         "artifacts/mapping-0/auth-003-wire-projection-authority-2026-09-26.json",
+        "contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-003-006-dto-schema-closure-gate.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-003-006-openapi-operation-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-003-list-response-closure-gate.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
+        "contracts/api/AUTH-003-credential-management-contract.v1.json",
         "contracts/dto/auth-dto-contract.v1.json",
         "contracts/dto/auth-dto-records.v1.json",
-        "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
-        "contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json",
         "contracts/entity/entity-implementation-evidence.v1.json",
-        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
-        "workers/W02-content/src/credentials/credential-add.ts",
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
-        "https://github.com/wanghuinet/luckread/actions/runs/36299334577"
+        "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
+        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
+        "workers/W02-content/src/credentials/credential-add.ts"
       ],
       "blockers": [
         "Full AUTH-003 lifecycle runtime evidence for authCredentialList, authCredentialReplace and authCredentialRemove remains open.",
