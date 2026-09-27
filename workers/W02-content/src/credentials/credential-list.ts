@@ -190,7 +190,7 @@ export async function listCredentials(
           '  SELECT 1',
           '  FROM auth_credentials next_c',
           '  INNER JOIN auth_identities next_i ON next_i.id = next_c.identity_id',
-          '  WHERE next_i.user_id = c.user_id',
+          '  WHERE next_i.user_id = i.user_id',
           '    AND (next_c.created_at < c.created_at OR (next_c.created_at = c.created_at AND next_c.id < c.id))',
           ') AS has_more',
           'FROM auth_credentials c',
