@@ -31,8 +31,8 @@
 - Event IDs for password change/reset and credential rotation: missing.
 - Worker/runtime implementation evidence: missing.
 - D1 domain is `D1-01`; AUTH-004 custom migration is explicitly `NOT_REQUIRED_NATIVE`, while physical schema/runtime evidence remains unresolved.
-- Executed security tests for replay, expiry, enumeration resistance, and credential non-disclosure: missing.
-- Integration/E2E execution evidence: missing.
+- Executed local integration tests now provide replay/expiry and credential non-disclosure evidence; protected-account enumeration and remote/E2E security evidence remain missing.
+- Local Payload API integration evidence is now registered; controlled remote W01 and HTTP E2E execution evidence remain missing.
 - Evidence Registry IDs bound to `AUTH-004`: missing.
 
 ## 3. Evidence interpretation rules
@@ -54,10 +54,10 @@ Definition-layer reconciliation is recorded at main commit `3ab18252544ffb9a15da
 - Wire contract: reconciled
 - Auth Operation Policy: reconciled
 - Canonical OpenAPI/DTO registry: still pending
-- Runtime/persistence/security/integration evidence: still missing
+- Runtime/persistence/security/integration evidence: local native integration evidence registered; remote/persistence/E2E/session-invalidation evidence still missing
 
 ## 7. Gate result
 
 `AUTH-004 = BLOCKED_NOT_GREEN`
 
-Reason: the downstream API, credential/recovery data contracts, persistence evidence, implementation evidence, and executed security/integration evidence required by the canonical traceability chain are not yet established. Runtime/worker code must not be added merely to force this feature to GREEN.
+Reason: local native password/recovery integration evidence is now registered, but controlled remote W01 behavior, HTTP E2E transport, protected-account enumeration resistance, session invalidation after credential rotation, lifecycle event evidence, and full canonical traceability are not yet established. Runtime/worker code must not be added merely to force this feature to GREEN.
