@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "controlId": "CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27",
-  "sourceHead": "953e9f40cdbd9eccf454ee2cb6deae2cb543d352",
+  "sourceHead": "673fc9d14fef33d618fb2121c3f5304cf46ae926",
   "backupBranch": "backup/pre-auth003-postmigration-reconciliation-20260927",
   "status": "SCHEMA_EVIDENCE_ADMITTED / REMOTE_MIGRATION_EXECUTED / POSTCHECK_REQUIRED",
   "scope": "AUTH-003 credential-management runtime/persistence admission",
@@ -219,7 +219,24 @@
         "d1_migrations",
         "_cf_KV"
       ],
-      "auth003SpecificPersistence": "NOT_EVIDENCED_PRE_MIGRATION"
+      "auth003SpecificPersistence": "NOT_EVIDENCED_PRE_MIGRATION",
+      "postMigrationPostcheck": {
+        "workflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
+        "workflowCommit": "673fc9d14fef33d618fb2121c3f5304cf46ae926",
+        "sourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435",
+        "databaseName": "luckread",
+        "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+        "mode": "READONLY",
+        "requiredCapturedFacts": [
+          "actual auth_identities columns and nullability/defaults",
+          "actual auth_credentials columns and nullability/defaults",
+          "actual auth_identities indexes",
+          "actual auth_credentials indexes",
+          "actual auth_credentials foreign key",
+          "foreign_key_check is clean",
+          "MIG-AUTH-003-CREDENTIAL-V1 present in d1_migrations"
+        ]
+      }
     }
   },
   "authoritySourcesChecked": [
@@ -301,6 +318,12 @@
     "captures": [
       "sqlite_master",
       "table_list",
+      "auth_identities_table_info",
+      "auth_credentials_table_info",
+      "auth_identities_index_list",
+      "auth_credentials_index_list",
+      "auth_credentials_foreign_keys",
+      "foreign_key_check",
       "d1_migrations_presence",
       "d1_migrations",
       "provenance"
@@ -318,7 +341,9 @@
       "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
       "mode": "READONLY",
       "status": "REQUIRED"
-    }
+    },
+    "workflowCommit": "673fc9d14fef33d618fb2121c3f5304cf46ae926",
+    "postcheckValidation": "READONLY workflow now validates observed AUTH-003 schema objects and migration ledger against the admitted design; it performs no remote DDL/DML."
   },
   "decisionInput": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md",
