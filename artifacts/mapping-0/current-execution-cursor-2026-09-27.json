@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "dca55b20f8bb2ee8c759b5d4fb761c677ee3fbac",
+  "sourceHead": "05b32b7517ca15c3ac8999753a11198f88ddce53",
   "backupBranch": "backup/pre-auth003-policy-task-authority-admission-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
@@ -47,7 +47,7 @@
     "Treat luckread-w02 and D1-01 target UUID 2f80471e-... as explicit authority inputs; do not reinterpret or reassign the target. Physical target identity is closed; current-SHA deployment correctness remains a separate gate.",
     "Do not inherit AUTH-003 runtime correctness from earlier W02 deployment evidence; same-SHA evidence is required."
   ],
-  "previousSourceHead": "c8df41d734dae4f57426c4b3a558c842da96beb3",
+  "previousSourceHead": "4e4a2302c25c316a27545643f0f31eeeb09582a0",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
