@@ -59,7 +59,7 @@ paths:
               type: object
               required: [identityType, identity, credential, username, consent]
               properties:
-                identityType: { enum: [phone, email] }
+                identityType: { enum: [email] }
                 identity: { type: string }
                 credential: { type: string, format: password }
                 username: { type: string }

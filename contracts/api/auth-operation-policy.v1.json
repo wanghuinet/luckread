@@ -15,7 +15,8 @@
       "capability": "account_registration",
       "contractStatus": "CONTRACTED_PARTIAL",
       "wire": {
-        "requiredFields": ["identityType", "identity", "credential", "username", "consent"]
+        "requiredFields": ["identityType", "identity", "credential", "username", "consent"],
+        "identityType": ["email"]
       },
       "auth": {
         "mode": "public",
