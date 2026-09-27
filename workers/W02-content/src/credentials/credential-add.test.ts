@@ -101,7 +101,7 @@ function fakeD1() {
 
 describe('AUTH-003 credential add', () => {
   it('normalizes username/email and validates phone without provider-specific rewriting', () => {
-    expect(normalizeCredentialValue('username', '  Cafe\\u0301User  ')).toBe('caféuser')
+    expect(normalizeCredentialValue('username', '  Cafe\u0301User  ')).toBe('caféuser')
     expect(normalizeCredentialValue('email', '  Test.Example@Invalid.Local ')).toBe(
       'test.example@invalid.local',
     )
