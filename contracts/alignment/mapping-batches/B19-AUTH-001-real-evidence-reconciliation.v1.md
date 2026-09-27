@@ -224,7 +224,7 @@ Authoritative control: `docs/change-control/CC-MAPPING-0-AUTH-001-NATIVE-AUTH-ID
 
 The older evidence summary above contains a stale observation that `workers/W01-payload/src/collections/Users.ts` had `fields: []`. That statement must not be used as current-head evidence.
 
-At current `main` source head `09b445ade0f3e937ad7a6d0c6c13a4cee013b7a4`, the active W01 `Users.ts` contains these application fields:
+At current `main` source head `7f508d76527ffa1a1740e749a6727c52514e4080`, the active W01 `Users.ts` contains these application fields:
 
 - required unique indexed `username`;
 - `displayName`;
