@@ -271,3 +271,9 @@ The registration writer boundary is now explicitly reconciled as a W01 Payload-n
 Authoritative control: `docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-WRITER-BOUNDARY-2026-09-27.md`.
 
 Consent persistence remains unresolved under PRIV-002; no runtime implementation is admitted.
+
+## 2026-09-27 lifecycle dependency clarification
+
+AUTH-001 writer-boundary reconciliation does not promote W01 account lifecycle persistence. The initial `PENDING_VERIFICATION` state remains dependent on the separate AUTH-013 persistence migration/admission and must not be inferred from the API response contract.
+
+AUTH-001 implementation therefore remains blocked on both PRIV-002 consent authority and AUTH-013 lifecycle persistence admission.
