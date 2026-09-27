@@ -1,9 +1,9 @@
 {
   "version": "1.0.0",
   "controlId": "CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27",
-  "sourceHead": "adcb527572b70baa7d06a5ee6612dcd2aee4ef88",
-  "backupBranch": "backup/pre-auth003-policy-task-authority-admission-20260927",
-  "status": "SCHEMA_EVIDENCE_ADMITTED / MIGRATION_ADMISSION_REQUIRED",
+  "sourceHead": "953e9f40cdbd9eccf454ee2cb6deae2cb543d352",
+  "backupBranch": "backup/pre-auth003-postmigration-reconciliation-20260927",
+  "status": "SCHEMA_EVIDENCE_ADMITTED / REMOTE_MIGRATION_EXECUTED / POSTCHECK_REQUIRED",
   "scope": "AUTH-003 credential-management runtime/persistence admission",
   "establishedInputs": {
     "operations": [
@@ -181,7 +181,20 @@
           "postcondition",
           "rollback/forward-recovery posture",
           "exact tested commit SHA"
-        ]
+        ],
+        "status": "EXECUTION_OBSERVED_POSTCHECK_REQUIRED",
+        "execution": {
+          "workflowRun": "36296831559",
+          "jobId": "108557122475",
+          "exactSourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435",
+          "remoteDatabase": "luckread",
+          "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+          "binding": "D1_01",
+          "migrationFile": "0004_auth_003_credentials.sql",
+          "remoteDdlApplied": true,
+          "postSchemaEvidenceAdmitted": false,
+          "note": "The migration was applied remotely and reported successful; the workflow's final evidence validation failed, so post-migration evidence must be recaptured read-only."
+        }
       },
       "authorityRule": "No physical table, column, index, constraint, or migration execution detail may be guessed from contract prose, neighboring features, archived artifacts, or Payload collection conventions.",
       "status": "MIGRATION_ADMISSION_REQUIRED",
@@ -227,23 +240,31 @@
     "Remote D1-01 schema/migration evidence is captured and admitted from run 36295541846 at exact source SHA ce308e202ff737e236f3bf35f30097e9e4e3b42c.",
     "The observed D1-01 table list contains users/users_sessions and existing auth/session/governance tables, but no separately evidenced ENT-IDENTITY or ENT-CREDENTIAL persistence structure.",
     "The observed users table has native email and username plus Payload password/recovery fields; these are not silently promoted into the frozen AUTH-003 entity model.",
-    "The D1 migration ledger contains four already-applied migrations and no MIG-AUTH-003-CREDENTIAL-V1 execution.",
     "ENT-IDENTITY and ENT-CREDENTIAL remain contract-only/proposed.",
     "AUTH-003 physical field mapping remains pending because the required credential persistence schema does not yet exist in the admitted remote state.",
-    "Next gate is migration admission, not runtime implementation."
+    "Next gate is migration admission, not runtime implementation.",
+    "Controlled remote run 36296831559 applied MIG-AUTH-003-CREDENTIAL-V1 at exact source SHA 52c6868f99ae2ec9aeb8bdceb4a18396cde20435; this is execution evidence only, not final schema admission.",
+    "Post-migration schema/ledger/provenance evidence from run 36296831559 was not admitted because final validation failed and no artifact was uploaded.",
+    "ENT-IDENTITY and ENT-CREDENTIAL remain contract-only/proposed until read-only post-migration evidence is captured and reconciled.",
+    "The migration MUST NOT be re-executed. The next gate is a read-only exact-SHA postcheck against the already-mutated D1-01 state."
   ],
   "nextAdmissibleSequence": [
-    "Prepare and admit MIG-AUTH-003-CREDENTIAL-V1 physical schema design against the observed pre-migration state.",
-    "Bind the migration and smallest AUTH-003 implementation slice to an exact tested SHA.",
-    "Execute isolated migration evidence and then same-SHA persistence/security/runtime evidence.",
-    "Register evidence and only then reconsider ENT-IDENTITY/ENT-CREDENTIAL promotion and Mapping 0/R4."
+    "Capture read-only post-migration schema, table list, migration ledger, and exact provenance against D1-01 using source SHA 52c6868f99ae2ec9aeb8bdceb4a18396cde20435.",
+    "Admit the post-migration physical mapping for ENT-IDENTITY and ENT-CREDENTIAL from observed remote evidence only.",
+    "Bind the smallest AUTH-003 persistence/security/runtime implementation slice to an exact tested SHA.",
+    "Execute same-SHA persistence/security/runtime evidence; register evidence; only then reconsider entity and Mapping 0 promotion."
   ],
   "forbiddenUntilInputs": [
-    "AUTH-003 runtime handlers before migration admission",
     "AUTH-003 migration execution before migration admission",
     "ENT-IDENTITY promotion",
     "ENT-CREDENTIAL promotion",
     "physical schema invention outside an admitted migration design",
+    "Evidence Registry PASS creation",
+    "Mapping 0 GREEN",
+    "AUTH-003 runtime handlers before post-migration schema evidence admission",
+    "re-executing MIG-AUTH-003-CREDENTIAL-V1",
+    "ENT-IDENTITY promotion",
+    "ENT-CREDENTIAL promotion",
     "Evidence Registry PASS creation",
     "Mapping 0 GREEN"
   ],
@@ -289,14 +310,25 @@
     "runId": "36295541846",
     "artifactId": "10923578328",
     "artifact": "auth-003-d1-readonly-schema-evidence-ce308e202ff737e236f3bf35f30097e9e4e3b42c",
-    "sourceSha": "ce308e202ff737e236f3bf35f30097e9e4e3b42c"
+    "sourceSha": "ce308e202ff737e236f3bf35f30097e9e4e3b42c",
+    "postMigrationPostcheck": {
+      "workflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
+      "sourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435",
+      "databaseName": "luckread",
+      "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+      "mode": "READONLY",
+      "status": "REQUIRED"
+    }
   },
   "decisionInput": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md",
     "document": "docs/decisions/2026-09-27-auth003-policy-and-task-edge-decision-input.md",
-    "status": "ADMITTED_SCHEMA_EVIDENCE / MIGRATION_ADMISSION_REQUIRED",
+    "status": "REMOTE_MIGRATION_EXECUTED / POSTCHECK_REQUIRED",
     "candidateTask": "T01",
     "proposedPolicyProfile": "MINIMAL_COST_FIRST",
-    "schemaEvidenceAdmission": "docs/change-control/CC-MAPPING-0-AUTH-003-D1-SCHEMA-EVIDENCE-ADMISSION-2026-09-27.md"
+    "schemaEvidenceAdmission": "docs/change-control/CC-MAPPING-0-AUTH-003-D1-SCHEMA-EVIDENCE-ADMISSION-2026-09-27.md",
+    "executionReconciliation": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
+    "executionRunId": "36296831559",
+    "executionSourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435"
   }
 }
