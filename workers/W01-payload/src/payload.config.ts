@@ -11,6 +11,7 @@ import { r2Storage } from '@payloadcms/storage-r2'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
+import { AuthRegistrationEnvelopes, Consents } from './collections/AuthRegistrationRecords'
 import { authSessionStateSchemaHook } from './db/auth-session-state-schema'
 
 const filename = fileURLToPath(import.meta.url)
@@ -63,7 +64,7 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [Users, Media],
+  collections: [Users, Media, AuthRegistrationEnvelopes, Consents],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
