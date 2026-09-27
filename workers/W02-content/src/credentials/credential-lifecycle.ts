@@ -148,15 +148,12 @@ export async function removeCredential(
   try {
     row = await db
       .prepare(
-        'SELECT c.id, c.identity_id, c.kind, c.value_hash, c.normalized_value, c.active, ' +
-          '(SELECT COUNT(*) FROM auth_credentials active_c ' +
-          'INNER JOIN auth_identities active_i ON active_i.id = active_c.identity_id ' +
-          'WHERE active_i.user_id = ? AND active_c.active = 1) AS active_credential_count ' +
+        'SELECT c.id, c.identity_id, c.kind, c.value_hash, c.normalized_value, c.active ' +
           'FROM auth_credentials c ' +
           'INNER JOIN auth_identities i ON i.id = c.identity_id ' +
           'WHERE c.id = ? AND i.user_id = ? LIMIT 1',
       )
-      .bind(input.actorUserId, input.credentialId, input.actorUserId)
+      .bind(input.credentialId, input.actorUserId)
       .first<CredentialRow>()
   } catch {
     throw new CredentialLifecycleError('UNAVAILABLE', 'credential service unavailable')
@@ -167,19 +164,23 @@ export async function removeCredential(
   }
   if (row.active !== 1) return
 
-  if ((row.active_credential_count ?? 0) <= 1) {
-    throw new CredentialLifecycleError('CONFLICT', 'credential could not be removed')
-  }
-
   try {
-    await db
+    const result = await db
       .prepare(
         'UPDATE auth_credentials SET active = 0, updated_at = ? ' +
-          'WHERE id = ? AND identity_id = ? AND active = 1',
+          'WHERE id = ? AND identity_id = ? AND active = 1 ' +
+          'AND (SELECT COUNT(*) FROM auth_credentials active_c ' +
+          'INNER JOIN auth_identities active_i ON active_i.id = active_c.identity_id ' +
+          'WHERE active_i.user_id = ? AND active_c.active = 1) > 1',
       )
-      .bind(input.now ?? new Date().toISOString(), row.id, row.identity_id)
+      .bind(input.now ?? new Date().toISOString(), row.id, row.identity_id, input.actorUserId)
       .run()
-  } catch {
+
+    if (result.meta?.changes !== undefined && result.meta.changes !== 1) {
+      throw new CredentialLifecycleError('CONFLICT', 'credential could not be removed')
+    }
+  } catch (error) {
+    if (error instanceof CredentialLifecycleError) throw error
     throw new CredentialLifecycleError('CONFLICT', 'credential could not be removed')
   }
 }
