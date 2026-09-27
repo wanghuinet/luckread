@@ -1,97 +1,62 @@
-# AUTH-003 Contractual Mapping Delta v1.0
+# AUTH-003 Contractual Mapping Delta v1.1
 
 ## Status
 
 `CONTRACTED_PARTIAL / NOT_GREEN`
 
-## Purpose
+## Current authority
 
-Record the newly closed contractual traceability for AUTH-003 without promoting runtime, persistence, test, or evidence state.
+AUTH-003 canonical operations are:
 
-## Canonical feature
+- `authCredentialList`
+- `authCredentialAdd`
+- `authCredentialReplace`
+- `authCredentialRemove`
 
-- Feature: `AUTH-003`
-- Name: username/email/phone credentials
-- Authority: `docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md`
+Canonical entities:
 
-## API operations
+- `ENT-IDENTITY` — governing identity-side authority, still PROPOSED.
+- `ENT-CREDENTIAL` — governing credential authority, still PROPOSED at catalog level pending final shared-entity promotion.
 
-- `authCredentialList` — `GET /auth/credentials`
-- `authCredentialAdd` — `POST /auth/credentials`
-- `authCredentialReplace` — `PUT /auth/credentials/{credentialId}`
-- `authCredentialRemove` — `DELETE /auth/credentials/{credentialId}`
+## Persistence mapping
 
-Canonical API contract: `contracts/api/AUTH-003-credential-management-contract.v1.json`
+The admitted physical persistence mapping is:
 
-## DTOs
+- `ENT-IDENTITY -> auth_identities`
+- `ENT-CREDENTIAL -> auth_credentials`
 
-- `DTO-AUTH-003-CREDENTIAL-LIST-RESPONSE`
-- `DTO-AUTH-003-CREDENTIAL-ADD-REQUEST`
-- `DTO-AUTH-003-CREDENTIAL-ADD-RESPONSE`
-- `DTO-AUTH-003-CREDENTIAL-REPLACE-REQUEST`
-- `DTO-AUTH-003-CREDENTIAL-REPLACE-RESPONSE`
-- `DTO-AUTH-003-CREDENTIAL-REMOVE-RESPONSE`
+All frozen credential fields are reconciled to concrete physical columns without inference. The authoritative credential uniqueness boundary is `(kind, normalized_value)`.
 
-## Entities
+Physical mapping evidence is now VERIFIED for the admitted AUTH-003 credential slice, using:
 
-- `ENT-IDENTITY` — proposed canonical authority; requires runtime/persistence evidence.
-- `ENT-CREDENTIAL` — proposed canonical authority; requires runtime/persistence evidence.
+- migration run `36296831559`
+- exact-SHA schema postcheck run `36298629648`
+- Add runtime run `36299334577`
+- List runtime run `36307891924`
+- Replace/Remove runtime run `36308120758`
 
-## Field contract
+## Entity disposition
 
-`contracts/entity/AUTH-003-credential-field-contract.v1.json`
+### ENT-CREDENTIAL
 
-The contract freezes the following field identities:
+Credential persistence/runtime implementation is evidenced for List/Add/Replace/Remove. Catalog promotion remains blocked because the entity points to `ENT-IDENTITY`, which has no independently evidenced production materialization/runtime ownership path.
 
-- `ENT-CREDENTIAL-F-ID`
-- `ENT-CREDENTIAL-F-IDENTITY-ID`
-- `ENT-CREDENTIAL-F-KIND`
-- `ENT-CREDENTIAL-F-VALUE-HASH`
-- `ENT-CREDENTIAL-F-NORMALIZED-VALUE`
-- `ENT-CREDENTIAL-F-VERIFIED-AT`
-- `ENT-CREDENTIAL-F-ACTIVE`
-- `ENT-CREDENTIAL-F-CREATED-AT`
-- `ENT-CREDENTIAL-F-UPDATED-AT`
+### ENT-IDENTITY
 
-## Deterministic normalization contract
+The physical schema is evidenced, but seeded `auth_identities` rows used by controlled runtime harnesses are prerequisites, not production lifecycle implementation evidence. Catalog status therefore remains PROPOSED.
 
-- username: trim → Unicode NFC → casefold.
-- email: trim → Unicode NFC → casefold; provider-specific transformations require a separate explicit contract and are not inferred.
-- phone: parse and validate as E.164.
+## Non-changes
 
-## Uniqueness contract
+- No API operationId change.
+- No DTO change.
+- No migration change.
+- No D1 schema change.
+- No Worker topology change.
+- No Payload native auth/recovery change.
+- No entity catalog promotion by dependency inference.
+- No Mapping 0 GREEN.
 
-Canonical persistence uniqueness is `(kind, normalizedValue)`.
-Concurrent claims of the same canonical credential must resolve to a single authoritative owner; conflict responses must not disclose protected account existence.
+## Next governed slice
 
-## Authorization contract
+Admit and implement the smallest ENT-IDENTITY materialization/runtime ownership slice against the already-established `auth_identities` persistence boundary, then produce exact-SHA evidence. Do not reopen AUTH-003 wire/API/DTO authority.
 
-All credential-management operations are self-scoped to the authenticated subject. Authorization must be evaluated before mutation. Cross-account management is denied.
-
-## Secret and projection rules
-
-Credential input values, normalized values and derived credential hashes are never returned in public projections and must not be logged.
-
-## Lifecycle
-
-Credential states are `ACTIVE`, `INACTIVE`, `RETIRED`. Replacement cannot make a new credential authoritative until validation and any required verification step succeeds. Removal must preserve an explicit safe recovery path when the credential is the account's only login method.
-
-## Current evidence disposition
-
-The following are now evidenced and admitted for the `authCredentialAdd` persistence/runtime slice:
-
-- D1-01 physical schema/migration evidence for `auth_identities` and `auth_credentials`.
-- Exact-SHA credential-add runtime evidence.
-- Normalization, persistence uniqueness, idempotent replay/conflict, cross-account denial, public projection and concurrency/security-negative checks.
-- Durable Evidence Registry entries `EVD-AUTH003-B15` through `EVD-AUTH003-B18`.
-
-These admissions do **not** make the full AUTH-003 lifecycle GREEN because List/Replace/Remove remain unverified and final Entity/Feature→Entity→Persistence/Mapping 0 promotion remains open.
-
-## Still blocking GREEN
-
-1. Full AUTH-003 lifecycle evidence for `authCredentialList`, `authCredentialReplace` and `authCredentialRemove`.
-2. Final field-by-field Entity/Feature→Entity→Persistence reconciliation and entity catalog promotion.
-3. Final Mapping 0/R4/Five-Way reconciliation; current global Mapping 0 remains NOT_GREEN.
-4. Any remaining lifecycle/security evidence required by the frozen contracts.
-
-`CONTRACTED_PARTIAL` remains the maximum valid overall feature state until those downstream gates close.
