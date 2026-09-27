@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "71168c77acc0be2889b2e36e2dccf6a525b43229",
+  "sourceHead": "8a79a49fd546842d4ad1f706e323510caa2962cd",
   "backupBranch": "backup/pre-auth003-policy-task-authority-admission-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
@@ -50,7 +50,7 @@
   "previousSourceHead": "1fec1cebb79243baba9f22e59e715b5e3335fabc",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
-    "result": "NO_AUTHORITY_FOUND_FOR_AUTH003_OPERATION_POLICY_BUDGETS",
+    "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
     "searchedSources": [
       "contracts/api/auth-operation-policy.v1.json",
       "docs/change-control/CC-MAPPING-0-AUTH-003-WIRE-PROJECTION-AUTHORITY-2026-09-26.md",
@@ -63,8 +63,8 @@
       "contracts/resource-budget/edge-first-worker-topology.json",
       "docs/04-WORKER-TOPOLOGY-CHANGE-CONTROL-v1.0.md"
     ],
-    "finding": "No AUTH-003-specific authoritative source supplies resource/cache/retry/event/queue/anti-abuse values. Neighbor-domain operation policies are reference-only and are not admitted as AUTH-003 authority.",
-    "decision": "KEEP_AUTH003_OPERATION_POLICY_FIELDS_BLOCKED",
+    "finding": "AUTH-003 operation-policy fields and task edge are now explicitly admitted by CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27. Historical neighbor-domain and superseded topology sources remain non-authoritative.",
+    "decision": "OPERATION_POLICY_AND_TASK_EDGE_CLOSED",
     "historicalResourceBudgetDisposition": "The edge-first-worker-topology resource defaults are explicitly historical and tied to the superseded W01-W13/P01-P08 topology. They are not current 12-Worker operation-policy authority and cannot be imported into AUTH-003."
   },
   "evidenceChannel": {
