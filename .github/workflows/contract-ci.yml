@@ -3,9 +3,9 @@ name: Contract CI
 on:
   push:
     branches: [main, 'contract/**']
-    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-admission-ci.yml']
+    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-ci.yml']
   pull_request:
-    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-admission-ci.yml']
+    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-ci.yml']
   workflow_dispatch:
     inputs:
       checkout_ref:

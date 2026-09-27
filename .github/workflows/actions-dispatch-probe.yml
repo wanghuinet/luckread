@@ -1,0 +1,17 @@
+name: Actions Dispatch Probe
+
+on:
+  push:
+    branches: ['diagnostic/**']
+    paths: ['.github/workflows/actions-dispatch-probe.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Actions Dispatcher Probe
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe
+        run: echo "ACTIONS_DISPATCH_PROBE_OK"
