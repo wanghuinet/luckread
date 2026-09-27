@@ -33,7 +33,9 @@
     "auth001IdempotencySemantics": true,
     "auth001RegistrationWriterBoundary": true,
     "auth001NativeEmailEntry": true,
-    "auth001Auth013InitialPersistence": true
+    "auth001Auth013InitialPersistence": true,
+    "auth003ListRuntime": "36307891924",
+    "auth003ReplaceRemoveLifecycleRuntime": "36308120758"
   },
   "historicalOnlyCursors": [
     "M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001 / WAIT_AUTHORITY_DECISION",
