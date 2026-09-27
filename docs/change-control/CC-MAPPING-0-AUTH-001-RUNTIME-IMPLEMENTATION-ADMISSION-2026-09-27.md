@@ -115,6 +115,12 @@ Development/integration implementation may proceed only when both conditions are
 
 The development policy is deterministic and server-controlled, but it is **not** a production legal/compliance authority.
 
+## Contract CI registration repair
+
+The canonical Contract CI execution gate remains unchanged. The workflow file was re-registered under `.github/workflows/contract-admission-ci.yml` after run `36354470138` created a failed workflow run with zero jobs. No Contract rule, admission criterion, or runtime evidence was changed by this repair.
+
+The new workflow path is included in its own event path filters so the registration can receive normal push/pull-request execution. A successful Contract CI run remains required before AUTH-001 runtime evidence admission.
+
 ## Production gate
 
 Production implementation, production deployment and Evidence Registry promotion remain blocked until a real production `ACCOUNT_REGISTRATION / LEGAL_AUDIT` policy instance is admitted with the required legal/compliance authority and approval evidence.
