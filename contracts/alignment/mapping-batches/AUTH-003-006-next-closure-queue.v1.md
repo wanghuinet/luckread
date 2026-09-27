@@ -138,3 +138,30 @@ Current blockers:
 - No Evidence Registry promotion or Mapping 0 GREEN promotion is permitted.
 
 This continuation override does not reopen AUTH-003 wire/OpenAPI/DTO work and does not authorize implementation by inference.
+
+
+## 2026-09-27 — Superseding continuation after wire/API/DTO reconciliation
+
+The prior runtime-persistence continuation is preserved as historical traceability. It is superseded for current execution because the following inputs are now closed:
+
+- operation-policy/task authority = PASS_VERIFIED;
+- AUTH-003 physical D1 mapping = evidenced for the admitted credential-add slice;
+- AUTH-003 OpenAPI/DTO wire schema = encoded and API Contract CI validated;
+- canonical AUTH-003 DTO bindings exist in `contracts/dto/auth-dto-contract.v1.json` and `contracts/dto/auth-dto-records.v1.json`;
+- credential-add runtime/security/concurrency evidence is admitted and VERIFIED.
+
+Current authoritative continuation:
+
+`AUTH-003 runtime lifecycle closure`
+
+State:
+
+`BLOCKED — CREDENTIAL-LIST RUNTIME/EVIDENCE REQUIRED`
+
+Current blockers:
+
+- `authCredentialList`, `authCredentialReplace`, and `authCredentialRemove` runtime/evidence are not yet admitted;
+- ENT-IDENTITY and ENT-CREDENTIAL catalog promotion remains blocked until full lifecycle reconciliation;
+- Mapping 0 / Five-Way remains globally NOT_GREEN.
+
+No wire-schema reopening, migration rerun, D1 mutation, or Mapping 0 GREEN promotion is authorized by this continuation.
