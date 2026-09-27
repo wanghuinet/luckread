@@ -2,7 +2,7 @@
 
 ## Status
 
-`GOVERNANCE_GUARD_ADDED / POLICY_INSTANCE_UNCHANGED`
+`GOVERNANCE_GUARD_ADDED / POLICY_INSTANCE_UNCHANGED / PROVENANCE_RECONCILED`
 
 ## Scope
 
@@ -45,8 +45,12 @@ The guard validates only structural/admission properties already required by the
 - exactly one deterministic rule mode;
 - DURATION requires `durationSeconds` and forbids `fixedUntil`;
 - FIXED_UNTIL requires `fixedUntil` and forbids `durationSeconds`;
-- current-commit provenance contains an exact 40-hex commit SHA and source path;
+- repository commit provenance contains an exact 40-hex commit SHA and canonical source path;
+- the provenance commit is the commit that last changed the canonical policy-instance artifact;
+- the provenance commit is an ancestor of the checked-out current HEAD;
 - packet admission must not remain `INPUT_REQUIRED` when a concrete approved instance is present.
+
+The provenance check intentionally does **not** require the policy-instance artifact to contain the self-referential SHA of the commit that contains that same artifact. See `CC-MAPPING-0-PRIV-004-PROVENANCE-RECONCILIATION-2026-09-27.md`.
 
 The guard does not:
 
