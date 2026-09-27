@@ -1,9 +1,9 @@
 {
   "version": "1.0.0",
   "controlId": "CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27",
-  "sourceHead": "5aa2e7c087b3276976995a5ad9b064ad60f08199",
+  "sourceHead": "f1853d3ee29f6f0cf84e8991096be062ea56c98b",
   "backupBranch": "backup/pre-auth003-credential-normalized-uniqueness-conflict-20260927",
-  "status": "SCHEMA_EVIDENCE_ADMITTED / REMOTE_MIGRATION_EXECUTED / POSTCHECK_VERIFIED / RUNTIME_SECURITY_VERIFIED / CONTRACT_SEMANTICS_BLOCKED",
+  "status": "SCHEMA_EVIDENCE_ADMITTED / REMOTE_MIGRATION_EXECUTED / POSTCHECK_VERIFIED / RUNTIME_SECURITY_VERIFIED / ENTITY_EVIDENCE_BOUND / MAPPING0_RECONCILIATION_REQUIRED",
   "scope": "AUTH-003 credential-management runtime/persistence admission",
   "establishedInputs": {
     "operations": [
@@ -254,22 +254,17 @@
     "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md"
   ],
   "currentFindings": [
-    "Remote AUTH-003 migration execution and read-only post-migration schema evidence remain admitted and unchanged.",
-    "The smallest AUTH-003 credential-add persistence/security/runtime slice is merged on main at exact source SHA 419bb7fd887af0c30412bead50f8196ec6446bb7.",
-    "Controlled remote runtime evidence run 36299334577 executed against that exact source SHA and D1-01 luckread; unit and runtime jobs both passed.",
-    "Runtime/security checks passed for normalization/uniqueness, deterministic idempotency/replay, idempotency conflict, cross-account denial, public projection, concurrency one-winner semantics and fixture cleanup.",
-    "Production Worker deployment was false; evidence harness was ephemeral and controlled.",
-    "Physical field-to-column alignment is observed for ENT-IDENTITY and ENT-CREDENTIAL from the admitted migration and remote schema evidence.",
-    "AUTH-003 contractual mapping delta defines canonical persistence uniqueness as (kind, normalizedValue).",
-    "AUTH-003 credential field contract currently declares ENT-CREDENTIAL-F-NORMALIZED-VALUE unique=true without expressing the composite key semantics.",
-    "The executed migration and runtime evidence implement/prove composite uniqueness, not global normalizedValue uniqueness across credential kinds.",
-    "This is a contract-semantics conflict and must remain BLOCKED pending authoritative decision. No implementation or migration change is authorized from this observation."
+    "Physical schema and runtime evidence are admitted and bound to ENT-IDENTITY / ENT-CREDENTIAL without changing implementation.",
+    "Entity implementation evidence registry now records concrete implementation, schema, migration and extension evidence while keeping both entities PROPOSED/BLOCKED.",
+    "AUTH-003 composite uniqueness semantics are reconciled: normalizedValue is not globally unique; (kind, normalizedValue) is the persistence boundary.",
+    "Runtime evidence remains bound to exact tested source SHA 419bb7fd887af0c30412bead50f8196ec6446bb7; current main is f1853d3ee29f6f0cf84e8991096be062ea56c98b.",
+    "The next gate is final Feature→Entity→Persistence registry reconciliation and Mapping 0 decision material; no entity or Mapping 0 GREEN promotion is authorized yet."
   ],
   "nextAdmissibleSequence": [
-    "Record the authoritative decision for ENT-CREDENTIAL-F-NORMALIZED-VALUE uniqueness semantics.",
-    "If the contract semantics are reconciled without schema change, update only the governing contract/mapping evidence as authorized.",
-    "Re-run only the specific contract/mapping validator required by that decision; do not rerun remote runtime/schema evidence unless the authoritative decision changes the persisted behavior.",
-    "Only after the contract conflict is closed may ENT-IDENTITY / ENT-CREDENTIAL promotion and Mapping 0 decision material proceed."
+    "Validate entity-implementation evidence registry at current main.",
+    "Add/refresh AUTH-003 Feature→Entity→Persistence registry record as BLOCKED with exact evidence references.",
+    "Reconcile AUTH-003 entity/field/persistence/runtime evidence into final Mapping 0 decision material.",
+    "Only then consider catalog promotion; Mapping 0 GREEN remains a separate global gate."
   ],
   "forbiddenUntilInputs": [
     "re-executing MIG-AUTH-003-CREDENTIAL-V1",
