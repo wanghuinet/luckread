@@ -24,6 +24,14 @@ Canonical API operation established by current repository contracts: `authRegist
 10. W01 contains a migration source artifact, but repository evidence does **not** establish a controlled-D1 execution result or a complete current W01 field mapping for the canonical ENT-USER contract. Therefore no D1 persistence or six-field implementation claim is made.
 11. Repository search does **not** establish a concrete runtime handler bound to `authRegister`. Therefore no handler/runtime claim is made.
 
+## Resolved authority subset
+
+The B01 foundation contract establishes that **User ID is immutable and authoritative across all domains**. Therefore the AUTH-001 identity/entity mapping has one closed subset:
+
+- `ENT-USER.id -> ENT-IDENTITY.userId -> auth_identities.user_id`
+
+This closes the User-ID source question only. It does not resolve the remaining registration identity/credential field mappings for `identityType`, `identity`, `credential`, optional `username`, consent, normalization/versioning, or account-state persistence.
+
 ## Evidence-supported links
 
 The following links can now be retained as evidence-backed contract mappings:
@@ -39,7 +47,7 @@ The following links can now be retained as evidence-backed contract mappings:
 
 ## Required links that remain unresolved
 
-- AUTH-001 request field -> entity/identity/credential mapping for `identityType`, `identity`, `credential`, optional `username`, and `consent`.
+- AUTH-001 request field -> entity/identity/credential mapping for `identityType`, `identity`, `credential`, optional `username`, and `consent` (User-ID authority is separately resolved as `ENT-USER.id -> ENT-IDENTITY.userId`).
 - Account lifecycle persistence for `accountState=PENDING_VERIFICATION`.
 - Concrete authoritative D1 table/column/constraint mapping.
 - Migration identifier/path and successful execution evidence.
@@ -63,4 +71,4 @@ Required chain:
 
 ## Next closure action
 
-The next admissible step is to establish the canonical registration implementation boundary and the authoritative persistence contract. Only after real handler/migration evidence exists should Mapping 0 be regenerated and evaluated by the fail-closed validator.
+The next admissible step is to establish the canonical registration implementation boundary and the authoritative persistence contract for the remaining registration identity/credential fields. Do not reopen the now-closed User-ID authority question. Only after real handler/migration evidence exists should Mapping 0 be regenerated and evaluated by the fail-closed validator.
