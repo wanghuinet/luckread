@@ -2,11 +2,21 @@
 
 ## Status
 
-`POLICY_AUTHORITY_CONTRACT_RECONCILED / POLICY_INSTANCE_INPUT_REQUIRED`
+`GOVERNANCE_BASELINE_RECONCILED / POLICY_INSTANCE_INPUT_REQUIRED`
 
 ## Purpose
 
 将 PRIV-004 剩余阻塞从抽象“缺少实例”转化为一个可审计、可直接提交批准输入的最小准入包。
+
+## Governance baseline now admitted
+
+The pre-launch privacy/data-retention governance baseline is now present on `main`:
+
+- `docs/176-PRIVACY-DATA-RETENTION-POLICY-v0.1.md`
+- `docs/change-control/CC-MAPPING-0-PRIVACY-DATA-RETENTION-POLICY-BASELINE-2026-09-27.md`
+- admitted main merge: `e5d1dea7531791892831d7c3f6c00e1cf8474fac`
+
+This baseline supplies governance structure only. It does not provide a concrete retention duration, fixed-until date, jurisdiction-specific rule, or approved policy instance.
 
 ## Current authoritative contract
 
@@ -81,6 +91,6 @@ A repository-only authority search was performed before runtime implementation w
 - Mapping 0 privacy reconciliation batch
 - repository-wide searches for ACCOUNT_REGISTRATION, LEGAL_AUDIT, retentionUntil, policyVersion, approval, and policy-instance records
 
-Result: no existing approved/active concrete PRIV-004 policy instance was found in the repository.
+Result: no approved/active concrete PRIV-004 policy instance was found in the repository. The newly admitted Privacy / Data Retention Policy v0.1 is a governance baseline and is explicitly not treated as a concrete policy instance.
 
 This is an authority-discovery checkpoint only. It does not authorize a retention duration, fixed-until date, jurisdiction-specific rule, or runtime behavior. Repeating the same repository-only search without a new authoritative source is not a new implementation gate.
