@@ -32,3 +32,8 @@ The next gate is therefore encoding this already-authorized wire decision into t
 `M0-AUTH-003-WIRE-SCHEMA-ENCODING-001`
 
 No public endpoint activation, production deployment, or Mapping 0 GREEN is implied by this cursor update.
+## R4 registry boundary correction
+
+The canonical Feature→Entity→Persistence registry only admits `VERIFIED` records under its current fail-closed checker. AUTH-003 therefore remains represented by the Entity Implementation Evidence and Evidence Registry layers while its Feature→Entity→Persistence promotion remains absent, rather than inserting a `BLOCKED` registry row.
+
+The already-admitted AUTH-003 Evidence Registry records B15–B18 now use `INHERITED_UNCHANGED_SCOPE` with explicit inheritance references; their original tested commit SHAs, artifacts and results are unchanged.
