@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "26ab8e73f21feb4f70b40fd4ffe55041973354e0",
-  "backupBranch": "backup/pre-auth003-batch-20260927",
+  "sourceHead": "ce47f97ebacc1341363c81b7a266d6638e5db5cf",
+  "backupBranch": "backup/pre-auth003-cursor-post-lifecycle-merge-20260927",
   "currentCursor": {
     "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
     "state": "BLOCKED_AUTH003_RUNTIME_LIFECYCLE_AND_ENTITY_PROMOTION",
@@ -153,9 +153,9 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Main advanced through AUTH-003 list TypeScript/harness diagnostic fixes; refresh cursor freshness only. No runtime evidence result, wire contract, D1 schema, entity promotion, or GREEN state is changed by this reconciliation.",
-    "previousCursorSourceHead": "da8d34fe05f1a006bd6b4be95119eff21ba4f29b",
-    "currentMainSha": "26ab8e73f21feb4f70b40fd4ffe55041973354e0",
+    "reason": "Main advanced through the governed AUTH-003 Replace/Remove implementation admission and lifecycle slice merge; refresh cursor freshness only. Runtime Evidence remains required and no Evidence Registry, Entity promotion, or Mapping 0 GREEN state is changed.",
+    "previousCursorSourceHead": "26ab8e73f21feb4f70b40fd4ffe55041973354e0",
+    "currentMainSha": "ce47f97ebacc1341363c81b7a266d6638e5db5cf",
     "remoteMigrationReexecution": "FORBIDDEN",
     "schemaPostcheckRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "runtimeEvidenceStatus": "ADMITTED_PASS_VERIFIED",
