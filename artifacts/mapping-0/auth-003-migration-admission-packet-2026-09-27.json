@@ -50,13 +50,15 @@
   },
   "indexPlan": {
     "auth_identities": [
-      "username_normalized",
-      "email_normalized",
-      "phone_normalized"
+      "UNIQUE user_id (index provided by constraint)",
+      "UNIQUE username_normalized (index provided by constraint)",
+      "UNIQUE email_normalized (index provided by constraint)",
+      "UNIQUE phone_normalized (index provided by constraint)"
     ],
     "auth_credentials": [
+      "UNIQUE value_hash (index provided by constraint)",
+      "UNIQUE kind + normalized_value",
       "identity_id",
-      "kind",
       "verified_at",
       "active",
       "created_at",
@@ -80,9 +82,10 @@
     "entitiesPromoted": false,
     "mapping0Green": false,
     "migrationWorkflow": ".github/workflows/w02-auth-003-migration-evidence.yml",
-    "nextRequiredRun": "manual workflow_dispatch with confirm=MIGRATE"
+    "nextRequiredRun": "manual workflow_dispatch with confirm=MIGRATE",
+    "workflowHardened": true
   },
-  "sourceHead": "4e4a2302c25c316a27545643f0f31eeeb09582a0",
+  "sourceHead": "2c222fdea5fb4f287069c0833a96226265a7f7fa",
   "localValidation": {
     "artifact": "artifacts/mapping-0/auth-003-migration-design-local-validation-2026-09-27.json",
     "status": "PASS_LOCAL_DESIGN_ONLY",
