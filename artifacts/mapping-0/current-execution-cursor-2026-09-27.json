@@ -49,9 +49,12 @@
       "contracts/api/user-account-operation-policy.v1.json",
       "contracts/api/feed-operation-policy.v1.json",
       "contracts/api/interaction-operation-policy.v1.json",
-      "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md"
+      "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md",
+      "contracts/resource-budget/edge-first-worker-topology.json",
+      "docs/04-WORKER-TOPOLOGY-CHANGE-CONTROL-v1.0.md"
     ],
     "finding": "No AUTH-003-specific authoritative source supplies resource/cache/retry/event/queue/anti-abuse values. Neighbor-domain operation policies are reference-only and are not admitted as AUTH-003 authority.",
-    "decision": "KEEP_AUTH003_OPERATION_POLICY_FIELDS_BLOCKED"
+    "decision": "KEEP_AUTH003_OPERATION_POLICY_FIELDS_BLOCKED",
+    "historicalResourceBudgetDisposition": "The edge-first-worker-topology resource defaults are explicitly historical and tied to the superseded W01-W13/P01-P08 topology. They are not current 12-Worker operation-policy authority and cannot be imported into AUTH-003."
   }
 }
