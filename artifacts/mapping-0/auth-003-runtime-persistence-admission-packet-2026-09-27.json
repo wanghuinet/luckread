@@ -1,9 +1,9 @@
 {
   "version": "1.0.0",
   "controlId": "CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27",
-  "sourceHead": "419bb7fd887af0c30412bead50f8196ec6446bb7",
-  "backupBranch": "backup/pre-auth003-current-sha-cursor-sync-20260927",
-  "status": "SCHEMA_EVIDENCE_ADMITTED / REMOTE_MIGRATION_EXECUTED / POSTCHECK_VERIFIED / RUNTIME_SECURITY_REQUIRED",
+  "sourceHead": "5dff85d47578eb1dcaa57a53b0a072dfe2a80d88",
+  "backupBranch": "backup/pre-auth003-runtime-evidence-admission-20260927",
+  "status": "SCHEMA_EVIDENCE_ADMITTED / REMOTE_MIGRATION_EXECUTED / POSTCHECK_VERIFIED / RUNTIME_SECURITY_VERIFIED / ENTITY_MAPPING_RECONCILIATION_REQUIRED",
   "scope": "AUTH-003 credential-management runtime/persistence admission",
   "establishedInputs": {
     "operations": [
@@ -254,30 +254,27 @@
     "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md"
   ],
   "currentFindings": [
-    "AUTH-003 remote migration 36296831559 was already executed at exact source SHA 52c6868f99ae2ec9aeb8bdceb4a18396cde20435; do not re-execute.",
-    "Read-only post-migration evidence run 36298629648 is PASS_VERIFIED and its table-scoped auth_credentials foreign_key_check was empty; do not rerun unchanged.",
-    "The admitted physical AUTH-003 schema is the input for runtime evidence; no new schema invention is permitted.",
-    "The smallest AUTH-003 credential-add persistence/security/runtime slice is merged on authoritative main at exact implementation SHA 419bb7fd887af0c30412bead50f8196ec6446bb7.",
-    "The merged slice includes normalization, persistence uniqueness boundary, deterministic idempotency/replay, self-authorization denial and public projection checks.",
-    "Unit evidence previously failed only because the normalization fixture used literal escape text; the fixture-only correction is merged at the current SHA. Controlled remote runtime evidence is still pending.",
-    "Runtime evidence must execute against the exact current main SHA and D1-01 luckread target; production Worker deployment remains false.",
-    "ENT-IDENTITY and ENT-CREDENTIAL must not be promoted and Mapping 0 must not be marked GREEN until runtime/security evidence is admitted."
+    "Remote AUTH-003 migration execution and read-only post-migration schema evidence remain admitted and unchanged.",
+    "The smallest AUTH-003 credential-add persistence/security/runtime slice is merged on main at exact source SHA 419bb7fd887af0c30412bead50f8196ec6446bb7.",
+    "Controlled remote runtime evidence run 36299334577 executed against that exact source SHA and D1-01 luckread; unit and runtime jobs both passed.",
+    "Runtime/security checks passed for normalization/uniqueness, deterministic idempotency/replay, idempotency conflict, cross-account denial, public projection, concurrency one-winner semantics and fixture cleanup.",
+    "Production Worker deployment was false; evidence harness was ephemeral and controlled.",
+    "ENT-IDENTITY and ENT-CREDENTIAL promotion remains a separate reconciliation/decision gate; runtime PASS does not itself promote entities or Mapping 0 GREEN."
   ],
   "nextAdmissibleSequence": [
-    "Execute .github/workflows/w02-auth-003-credential-add-runtime-evidence.yml with source_sha=419bb7fd887af0c30412bead50f8196ec6446bb7, database_name=luckread, confirm=RUN.",
-    "Verify same-SHA controlled remote runtime PASS, including normalization/uniqueness, idempotency replay/conflict, cross-account denial, public projection, concurrency winner/loser and cleanup.",
-    "Register the resulting runtime/security evidence with exact run/artifact/source provenance.",
-    "Only after runtime/security evidence admission reconsider AUTH-003 entity/Mapping 0 promotion."
+    "Register the exact runtime/security evidence under the canonical Evidence Registry with run/artifact/source provenance.",
+    "Reconcile the admitted physical schema plus runtime behavior against the frozen ENT-IDENTITY / ENT-CREDENTIAL field/ownership contract.",
+    "Prepare explicit decision material for entity promotion and Mapping 0 status; do not infer additional schema or transport.",
+    "Only after the entity/mapping gate is independently satisfied may a later control admit further feature work."
   ],
   "forbiddenUntilInputs": [
     "re-executing MIG-AUTH-003-CREDENTIAL-V1",
-    "re-running unchanged PASS_VERIFIED schema postcheck 36298629648",
-    "physical schema invention outside the admitted migration design",
-    "production Worker deployment for this evidence slice",
-    "ENT-IDENTITY promotion",
-    "ENT-CREDENTIAL promotion",
-    "Evidence Registry PASS creation without the actual runtime artifact",
-    "Mapping 0 GREEN"
+    "rerunning unchanged PASS_VERIFIED schema postcheck 36298629648",
+    "inventing additional physical schema or transport",
+    "ENT-IDENTITY promotion without reconciliation",
+    "ENT-CREDENTIAL promotion without reconciliation",
+    "Mapping 0 GREEN promotion",
+    "production Worker deployment as a substitute for this controlled evidence"
   ],
   "logicalOwnership": {
     "worker": "W02",
@@ -304,7 +301,7 @@
     "currentShaDeploymentEvidence": "REQUIRED_FOR_AUTH003",
     "schemaEvidence": "REQUIRED"
   },
-  "previousSourceHead": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
+  "previousSourceHead": "419bb7fd887af0c30412bead50f8196ec6446bb7",
   "evidenceChannel": {
     "workflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
     "mode": "READONLY",
@@ -361,5 +358,21 @@
     "implementationStatus": "MERGED_TO_MAIN_RUNTIME_EVIDENCE_PENDING",
     "runtimeWorkflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
     "runtimeEvidenceStatus": "PENDING"
+  },
+  "runtimeEvidence": {
+    "workflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
+    "runId": "36299334577",
+    "sourceSha": "5dff85d47578eb1dcaa57a53b0a072dfe2a80d88",
+    "databaseName": "luckread",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "artifactId": "10924573167",
+    "artifactSha256": "5ee09ed921ec8d1c1805e2db20c73a54a6be6c37a6a0ca4ddb3bf29f7ce353b5",
+    "status": "PASS_VERIFIED",
+    "productionWorkerDeployed": false,
+    "admittedClaims": [
+      "AUTH-003::RUNTIME_PERSISTENCE",
+      "AUTH-003::SECURITY_NEGATIVE",
+      "AUTH-003::CONCURRENCY"
+    ]
   }
 }
