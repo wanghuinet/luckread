@@ -21,7 +21,9 @@ AUTH-001 has admitted:
 
 `ENT-CONSENT.retentionUntil` is contractually required and must be server-calculated from the applicable lifecycle retention policy. Current authoritative sources define the lifecycle semantics but do not admit a concrete PRIV-004 policy authority/approved policy instance. Therefore runtime implementation is fail-closed until PRIV-004 is admitted. No retention duration is invented in AUTH-001.
 
-See `docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-GAP-2026-09-27.md`.
+See `docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md` and `docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-GAP-2026-09-27.md`.
+
+The 2026-09-27 repository authority-discovery checkpoint records that no approved/active concrete PRIV-004 policy instance currently exists in the repository. Repeating the same repository-only search is not a new gate.
 
 ## Smallest runtime slice
 
@@ -108,7 +110,7 @@ No documentation-only run may promote AUTH-001 GREEN.
 
 Implementation may start only after both of these conditions are true:
 
-1. PRIV-004 admits an authoritative server-side retention policy input sufficient to calculate `ENT-CONSENT.retentionUntil`.
+1. PRIV-004 admits the first approved/active `ACCOUNT_REGISTRATION / LEGAL_AUDIT` policy instance, with version, scope, effective period, deterministic rule, approval and provenance evidence, sufficient to calculate `ENT-CONSENT.retentionUntil`.
 2. The current Contract CI / API contract checks for the admitted contract change pass.
 
 Runtime evidence remains a separate promotion gate.
