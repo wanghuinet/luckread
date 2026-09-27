@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "c96b39569c7505ade615b15e63d87f5afb8066cc",
+  "sourceHead": "24099c9a3fc5c60eb09cb4c3c96f028e511b1376",
   "backupBranch": "backup/pre-auth003-lifecycle-evidence-admission-20260927",
   "currentCursor": {
     "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
@@ -153,9 +153,9 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "AUTH-003 List and Replace/Remove controlled remote runtime evidence is now admitted; cursor is refreshed to the current main tested source and advances only to entity reconciliation. No runtime rerun or Mapping 0 GREEN inference is made.",
-    "previousCursorSourceHead": "ce47f97ebacc1341363c81b7a266d6638e5db5cf",
-    "currentMainSha": "c96b39569c7505ade615b15e63d87f5afb8066cc",
+    "reason": "Main advanced only through AUTH-003 evidence admission documentation; cursor freshness is reconciled to the current main without changing runtime evidence or reopening any closed gate.",
+    "previousCursorSourceHead": "c96b39569c7505ade615b15e63d87f5afb8066cc",
+    "currentMainSha": "24099c9a3fc5c60eb09cb4c3c96f028e511b1376",
     "remoteMigrationReexecution": "FORBIDDEN",
     "schemaPostcheckRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "runtimeEvidenceStatus": "AUTH003_LIST_AND_LIFECYCLE_PASS_VERIFIED",
