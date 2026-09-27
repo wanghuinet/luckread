@@ -147,3 +147,20 @@ The previously identified registration writer-boundary gap is now narrowed by th
 The remaining blocker is not transport availability. It is the lack of an admitted atomic persistence contract spanning Payload-native User creation in W01 and ENT-IDENTITY / ENT-CREDENTIAL persistence in W02/D1-01 under AUTH-001 `d1WriteMax=1`. No cross-worker transaction or compensating write sequence is inferred.
 
 Authoritative control: `docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-TRANSPORT-AND-ATOMICITY-2026-09-27.md`.
+
+
+## 2026-09-27 evidence-bound correction — phone source persistence
+
+The earlier registration field table established the **semantic destination** of `identityType=phone` as the phone branch of ENT-IDENTITY and the corresponding AUTH-003 credential kind. That semantic mapping does **not** by itself prove that the submitted phone value has an authoritative durable source in the current registration writer.
+
+Current active W01 `workers/W01-payload/src/collections/Users.ts` declares `username`, `displayName`, `bio`, `avatar`, `locale`, and `timezone`, in addition to Payload's native auth-managed fields. It does not declare a phone field. Therefore the current repository does not establish a durable registration source from which a later W02 identity materializer could recover a phone registration after a delivery failure.
+
+Disposition correction:
+
+- `identityType=email`: semantic destination is established, but runtime/persistence implementation remains unverified.
+- `identityType=phone`: semantic destination is established; **durable source persistence is BLOCKED**.
+- `username`: semantic destination is established; current Payload User source exists, but synchronization into ENT-IDENTITY/ENT-CREDENTIAL remains unimplemented.
+
+No phone value may be hidden in `username`, consent, or another unrelated User field by inference. No new field or migration is authorized by this correction.
+
+This correction narrows the eventual-consistency decision: before any asynchronous identity materialization can be admitted, the authority for durable registration identity input must explicitly cover the phone branch as well as its replay/recovery semantics.
