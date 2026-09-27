@@ -105,6 +105,9 @@
         "contracts/api/AUTH-003-credential-management-contract.v1.json",
         "contracts/dto/auth-dto-contract.v1.json",
         "contracts/dto/auth-dto-records.v1.json",
+        "contracts/entity/AUTH-002-006-canonical-field-authority.v1.json",
+        "contracts/entity/AUTH-003-credential-field-contract.v1.json",
+        "contracts/entity/AUTH-003-identity-field-contract.v1.json",
         "contracts/entity/entity-implementation-evidence.v1.json",
         "contracts/evidence/mapping-0-evidence-registry.v1.json",
         "docs/change-control/CC-MAPPING-0-AUTH-003-LIFECYCLE-EVIDENCE-ADMISSION-2026-09-27.md",
@@ -113,10 +116,7 @@
         "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
         "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
         "workers/W02-content/migrations/0004_auth_003_credentials.sql",
-        "workers/W02-content/src/credentials/credential-add.ts",
-        "contracts/entity/AUTH-002-006-canonical-field-authority.v1.json",
-        "contracts/entity/AUTH-003-identity-field-contract.v1.json",
-        "contracts/entity/AUTH-003-credential-field-contract.v1.json"
+        "workers/W02-content/src/credentials/credential-add.ts"
       ],
       "blockers": [
         "Final AUTH-003 entity/field reconciliation and Entity promotion remain open; Mapping 0 / Five-Way remains globally NOT_GREEN.",
@@ -5506,11 +5506,11 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
         "contracts/alignment/mapping-batches/PRIV-001-008-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/privacy/PRIV-004-retention-policy-authority.v1.json",
-        "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md",
-        "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md"
       ],
       "blockers": [
         "Approved production policy instance for ACCOUNT_REGISTRATION / LEGAL_AUDIT is not yet admitted.",
