@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "62005334267f3db3237ad42774c3a5ca984615cb",
-  "backupBranch": "backup/pre-current-cursor-head-correction-20260927",
+  "sourceHead": "2b1367368c24569a4e65598cef4e4639cf937e6f",
+  "backupBranch": "backup/pre-auth003-current-cursor-freshness-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
     "state": "BLOCKED_RUNTIME_PERSISTENCE_IMPLEMENTATION_ADMISSION_REQUIRED",
@@ -37,5 +37,21 @@
     "Do not promote ENT-IDENTITY or ENT-CREDENTIAL.",
     "Do not promote Mapping 0 GREEN or Evidence Registry status from documentation-only changes."
   ],
-  "previousSourceHead": "d8915eab213070c45ae858f2d409a3679065a6c1"
+  "previousSourceHead": "62005334267f3db3237ad42774c3a5ca984615cb",
+  "authorityDiscovery": {
+    "reviewedAt": "2026-09-27",
+    "result": "NO_AUTHORITY_FOUND_FOR_AUTH003_OPERATION_POLICY_BUDGETS",
+    "searchedSources": [
+      "contracts/api/auth-operation-policy.v1.json",
+      "docs/change-control/CC-MAPPING-0-AUTH-003-WIRE-PROJECTION-AUTHORITY-2026-09-26.md",
+      "docs/21-P0-PUBLIC-API-INVENTORY-AND-COMPLETENESS-CONTRACT-v1.0.md",
+      "docs/23-P0-API-INVENTORY-RECONCILIATION-CONTRACT-v1.0.md",
+      "contracts/api/user-account-operation-policy.v1.json",
+      "contracts/api/feed-operation-policy.v1.json",
+      "contracts/api/interaction-operation-policy.v1.json",
+      "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md"
+    ],
+    "finding": "No AUTH-003-specific authoritative source supplies resource/cache/retry/event/queue/anti-abuse values. Neighbor-domain operation policies are reference-only and are not admitted as AUTH-003 authority.",
+    "decision": "KEEP_AUTH003_OPERATION_POLICY_FIELDS_BLOCKED"
+  }
 }
