@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "e52d43b8ce0a222cb1a41c1a2c0cd89457f0bcdb",
+  "sourceHead": "dca55b20f8bb2ee8c759b5d4fb761c677ee3fbac",
   "backupBranch": "backup/pre-auth003-policy-task-authority-admission-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
-    "state": "BLOCKED_MIGRATION_ADMISSION_REQUIRED",
-    "objective": "Use admitted remote D1-01 schema evidence to prepare and admit the smallest AUTH-003 credential persistence migration before runtime implementation.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27.md",
+    "state": "BLOCKED_REMOTE_MIGRATION_EVIDENCE_REQUIRED",
+    "objective": "Execute and admit the already-authorized MIG-AUTH-003-CREDENTIAL-V1 schema migration against D1-01, then advance to the smallest same-SHA AUTH-003 persistence/runtime slice.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-MIGRATION-ADMISSION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-003 MIG-AUTH-003-CREDENTIAL-V1 migration admission -> migration execution + smallest runtime/persistence vertical slice",
+    "nextGate": "AUTH-003 migration evidence admission -> same-SHA persistence/security/runtime vertical slice",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED"
@@ -47,7 +47,7 @@
     "Treat luckread-w02 and D1-01 target UUID 2f80471e-... as explicit authority inputs; do not reinterpret or reassign the target. Physical target identity is closed; current-SHA deployment correctness remains a separate gate.",
     "Do not inherit AUTH-003 runtime correctness from earlier W02 deployment evidence; same-SHA evidence is required."
   ],
-  "previousSourceHead": "ce308e202ff737e236f3bf35f30097e9e4e3b42c",
+  "previousSourceHead": "c8df41d734dae4f57426c4b3a558c842da96beb3",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
@@ -82,7 +82,9 @@
     "runId": "36295541846",
     "artifactId": "10923578328",
     "sourceSha": "ce308e202ff737e236f3bf35f30097e9e4e3b42c",
-    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64"
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "migrationDesign": "ADMITTED_NOT_EXECUTED",
+    "migrationWorkflow": ".github/workflows/w02-auth-003-migration-evidence.yml"
   },
   "decisionInput": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md",
@@ -91,7 +93,9 @@
     "operationPolicyStatus": "CLOSED_AUTHORITY_ADMITTED",
     "sourceHead": "f7aaf97871657f4e579e42415968a20b60d1ff5e",
     "schemaEvidenceAdmission": "docs/change-control/CC-MAPPING-0-AUTH-003-D1-SCHEMA-EVIDENCE-ADMISSION-2026-09-27.md",
-    "schemaEvidenceStatus": "PASS_VERIFIED_EVIDENCE_CAPTURE"
+    "schemaEvidenceStatus": "PASS_VERIFIED_EVIDENCE_CAPTURE",
+    "migrationAdmission": "docs/change-control/CC-MAPPING-0-AUTH-003-MIGRATION-ADMISSION-2026-09-27.md",
+    "migrationDesignStatus": "PASS_VERIFIED_DESIGN_ADMISSION"
   },
   "authoritySourcesChecked": [
     "contracts/api/auth-operation-policy.v1.json",
