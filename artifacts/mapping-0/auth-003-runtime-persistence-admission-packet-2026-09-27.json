@@ -357,12 +357,13 @@
     "implementationCommit": "419bb7fd887af0c30412bead50f8196ec6446bb7",
     "implementationStatus": "MERGED_TO_MAIN_RUNTIME_EVIDENCE_PENDING",
     "runtimeWorkflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
-    "runtimeEvidenceStatus": "PENDING"
+    "runtimeEvidenceStatus": "ADMITTED_PASS_VERIFIED",
+    "runtimeEvidenceSourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7"
   },
   "runtimeEvidence": {
     "workflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
     "runId": "36299334577",
-    "sourceSha": "5dff85d47578eb1dcaa57a53b0a072dfe2a80d88",
+    "sourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
     "databaseName": "luckread",
     "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
     "artifactId": "10924573167",
@@ -374,5 +375,13 @@
       "AUTH-003::SECURITY_NEGATIVE",
       "AUTH-003::CONCURRENCY"
     ]
+  },
+  "provenanceCorrection": {
+    "correctedAt": "2026-09-27",
+    "reason": "Correct runtime evidence provenance: run 36299334577 executed source 419bb7fd..., while current main is 7f0bab26....",
+    "runtimeRunId": "36299334577",
+    "runtimeTestedSourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+    "currentMainSha": "7f0bab266fcea439941274ab97a2ea53cc6a3596",
+    "rerunRequired": false
   }
 }
