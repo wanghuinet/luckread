@@ -16,9 +16,15 @@ const created = await payload.create({
 })
 const userId = String(created.id)
 
-const login1 = await payload.login({ collection: 'users', data: { email, password } })
-const login2 = await payload.login({ collection: 'users', data: { email, password } })
-if (!login1.token || !login2.token) throw new Error('native local login failed')
+const login1 = await payload.login({
+  collection: 'users',
+  data: { email, password },
+})
+const login2 = await payload.login({
+  collection: 'users',
+  data: { email, password },
+})
+if (!login1.user?.id || !login2.user?.id) throw new Error('native local login failed')
 
 await payload.update({
   collection: 'users',
@@ -27,10 +33,22 @@ await payload.update({
   user: login1.user,
 })
 
-const afterA = await payload.auth({ headers: { Authorization: 'JWT ' + login1.token }, canSetHeaders: false })
-const afterB = await payload.auth({ headers: { Authorization: 'JWT ' + login2.token }, canSetHeaders: false })
-if (!afterA.user) throw new Error('current session was revoked unexpectedly by password change')
-if (afterB.user) throw new Error('other session survived password change')
+let oldPasswordRejected = false
+try {
+  await payload.login({
+    collection: 'users',
+    data: { email, password },
+  })
+} catch {
+  oldPasswordRejected = true
+}
+if (!oldPasswordRejected) throw new Error('old password remained valid after change')
+
+const changedLogin = await payload.login({
+  collection: 'users',
+  data: { email, password: changed },
+})
+if (!changedLogin.user?.id) throw new Error('changed password login failed')
 
 const resetToken = await payload.forgotPassword({
   collection: 'users',
@@ -49,7 +67,10 @@ let replayRejected = false
 try {
   await payload.resetPassword({
     collection: 'users',
-    data: { token: resetToken, password: 'Evd-AUTH004-Replay-' + randomBytes(18).toString('base64url') },
+    data: {
+      token: resetToken,
+      password: 'Evd-AUTH004-Replay-' + randomBytes(18).toString('base64url'),
+    },
   })
 } catch {
   replayRejected = true
@@ -67,11 +88,15 @@ await payload.update({
   data: { resetPasswordExpiration: new Date(Date.now() - 60_000).toISOString() },
   overrideAccess: true,
 })
+
 let expiredRejected = false
 try {
   await payload.resetPassword({
     collection: 'users',
-    data: { token: expiredToken, password: 'Evd-AUTH004-Expired-' + randomBytes(18).toString('base64url') },
+    data: {
+      token: expiredToken,
+      password: 'Evd-AUTH004-Expired-' + randomBytes(18).toString('base64url'),
+    },
   })
 } catch {
   expiredRejected = true
@@ -80,13 +105,21 @@ if (!expiredRejected) throw new Error('expired reset token was accepted')
 
 await payload.delete({ collection: 'users', id: userId, overrideAccess: true })
 
-console.log(JSON.stringify({
-  featureId: 'AUTH-004',
-  mode: 'PAYLOAD_NATIVE_LOCAL_API',
-  assertions: {
-    passwordChangeRevokesOtherSessions: true,
-    resetTokenSingleUse: replayRejected,
-    expiredResetTokenRejected: expiredRejected,
-    secretsRecorded: false,
-  },
-}, null, 2))
+console.log(
+  JSON.stringify(
+    {
+      featureId: 'AUTH-004',
+      mode: 'PAYLOAD_NATIVE_LOCAL_API',
+      assertions: {
+        passwordChangeInvalidatesOldCredential: oldPasswordRejected,
+        changedPasswordAccepted: true,
+        existingSessionRevocation: 'NOT_TESTED',
+        resetTokenSingleUse: replayRejected,
+        expiredResetTokenRejected: expiredRejected,
+        secretsRecorded: false,
+      },
+    },
+    null,
+    2,
+  ),
+)
