@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "controlId": "CC-MAPPING-0-AUTH-003-LOGICAL-OWNERSHIP-RECONCILIATION-2026-09-27",
-  "sourceHead": "74004fad7e61c585d0d9af8aeb5c87d8a7be2ed8",
+  "sourceHead": "d7b370ee1bb6ae79944db09b46ed84aaa97976c3",
   "backupBranch": "backup/pre-auth003-logical-ownership-reconcile-20260927",
   "status": "PASS_VERIFIED_LOGICAL_AUTHORITY / PHYSICAL_RUNTIME_BLOCKED",
   "featureId": "AUTH-003",
@@ -56,5 +56,13 @@
     "migrationExecution": "NOT_AUTHORIZED",
     "evidenceRegistryPromotion": "NOT_AUTHORIZED",
     "mapping0Green": "NOT_AUTHORIZED"
+  },
+  "taskEdge": {
+    "featureId": "AUTH-003",
+    "taskId": "T01",
+    "workerId": "W02",
+    "d1Domain": "D1-01",
+    "authorityControl": "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md",
+    "status": "PASS_VERIFIED_LOGICAL_MAPPING"
   }
 }
