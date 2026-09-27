@@ -315,3 +315,24 @@ The current authoritative inputs establish:
 - lifecycle/retention follows the existing server-governed retention contract rather than client-selected retention metadata.
 
 This closes only the **semantic** PRIV-002 authority gap. Concrete consent entity/schema, exact fields/enums, consent-specific retention binding/duration, and the AUTH-001 registration-envelope mapping remain blocked. No runtime or migration implementation is authorized.
+
+
+## 2026-09-27 registration envelope idempotency schema reconciliation
+
+The AUTH-001 registration envelope now has a concrete admitted **idempotency subset**:
+`contracts/persistence/AUTH-001-registration-envelope-contract.v1.json`.
+
+Frozen from the canonical P0 idempotency contract:
+
+- `idempotency_key`;
+- `scope`;
+- `endpoint`;
+- `payload_hash`;
+- `state`;
+- `response_digest`;
+- `created_at`;
+- `expires_at`.
+
+The 24-hour retention and replay/conflict semantics are inherited unchanged.
+
+The exact persistence shape of the committed registration response identity/status and the binding of request `consent` remain blocked. Therefore the envelope is only `CONTRACTED_PARTIAL`; no registration runtime or migration is authorized.

@@ -143,3 +143,17 @@ The writer boundary may inherit these semantic rules without inventing a schema:
 - retention is governed by the platform lifecycle contract.
 
 The remaining AUTH-001 blocker is the **concrete PRIV-002 persistence contract and its binding into the registration envelope**. No consent entity/table, field names, enum, retention duration, migration, or runtime code is inferred here.
+
+
+## 2026-09-27 registration envelope idempotency schema reconciliation
+
+The registration-local envelope's idempotency portion is now explicitly frozen by:
+`contracts/persistence/AUTH-001-registration-envelope-contract.v1.json`.
+
+It reuses the canonical fields and semantics from the P0 Idempotency Contract and does not introduce a second idempotency model.
+
+The envelope remains blocked only on:
+1. exact persistence shape for replayable committed User ID/status;
+2. concrete PRIV-002 consent persistence and envelope binding.
+
+No runtime, migration, or new infrastructure is authorized by this partial admission.
