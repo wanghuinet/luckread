@@ -52,6 +52,10 @@ Therefore the repository remains:
 
 The repair only ensures that a future authoritative approved instance can be admitted through a mechanically realizable provenance rule. The provenance checkpoint is traceability evidence; it is not itself a legal/compliance authority.
 
+## Current-main development approval checkpoint — 2026-09-28
+
+The development-only `PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP / DEV-2026-09-28.1` engineering test policy is approved for development/integration validation only. This paragraph is the current-main approval/source checkpoint for the canonical policy-instance artifact. Production legal/compliance authority remains pending.
+
 ## Required verification
 
 The resulting branch must pass the existing PRIV-004 admission workflow and applicable Contract CI checks. No runtime evidence rerun is required by this reconciliation.
