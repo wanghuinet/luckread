@@ -59,3 +59,7 @@ The development-only `PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP / DEV-2026-09-28.1`
 ## Required verification
 
 The resulting branch must pass the existing PRIV-004 admission workflow and applicable Contract CI checks. No runtime evidence rerun is required by this reconciliation.
+
+## Checkpoint record
+
+This non-empty governance commit is the preserved approval/source checkpoint for the development-only PRIV-004 policy artifact; the following artifact commit binds its provenance to this checkpoint.
