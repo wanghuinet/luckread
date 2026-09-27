@@ -67,3 +67,20 @@ Those values must arrive through the authoritative approval input.
 ## Next Gate
 
 `PRIV-004::admit the first approved ACCOUNT_REGISTRATION / LEGAL_AUDIT policy instance with version, scope, effective period, deterministic rule, approval and provenance evidence.`
+
+
+## Authority discovery checkpoint — 2026-09-27
+
+A repository-only authority search was performed before runtime implementation was considered. The search covered:
+
+- docs/160-DATA-LIFECYCLE-RETENTION-ERASURE-CONTRACT-v1.0.md
+- docs/175-FEATURE-FLAG-CONFIG-POLICY-VERSIONING-CONTRACT-v1.0.md
+- contracts/privacy/PRIV-004-retention-policy-authority.v1.json
+- AUTH-001 / PRIV-002 change-control and reconciliation records
+- Foundation implementation plan and Blueprint references for PRIV-004
+- Mapping 0 privacy reconciliation batch
+- repository-wide searches for ACCOUNT_REGISTRATION, LEGAL_AUDIT, retentionUntil, policyVersion, approval, and policy-instance records
+
+Result: no existing approved/active concrete PRIV-004 policy instance was found in the repository.
+
+This is an authority-discovery checkpoint only. It does not authorize a retention duration, fixed-until date, jurisdiction-specific rule, or runtime behavior. Repeating the same repository-only search without a new authoritative source is not a new implementation gate.
