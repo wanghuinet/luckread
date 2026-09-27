@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "774f761f55ff3adf4788b6690d0b3f933d5d245e",
-  "backupBranch": "backup/pre-auth001-phone-source-correction-20260927",
+  "sourceHead": "da6707db14c11cac07d8e055c94380ebd75cad5e",
+  "backupBranch": "backup/pre-auth001-idempotency-source-gate-20260927",
   "currentCursor": {
     "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
-    "state": "BLOCKED_AUTH001_IDENTITY_INPUT_SOURCE_AND_ATOMICITY",
-    "objective": "Establish durable authoritative source persistence for every supported AUTH-001 registration identity type, then resolve atomic-vs-eventual materialization semantics without adding architecture.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-IDENTITY-INPUT-SOURCE-CORRECTION-2026-09-27.md",
+    "state": "BLOCKED_AUTH001_IDEMPOTENCY_SOURCE",
+    "objective": "Bind durable AUTH-001 idempotency authority and replay/recovery semantics before authorizing registration runtime.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-IDEMPOTENCY-SOURCE-GATE-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::durable identity-input source authority (email/phone/username) + consistency decision; then smallest admitted registration runtime slice.",
+    "nextGate": "AUTH-001::durable idempotency authority + partial-registration recovery semantics; then minimal registration runtime admission.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -153,14 +153,15 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Semantic field destinations are known, but active W01 Users source lacks a phone field. Existing queue budget is not sufficient evidence for identity materialization because payload, retry, recovery and consumer authority are undefined.",
-    "currentMainSha": "774f761f55ff3adf4788b6690d0b3f933d5d245e",
+    "reason": "Current AUTH-001 policy requires Idempotency-Key replay safety, but no AUTH-001-specific durable idempotency record/request-fingerprint binding is evidenced. Existing D1-03 operational idempotency and AUTH-013 journal idempotency are scoped elsewhere and cannot be inherited.",
+    "currentMainSha": "da6707db14c11cac07d8e055c94380ebd75cad5e",
     "transportStatus": "W01_W02_SERVICE_BINDING_VERIFIED_AT_RUNTIME_SCOPE",
-    "atomicityStatus": "BLOCKED",
     "phoneSourceStatus": "BLOCKED",
+    "atomicityStatus": "BLOCKED",
+    "idempotencySourceStatus": "BLOCKED",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED"
   },
-  "nextGate": "AUTH-001::durable identity-input source authority (email/phone/username) + consistency decision; then smallest admitted registration runtime slice.",
+  "nextGate": "AUTH-001::durable idempotency authority + partial-registration recovery semantics; then minimal registration runtime admission.",
   "runtimeEvidenceAdmission": {
     "list": {
       "workflow": ".github/workflows/w02-auth-003-credential-list-runtime-evidence.yml",
@@ -199,7 +200,7 @@
       "ENT-IDENTITY",
       "ENT-CREDENTIAL"
     ],
-    "reason": "ENT-CREDENTIAL remains evidenced but not promoted. ENT-IDENTITY remains blocked. AUTH-001 registration cannot be admitted until durable identity-input source authority and consistency semantics are explicitly contracted.",
+    "reason": "ENT-CREDENTIAL remains evidenced but not promoted. ENT-IDENTITY remains blocked. AUTH-001 registration remains closed until identity-input source, consistency and idempotency recovery authority are explicit.",
     "evidenceRegistryStatus": "NOT_GREEN",
     "fiveWayStatus": "NOT_GREEN"
   }

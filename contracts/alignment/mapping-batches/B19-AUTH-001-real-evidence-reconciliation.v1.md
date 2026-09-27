@@ -164,3 +164,12 @@ Disposition correction:
 No phone value may be hidden in `username`, consent, or another unrelated User field by inference. No new field or migration is authorized by this correction.
 
 This correction narrows the eventual-consistency decision: before any asynchronous identity materialization can be admitted, the authority for durable registration identity input must explicitly cover the phone branch as well as its replay/recovery semantics.
+
+
+## 2026-09-27 idempotency source gate
+
+AUTH-001's Idempotency-Key requirement is contractually defined, but current-source inspection does not identify an AUTH-001-specific durable idempotency record or request-fingerprint binding. Existing D1-03 operational idempotency and AUTH-013 publication-journal idempotency are separate scoped authorities and cannot be silently reused.
+
+This blocks safe recovery of a partially materialized registration: a replay must be distinguishable from an unrelated anonymous request using the same identity. Until the idempotency authority, replay semantics and partial-registration recovery semantics are explicitly contracted, `authRegister` implementation remains unauthorized.
+
+Authoritative control: `docs/change-control/CC-MAPPING-0-AUTH-001-IDEMPOTENCY-SOURCE-GATE-2026-09-27.md`.
