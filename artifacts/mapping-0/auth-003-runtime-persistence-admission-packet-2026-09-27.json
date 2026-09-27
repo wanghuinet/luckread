@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
   "controlId": "CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27",
-  "sourceHead": "6f23e53237286c8fdec5d078737d0340d61f794a",
-  "backupBranch": "backup/pre-auth003-admission-packet-20260927",
+  "sourceHead": "1b3406860d88c12160513caa01fbc99cfbdc4507",
+  "backupBranch": "backup/pre-auth003-logical-ownership-reconcile-20260927",
   "status": "AUTHORITY_INPUT_REQUIRED / IMPLEMENTATION_NOT_AUTHORIZED",
   "scope": "AUTH-003 credential-management runtime/persistence admission",
   "establishedInputs": {
@@ -155,7 +155,9 @@
       "admissionRule": "Every field must be supplied by an explicit authoritative source or explicitly marked N/A with rationale. Neighbor-domain operation policies and historical topology defaults are reference-only and cannot be silently inherited."
     },
     "persistence": {
-      "targetIdentity": "exact controlled D1 target identifier",
+      "logicalDomain": "D1-01",
+      "physicalWorkerBinding": "REQUIRED / NOT_ESTABLISHED",
+      "physicalD1Identity": "REQUIRED / NOT_ESTABLISHED_FOR_AUTH003",
       "requiredSchemaEvidence": [
         "database identifier",
         "environment class",
@@ -196,6 +198,9 @@
     "No AUTH-003-specific operation-policy authority was found for resource/cache/retry/event/queue/anti-abuse.",
     "user-account-operation-policy is a separate domain contract and has no explicit AUTH-003 authority-binding edge.",
     "edge-first-worker-topology resource defaults are historical/superseded and cannot be imported into the current 12-Worker architecture.",
+    "AUTH-003 logical Worker ownership is W02 and logical D1 ownership is D1-01 under the active canonical Worker/D1 authorities.",
+    "No specific Contract Task is assigned to AUTH-003 by current authoritative mapping; T01/T02/T03 are W02-owned but no AUTH-003 task edge is explicitly frozen.",
+    "The current physical Worker-to-D1 binding is still not established. The existing luckread physical D1 record is explicitly W01-PAYLOAD-D1-BINDING and must not be reassigned by inference.",
     "No admitted AUTH-003 physical D1 schema/migration evidence exists on current main.",
     "ENT-IDENTITY and ENT-CREDENTIAL remain contract-only/proposed."
   ],
@@ -214,5 +219,19 @@
     "physical schema name invention",
     "Evidence Registry PASS creation",
     "Mapping 0 GREEN"
-  ]
+  ],
+  "logicalOwnership": {
+    "worker": "W02",
+    "d1Domain": "D1-01",
+    "entities": [
+      "ENT-IDENTITY",
+      "ENT-CREDENTIAL"
+    ],
+    "authority": [
+      "docs/04-WORKER-MASTER-v1.0.md",
+      "docs/03-WORKER-BINDING-MAPPING-v1.0.md",
+      "docs/09-D1-DOMAIN-MASTER-v1.0.md"
+    ],
+    "status": "CLOSED_LOGICAL_AUTHORITY"
+  }
 }
