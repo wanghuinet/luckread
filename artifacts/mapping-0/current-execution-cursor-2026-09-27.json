@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "383bfa64c65c58231bf84ac58fc7968bb35b9873",
-  "backupBranch": "backup/post-user-profile-auto-mapping-reconcile-20260927",
+  "sourceHead": "651be8b8e3f8209497977ea0d32056fc01b4b462",
+  "backupBranch": "backup/post-auth001-wire-reconcile-cursor-20260927",
   "currentCursor": {
     "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
     "state": "BLOCKED_AUTH001_NATIVE_AUTH_IDENTITY_BOUNDARY",
     "objective": "Reconcile supported registration identity types with the existing Payload-native User/auth boundary before authorizing authRegister runtime.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-NATIVE-AUTH-IDENTITY-BOUNDARY-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::apply verified Payload-native capability to username-wire reconciliation; then resolve phone durable source + consent + idempotency/replay + registration writer boundary; only then authorize the smallest registration runtime slice.",
+    "nextGate": "AUTH-001::resolve phone durable source + canonical consent persistence + durable idempotency/replay + registration writer boundary; only then authorize the smallest registration runtime slice.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -25,7 +25,8 @@
     "auth002E6Runtime": "36219132123",
     "w01Baseline": "35508571153",
     "auth002Auth003SharedEntityAuthority": true,
-    "auth003PhysicalMapping": true
+    "auth003PhysicalMapping": true,
+    "auth001RegisterWireRequiredness": true
   },
   "historicalOnlyCursors": [
     "M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001 / WAIT_AUTHORITY_DECISION",
@@ -56,7 +57,7 @@
     "Treat 36296831559 as execution checkpoint only; final schema correctness requires a later read-only exact-SHA postcheck.",
     "Do not promote AUTH-003 persistence status from the migration execution log alone."
   ],
-  "previousSourceHead": "f02d1815e0100ce3934197c81689a5ff2ebe527b",
+  "previousSourceHead": "17d005179da4cdefb449b0db79f33d865fc99f59",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
@@ -153,10 +154,10 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Active W01 Users.ts uses Payload native auth without a custom phone strategy, while AUTH-001 permits phone registration. Combined with required username vs optional wire, missing consent authority, missing durable idempotency authority and unresolved consistency semantics, runtime remains unauthorized.",
-    "currentMainSha": "383bfa64c65c58231bf84ac58fc7968bb35b9873",
+    "reason": "Active W01 Users.ts uses Payload native auth without a custom phone strategy, while AUTH-001 still permits phone registration. Username wire requiredness has now been reconciled with the required W01/ENT-USER field; canonical consent persistence, durable idempotency/replay, and registration consistency semantics remain unresolved, so runtime remains unauthorized.",
+    "currentMainSha": "651be8b8e3f8209497977ea0d32056fc01b4b462",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
-    "payloadWireCompatibilityStatus": "BLOCKED",
+    "payloadWireCompatibilityStatus": "USERNAME_REQUIREDNESS_RECONCILED_REMAINING_GATES_BLOCKED",
     "phoneSourceStatus": "BLOCKED",
     "idempotencySourceStatus": "BLOCKED",
     "atomicityStatus": "BLOCKED",
@@ -207,11 +208,12 @@
   },
   "supportingControls": [
     "docs/change-control/CC-MAPPING-0-AUTH-001-PAYLOAD-NATIVE-CAPABILITY-RECONCILIATION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTER-WIRE-RECONCILIATION-2026-09-27.md",
     "docs/change-control/CC-MAPPING-0-USER-001-PAYLOAD-API-FIELD-RECONCILIATION-2026-09-27.md"
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
-    "mainSha": "383bfa64c65c58231bf84ac58fc7968bb35b9873",
+    "mainSha": "651be8b8e3f8209497977ea0d32056fc01b4b462",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
