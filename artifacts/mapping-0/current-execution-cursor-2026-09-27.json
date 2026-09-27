@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "8c6b129a72a44ed124b20aed8f94053896c4af4f",
-  "backupBranch": "backup/pre-auth001-registration-write-boundary-20260927",
+  "sourceHead": "c1a875cfa18de93c86ac7ba54f7ec92353003f31",
+  "backupBranch": "backup/pre-auth001-transport-boundary-20260927",
   "currentCursor": {
     "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
-    "state": "BLOCKED_AUTH001_REGISTRATION_SINGLE_WRITER_BOUNDARY",
-    "objective": "Resolve the AUTH-001 registration single-writer boundary while preserving Payload-native password handling and the frozen Identity/Credential authority.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-WRITE-BOUNDARY-2026-09-27.md",
+    "state": "BLOCKED_AUTH001_REGISTRATION_ATOMICITY",
+    "objective": "Resolve AUTH-001 registration atomic persistence semantics across the W01 Payload User boundary and W02/D1-01 Identity/Credential authority.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-TRANSPORT-AND-ATOMICITY-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::registration write-boundary decision; then smallest admitted registration runtime slice.",
+    "nextGate": "AUTH-001::registration internal wire contract + atomic-vs-eventual persistence decision; then smallest admitted registration runtime slice.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -153,20 +153,14 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "AUTH-001 request field authority is reconciled for User ID, password, identityType/identity, username and accountState. The remaining blocker is the single authoritative write boundary across Payload User plus Identity/Credential persistence; no cross-worker sequence is inferred.",
-    "previousCursorSourceHead": "a629a50bb05c7b73dc4df0d72544684e5cec7082",
-    "currentMainSha": "8c6b129a72a44ed124b20aed8f94053896c4af4f",
-    "remoteMigrationReexecution": "FORBIDDEN_UNCHANGED_EVIDENCE",
-    "schemaPostcheckRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
-    "runtimeEvidenceStatus": "AUTH003_CREDENTIAL_SLICE_PASS_VERIFIED",
-    "runtimeEvidenceRuns": [
-      "36299334577",
-      "36307891924",
-      "36308120758"
-    ],
-    "entityEvidenceBindingStatus": "ENT-CREDENTIAL_BOUND_NOT_PROMOTED__ENT-IDENTITY_BLOCKED"
+    "reason": "Existing W01->W02 Service Binding is already admitted and runtime-verified, and AUTH-001 rpcMax=1 permits one internal call. The unresolved gate is atomic persistence semantics between Payload-native User creation and W02/D1-01 Identity/Credential authority under d1WriteMax=1.",
+    "transportStatus": "W01_W02_SERVICE_BINDING_VERIFIED_AT_RUNTIME_SCOPE",
+    "currentMainSha": "c1a875cfa18de93c86ac7ba54f7ec92353003f31",
+    "priorControl": "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-WRITE-BOUNDARY-2026-09-27.md",
+    "remoteEvidenceReexecution": "FORBIDDEN_UNCHANGED",
+    "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED"
   },
-  "nextGate": "AUTH-001::registration write-boundary decision; then smallest admitted registration runtime slice.",
+  "nextGate": "AUTH-001::registration internal wire contract + atomic-vs-eventual persistence decision; then smallest admitted registration runtime slice.",
   "runtimeEvidenceAdmission": {
     "list": {
       "workflow": ".github/workflows/w02-auth-003-credential-list-runtime-evidence.yml",
@@ -205,7 +199,7 @@
       "ENT-IDENTITY",
       "ENT-CREDENTIAL"
     ],
-    "reason": "AUTH-003 credential slice remains evidenced but not promoted. AUTH-001 now has reconciled field authority, while its single-writer registration boundary is still blocked; Mapping 0 / Five-Way remains NOT_GREEN.",
+    "reason": "ENT-CREDENTIAL remains evidenced but not promoted. ENT-IDENTITY remains blocked until AUTH-001 establishes a governed registration persistence boundary. Mapping 0 / Five-Way remains NOT_GREEN.",
     "evidenceRegistryStatus": "NOT_GREEN",
     "fiveWayStatus": "NOT_GREEN"
   }
