@@ -1,0 +1,218 @@
+{
+  "version": "1.0.0",
+  "controlId": "CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27",
+  "sourceHead": "6f23e53237286c8fdec5d078737d0340d61f794a",
+  "backupBranch": "backup/pre-auth003-admission-packet-20260927",
+  "status": "AUTHORITY_INPUT_REQUIRED / IMPLEMENTATION_NOT_AUTHORIZED",
+  "scope": "AUTH-003 credential-management runtime/persistence admission",
+  "establishedInputs": {
+    "operations": [
+      "authCredentialList",
+      "authCredentialAdd",
+      "authCredentialReplace",
+      "authCredentialRemove"
+    ],
+    "routes": [
+      "GET /auth/credentials",
+      "POST /auth/credentials",
+      "PUT /auth/credentials/{credentialId}",
+      "DELETE /auth/credentials/{credentialId}"
+    ],
+    "authorization": {
+      "list": "user.credential.read / self",
+      "mutations": "user.credential.manage / self"
+    },
+    "idempotency": {
+      "mutations": true,
+      "header": "Idempotency-Key"
+    },
+    "normalization": {
+      "username_email": "trim -> Unicode NFC -> casefold",
+      "phone": "E.164 parse/validation"
+    },
+    "uniqueness": "persistence boundary; kind + normalizedValue; concurrent insert resolves to one authoritative owner",
+    "publicProjection": [
+      "credentialId",
+      "kind",
+      "active"
+    ],
+    "nonPublic": [
+      "credential value",
+      "normalized value",
+      "credential hash",
+      "identityId",
+      "verification metadata"
+    ]
+  },
+  "requiredAuthorityInputs": {
+    "operationPolicy": {
+      "commonRequired": [
+        "resource",
+        "cache",
+        "retry",
+        "event",
+        "queue",
+        "antiAbuse"
+      ],
+      "operations": {
+        "authCredentialList": {
+          "required": [
+            "resource.class",
+            "resource.d1ReadMax",
+            "resource.d1WriteMax",
+            "resource.d1ReadRowsMax",
+            "resource.d1WriteRowsMax",
+            "resource.rpcMax",
+            "resource.outboundMax",
+            "cache.mode",
+            "cache.shared",
+            "cache.authorizationBoundary",
+            "retry.maxAttempts",
+            "retry.clientRetrySafe",
+            "event.syncConsumersMax",
+            "event.asyncEventsMax",
+            "event.fanoutMax",
+            "queue.enqueueMax",
+            "queue.taskType_if_applicable",
+            "antiAbuse.required",
+            "antiAbuse.scopes",
+            "antiAbuse.actions"
+          ]
+        },
+        "authCredentialAdd": {
+          "required": [
+            "resource.class",
+            "resource.d1ReadMax",
+            "resource.d1WriteMax",
+            "resource.d1ReadRowsMax",
+            "resource.d1WriteRowsMax",
+            "resource.rpcMax",
+            "resource.outboundMax",
+            "cache.mode",
+            "cache.shared",
+            "cache.authorizationBoundary",
+            "retry.maxAttempts",
+            "retry.clientRetrySafe",
+            "event.syncConsumersMax",
+            "event.asyncEventsMax",
+            "event.fanoutMax",
+            "queue.enqueueMax",
+            "queue.taskType_if_applicable",
+            "antiAbuse.required",
+            "antiAbuse.scopes",
+            "antiAbuse.actions"
+          ]
+        },
+        "authCredentialReplace": {
+          "required": [
+            "resource.class",
+            "resource.d1ReadMax",
+            "resource.d1WriteMax",
+            "resource.d1ReadRowsMax",
+            "resource.d1WriteRowsMax",
+            "resource.rpcMax",
+            "resource.outboundMax",
+            "cache.mode",
+            "cache.shared",
+            "cache.authorizationBoundary",
+            "retry.maxAttempts",
+            "retry.clientRetrySafe",
+            "event.syncConsumersMax",
+            "event.asyncEventsMax",
+            "event.fanoutMax",
+            "queue.enqueueMax",
+            "queue.taskType_if_applicable",
+            "antiAbuse.required",
+            "antiAbuse.scopes",
+            "antiAbuse.actions"
+          ]
+        },
+        "authCredentialRemove": {
+          "required": [
+            "resource.class",
+            "resource.d1ReadMax",
+            "resource.d1WriteMax",
+            "resource.d1ReadRowsMax",
+            "resource.d1WriteRowsMax",
+            "resource.rpcMax",
+            "resource.outboundMax",
+            "cache.mode",
+            "cache.shared",
+            "cache.authorizationBoundary",
+            "retry.maxAttempts",
+            "retry.clientRetrySafe",
+            "event.syncConsumersMax",
+            "event.asyncEventsMax",
+            "event.fanoutMax",
+            "queue.enqueueMax",
+            "queue.taskType_if_applicable",
+            "antiAbuse.required",
+            "antiAbuse.scopes",
+            "antiAbuse.actions"
+          ]
+        }
+      },
+      "admissionRule": "Every field must be supplied by an explicit authoritative source or explicitly marked N/A with rationale. Neighbor-domain operation policies and historical topology defaults are reference-only and cannot be silently inherited."
+    },
+    "persistence": {
+      "targetIdentity": "exact controlled D1 target identifier",
+      "requiredSchemaEvidence": [
+        "database identifier",
+        "environment class",
+        "pre/post schema snapshot",
+        "actual table names",
+        "actual columns with types/nullability/defaults",
+        "actual indexes",
+        "actual constraints/foreign keys",
+        "migration history"
+      ],
+      "requiredMapping": [
+        "ENT-IDENTITY field-by-field physical mapping",
+        "ENT-CREDENTIAL field-by-field physical mapping"
+      ],
+      "migration": {
+        "migrationId": "MIG-AUTH-003-CREDENTIAL-V1",
+        "requiredEvidence": [
+          "precondition",
+          "execution",
+          "postcondition",
+          "rollback/forward-recovery posture",
+          "exact tested commit SHA"
+        ]
+      },
+      "authorityRule": "No physical table, column, index, constraint, or migration execution detail may be guessed from contract prose, neighboring features, archived artifacts, or Payload collection conventions."
+    }
+  },
+  "authoritySourcesChecked": [
+    "contracts/api/auth-operation-policy.v1.json",
+    "contracts/api/user-account-operation-policy.v1.json",
+    "docs/change-control/CC-MAPPING-0-AUTH-003-WIRE-PROJECTION-AUTHORITY-2026-09-26.md",
+    "contracts/resource-budget/edge-first-worker-topology.json",
+    "docs/04-WORKER-TOPOLOGY-CHANGE-CONTROL-v1.0.md",
+    "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md",
+    "contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json"
+  ],
+  "currentFindings": [
+    "No AUTH-003-specific operation-policy authority was found for resource/cache/retry/event/queue/anti-abuse.",
+    "user-account-operation-policy is a separate domain contract and has no explicit AUTH-003 authority-binding edge.",
+    "edge-first-worker-topology resource defaults are historical/superseded and cannot be imported into the current 12-Worker architecture.",
+    "No admitted AUTH-003 physical D1 schema/migration evidence exists on current main.",
+    "ENT-IDENTITY and ENT-CREDENTIAL remain contract-only/proposed."
+  ],
+  "nextAdmissibleSequence": [
+    "Supply/admit operation-policy authority inputs.",
+    "Supply/admit actual physical D1 schema evidence and field mapping.",
+    "Create implementation Change Control for the smallest AUTH-003 slice.",
+    "Implement and execute evidence under one tested commit SHA.",
+    "Register evidence and only then reconsider Mapping 0/R4 promotion."
+  ],
+  "forbiddenUntilInputs": [
+    "AUTH-003 runtime handlers",
+    "AUTH-003 migration execution",
+    "ENT-IDENTITY promotion",
+    "ENT-CREDENTIAL promotion",
+    "physical schema name invention",
+    "Evidence Registry PASS creation",
+    "Mapping 0 GREEN"
+  ]
+}
