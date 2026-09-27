@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
-  "backupBranch": "backup/pre-auth003-postmigration-reconciliation-20260927",
+  "sourceHead": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+  "backupBranch": "backup/pre-auth003-current-sha-cursor-sync-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
     "state": "BLOCKED_RUNTIME_PERSISTENCE_SECURITY_EVIDENCE_REQUIRED",
     "objective": "Admit the actual remote MIG-AUTH-003-CREDENTIAL-V1 execution through read-only exact-SHA post-schema, migration-ledger, and provenance evidence before runtime implementation.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-003 same-SHA persistence/security/runtime vertical slice -> runtime/security evidence admission",
+    "nextGate": "AUTH-003 same-SHA persistence/security/runtime vertical slice -> controlled remote runtime evidence -> runtime/security evidence admission",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED"
@@ -50,7 +50,7 @@
     "Treat 36296831559 as execution checkpoint only; final schema correctness requires a later read-only exact-SHA postcheck.",
     "Do not promote AUTH-003 persistence status from the migration execution log alone."
   ],
-  "previousSourceHead": "7c9f1fbf41791f56cd23e2ee27ded09f883b956a",
+  "previousSourceHead": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
@@ -131,5 +131,21 @@
     "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md",
     "contracts/resource-budget/edge-first-worker-topology.json",
     "docs/04-WORKER-TOPOLOGY-CHANGE-CONTROL-v1.0.md"
-  ]
+  ],
+  "implementationState": {
+    "sourceHead": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+    "slice": "AUTH-003 credential-add persistence/security/runtime vertical slice",
+    "implementationCommit": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+    "implementationStatus": "MERGED_TO_MAIN_RUNTIME_EVIDENCE_PENDING",
+    "runtimeWorkflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
+    "runtimeRequirement": "same-SHA controlled remote D1 runtime evidence; no production Worker deployment"
+  },
+  "currentHeadReconciliation": {
+    "reason": "Main advanced after the prior post-migration evidence admission and AUTH-003 credential-add implementation merge; cursor must track the current authoritative main SHA without changing remote D1 state.",
+    "previousCursorSourceHead": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
+    "currentMainSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+    "remoteMigrationReexecution": "FORBIDDEN",
+    "schemaPostcheckRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
+    "runtimeEvidenceStatus": "PENDING"
+  }
 }
