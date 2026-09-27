@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "controlId": "CC-MAPPING-0-AUTH-003-D1-READONLY-SCHEMA-EVIDENCE-CHANNEL-2026-09-27",
+  "status": "EVIDENCE_CHANNEL_READY / NOT_EVIDENCE / NOT_GREEN",
+  "sourceHead": "14e508a00bdaa4404a79e80f9f32649c0ee46c36",
+  "backupBranch": "backup/pre-auth003-admission-batch-20260927",
+  "target": {
+    "logicalWorker": "W02",
+    "physicalWorker": "luckread-w02",
+    "sourcePath": "workers/W02-content",
+    "d1Domain": "D1-01",
+    "databaseName": "luckread",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64"
+  },
+  "workflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
+  "captureUnits": [
+    "sqlite_master",
+    "pragma_table_list",
+    "d1_migrations_presence",
+    "d1_migrations",
+    "provenance"
+  ],
+  "executionMode": "READONLY",
+  "remoteDdl": false,
+  "remoteDml": false,
+  "schemaAuthority": "PENDING_CAPTURE_AND_REVIEW",
+  "operationPolicyAuthority": "BLOCKED",
+  "implementationAdmission": "NOT_AUTHORIZED",
+  "entityPromotion": "NOT_AUTHORIZED",
+  "mapping0Green": "NOT_AUTHORIZED"
+}
