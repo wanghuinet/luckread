@@ -2,7 +2,7 @@ name: Contract CI
 
 on:
   push:
-    branches: [main, 'contract/**', 'change/**']
+    branches: [main, 'contract/**']
     paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-ci.yml']
   pull_request:
     paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-ci.yml']
