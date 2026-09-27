@@ -101,7 +101,18 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT id,name,applied_at FROM d1_migrations WHERE name='$EXPECTED_MIGRATION';"             > ../../artifacts/mapping-0/auth-003-migration-evidence/post_migration_ledger.txt
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "PRAGMA foreign_key_check;"             > ../../artifacts/mapping-0/auth-003-migration-evidence/foreign_key_check.txt
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT sql FROM sqlite_master WHERE type='table' AND name='users';"             > ../../artifacts/mapping-0/auth-003-migration-evidence/post_users_schema.txt
-            "application_data_dml=false"             "d1_migration_ledger_write=true" \\
+          printf '%s\n' \
+            "AUTH-003 Migration Evidence" \
+            "run_id=${{ github.run_id }}" \
+            "source_sha=$SOURCE_SHA" \
+            "database_name=$DATABASE_NAME" \
+            "database_id=$D1_01_ID" \
+            "migration=$EXPECTED_MIGRATION" \
+            "remote_ddl=true" \
+            "application_data_dml=false" \
+            "d1_migration_ledger_write=true" \
+            "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > ../../artifacts/mapping-0/auth-003-migration-evidence/provenance.txt
 
       - name: Validate evidence
         working-directory: workers/W02-content
