@@ -76,13 +76,22 @@ Credential input values, normalized values and derived credential hashes are nev
 
 Credential states are `ACTIVE`, `INACTIVE`, `RETIRED`. Replacement cannot make a new credential authoritative until validation and any required verification step succeeds. Removal must preserve an explicit safe recovery path when the credential is the account's only login method.
 
+## Current evidence disposition
+
+The following are now evidenced and admitted for the `authCredentialAdd` persistence/runtime slice:
+
+- D1-01 physical schema/migration evidence for `auth_identities` and `auth_credentials`.
+- Exact-SHA credential-add runtime evidence.
+- Normalization, persistence uniqueness, idempotent replay/conflict, cross-account denial, public projection and concurrency/security-negative checks.
+- Durable Evidence Registry entries `EVD-AUTH003-B15` through `EVD-AUTH003-B18`.
+
+These admissions do **not** make the full AUTH-003 lifecycle GREEN because List/Replace/Remove remain unverified and final Entity/Feature→Entity→Persistence/Mapping 0 promotion remains open.
+
 ## Still blocking GREEN
 
-1. D1 table/column/migration mapping and actual remote schema evidence.
-2. Runtime implementation evidence tied to the tested commit SHA.
-3. Executed normalization and uniqueness race tests.
-4. Enumeration-resistance and credential non-disclosure integration/security tests.
-5. Durable Evidence Registry IDs.
-6. Final Mapping 0 validator result bound to the same commit SHA.
+1. Full AUTH-003 lifecycle evidence for `authCredentialList`, `authCredentialReplace` and `authCredentialRemove`.
+2. Final field-by-field Entity/Feature→Entity→Persistence reconciliation and entity catalog promotion.
+3. Final Mapping 0/R4/Five-Way reconciliation; current global Mapping 0 remains NOT_GREEN.
+4. Any remaining lifecycle/security evidence required by the frozen contracts.
 
-`CONTRACTED_PARTIAL` is therefore the maximum valid state at this point.
+`CONTRACTED_PARTIAL` remains the maximum valid overall feature state until those downstream gates close.
