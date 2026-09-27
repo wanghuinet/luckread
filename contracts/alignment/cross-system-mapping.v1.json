@@ -5450,9 +5450,14 @@
     },
     {
       "featureId": "PRIV-002",
-      "status": "UNRESOLVED",
-      "apiOperationIds": [],
-      "entityIds": [],
+      "status": "PARTIAL",
+      "apiOperationIds": [
+        "authRegister"
+      ],
+      "entityIds": [
+        "ENT-CONSENT",
+        "ENT-USER"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
@@ -5460,7 +5465,19 @@
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Runtime persistence and physical mapping remain unverified.",
+        "Withdrawal runtime and evidence remain unverified."
+      ],
+      "contractRefs": [
+        "contracts/entity/PRIV-002-consent-field-contract.v1.json",
+        "contracts/persistence/PRIV-002-consent-persistence-contract.v1.json",
+        "contracts/events/privacy-consent-withdrawn.v1.json"
+      ],
+      "mappingRules": [
+        "AUTH-001 registration consent binds to ENT-CONSENT with purpose ACCOUNT_REGISTRATION and legalBasis CONSENT.",
+        "Consent resourceId and ownerSubjectId bind to ENT-USER.id after the authoritative User write.",
+        "Consent state starts GRANTED; withdrawal transitions to REVOKED and preserves history.",
+        "Retention class is LEGAL_AUDIT and retentionUntil is server-calculated by lifecycle policy."
       ]
     },
     {
