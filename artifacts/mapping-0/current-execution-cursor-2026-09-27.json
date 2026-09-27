@@ -2,14 +2,14 @@
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
   "sourceHead": "d831a871a57309a73d825a86e280ea1f4d0dbcf4",
-  "backupBranch": "backup/pre-auth001-priv002-concrete-schema-gate-20260927",
+  "backupBranch": "backup/pre-auth001-response-replay-shape-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "BLOCKED_AUTH001_CONSENT_RESPONSE_BINDING",
-    "objective": "Complete the remaining AUTH-001 persistence contract: concrete PRIV-002 consent binding and exact replayable committed response identity/status within the registration envelope.",
+    "state": "BLOCKED_AUTH001_CONSENT_BINDING",
+    "objective": "Complete the remaining AUTH-001 persistence contract: concrete PRIV-002 consent entity/schema/field/version/retention binding.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-SCHEMA-RECONCILIATION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::admit replayable committed User ID/status persistence shape + concrete PRIV-002 consent entity/field/retention binding; then authorize the smallest registration runtime slice.",
+    "nextGate": "AUTH-001::admit the concrete PRIV-002 consent entity/schema/field/version/retention binding; then authorize the smallest registration runtime slice.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -158,12 +158,12 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "AUTH-001 registration envelope idempotency fields/semantics are now concretely admitted from the canonical P0 Idempotency Contract. Remaining persistence gates are the exact replayable committed User ID/status shape and concrete PRIV-002 consent binding.",
+    "reason": "AUTH-001 registration envelope idempotency fields/semantics and replayable committed response projection are now concretely admitted. Remaining persistence gate is the concrete PRIV-002 consent entity/schema/field/version/retention binding.",
     "currentMainSha": "d831a871a57309a73d825a86e280ea1f4d0dbcf4",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "USERNAME_CONSENT_AND_IDENTITY_ENTRY_RECONCILED_REMAINING_GATES_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
-    "idempotencySourceStatus": "CANONICAL_SEMANTICS_AND_WRITER_BOUNDARY_CLOSED_ENVELOPE_SCHEMA_BLOCKED",
+    "idempotencySourceStatus": "CANONICAL_SEMANTICS_AND_WRITER_BOUNDARY_AND_REPLAY_SHAPE_CLOSED_CONSENT_BINDING_BLOCKED",
     "atomicityStatus": "EVENTUAL_CONSISTENCY_WRITER_BOUNDARY_RECONCILED",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED"
   },
@@ -224,7 +224,7 @@
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
-    "mainSha": "2c94420d670d6f96e468c32a9e0ce7081467f987",
+    "mainSha": "8212a33cd8d2a0b979764073cf9d13c04e3ef70c",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
