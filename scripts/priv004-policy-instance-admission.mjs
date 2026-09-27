@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
 const root = resolve(process.cwd())
@@ -116,6 +117,14 @@ if (!/^[0-9a-f]{40}$/.test(instance.provenance.commitSha ?? '')) {
   fail('provenance.commitSha must be an exact 40-hex commit SHA')
 }
 requireNonEmptyString(instance.provenance.sourcePath, 'provenance.sourcePath')
+
+const currentCommitSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+if (instance.provenance.commitSha !== currentCommitSha) {
+  fail(`provenance.commitSha must equal current HEAD (${currentCommitSha})`)
+}
+if (instance.provenance.sourcePath !== 'artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json') {
+  fail('provenance.sourcePath must identify the canonical approved policy instance artifact')
+}
 
 if (packet.status === 'INPUT_REQUIRED') {
   fail('concrete policy instance exists but admission packet remains INPUT_REQUIRED')
