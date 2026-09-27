@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "ce47f97ebacc1341363c81b7a266d6638e5db5cf",
-  "backupBranch": "backup/pre-auth003-cursor-post-lifecycle-merge-20260927",
+  "sourceHead": "c96b39569c7505ade615b15e63d87f5afb8066cc",
+  "backupBranch": "backup/pre-auth003-lifecycle-evidence-admission-20260927",
   "currentCursor": {
     "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
-    "state": "BLOCKED_AUTH003_RUNTIME_LIFECYCLE_AND_ENTITY_PROMOTION",
-    "objective": "With AUTH-003 OpenAPI/DTO wire encoding closed, execute the smallest remaining runtime lifecycle slice and then reconcile entity promotion without reopening wire authority.",
+    "state": "BLOCKED_AUTH003_ENTITY_RECONCILIATION_AND_MAPPING0_PROMOTION",
+    "objective": "With AUTH-003 List/Add/Replace/Remove runtime evidence admitted, reconcile ENT-IDENTITY/ENT-CREDENTIAL field and ownership bindings without reopening wire/API/DTO authority.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-WIRE-SCHEMA-ENCODING-RECONCILIATION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-003::credential-list runtime/evidence slice; then Replace/Remove lifecycle evidence.",
+    "nextGate": "AUTH-003::entity field/ownership reconciliation; then final Mapping 0 / Five-Way gate.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -153,45 +153,37 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Main advanced through the governed AUTH-003 Replace/Remove implementation admission and lifecycle slice merge; refresh cursor freshness only. Runtime Evidence remains required and no Evidence Registry, Entity promotion, or Mapping 0 GREEN state is changed.",
-    "previousCursorSourceHead": "26ab8e73f21feb4f70b40fd4ffe55041973354e0",
-    "currentMainSha": "ce47f97ebacc1341363c81b7a266d6638e5db5cf",
+    "reason": "AUTH-003 List and Replace/Remove controlled remote runtime evidence is now admitted; cursor is refreshed to the current main tested source and advances only to entity reconciliation. No runtime rerun or Mapping 0 GREEN inference is made.",
+    "previousCursorSourceHead": "ce47f97ebacc1341363c81b7a266d6638e5db5cf",
+    "currentMainSha": "c96b39569c7505ade615b15e63d87f5afb8066cc",
     "remoteMigrationReexecution": "FORBIDDEN",
     "schemaPostcheckRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
-    "runtimeEvidenceStatus": "ADMITTED_PASS_VERIFIED",
-    "runtimeEvidenceRunId": "36299334577",
-    "runtimeEvidenceArtifactId": "10924573167",
-    "runtimeEvidenceSourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+    "runtimeEvidenceStatus": "AUTH003_LIST_AND_LIFECYCLE_PASS_VERIFIED",
+    "runtimeEvidenceRuns": [
+      "36307891924",
+      "36308120758"
+    ],
     "entityEvidenceBindingStatus": "BOUND_NOT_PROMOTED"
   },
-  "nextGate": "AUTH-003::credential-list runtime/evidence slice",
+  "nextGate": "AUTH-003::entity field/ownership reconciliation; then final Mapping 0 / Five-Way gate.",
   "runtimeEvidenceAdmission": {
-    "workflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
-    "runId": "36299334577",
-    "sourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
-    "databaseName": "luckread",
-    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
-    "artifactId": "10924573167",
-    "artifactSha256": "5ee09ed921ec8d1c1805e2db20c73a54a6be6c37a6a0ca4ddb3bf29f7ce353b5",
-    "status": "PASS_VERIFIED",
-    "productionWorkerDeployed": false,
-    "checks": [
-      "crossAccountDeniedBeforeMutation",
-      "addSucceededWithPublicProjectionOnly",
-      "idempotentReplayReturnsSameProjection",
-      "idempotencyConflictForDifferentRequest",
-      "concurrentUniquenessHasOneWinner",
-      "concurrentLoserIsGenericConflict",
-      "oneAuthoritativeNormalizedOwner",
-      "syntheticRowsRemainBounded"
-    ],
-    "provenanceCorrection": {
-      "correctedAt": "2026-09-27",
-      "reason": "Runtime evidence run 36299334577 tested exact implementation source 419bb7fd...; prior admission commit accidentally copied current main SHA into the sourceSha metadata field.",
-      "runtimeRunId": "36299334577",
-      "runtimeTestedSourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
-      "currentMainSha": "da8d34fe05f1a006bd6b4be95119eff21ba4f29b",
-      "rerunRequired": false
+    "list": {
+      "workflow": ".github/workflows/w02-auth-003-credential-list-runtime-evidence.yml",
+      "runId": "36307891924",
+      "sourceSha": "8a649ff602daaa0d4143324a52bcfa6c7443af6c",
+      "artifactId": "10927373190",
+      "artifactSha256": "3be328033f2bb13474c1beddfd8c85d2f5e496028afd0bb3875fbb552bad7850",
+      "status": "PASS_VERIFIED",
+      "productionWorkerDeployed": false
+    },
+    "lifecycle": {
+      "workflow": ".github/workflows/w02-auth-003-credential-lifecycle-runtime-evidence.yml",
+      "runId": "36308120758",
+      "sourceSha": "c96b39569c7505ade615b15e63d87f5afb8066cc",
+      "artifactId": "10928266844",
+      "artifactSha256": "a31d07cdf6ad9008e36faf410980e06f136aefc6e929aa18ba51ce50851ea56a",
+      "status": "PASS_VERIFIED",
+      "productionWorkerDeployed": false
     }
   },
   "contractDecisionBlocker": {
@@ -212,7 +204,7 @@
       "ENT-IDENTITY",
       "ENT-CREDENTIAL"
     ],
-    "reason": "AUTH-003 wire/API/DTO chain and physical add-slice evidence are closed; catalog promotion still requires full lifecycle runtime/evidence and final Mapping 0 reconciliation.",
+    "reason": "AUTH-003 List/Add/Replace/Remove runtime evidence is admitted; catalog promotion still requires final entity field/ownership reconciliation and Mapping 0 / Five-Way admission.",
     "evidenceRegistryStatus": "NOT_GREEN",
     "fiveWayStatus": "NOT_GREEN"
   }

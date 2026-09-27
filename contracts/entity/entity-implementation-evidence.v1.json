@@ -46,11 +46,13 @@
       "payloadNativeEvidenceRefs": [],
       "extensionEvidenceRefs": [
         "workers/W02-content/src/credentials/credential-add.ts",
-        "https://github.com/wanghuinet/luckread/actions/runs/36299334577"
+        "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
+        "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
+        "https://github.com/wanghuinet/luckread/actions/runs/36308120758"
       ],
       "blockers": [
         "ENT-IDENTITY catalog status remains PROPOSED pending final Mapping 0 entity/persistence promotion.",
-        "Full identity lifecycle outside the admitted credential-add slice is not evidenced.",
+        "AUTH-003 List/Replace/Remove lifecycle runtime evidence is now VERIFIED; final identity/entity promotion remains blocked by Mapping 0 reconciliation.",
         "Final Five-Way/R4 Mapping 0 validation remains NOT_GREEN."
       ],
       "status": "BLOCKED"
@@ -73,11 +75,13 @@
       "payloadNativeEvidenceRefs": [],
       "extensionEvidenceRefs": [
         "workers/W02-content/src/credentials/credential-add.ts",
-        "https://github.com/wanghuinet/luckread/actions/runs/36299334577"
+        "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
+        "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
+        "https://github.com/wanghuinet/luckread/actions/runs/36308120758"
       ],
       "blockers": [
         "ENT-CREDENTIAL catalog status remains PROPOSED pending final Mapping 0 entity/persistence promotion.",
-        "Only the admitted credential-add slice is evidenced; list/replace/remove lifecycle remains unverified.",
+        "AUTH-003 List/Replace/Remove lifecycle runtime evidence is now VERIFIED; final credential/entity promotion remains blocked by Mapping 0 reconciliation.",
         "Final Five-Way/R4 Mapping 0 validation remains NOT_GREEN."
       ],
       "status": "BLOCKED"
