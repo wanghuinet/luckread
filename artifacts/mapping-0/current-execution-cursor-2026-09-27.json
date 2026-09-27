@@ -2,14 +2,14 @@
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
   "sourceHead": "d831a871a57309a73d825a86e280ea1f4d0dbcf4",
-  "backupBranch": "backup/pre-auth001-response-replay-shape-20260927",
+  "backupBranch": "backup/pre-auth001-priv002-decision-packet-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
     "state": "BLOCKED_AUTH001_CONSENT_BINDING",
     "objective": "Complete the remaining AUTH-001 persistence contract: concrete PRIV-002 consent entity/schema/field/version/retention binding.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-SCHEMA-RECONCILIATION-2026-09-27.md",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-CONTRACT-DECISION-PACKET-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::admit the concrete PRIV-002 consent entity/schema/field/version/retention binding; then authorize the smallest registration runtime slice.",
+    "nextGate": "PRIV-002::merge one canonical concrete consent contract/change-control decision for Entity/Field/state/purpose/policy-version/retention/withdrawal; then bind AUTH-001 consent and authorize the smallest registration runtime slice.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -159,7 +159,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "AUTH-001 registration envelope idempotency fields/semantics and replayable committed response projection are now concretely admitted. Remaining persistence gate is the concrete PRIV-002 consent entity/schema/field/version/retention binding.",
-    "currentMainSha": "d831a871a57309a73d825a86e280ea1f4d0dbcf4",
+    "currentMainSha": "84793a33960961f8a91e50ec138fa287e8fa9e08",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "USERNAME_CONSENT_AND_IDENTITY_ENTRY_RECONCILED_REMAINING_GATES_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -220,15 +220,16 @@
     "docs/change-control/CC-MAPPING-0-AUTH-001-AUTH-013-INITIAL-PERSISTENCE-RECONCILIATION-2026-09-27.md",
     "docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-AUTHORITY-RECONCILIATION-2026-09-27.md",
     "docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONCRETE-SCHEMA-ADMISSION-GAP-2026-09-27.md",
-    "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-SCHEMA-RECONCILIATION-2026-09-27.md"
+    "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-SCHEMA-RECONCILIATION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-CONTRACT-DECISION-PACKET-2026-09-27.md"
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
-    "mainSha": "8212a33cd8d2a0b979764073cf9d13c04e3ef70c",
+    "mainSha": "84793a33960961f8a91e50ec138fa287e8fa9e08",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
     "implementationDisposition": "NO_CODE_CHANGE_AUTHORIZED_BY_CAPABILITY_CONTROL",
-    "staleEvidenceCorrection": "B19 old fields:[] observation is superseded by current active Users.ts source and must not be treated as current-head evidence."
+    "staleEvidenceCorrection": "B19 historical fields:[] observation remains superseded by active W01 source; replay response and PRIV-002 decision boundary were reconciled at current main head."
   }
 }

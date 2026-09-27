@@ -336,3 +336,25 @@ Frozen from the canonical P0 idempotency contract:
 The 24-hour retention and replay/conflict semantics are inherited unchanged.
 
 The exact persistence shape of the committed registration response identity/status and the binding of request `consent` remain blocked. Therefore the envelope is only `CONTRACTED_PARTIAL`; no registration runtime or migration is authorized.
+
+
+## 2026-09-27 AUTH-001 replay response reconciliation
+
+The registration envelope replay-response gate is now reconciled from canonical AUTH-001 / AUTH-013 authorities:
+
+- `userId` -> `ENT-USER.id`;
+- `accountState` -> `users.account_state`;
+- initial account state -> `PENDING_VERIFICATION`, version 1;
+- completed replay returns the original HTTP 201 result body without a second persisted status authority.
+
+Authoritative control:
+`docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-SCHEMA-RECONCILIATION-2026-09-27.md`.
+
+## 2026-09-27 PRIV-002 decision-boundary reconciliation
+
+The remaining AUTH-001 Contract blocker is now isolated to the concrete PRIV-002 consent contract. The exhaustive current-head search found no admitted canonical consent entity/field/retention schema.
+
+Authoritative decision packet:
+`docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-CONTRACT-DECISION-PACKET-2026-09-27.md`.
+
+No runtime, migration, or Mapping 0 promotion is authorized until that concrete authority decision is merged.
