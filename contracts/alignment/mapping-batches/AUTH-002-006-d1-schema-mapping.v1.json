@@ -35,11 +35,90 @@
         "ENT-CREDENTIAL"
       ],
       "fieldContractRef": "contracts/entity/AUTH-003-credential-field-contract.v1.json",
-      "physicalTableIds": "PENDING_SCHEMA_EVIDENCE",
-      "columnMappings": "PENDING_FIELD_BY_FIELD_SCHEMA_EVIDENCE",
-      "indexes": "PENDING_SCHEMA_EVIDENCE",
-      "constraints": "PENDING_SCHEMA_EVIDENCE",
-      "migrationId": "MIG-AUTH-003-CREDENTIAL-V1"
+      "physicalTableIds": {
+        "ENT-IDENTITY": "auth_identities",
+        "ENT-CREDENTIAL": "auth_credentials"
+      },
+      "columnMappings": {
+        "ENT-IDENTITY": {
+          "id": "id",
+          "userId": "user_id",
+          "username": "username",
+          "usernameNormalized": "username_normalized",
+          "email": "email",
+          "emailNormalized": "email_normalized",
+          "phone": "phone",
+          "phoneNormalized": "phone_normalized",
+          "normalizationVersion": "normalization_version"
+        },
+        "ENT-CREDENTIAL": {
+          "id": "id",
+          "identityId": "identity_id",
+          "kind": "kind",
+          "valueHash": "value_hash",
+          "normalizedValue": "normalized_value",
+          "verifiedAt": "verified_at",
+          "active": "active",
+          "createdAt": "created_at",
+          "updatedAt": "updated_at"
+        }
+      },
+      "indexes": {
+        "auth_identities": [
+          "UNIQUE(user_id)",
+          "UNIQUE(username_normalized)",
+          "UNIQUE(email_normalized)",
+          "UNIQUE(phone_normalized)"
+        ],
+        "auth_credentials": [
+          "UNIQUE(value_hash)",
+          "UNIQUE(kind, normalized_value)",
+          "INDEX(identity_id)",
+          "INDEX(kind)",
+          "INDEX(verified_at)",
+          "INDEX(active)",
+          "INDEX(created_at)",
+          "INDEX(updated_at)"
+        ]
+      },
+      "constraints": {
+        "auth_identities": [
+          "PRIMARY KEY(id)",
+          "NOT NULL(id)",
+          "NOT NULL(user_id)",
+          "NOT NULL(normalization_version)",
+          "CHECK(length(normalization_version) > 0)"
+        ],
+        "auth_credentials": [
+          "PRIMARY KEY(id)",
+          "NOT NULL(id, identity_id, kind, value_hash, normalized_value, active, created_at, updated_at)",
+          "CHECK(kind IN ('username','email','phone'))",
+          "CHECK(active IN (0,1))",
+          "FOREIGN KEY(identity_id) REFERENCES auth_identities(id) ON DELETE CASCADE"
+        ]
+      },
+      "migrationId": "MIG-AUTH-003-CREDENTIAL-V1",
+      "evidenceRefs": [
+        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
+        "https://github.com/wanghuinet/luckread/actions/runs/36296831559",
+        "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
+        "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
+        "artifacts/mapping-0/auth-003-logical-ownership-reconciliation-2026-09-27.json"
+      ],
+      "verifiedSourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435",
+      "schemaEvidenceArtifact": {
+        "runId": "36298629648",
+        "artifactId": "10924623571",
+        "artifactSha256": "983dbb8a8dca7f3919c5736acfa6f873653decd13633831f55d7ef76653e5dbb5",
+        "databaseName": "luckread",
+        "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+        "binding": "D1_01",
+        "mode": "READONLY",
+        "remoteDdl": false,
+        "remoteDml": false
+      },
+      "mappingDisposition": "PHYSICAL_MAPPING_EVIDENCED_FOR_ADMITTED_AUTH003_SLICE",
+      "status": "BLOCKED_ON_FULL_LIFECYCLE_AND_MAPPING0"
     },
     {
       "featureId": "AUTH-004",
