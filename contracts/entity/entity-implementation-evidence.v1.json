@@ -31,11 +31,8 @@
     {
       "entityId": "ENT-IDENTITY",
       "catalogStatus": "PROPOSED",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
-        "workers/W02-content/src/credentials/credential-add.ts"
-      ],
+      "implementationStatus": "BLOCKED",
+      "implementationRefs": [],
       "schemaEvidenceRefs": [
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
       ],
@@ -51,9 +48,9 @@
         "https://github.com/wanghuinet/luckread/actions/runs/36308120758"
       ],
       "blockers": [
-        "ENT-IDENTITY catalog status remains PROPOSED pending final Mapping 0 entity/persistence promotion.",
-        "AUTH-003 List/Replace/Remove lifecycle runtime evidence is now VERIFIED; final identity/entity promotion remains blocked by Mapping 0 reconciliation.",
-        "Final Five-Way/R4 Mapping 0 validation remains NOT_GREEN."
+        "ENT-IDENTITY schema and migration evidence exist, but no independently evidenced production identity materialization/CRUD lifecycle implementation exists.",
+        "AUTH-003 runtime evidence uses seeded auth_identities fixtures as a dependency and does not itself establish identity lifecycle ownership.",
+        "Final Mapping 0 / Five-Way validation remains NOT_GREEN."
       ],
       "status": "BLOCKED"
     },
@@ -63,7 +60,9 @@
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
         "workers/W02-content/src/credentials/credential-add.ts",
-        "workers/W02-content/migrations/0004_auth_003_credentials.sql"
+        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
+        "workers/W02-content/src/credentials/credential-list.ts",
+        "workers/W02-content/src/credentials/credential-lifecycle.ts"
       ],
       "schemaEvidenceRefs": [
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
@@ -80,9 +79,9 @@
         "https://github.com/wanghuinet/luckread/actions/runs/36308120758"
       ],
       "blockers": [
-        "ENT-CREDENTIAL catalog status remains PROPOSED pending final Mapping 0 entity/persistence promotion.",
-        "AUTH-003 List/Replace/Remove lifecycle runtime evidence is now VERIFIED; final credential/entity promotion remains blocked by Mapping 0 reconciliation.",
-        "Final Five-Way/R4 Mapping 0 validation remains NOT_GREEN."
+        "ENT-CREDENTIAL runtime/persistence evidence is complete for the admitted AUTH-003 List/Add/Replace/Remove slice.",
+        "Canonical catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and final Mapping 0 / Five-Way reconciliation is NOT_GREEN.",
+        "No promotion is inferred from the credential entity's dependency on auth_identities."
       ],
       "status": "BLOCKED"
     },
