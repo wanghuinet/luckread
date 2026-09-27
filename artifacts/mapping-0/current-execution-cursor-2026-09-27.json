@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "270214173f451e7ee209acb597d91e6c92bff93d",
-  "backupBranch": "backup/pre-auth001-wire-payload-compatibility-20260927",
+  "sourceHead": "09b445ade0f3e937ad7a6d0c6c13a4cee013b7a4",
+  "backupBranch": "backup/pre-auth001-native-auth-identity-boundary-20260927",
   "currentCursor": {
     "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
-    "state": "BLOCKED_AUTH001_WIRE_PAYLOAD_COMPATIBILITY",
-    "objective": "Reconcile the AUTH-001 public registration wire with the active Payload User persistence boundary before authorizing runtime implementation.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-PAYLOAD-WIRE-COMPATIBILITY-2026-09-27.md",
+    "state": "BLOCKED_AUTH001_NATIVE_AUTH_IDENTITY_BOUNDARY",
+    "objective": "Reconcile supported registration identity types with the existing Payload-native User/auth boundary before authorizing authRegister runtime.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-NATIVE-AUTH-IDENTITY-BOUNDARY-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::username omission + phone durable source + consent authority + idempotency replay reconciliation; then smallest admitted registration handler.",
+    "nextGate": "AUTH-001::native-auth identity decision + username omission + phone source + consent + idempotency/replay + consistency semantics; then smallest admitted registration runtime slice.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -153,16 +153,16 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Current AUTH-001 wire and active Payload User contract are concretely incompatible: username is optional in wire but required in User; phone is accepted by wire but absent from User durable source; consent has no admitted persistence authority; registration idempotency persistence is not evidenced.",
-    "currentMainSha": "270214173f451e7ee209acb597d91e6c92bff93d",
-    "transportStatus": "W01_W02_SERVICE_BINDING_VERIFIED_AT_RUNTIME_SCOPE",
-    "phoneSourceStatus": "BLOCKED",
+    "reason": "Active W01 Users.ts uses Payload native auth without a custom phone strategy, while AUTH-001 permits phone registration. Combined with required username vs optional wire, missing consent authority, missing durable idempotency authority and unresolved consistency semantics, runtime remains unauthorized.",
+    "currentMainSha": "09b445ade0f3e937ad7a6d0c6c13a4cee013b7a4",
+    "nativeAuthStatus": "PAYLOAD_NATIVE_NO_PHONE_STRATEGY_ADMITTED",
     "payloadWireCompatibilityStatus": "BLOCKED",
+    "phoneSourceStatus": "BLOCKED",
     "idempotencySourceStatus": "BLOCKED",
     "atomicityStatus": "BLOCKED",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED"
   },
-  "nextGate": "AUTH-001::username omission + phone durable source + consent authority + idempotency replay reconciliation; then smallest admitted registration handler.",
+  "nextGate": "AUTH-001::native-auth identity decision + username omission + phone source + consent + idempotency/replay + consistency semantics; then smallest admitted registration runtime slice.",
   "runtimeEvidenceAdmission": {
     "list": {
       "workflow": ".github/workflows/w02-auth-003-credential-list-runtime-evidence.yml",
@@ -201,7 +201,7 @@
       "ENT-IDENTITY",
       "ENT-CREDENTIAL"
     ],
-    "reason": "ENT-CREDENTIAL remains evidenced but not promoted. ENT-IDENTITY remains blocked. AUTH-001 cannot enter runtime implementation while public wire and Payload User persistence semantics remain inconsistent.",
+    "reason": "ENT-CREDENTIAL remains evidenced but not promoted. ENT-IDENTITY remains blocked. AUTH-001 requires explicit identity-type/native-auth reconciliation before implementation.",
     "evidenceRegistryStatus": "NOT_GREEN",
     "fiveWayStatus": "NOT_GREEN"
   }
