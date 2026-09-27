@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "9b9d5a9ce8025569048915bd991e20d4ff901be1",
-  "backupBranch": "backup/pre-priv004-policy-instance-admission-20260927",
+  "sourceHead": "93ab9acd5c20b924ec27e7db87e8f33e5a4d7c7c",
+  "backupBranch": "backup/pre-cursor-head-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
     "state": "BLOCKED_PRIV004_POLICY_INSTANCE",
@@ -161,8 +161,8 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "PRIV-004 authority contract shape is reconciled and the concrete policy-instance admission packet is frozen, but no approved ACCOUNT_REGISTRATION / LEGAL_AUDIT policy instance has been admitted.",
-    "currentMainSha": "9b9d5a9ce8025569048915bd991e20d4ff901be1",
+    "reason": "PRIV-004 authority contract shape and policy-instance admission gate are reconciled on current main; no approved ACCOUNT_REGISTRATION / LEGAL_AUDIT policy instance has been admitted.",
+    "currentMainSha": "93ab9acd5c20b924ec27e7db87e8f33e5a4d7c7c",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_CONTRACT_PRECONDITIONS_RECONCILED_RUNTIME_PENDING",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -237,7 +237,7 @@
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
-    "mainSha": "9b9d5a9ce8025569048915bd991e20d4ff901be1",
+    "mainSha": "93ab9acd5c20b924ec27e7db87e8f33e5a4d7c7c",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
