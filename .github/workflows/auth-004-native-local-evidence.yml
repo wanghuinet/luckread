@@ -19,8 +19,15 @@ jobs:
       - name: Install W01 dependencies
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
+      - name: Initialize local Payload D1 schema
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: development
+          PAYLOAD_SECRET: ignore
+        run: pnpm payload migrate
       - name: Run native AUTH-004 Local API lifecycle probe
         working-directory: workers/W01-payload
         env:
+          NODE_ENV: development
           PAYLOAD_SECRET: ignore
         run: node --import=tsx/esm scripts/auth-004-native-local-probe.mjs
