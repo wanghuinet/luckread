@@ -58,3 +58,7 @@ Therefore the current decision remains:
 - Mapping 0 GREEN promotion: `NOT_AUTHORIZED`
 
 This reconciliation closes the search step without manufacturing authority and does not reopen any already-closed AUTH-003 wire/API/DTO work.
+
+## Historical resource-budget source disposition
+
+`contracts/resource-budget/edge-first-worker-topology.json` was also checked. Its resource defaults are not current AUTH-003 authority: the repository explicitly classifies that W01-W13/P01-P08 topology as historical and superseded by the current 12-Worker target. Therefore its D1/event/queue/anti-abuse defaults are not promoted into the AUTH-003 Operation Policy.
