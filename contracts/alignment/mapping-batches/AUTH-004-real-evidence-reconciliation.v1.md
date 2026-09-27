@@ -21,13 +21,13 @@
 
 ## 2. Missing canonical traceability
 
-- Canonical API operation IDs are now bound by `contracts/api/AUTH-004-password-recovery-contract.v1.json`.
-- Request/response DTO IDs: missing.
+- Canonical API operation IDs and wire-contract fields/statuses are now bound by `contracts/api/AUTH-004-password-recovery-contract.v1.json`.
+- Request/response DTO IDs: bound in the AUTH-004 feature contract; canonical DTO Registry admission remains pending canonical OpenAPI admission.
 - Credential/session entity references are now bound for the native implementation mapping; runtime field/schema evidence remains missing.
 - Recovery-token persistence mapping now points to Payload-native `resetPasswordToken` / `resetPasswordExpiration`; actual D1 runtime schema evidence remains missing.
-- Permission/scoped authorization mapping for authenticated password change: missing.
-- Account recovery authorization boundary: missing.
-- Account/session invalidation semantics after password change/reset: incomplete.
+- Permission/scoped authorization mapping for authenticated password change: bound to `user.credential.manage` + `self` in the AUTH-004 feature contract and Auth Operation Policy.
+- Account recovery authorization boundary: bound to anonymous reset request and token-bound reset confirm in the AUTH-004 feature contract and Auth Operation Policy.
+- Account/session invalidation semantics after password change/reset: contractually bound to native Payload session lifecycle; executable lifecycle evidence remains missing.
 - Event IDs for password change/reset and credential rotation: missing.
 - Worker/runtime implementation evidence: missing.
 - D1 domain is `D1-01`; AUTH-004 custom migration is explicitly `NOT_REQUIRED_NATIVE`, while physical schema/runtime evidence remains unresolved.
@@ -47,7 +47,16 @@ The Payload-native implementation boundary is now explicitly recorded in code an
 
 `AUTH-004` may be promoted only after the required API/DTO/entity/field/persistence/security/lifecycle/event/worker/test/evidence links are authoritative and non-empty, executable verification produces durable evidence, and the final Mapping 0 validator result is tied to a commit SHA.
 
-## 6. Gate result
+## 6. Contract-reconciliation result
+
+Definition-layer reconciliation is recorded at main commit `3ab18252544ffb9a15da3380b5878d5c6b6fc63a`.
+
+- Wire contract: reconciled
+- Auth Operation Policy: reconciled
+- Canonical OpenAPI/DTO registry: still pending
+- Runtime/persistence/security/integration evidence: still missing
+
+## 7. Gate result
 
 `AUTH-004 = BLOCKED_NOT_GREEN`
 
