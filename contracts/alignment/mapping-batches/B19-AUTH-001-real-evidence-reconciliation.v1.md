@@ -173,3 +173,37 @@ AUTH-001's Idempotency-Key requirement is contractually defined, but current-sou
 This blocks safe recovery of a partially materialized registration: a replay must be distinguishable from an unrelated anonymous request using the same identity. Until the idempotency authority, replay semantics and partial-registration recovery semantics are explicitly contracted, `authRegister` implementation remains unauthorized.
 
 Authoritative control: `docs/change-control/CC-MAPPING-0-AUTH-001-IDEMPOTENCY-SOURCE-GATE-2026-09-27.md`.
+
+
+## 2026-09-27 Payload/Wire compatibility gate
+
+A current-source comparison found a concrete pre-implementation contract mismatch between the AUTH-001 public request and the active Payload User persistence contract.
+
+### Mismatch A — optional username vs required User field
+
+The canonical AUTH-001 OpenAPI request makes `username` optional. The active `ENT-USER-F-USERNAME` contract and W01 `Users.ts` make `username` required, unique and indexed.
+
+No authoritative rule currently defines how a registration request that omits `username` produces the required User username. Deriving a username from email/phone, synthesizing one, or making the field optional would each change a frozen contract and is not authorized by inference.
+
+### Mismatch B — phone registration lacks a User-side durable source
+
+AUTH-001 permits `identityType=phone`. The active W01 Users collection has no phone field. Therefore a later W02 identity materialization cannot recover the original phone identifier from the committed User record after a cross-worker delivery failure.
+
+The semantic destination `ENT-IDENTITY.phone` remains valid, but the current source boundary is not.
+
+### Mismatch C — consent has no admitted persistence authority
+
+The AUTH-001 request contains optional `consent`, while no canonical entity/field persistence authority has been admitted for this request object.
+
+### Disposition
+
+These are contract compatibility blockers, not implementation bugs. No runtime handler should be written until the registration wire contract and Payload User boundary are explicitly reconciled.
+
+The reconciliation must decide, without adding an unnecessary parallel account model:
+
+1. the authoritative rule for omitted username;
+2. the durable source for phone registration;
+3. the persistence/retention authority for consent;
+4. the interaction of these fields with the existing Payload-native password boundary and AUTH-001 idempotency semantics.
+
+Mapping 0 remains NOT_GREEN.
