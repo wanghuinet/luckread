@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "419bb7fd887af0c30412bead50f8196ec6446bb7",
-  "backupBranch": "backup/pre-auth003-current-sha-cursor-sync-20260927",
+  "sourceHead": "5dff85d47578eb1dcaa57a53b0a072dfe2a80d88",
+  "backupBranch": "backup/pre-auth003-runtime-evidence-admission-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
-    "state": "BLOCKED_RUNTIME_PERSISTENCE_SECURITY_EVIDENCE_REQUIRED",
+    "state": "BLOCKED_AUTH003_ENTITY_MAPPING_RECONCILIATION_REQUIRED",
     "objective": "Admit the actual remote MIG-AUTH-003-CREDENTIAL-V1 execution through read-only exact-SHA post-schema, migration-ledger, and provenance evidence before runtime implementation.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-003 same-SHA persistence/security/runtime vertical slice -> controlled remote runtime evidence -> runtime/security evidence admission",
+    "nextGate": "AUTH-003 admitted runtime/security evidence -> reconcile ENT-IDENTITY / ENT-CREDENTIAL physical mapping -> decision admission; no Mapping 0 GREEN",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED"
@@ -138,7 +138,11 @@
     "implementationCommit": "419bb7fd887af0c30412bead50f8196ec6446bb7",
     "implementationStatus": "MERGED_TO_MAIN_RUNTIME_EVIDENCE_PENDING",
     "runtimeWorkflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
-    "runtimeRequirement": "same-SHA controlled remote D1 runtime evidence; no production Worker deployment"
+    "runtimeRequirement": "same-SHA controlled remote D1 runtime evidence; no production Worker deployment",
+    "runtimeEvidenceStatus": "PASS_VERIFIED",
+    "runtimeEvidenceRunId": "36299334577",
+    "runtimeEvidenceArtifactId": "10924573167",
+    "runtimeEvidenceArtifactSha256": "5ee09ed921ec8d1c1805e2db20c73a54a6be6c37a6a0ca4ddb3bf29f7ce353b5"
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced after the prior post-migration evidence admission and AUTH-003 credential-add implementation merge; cursor must track the current authoritative main SHA without changing remote D1 state.",
@@ -146,6 +150,30 @@
     "currentMainSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
     "remoteMigrationReexecution": "FORBIDDEN",
     "schemaPostcheckRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
-    "runtimeEvidenceStatus": "PENDING"
+    "runtimeEvidenceStatus": "ADMITTED_PASS_VERIFIED",
+    "runtimeEvidenceRunId": "36299334577",
+    "runtimeEvidenceArtifactId": "10924573167"
+  },
+  "nextGate": "Reconcile admitted AUTH-003 runtime/persistence evidence to ENT-IDENTITY/ENT-CREDENTIAL physical mapping and Mapping 0 decision material; do not mark Mapping 0 GREEN.",
+  "runtimeEvidenceAdmission": {
+    "workflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
+    "runId": "36299334577",
+    "sourceSha": "5dff85d47578eb1dcaa57a53b0a072dfe2a80d88",
+    "databaseName": "luckread",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "artifactId": "10924573167",
+    "artifactSha256": "5ee09ed921ec8d1c1805e2db20c73a54a6be6c37a6a0ca4ddb3bf29f7ce353b5",
+    "status": "PASS_VERIFIED",
+    "productionWorkerDeployed": false,
+    "checks": [
+      "crossAccountDeniedBeforeMutation",
+      "addSucceededWithPublicProjectionOnly",
+      "idempotentReplayReturnsSameProjection",
+      "idempotencyConflictForDifferentRequest",
+      "concurrentUniquenessHasOneWinner",
+      "concurrentLoserIsGenericConflict",
+      "oneAuthoritativeNormalizedOwner",
+      "syntheticRowsRemainBounded"
+    ]
   }
 }
