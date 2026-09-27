@@ -249,7 +249,7 @@
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
-    "mainSha": "e5d1dea7531791892831d7c3f6c00e1cf8474fac",
+    "mainSha": "1a1e097dff6334dee8878d098c772bedaa6cb87e",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
