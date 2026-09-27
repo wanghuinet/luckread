@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "953e9f40cdbd9eccf454ee2cb6deae2cb543d352",
+  "sourceHead": "673fc9d14fef33d618fb2121c3f5304cf46ae926",
   "backupBranch": "backup/pre-auth003-postmigration-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
@@ -77,6 +77,12 @@
     "captures": [
       "sqlite_master",
       "table_list",
+      "auth_identities_table_info",
+      "auth_credentials_table_info",
+      "auth_identities_index_list",
+      "auth_credentials_index_list",
+      "auth_credentials_foreign_keys",
+      "foreign_key_check",
       "d1_migrations_presence",
       "d1_migrations",
       "provenance"
@@ -95,7 +101,9 @@
     "executionEvidenceRef": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
     "postcheckWorkflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
     "postcheckRequired": true,
-    "migrationWorkflow": ".github/workflows/w02-auth-003-migration-evidence.yml"
+    "migrationWorkflow": ".github/workflows/w02-auth-003-migration-evidence.yml",
+    "workflowCommit": "673fc9d14fef33d618fb2121c3f5304cf46ae926",
+    "postcheckValidation": "Expected AUTH-003 tables/columns/indexes/FK and migration ledger are validated read-only; no DDL/DML."
   },
   "decisionInput": {
     "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md",
