@@ -5,7 +5,7 @@ on:
     branches: [main, 'contract/**']
     paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-admission-v2.yml']
   pull_request:
-    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-admission-ci.yml']
+    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-admission-v2.yml']
   workflow_dispatch:
     inputs:
       checkout_ref:
