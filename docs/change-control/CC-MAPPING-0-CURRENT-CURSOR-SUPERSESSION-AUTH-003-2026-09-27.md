@@ -3,8 +3,8 @@
 
 - Control ID: `CC-MAPPING-0-CURRENT-CURSOR-SUPERSESSION-AUTH-003-2026-09-27`
 - Status: `CURRENT CURSOR RECONCILED / NOT GREEN`
-- Source main: `d8915eab213070c45ae858f2d409a3679065a6c1`
-- Backup: `backup/pre-current-cursor-supersession-auth003-20260927`
+- Source main: `62005334267f3db3237ad42774c3a5ca984615cb`
+- Backup: `backup/pre-current-cursor-head-correction-20260927`
 - Machine cursor: `artifacts/mapping-0/current-execution-cursor-2026-09-27.json`
 
 ## Current execution authority

@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "d8915eab213070c45ae858f2d409a3679065a6c1",
-  "backupBranch": "backup/pre-current-cursor-supersession-auth003-20260927",
+  "sourceHead": "62005334267f3db3237ad42774c3a5ca984615cb",
+  "backupBranch": "backup/pre-current-cursor-head-correction-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
     "state": "BLOCKED_RUNTIME_PERSISTENCE_IMPLEMENTATION_ADMISSION_REQUIRED",
@@ -36,5 +36,6 @@
     "Do not infer AUTH-003 physical table, column, index or constraint names.",
     "Do not promote ENT-IDENTITY or ENT-CREDENTIAL.",
     "Do not promote Mapping 0 GREEN or Evidence Registry status from documentation-only changes."
-  ]
+  ],
+  "previousSourceHead": "d8915eab213070c45ae858f2d409a3679065a6c1"
 }
