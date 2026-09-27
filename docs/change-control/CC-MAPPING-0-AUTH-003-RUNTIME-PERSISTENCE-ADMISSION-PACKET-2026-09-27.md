@@ -3,7 +3,7 @@
 
 - Control ID: `CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27`
 - Status: `AUTHORITY INPUT REQUIRED / IMPLEMENTATION NOT AUTHORIZED`
-- Source main: `6f23e53237286c8fdec5d078737d0340d61f794a8`
+- Source main: `a587ccb7670e402c5fef300ac4f25e6705a846128`
 - Backup: `backup/pre-auth003-admission-packet-20260927`
 - Machine packet: `artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json`
 
