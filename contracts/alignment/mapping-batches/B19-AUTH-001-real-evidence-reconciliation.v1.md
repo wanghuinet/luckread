@@ -72,3 +72,69 @@ Required chain:
 ## Next closure action
 
 The next admissible step is to establish the canonical registration implementation boundary and the authoritative persistence contract for the remaining registration identity/credential fields. Do not reopen the now-closed User-ID authority question. Only after real handler/migration evidence exists should Mapping 0 be regenerated and evaluated by the fail-closed validator.
+
+
+## Registration field authority reconciliation
+
+The following subset is now contract-reconciled without claiming implementation:
+
+| AUTH-001 request field | Canonical destination | Disposition |
+| --- | --- | --- |
+| identityType | selects ENT-IDENTITY.email or ENT-IDENTITY.phone; corresponding ENT-CREDENTIAL.kind is email or phone | CONTRACT-RECONCILED |
+| identity | value for the selected email/phone identity; normalized form follows AUTH-003 deterministic normalization rules | CONTRACT-RECONCILED |
+| username | ENT-IDENTITY.username and corresponding ENT-CREDENTIAL.kind=username when supplied | CONTRACT-RECONCILED |
+| credential | Payload native authentication password material on ENT-USER; not an ENT-CREDENTIAL username/email/phone row | CONTRACT-RECONCILED |
+| consent | no canonical persistence entity/field is currently admitted for this request object | UNRESOLVED / BLOCKED |
+| response userId | ENT-USER.id, also the immutable cross-domain source for ENT-IDENTITY.userId | CONTRACT-RECONCILED |
+| response accountState | ENT-USER.account_state; first persisted registration state is PENDING_VERIFICATION, version 1 under the existing AUTH-013 account-state contract | PERSISTENCE CONTRACT RECONCILED; RUNTIME REGISTRATION UNVERIFIED |
+
+The password disposition follows the existing Payload-native authentication boundary. The active W01 Users collection is auth-enabled, and Payload documents password as an authentication field rather than a custom application credential entity. Payload also supports native username/email authentication configuration.
+
+## Registration writer-boundary conflict
+
+The remaining blocking decision is the write boundary, not the field vocabulary.
+
+AUTH-001 currently declares:
+
+- resource class: SINGLE_AUTHORITATIVE_WRITE;
+- D1 writes max: 1;
+- outbound/RPC max: 0;
+- same-request replay must not create a second account.
+
+The reconciled field model simultaneously requires, for a complete registration outcome:
+
+1. one authoritative ENT-USER account creation through the existing Payload auth boundary;
+2. one ENT-IDENTITY row in auth_identities;
+3. zero or more initial ENT-CREDENTIAL identifier rows in auth_credentials;
+4. ENT-USER.account_state=PENDING_VERIFICATION.
+
+The current repository does not contain an admitted single-writer mechanism that atomically owns all of those writes. Splitting the work across W01 Payload creation plus a second W02 D1 write would violate the existing AUTH-001 outboundMax=0 / single-authoritative-write contract unless a new Change Control decision explicitly changes that boundary.
+
+Therefore:
+
+- no registration runtime implementation is authorized by this reconciliation;
+- no cross-Worker registration RPC is invented;
+- no second identity service is introduced;
+- no direct replacement of Payload native password handling is introduced.
+
+The next Change Control must resolve where the single authoritative registration write occurs while preserving Payload-native password handling and the frozen AUTH-001 budget.
+
+## Closed registration sub-gates
+
+Closed:
+
+- ENT-USER.id -> ENT-IDENTITY.userId -> auth_identities.user_id;
+- registration password -> Payload native auth credential material, not ENT-CREDENTIAL;
+- response.userId -> ENT-USER.id;
+- response.accountState -> users.account_state;
+- first persisted account state contract -> PENDING_VERIFICATION, version 1.
+
+Still blocked:
+
+- canonical consent persistence/authority;
+- atomic/single-writer registration boundary across User + Identity + Credential persistence;
+- concrete authRegister handler;
+- registration security/anti-abuse executable evidence;
+- integration/E2E and Evidence Registry admission.
+
+AUTH-001 remains BLOCKED_UNTIL_IMPLEMENTATION_AND_PERSISTENCE_EVIDENCE; Mapping 0 remains NOT_GREEN.
