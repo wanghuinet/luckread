@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "ecfcbdfc2e5e64c77a7abd9f51407f60a183bbfb",
-  "backupBranch": "backup/pre-auth003-policy-task-decision-input-20260927",
+  "sourceHead": "71168c77acc0be2889b2e36e2dccf6a525b43229",
+  "backupBranch": "backup/pre-auth003-policy-task-authority-admission-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
-    "state": "BLOCKED_RUNTIME_PERSISTENCE_IMPLEMENTATION_ADMISSION_REQUIRED",
-    "objective": "Resolve explicit operation-policy authority and physical persistence authority before runtime or migration implementation.",
+    "state": "BLOCKED_SCHEMA_EVIDENCE_REQUIRED",
+    "objective": "Capture/admit actual D1-01 schema/migration evidence before runtime or migration implementation.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-003 D1-01 schema evidence + policy/task-edge decision admission -> smallest runtime/persistence vertical slice",
+    "nextGate": "AUTH-003 D1-01 schema evidence admission -> smallest runtime/persistence vertical slice",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED"
@@ -81,11 +81,10 @@
     "schemaEvidence": "PENDING_CAPTURE_AND_REVIEW"
   },
   "decisionInput": {
-    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-POLICY-TASK-DECISION-INPUT-2026-09-27.md",
-    "document": "docs/decisions/2026-09-27-auth003-policy-and-task-edge-decision-input.md",
-    "status": "PROPOSED_NOT_AUTHORIZED",
-    "candidateTask": "T01",
-    "policyProfile": "MINIMAL_COST_FIRST"
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md",
+    "taskEdge": "AUTH-003 -> T01 -> W02 -> D1-01",
+    "taskEdgeStatus": "PASS_VERIFIED_LOGICAL_MAPPING",
+    "operationPolicyStatus": "CLOSED_AUTHORITY_ADMITTED"
   },
   "authoritySourcesChecked": [
     "contracts/api/auth-operation-policy.v1.json",
