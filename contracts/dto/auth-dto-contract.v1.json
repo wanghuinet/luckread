@@ -149,6 +149,47 @@
         "ENT-USER"
       ],
       "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "AUTH-004",
+      "operationId": "authPasswordChange",
+      "requestDtoId": "DTO-AUTH-004-PASSWORD-CHANGE-REQUEST",
+      "responseDtoId": null,
+      "requestSchemaRef": "#/paths/~1auth~1password~1change/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": null,
+      "responseStatus": 204,
+      "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-SESSION"
+      ],
+      "status": "NO_BODY_DTO"
+    },
+    {
+      "featureId": "AUTH-004",
+      "operationId": "authPasswordResetRequest",
+      "requestDtoId": "DTO-AUTH-004-PASSWORD-RESET-REQUEST",
+      "responseDtoId": null,
+      "requestSchemaRef": "#/paths/~1auth~1password~1reset~1request/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": null,
+      "responseStatus": 202,
+      "entityIds": [
+        "ENT-CREDENTIAL"
+      ],
+      "status": "NO_BODY_DTO"
+    },
+    {
+      "featureId": "AUTH-004",
+      "operationId": "authPasswordResetConfirm",
+      "requestDtoId": "DTO-AUTH-004-PASSWORD-RESET-CONFIRM",
+      "responseDtoId": null,
+      "requestSchemaRef": "#/paths/~1auth~1password~1reset~1confirm/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": null,
+      "responseStatus": 204,
+      "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-SESSION"
+      ],
+      "status": "NO_BODY_DTO"
     }
   ],
   "bindingRules": {

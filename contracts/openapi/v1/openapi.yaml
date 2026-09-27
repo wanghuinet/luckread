@@ -122,6 +122,97 @@ paths:
           description: Logged out; token version incremented.
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+  /auth/password/change:
+    post:
+      tags: [Auth]
+      summary: Change the current user's password
+      security:
+        - bearerAuth: []
+      operationId: authPasswordChange
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              additionalProperties: false
+              properties:
+                currentPassword:
+                  type: string
+                  format: password
+                  minLength: 15
+                  maxLength: 128
+                  writeOnly: true
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 15
+                  maxLength: 128
+                  writeOnly: true
+                  description: Must satisfy the canonical password policy, including compromised-password screening.
+      responses:
+        '204':
+          description: Password changed; no response body.
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /auth/password/reset/request:
+    post:
+      tags: [Auth]
+      summary: Request a password recovery email or equivalent asynchronous delivery
+      security: []
+      operationId: authPasswordResetRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier]
+              additionalProperties: false
+              properties:
+                identifier:
+                  type: string
+                  minLength: 1
+                  description: Account/recovery identifier. Public semantics must not disclose whether an account exists.
+      responses:
+        '202':
+          description: Recovery request accepted; no response body.
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /auth/password/reset/confirm:
+    post:
+      tags: [Auth]
+      summary: Confirm a password recovery request
+      security: []
+      operationId: authPasswordResetConfirm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recoveryToken, newPassword]
+              additionalProperties: false
+              properties:
+                recoveryToken:
+                  type: string
+                  minLength: 1
+                  writeOnly: true
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 15
+                  maxLength: 128
+                  writeOnly: true
+                  description: Must satisfy the canonical password policy, including compromised-password screening.
+      responses:
+        '204':
+          description: Password reset completed; no response body.
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
   /auth/credentials:
     get:
       tags: [Auth]
