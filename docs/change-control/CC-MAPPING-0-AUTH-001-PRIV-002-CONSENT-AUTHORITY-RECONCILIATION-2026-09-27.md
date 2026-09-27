@@ -2,7 +2,7 @@
 
 ## Status
 
-`PRIV-002_SEMANTIC_AUTHORITY_RECONCILED / CONCRETE_SCHEMA_BLOCKED`
+`PRIV-002_CONCRETE_CONTRACT_RECONCILED / RUNTIME_BLOCKED`
 
 ## Scope
 
@@ -78,3 +78,25 @@ This control does not authorize:
 PRIV-002 is no longer an unqualified "no authority" gap. Its minimum semantic invariants are reconciled from existing canonical sources.
 
 The remaining blocker is the **concrete executable contract**: schema/fields, retention binding, and AUTH-001 registration-envelope mapping.
+
+
+## 2026-09-27 concrete contract admission
+
+The minimum concrete PRIV-002 contract is now admitted for AUTH-001 registration:
+
+- canonical entity: `ENT-CONSENT`;
+- registration purpose: `ACCOUNT_REGISTRATION`;
+- initial state: `GRANTED`;
+- legal basis: `CONSENT`;
+- policy version: immutable per record;
+- actor/owner/resource scope binds to the committed `ENT-USER.id`;
+- consent retention class: `LEGAL_AUDIT`;
+- `retentionUntil` is server-calculated from the applicable lifecycle retention policy and is not client-selectable;
+- withdrawal is represented by `REVOKED`, a write-once `withdrawnAt`, immutable history, and the admitted `privacy.consent_withdrawn` event schema.
+
+Authoritative contract artifacts:
+- `contracts/entity/PRIV-002-consent-field-contract.v1.json`
+- `contracts/persistence/PRIV-002-consent-persistence-contract.v1.json`
+- `contracts/events/privacy-consent-withdrawn.v1.json`
+
+This closes the concrete schema gate for AUTH-001. Runtime, migration, physical persistence evidence and Evidence Registry promotion remain separate gates.
