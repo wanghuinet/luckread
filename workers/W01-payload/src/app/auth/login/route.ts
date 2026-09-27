@@ -82,10 +82,12 @@ export async function POST(request: Request): Promise<Response> {
 
   const payload = await getPayload({ config })
 
+  const loginContext: { __luckreadNativeAuthToken?: unknown } = {}
   let loginResult: Awaited<ReturnType<typeof payload.login>>
   try {
     loginResult = await payload.login({
       collection: 'users',
+      context: loginContext,
       data: {
         email: body.identity,
         password: body.credential,
@@ -104,17 +106,19 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
   }
 
-  // Payload's native login token is intentionally not exposed by the public
-  // collection response, but the Local API result still contains it internally.
-  // Re-authenticate that exact native token to obtain Payload's canonical _sid
-  // instead of inferring a session from the sessions[] ordering.
-  if (!loginResult.token || !loginResult.user?.id || !loginResult.exp) {
+  // Payload's native login result intentionally omits token when
+  // removeTokenFromResponses=true. The native afterLogin hook preserves that
+  // exact token only in this request-local context; re-authenticate it through
+  // Payload.auth() to obtain Payload's canonical _sid instead of guessing from
+  // sessions[] ordering.
+  const nativeAuthToken = loginContext.__luckreadNativeAuthToken
+  if (typeof nativeAuthToken !== 'string' || !loginResult.user?.id || !loginResult.exp) {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication runtime is unavailable')
   }
 
   const authResult = await payload.auth({
     headers: new Headers({
-      Authorization: 'Bearer ' + loginResult.token,
+      Authorization: 'Bearer ' + nativeAuthToken,
     }),
     canSetHeaders: false,
   })
