@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "status": "INPUT_REQUIRED",
+  "featureId": "PRIV-004",
+  "authorityContract": "contracts/privacy/PRIV-004-retention-policy-authority.v1.json",
+  "purposeBinding": {
+    "operationId": "authRegister",
+    "purpose": "ACCOUNT_REGISTRATION",
+    "retentionClass": "LEGAL_AUDIT",
+    "entityId": "ENT-CONSENT"
+  },
+  "requiredApprovedInstance": {
+    "policyId": "REQUIRED",
+    "policyVersion": "REQUIRED",
+    "owner": "REQUIRED",
+    "scope": "REQUIRED",
+    "environment": "REQUIRED",
+    "status": "MUST_BE_APPROVED_OR_ACTIVE",
+    "effectiveFrom": "REQUIRED",
+    "effectiveTo": "OPTIONAL",
+    "rule": {
+      "mode": "REQUIRED",
+      "durationSeconds": "REQUIRED_WHEN_MODE_DURATION",
+      "fixedUntil": "REQUIRED_WHEN_MODE_FIXED_UNTIL"
+    },
+    "sourceAuthority": "REQUIRED",
+    "approvalRef": "REQUIRED",
+    "rollbackVersion": "REQUIRED"
+  },
+  "admissionRules": [
+    "The instance must bind to ACCOUNT_REGISTRATION and LEGAL_AUDIT.",
+    "The instance must be approved or active before runtime use.",
+    "Exactly one deterministic retention rule mode must be present.",
+    "The client must not select or override the rule.",
+    "The selected policyVersion is persisted immutably on ENT-CONSENT.",
+    "No AUTH-001 runtime registration may persist ENT-CONSENT while the applicable policy instance is absent or unresolved.",
+    "Approval and provenance must be traceable to a current repository artifact."
+  ],
+  "missingInputs": [
+    "approved policyVersion and policyId",
+    "authoritative scope/effective period",
+    "approved deterministic retention rule",
+    "approvalRef and approval evidence",
+    "rollbackVersion/retirement path",
+    "current-commit provenance"
+  ],
+  "nonAuthorizations": [
+    "No concrete duration is inferred.",
+    "No fixed-until timestamp is inferred.",
+    "No jurisdiction-specific legal conclusion is inferred.",
+    "No runtime implementation or Evidence Registry promotion is authorized."
+  ]
+}
