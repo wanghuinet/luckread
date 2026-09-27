@@ -49,5 +49,12 @@
     "No fixed-until timestamp is inferred.",
     "No jurisdiction-specific legal conclusion is inferred.",
     "No runtime implementation or Evidence Registry promotion is authorized."
-  ]
+  ],
+  "governanceBaseline": {
+    "status": "ADMITTED",
+    "policy": "docs/176-PRIVACY-DATA-RETENTION-POLICY-v0.1.md",
+    "changeControl": "docs/change-control/CC-MAPPING-0-PRIVACY-DATA-RETENTION-POLICY-BASELINE-2026-09-27.md",
+    "admittedMainSha": "e5d1dea7531791892831d7c3f6c00e1cf8474fac",
+    "boundary": "Governance baseline only; does not satisfy concrete PRIV-004 policy-instance admission."
+  }
 }
