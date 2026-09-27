@@ -2,7 +2,7 @@
 
 ## Status
 
-`CONTRACT_PRECONDITIONS_RECONCILED / RUNTIME_IMPLEMENTATION_PENDING_CI_AND_EVIDENCE`
+`CONTRACT_PRECONDITIONS_RECONCILED / RUNTIME_BLOCKED_PRIV004_RETENTION_AUTHORITY`
 
 ## Preconditions already reconciled
 
@@ -16,6 +16,12 @@ AUTH-001 has admitted:
 - AUTH-001 envelope binding `consent_record_id -> ENT-CONSENT.id`;
 - W01 same-transaction writer boundary;
 - W02/D1-01 eventual Identity/Credential materialization.
+
+## Newly discovered runtime precondition gap
+
+`ENT-CONSENT.retentionUntil` is contractually required and must be server-calculated from the applicable lifecycle retention policy. Current authoritative sources define the lifecycle semantics but do not admit a concrete PRIV-004 policy authority/approved policy instance. Therefore runtime implementation is fail-closed until PRIV-004 is admitted. No retention duration is invented in AUTH-001.
+
+See `docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-GAP-2026-09-27.md`.
 
 ## Smallest runtime slice
 
@@ -100,4 +106,9 @@ No documentation-only run may promote AUTH-001 GREEN.
 
 ## Gate
 
-Implementation may start only after the current Contract CI / API contract checks for the admitted PR pass. Runtime evidence remains a separate promotion gate.
+Implementation may start only after both of these conditions are true:
+
+1. PRIV-004 admits an authoritative server-side retention policy input sufficient to calculate `ENT-CONSENT.retentionUntil`.
+2. The current Contract CI / API contract checks for the admitted contract change pass.
+
+Runtime evidence remains a separate promotion gate.
