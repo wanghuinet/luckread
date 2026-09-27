@@ -1,0 +1,40 @@
+{
+  "version": "1.0.0",
+  "status": "CURRENT_CURSOR_AUTHORITATIVE",
+  "sourceHead": "d8915eab213070c45ae858f2d409a3679065a6c1",
+  "backupBranch": "backup/pre-current-cursor-supersession-auth003-20260927",
+  "currentCursor": {
+    "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
+    "state": "BLOCKED_RUNTIME_PERSISTENCE_IMPLEMENTATION_ADMISSION_REQUIRED",
+    "objective": "Resolve explicit operation-policy authority and physical persistence authority before runtime or migration implementation.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-IMPLEMENTATION-ADMISSION-GAP-2026-09-27.md"
+  },
+  "alreadyClosed": {
+    "auth003Wire": true,
+    "auth003OpenApiDto": true,
+    "auth002E6Runtime": "36219132123",
+    "w01Baseline": "35508571153",
+    "auth002Auth003SharedEntityAuthority": true
+  },
+  "historicalOnlyCursors": [
+    "M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001 / WAIT_AUTHORITY_DECISION",
+    "AUTH-003 WIRE_SCHEMA_CLOSED / RUNTIME_PERSISTENCE_BLOCKED",
+    "AUTH-004 NEXT wording in pre-2026-09-27 queue header/body",
+    "W01-MIGRATION-BASELINE-AUTHORITY-001 / BLOCKED_EXTERNAL in historical ledger sections"
+  ],
+  "historicalRefs": [
+    "docs/change-control/CC-MAPPING-0-AUTH-002-R4-ENTITY-EVIDENCE-DEPENDENCY-2026-09-26.md",
+    "artifacts/mapping-0/auth-002-r4-entity-evidence-dependency-2026-09-26.json",
+    "docs/MAPPING-0-CLOSURE-LEDGER.md",
+    "contracts/alignment/mapping-batches/AUTH-003-006-next-closure-queue.v1.md"
+  ],
+  "rules": [
+    "Historical cursor text must not be treated as the current execution instruction.",
+    "Do not rerun W01 baseline 35508571153 unchanged.",
+    "Do not rerun AUTH-002 E6 runtime 36219132123 unchanged.",
+    "Do not reopen AUTH-003 wire/OpenAPI/DTO authority unless an authoritative input changes.",
+    "Do not infer AUTH-003 physical table, column, index or constraint names.",
+    "Do not promote ENT-IDENTITY or ENT-CREDENTIAL.",
+    "Do not promote Mapping 0 GREEN or Evidence Registry status from documentation-only changes."
+  ]
+}
