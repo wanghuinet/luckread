@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "controlId": "CC-MAPPING-0-AUTH-003-MIGRATION-ADMISSION-2026-09-27",
-  "status": "MIGRATION_DESIGN_ADMITTED / NOT_EXECUTED",
+  "status": "MIGRATION_DESIGN_ADMITTED / REMOTE_EXECUTION_REQUIRED",
   "featureId": "AUTH-003",
   "migrationId": "MIG-AUTH-003-CREDENTIAL-V1",
   "sourceEvidence": {
@@ -78,6 +78,14 @@
     "remoteMigrationApplied": false,
     "remoteEvidenceRegistered": false,
     "entitiesPromoted": false,
-    "mapping0Green": false
+    "mapping0Green": false,
+    "migrationWorkflow": ".github/workflows/w02-auth-003-migration-evidence.yml",
+    "nextRequiredRun": "manual workflow_dispatch with confirm=MIGRATE"
+  },
+  "sourceHead": "4e4a2302c25c316a27545643f0f31eeeb09582a0",
+  "localValidation": {
+    "artifact": "artifacts/mapping-0/auth-003-migration-design-local-validation-2026-09-27.json",
+    "status": "PASS_LOCAL_DESIGN_ONLY",
+    "remoteEvidence": false
   }
 }
