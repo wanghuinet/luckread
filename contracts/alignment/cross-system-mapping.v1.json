@@ -5500,17 +5500,24 @@
     },
     {
       "featureId": "PRIV-004",
-      "status": "UNRESOLVED",
+      "status": "PARTIAL",
       "apiOperationIds": [],
       "entityIds": [],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/PRIV-001-008-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/privacy/PRIV-004-retention-policy-authority.v1.json",
+        "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Approved production policy instance for ACCOUNT_REGISTRATION / LEGAL_AUDIT is not yet admitted.",
+        "Runtime retention evaluation and executable evidence remain blocked until the first policy instance is admitted."
+      ],
+      "contractRefs": [
+        "contracts/privacy/PRIV-004-retention-policy-authority.v1.json",
+        "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md"
       ]
     },
     {
