@@ -95,6 +95,10 @@ jobs:
             --config wrangler.jsonc \
             --command "PRAGMA foreign_key_check;" \
             > ../../artifacts/mapping-0/auth-003-d1-schema/foreign_key_check.txt
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote \
+            --config wrangler.jsonc \
+            --command "PRAGMA foreign_key_check(auth_credentials);" \
+            > ../../artifacts/mapping-0/auth-003-d1-schema/auth_credentials_foreign_key_check.txt
 
       - name: Read and persist remote migration ledger
         working-directory: workers/W02-content
