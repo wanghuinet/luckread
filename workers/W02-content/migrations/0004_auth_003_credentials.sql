@@ -21,15 +21,6 @@ CREATE TABLE auth_identities (
     CHECK (length(normalization_version) > 0)
 );
 
-CREATE INDEX auth_identities_username_normalized_idx
-  ON auth_identities (username_normalized);
-
-CREATE INDEX auth_identities_email_normalized_idx
-  ON auth_identities (email_normalized);
-
-CREATE INDEX auth_identities_phone_normalized_idx
-  ON auth_identities (phone_normalized);
-
 CREATE TABLE auth_credentials (
   id TEXT PRIMARY KEY NOT NULL,
   identity_id TEXT NOT NULL,
