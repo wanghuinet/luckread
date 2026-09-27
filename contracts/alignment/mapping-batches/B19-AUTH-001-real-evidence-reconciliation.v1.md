@@ -138,3 +138,12 @@ Still blocked:
 - integration/E2E and Evidence Registry admission.
 
 AUTH-001 remains BLOCKED_UNTIL_IMPLEMENTATION_AND_PERSISTENCE_EVIDENCE; Mapping 0 remains NOT_GREEN.
+
+
+## 2026-09-27 transport reconciliation
+
+The previously identified registration writer-boundary gap is now narrowed by the existing canonical transport authority. W01 is the public API/Gateway boundary, W02 is the D1-01 identity/account authority, and the W01 -> W02 HTTP Service Binding is already admitted and runtime-verified for governed AUTH/T01/T03 calls. AUTH-001 `rpcMax=1` therefore permits one internal call; `outboundMax=0` does not prohibit that internal Service Binding.
+
+The remaining blocker is not transport availability. It is the lack of an admitted atomic persistence contract spanning Payload-native User creation in W01 and ENT-IDENTITY / ENT-CREDENTIAL persistence in W02/D1-01 under AUTH-001 `d1WriteMax=1`. No cross-worker transaction or compensating write sequence is inferred.
+
+Authoritative control: `docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-TRANSPORT-AND-ATOMICITY-2026-09-27.md`.
