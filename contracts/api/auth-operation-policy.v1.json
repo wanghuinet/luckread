@@ -18,6 +18,17 @@
         "requiredFields": ["identityType", "identity", "credential", "username", "consent"],
         "identityType": ["email"]
       },
+      "consistency": {
+        "registrationCommitAuthority": "W01_PAYLOAD",
+        "authoritativeCommitScope": ["ENT-USER", "AUTH-001_REGISTRATION_ENVELOPE"],
+        "completion": "AFTER_W01_TRANSACTION_COMMIT",
+        "identityCredentialMaterialization": "EVENTUAL",
+        "materializerAuthority": "W02_D1-01",
+        "materializationSource": "AUTH-001_REGISTRATION_ENVELOPE + PAYLOAD_USERS_NATIVE_AUTH_SOURCE",
+        "recovery": "W02_SCHEDULED_RECONCILIATION",
+        "crossWorkerTransaction": false,
+        "crossD1Transaction": false
+      },
       "auth": {
         "mode": "public",
         "subject": "anonymous"
