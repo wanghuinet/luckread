@@ -123,3 +123,5 @@ console.log(
     2,
   ),
 )
+
+await payload.destroy()
