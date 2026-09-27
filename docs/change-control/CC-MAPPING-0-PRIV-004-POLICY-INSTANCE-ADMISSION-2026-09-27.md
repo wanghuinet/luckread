@@ -2,7 +2,7 @@
 
 ## Status
 
-`GOVERNANCE_BASELINE_RECONCILED / POLICY_INSTANCE_INPUT_REQUIRED`
+`GOVERNANCE_BASELINE_RECONCILED / DEV_TEST_INSTANCE_AUTHORIZED / PRODUCTION_INSTANCE_PENDING`
 
 ## Purpose
 
@@ -94,3 +94,28 @@ A repository-only authority search was performed before runtime implementation w
 Result: no approved/active concrete PRIV-004 policy instance was found in the repository. The newly admitted Privacy / Data Retention Policy v0.1 is a governance baseline and is explicitly not treated as a concrete policy instance.
 
 This is an authority-discovery checkpoint only. It does not authorize a retention duration, fixed-until date, jurisdiction-specific rule, or runtime behavior. Repeating the same repository-only search without a new authoritative source is not a new implementation gate.
+
+
+## Development-only temporary policy instance — 2026-09-28
+
+The project is explicitly authorizing a **development/test-only** PRIV-004 instance so AUTH-001 can proceed through deterministic engineering validation without fabricating a legal or compliance conclusion.
+
+Canonical instance:
+
+- `artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json`
+- `policyId = PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP`
+- `policyVersion = DEV-2026-09-28.1`
+- `environment = DEVELOPMENT`
+- `status = APPROVED` by internal engineering authority only
+- `rule = DURATION / 63072000 seconds` (730 days)
+- `effectiveTo = 2026-12-31T23:59:59Z`
+
+Boundary:
+
+- 730 days is an engineering test parameter, not a legal retention requirement.
+- `LEGAL_AUDIT` remains the contract retention class label; it is not a jurisdiction-specific legal conclusion.
+- This instance is not valid for production data or public-facing privacy/compliance claims.
+- Production remains fail-closed until a real production policy authority is admitted.
+- No Mapping 0 GREEN, Evidence Registry promotion, or production deployment is implied.
+
+The temporary instance is intentionally short-lived and must be replaced before any production authorization.

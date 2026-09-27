@@ -5,11 +5,11 @@
   "backupBranch": "backup/pre-priv004-baseline-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "BLOCKED_PRIV004_POLICY_INSTANCE",
-    "objective": "Admit the first approved PRIV-004 policy instance required to deterministically calculate ENT-CONSENT.retentionUntil, then return to AUTH-001 runtime implementation admission.",
+    "state": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
+    "objective": "Use the admitted development-only PRIV-004 test policy to proceed with AUTH-001 development/integration validation, while keeping production authorization fail-closed until a real production retention authority is admitted.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "PRIV-004::admit the first approved ACCOUNT_REGISTRATION / LEGAL_AUDIT policy instance with version, scope, effective period, deterministic rule, approval and provenance evidence.",
+    "nextGate": "AUTH-001::development runtime implementation + Contract CI/API checks using DEV-2026-09-28.1; production remains blocked on real PRIV-004 authority.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -18,8 +18,8 @@
       "AUTH-003 entity/persistence physical mapping is reconciled and admitted for the implemented credential-add slice.",
       "The old AUTH-003 List Response Closure Gate remains historical because wire authority artifact 2026-09-26 explicitly resolves public projection, default/max limits and ordering.",
       "AUTH-001 runtime readiness is blocked by PRIV-004 retention-policy authority; no retention duration/value is authorized by inference.",
-      "PRIV-004 policy authority contract shape is now reconciled; concrete approved policy instance remains pending.",
-      "PRIV-004 policy instance admission is now formalized as a machine-readable input gate; no approved instance exists yet."
+      "PRIV-004 policy instance admission is now formalized as a machine-readable input gate; no approved instance exists yet.",
+      "A development-only deterministic test policy instance is now admitted; this does not satisfy production legal/compliance authority."
     ]
   },
   "alreadyClosed": {
@@ -170,7 +170,7 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "PRIV-004 authority contract, policy-instance admission gate, privacy/data-retention governance baseline, fail-closed admission guard, and current-commit provenance guard are reconciled on current main; no approved ACCOUNT_REGISTRATION / LEGAL_AUDIT policy instance has been admitted.",
+    "reason": "PRIV-004 control-plane provenance is mechanically reconciled and a development-only deterministic test instance is admitted for engineering validation. Production retention authority remains pending and production runtime remains fail-closed.",
     "currentMainSha": "d6a6cf225c4f5ac9599c30949fc4143df04c932b",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_CONTRACT_PRECONDITIONS_RECONCILED_RUNTIME_PENDING",
@@ -178,7 +178,7 @@
     "idempotencySourceStatus": "CLOSED",
     "atomicityStatus": "W01_USER_ENVELOPE_CONSENT_SAME_TRANSACTION_W02_EVENTUAL_MATERIALIZATION",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
-    "consentRetentionPolicyStatus": "BLOCKED_PRIV004_POLICY_INSTANCE"
+    "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED"
   },
   "nextGate": "PRIV-004::admit the first approved policy instance for ACCOUNT_REGISTRATION / LEGAL_AUDIT, with version, scope, effective period, deterministic rule, approval and provenance evidence.",
   "runtimeEvidenceAdmission": {
@@ -257,5 +257,12 @@
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
     "implementationDisposition": "NO_CODE_CHANGE_AUTHORIZED_BY_CAPABILITY_CONTROL",
     "staleEvidenceCorrection": "B19 historical fields:[] observation remains superseded by active W01 source; replay response and PRIV-002 decision boundary were reconciled at current main head."
+  },
+  "devTestPolicy": {
+    "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
+    "policyVersion": "DEV-2026-09-28.1",
+    "durationSeconds": 63072000,
+    "productionUse": false,
+    "expires": "2026-12-31T23:59:59Z"
   }
 }

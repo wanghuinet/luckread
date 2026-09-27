@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "status": "INPUT_REQUIRED",
+  "status": "DEV_TEST_ONLY_ADMITTED",
   "featureId": "PRIV-004",
   "authorityContract": "contracts/privacy/PRIV-004-retention-policy-authority.v1.json",
   "purposeBinding": {
@@ -36,25 +36,41 @@
     "No AUTH-001 runtime registration may persist ENT-CONSENT while the applicable policy instance is absent or unresolved.",
     "Approval and provenance must be traceable to a current repository artifact."
   ],
-  "missingInputs": [
-    "approved policyVersion and policyId",
-    "authoritative scope/effective period",
-    "approved deterministic retention rule",
-    "approvalRef and approval evidence",
-    "rollbackVersion/retirement path",
-    "current-commit provenance"
-  ],
+  "missingInputs": [],
   "nonAuthorizations": [
-    "No concrete duration is inferred.",
-    "No fixed-until timestamp is inferred.",
-    "No jurisdiction-specific legal conclusion is inferred.",
-    "No runtime implementation or Evidence Registry promotion is authorized."
+    "The 730-day value is not inferred from law or jurisdiction-specific compliance requirements.",
+    "No public privacy notice may represent 730 days as a legal requirement.",
+    "No production runtime authorization is created by this development-only instance.",
+    "No Mapping 0 GREEN or Evidence Registry promotion is implied.",
+    "No new Worker/D1/Queue or Payload Core change is authorized by this admission."
   ],
   "governanceBaseline": {
     "status": "ADMITTED",
     "policy": "docs/176-PRIVACY-DATA-RETENTION-POLICY-v0.1.md",
     "changeControl": "docs/change-control/CC-MAPPING-0-PRIVACY-DATA-RETENTION-POLICY-BASELINE-2026-09-27.md",
     "admittedMainSha": "e5d1dea7531791892831d7c3f6c00e1cf8474fac",
-    "boundary": "Governance baseline only; does not satisfy concrete PRIV-004 policy-instance admission."
+    "boundary": "Governance baseline plus an explicitly development-only deterministic test policy; production legal/compliance authority remains pending."
+  },
+  "admissionMode": "DEVELOPMENT_ONLY",
+  "admittedInstance": {
+    "path": "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json",
+    "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
+    "policyVersion": "DEV-2026-09-28.1",
+    "environment": "DEVELOPMENT",
+    "status": "APPROVED_INTERNAL_ENGINEERING_ONLY",
+    "rule": {
+      "mode": "DURATION",
+      "durationSeconds": 63072000
+    },
+    "effectiveFrom": "2026-09-28T00:00:00Z",
+    "effectiveTo": "2026-12-31T23:59:59Z"
+  },
+  "productionMissingInputs": [
+    "production legal/compliance authority and approval for the applicable retention schedule",
+    "production policy version/scope/effective period replacing the development-only instance"
+  ],
+  "runtimeAuthorization": {
+    "development": "AUTH-001 development/integration validation may use the admitted deterministic test policy",
+    "production": "BLOCKED"
   }
 }
