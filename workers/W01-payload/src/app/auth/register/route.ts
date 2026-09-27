@@ -168,7 +168,7 @@ const validatePolicy = (now: Date) => {
 
   return {
     policyVersion: priv004Policy.policyVersion,
-    retentionClass: priv004Policy.retentionClass,
+    retentionClass: 'LEGAL_AUDIT' as const,
     retentionUntil: new Date(now.getTime() + priv004Policy.rule.durationSeconds * 1000).toISOString(),
     sourceAuthority: priv004Policy.sourceAuthority,
   }
