@@ -119,7 +119,7 @@ The development policy is deterministic and server-controlled, but it is **not**
 
 The canonical Contract CI execution gate remains unchanged. The workflow file was re-registered under `.github/workflows/contract-admission-ci.yml` after run `36354470138` created a failed workflow run with zero jobs. No Contract rule, admission criterion, or runtime evidence was changed by this repair.
 
-The new workflow path is included in its own event path filters so the registration can receive normal push/pull-request execution. Main registration repair is merged as `61da1c646d481361999fa33fd66a06482beb19f9` (PR #98). A successful Contract CI run remains required before AUTH-001 runtime evidence admission.
+The new workflow path is included in its own event path filters so the registration can receive normal push/pull-request execution. Main registration repair is merged as `61da1c646d481361999fa33fd66a06482beb19f9` (PR #98), and the exact workflow was restored on current main as `cd5b9061def9fac80cf9e9dedf308c1d3d0b45f4` (PR #100) after temporary diagnostic cleanup. A successful Contract CI run remains required before AUTH-001 runtime evidence admission.
 
 ## Production gate
 
