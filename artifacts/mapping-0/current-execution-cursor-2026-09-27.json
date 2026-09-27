@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "d3d22d4b700fc0949b320f350d22c3ffb2dd3e63",
-  "backupBranch": "backup/pre-priv004-retention-gap-latest-main-20260927",
+  "sourceHead": "9b9d5a9ce8025569048915bd991e20d4ff901be1",
+  "backupBranch": "backup/pre-priv004-policy-authority-contract-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "BLOCKED_AUTH001_PRIV004_RETENTION_POLICY",
-    "objective": "Resolve the PRIV-004 retention-policy authority required to deterministically calculate ENT-CONSENT.retentionUntil before AUTH-001 runtime implementation.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-GAP-2026-09-27.md",
+    "state": "BLOCKED_PRIV004_POLICY_INSTANCE",
+    "objective": "Admit the first approved PRIV-004 policy instance required to deterministically calculate ENT-CONSENT.retentionUntil, then return to AUTH-001 runtime implementation admission.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "PRIV-004::admit the minimum retention-policy authority required to deterministically calculate ENT-CONSENT.retentionUntil, then return to AUTH-001 runtime implementation admission.",
+    "nextGate": "PRIV-004::admit the first approved policy instance for ACCOUNT_REGISTRATION / LEGAL_AUDIT, with version, scope, effective period, deterministic rule, approval and provenance evidence.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -17,7 +17,8 @@
       "CC-AUTH003-NORMALIZED-UNIQUENESS-SEMANTICS-2026-09-27 is RESOLVED by merged contract reconciliation.",
       "AUTH-003 entity/persistence physical mapping is reconciled and admitted for the implemented credential-add slice.",
       "The old AUTH-003 List Response Closure Gate remains historical because wire authority artifact 2026-09-26 explicitly resolves public projection, default/max limits and ordering.",
-      "AUTH-001 runtime readiness is blocked by PRIV-004 retention-policy authority; no retention duration/value is authorized by inference."
+      "AUTH-001 runtime readiness is blocked by PRIV-004 retention-policy authority; no retention duration/value is authorized by inference.",
+      "PRIV-004 policy authority contract shape is now reconciled; concrete approved policy instance remains pending."
     ]
   },
   "alreadyClosed": {
@@ -159,17 +160,17 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Concrete PRIV-002 consent contract is reconciled, but runtime implementation cannot start because ENT-CONSENT.retentionUntil has no approved PRIV-004 policy authority.",
-    "currentMainSha": "d3d22d4b700fc0949b320f350d22c3ffb2dd3e63",
+    "reason": "PRIV-004 policy authority contract shape is reconciled from the global policy/config and lifecycle contracts, but no approved policy instance exists to deterministically calculate ENT-CONSENT.retentionUntil.",
+    "currentMainSha": "9b9d5a9ce8025569048915bd991e20d4ff901be1",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_CONTRACT_PRECONDITIONS_RECONCILED_RUNTIME_PENDING",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
     "idempotencySourceStatus": "CLOSED",
     "atomicityStatus": "W01_USER_ENVELOPE_CONSENT_SAME_TRANSACTION_W02_EVENTUAL_MATERIALIZATION",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
-    "consentRetentionPolicyStatus": "BLOCKED_PRIV004_AUTHORITY"
+    "consentRetentionPolicyStatus": "BLOCKED_PRIV004_POLICY_INSTANCE"
   },
-  "nextGate": "PRIV-004::admit the minimum retention-policy authority required to deterministically calculate ENT-CONSENT.retentionUntil, then return to AUTH-001 runtime implementation admission.",
+  "nextGate": "PRIV-004::admit the first approved policy instance for ACCOUNT_REGISTRATION / LEGAL_AUDIT, with version, scope, effective period, deterministic rule, approval and provenance evidence.",
   "runtimeEvidenceAdmission": {
     "list": {
       "workflow": ".github/workflows/w02-auth-003-credential-list-runtime-evidence.yml",
@@ -227,11 +228,13 @@
     "contracts/entity/PRIV-002-consent-field-contract.v1.json",
     "contracts/persistence/PRIV-002-consent-persistence-contract.v1.json",
     "contracts/events/privacy-consent-withdrawn.v1.json",
-    "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-GAP-2026-09-27.md"
+    "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-GAP-2026-09-27.md",
+    "contracts/privacy/PRIV-004-retention-policy-authority.v1.json",
+    "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md"
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
-    "mainSha": "84793a33960961f8a91e50ec138fa287e8fa9e08",
+    "mainSha": "9b9d5a9ce8025569048915bd991e20d4ff901be1",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
