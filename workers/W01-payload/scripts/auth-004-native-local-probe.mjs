@@ -124,4 +124,4 @@ console.log(
   ),
 )
 
-await payload.destroy()
+process.exit(0)
