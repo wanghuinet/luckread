@@ -2,7 +2,7 @@
 
 ## Status
 
-`GAP_CONFIRMED / AUTH-001_RUNTIME_BLOCKED`
+`GAP_NARROWED / POLICY_INSTANCE_BLOCKED`
 
 ## Purpose
 
@@ -48,7 +48,11 @@ PRIV-004 后续变更必须至少冻结：
 - no Mapping 0 GREEN;
 - no runtime evidence admission.
 
+## 2026-09-27 authority-contract reconciliation
+
+The minimum PRIV-004 Policy Config Authority shape is now admitted by `contracts/privacy/PRIV-004-retention-policy-authority.v1.json` and the companion decision packet. The concrete gap is narrowed to the first approved policy instance; no duration or jurisdiction-specific rule has been invented.
+
 ## Next Gate
 
-`PRIV-004::admit the minimum retention-policy authority required to deterministically calculate ENT-CONSENT.retentionUntil, then return to AUTH-001 runtime implementation admission.`
+`PRIV-004::admit the first approved policy instance for ACCOUNT_REGISTRATION / LEGAL_AUDIT, with version, scope, effective period, deterministic rule, approval and provenance evidence.`
 
