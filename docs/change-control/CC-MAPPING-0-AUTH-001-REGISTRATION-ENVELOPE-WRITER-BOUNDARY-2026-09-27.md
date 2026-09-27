@@ -126,3 +126,20 @@ Existing D1-01 migration evidence proves that new `users` rows receive:
 Therefore the W01 Payload-native User creation can rely on the existing D1 defaults inside the admitted persistence boundary. No `account_state` field is added to `workers/W01-payload/src/collections/Users.ts`, and no second lifecycle writer is introduced.
 
 The original dependency list above is retained as historical decision context. For current execution, AUTH-001's lifecycle prerequisite is **reconciled for initial persistence**. AUTH-013's broader transition, side-effect, security, integration, and Evidence Registry closure remains separate and is not promoted or rerun.
+
+
+## 2026-09-27 PRIV-002 semantic authority reconciliation
+
+The consent dependency is narrowed by:
+`docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-AUTHORITY-RECONCILIATION-2026-09-27.md`.
+
+The writer boundary may inherit these semantic rules without inventing a schema:
+
+- consent persistence is durable;
+- attached policy version is immutable;
+- duplicate submission is deterministic;
+- withdrawal preserves history;
+- unauthorized mutation fails closed;
+- retention is governed by the platform lifecycle contract.
+
+The remaining AUTH-001 blocker is the **concrete PRIV-002 persistence contract and its binding into the registration envelope**. No consent entity/table, field names, enum, retention duration, migration, or runtime code is inferred here.
