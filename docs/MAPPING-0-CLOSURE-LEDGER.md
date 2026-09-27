@@ -3352,3 +3352,23 @@ Result:
 - Rate-limit and reset-token lifecycle constraints are admitted without inventing numeric limits, anti-abuse scopes/actions, public DTO fields, HTTP statuses, or Idempotency-Key requirements.
 - The unresolved feature-specific wire decision set is unchanged in kind, but reduced by explicit lifecycle authority coverage.
 - No OpenAPI, DTO Registry, runtime, persistence, or Evidence promotion occurred.
+
+
+## 2026-09-27 — Superpowers continuation cursor reconciliation / AUTH-003
+
+Source head before reconciliation: `6782cdc0850ec981d5eb2b6ec6ea7bdb9d3dd5e7`.
+Governance reconciliation commit: `4f2c75735227e3b2f43e8a2be5a4987e06e317df`.
+Backup: `backup/pre-mapping0-cursor-reconcile-auth003-20260927`.
+Control: `CC-MAPPING-0-CURSOR-AUTH-003-RUNTIME-PERSISTENCE-RECONCILIATION-2026-09-27`.
+
+Reconciled facts:
+- W01 baseline migration execution run `35508571153` is historical PASS evidence and must not be repeated unchanged.
+- AUTH-002 E6 Runtime-003 run `36219132123` is verified and must not be repeated unchanged.
+- AUTH-002/AUTH-003 shared Identity/Credential entity authority is already `CLOSED — PASS_VERIFIED`; dependency references remain unchanged and entity promotion remains blocked.
+- AUTH-003 public wire authority and field↔wire reconciliation are already closed; current OpenAPI/DTO/API inventory bindings exist.
+- AUTH-003 remaining blockers are D1 persistence, runtime implementation/admission, normalization/uniqueness execution evidence, security/E2E evidence, Evidence Registry binding, and final Mapping 0 reconciliation.
+
+Current continuation:
+`AUTH-003 runtime/persistence/evidence closure under existing contracts` / `BLOCKED — RUNTIME/PERSISTENCE IMPLEMENTATION ADMISSION REQUIRED`.
+
+No API, DTO, entity, migration, Worker, D1 domain, operationId, runtime implementation, Evidence Registry promotion, or Mapping 0 GREEN status is introduced by this cursor reconciliation.
