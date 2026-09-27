@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "2458c7ce75aa1bea3f16ec33985e6ec245224500",
+  "sourceHead": "da8d34fe05f1a006bd6b4be95119eff21ba4f29b",
   "backupBranch": "backup/pre-auth003-credential-normalized-uniqueness-conflict-20260927",
   "currentCursor": {
-    "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
-    "state": "BLOCKED_AUTH003_WIRE_SCHEMA_ENCODING_AND_FULL_LIFECYCLE_RUNTIME_EVIDENCE",
-    "objective": "Advance from admitted wire authority and physical persistence evidence to canonical OpenAPI/DTO encoding, then execute the smallest remaining AUTH-003 lifecycle runtime slices under the frozen contract.",
+    "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
+    "state": "BLOCKED_AUTH003_RUNTIME_LIFECYCLE_AND_ENTITY_PROMOTION",
+    "objective": "With AUTH-003 OpenAPI/DTO wire encoding closed, execute the smallest remaining runtime lifecycle slice and then reconcile entity promotion without reopening wire authority.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "M0-AUTH-003-WIRE-SCHEMA-ENCODING-001: encode the already PASS_VERIFIED wire authority into canonical OpenAPI/DTO; then close credential-list runtime evidence before Replace/Remove.",
+    "nextGate": "AUTH-003::credential-list runtime/evidence slice; then Replace/Remove lifecycle evidence.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -24,7 +24,8 @@
     "auth003OpenApiDto": true,
     "auth002E6Runtime": "36219132123",
     "w01Baseline": "35508571153",
-    "auth002Auth003SharedEntityAuthority": true
+    "auth002Auth003SharedEntityAuthority": true,
+    "auth003PhysicalMapping": true
   },
   "historicalOnlyCursors": [
     "M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001 / WAIT_AUTHORITY_DECISION",
@@ -154,7 +155,7 @@
   "currentHeadReconciliation": {
     "reason": "Main advanced after the prior post-migration evidence admission and AUTH-003 credential-add implementation merge; cursor must track the current authoritative main SHA without changing remote D1 state.",
     "previousCursorSourceHead": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
-    "currentMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500",
+    "currentMainSha": "da8d34fe05f1a006bd6b4be95119eff21ba4f29b",
     "remoteMigrationReexecution": "FORBIDDEN",
     "schemaPostcheckRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "runtimeEvidenceStatus": "ADMITTED_PASS_VERIFIED",
@@ -189,7 +190,7 @@
       "reason": "Runtime evidence run 36299334577 tested exact implementation source 419bb7fd...; prior admission commit accidentally copied current main SHA into the sourceSha metadata field.",
       "runtimeRunId": "36299334577",
       "runtimeTestedSourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
-      "currentMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500",
+      "currentMainSha": "da8d34fe05f1a006bd6b4be95119eff21ba4f29b",
       "rerunRequired": false
     }
   },
@@ -211,7 +212,7 @@
       "ENT-IDENTITY",
       "ENT-CREDENTIAL"
     ],
-    "reason": "Entity evidence and physical D1 mapping are admitted for credential-add, but catalog promotion requires broader AUTH-003 lifecycle and final Mapping 0 reconciliation.",
+    "reason": "AUTH-003 wire/API/DTO chain and physical add-slice evidence are closed; catalog promotion still requires full lifecycle runtime/evidence and final Mapping 0 reconciliation.",
     "evidenceRegistryStatus": "NOT_GREEN",
     "fiveWayStatus": "NOT_GREEN"
   }
