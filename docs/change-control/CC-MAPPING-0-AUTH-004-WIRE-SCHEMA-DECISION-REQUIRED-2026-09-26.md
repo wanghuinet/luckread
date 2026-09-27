@@ -2,10 +2,10 @@
 
 - Feature: `AUTH-004`
 - Scope: password change / password reset request / password reset confirm
-- Status: `DECISION_REQUIRED`
+- Status: `SUPERSEDED_BY_AUTHORITY_DECISION / RECONCILED`
 - Implementation authorization: `false`
-- OpenAPI promotion: `false`
-- DTO registry promotion: `false`
+- OpenAPI promotion: `false` (separate next change)
+- DTO registry promotion: `false` (separate next change)
 - Runtime admission: `false`
 - Evidence admission: `false`
 - Mapping-0 GREEN: `false`
@@ -134,9 +134,11 @@ Until the above decision is explicitly approved:
 
 ## 8. Result
 
-`AUTH-004 = BLOCKED_DECISION_REQUIRED`
+`AUTH-004 = WIRE_AUTHORITY_FROZEN / IMPLEMENTATION_NOT_AUTHORIZED`
 
-This record closes the provenance/decision boundary only. It does not close the wire schema.
+The feature-specific wire schema is now frozen by `docs/decisions/2026-09-26-password-recovery.md` and reconciled by `CC-MAPPING-0-AUTH-004-WIRE-SCHEMA-AUTHORITY-RECONCILIATION-2026-09-27`.
+
+OpenAPI/DTO promotion remains a separate controlled change; runtime/evidence/Mapping-0 remain blocked.
 
 
 ## 9. Cross-cutting public-wire inheritance reconciliation — 2026-09-26
@@ -228,4 +230,6 @@ No feature-specific value is inferred by this reconciliation.
 
 `AUTH-004 COMMON WIRE INHERITANCE = PASS_VERIFIED_SOURCE_ONLY`
 
-`AUTH-004 FEATURE-SPECIFIC WIRE SCHEMA = DECISION_REQUIRED`
+`AUTH-004 FEATURE-SPECIFIC WIRE SCHEMA = FROZEN_BY_AUTHORITATIVE_DECISION`
+
+Reconciliation record: `CC-MAPPING-0-AUTH-004-WIRE-SCHEMA-AUTHORITY-RECONCILIATION-2026-09-27`

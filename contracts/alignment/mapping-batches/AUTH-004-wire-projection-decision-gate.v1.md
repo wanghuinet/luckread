@@ -2,7 +2,7 @@
 
 - Feature: `AUTH-004`
 - Scope: password change / password reset request / password reset confirm
-- Status: `DECISION_GATE_CLOSED / BLOCKED_NOT_GREEN`
+- Status: `WIRE_AUTHORITY_FROZEN / BLOCKED_NOT_GREEN`
 - Implementation authorization: `false`
 
 ## 1. Authority inspected
@@ -15,7 +15,7 @@ The following artifacts are authoritative inputs for this gate:
 - `contracts/alignment/mapping-batches/AUTH-003-006-openapi-promotion-input.v1.md`
 - `docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md`
 
-The API contract currently establishes three operations and their authorization boundaries, but does not establish complete request/response field schemas. fileciteturn13file0
+The API contract and authoritative wire decision now establish the three operations and their frozen public request/response schema. Runtime and production admission remain separately blocked. fileciteturn13file0
 
 ## 2. Confirmed non-public material
 
@@ -29,7 +29,9 @@ The following must remain non-public unless a later authoritative API decision e
 - internal identity/recovery identifiers when used only for persistence correlation
 - consumed/invalidated persistence timestamps when they are not explicitly part of a public response contract
 
-## 3. Missing wire decisions
+## 3. Historical wire-decision checklist
+
+The previously open field/status/idempotency questions are now resolved by `docs/decisions/2026-09-26-password-recovery.md` and `CC-MAPPING-0-AUTH-004-WIRE-SCHEMA-AUTHORITY-RECONCILIATION-2026-09-27`. The checklist below is retained as decision provenance and must not be treated as an active blocker.
 
 No public request/response schema is promoted by this gate. The following decisions remain required before OpenAPI/DTO promotion:
 
@@ -92,24 +94,24 @@ The L5/L6 registry is an additional authoritative lifecycle input for AUTH-004. 
 
 These claims freeze lifecycle/security behavior only. They do **not** authorize public field names, token wire representation, HTTP status codes, response bodies, error-code mappings, delivery metadata, or per-operation Idempotency-Key requirements. The latter remain explicit AUTH-004 wire/policy decisions.
 
-## 5. Promotion gate
+## 5. Current promotion gate
 
-Until the missing wire decisions above are explicitly established by an authoritative API decision artifact:
+The wire decision is now frozen. The following remain explicitly out of scope for this reconciliation:
 
-- `NO_OPENAPI_WRITE`
-- `NO_DTO_REGISTRY_PROMOTION`
-- `NO_MAPPING_0_PROMOTION`
-- `NO_RUNTIME_IMPLEMENTATION_AUTHORIZATION`
-- `NO_GREEN`
+- `NO_OPENAPI_WRITE` — requires a separate controlled promotion change;
+- `NO_DTO_REGISTRY_PROMOTION` — follows canonical OpenAPI admission;
+- `NO_MAPPING_0_PROMOTION`;
+- `NO_RUNTIME_IMPLEMENTATION_AUTHORIZATION`;
+- `NO_GREEN`.
 
 The existing real-evidence reconciliation independently confirms that runtime, persistence, security-test, integration, and Mapping-0 evidence are still missing. fileciteturn15file0
 
 ## 6. Next closure unit
 
-The next direct closure unit is an explicit `AUTH-004` wire-schema decision artifact. Only after that artifact freezes the request/response shapes may the canonical API contract, OpenAPI operation schemas, DTO registry, and Mapping-0 reconciliation be advanced.
+The next direct closure unit is the separately controlled OpenAPI/DTO promotion for the already-frozen AUTH-004 wire schema.
 
 ## 7. Gate result
 
 `AUTH-004 = BLOCKED_NOT_GREEN`
 
-This is a controlled block, not a regression: the batch advances by freezing the exact decision boundary and preventing entity/persistence fields from being silently promoted into public API semantics.
+This is a controlled block, not a regression: wire authority is closed, while runtime, persistence, security, evidence, and Mapping-0 admission remain fail-closed.
