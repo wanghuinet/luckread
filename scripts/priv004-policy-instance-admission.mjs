@@ -111,7 +111,7 @@ if (mode === 'FIXED_UNTIL') {
 }
 
 if (!isRecord(instance.provenance)) {
-  fail('provenance is required for current-commit traceability')
+  fail('provenance is required for current-main traceability')
 }
 if (!/^[0-9a-f]{40}$/.test(instance.provenance.commitSha ?? '')) {
   fail('provenance.commitSha must be an exact 40-hex commit SHA')
@@ -119,9 +119,28 @@ if (!/^[0-9a-f]{40}$/.test(instance.provenance.commitSha ?? '')) {
 requireNonEmptyString(instance.provenance.sourcePath, 'provenance.sourcePath')
 
 const currentCommitSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
-if (instance.provenance.commitSha !== currentCommitSha) {
-  fail(`provenance.commitSha must equal current HEAD (${currentCommitSha})`)
+const instanceSourceCommitSha = execFileSync(
+  'git',
+  ['log', '-1', '--format=%H', '--', 'artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'],
+  { encoding: 'utf8' },
+).trim()
+
+if (!instanceSourceCommitSha) {
+  fail('canonical policy instance must be present in repository history')
 }
+
+if (instance.provenance.commitSha !== instanceSourceCommitSha) {
+  fail(
+    `provenance.commitSha must equal the commit that last changed the canonical policy instance (${instanceSourceCommitSha}), not a self-referential HEAD SHA (${currentCommitSha})`,
+  )
+}
+
+try {
+  execFileSync('git', ['merge-base', '--is-ancestor', instanceSourceCommitSha, currentCommitSha])
+} catch {
+  fail('provenance.commitSha must be an ancestor of current HEAD')
+}
+
 if (instance.provenance.sourcePath !== 'artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json') {
   fail('provenance.sourcePath must identify the canonical approved policy instance artifact')
 }
@@ -132,5 +151,6 @@ if (packet.status === 'INPUT_REQUIRED') {
 
 console.log('PRIV004_ADMISSION_GUARD_PASS')
 console.log('- concrete policy instance satisfies the contracted admission shape')
+console.log('- policy-instance provenance is tied to its last repository commit and verified as reachable from current HEAD')
 console.log('- packet is no longer INPUT_REQUIRED')
 console.log('- no runtime implementation or Evidence Registry promotion is performed')
