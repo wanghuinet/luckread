@@ -79,8 +79,8 @@ The admitted runtime evidence verifies self-scope, cross-account denial, public 
 
 ## 6. Remaining gate
 
-The next governed implementation slice is **ENT-IDENTITY materialization/runtime ownership**.
+The remaining entity blocker is not an AUTH-003 standalone identity service. B01 establishes `ENT-USER.id` as the immutable cross-domain User-ID authority, while the current AUTH-001 registration contract still leaves the request-to-`ENT-IDENTITY` / `ENT-CREDENTIAL` field mapping unresolved.
 
-That slice must receive explicit change-control admission and exact runtime evidence. AUTH-003 wire/API/DTO authority remains closed and must not be reopened.
+The next governed slice is **AUTH-001 registration identity/entity mapping reconciliation**. Only after that authority closes may a shared materialization implementation be admitted.
 
-Mapping 0 / Five-Way remains `NOT_GREEN`.
+AUTH-003 wire/API/DTO authority and its credential runtime slice remain closed. Mapping 0 / Five-Way remains `NOT_GREEN`.
