@@ -1,24 +1,17 @@
-name: Contract CI
+name: Contract CI (retired)
 
 on:
-  push:
-    branches: [main, 'contract/**']
-    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-ci.yml']
-  pull_request:
-    paths: ['package.json','package-lock.json','contracts/**','docs/**','scripts/**','.github/workflows/contract-ci.yml']
   workflow_dispatch:
     inputs:
       checkout_ref:
-        description: 'Exact commit SHA to validate'
+        description: 'Exact commit SHA to validate with the retired workflow'
         required: false
         type: string
       admission_mode:
-        description: 'DEVELOPMENT = contract/structural admission; FULL = include Five-Way + R4/Evidence/R5 downstream audit'
+        description: 'Retired workflow; use Contract Admission CI v2 instead'
         required: true
         type: choice
-        options:
-          - DEVELOPMENT
-          - FULL
+        options: [DEVELOPMENT, FULL]
         default: DEVELOPMENT
 
 permissions:
