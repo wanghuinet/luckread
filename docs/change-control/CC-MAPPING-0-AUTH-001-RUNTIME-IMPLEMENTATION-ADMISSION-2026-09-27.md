@@ -1,0 +1,103 @@
+# CC-MAPPING-0-AUTH-001-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-27
+
+## Status
+
+`CONTRACT_PRECONDITIONS_RECONCILED / RUNTIME_IMPLEMENTATION_PENDING_CI_AND_EVIDENCE`
+
+## Preconditions already reconciled
+
+AUTH-001 has admitted:
+
+- Payload-native User creation and native password handling;
+- canonical Idempotency-Key semantics and 24h retention;
+- replayable committed response `{userId, accountState}` with HTTP 201;
+- initial `PENDING_VERIFICATION` / version 1 persistence dependency;
+- concrete PRIV-002 consent contract;
+- AUTH-001 envelope binding `consent_record_id -> ENT-CONSENT.id`;
+- W01 same-transaction writer boundary;
+- W02/D1-01 eventual Identity/Credential materialization.
+
+## Smallest runtime slice
+
+Implementation is constrained to the existing W01 Payload worker and the already-admitted W02 materialization boundary.
+
+Expected code/config surface:
+
+1. `workers/W01-payload/src/app/auth/register/route.ts`
+   - canonical `POST /auth/register` transport;
+   - validates the admitted request DTO;
+   - applies Idempotency-Key semantics;
+   - executes one Payload transaction for User + registration envelope + Consent;
+   - returns the canonical 201 body or deterministic idempotency conflict response;
+   - never writes `auth_identities` / `auth_credentials` directly.
+
+2. W01 Payload collection/config additions for the admitted internal records:
+   - AUTH-001 registration envelope fields from `contracts/persistence/AUTH-001-registration-envelope-contract.v1.json`;
+   - ENT-CONSENT fields from `contracts/entity/PRIV-002-consent-field-contract.v1.json`.
+   Physical collection/table names remain implementation details and require migration evidence.
+
+3. Existing W01 Payload native User boundary remains the password/auth authority. No Payload Core modification is permitted.
+
+4. Existing W02 scheduled reconciliation remains the eventual Identity/Credential materializer. No new Worker, D1 binding or Queue is permitted.
+
+## Required runtime behavior
+
+Positive:
+- new email registration commits User + Consent + envelope atomically;
+- returned User ID and accountState match the committed response contract;
+- accountState is sourced from existing D1 default `PENDING_VERIFICATION`.
+
+Idempotency:
+- same key + same payload after COMPLETED replays the original 201 body;
+- same key + same payload while IN_PROGRESS returns `IDEMPOTENCY_IN_PROGRESS`;
+- same key + different payload returns `IDEMPOTENCY_KEY_REUSE_CONFLICT`;
+- expired key is treated as a new request.
+
+Consent:
+- registration creates `ENT-CONSENT` with `ACCOUNT_REGISTRATION / CONSENT / GRANTED`;
+- policyVersion is persisted and immutable;
+- retentionClass is server-set to `LEGAL_AUDIT`;
+- retentionUntil is server-calculated;
+- consent record ID is retained by the registration envelope.
+
+Security:
+- no password/credential secret is returned;
+- no account enumeration;
+- malformed/invalid consent is rejected;
+- unauthorized consent mutation is not exposed by registration;
+- replay never creates a second User or Consent.
+
+Failure:
+- User/Envelope/Consent transaction rolls back together;
+- W02 materialization may remain temporarily incomplete after W01 commit;
+- replay remains authoritative from the W01 envelope.
+
+## Evidence admission matrix
+
+Runtime promotion requires controlled evidence for:
+
+- happy-path registration;
+- duplicate replay;
+- key reuse conflict;
+- concurrent same-key submission;
+- consent policy-version validation;
+- rollback/no-partial-write behavior;
+- no-secret/no-enumeration response behavior;
+- W01/W02 convergence after commit;
+- exact source SHA provenance;
+- D1 schema/migration evidence for the actual implemented physical collections.
+
+No documentation-only run may promote AUTH-001 GREEN.
+
+## Explicit non-authorizations
+
+- no Payload Core fork/patch;
+- no direct W01 -> D1-01 identity/credential write;
+- no new generic Idempotency service;
+- no new Worker/D1/Queue;
+- no reuse of unrelated AUTH-013/D1-03 idempotency journals;
+- no Mapping 0 GREEN until runtime and Evidence Registry gates pass.
+
+## Gate
+
+Implementation may start only after the current Contract CI / API contract checks for the admitted PR pass. Runtime evidence remains a separate promotion gate.
