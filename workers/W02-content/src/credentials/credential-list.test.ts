@@ -96,13 +96,11 @@ describe('credential-list', () => {
       '2026-09-27T08:00:00.000Z',
       '2026-09-27T08:00:00.000Z',
       'cred-3',
-      'user-1',
-      '2026-09-27T08:00:00.000Z',
-      '2026-09-27T08:00:00.000Z',
-      'cred-3',
       20,
     ])
     expect(calls2[0].sql).toContain('EXISTS')
+    expect(calls2[0].sql).toContain('next_i.user_id = i.user_id')
+    expect(calls2[0].sql).toContain('next_c.created_at < c.created_at')
     expect(CREDENTIAL_LIST_ORDERING).toBe('createdAt DESC, credentialId DESC')
   })
 
