@@ -157,3 +157,13 @@ The envelope remains blocked only on:
 2. concrete PRIV-002 consent persistence and envelope binding.
 
 No runtime, migration, or new infrastructure is authorized by this partial admission.
+
+
+## 2026-09-27 PRIV-002 decision boundary consolidation
+
+The remaining consent dependency is now explicitly tied to:
+`docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-CONTRACT-DECISION-PACKET-2026-09-27.md`.
+
+The exhaustive current-head search found no canonical concrete consent entity/field/retention authority. No consent schema may be inferred from historical or neighboring contracts.
+
+After a canonical PRIV-002 decision is merged, the AUTH-001 envelope can bind request `consent` to that admitted contract without reopening the already-closed replay, idempotency, writer-boundary, or AUTH-013 initial-persistence decisions.
