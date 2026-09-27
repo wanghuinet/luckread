@@ -98,3 +98,40 @@ Gate: `BLOCKED_NOT_GREEN`.
 This reconciliation deliberately does **not** promote discovered contracts or existing Payload fields into GREEN. Existing `ENT-USER` evidence is retained as authoritative only where the entity/field contracts already mark it verified. All other links remain fail-closed until authoritative evidence exists.
 
 Mapping 0 remains `NOT_GREEN`; runtime/Worker implementation remains unauthorized until the canonical validator accepts the complete traceability graph.
+
+## 2026-09-27 field-projection reconciliation — active W01 User vs /users/me
+
+Current main at review: `6f4245679270ea1fe10a5c3084c0faaaf11f4323`.
+
+The active W01 Users collection remains evidence-bound to the six verified ENT-USER profile/preference fields:
+
+- `username`
+- `displayName`
+- `bio`
+- `avatar`
+- `locale`
+- `timezone`
+
+The existing W01 integration contract test `workers/W01-payload/tests/int/users-collection.int.spec.ts` asserts those six fields and the username uniqueness/index requirement.
+
+The current OpenAPI `User` response schema for `GET /users/me` exposes only:
+
+- `id`
+- `username`
+- `accountState`
+- `layer`
+
+Therefore the profile/preference fields are implemented at the W01/ENT-USER substrate level but are not yet reconciled into the `/users/me` DTO projection. This is a projection/DTO contract gap, not evidence that the fields are missing from W01.
+
+Conversely, `accountState` and `accountStateVersion` are contract-defined lifecycle fields but are not declared in the current active `Users.ts`; their API presence must not be treated as proof of persistence implementation. `layer` remains an authorization-derived value and must not be copied into ENT-USER by inference.
+
+Authoritative control:
+`docs/change-control/CC-MAPPING-0-USER-001-PAYLOAD-API-FIELD-RECONCILIATION-2026-09-27.md`
+
+Disposition:
+
+- profile fields -> **SOURCE IMPLEMENTED / API PROJECTION UNRESOLVED**
+- account lifecycle fields -> **CONTRACTED / SOURCE IMPLEMENTATION UNVERIFIED**
+- layer -> **DERIVED AUTHZ / SEPARATE AUTHORITY**
+- USER-001 -> **BLOCKED_NOT_GREEN**
+- Mapping 0 -> **NOT_GREEN**
