@@ -9,6 +9,14 @@ on:
       - "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json"
       - "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md"
       - "docs/change-control/CC-MAPPING-0-PRIV-004-ADMISSION-GUARD-2026-09-27.md"
+  pull_request:
+    paths:
+      - "scripts/priv004-policy-instance-admission.mjs"
+      - "contracts/privacy/PRIV-004-retention-policy-authority.v1.json"
+      - "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json"
+      - "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json"
+      - "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md"
+      - "docs/change-control/CC-MAPPING-0-PRIV-004-ADMISSION-GUARD-2026-09-27.md"
   workflow_dispatch:
 
 permissions:
