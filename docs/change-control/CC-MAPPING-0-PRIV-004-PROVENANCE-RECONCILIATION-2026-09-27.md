@@ -20,10 +20,10 @@ The authoritative PRIV-004 contract requires **current-commit provenance**, mean
 
 The reconciled interpretation is:
 
-1. `provenance.commitSha` identifies the commit that last changed the canonical policy-instance artifact.
-2. The guard resolves that source commit from Git history.
-3. The guard requires the source commit to be an ancestor of the checked-out current HEAD.
-4. This proves that the admitted policy-instance artifact is part of the current repository history without requiring an impossible self-reference.
+1. `provenance.commitSha` identifies an approval/source checkpoint commit that predates the canonical policy-instance artifact change.
+2. The guard resolves the canonical policy-instance source commit from Git history.
+3. The guard requires `provenance.commitSha` to be an ancestor of that artifact source commit and of the checked-out current HEAD.
+4. This proves the policy instance is attached to an already-existing repository authorization checkpoint without requiring an impossible self-reference.
 5. The canonical `provenance.sourcePath` remains fixed to:
    `artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json`
 
@@ -50,7 +50,7 @@ Therefore the repository remains:
 
 `PRIV-004 INPUT_REQUIRED -> AUTH-001 RUNTIME BLOCKED`
 
-The repair only ensures that a future authoritative approved instance can be admitted through a mechanically realizable provenance rule.
+The repair only ensures that a future authoritative approved instance can be admitted through a mechanically realizable provenance rule. The provenance checkpoint is traceability evidence; it is not itself a legal/compliance authority.
 
 ## Required verification
 
