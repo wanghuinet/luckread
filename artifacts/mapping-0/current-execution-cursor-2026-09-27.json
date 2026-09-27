@@ -7,7 +7,7 @@
     "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
     "state": "BLOCKED_AUTH003_RUNTIME_LIFECYCLE_AND_ENTITY_PROMOTION",
     "objective": "With AUTH-003 OpenAPI/DTO wire encoding closed, execute the smallest remaining runtime lifecycle slice and then reconcile entity promotion without reopening wire authority.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-WIRE-SCHEMA-ENCODING-RECONCILIATION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
     "nextGate": "AUTH-003::credential-list runtime/evidence slice; then Replace/Remove lifecycle evidence.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
@@ -164,7 +164,7 @@
     "runtimeEvidenceSourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
     "entityEvidenceBindingStatus": "BOUND_NOT_PROMOTED"
   },
-  "nextGate": "M0-AUTH-003-WIRE-SCHEMA-ENCODING-001",
+  "nextGate": "AUTH-003::credential-list runtime/evidence slice",
   "runtimeEvidenceAdmission": {
     "workflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
     "runId": "36299334577",
