@@ -5509,7 +5509,8 @@
         "contracts/alignment/mapping-batches/PRIV-001-008-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/privacy/PRIV-004-retention-policy-authority.v1.json",
-        "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md"
+        "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md",
+        "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json"
       ],
       "blockers": [
         "Approved production policy instance for ACCOUNT_REGISTRATION / LEGAL_AUDIT is not yet admitted.",
@@ -5517,7 +5518,8 @@
       ],
       "contractRefs": [
         "contracts/privacy/PRIV-004-retention-policy-authority.v1.json",
-        "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md"
+        "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md",
+        "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json"
       ]
     },
     {
