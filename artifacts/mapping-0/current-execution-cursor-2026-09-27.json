@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "e5d1dea7531791892831d7c3f6c00e1cf8474fac",
+  "sourceHead": "b575603f04d2167b72b41624570d0ccf14af7159",
   "backupBranch": "backup/pre-priv004-baseline-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
@@ -64,7 +64,7 @@
     "Treat 36296831559 as execution checkpoint only; final schema correctness requires a later read-only exact-SHA postcheck.",
     "Do not promote AUTH-003 persistence status from the migration execution log alone."
   ],
-  "previousSourceHead": "0af81384584f27f2b8d472802ddb1f237fe3533d",
+  "previousSourceHead": "e5d1dea7531791892831d7c3f6c00e1cf8474fac",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
@@ -168,8 +168,8 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "PRIV-004 authority contract, policy-instance admission gate, privacy/data-retention governance baseline, authority-discovery checkpoint, and AUTH-001 gate reference are reconciled on current main; no approved ACCOUNT_REGISTRATION / LEGAL_AUDIT policy instance has been admitted.",
-    "currentMainSha": "e5d1dea7531791892831d7c3f6c00e1cf8474fac",
+    "reason": "PRIV-004 authority contract, policy-instance admission gate, privacy/data-retention governance baseline, fail-closed admission guard, and current-commit provenance guard are reconciled on current main; no approved ACCOUNT_REGISTRATION / LEGAL_AUDIT policy instance has been admitted.",
+    "currentMainSha": "b575603f04d2167b72b41624570d0ccf14af7159",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_CONTRACT_PRECONDITIONS_RECONCILED_RUNTIME_PENDING",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -243,7 +243,9 @@
     "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
     "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-27.md",
     "docs/176-PRIVACY-DATA-RETENTION-POLICY-v0.1.md",
-    "docs/change-control/CC-MAPPING-0-PRIVACY-DATA-RETENTION-POLICY-BASELINE-2026-09-27.md"
+    "docs/change-control/CC-MAPPING-0-PRIVACY-DATA-RETENTION-POLICY-BASELINE-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-PRIV-004-ADMISSION-GUARD-2026-09-27.md",
+    ".github/workflows/priv004-policy-instance-admission.yml"
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
