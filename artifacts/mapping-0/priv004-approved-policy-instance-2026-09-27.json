@@ -21,7 +21,7 @@
   "approvalRef": "ENG-DECISION-2026-09-28-PRIV004-DEV-730D",
   "rollbackVersion": "NONE-DEV-TEST-RETIRE-ON-REPLACEMENT",
   "provenance": {
-    "commitSha": "d58110c7994e34de50a6cf78e3d0b5b822242f74",
+    "commitSha": "cad0e61afec180bc01899c707d19f017dffbe1a2",
     "sourcePath": "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json",
     "kind": "APPROVAL_SOURCE_CHECKPOINT"
   },
