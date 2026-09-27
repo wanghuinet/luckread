@@ -2,14 +2,14 @@
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
   "sourceHead": "9b9d5a9ce8025569048915bd991e20d4ff901be1",
-  "backupBranch": "backup/pre-priv004-policy-authority-contract-20260927",
+  "backupBranch": "backup/pre-priv004-policy-instance-admission-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
     "state": "BLOCKED_PRIV004_POLICY_INSTANCE",
     "objective": "Admit the first approved PRIV-004 policy instance required to deterministically calculate ENT-CONSENT.retentionUntil, then return to AUTH-001 runtime implementation admission.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "PRIV-004::admit the first approved policy instance for ACCOUNT_REGISTRATION / LEGAL_AUDIT, with version, scope, effective period, deterministic rule, approval and provenance evidence.",
+    "nextGate": "PRIV-004::admit the first approved ACCOUNT_REGISTRATION / LEGAL_AUDIT policy instance with version, scope, effective period, deterministic rule, approval and provenance evidence.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -18,7 +18,8 @@
       "AUTH-003 entity/persistence physical mapping is reconciled and admitted for the implemented credential-add slice.",
       "The old AUTH-003 List Response Closure Gate remains historical because wire authority artifact 2026-09-26 explicitly resolves public projection, default/max limits and ordering.",
       "AUTH-001 runtime readiness is blocked by PRIV-004 retention-policy authority; no retention duration/value is authorized by inference.",
-      "PRIV-004 policy authority contract shape is now reconciled; concrete approved policy instance remains pending."
+      "PRIV-004 policy authority contract shape is now reconciled; concrete approved policy instance remains pending.",
+      "PRIV-004 policy instance admission is now formalized as a machine-readable input gate; no approved instance exists yet."
     ]
   },
   "alreadyClosed": {
@@ -160,7 +161,7 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "PRIV-004 policy authority contract shape is reconciled from the global policy/config and lifecycle contracts, but no approved policy instance exists to deterministically calculate ENT-CONSENT.retentionUntil.",
+    "reason": "PRIV-004 authority contract shape is reconciled and the concrete policy-instance admission packet is frozen, but no approved ACCOUNT_REGISTRATION / LEGAL_AUDIT policy instance has been admitted.",
     "currentMainSha": "9b9d5a9ce8025569048915bd991e20d4ff901be1",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_CONTRACT_PRECONDITIONS_RECONCILED_RUNTIME_PENDING",
@@ -230,7 +231,9 @@
     "contracts/events/privacy-consent-withdrawn.v1.json",
     "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-GAP-2026-09-27.md",
     "contracts/privacy/PRIV-004-retention-policy-authority.v1.json",
-    "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md"
+    "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md",
+    "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
+    "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md"
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
