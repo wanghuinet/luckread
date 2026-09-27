@@ -1,17 +1,18 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "1b3406860d88c12160513caa01fbc99cfbdc4507",
-  "backupBranch": "backup/pre-auth003-logical-ownership-reconcile-20260927",
+  "sourceHead": "1fec1cebb79243baba9f22e59e715b5e3335fabc",
+  "backupBranch": "backup/pre-auth003-physical-identity-reconcile-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
     "state": "BLOCKED_RUNTIME_PERSISTENCE_IMPLEMENTATION_ADMISSION_REQUIRED",
     "objective": "Resolve explicit operation-policy authority and physical persistence authority before runtime or migration implementation.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-003 operation-policy authority + physical W02/D1-01 binding -> smallest runtime/persistence vertical slice",
+    "nextGate": "AUTH-003 operation-policy authority + D1-01 schema/migration evidence -> smallest runtime/persistence vertical slice",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
-    "physicalBinding": "W02/D1-01 physical target NOT_ESTABLISHED"
+    "physicalBinding": "W02/D1-01 physical target NOT_ESTABLISHED",
+    "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED"
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -42,9 +43,11 @@
     "Do not promote Mapping 0 GREEN or Evidence Registry status from documentation-only changes.",
     "Use the AUTH-003 runtime/persistence admission packet as the single input checklist; do not reopen closed wire/API/DTO work.",
     "Do not assign the existing W01-PAYLOAD-D1-BINDING physical database to W02/D1-01 by inference.",
-    "Treat W02 -> D1-01 as the closed logical owner chain; keep physical Worker/D1 binding as a separate gate."
+    "Treat W02 -> D1-01 as the closed logical owner chain; keep physical Worker/D1 binding as a separate gate.",
+    "Treat luckread-w02 and D1-01 target UUID 2f80471e-... as explicit authority inputs; do not reinterpret or reassign the target.",
+    "Do not inherit AUTH-003 runtime correctness from earlier W02 deployment evidence; same-SHA evidence is required."
   ],
-  "previousSourceHead": "74004fad7e61c585d0d9af8aeb5c87d8a7be2ed8",
+  "previousSourceHead": "1fec1cebb79243baba9f22e59e715b5e3335fabc",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "NO_AUTHORITY_FOUND_FOR_AUTH003_OPERATION_POLICY_BUDGETS",
