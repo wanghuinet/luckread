@@ -13,6 +13,18 @@ export const Users: CollectionConfig = {
     removeTokenFromResponses: true,
     // AUTH-004 remains contract/evidence gated; native capability is the implementation baseline.
   },
+  hooks: {
+    // Payload strips loginResult.token from Local API responses when
+    // removeTokenFromResponses=true. Preserve the native token only in the
+    // request-local context so the W01 adapter can immediately call payload.auth().
+    afterLogin: [
+      ({ req, token }) => {
+        if (req.context && typeof token === 'string') {
+          ;(req.context as Record<string, unknown>).__luckreadNativeAuthToken = token
+        }
+      },
+    ],
+  },
   // AUTH-001 contract: account registration is anonymous/public. Keep the
   // public boundary limited to creation; read/update/delete remain protected
   // by Payload's default authenticated access control until explicit rules
