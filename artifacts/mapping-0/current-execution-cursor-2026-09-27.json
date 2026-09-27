@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "5aa2e7c087b3276976995a5ad9b064ad60f08199",
+  "sourceHead": "f1853d3ee29f6f0cf84e8991096be062ea56c98b",
   "backupBranch": "backup/pre-auth003-credential-normalized-uniqueness-conflict-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
-    "state": "BLOCKED_AUTH003_CONTRACT_SEMANTICS_DECISION_REQUIRED",
+    "state": "BLOCKED_AUTH003_ENTITY_PROMOTION_AND_MAPPING0_RECONCILIATION_REQUIRED",
     "objective": "Admit the actual remote MIG-AUTH-003-CREDENTIAL-V1 execution through read-only exact-SHA post-schema, migration-ledger, and provenance evidence before runtime implementation.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "Resolve ENT-CREDENTIAL normalizedValue uniqueness semantics conflict: field contract unique=true vs canonical composite uniqueness (kind, normalizedValue); then reconcile entity mapping without code/schema change.",
+    "nextGate": "AUTH-003 entity/persistence evidence bound -> validate entity/field implementation registry -> reconcile Feature→Entity→Persistence registry -> final Mapping 0 decision material; no GREEN promotion yet.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED"
@@ -142,18 +142,21 @@
     "runtimeEvidenceStatus": "PASS_VERIFIED",
     "runtimeEvidenceRunId": "36299334577",
     "runtimeEvidenceArtifactId": "10924573167",
-    "runtimeEvidenceArtifactSha256": "5ee09ed921ec8d1c1805e2db20c73a54a6be6c37a6a0ca4ddb3bf29f7ce353b5"
+    "runtimeEvidenceArtifactSha256": "5ee09ed921ec8d1c1805e2db20c73a54a6be6c37a6a0ca4ddb3bf29f7ce353b5",
+    "entityEvidenceBindingStatus": "BOUND_NOT_PROMOTED",
+    "entityEvidenceBindingMainSha": "f1853d3ee29f6f0cf84e8991096be062ea56c98b"
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced after the prior post-migration evidence admission and AUTH-003 credential-add implementation merge; cursor must track the current authoritative main SHA without changing remote D1 state.",
     "previousCursorSourceHead": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
-    "currentMainSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+    "currentMainSha": "f1853d3ee29f6f0cf84e8991096be062ea56c98b",
     "remoteMigrationReexecution": "FORBIDDEN",
     "schemaPostcheckRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "runtimeEvidenceStatus": "ADMITTED_PASS_VERIFIED",
     "runtimeEvidenceRunId": "36299334577",
     "runtimeEvidenceArtifactId": "10924573167",
-    "runtimeEvidenceSourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7"
+    "runtimeEvidenceSourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+    "entityEvidenceBindingStatus": "BOUND_NOT_PROMOTED"
   },
   "nextGate": "Reconcile admitted AUTH-003 runtime/persistence evidence to ENT-IDENTITY/ENT-CREDENTIAL physical mapping and Mapping 0 decision material; do not mark Mapping 0 GREEN.",
   "runtimeEvidenceAdmission": {
@@ -195,5 +198,15 @@
     "conflict": "Field contract declares normalizedValue unique=true, while canonical AUTH-003 uniqueness is (kind, normalizedValue) and the executed migration creates auth_credentials_kind_normalized_value_uq on that composite.",
     "runtimeScope": "Run 36299334577 proved one-winner uniqueness for concurrent email claims; it did not prove a global normalizedValue uniqueness constraint across different credential kinds.",
     "disposition": "Do not alter migration, code, or field contract until the authority decision is recorded."
+  },
+  "entityPromotionGate": {
+    "status": "BLOCKED",
+    "entities": [
+      "ENT-IDENTITY",
+      "ENT-CREDENTIAL"
+    ],
+    "reason": "Concrete implementation/schema/migration/runtime evidence is now bound, but catalog promotion and Mapping 0 GREEN require separate final reconciliation.",
+    "evidenceRegistryStatus": "NOT_GREEN",
+    "fiveWayStatus": "NOT_GREEN"
   }
 }

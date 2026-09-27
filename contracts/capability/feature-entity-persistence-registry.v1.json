@@ -20,6 +20,27 @@
         "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
         "contracts/entity/AUTH-002-session-field-contract.v1.json"
       ]
+    },
+    {
+      "featureId": "AUTH-003",
+      "domainId": "D1-01",
+      "entityIds": [
+        "ENT-IDENTITY",
+        "ENT-CREDENTIAL"
+      ],
+      "persistenceMode": "LUCKREAD_EXTENSION",
+      "owner": "D1-01",
+      "status": "BLOCKED",
+      "evidenceRefs": [
+        "contracts/api/AUTH-003-credential-management-contract.v1.json",
+        "contracts/entity/AUTH-003-identity-field-contract.v1.json",
+        "contracts/entity/AUTH-003-credential-field-contract.v1.json",
+        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
+        "workers/W02-content/src/credentials/credential-add.ts",
+        "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
+        "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
+        "artifacts/mapping-0/auth-003-logical-ownership-reconciliation-2026-09-27.json"
+      ]
     }
   ]
 }
