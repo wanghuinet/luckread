@@ -46,9 +46,6 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Verify exact source and D1 target
         working-directory: workers/W02-content
         run: |
