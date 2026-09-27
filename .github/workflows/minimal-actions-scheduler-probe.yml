@@ -1,7 +1,9 @@
 name: Minimal Actions Scheduler Probe
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
