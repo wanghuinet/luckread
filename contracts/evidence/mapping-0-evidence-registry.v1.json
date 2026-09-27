@@ -600,7 +600,9 @@
       "result": "PASS",
       "status": "VERIFIED",
       "validUntil": null,
-      "note": "Fresh read-only post-migration evidence for the already-executed MIG-AUTH-003-CREDENTIAL-V1. Exact execution source SHA is preserved as 52c6868f99ae2ec9aeb8bdceb4a18396cde20435; target is luckread / D1-01 UUID 2f80471e-3756-49f9-8db1-7707a433ad64. Captured auth_identities/auth_credentials schema, indexes, foreign keys, global and table-scoped FK checks, d1_migrations, and provenance. Table-scoped auth_credentials FK check returned an empty result set. No remote DDL/DML was executed. Artifact 10924623571, sha256:983dbb8a8dca7f3919c5736acfa6f873653decd13633831f55d7ef76653e5dbb."
+      "note": "Fresh read-only post-migration evidence for the already-executed MIG-AUTH-003-CREDENTIAL-V1. Exact execution source SHA is preserved as 52c6868f99ae2ec9aeb8bdceb4a18396cde20435; target is luckread / D1-01 UUID 2f80471e-3756-49f9-8db1-7707a433ad64. Captured auth_identities/auth_credentials schema, indexes, foreign keys, global and table-scoped FK checks, d1_migrations, and provenance. Table-scoped auth_credentials FK check returned an empty result set. No remote DDL/DML was executed. Artifact 10924623571, sha256:983dbb8a8dca7f3919c5736acfa6f873653decd13633831f55d7ef76653e5dbb.",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-003-PHYSICAL-D1-MAPPING-RECONCILIATION-2026-09-27.md"
     },
     {
       "evidenceId": "EVD-AUTH003-B16-RUNTIME-PERSISTENCE-REMOTE-001",
@@ -617,8 +619,9 @@
       "status": "VERIFIED",
       "checkId": "108563979953",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
-      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
-      "note": "Fresh controlled remote D1 runtime evidence executed against exact tested source SHA 419bb7fd887af0c30412bead50f8196ec6446bb7 on luckread / D1-01. Credential add succeeded with public projection only; deterministic idempotent replay returned the same projection; different reuse of the idempotency key returned CONFLICT; exactly one concurrent normalized-email winner and one loser were observed; normalized owner count was 1. Synthetic identity fixtures were bounded and cleaned. No production Worker deployment occurred. Artifact 10924573167, sha256:5ee09ed921ec8d1c1805e2db20c73a54a6be6c37a6a0ca4ddb3bf29f7ce353b5."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Fresh controlled remote D1 runtime evidence executed against exact tested source SHA 419bb7fd887af0c30412bead50f8196ec6446bb7 on luckread / D1-01. Credential add succeeded with public projection only; deterministic idempotent replay returned the same projection; different reuse of the idempotency key returned CONFLICT; exactly one concurrent normalized-email winner and one loser were observed; normalized owner count was 1. Synthetic identity fixtures were bounded and cleaned. No production Worker deployment occurred. Artifact 10924573167, sha256:5ee09ed921ec8d1c1805e2db20c73a54a6be6c37a6a0ca4ddb3bf29f7ce353b5.",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-003-RUNTIME-SECURITY-EVIDENCE-ADMISSION-2026-09-27.md"
     },
     {
       "evidenceId": "EVD-AUTH003-B17-SECURITY-NEGATIVE-REMOTE-001",
@@ -635,8 +638,9 @@
       "status": "VERIFIED",
       "checkId": "108563979953",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
-      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
-      "note": "Fresh controlled remote D1 negative-security evidence at exact source SHA 419bb7fd887af0c30412bead50f8196ec6446bb7. Cross-account credential mutation was denied with PERMISSION_DENIED before mutation. Public projection excluded value, normalizedValue and valueHash. The remote probe completed without production Worker deployment."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Fresh controlled remote D1 negative-security evidence at exact source SHA 419bb7fd887af0c30412bead50f8196ec6446bb7. Cross-account credential mutation was denied with PERMISSION_DENIED before mutation. Public projection excluded value, normalizedValue and valueHash. The remote probe completed without production Worker deployment.",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-003-RUNTIME-SECURITY-EVIDENCE-ADMISSION-2026-09-27.md"
     },
     {
       "evidenceId": "EVD-AUTH003-B18-CONCURRENCY-REMOTE-001",
@@ -653,8 +657,9 @@
       "status": "VERIFIED",
       "checkId": "108563979953",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
-      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
-      "note": "Controlled remote concurrency evidence passed at exact source SHA 419bb7fd887af0c30412bead50f8196ec6446bb7: concurrent normalized-email attempts produced one success and one generic CONFLICT, and the resulting normalized owner count was exactly 1. Synthetic fixture rows were cleaned after execution."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Controlled remote concurrency evidence passed at exact source SHA 419bb7fd887af0c30412bead50f8196ec6446bb7: concurrent normalized-email attempts produced one success and one generic CONFLICT, and the resulting normalized owner count was exactly 1. Synthetic fixture rows were cleaned after execution.",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-003-RUNTIME-SECURITY-EVIDENCE-ADMISSION-2026-09-27.md"
     }
   ],
   "testedCommitSha": "5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55"

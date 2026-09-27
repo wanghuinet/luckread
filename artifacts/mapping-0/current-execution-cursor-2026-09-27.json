@@ -1,18 +1,23 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "f1853d3ee29f6f0cf84e8991096be062ea56c98b",
+  "sourceHead": "2458c7ce75aa1bea3f16ec33985e6ec245224500",
   "backupBranch": "backup/pre-auth003-credential-normalized-uniqueness-conflict-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
-    "state": "BLOCKED_AUTH003_ENTITY_PROMOTION_AND_MAPPING0_RECONCILIATION_REQUIRED",
-    "objective": "Admit the actual remote MIG-AUTH-003-CREDENTIAL-V1 execution through read-only exact-SHA post-schema, migration-ledger, and provenance evidence before runtime implementation.",
+    "state": "BLOCKED_AUTH003_WIRE_SCHEMA_ENCODING_AND_FULL_LIFECYCLE_RUNTIME_EVIDENCE",
+    "objective": "Advance from admitted wire authority and physical persistence evidence to canonical OpenAPI/DTO encoding, then execute the smallest remaining AUTH-003 lifecycle runtime slices under the frozen contract.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-003 entity/persistence evidence bound -> validate entity/field implementation registry -> reconcile Feature→Entity→Persistence registry -> final Mapping 0 decision material; no GREEN promotion yet.",
+    "nextGate": "M0-AUTH-003-WIRE-SCHEMA-ENCODING-001: encode the already PASS_VERIFIED wire authority into canonical OpenAPI/DTO; then close credential-list runtime evidence before Replace/Remove.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
-    "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED"
+    "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
+    "supersededBlockers": [
+      "CC-AUTH003-NORMALIZED-UNIQUENESS-SEMANTICS-2026-09-27 is RESOLVED by merged contract reconciliation.",
+      "AUTH-003 entity/persistence physical mapping is reconciled and admitted for the implemented credential-add slice.",
+      "The old AUTH-003 List Response Closure Gate remains historical because wire authority artifact 2026-09-26 explicitly resolves public projection, default/max limits and ordering."
+    ]
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -136,7 +141,7 @@
     "sourceHead": "419bb7fd887af0c30412bead50f8196ec6446bb7",
     "slice": "AUTH-003 credential-add persistence/security/runtime vertical slice",
     "implementationCommit": "419bb7fd887af0c30412bead50f8196ec6446bb7",
-    "implementationStatus": "MERGED_TO_MAIN_RUNTIME_EVIDENCE_PENDING",
+    "implementationStatus": "MERGED_TO_MAIN_RUNTIME_EVIDENCE_ADMITTED_FOR_ADD_SLICE",
     "runtimeWorkflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
     "runtimeRequirement": "same-SHA controlled remote D1 runtime evidence; no production Worker deployment",
     "runtimeEvidenceStatus": "PASS_VERIFIED",
@@ -144,12 +149,12 @@
     "runtimeEvidenceArtifactId": "10924573167",
     "runtimeEvidenceArtifactSha256": "5ee09ed921ec8d1c1805e2db20c73a54a6be6c37a6a0ca4ddb3bf29f7ce353b5",
     "entityEvidenceBindingStatus": "BOUND_NOT_PROMOTED",
-    "entityEvidenceBindingMainSha": "f1853d3ee29f6f0cf84e8991096be062ea56c98b"
+    "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced after the prior post-migration evidence admission and AUTH-003 credential-add implementation merge; cursor must track the current authoritative main SHA without changing remote D1 state.",
     "previousCursorSourceHead": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
-    "currentMainSha": "f1853d3ee29f6f0cf84e8991096be062ea56c98b",
+    "currentMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500",
     "remoteMigrationReexecution": "FORBIDDEN",
     "schemaPostcheckRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "runtimeEvidenceStatus": "ADMITTED_PASS_VERIFIED",
@@ -158,7 +163,7 @@
     "runtimeEvidenceSourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
     "entityEvidenceBindingStatus": "BOUND_NOT_PROMOTED"
   },
-  "nextGate": "Reconcile admitted AUTH-003 runtime/persistence evidence to ENT-IDENTITY/ENT-CREDENTIAL physical mapping and Mapping 0 decision material; do not mark Mapping 0 GREEN.",
+  "nextGate": "M0-AUTH-003-WIRE-SCHEMA-ENCODING-001",
   "runtimeEvidenceAdmission": {
     "workflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
     "runId": "36299334577",
@@ -184,20 +189,21 @@
       "reason": "Runtime evidence run 36299334577 tested exact implementation source 419bb7fd...; prior admission commit accidentally copied current main SHA into the sourceSha metadata field.",
       "runtimeRunId": "36299334577",
       "runtimeTestedSourceSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
-      "currentMainSha": "7f0bab266fcea439941274ab97a2ea53cc6a3596",
+      "currentMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500",
       "rerunRequired": false
     }
   },
   "contractDecisionBlocker": {
     "issueId": "CC-AUTH003-NORMALIZED-UNIQUENESS-SEMANTICS-2026-09-27",
-    "status": "BLOCKED_DECISION_REQUIRED",
-    "fieldId": "ENT-CREDENTIAL-F-NORMALIZED-VALUE",
-    "fieldContract": "contracts/entity/AUTH-003-credential-field-contract.v1.json",
-    "contractDelta": "contracts/alignment/mapping-batches/AUTH-003-contractual-mapping-delta.v1.md",
-    "migration": "workers/W02-content/migrations/0004_auth_003_credentials.sql",
-    "conflict": "Field contract declares normalizedValue unique=true, while canonical AUTH-003 uniqueness is (kind, normalizedValue) and the executed migration creates auth_credentials_kind_normalized_value_uq on that composite.",
-    "runtimeScope": "Run 36299334577 proved one-winner uniqueness for concurrent email claims; it did not prove a global normalizedValue uniqueness constraint across different credential kinds.",
-    "disposition": "Do not alter migration, code, or field contract until the authority decision is recorded."
+    "status": "RESOLVED_PASS_VERIFIED",
+    "resolution": "ENT-CREDENTIAL normalizedValue is not independently unique; persistence uniqueness is composite (kind, normalizedValue).",
+    "resolutionRefs": [
+      "docs/change-control/CC-MAPPING-0-AUTH-003-NORMALIZED-UNIQUENESS-SEMANTICS-RESOLUTION-2026-09-27.md",
+      "contracts/entity/AUTH-003-credential-field-contract.v1.json",
+      "contracts/entity/entity-field-contract.v1.json",
+      "contracts/api/AUTH-003-credential-management-contract.v1.json",
+      "workers/W02-content/migrations/0004_auth_003_credentials.sql"
+    ]
   },
   "entityPromotionGate": {
     "status": "BLOCKED",
@@ -205,7 +211,7 @@
       "ENT-IDENTITY",
       "ENT-CREDENTIAL"
     ],
-    "reason": "Concrete implementation/schema/migration/runtime evidence is now bound, but catalog promotion and Mapping 0 GREEN require separate final reconciliation.",
+    "reason": "Entity evidence and physical D1 mapping are admitted for credential-add, but catalog promotion requires broader AUTH-003 lifecycle and final Mapping 0 reconciliation.",
     "evidenceRegistryStatus": "NOT_GREEN",
     "fiveWayStatus": "NOT_GREEN"
   }
