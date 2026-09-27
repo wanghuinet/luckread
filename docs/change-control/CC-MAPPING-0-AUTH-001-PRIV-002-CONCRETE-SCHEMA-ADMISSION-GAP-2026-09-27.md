@@ -2,7 +2,7 @@
 
 ## Status
 
-`DECISION_READY / CONCRETE_CONTRACT_BLOCKED`
+`EXTERNAL_AUTHORITY_DECISION_REQUIRED / CONCRETE_CONTRACT_BLOCKED`
 
 ## Scope
 
@@ -57,3 +57,13 @@ The next authority decision should answer the blocked matrix above in one dedica
 ## Non-authoritative inputs explicitly excluded
 
 Historical/archive capability matrices and unrelated advertising/privacy consumers may describe consent behavior, but they do not by themselves freeze LuckRead's canonical PRIV-002 persistence schema.
+
+
+## 2026-09-27 decision packet consolidation
+
+The exhaustive current-head search is now frozen by:
+`docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-CONTRACT-DECISION-PACKET-2026-09-27.md`.
+
+No new repository authority was found for the remaining concrete values. This converts the gate from an open-ended re-audit into a single explicit authority-decision dependency.
+
+The remaining values MUST be admitted by one canonical PRIV-002 contract/change-control decision before AUTH-001 runtime authorization.
