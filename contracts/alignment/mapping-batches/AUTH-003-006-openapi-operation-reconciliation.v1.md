@@ -12,9 +12,9 @@ The feature contracts define the currently authoritative feature-operation propo
 
 No operation, DTO, request schema, response schema, or status code may be inferred from another contract merely to remove a Mapping blocker.
 
-## Current verified gap
+## Current verified disposition
 
-The inspected OpenAPI document currently contains the Auth routes for registration, login, and logout, including `authRegister`, `authLogin`, and `authLogout`. It does not currently expose the AUTH-003～AUTH-006 feature operations identified below.
+The current OpenAPI document contains all four AUTH-003 operations with matching method/path/operationId and concrete request/response/parameter schemas. AUTH-004～AUTH-006 remain outside the admitted OpenAPI surface.
 
 ### AUTH-003
 
@@ -34,7 +34,7 @@ Feature DTO IDs:
 - `DTO-AUTH-003-CREDENTIAL-REPLACE-RESPONSE`
 - `DTO-AUTH-003-CREDENTIAL-REMOVE-RESPONSE`
 
-Result: `OPENAPI_ROUTE_MISSING`.
+Result: `OPENAPI_ROUTE_AND_SCHEMA_VERIFIED` for AUTH-003.
 
 ### AUTH-004
 
@@ -109,21 +109,19 @@ Those identifiers are **not** the current AUTH-006 feature-contract authority an
 
 | Feature | API contract | OpenAPI route | Canonical DTO admission | Mapping promotion |
 |---|---|---|---|---|
-| AUTH-003 | present | missing | blocked | blocked |
+| AUTH-003 | present | verified | bound | downstream blocked |
 | AUTH-004 | present | missing | blocked | blocked |
 | AUTH-005 | present | missing | blocked | blocked |
 | AUTH-006 | present | missing | blocked | blocked |
 
 ## Required next gate
 
-Before DTO registry mutation:
+After AUTH-003 wire closure:
 
-1. Decide whether the feature contracts are to be promoted into the canonical OpenAPI authority.
-2. If promoted, add exact routes and schemas to OpenAPI; do not invent schemas beyond approved feature-contract evidence.
-3. Run OpenAPI structural/schema validation.
-4. Update the canonical DTO registry from the resulting OpenAPI authority.
-5. Reconcile persistence Mapping IDs only after canonical DTO IDs are established.
-6. Run Mapping-0 and keep all rows fail-closed until runtime/persistence evidence exists.
+1. Keep the existing AUTH-003 OpenAPI routes/schemaRefs stable.
+2. Reconcile persistence Mapping DTO refs against the canonical AUTH-003 DTO registry.
+3. Execute the credential-list runtime/evidence slice.
+4. Keep Replace/Remove and entity/Mapping-0 promotion separate.
 
 ## Explicit prohibitions
 
@@ -135,4 +133,4 @@ Before DTO registry mutation:
 
 ## Evidence status
 
-This is contract/audit evidence only. No runtime, D1, migration, security-E2E, concurrency-E2E, or Mapping-0 GREEN promotion is claimed by this document.
+This is contract/audit evidence only. AUTH-003 OpenAPI/DTO encoding is PASS_VERIFIED; no runtime, entity VERIFIED, Evidence Registry GREEN, or Mapping-0 GREEN promotion is claimed.

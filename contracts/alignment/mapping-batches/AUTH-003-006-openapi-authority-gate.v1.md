@@ -18,12 +18,12 @@ The current canonical DTO contract declares `contracts/openapi/v1/openapi.yaml` 
 
 | Feature | Feature-contract operations | Current OpenAPI evidence | Canonical DTO state | Gate |
 |---|---|---|---|---|
-| AUTH-003 | `authCredentialList`, `authCredentialAdd`, `authCredentialReplace`, `authCredentialRemove` | No corresponding `/auth/credentials` operation verified in the inspected OpenAPI surface | Blocked | `RED` |
+| AUTH-003 | `authCredentialList`, `authCredentialAdd`, `authCredentialReplace`, `authCredentialRemove` | All four routes are present in `contracts/openapi/v1/openapi.yaml` with matching operationIds, request/response schema refs, credentialId parameter, and canonical error responses | Contract-bound | `PASS_VERIFIED` |
 | AUTH-004 | `authPasswordChange`, `authPasswordResetRequest`, `authPasswordResetConfirm` | No corresponding password-change/reset routes verified in the inspected OpenAPI surface | Blocked | `RED` |
 | AUTH-005 | `authVerificationRequest`, `authVerificationConfirm`, `authVerificationRevoke` | No corresponding verification routes verified in the inspected OpenAPI surface | Blocked | `RED` |
 | AUTH-006 | `authPasskeyRegistrationOptions`, `authPasskeyRegistrationVerify`, `authPasskeyAssertionOptions`, `authPasskeyAssertionVerify`, `authPasskeyRemove` | No corresponding passkey routes verified in the inspected OpenAPI surface | Blocked | `RED` |
 
-The inspected OpenAPI document currently exposes the Auth routes for registration, login, and logout; those are already represented in the canonical DTO contract.
+The inspected OpenAPI document now also contains the complete AUTH-003 credential-management surface. API Contract CI has validated the current OpenAPI surface. AUTH-004～AUTH-006 remain under the separate blocked rows above.
 
 ## DTO authority rule
 
@@ -39,7 +39,7 @@ Feature contract DTO set:
 - `DTO-AUTH-003-CREDENTIAL-REPLACE-RESPONSE`
 - `DTO-AUTH-003-CREDENTIAL-REMOVE-RESPONSE`
 
-No canonical registry binding is admitted yet.
+Canonical DTO binding is present: `contracts/dto/auth-dto-contract.v1.json` contains the AUTH-003 list/add/replace/remove bindings, and `contracts/dto/auth-dto-records.v1.json` resolves the corresponding OpenAPI schemaRefs. Remove is explicit no-body/204.
 
 ### AUTH-004
 
@@ -97,4 +97,4 @@ The gate can move from `BLOCKED_NOT_GREEN` only after all applicable conditions 
 
 ## Current conclusion
 
-No AUTH-003–AUTH-006 feature is promoted by this gate. The correct state is `BLOCKED_NOT_GREEN`, with the primary blocker being missing canonical OpenAPI exposure and the secondary blocker being DTO identifier divergence between feature contracts and persistence mapping.
+AUTH-003 has closed the OpenAPI/DTO encoding gate for its current wire contract. The combined AUTH-003～AUTH-006 gate remains `BLOCKED_NOT_GREEN` because AUTH-004～AUTH-006 are still unresolved. AUTH-003 downstream blockers are runtime/persistence evidence, entity catalog promotion, and final Mapping-0 closure.

@@ -24,7 +24,7 @@ Freeze the exact schema material required before AUTH-003～AUTH-006 can enter t
 
 ## Current evidence finding
 
-The inspected feature contracts define operation IDs, HTTP methods, paths, authorization rules, selected security invariants, DTO identifiers, and selected domain/entity requirements, but they do not contain complete JSON Schemas for all referenced DTOs. The canonical OpenAPI currently admits `authRegister`, `authLogin`, and `authLogout`; AUTH-003～AUTH-006 routes are not yet admitted.
+The AUTH-003 feature contract plus the PASS_VERIFIED wire-projection authority now have corresponding concrete request/response/parameter schemas in `contracts/openapi/v1/openapi.yaml`. API Contract CI has validated the current surface. AUTH-004～AUTH-006 remain blocked under the same combined gate.
 
 The persistence mapping already contains references to several AUTH-003～AUTH-006 DTO identifiers, but persistence mappings are not public API authority and must not be used to synthesize schemas.
 
@@ -32,7 +32,7 @@ The persistence mapping already contains references to several AUTH-003～AUTH-0
 
 | Feature | Operation set | Required schema closure | Current state |
 |---|---|---|---|
-| AUTH-003 | `authCredentialList`, `authCredentialAdd`, `authCredentialReplace`, `authCredentialRemove` | list response; add request/response; replace request/response; remove response; `credentialId` path parameter; exact status/error semantics; security/idempotency representation | `BLOCKED` |
+| AUTH-003 | `authCredentialList`, `authCredentialAdd`, `authCredentialReplace`, `authCredentialRemove` | list response; add request/response; replace request/response; remove 204 no-body; `credentialId` parameter; exact status/error semantics; security/idempotency representation | `PASS_VERIFIED` |
 | AUTH-004 | `authPasswordChange`, `authPasswordResetRequest`, `authPasswordResetConfirm` | change request/response; reset request shape; reset-confirm request/response; recovery-token representation; exact status/error semantics | `BLOCKED` |
 | AUTH-005 | `authVerificationRequest`, `authVerificationConfirm`, `authVerificationRevoke` | request/response schema for each operation; challenge/token representation; exact status/error semantics; lifecycle result representation | `BLOCKED` |
 | AUTH-006 | `authPasskeyRegistrationOptions`, `authPasskeyRegistrationVerify`, `authPasskeyAssertionOptions`, `authPasskeyAssertionVerify`, `authPasskeyRemove` | registration/assertion option schemas; verification request/response schemas; WebAuthn credential/challenge representation; `credentialId` path parameter; exact status/error semantics | `BLOCKED` |
@@ -43,19 +43,7 @@ The persistence mapping already contains references to several AUTH-003～AUTH-0
 
 Canonical feature operations are defined in `contracts/api/AUTH-003-credential-management-contract.v1.json`. The contract establishes the credential management operation set, self-scoped authorization, required idempotency for mutating operations, normalization rules, uniqueness rules, and projection/security invariants.
 
-Those constraints do not by themselves establish an exact wire schema. The following must therefore be explicitly contracted before OpenAPI promotion:
-
-- list response item shape and pagination envelope;
-- add request fields and requiredness;
-- add response shape;
-- replace request fields and requiredness;
-- replace response shape;
-- remove response shape or explicit no-body semantics;
-- exact `credentialId` path parameter schema;
-- exact success and client-error status semantics;
-- exact representation of generic credential-conflict semantics.
-
-Credential secret values, normalized values, and credential hashes must not be exposed by the response schema.
+The exact AUTH-003 wire schema is now encoded and validated. It includes the canonical cursor envelope, public credential projection `credentialId/kind/active`, add request `kind/value`, replace request `value`, immutable credential kind, `credentialId` path parameter, explicit 201/200/204 success semantics, canonical 401/403/404/409/422/429 errors, and required idempotency metadata. Credential secret values, normalized values, and credential hashes remain non-public.
 
 ### AUTH-004
 
@@ -138,15 +126,13 @@ A DTO may be admitted to `contracts/dto/auth-dto-contract.v1.json` only when:
 
 ## Decision
 
-`NO_DTO_PROMOTION_YET`
+`AUTH-003 DTO_SCHEMA_CLOSED / OPENAPI_ENCODED / PASS_VERIFIED`
 
-`NO_OPENAPI_WRITE_YET`
-
-Reason: the current feature contracts are sufficient to identify the operation inventory and important invariants, but are not sufficient to derive complete wire schemas without invention.
+AUTH-004～AUTH-006 remain `NO_DTO_PROMOTION_YET`. No runtime or GREEN claim follows from this schema closure.
 
 ## Next executable contract batch
 
-Close the DTO schemas themselves, feature by feature, starting with AUTH-003 because its operation set and field-level credential contract are already the most concretely specified. After DTO schema closure, update canonical OpenAPI, validate it, then update the canonical DTO registry and only afterward reconcile persistence Mapping rows.
+Next executable batch after this AUTH-003 closure is downstream reconciliation: confirm canonical DTO refs in persistence Mapping, then implement/evidence credential-list. Replace/Remove remain later lifecycle slices.
 
 ## Evidence boundary
 

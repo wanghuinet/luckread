@@ -77,7 +77,7 @@ The current field contract explicitly marks normalized values and value hashes a
 
 ## Current closure result
 
-`FIELD_AUTHORITY_FOUND / WIRE_SCHEMA_NOT_CLOSED`
+`FIELD_AUTHORITY_FOUND / WIRE_SCHEMA_CLOSED`
 
 What is already frozen:
 
@@ -90,25 +90,21 @@ What is already frozen:
 
 What is still missing before OpenAPI promotion:
 
-1. exact request fields and requiredness;
-2. exact response fields and requiredness;
-3. public representation of `kind`, if any;
-4. list pagination envelope;
-5. path parameter schema for `credentialId`;
-6. success status semantics;
-7. canonical client-error mapping including generic credential conflict;
-8. explicit body/no-body semantics for remove;
-9. examples only after the schema is approved.
+1. OpenAPI request/response schema refs for all four operations;
+2. public projection `credentialId/kind/active`;
+3. canonical cursor pagination/default 50/max 100/order;
+4. credentialId ResourceId path parameter;
+5. 201/200/204 success semantics;
+6. canonical 401/403/404/409/422/429 errors;
+7. idempotency metadata for mutations. The remaining work is runtime/persistence/evidence, not wire-schema invention.
 
 ## Gate decision
 
-`NO_OPENAPI_WRITE`
+`OPENAPI_ENCODED`
 
-`NO_DTO_REGISTRY_PROMOTION`
+`DTO_BINDINGS_PRESENT`
 
-`NO_MAPPING_PROMOTION`
-
-Reason: the repository currently provides field authority and security rules but does not yet provide the explicit public wire projection needed to safely create canonical DTO/OpenAPI schemas.
+Runtime and Mapping-0 remain separate downstream gates.
 ## Accepted wire projection — 2026-09-26
 
 credentialId, kind, and active are the only public credential-item fields. Input value, normalizedValue, valueHash, identityId, verifiedAt, createdAt and updatedAt remain non-public.

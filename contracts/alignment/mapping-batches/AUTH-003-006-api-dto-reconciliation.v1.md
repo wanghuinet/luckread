@@ -2,7 +2,7 @@
 
 ## Status
 
-`API_CANONICAL_PARTIAL / DTO_CANONICAL_BLOCKED / NOT_GREEN`
+`API_CANONICAL_PARTIAL / AUTH-003 DTO CANONICAL_BOUND / NOT_GREEN`
 
 ## Authority rule
 
@@ -21,7 +21,7 @@ Canonical operations evidenced:
 
 Existing persistence mapping operations such as `authUsernameCreate`, `authUsernameChange`, `authEmailAdd`, `authEmailChange`, `authPhoneAdd`, and `authPhoneChange` are therefore treated as `STALE_OR_UNRECONCILED` until an authoritative API source explicitly binds them.
 
-Canonical DTO binding remains blocked because `contracts/dto/auth-dto-contract.v1.json` does not currently contain an AUTH-003 canonical operation record.
+Canonical AUTH-003 DTO binding is present in `contracts/dto/auth-dto-contract.v1.json` and `contracts/dto/auth-dto-records.v1.json`. The records resolve directly to the current OpenAPI request/response schemas; `authCredentialRemove` is explicitly represented as no-body/204.
 
 ## AUTH-004
 
@@ -60,7 +60,7 @@ Remaining operations must be taken from the same canonical contract and not infe
 
 ## Canonical DTO registry finding
 
-`contracts/dto/auth-dto-contract.v1.json` currently binds AUTH-001 and AUTH-002 only, while AUTH-003, AUTH-004 and AUTH-005 are explicitly unresolved. AUTH-006 is also not represented as a canonical DTO record in the inspected contract.
+`contracts/dto/auth-dto-contract.v1.json` contains canonical AUTH-003 bindings. AUTH-004～AUTH-006 remain separate unresolved promotion work.
 
 Therefore the following are prohibited until DTO reconciliation:
 
@@ -71,11 +71,10 @@ Therefore the following are prohibited until DTO reconciliation:
 
 ## Required next closure
 
-1. Reconcile each feature API contract with `openapi.yaml`.
-2. Add or amend canonical OpenAPI operations where the feature contract is authoritative and the public API is intended to expose them.
-3. Add canonical DTO registry records only after the operation IDs and schema refs are authoritative.
-4. Reconcile persistence mapping to the resulting canonical operation/DTO IDs.
-5. Run Mapping-0 and keep runtime/evidence states separate.
+1. Keep AUTH-003 canonical operation/DTO bindings stable; do not reopen wire authority.
+2. Reconcile AUTH-003 persistence mapping against the canonical DTO refs and admitted physical D1 mapping.
+3. Execute the smallest remaining runtime slice: credential list, then Replace/Remove.
+4. Keep entity catalog promotion and Mapping-0 GREEN separate from runtime evidence.
 
 ## Promotion
 
