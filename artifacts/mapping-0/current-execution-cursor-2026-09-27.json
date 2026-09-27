@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "fd7c0b21deac173b5811fa7f7600f8f048cc15e8",
+  "sourceHead": "ecfcbdfc2e5e64c77a7abd9f51407f60a183bbfb",
   "backupBranch": "backup/pre-auth003-policy-task-decision-input-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
@@ -81,9 +81,22 @@
     "schemaEvidence": "PENDING_CAPTURE_AND_REVIEW"
   },
   "decisionInput": {
-    "path": "docs/decisions/2026-09-27-auth003-policy-and-task-edge-decision-input.md",
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-POLICY-TASK-DECISION-INPUT-2026-09-27.md",
+    "document": "docs/decisions/2026-09-27-auth003-policy-and-task-edge-decision-input.md",
     "status": "PROPOSED_NOT_AUTHORIZED",
     "candidateTask": "T01",
-    "proposedPolicyProfile": "MINIMAL_COST_FIRST"
-  }
+    "policyProfile": "MINIMAL_COST_FIRST"
+  },
+  "authoritySourcesChecked": [
+    "contracts/api/auth-operation-policy.v1.json",
+    "docs/change-control/CC-MAPPING-0-AUTH-003-WIRE-PROJECTION-AUTHORITY-2026-09-26.md",
+    "docs/21-P0-PUBLIC-API-INVENTORY-AND-COMPLETENESS-CONTRACT-v1.0.md",
+    "docs/23-P0-API-INVENTORY-RECONCILIATION-CONTRACT-v1.0.md",
+    "contracts/api/user-account-operation-policy.v1.json",
+    "contracts/api/feed-operation-policy.v1.json",
+    "contracts/api/interaction-operation-policy.v1.json",
+    "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md",
+    "contracts/resource-budget/edge-first-worker-topology.json",
+    "docs/04-WORKER-TOPOLOGY-CHANGE-CONTROL-v1.0.md"
+  ]
 }
