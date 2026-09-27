@@ -106,14 +106,14 @@
         "contracts/dto/auth-dto-contract.v1.json",
         "contracts/dto/auth-dto-records.v1.json",
         "contracts/entity/entity-implementation-evidence.v1.json",
+        "contracts/evidence/mapping-0-evidence-registry.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-LIFECYCLE-EVIDENCE-ADMISSION-2026-09-27.md",
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
         "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
-        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
-        "workers/W02-content/src/credentials/credential-add.ts",
         "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
         "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
-        "contracts/evidence/mapping-0-evidence-registry.v1.json",
-        "docs/change-control/CC-MAPPING-0-AUTH-003-LIFECYCLE-EVIDENCE-ADMISSION-2026-09-27.md"
+        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
+        "workers/W02-content/src/credentials/credential-add.ts"
       ],
       "blockers": [
         "Final AUTH-003 entity/field reconciliation and Entity promotion remain open; Mapping 0 / Five-Way remains globally NOT_GREEN.",
