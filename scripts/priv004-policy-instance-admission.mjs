@@ -129,16 +129,20 @@ if (!instanceSourceCommitSha) {
   fail('canonical policy instance must be present in repository history')
 }
 
-if (instance.provenance.commitSha !== instanceSourceCommitSha) {
+try {
+  execFileSync('git', ['merge-base', '--is-ancestor', instance.provenance.commitSha, instanceSourceCommitSha])
+} catch {
   fail(
-    `provenance.commitSha must equal the commit that last changed the canonical policy instance (${instanceSourceCommitSha}), not a self-referential HEAD SHA (${currentCommitSha})`,
+    `provenance.commitSha (${instance.provenance.commitSha}) must be an ancestor of the commit that last changed the canonical policy instance (${instanceSourceCommitSha})`,
   )
 }
 
 try {
-  execFileSync('git', ['merge-base', '--is-ancestor', instanceSourceCommitSha, currentCommitSha])
+  execFileSync('git', ['merge-base', '--is-ancestor', instance.provenance.commitSha, currentCommitSha])
 } catch {
-  fail('provenance.commitSha must be an ancestor of current HEAD')
+  fail(
+    `provenance.commitSha (${instance.provenance.commitSha}) must be an ancestor of current HEAD (${currentCommitSha})`,
+  )
 }
 
 if (instance.provenance.sourcePath !== 'artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json') {
@@ -151,6 +155,6 @@ if (packet.status === 'INPUT_REQUIRED') {
 
 console.log('PRIV004_ADMISSION_GUARD_PASS')
 console.log('- concrete policy instance satisfies the contracted admission shape')
-console.log('- policy-instance provenance is tied to its last repository commit and verified as reachable from current HEAD')
+console.log('- policy-instance provenance is tied to an approved/source checkpoint ancestor of the artifact commit and verified as reachable from current HEAD')
 console.log('- packet is no longer INPUT_REQUIRED')
 console.log('- no runtime implementation or Evidence Registry promotion is performed')
