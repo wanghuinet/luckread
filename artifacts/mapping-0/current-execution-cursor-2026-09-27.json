@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "edc0f727b8bdce0a4edeb5767e883fb2bbe34ae2",
-  "backupBranch": "backup/pre-cursor-provenance-sync-20260927",
+  "sourceHead": "e5d1dea7531791892831d7c3f6c00e1cf8474fac",
+  "backupBranch": "backup/pre-priv004-baseline-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
     "state": "BLOCKED_PRIV004_POLICY_INSTANCE",
@@ -82,7 +82,14 @@
     ],
     "finding": "AUTH-003 operation-policy fields and task edge are now explicitly admitted by CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27. Historical neighbor-domain and superseded topology sources remain non-authoritative.",
     "decision": "OPERATION_POLICY_AND_TASK_EDGE_CLOSED",
-    "historicalResourceBudgetDisposition": "The edge-first-worker-topology resource defaults are explicitly historical and tied to the superseded W01-W13/P01-P08 topology. They are not current 12-Worker operation-policy authority and cannot be imported into AUTH-003."
+    "historicalResourceBudgetDisposition": "The edge-first-worker-topology resource defaults are explicitly historical and tied to the superseded W01-W13/P01-P08 topology. They are not current 12-Worker operation-policy authority and cannot be imported into AUTH-003.",
+    "baselineAdmission": {
+      "status": "ADMITTED_GOVERNANCE_BASELINE",
+      "policy": "docs/176-PRIVACY-DATA-RETENTION-POLICY-v0.1.md",
+      "changeControl": "docs/change-control/CC-MAPPING-0-PRIVACY-DATA-RETENTION-POLICY-BASELINE-2026-09-27.md",
+      "mainSha": "e5d1dea7531791892831d7c3f6c00e1cf8474fac",
+      "effect": "Does not change the missing concrete PRIV-004 policy-instance gate."
+    }
   },
   "evidenceChannel": {
     "workflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
@@ -161,8 +168,8 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "PRIV-004 authority contract, policy-instance admission gate, authority-discovery checkpoint, and AUTH-001 gate reference are reconciled on the current main head; no approved ACCOUNT_REGISTRATION / LEGAL_AUDIT policy instance has been admitted.",
-    "currentMainSha": "edc0f727b8bdce0a4edeb5767e883fb2bbe34ae2",
+    "reason": "PRIV-004 authority contract, policy-instance admission gate, privacy/data-retention governance baseline, authority-discovery checkpoint, and AUTH-001 gate reference are reconciled on current main; no approved ACCOUNT_REGISTRATION / LEGAL_AUDIT policy instance has been admitted.",
+    "currentMainSha": "e5d1dea7531791892831d7c3f6c00e1cf8474fac",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_CONTRACT_PRECONDITIONS_RECONCILED_RUNTIME_PENDING",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -235,11 +242,12 @@
     "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
     "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
     "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-27.md",
-    "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md"
+    "docs/176-PRIVACY-DATA-RETENTION-POLICY-v0.1.md",
+    "docs/change-control/CC-MAPPING-0-PRIVACY-DATA-RETENTION-POLICY-BASELINE-2026-09-27.md"
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
-    "mainSha": "edc0f727b8bdce0a4edeb5767e883fb2bbe34ae2",
+    "mainSha": "e5d1dea7531791892831d7c3f6c00e1cf8474fac",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
