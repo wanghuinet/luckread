@@ -118,3 +118,23 @@ AUTH-003 wire closure is already recorded as closed. Do not reopen or repeat its
 ## 2026-09-26 AUTH-003 wire closure
 
 The explicit public wire-schema authority has been accepted and encoded in the canonical API contract, OpenAPI, API Inventory source and DTO registry. The remaining AUTH-003 blockers are D1 persistence, runtime implementation, normalization/uniqueness execution evidence, security-E2E evidence, durable Evidence Registry binding and final Mapping-0 reconciliation.
+
+
+## 2026-09-27 — Current continuation override / AUTH-003 runtime-persistence admission
+
+The previously appended `AUTH-003 wire closure` is retained as historical source evidence. The current Mapping 0 continuation cursor now supersedes the older batch wording that named AUTH-004 as the next execution unit.
+
+Current authoritative continuation:
+`AUTH-003 runtime/persistence/evidence closure under existing contracts`
+
+State:
+`BLOCKED — RUNTIME/PERSISTENCE IMPLEMENTATION ADMISSION REQUIRED`
+
+Current blockers:
+- AUTH-003 operation-policy resource/cache/retry/event/queue/anti-abuse authority is incomplete.
+- AUTH-003 physical D1 table/column/index/constraint authority remains `PENDING_SCHEMA_EVIDENCE`.
+- AUTH-003 runtime implementation and migration execution are not admitted.
+- ENT-IDENTITY and ENT-CREDENTIAL remain contract-only/proposed.
+- No Evidence Registry promotion or Mapping 0 GREEN promotion is permitted.
+
+This continuation override does not reopen AUTH-003 wire/OpenAPI/DTO work and does not authorize implementation by inference.

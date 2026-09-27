@@ -1,0 +1,90 @@
+{
+  "version": "1.0.0",
+  "status": "ADMISSION_GAP_REGISTERED",
+  "featureId": "AUTH-003",
+  "sourceHead": "b65ccc2873418367f372b4b3adf8101af0fbb54e",
+  "backupBranch": "backup/pre-auth003-runtime-persistence-batch-20260927",
+  "implementationAuthorization": false,
+  "migrationExecution": false,
+  "runtimeEvidenceAdmission": false,
+  "entityPromotion": false,
+  "mapping0Promotion": false,
+  "established": {
+    "operations": [
+      "authCredentialList",
+      "authCredentialAdd",
+      "authCredentialReplace",
+      "authCredentialRemove"
+    ],
+    "routes": [
+      "/auth/credentials",
+      "/auth/credentials/{credentialId}"
+    ],
+    "wireAuthority": "CLOSED",
+    "dtoAuthority": "CONTRACT_BOUND",
+    "normalization": {
+      "username": "trim_then_unicode_nfc_then_casefold",
+      "email": "trim_then_unicode_nfc_then_casefold",
+      "phone": "parse_and_validate_as_E164"
+    },
+    "uniqueness": {
+      "authority": "persistence_boundary",
+      "scope": [
+        "kind",
+        "normalizedValue"
+      ],
+      "concurrency": "single_authoritative_owner"
+    }
+  },
+  "blockers": [
+    {
+      "id": "OPERATION_POLICY",
+      "state": "MISSING_AUTHORITY",
+      "source": "contracts/api/auth-operation-policy.v1.json",
+      "missing": [
+        "resource",
+        "cache",
+        "retry",
+        "event",
+        "queue",
+        "antiAbuse"
+      ]
+    },
+    {
+      "id": "D1_PHYSICAL_SCHEMA",
+      "state": "PENDING_SCHEMA_EVIDENCE",
+      "source": "contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json#AUTH-003",
+      "missing": [
+        "physicalTableIds",
+        "columnMappings",
+        "indexes",
+        "constraints"
+      ]
+    },
+    {
+      "id": "RUNTIME_IMPLEMENTATION",
+      "state": "NOT_ADMITTED",
+      "basis": "No AUTH-003 runtime implementation reference exists on current main; ENT-IDENTITY and ENT-CREDENTIAL remain contract-only."
+    },
+    {
+      "id": "EVIDENCE",
+      "state": "NOT_ADMITTED",
+      "missing": [
+        "real-D1-schema",
+        "migration",
+        "normalization-uniqueness-runtime",
+        "enumeration-resistance",
+        "security-E2E",
+        "Evidence Registry binding"
+      ]
+    }
+  ],
+  "nextAction": "Resolve operation-policy authority and physical persistence mapping before runtime/migration implementation admission.",
+  "prohibited": [
+    "Do not infer physical table names.",
+    "Do not infer physical column/index/constraint names.",
+    "Do not copy resource or anti-abuse values from neighboring operations.",
+    "Do not rerun AUTH-002 E6 runtime 36219132123 unchanged.",
+    "Do not rerun W01 baseline migration evidence 35508571153 unchanged."
+  ]
+}

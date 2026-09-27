@@ -3372,3 +3372,29 @@ Current continuation:
 `AUTH-003 runtime/persistence/evidence closure under existing contracts` / `BLOCKED — RUNTIME/PERSISTENCE IMPLEMENTATION ADMISSION REQUIRED`.
 
 No API, DTO, entity, migration, Worker, D1 domain, operationId, runtime implementation, Evidence Registry promotion, or Mapping 0 GREEN status is introduced by this cursor reconciliation.
+
+
+## 2026-09-27 — AUTH-003 runtime/persistence admission preflight
+
+Source head: `b65ccc2873418367f372b4b3adf8101af0fbb54e`.
+Backup: `backup/pre-auth003-runtime-persistence-batch-20260927`.
+Change Control: `docs/change-control/CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-IMPLEMENTATION-ADMISSION-GAP-2026-09-27.md`.
+Machine artifact: `artifacts/mapping-0/auth-003-runtime-persistence-admission-gap-2026-09-27.json`.
+
+Batch result:
+- AUTH-003 wire/API/DTO authority remains closed and is not reopened.
+- AUTH-003 operation-policy resource/cache/retry/event/queue/anti-abuse authority remains unresolved.
+- AUTH-003 D1 physical persistence mapping remains pending actual schema authority; no table/column/index/constraint names are inferred.
+- Current W01 Payload Users implementation proves ENT-USER only; ENT-IDENTITY / ENT-CREDENTIAL remain contract-only.
+- No AUTH-003 migration, runtime implementation, Evidence Registry promotion, entity promotion or Mapping 0 GREEN status is introduced.
+
+Current continuation:
+`AUTH-003 runtime/persistence/evidence closure under existing contracts` /
+`BLOCKED — RUNTIME/PERSISTENCE IMPLEMENTATION ADMISSION REQUIRED`.
+
+Next admissible upstream work:
+1. operation-policy authority closure;
+2. physical persistence mapping authority closure;
+3. implementation/evidence admission under the resulting frozen inputs.
+
+Do not rerun AUTH-002 E6 runtime `36219132123` or W01 baseline migration evidence `35508571153` unchanged.
