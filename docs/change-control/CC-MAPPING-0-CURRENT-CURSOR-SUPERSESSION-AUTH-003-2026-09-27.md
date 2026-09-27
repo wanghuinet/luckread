@@ -62,3 +62,23 @@ This reconciliation closes the search step without manufacturing authority and d
 ## Historical resource-budget source disposition
 
 `contracts/resource-budget/edge-first-worker-topology.json` was also checked. Its resource defaults are not current AUTH-003 authority: the repository explicitly classifies that W01-W13/P01-P08 topology as historical and superseded by the current 12-Worker target. Therefore its D1/event/queue/anti-abuse defaults are not promoted into the AUTH-003 Operation Policy.
+
+
+## 2026-09-28 — superseded by dedicated current-execution cursor
+
+This control remains valid as historical governance evidence for the earlier AUTH-003 execution phase.
+
+The "Current execution authority" section above is no longer the active work-selection source. The dedicated cursor
+`artifacts/mapping-0/current-execution-cursor-2026-09-27.json`
+is the authoritative current execution source and explicitly declares:
+
+- `status = CURRENT_CURSOR_AUTHORITATIVE`
+- `currentCursor.id = AUTH-001-REGISTRATION-CLOSURE`
+- `currentCursor.state = BLOCKED_PRIV004_POLICY_INSTANCE`
+
+Therefore the earlier AUTH-003 cursor package is superseded as an execution instruction, while all of its historical evidence and prohibitions remain preserved.
+
+Current gate:
+admit the first approved `ACCOUNT_REGISTRATION / LEGAL_AUDIT` PRIV-004 policy instance with version, scope, effective period, deterministic rule, approval and provenance evidence.
+
+No AUTH-003 runtime rerun, entity promotion, or Mapping 0 promotion is authorized by this supersession note.
