@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "controlId": "CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27",
-  "sourceHead": "3d2f0dc6bd182a7ef318e9f43a5df961bc6a35bd",
+  "sourceHead": "544dd896ae40e72bcf358cf1336829c625f69e97",
   "backupBranch": "backup/pre-auth003-policy-task-decision-input-20260927",
   "status": "AUTHORITY_INPUT_REQUIRED / IMPLEMENTATION_NOT_AUTHORIZED",
   "scope": "AUTH-003 credential-management runtime/persistence admission",
@@ -195,7 +195,8 @@
     "contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json",
     ".github/workflows/w02-remote-d1-readonly-evidence.yml",
     "docs/decisions/2026-09-27-auth003-policy-and-task-edge-decision-input.md",
-    "artifacts/mapping-0/auth-003-policy-task-decision-input-2026-09-27.json"
+    "artifacts/mapping-0/auth-003-policy-task-decision-input-2026-09-27.json",
+    "docs/change-control/CC-MAPPING-0-AUTH-003-POLICY-TASK-DECISION-INPUT-2026-09-27.md"
   ],
   "currentFindings": [
     "No AUTH-003-specific operation-policy authority was found for resource/cache/retry/event/queue/anti-abuse.",
@@ -264,5 +265,12 @@
     ],
     "status": "READY_MANUAL_RUN",
     "admission": "NOT_YET"
+  },
+  "decisionInput": {
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-POLICY-TASK-DECISION-INPUT-2026-09-27.md",
+    "document": "docs/decisions/2026-09-27-auth003-policy-and-task-edge-decision-input.md",
+    "status": "PROPOSED_NOT_AUTHORIZED",
+    "candidateTask": "T01",
+    "proposedPolicyProfile": "MINIMAL_COST_FIRST"
   }
 }
