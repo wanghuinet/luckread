@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "01c7289301ceff18f51577f626851a690fb3c038",
-  "backupBranch": "backup/post-auth001-writer-boundary-reconcile-20260927",
+  "sourceHead": "fcc8bfb133a2469acc9b6519fd2502bd0731b781",
+  "backupBranch": "backup/pre-auth001-consent-auth013-reconcile-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "BLOCKED_AUTH001_CONSENT_LIFECYCLE_ENVELOPE",
-    "objective": "Resolve the remaining AUTH-001 implementation prerequisites: canonical consent persistence, AUTH-013 lifecycle persistence, and concrete registration-envelope persistence/evidence.",
+    "state": "BLOCKED_AUTH001_CONSENT_ENVELOPE",
+    "objective": "Resolve the remaining AUTH-001 implementation prerequisites: canonical PRIV-002 consent persistence and concrete registration-envelope persistence/evidence.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-WRITER-BOUNDARY-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::admit PRIV-002 consent persistence/retention/version semantics + AUTH-013 initial PENDING_VERIFICATION persistence + concrete registration-envelope schema/evidence; then authorize the smallest registration runtime slice.",
+    "nextGate": "AUTH-001::admit PRIV-002 consent persistence/retention/version semantics + concrete registration-envelope schema/evidence; then authorize the smallest registration runtime slice.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -29,7 +29,8 @@
     "auth001RegisterWireRequiredness": true,
     "auth001IdempotencySemantics": true,
     "auth001RegistrationWriterBoundary": true,
-    "auth001NativeEmailEntry": true
+    "auth001NativeEmailEntry": true,
+    "auth001Auth013InitialPersistence": true
   },
   "historicalOnlyCursors": [
     "M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001 / WAIT_AUTHORITY_DECISION",
@@ -157,8 +158,8 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Active W01 Users.ts uses Payload native auth without a custom phone strategy. AUTH-001 identity entry is constrained to email; phone remains under AUTH-003/AUTH-005. Username/consent wire requiredness, canonical idempotency semantics, and the W01 registration writer boundary are reconciled. Runtime remains blocked on PRIV-002 consent persistence, AUTH-013 lifecycle persistence, and concrete registration-envelope schema/evidence.",
-    "currentMainSha": "01c7289301ceff18f51577f626851a690fb3c038",
+    "reason": "Active W01 Users.ts uses Payload native auth without a custom phone strategy. AUTH-001 identity entry is constrained to email; phone remains under AUTH-003/AUTH-005. Username/consent wire requiredness, canonical idempotency semantics, the W01 registration writer boundary, and the AUTH-001 initial PENDING_VERIFICATION persistence dependency are reconciled from existing evidence. Runtime remains blocked on PRIV-002 consent persistence and concrete registration-envelope schema/evidence.",
+    "currentMainSha": "9c363e4cee0b5208a755fa86149307f86fecf150",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "USERNAME_CONSENT_AND_IDENTITY_ENTRY_RECONCILED_REMAINING_GATES_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -166,7 +167,7 @@
     "atomicityStatus": "EVENTUAL_CONSISTENCY_WRITER_BOUNDARY_RECONCILED",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED"
   },
-  "nextGate": "AUTH-001::admit PRIV-002 consent persistence/retention/version semantics + AUTH-013 initial PENDING_VERIFICATION persistence + concrete registration-envelope schema/evidence; then authorize the smallest registration runtime slice.",
+  "nextGate": "AUTH-001::admit PRIV-002 consent persistence/retention/version semantics + concrete registration-envelope schema/evidence; then authorize the smallest registration runtime slice.",
   "runtimeEvidenceAdmission": {
     "list": {
       "workflow": ".github/workflows/w02-auth-003-credential-list-runtime-evidence.yml",
@@ -215,11 +216,12 @@
     "docs/change-control/CC-MAPPING-0-AUTH-001-IDEMPOTENCY-CANONICAL-SEAM-RECONCILIATION-2026-09-27.md",
     "docs/change-control/CC-MAPPING-0-AUTH-001-NATIVE-EMAIL-REGISTRATION-DECISION-2026-09-27.md",
     "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-WRITER-BOUNDARY-2026-09-27.md",
-    "docs/change-control/CC-MAPPING-0-USER-001-PAYLOAD-API-FIELD-RECONCILIATION-2026-09-27.md"
+    "docs/change-control/CC-MAPPING-0-USER-001-PAYLOAD-API-FIELD-RECONCILIATION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-AUTH-013-INITIAL-PERSISTENCE-RECONCILIATION-2026-09-27.md"
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
-    "mainSha": "01c7289301ceff18f51577f626851a690fb3c038",
+    "mainSha": "9c363e4cee0b5208a755fa86149307f86fecf150",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",

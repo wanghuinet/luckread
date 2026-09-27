@@ -110,3 +110,19 @@ This control does not authorize runtime code, migrations, new infrastructure, Ma
 The AUTH-001 registration writer is no longer blocked by an impossible cross-worker atomicity requirement. The minimum viable authority is W01 transactional registration envelope + W02 eventual identity/credential materialization, with no distributed transaction.
 
 Consent persistence and AUTH-013 lifecycle persistence remain independent implementation dependencies.
+
+## 2026-09-27 AUTH-013 initial persistence dependency reconciliation
+
+The AUTH-013 dependency for the **first persisted registration lifecycle state** is now evidence-backed and no longer blocks the AUTH-001 writer boundary.
+
+Authoritative control:
+`docs/change-control/CC-MAPPING-0-AUTH-001-AUTH-013-INITIAL-PERSISTENCE-RECONCILIATION-2026-09-27.md`.
+
+Existing D1-01 migration evidence proves that new `users` rows receive:
+
+- `account_state = PENDING_VERIFICATION`;
+- `account_state_version = 1`.
+
+Therefore the W01 Payload-native User creation can rely on the existing D1 defaults inside the admitted persistence boundary. No `account_state` field is added to `workers/W01-payload/src/collections/Users.ts`, and no second lifecycle writer is introduced.
+
+The original dependency list above is retained as historical decision context. For current execution, AUTH-001's lifecycle prerequisite is **reconciled for initial persistence**. AUTH-013's broader transition, side-effect, security, integration, and Evidence Registry closure remains separate and is not promoted or rerun.
