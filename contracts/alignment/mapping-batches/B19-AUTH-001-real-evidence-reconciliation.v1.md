@@ -254,3 +254,20 @@ Authoritative capability reconciliation:
 `docs/change-control/CC-MAPPING-0-AUTH-001-PAYLOAD-NATIVE-CAPABILITY-RECONCILIATION-2026-09-27.md`
 
 Mapping 0 remains NOT_GREEN.
+
+
+## 2026-09-27 native-email entry correction
+
+Current AUTH-001 public registration identity entry is `identityType=email`.
+
+Phone is deferred to the AUTH-003/AUTH-005 credential and verification path. The previous phone-entry reconciliation text is historical decision material and does not authorize a phone registration runtime.
+
+Authoritative control: `docs/change-control/CC-MAPPING-0-AUTH-001-NATIVE-EMAIL-REGISTRATION-DECISION-2026-09-27.md`.
+
+## 2026-09-27 registration writer-boundary reconciliation
+
+The registration writer boundary is now explicitly reconciled as a W01 Payload-native transaction containing the User creation and a registration-local idempotency/envelope record, followed by eventual W02/D1-01 Identity/Credential materialization.
+
+Authoritative control: `docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-WRITER-BOUNDARY-2026-09-27.md`.
+
+Consent persistence remains unresolved under PRIV-002; no runtime implementation is admitted.
