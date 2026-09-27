@@ -111,6 +111,7 @@ function decodeCursor(cursor: string): CursorPayload {
     typeof (payload as Partial<CursorPayload>).createdAt !== 'string' ||
     typeof (payload as Partial<CursorPayload>).credentialId !== 'string' ||
     (payload as Partial<CursorPayload>).createdAt.length === 0 ||
+    Number.isNaN(Date.parse((payload as Partial<CursorPayload>).createdAt)) ||
     (payload as Partial<CursorPayload>).credentialId.length === 0
   ) {
     throw new CredentialListError('INVALID_CURSOR', 'cursor is invalid')
