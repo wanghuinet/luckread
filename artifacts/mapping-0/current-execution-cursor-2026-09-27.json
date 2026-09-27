@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "aaa422b0a307bb2661339dabe6b3e6a9185b025e",
-  "backupBranch": "backup/pre-auth003-policy-task-authority-admission-20260927",
+  "sourceHead": "953e9f40cdbd9eccf454ee2cb6deae2cb543d352",
+  "backupBranch": "backup/pre-auth003-postmigration-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-003-RUNTIME-PERSISTENCE-EVIDENCE-ADMISSION",
-    "state": "BLOCKED_REMOTE_MIGRATION_EVIDENCE_REQUIRED",
-    "objective": "Execute and admit the authorized MIG-AUTH-003-CREDENTIAL-V1 migration against D1-01, with exact-SHA pre/post schema and preservation evidence, before runtime implementation.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-MIGRATION-ADMISSION-2026-09-27.md",
+    "state": "BLOCKED_REMOTE_MIGRATION_POSTCHECK_EVIDENCE_REQUIRED",
+    "objective": "Admit the actual remote MIG-AUTH-003-CREDENTIAL-V1 execution through read-only exact-SHA post-schema, migration-ledger, and provenance evidence before runtime implementation.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-003 migration evidence admission -> same-SHA persistence/security/runtime vertical slice",
+    "nextGate": "AUTH-003 post-migration read-only evidence admission -> same-SHA persistence/security/runtime vertical slice",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED"
@@ -45,7 +45,10 @@
     "Do not assign the existing W01-PAYLOAD-D1-BINDING physical database to W02/D1-01 by inference.",
     "Treat W02 -> D1-01 as the closed logical owner chain; keep physical Worker/D1 binding as a separate gate.",
     "Treat luckread-w02 and D1-01 target UUID 2f80471e-... as explicit authority inputs; do not reinterpret or reassign the target. Physical target identity is closed; current-SHA deployment correctness remains a separate gate.",
-    "Do not inherit AUTH-003 runtime correctness from earlier W02 deployment evidence; same-SHA evidence is required."
+    "Do not inherit AUTH-003 runtime correctness from earlier W02 deployment evidence; same-SHA evidence is required.",
+    "Do not rerun remote migration 36296831559 or reapply 0004_auth_003_credentials.sql; remote DDL execution has already occurred.",
+    "Treat 36296831559 as execution checkpoint only; final schema correctness requires a later read-only exact-SHA postcheck.",
+    "Do not promote AUTH-003 persistence status from the migration execution log alone."
   ],
   "previousSourceHead": "2c222fdea5fb4f287069c0833a96226265a7f7fa",
   "authorityDiscovery": {
@@ -70,7 +73,7 @@
   "evidenceChannel": {
     "workflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
     "mode": "READONLY",
-    "status": "READY_MANUAL_RUN_AND_REVIEW",
+    "status": "EXECUTION_OBSERVED_POSTCHECK_REQUIRED",
     "captures": [
       "sqlite_master",
       "table_list",
@@ -83,7 +86,15 @@
     "artifactId": "10923578328",
     "sourceSha": "ce308e202ff737e236f3bf35f30097e9e4e3b42c",
     "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
-    "migrationDesign": "ADMITTED_NOT_EXECUTED",
+    "migrationDesign": "ADMITTED",
+    "executionRunId": "36296831559",
+    "executionJobId": "108557122475",
+    "executionSourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435",
+    "executionStatus": "REMOTE_DDL_APPLIED",
+    "executionConclusion": "REMOTE_DDL_EXECUTED_TRUE_POST_SCHEMA_EVIDENCE_NOT_ADMITTED",
+    "executionEvidenceRef": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
+    "postcheckWorkflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
+    "postcheckRequired": true,
     "migrationWorkflow": ".github/workflows/w02-auth-003-migration-evidence.yml"
   },
   "decisionInput": {
@@ -91,12 +102,15 @@
     "taskEdge": "AUTH-003 -> T01 -> W02 -> D1-01",
     "taskEdgeStatus": "PASS_VERIFIED_LOGICAL_MAPPING",
     "operationPolicyStatus": "CLOSED_AUTHORITY_ADMITTED",
-    "sourceHead": "f7aaf97871657f4e579e42415968a20b60d1ff5e",
+    "sourceHead": "953e9f40cdbd9eccf454ee2cb6deae2cb543d352",
     "schemaEvidenceAdmission": "docs/change-control/CC-MAPPING-0-AUTH-003-D1-SCHEMA-EVIDENCE-ADMISSION-2026-09-27.md",
     "schemaEvidenceStatus": "PASS_VERIFIED_EVIDENCE_CAPTURE",
     "migrationAdmission": "docs/change-control/CC-MAPPING-0-AUTH-003-MIGRATION-ADMISSION-2026-09-27.md",
     "migrationDesignStatus": "PASS_VERIFIED_DESIGN_ADMISSION",
-    "remoteMigrationStatus": "NOT_EXECUTED"
+    "remoteMigrationStatus": "EXECUTED_POSTCHECK_PENDING",
+    "executionReconciliation": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
+    "executionRunId": "36296831559",
+    "executionSourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435"
   },
   "authoritySourcesChecked": [
     "contracts/api/auth-operation-policy.v1.json",
