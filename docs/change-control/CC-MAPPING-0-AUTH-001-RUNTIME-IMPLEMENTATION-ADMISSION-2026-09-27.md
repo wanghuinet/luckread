@@ -2,7 +2,7 @@
 
 ## Status
 
-`CONTRACT_PRECONDITIONS_RECONCILED / RUNTIME_BLOCKED_PRIV004_RETENTION_AUTHORITY`
+`CONTRACT_PRECONDITIONS_RECONCILED / DEV_TEST_RUNTIME_ADMISSIBLE / PRODUCTION_BLOCKED`
 
 ## Preconditions already reconciled
 
@@ -23,7 +23,7 @@ AUTH-001 has admitted:
 
 See `docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md` and `docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-GAP-2026-09-27.md`.
 
-The 2026-09-27 repository authority-discovery checkpoint records that no approved/active concrete PRIV-004 policy instance currently exists in the repository. Repeating the same repository-only search is not a new gate.
+Production authority discovery remains unresolved, but a separate development-only instance `DEV-2026-09-28.1` is now admitted for deterministic engineering validation. It is not a legal/compliance authority and cannot authorize production.
 
 ## Smallest runtime slice
 
@@ -106,11 +106,24 @@ No documentation-only run may promote AUTH-001 GREEN.
 - no reuse of unrelated AUTH-013/D1-03 idempotency journals;
 - no Mapping 0 GREEN until runtime and Evidence Registry gates pass.
 
-## Gate
+## Development gate
 
-Implementation may start only after both of these conditions are true:
+Development/integration implementation may proceed only when both conditions are true:
 
-1. PRIV-004 admits the first approved/active `ACCOUNT_REGISTRATION / LEGAL_AUDIT` policy instance, with version, scope, effective period, deterministic rule, approval and provenance evidence, sufficient to calculate `ENT-CONSENT.retentionUntil`.
-2. The current Contract CI / API contract checks for the admitted contract change pass.
+1. the admitted `DEV-2026-09-28.1` policy instance is selected by the development environment; and
+2. Contract Admission DEVELOPMENT is PASS_VERIFIED on the current admitted change.
+
+Observed Contract Admission evidence:
+- workflow: `.github/workflows/contract-admission-v2.yml`
+- run: `36356226141`
+- source: `8181df2ac1265f7a5cd64225f8f95a03ef95a067`
+- applicable DEVELOPMENT gates: PASS_VERIFIED
+- FULL-only R4/Evidence/Five-Way/OpenAPI stages remain outside this development admission.
+
+The development policy is deterministic and server-controlled, but it is not a production legal/compliance authority.
+
+## Production gate
+
+Production implementation, production deployment and Evidence Registry promotion remain blocked until a real production `ACCOUNT_REGISTRATION / LEGAL_AUDIT` policy instance is admitted with the required legal/compliance authority and approval evidence.
 
 Runtime evidence remains a separate promotion gate.

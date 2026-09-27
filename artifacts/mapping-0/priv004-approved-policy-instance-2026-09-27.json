@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
+  "policyVersion": "DEV-2026-09-28.1",
+  "owner": "LuckRead Engineering",
+  "scope": {
+    "operationId": "authRegister",
+    "purpose": "ACCOUNT_REGISTRATION",
+    "environment": "DEVELOPMENT"
+  },
+  "environment": "DEVELOPMENT",
+  "status": "APPROVED",
+  "effectiveFrom": "2026-09-28T00:00:00Z",
+  "effectiveTo": "2026-12-31T23:59:59Z",
+  "retentionClass": "LEGAL_AUDIT",
+  "rule": {
+    "mode": "DURATION",
+    "durationSeconds": 63072000
+  },
+  "sourceAuthority": "LuckRead Internal Engineering Temporary Runtime Test Authority",
+  "approvalRef": "ENG-DECISION-2026-09-28-PRIV004-DEV-730D",
+  "rollbackVersion": "NONE-DEV-TEST-RETIRE-ON-REPLACEMENT",
+  "provenance": {
+    "commitSha": "5f39e147290396284ebf64f0cf4511bc890ab544",
+    "sourcePath": "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json",
+    "kind": "APPROVAL_SOURCE_CHECKPOINT"
+  },
+  "usage": {
+    "mode": "DEVELOPMENT_TEST_ONLY",
+    "productionUse": false,
+    "replacementRequiredBeforeProduction": true,
+    "legalComplianceStatus": "NOT_A_LEGAL_OR_COMPLIANCE_AUTHORITY",
+    "retentionMeaning": "730-day deterministic engineering test value only; not a claim that any law requires 730 days.",
+    "engineeringRationale": "Provides a stable deterministic retentionUntil value for registration transaction, replay, expiry and reconciliation tests while the production legal/compliance retention schedule remains pending."
+  }
+}
