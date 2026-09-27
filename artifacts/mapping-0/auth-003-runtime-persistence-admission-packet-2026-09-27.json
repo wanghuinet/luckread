@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
   "controlId": "CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27",
-  "sourceHead": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
-  "backupBranch": "backup/pre-auth003-postmigration-reconciliation-20260927",
+  "sourceHead": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+  "backupBranch": "backup/pre-auth003-current-sha-cursor-sync-20260927",
   "status": "SCHEMA_EVIDENCE_ADMITTED / REMOTE_MIGRATION_EXECUTED / POSTCHECK_VERIFIED / RUNTIME_SECURITY_REQUIRED",
   "scope": "AUTH-003 credential-management runtime/persistence admission",
   "establishedInputs": {
@@ -254,37 +254,29 @@
     "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md"
   ],
   "currentFindings": [
-    "Remote D1-01 schema/migration evidence is captured and admitted from run 36295541846 at exact source SHA ce308e202ff737e236f3bf35f30097e9e4e3b42c.",
-    "The observed D1-01 table list contains users/users_sessions and existing auth/session/governance tables, but no separately evidenced ENT-IDENTITY or ENT-CREDENTIAL persistence structure.",
-    "The observed users table has native email and username plus Payload password/recovery fields; these are not silently promoted into the frozen AUTH-003 entity model.",
-    "ENT-IDENTITY and ENT-CREDENTIAL remain contract-only/proposed.",
-    "AUTH-003 physical field mapping remains pending because the required credential persistence schema does not yet exist in the admitted remote state.",
-    "Next gate is migration admission, not runtime implementation.",
-    "Controlled remote run 36296831559 applied MIG-AUTH-003-CREDENTIAL-V1 at exact source SHA 52c6868f99ae2ec9aeb8bdceb4a18396cde20435; this is execution evidence only, not final schema admission.",
-    "ENT-IDENTITY and ENT-CREDENTIAL remain contract-only/proposed until read-only post-migration evidence is captured and reconciled.",
-    "The migration MUST NOT be re-executed. The next gate is a read-only exact-SHA postcheck against the already-mutated D1-01 state.",
-    "Read-only post-migration evidence run 36298629648 verified the observed AUTH-003 schema, indexes, foreign key, migration ledger and exact provenance.",
-    "Table-scoped PRAGMA foreign_key_check(auth_credentials) returned an empty result set.",
-    "AUTH-003 post-migration schema evidence is now admitted; runtime/security implementation remains the next separate gate."
+    "AUTH-003 remote migration 36296831559 was already executed at exact source SHA 52c6868f99ae2ec9aeb8bdceb4a18396cde20435; do not re-execute.",
+    "Read-only post-migration evidence run 36298629648 is PASS_VERIFIED and its table-scoped auth_credentials foreign_key_check was empty; do not rerun unchanged.",
+    "The admitted physical AUTH-003 schema is the input for runtime evidence; no new schema invention is permitted.",
+    "The smallest AUTH-003 credential-add persistence/security/runtime slice is merged on authoritative main at exact implementation SHA 419bb7fd887af0c30412bead50f8196ec6446bb7.",
+    "The merged slice includes normalization, persistence uniqueness boundary, deterministic idempotency/replay, self-authorization denial and public projection checks.",
+    "Unit evidence previously failed only because the normalization fixture used literal escape text; the fixture-only correction is merged at the current SHA. Controlled remote runtime evidence is still pending.",
+    "Runtime evidence must execute against the exact current main SHA and D1-01 luckread target; production Worker deployment remains false.",
+    "ENT-IDENTITY and ENT-CREDENTIAL must not be promoted and Mapping 0 must not be marked GREEN until runtime/security evidence is admitted."
   ],
   "nextAdmissibleSequence": [
-    "Admit the observed post-migration physical mapping for ENT-IDENTITY and ENT-CREDENTIAL from run 36298629648.",
-    "Bind the smallest AUTH-003 persistence/security/runtime implementation slice to an exact tested SHA.",
-    "Execute same-SHA persistence/security/runtime evidence including normalization/uniqueness and security-negative cases.",
-    "Register runtime/security evidence; only then reconsider entity and Mapping 0 promotion."
+    "Execute .github/workflows/w02-auth-003-credential-add-runtime-evidence.yml with source_sha=419bb7fd887af0c30412bead50f8196ec6446bb7, database_name=luckread, confirm=RUN.",
+    "Verify same-SHA controlled remote runtime PASS, including normalization/uniqueness, idempotency replay/conflict, cross-account denial, public projection, concurrency winner/loser and cleanup.",
+    "Register the resulting runtime/security evidence with exact run/artifact/source provenance.",
+    "Only after runtime/security evidence admission reconsider AUTH-003 entity/Mapping 0 promotion."
   ],
   "forbiddenUntilInputs": [
-    "AUTH-003 migration execution before migration admission",
-    "ENT-IDENTITY promotion",
-    "ENT-CREDENTIAL promotion",
-    "physical schema invention outside an admitted migration design",
-    "Evidence Registry PASS creation",
-    "Mapping 0 GREEN",
-    "AUTH-003 runtime handlers before post-migration schema evidence admission",
     "re-executing MIG-AUTH-003-CREDENTIAL-V1",
+    "re-running unchanged PASS_VERIFIED schema postcheck 36298629648",
+    "physical schema invention outside the admitted migration design",
+    "production Worker deployment for this evidence slice",
     "ENT-IDENTITY promotion",
     "ENT-CREDENTIAL promotion",
-    "Evidence Registry PASS creation",
+    "Evidence Registry PASS creation without the actual runtime artifact",
     "Mapping 0 GREEN"
   ],
   "logicalOwnership": {
@@ -312,7 +304,7 @@
     "currentShaDeploymentEvidence": "REQUIRED_FOR_AUTH003",
     "schemaEvidence": "REQUIRED"
   },
-  "previousSourceHead": "673fc9d14fef33d618fb2121c3f5304cf46ae926",
+  "previousSourceHead": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
   "evidenceChannel": {
     "workflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
     "mode": "READONLY",
@@ -360,5 +352,14 @@
     "executionReconciliation": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
     "executionRunId": "36296831559",
     "executionSourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435"
+  },
+  "currentHeadReconciliation": {
+    "reason": "Synchronize admission packet to the authoritative main SHA after the AUTH-003 credential-add implementation merge.",
+    "previousSourceHead": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
+    "currentMainSha": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+    "implementationCommit": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+    "implementationStatus": "MERGED_TO_MAIN_RUNTIME_EVIDENCE_PENDING",
+    "runtimeWorkflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
+    "runtimeEvidenceStatus": "PENDING"
   }
 }
