@@ -1,6 +1,10 @@
 name: AUTH-004 Native Local Evidence
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/auth-004-native-local-evidence.yml"
+      - "workers/W01-payload/scripts/auth-004-native-local-probe.mjs"
 permissions:
   contents: read
 jobs:
