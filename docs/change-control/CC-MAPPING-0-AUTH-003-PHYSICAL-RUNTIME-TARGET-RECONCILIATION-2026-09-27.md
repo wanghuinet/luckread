@@ -3,7 +3,7 @@
 
 - Control ID: `CC-MAPPING-0-AUTH-003-PHYSICAL-RUNTIME-TARGET-RECONCILIATION-2026-09-27`
 - Status: `PHYSICAL_TARGET_AUTHORITY_CLOSED / CURRENT-SHA-EVIDENCE_SEPARATE`
-- Source main: `1fec1cebb79243baba9f22e59e715b5e3335fabc`
+- Source main: `764972cfa0f23efbac951f1da20c9bda9d6a71f7`
 - Backup: `backup/pre-auth003-physical-identity-reconcile-20260927`
 - Machine artifact: `artifacts/mapping-0/auth-003-physical-runtime-target-reconciliation-2026-09-27.json`
 
