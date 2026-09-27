@@ -498,22 +498,46 @@
         "scope": "self"
       },
       "resource": {
-        "status": "MISSING"
+        "class": "BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 100,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0,
+        "outboundMax": 0
       },
       "cache": {
-        "status": "MISSING"
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
       },
       "retry": {
-        "status": "MISSING"
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": false
       },
       "event": {
-        "status": "MISSING"
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
       },
       "queue": {
-        "status": "MISSING"
+        "enqueueMax": 0
       },
       "antiAbuse": {
-        "status": "MISSING"
+        "required": true,
+        "scopes": [
+          "account",
+          "identity",
+          "device",
+          "endpoint"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK"
+        ]
       },
       "idempotency": {
         "required": false
@@ -557,22 +581,46 @@
         "scope": "self"
       },
       "resource": {
-        "status": "MISSING"
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 2,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 4,
+        "rpcMax": 0,
+        "outboundMax": 0
       },
       "cache": {
-        "status": "MISSING"
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
       },
       "retry": {
-        "status": "MISSING"
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
       },
       "event": {
-        "status": "MISSING"
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
       },
       "queue": {
-        "status": "MISSING"
+        "enqueueMax": 0
       },
       "antiAbuse": {
-        "status": "MISSING"
+        "required": true,
+        "scopes": [
+          "account",
+          "identity",
+          "device",
+          "endpoint"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK"
+        ]
       },
       "idempotency": {
         "required": true,
@@ -618,27 +666,51 @@
         "scope": "self"
       },
       "resource": {
-        "status": "MISSING"
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 2,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 4,
+        "rpcMax": 0,
+        "outboundMax": 0
       },
       "cache": {
-        "status": "MISSING"
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
       },
       "retry": {
-        "status": "MISSING"
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
       },
       "event": {
-        "status": "MISSING"
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
       },
       "queue": {
-        "status": "MISSING"
+        "enqueueMax": 0
       },
       "antiAbuse": {
-        "status": "MISSING"
+        "required": true,
+        "scopes": [
+          "account",
+          "identity",
+          "device",
+          "endpoint"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK"
+        ]
       },
       "idempotency": {
         "required": true,
         "key": "Idempotency-Key",
-        "semantic": "same-request-replay-must-not-create-second-authoritative-replacement"
+        "semantic": "same-request-replay-must-not-repeat-authoritative-replacement"
       },
       "security": [
         "credential_values_never_appear_in_logs",
@@ -679,22 +751,46 @@
         "scope": "self"
       },
       "resource": {
-        "status": "MISSING"
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 2,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 4,
+        "rpcMax": 0,
+        "outboundMax": 0
       },
       "cache": {
-        "status": "MISSING"
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
       },
       "retry": {
-        "status": "MISSING"
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
       },
       "event": {
-        "status": "MISSING"
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
       },
       "queue": {
-        "status": "MISSING"
+        "enqueueMax": 0
       },
       "antiAbuse": {
-        "status": "MISSING"
+        "required": true,
+        "scopes": [
+          "account",
+          "identity",
+          "device",
+          "endpoint"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK"
+        ]
       },
       "idempotency": {
         "required": true,
