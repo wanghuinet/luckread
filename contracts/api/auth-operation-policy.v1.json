@@ -744,25 +744,15 @@
         "d1ReadMax": 2,
         "d1WriteMax": 2,
         "d1ReadRowsMax": 8,
-        "d1WriteRowsMax": 64,
-        "rpcMax": 1,
-        "outboundMax": 0
+        "d1WriteRowsMax": 64
       },
       "cache": {
         "mode": "NO_STORE",
         "shared": false,
         "authorizationBoundary": true
       },
-      "retry": {
-        "maxAttempts": 1,
-        "clientRetrySafe": true,
-        "requiresIdempotency": true
-      },
       "event": {
         "status": "MISSING"
-      },
-      "queue": {
-        "enqueueMax": 0
       },
       "antiAbuse": {
         "status": "MISSING"
@@ -781,10 +771,10 @@
       "evidence": {
         "openapi": "MISSING",
         "inventory": "MISSING",
-        "permission": "PASS",
+        "permission": "MISSING",
         "state": "MISSING",
-        "resource": "PASS",
-        "cache": "PASS",
+        "resource": "MISSING",
+        "cache": "MISSING",
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
@@ -811,25 +801,17 @@
         "d1ReadMax": 2,
         "d1WriteMax": 2,
         "d1ReadRowsMax": 8,
-        "d1WriteRowsMax": 4,
-        "rpcMax": 1,
-        "outboundMax": 1
+        "d1WriteRowsMax": 4
       },
       "cache": {
         "mode": "NO_STORE",
         "shared": false,
         "authorizationBoundary": false
       },
-      "retry": {
-        "maxAttempts": 1,
-        "clientRetrySafe": true,
-        "requiresIdempotency": false
-      },
       "event": {
         "status": "MISSING"
       },
       "queue": {
-        "enqueueMax": 1,
         "delivery": "ASYNC",
         "status": "CONTRACTED"
       },
@@ -851,8 +833,8 @@
         "inventory": "MISSING",
         "permission": "N/A",
         "state": "N/A",
-        "resource": "PASS",
-        "cache": "PASS",
+        "resource": "MISSING",
+        "cache": "MISSING",
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
@@ -879,25 +861,15 @@
         "d1ReadMax": 2,
         "d1WriteMax": 2,
         "d1ReadRowsMax": 8,
-        "d1WriteRowsMax": 64,
-        "rpcMax": 1,
-        "outboundMax": 0
+        "d1WriteRowsMax": 64
       },
       "cache": {
         "mode": "NO_STORE",
         "shared": false,
         "authorizationBoundary": true
       },
-      "retry": {
-        "maxAttempts": 1,
-        "clientRetrySafe": false,
-        "requiresIdempotency": false
-      },
       "event": {
         "status": "MISSING"
-      },
-      "queue": {
-        "enqueueMax": 0
       },
       "antiAbuse": {
         "status": "MISSING"
@@ -917,10 +889,10 @@
       "evidence": {
         "openapi": "MISSING",
         "inventory": "MISSING",
-        "permission": "PASS",
+        "permission": "MISSING",
         "state": "MISSING",
-        "resource": "PASS",
-        "cache": "PASS",
+        "resource": "MISSING",
+        "cache": "MISSING",
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
