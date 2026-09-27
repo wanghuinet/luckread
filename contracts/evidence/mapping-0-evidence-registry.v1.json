@@ -585,6 +585,22 @@
       "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
       "note": "Exact tested commit 5d8884dc7a64163904ec96a46cbc9769cc937a7c. Local Payload 3.87.1/D1 evidence verified password-change old-credential rejection, changed-password acceptance, native forgotPassword/resetPassword success, single-use reset-token rejection, expired reset-token rejection, and no secret emission in the evidence result. Existing-session revocation after password change was explicitly NOT_TESTED by this harness because W01 intentionally uses removeTokenFromResponses=true. This is local integration evidence only; it does not prove controlled remote W01 behavior, HTTP E2E transport, or AUTH-004 GREEN.",
       "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
+    },
+    {
+      "evidenceId": "EVD-AUTH003-B15-D1-SCHEMA-POSTMIGRATION-REMOTE-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-003::D1-SCHEMA-POSTMIGRATION",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-003",
+      "source": "GitHub Actions W02 Remote D1 Readonly Schema Evidence against controlled Cloudflare D1",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
+      "commitSha": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
+      "timestamp": "2026-09-27T05:56:55Z",
+      "producer": "Wrangler 4.116.0 remote D1 read-only schema/migration/provenance capture",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "validUntil": null,
+      "note": "Fresh read-only post-migration evidence for the already-executed MIG-AUTH-003-CREDENTIAL-V1. Exact execution source SHA is preserved as 52c6868f99ae2ec9aeb8bdceb4a18396cde20435; target is luckread / D1-01 UUID 2f80471e-3756-49f9-8db1-7707a433ad64. Captured auth_identities/auth_credentials schema, indexes, foreign keys, global and table-scoped FK checks, d1_migrations, and provenance. Table-scoped auth_credentials FK check returned an empty result set. No remote DDL/DML was executed. Artifact 10924623571, sha256:983dbb8a8dca7f3919c5736acfa6f873653decd13633831f55d7ef76653e5dbb."
     }
   ],
   "testedCommitSha": "5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55"

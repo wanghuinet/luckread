@@ -1,9 +1,9 @@
 {
   "version": "1.0.0",
   "controlId": "CC-MAPPING-0-AUTH-003-RUNTIME-PERSISTENCE-ADMISSION-PACKET-2026-09-27",
-  "sourceHead": "673fc9d14fef33d618fb2121c3f5304cf46ae926",
+  "sourceHead": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
   "backupBranch": "backup/pre-auth003-postmigration-reconciliation-20260927",
-  "status": "SCHEMA_EVIDENCE_ADMITTED / REMOTE_MIGRATION_EXECUTED / POSTCHECK_REQUIRED",
+  "status": "SCHEMA_EVIDENCE_ADMITTED / REMOTE_MIGRATION_EXECUTED / POSTCHECK_VERIFIED / RUNTIME_SECURITY_REQUIRED",
   "scope": "AUTH-003 credential-management runtime/persistence admission",
   "establishedInputs": {
     "operations": [
@@ -261,15 +261,17 @@
     "AUTH-003 physical field mapping remains pending because the required credential persistence schema does not yet exist in the admitted remote state.",
     "Next gate is migration admission, not runtime implementation.",
     "Controlled remote run 36296831559 applied MIG-AUTH-003-CREDENTIAL-V1 at exact source SHA 52c6868f99ae2ec9aeb8bdceb4a18396cde20435; this is execution evidence only, not final schema admission.",
-    "Post-migration schema/ledger/provenance evidence from run 36296831559 was not admitted because final validation failed and no artifact was uploaded.",
     "ENT-IDENTITY and ENT-CREDENTIAL remain contract-only/proposed until read-only post-migration evidence is captured and reconciled.",
-    "The migration MUST NOT be re-executed. The next gate is a read-only exact-SHA postcheck against the already-mutated D1-01 state."
+    "The migration MUST NOT be re-executed. The next gate is a read-only exact-SHA postcheck against the already-mutated D1-01 state.",
+    "Read-only post-migration evidence run 36298629648 verified the observed AUTH-003 schema, indexes, foreign key, migration ledger and exact provenance.",
+    "Table-scoped PRAGMA foreign_key_check(auth_credentials) returned an empty result set.",
+    "AUTH-003 post-migration schema evidence is now admitted; runtime/security implementation remains the next separate gate."
   ],
   "nextAdmissibleSequence": [
-    "Capture read-only post-migration schema, table list, migration ledger, and exact provenance against D1-01 using source SHA 52c6868f99ae2ec9aeb8bdceb4a18396cde20435.",
-    "Admit the post-migration physical mapping for ENT-IDENTITY and ENT-CREDENTIAL from observed remote evidence only.",
+    "Admit the observed post-migration physical mapping for ENT-IDENTITY and ENT-CREDENTIAL from run 36298629648.",
     "Bind the smallest AUTH-003 persistence/security/runtime implementation slice to an exact tested SHA.",
-    "Execute same-SHA persistence/security/runtime evidence; register evidence; only then reconsider entity and Mapping 0 promotion."
+    "Execute same-SHA persistence/security/runtime evidence including normalization/uniqueness and security-negative cases.",
+    "Register runtime/security evidence; only then reconsider entity and Mapping 0 promotion."
   ],
   "forbiddenUntilInputs": [
     "AUTH-003 migration execution before migration admission",
@@ -310,7 +312,7 @@
     "currentShaDeploymentEvidence": "REQUIRED_FOR_AUTH003",
     "schemaEvidence": "REQUIRED"
   },
-  "previousSourceHead": "1fec1cebb79243baba9f22e59e715b5e3335fabc",
+  "previousSourceHead": "673fc9d14fef33d618fb2121c3f5304cf46ae926",
   "evidenceChannel": {
     "workflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
     "mode": "READONLY",
@@ -340,7 +342,10 @@
       "databaseName": "luckread",
       "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
       "mode": "READONLY",
-      "status": "REQUIRED"
+      "status": "PASS_VERIFIED",
+      "workflowCommit": "90ecdd956b4cf99ceeae4cd49ded4dfe6a24ddc0",
+      "runId": "36298629648",
+      "artifactId": "10924623571"
     },
     "workflowCommit": "673fc9d14fef33d618fb2121c3f5304cf46ae926",
     "postcheckValidation": "READONLY workflow now validates observed AUTH-003 schema objects and migration ledger against the admitted design; it performs no remote DDL/DML."
