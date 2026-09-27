@@ -1,4 +1,4 @@
-name: Contract CI
+name: Contract Admission CI
 
 on:
   push:
