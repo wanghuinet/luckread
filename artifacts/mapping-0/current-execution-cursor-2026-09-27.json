@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "5d35d0609538d314b856531788151a1988093896",
-  "backupBranch": "backup/pre-auth001-identity-authority-reconcile-20260927",
+  "sourceHead": "8c6b129a72a44ed124b20aed8f94053896c4af4f",
+  "backupBranch": "backup/pre-auth001-registration-write-boundary-20260927",
   "currentCursor": {
     "id": "AUTH-003-DOWNSTREAM-LIFECYCLE-CLOSURE",
-    "state": "BLOCKED_AUTH001_USER_IDENTITY_FIELD_AUTHORITY",
-    "objective": "Resolve AUTH-001 registration to ENT-IDENTITY/ENT-CREDENTIAL field authority before admitting any shared identity materialization implementation.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-IDENTITY-MATERIALIZATION-AUTHORITY-GAP-2026-09-27.md",
+    "state": "BLOCKED_AUTH001_REGISTRATION_SINGLE_WRITER_BOUNDARY",
+    "objective": "Resolve the AUTH-001 registration single-writer boundary while preserving Payload-native password handling and the frozen Identity/Credential authority.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-WRITE-BOUNDARY-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/auth-003-runtime-persistence-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::registration identity/entity mapping reconciliation; then smallest shared identity materialization slice.",
+    "nextGate": "AUTH-001::registration write-boundary decision; then smallest admitted registration runtime slice.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -153,10 +153,10 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "B01 establishes ENT-USER.id as immutable cross-domain authority. AUTH-003 credential persistence/runtime is complete for its admitted slice, but the remaining identity materialization gap belongs at AUTH-001 registration because the current AUTH-001 DTO does not yet bind identity-bearing request fields to ENT-IDENTITY/ENT-CREDENTIAL.",
-    "previousCursorSourceHead": "9d5f805d7f58bee85a2b8d51a244250a49a8f927",
-    "currentMainSha": "5d35d0609538d314b856531788151a1988093896",
-    "remoteMigrationReexecution": "FORBIDDEN",
+    "reason": "AUTH-001 request field authority is reconciled for User ID, password, identityType/identity, username and accountState. The remaining blocker is the single authoritative write boundary across Payload User plus Identity/Credential persistence; no cross-worker sequence is inferred.",
+    "previousCursorSourceHead": "a629a50bb05c7b73dc4df0d72544684e5cec7082",
+    "currentMainSha": "8c6b129a72a44ed124b20aed8f94053896c4af4f",
+    "remoteMigrationReexecution": "FORBIDDEN_UNCHANGED_EVIDENCE",
     "schemaPostcheckRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "runtimeEvidenceStatus": "AUTH003_CREDENTIAL_SLICE_PASS_VERIFIED",
     "runtimeEvidenceRuns": [
@@ -166,7 +166,7 @@
     ],
     "entityEvidenceBindingStatus": "ENT-CREDENTIAL_BOUND_NOT_PROMOTED__ENT-IDENTITY_BLOCKED"
   },
-  "nextGate": "AUTH-001::registration identity/entity mapping reconciliation; then smallest shared identity materialization slice.",
+  "nextGate": "AUTH-001::registration write-boundary decision; then smallest admitted registration runtime slice.",
   "runtimeEvidenceAdmission": {
     "list": {
       "workflow": ".github/workflows/w02-auth-003-credential-list-runtime-evidence.yml",
@@ -205,7 +205,7 @@
       "ENT-IDENTITY",
       "ENT-CREDENTIAL"
     ],
-    "reason": "ENT-CREDENTIAL credential slice is evidenced but not promoted; ENT-IDENTITY physical mapping is evidenced but its field/materialization authority must be resolved through AUTH-001 registration. Mapping 0 / Five-Way remains NOT_GREEN.",
+    "reason": "AUTH-003 credential slice remains evidenced but not promoted. AUTH-001 now has reconciled field authority, while its single-writer registration boundary is still blocked; Mapping 0 / Five-Way remains NOT_GREEN.",
     "evidenceRegistryStatus": "NOT_GREEN",
     "fiveWayStatus": "NOT_GREEN"
   }
