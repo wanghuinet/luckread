@@ -97,8 +97,9 @@ The writer boundary is now reconciled, but AUTH-001 remains blocked until the pr
 The registration runtime must not be implemented until:
 
 1. PRIV-002 consent persistence/retention/version semantics are admitted;
-2. the registration envelope schema is admitted as the concrete persistence contract;
-3. implementation and controlled evidence are executed against the admitted contract.
+2. AUTH-013 account-state persistence for the initial `PENDING_VERIFICATION` state is admitted and proven at the active W01/D1 persistence boundary;
+3. the registration envelope schema is admitted as the concrete persistence contract;
+4. implementation and controlled evidence are executed against the admitted contract.
 
 ## Non-authorizations
 
@@ -108,4 +109,4 @@ This control does not authorize runtime code, migrations, new infrastructure, Ma
 
 The AUTH-001 registration writer is no longer blocked by an impossible cross-worker atomicity requirement. The minimum viable authority is W01 transactional registration envelope + W02 eventual identity/credential materialization, with no distributed transaction.
 
-Consent remains the only unresolved contract dependency before implementation admission.
+Consent persistence and AUTH-013 lifecycle persistence remain independent implementation dependencies.
