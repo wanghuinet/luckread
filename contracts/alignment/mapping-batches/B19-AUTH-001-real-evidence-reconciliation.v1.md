@@ -218,3 +218,39 @@ Therefore phone registration cannot currently be treated as a pure Payload-nativ
 This finding is coupled with the already-recorded username-required-vs-wire-optional mismatch, missing consent persistence authority, missing AUTH-001 durable idempotency authority, and unresolved registration atomic-vs-eventual consistency model.
 
 Authoritative control: `docs/change-control/CC-MAPPING-0-AUTH-001-NATIVE-AUTH-IDENTITY-BOUNDARY-2026-09-27.md`.
+
+
+## 2026-09-27 evidence-bound correction — active W01 User source and Payload native capability
+
+The older evidence summary above contains a stale observation that `workers/W01-payload/src/collections/Users.ts` had `fields: []`. That statement must not be used as current-head evidence.
+
+At current `main` source head `09b445ade0f3e937ad7a6d0c6c13a4cee013b7a4`, the active W01 `Users.ts` contains these application fields:
+
+- required unique indexed `username`;
+- `displayName`;
+- `bio`;
+- `avatar`;
+- `locale` default `en-US`;
+- `timezone` default `UTC`.
+
+Payload native auth remains enabled, with native password/recovery behavior and no custom phone authentication strategy.
+
+The current W01 package is pinned to Payload `3.87.1`.
+
+Payload's current authentication capability documentation also confirms that:
+
+- `auth.loginWithUsername` is a native configuration option for username/password login;
+- `loginWithUsername.requireEmail=false` permits username-based account creation without requiring an email;
+- custom authentication strategies are an advanced extension point and are not necessary solely to enable native username/password authentication.
+
+This capability finding does not authorize a code or wire change. It narrows the AUTH-001 decision:
+
+- the username side does not require a parallel authentication subsystem;
+- the current blocker is the public `authRegister.username` optionality versus the already-required W01/ENT-USER username;
+- phone registration still lacks an admitted durable source/authentication contract;
+- consent, durable Idempotency-Key/replay authority, and the atomic registration writer boundary remain blocked.
+
+Authoritative capability reconciliation:
+`docs/change-control/CC-MAPPING-0-AUTH-001-PAYLOAD-NATIVE-CAPABILITY-RECONCILIATION-2026-09-27.md`
+
+Mapping 0 remains NOT_GREEN.
