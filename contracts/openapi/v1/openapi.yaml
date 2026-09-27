@@ -57,7 +57,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [identityType, identity, credential]
+              required: [identityType, identity, credential, username, consent]
               properties:
                 identityType: { enum: [phone, email] }
                 identity: { type: string }
