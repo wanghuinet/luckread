@@ -277,3 +277,20 @@ Consent persistence remains unresolved under PRIV-002; no runtime implementation
 AUTH-001 writer-boundary reconciliation does not promote W01 account lifecycle persistence. The initial `PENDING_VERIFICATION` state remains dependent on the separate AUTH-013 persistence migration/admission and must not be inferred from the API response contract.
 
 AUTH-001 implementation therefore remains blocked on both PRIV-002 consent authority and AUTH-013 lifecycle persistence admission.
+
+
+## 2026-09-27 AUTH-013 initial persistence reconciliation
+
+The earlier lifecycle dependency statement is superseded for the **initial registration persistence prerequisite** by:
+`docs/change-control/CC-MAPPING-0-AUTH-001-AUTH-013-INITIAL-PERSISTENCE-RECONCILIATION-2026-09-27.md`.
+
+Existing controlled AUTH-013 evidence already proves the D1-01 `users` schema used by W01 registration has:
+
+- `account_state` = `TEXT NOT NULL DEFAULT 'PENDING_VERIFICATION'`;
+- `account_state_version` = `INTEGER NOT NULL DEFAULT 1`.
+
+Therefore the first W01 Payload User insert receives the admitted initial lifecycle state from the existing D1 schema default; W01 does not need a new collection field solely for this initial-state persistence dependency.
+
+This closes **only the AUTH-001 initial lifecycle-persistence prerequisite**. AUTH-013 remains separately `BLOCKED_NOT_GREEN` for its downstream lifecycle/security/integration/Evidence Registry gates, and no verified AUTH-013 evidence is rerun.
+
+AUTH-001 remains blocked on PRIV-002 consent persistence authority, concrete registration-envelope schema/evidence, and the remaining runtime/security/evidence chain.
