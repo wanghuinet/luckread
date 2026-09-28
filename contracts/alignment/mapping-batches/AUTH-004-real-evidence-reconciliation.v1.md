@@ -27,14 +27,14 @@
 - Recovery-token persistence mapping now points to Payload-native `resetPasswordToken` / `resetPasswordExpiration`; actual D1 runtime schema evidence remains missing.
 - Permission/scoped authorization mapping for authenticated password change: bound to `user.credential.manage` + `self` in the AUTH-004 feature contract and Auth Operation Policy.
 - Account recovery authorization boundary: bound to anonymous reset request and token-bound reset confirm in the AUTH-004 feature contract and Auth Operation Policy.
-- Account/session invalidation semantics after password change/reset: contractually bound to native Payload session lifecycle; local executable lifecycle evidence is now verified at Actions run `36411953998`, while controlled remote HTTP/session evidence remains missing.
+- Account/session invalidation semantics after password change/reset: contractually bound to native Payload session lifecycle; local evidence is verified at Actions run `36411953998`, and controlled remote session evidence is now verified at run `36455724050` for the tested W01/W02 deployment.
 - Event IDs for password change/reset and credential rotation: missing.
 - Worker/runtime implementation evidence: W01 thin-adapter implementation is now bound to exact main commit `7e9396460136a6ce083db0f600ec04c7829a9c99`; remote execution evidence remains missing.
 - D1 domain is `D1-01`; AUTH-004 custom migration is explicitly `NOT_REQUIRED_NATIVE`, while physical schema/runtime evidence remains unresolved.
-- Executed local integration tests now provide replay/expiry, credential non-disclosure, and native session invalidation evidence; protected-account enumeration and remote/E2E security evidence remain missing.
-- Local Payload API integration evidence `EVD-AUTH004-B11-NATIVE-LOCAL-LIFECYCLE-002` is now registered at exact SHA `1c7010b33ac8941293ab919413b1348df0593ee0`; controlled remote W01 and HTTP E2E execution evidence remain missing.
+- Executed local integration tests provide replay/expiry, credential non-disclosure, and native session invalidation evidence; controlled remote reset-request enumeration behavior and remote HTTP/session E2E evidence are now verified at run `36455724050`.
+- Local Payload API integration evidence `EVD-AUTH004-B11-NATIVE-LOCAL-LIFECYCLE-002` remains registered at exact SHA `1c7010b33ac8941293ab919413b1348df0593ee0`; controlled remote W01/HTTP E2E evidence is now registered as `EVD-AUTH004-B12-REMOTE-HTTP-E2E-001`, `EVD-AUTH004-B12-PROTECTED-ACCOUNT-ENUMERATION-001`, and `EVD-AUTH004-B12-SESSION-LIFECYCLE-REMOTE-001` from run `36455724050`.
 - Feature→Entity→Persistence registry binding is now recorded as `BLOCKED` using the existing contract and local executable evidence; no promotion is inferred.
-- Canonical Evidence Registry now contains the exact-SHA local lifecycle evidence plus the exact-SHA W01 adapter implementation record; remote W01/HTTP E2E and protected-account enumeration evidence remain missing.
+- Canonical Evidence Registry now contains the local lifecycle/adapter evidence and the admitted remote E2E evidence set. AUTH-004 remains non-GREEN because lifecycle-event evidence and final Mapping 0/Five-Way admission are still unresolved.
 
 ## 3. Evidence interpretation rules
 
@@ -56,13 +56,13 @@ Definition-layer reconciliation was previously recorded at `3ab18252544ffb9a15da
 - Auth Operation Policy: reconciled
 - DTO registry: reconciled and bound in canonical Feature→Entity→Persistence registration
 - Canonical OpenAPI/DTO registry: AUTH-004 operations reconciled; runtime implementation remains separately gated
-- Runtime implementation: exact-SHA W01 adapter implementation registered; fresh exact-SHA local native lifecycle evidence registered; remote/persistence/HTTP E2E and protected-account enumeration evidence still missing
+- Runtime implementation: exact-SHA W01 adapter implementation registered; fresh local native lifecycle evidence registered; controlled remote HTTP E2E, protected-account enumeration behavior, and remote session lifecycle evidence are registered from run `36455724050`.
 
 ## 7. Gate result
 
 `AUTH-004 = BLOCKED_NOT_GREEN`
 
-Reason: local native password/recovery integration evidence is now registered and native session invalidation is verified locally, but controlled remote W01 behavior, HTTP E2E transport, protected-account enumeration resistance, lifecycle event evidence, and full canonical traceability are not yet established. Runtime/worker code must not be added merely to force this feature to GREEN.
+Reason: local and controlled remote password/recovery evidence is now registered, including remote HTTP E2E, protected-account enumeration-resistant reset requests, session invalidation, replay rejection and expiry rejection. Lifecycle event evidence and final canonical traceability / Mapping 0 / Five-Way admission remain unresolved. Runtime/worker code must not be added merely to force this feature to GREEN.
 
 ## 8. Current remote HTTP E2E admission checkpoint — 2026-09-29
 
