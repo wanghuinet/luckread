@@ -34,3 +34,15 @@ No AUTH-013 route, Contract, D1 schema, Payload version, Worker topology, sessio
 This control is complete only after a fresh manual AUTH-013 public HTTP E2E run passes the existing exact-deployment provenance checks, public HTTP assertions, stale-session denial, authoritative D1 assertions, and fixture cleanup.
 
 No Evidence Registry promotion or Mapping 0 GREEN is implied by this tooling change.
+
+
+## Follow-up execution reconciliation — run 36458036138
+
+A second manual execution reached the exact deployment provenance and the evidence-tooling checkout, but failed before the W01 install step because the second `actions/checkout@v4` used the default workspace root and cleaned the sibling `deployed-source/` checkout.
+
+Admitted correction:
+- the current evidence-tooling checkout now uses `path: evidence-tooling`;
+- fixture and public-transport scripts are invoked from `evidence-tooling/scripts/`;
+- the exact deployed runtime remains isolated under `deployed-source/`.
+
+No runtime source or contract/schema authority changed.
