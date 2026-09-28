@@ -40,9 +40,9 @@ export const AuthRegistrationEnvelopes: CollectionConfig = {
       admin: { hidden: true },
     },
     { name: 'responseDigest', type: 'text', admin: { hidden: true } },
-    { name: 'committedResponse', type: 'json', required: true, admin: { hidden: true } },
+    { name: 'committedResponse', type: 'json', admin: { hidden: true } },
     { name: 'expiresAt', type: 'date', required: true, index: true, admin: { hidden: true } },
-    { name: 'consentRecordId', type: 'text', required: true, index: true, admin: { hidden: true } },
+    { name: 'consentRecordId', type: 'text', index: true, admin: { hidden: true } },
   ],
   timestamps: true,
 }
