@@ -3,7 +3,16 @@ import { appendFileSync, writeFileSync } from 'node:fs'
 
 const runId = process.env.GITHUB_RUN_ID ?? String(Date.now())
 const attempt = process.env.GITHUB_RUN_ATTEMPT ?? '1'
-const base = 1500000000 + (Number(runId) % 100000000) * 2
+const makeNumericId = () => {
+  const bytes = randomBytes(7)
+  let value = 0n
+  for (const byte of bytes) value = (value << 8n) | BigInt(byte)
+  return String(1000000000000n + (value % 8000000000000n))
+}
+
+const basicUserId = makeNumericId()
+let operatorUserId = makeNumericId()
+while (operatorUserId === basicUserId) operatorUserId = makeNumericId()
 
 const esc = (value) => String(value).replace(/'/g, "''")
 const now = new Date().toISOString()
@@ -14,8 +23,8 @@ const basicRefresh = makeToken()
 const operatorRefresh = makeToken()
 
 const fixture = {
-  basicUserId: String(base),
-  operatorUserId: String(base + 1),
+  basicUserId,
+  operatorUserId,
   basicEmail: 'auth013-e2e-basic-' + runId + '-' + attempt + '@luckread.test',
   operatorEmail: 'auth013-e2e-operator-' + runId + '-' + attempt + '@luckread.test',
   basicUsername: 'auth013-e2e-basic-' + runId + '-' + attempt,
@@ -40,8 +49,7 @@ for (const [key, value] of Object.entries(fixture)) {
   if (key.toLowerCase().includes('token')) console.log('::add-mask::' + value)
 }
 
-const sql = `BEGIN;
-INSERT INTO users
+const sql = `INSERT INTO users
   (id, username, display_name, locale, timezone, email, account_state, account_state_version, created_at, updated_at)
 VALUES
   (${fixture.basicUserId}, '${esc(fixture.basicUsername)}', 'AUTH013 E2E Basic', 'en-US', 'UTC', '${esc(fixture.basicEmail)}', 'ACTIVE', 1, '${fixture.now}', '${fixture.now}'),
@@ -63,7 +71,6 @@ INSERT INTO auth_session_state
 VALUES
   ('${esc(fixture.basicSessionId)}', '${fixture.basicUserId}', '${esc(fixture.basicDeviceId)}', 1, '${fixture.basicRefreshHash}', NULL, '${fixture.now}'),
   ('${esc(fixture.operatorSessionId)}', '${fixture.operatorUserId}', '${esc(fixture.operatorDeviceId)}', 1, '${fixture.operatorRefreshHash}', NULL, '${fixture.now}');
-COMMIT;
 `
 
 writeFileSync('/tmp/auth013-seed.sql', sql)
