@@ -1,23 +1,25 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "7082e3ced331ceb9b891a175306db3a479a528f2",
-  "backupBranch": "backup/main-before-auth004-batch-20260928-2003",
+  "sourceHead": "0404462d56c5a2e66f08fc5215cfd22de2754c68",
+  "backupBranch": "backup/main-before-auth004-pbkdf2-runtime-blocker-20260928-2107",
   "currentCursor": {
     "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
-    "state": "BLOCKED_REMOTE_E2E",
+    "state": "BLOCKED_EXTERNAL_COMPATIBILITY",
     "objective": "Close the AUTH-004 controlled remote HTTP/E2E lifecycle gate against the exact deployed W01 source without adding a custom auth subsystem, migration, Worker, D1 database, queue, or Payload core change.",
     "authoritativeControl": "docs/change-control/CC-AUTH-004-PAYLOAD-VERSION-ALIGNMENT-2026-09-28.md",
-    "nextGate": "Consume W01/W02 binding deployment run 36420996656 attempt 6 completion. Application source must remain 6d574bb56222e0eaf44df663e04eb59535e84be6; then admit only the corrected POST-only AUTH-004 Remote E2E evidence.",
+    "nextGate": "Resolve the Payload 3.90.2 × Cloudflare Workers native PBKDF2 compatibility blocker under approved upstream/runtime-compatible authority; do not reduce iterations, fork Payload core, or add a parallel auth subsystem.",
     "logicalOwnership": "W01 -> AUTH-004 Payload-native authority CLOSED",
-    "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding — attempt 5 deployed 6d574bb56222e0eaf44df663e04eb59535e84be6. Attempt 6 is a controlled same-source rerun solely to emit a fresh workflow_run event after the CI-only tail diagnostic correction.",
+    "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding — deployment run 36420996656 attempt 7 SUCCESS; deployed application source 6d574bb56222e0eaf44df663e04eb59535e84be6.",
     "physicalRuntimeTarget": "W01 luckread-w01-payload / D1-01 luckread",
     "supersededBlockers": [
       "Payload 3.87.1 version-alignment gap is superseded by the merged 3.90.2 dependency baseline and successful W01 deployment run 36418911699.",
       "AUTH-004 local native lifecycle evidence is already VERIFIED at run 36411953998 and must not be rerun unchanged.",
       "AUTH-004 canonical API/DTO/field mapping is already reconciled and must not be reopened.",
       "The remaining feature-level runtime gap is controlled remote HTTP/E2E evidence, including remote session invalidation and protected-account enumeration resistance.",
-      "Global Evidence Registry and Mapping 0 remain NOT_GREEN; no promotion is inferred from build/deploy success."
+      "Global Evidence Registry and Mapping 0 remain NOT_GREEN; no promotion is inferred from build/deploy success.",
+      "Remote E2E run 36426287424 reached the real Worker and failed before AUTH-004 lifecycle assertions because Payload native PBKDF2 requests 600000 iterations and Cloudflare Workers rejects counts above 100000.",
+      "Upstream Payload issue #18274 remains OPEN / needs-triage; no stable Payload 3.x release after 3.90.2 is available with an admitted fix at this checkpoint."
     ]
   },
   "alreadyClosed": {
@@ -183,21 +185,21 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Main advanced through the AUTH-004 3.90.2 version-alignment, native migration review, local lifecycle evidence, remote E2E harness, and W01/W02 binding deployment checkpoints. The latest deployment succeeded; no remote E2E PASS is claimed yet.",
-    "currentMainSha": "7082e3ced331ceb9b891a175306db3a479a528f2",
+    "reason": "Main advanced through the corrected Remote E2E deployment attempt. The new remote run reached real Worker execution and exposed the external Payload 3.90.2 × Cloudflare Workers PBKDF2 compatibility blocker; no lifecycle PASS is claimed.",
+    "currentMainSha": "0404462d56c5a2e66f08fc5215cfd22de2754c68",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
-    "payloadWireCompatibilityStatus": "AUTH004_LOCAL_LIFECYCLE_VERIFIED_REMOTE_E2E_BLOCKED",
+    "payloadWireCompatibilityStatus": "AUTH004_REMOTE_RUNTIME_BLOCKED_PBKDF2_COMPATIBILITY",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
     "idempotencySourceStatus": "CLOSED",
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "7082e3ced331ceb9b891a175306db3a479a528f2",
-    "governanceHeadDisposition": "Current main includes only a CI-only AUTH-004 diagnostic correction: Wrangler 4.116.0 rejected --once, so the tail now uses POST-only filtering without --search/--once. Application source remains 6d574bb56222e0eaf44df663e04eb59535e84be6; deployment attempt 6 is in progress.",
+    "actualGitMainHead": "0404462d56c5a2e66f08fc5215cfd22de2754c68",
+    "governanceHeadDisposition": "Governance-only reconciliation records the external PBKDF2 compatibility blocker. Application source remains 6d574bb56222e0eaf44df663e04eb59535e84be6; no business implementation or topology change.",
     "reviewedAt": "2026-09-28",
     "implementationEvidenceSourceHead": "6d574bb56222e0eaf44df663e04eb59535e84be6"
   },
-  "nextGate": "AUTH-004 controlled remote HTTP E2E evidence against exact deployed source 39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20; after evidence admission, final Evidence Registry / Mapping 0 checks.",
+  "nextGate": "AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY",
   "latestControlGate": {
     "workflow": ".github/workflows/auth-002-e5-remote-migration-execution.yml",
     "runId": "35552919573",
@@ -270,15 +272,15 @@
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-28",
-    "mainSha": "174bdc7f09d2222f32276ae2fd9b51c1485e5f19",
+    "mainSha": "0404462d56c5a2e66f08fc5215cfd22de2754c68",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.90.2",
-    "capabilityFinding": "Payload native AUTH-004 password lifecycle capability is aligned to the 3.90.2 baseline; no custom session invalidation subsystem is admitted.",
-    "implementationDisposition": "MERGED_REMOTE_E2E_BLOCKED_POST_ONLY_TAIL_DIAGNOSTIC_DEPLOYMENT_ATTEMPT_6_IN_PROGRESS",
-    "staleEvidenceCorrection": "The previous cursor's 3.87.1 source statement is historical and superseded by the current 3.90.2 main head.",
-    "currentMainSha": "7082e3ced331ceb9b891a175306db3a479a528f2",
+    "capabilityFinding": "Payload native AUTH-004 capability is contractually aligned to 3.90.2, but the native password hashing implementation is incompatible with Cloudflare Workers production because it requests 600000 PBKDF2 iterations.",
+    "implementationDisposition": "REMOTE_E2E_BLOCKED_PAYLOAD_PBKDF2_COMPATIBILITY",
+    "staleEvidenceCorrection": "The 3.87.1 cursor is historical and superseded by 3.90.2; the new blocker is external runtime compatibility, not a version-alignment gap.",
+    "currentMainSha": "0404462d56c5a2e66f08fc5215cfd22de2754c68",
     "implementationSourceSha": "6d574bb56222e0eaf44df663e04eb59535e84be6",
-    "currentSourceHead": "40f41903806c247aa946067901df6b219efabe1e"
+    "currentSourceHead": "0404462d56c5a2e66f08fc5215cfd22de2754c68"
   },
   "devTestPolicy": {
     "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
