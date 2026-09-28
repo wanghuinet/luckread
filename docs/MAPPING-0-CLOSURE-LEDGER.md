@@ -3649,3 +3649,15 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Therefore the next admissible execution is a fresh Remote E2E workflow_run produced from a successful deployment completion under the corrected workflow definition. Do not rerun `36423592893` as evidence, and do not promote any lifecycle claim from the stale run.
 - AUTH-004 remains `BLOCKED / NOT_GREEN`; Mapping 0 remains `NOT_GREEN`.
 - No application behavior, schema, Worker topology, D1 topology, Payload version, or public contract changed in this checkpoint.
+
+## 2026-09-28 — AUTH-004 remote production PBKDF2 compatibility blocker
+
+- Backup before this governance-only checkpoint: `backup/main-before-auth004-pbkdf2-runtime-blocker-20260928-2107`.
+- W01/W02 deployment attempt 7 in run `36420996656` succeeded against exact application source `6d574bb56222e0eaf44df663e04eb59535e84be6`.
+- AUTH-004 Remote E2E run `36426287424` passed deployment provenance and remote Payload 3.90.2 migration/schema preconditions, then failed at `POST /auth/register` with HTTP 503 before any AUTH-004 lifecycle assertion executed.
+- Artifact `10971074778` contains the durable runtime diagnostic: Payload emitted `auth.register.native_validation_failure` with `errorName: NotSupportedError`; the captured event had no secret material.
+- Root cause is platform compatibility: Payload 3.90.2's native password-hash implementation uses PBKDF2 with 600000 iterations, while Cloudflare Workers production rejects counts above 100000. This is an upstream Payload/Cloudflare compatibility issue, not evidence of an AUTH-004 business-layer contract defect.
+- No reduced PBKDF2 iteration count, custom hashing implementation, Payload core patch/fork, second authentication subsystem, or topology expansion is admitted as a closure shortcut.
+- AUTH-004 remains `BLOCKED / NOT_GREEN`; Evidence Registry and Mapping 0 remain fail-closed.
+- Historical failed Remote E2E runs remain evidence-negative and are not reinterpreted as lifecycle results.
+- Next cursor: `AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY`.
