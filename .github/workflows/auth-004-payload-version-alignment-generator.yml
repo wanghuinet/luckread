@@ -1,0 +1,54 @@
+name: AUTH-004 Payload Version Alignment Generator
+
+on:
+  push:
+    branches:
+      - change/auth004-payload-390-alignment-20260928
+    paths:
+      - ".github/workflows/auth-004-payload-version-alignment-generator.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
+      - name: Align W01 Payload family
+        working-directory: workers/W01-payload
+        run: |
+          pnpm add --save-exact --ignore-scripts \
+            payload@3.90.2 \
+            @payloadcms/db-d1-sqlite@3.90.2 \
+            @payloadcms/next@3.90.2 \
+            @payloadcms/richtext-lexical@3.90.2 \
+            @payloadcms/storage-r2@3.90.2 \
+            @payloadcms/ui@3.90.2
+
+      - name: Validate frozen lock
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Commit generated dependency alignment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add workers/W01-payload/package.json workers/W01-payload/pnpm-lock.yaml
+          git diff --cached --quiet && exit 0
+          git commit -m "build(auth004): align Payload family to 3.90.2"
+          git push origin HEAD:${GITHUB_REF_NAME}
