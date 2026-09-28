@@ -584,11 +584,11 @@
       "timestamp": "2026-09-27T02:22:56.832Z",
       "producer": "GitHub Actions AUTH-004 Native Local Evidence",
       "result": "PASS",
-      "status": "VERIFIED",
+      "status": "SUPERSEDED",
       "checkId": "AUTH-004-NATIVE-LOCAL-LIFECYCLE",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36288319530",
       "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
-      "note": "Exact tested commit 5d8884dc7a64163904ec96a46cbc9769cc937a7c. Local Payload 3.87.1/D1 evidence verified password-change old-credential rejection, changed-password acceptance, native forgotPassword/resetPassword success, single-use reset-token rejection, expired reset-token rejection, and no secret emission in the evidence result. Existing-session revocation after password change was explicitly NOT_TESTED by this harness because W01 intentionally uses removeTokenFromResponses=true. This is local integration evidence only; it does not prove controlled remote W01 behavior, HTTP E2E transport, or AUTH-004 GREEN.",
+      "note": "Historical local Payload 3.87.1 evidence is preserved. Superseded by EVD-AUTH004-B11-NATIVE-LOCAL-LIFECYCLE-002 after W01 moved to Payload 3.90.2 and the native session invalidation behavior was re-executed. The original NOT_TESTED session-revocation limitation remains historical and unchanged.",
       "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
@@ -874,6 +874,24 @@
       "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-002-HISTORICAL-MIGRATION-EVIDENCE-ADMISSION-2026-09-28.md",
       "evidenceArtifact": "artifacts/mapping-0/auth-002-historical-migration-evidence-admission-2026-09-28.json",
       "note": "Historical technical migration execution evidence is admitted without retroactive authorization. The exact tested commit is fe1f2784d21f3f629bbad0baa971f1aa56520914; the migration file blob is byte-identical on current main. The E5 artifact contains controlled preflight, successful migration execution, post-schema validation, migration-history proof, integrity check, native users/users_sessions schema stability, and provenance. No Runtime rerun, migration reapplication, or production deployment is performed by this admission."
+    },
+    {
+      "evidenceId": "EVD-AUTH004-B11-NATIVE-LOCAL-LIFECYCLE-002",
+      "type": "SECURITY",
+      "claimId": "AUTH-004::NATIVE-PASSWORD-RECOVERY-LOCAL",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-004",
+      "source": "GitHub Actions AUTH-004 Native Local Evidence against Payload 3.90.2 + native schema alignment",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36411953998/artifacts/10964656503",
+      "commitSha": "1c7010b33ac8941293ab919413b1348df0593ee0",
+      "timestamp": "2026-09-28T10:50:04Z",
+      "producer": "GitHub Actions AUTH-004 Native Local Evidence / run 36411953998 / job 108894001186",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "108894001186",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36411953998",
+      "freshnessMode": "EXACT_SHA",
+      "note": "Local W01 Payload-native Local API lifecycle evidence at exact current-main SHA 1c7010b33ac8941293ab919413b1348df0593ee0. PASS assertions: old password rejected after change; changed password accepted; two previously-valid native sessions were both invalidated after password change (revokedExistingSessionCount=2); the changed-password session was invalidated after native reset; reset token replay rejected; expired reset token rejected; secretsRecorded=false. This is controlled local D1 integration evidence only and does not establish remote W01 HTTP E2E, protected-account enumeration resistance, lifecycle event evidence, or Mapping 0 GREEN."
     },
     {
       "evidenceId": "EVD-AUTH004-B10-W01-ADAPTER-IMPLEMENTATION-001",
