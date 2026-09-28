@@ -53,3 +53,21 @@ This control does not authorize a production rollout and does not promote ENT-ID
 - Final diagnostic cleanup merge: `75d30eeeeedf09ee6a9d08de2a2345cf85edee26`
 - Exact runtime-tested source: `b357ebe74f480f00c72f8fb0606226348570c105`
 - Runtime workflow: `.github/workflows/auth-001-registration-local-evidence.yml`
+
+
+## Current-head environment-policy evidence reconciliation — 2026-09-28
+
+The development runtime evidence was rerun because the AUTH-001 policy configuration boundary changed from a single shared artifact to explicit DEV/PROD policy artifacts.
+
+Fresh controlled evidence:
+- exact tested source SHA: `dd803fb465bf91e9bd8e22ecd34798cdaec42359`
+- GitHub Actions run: `36386908500`
+- artifact: `10954444469`
+- artifact SHA-256: `c7bfc953c93abc83ec66d4bc289f8c2970a1dc536d38282fa3a30b4818d6fe39`
+- development policy version exercised: `DEV-2026-09-28.1`
+- production policy artifact exists separately at `artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json`
+- production deployment: **false**
+
+The fresh run passed the same AUTH-001 registration assertions as the previously admitted development evidence while proving the environment-separated policy resolution does not break the controlled development path.
+
+This evidence does not authorize production deployment. Production policy authority is now separately admitted by PRIV-004; production deployment remains a separate deployment/evidence gate.

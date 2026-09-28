@@ -2,21 +2,22 @@
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
   "sourceHead": "4399b83c31c2ac709bcc36c648b2bd994fb711dd",
-  "backupBranch": "backup/main-before-priv004-env-policy-split-20260928",
+  "backupBranch": "backup/main-before-auth001-fresh-evidence-admission-20260928",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "PRIV004_ENVIRONMENT_POLICY_SEPARATED_PRODUCTION_GATE_PENDING",
-    "objective": "Keep development evidence bound to the DEVELOPMENT policy instance and production runtime authority bound to the separate PRODUCTION policy instance; then admit the resulting production gate evidence and continue to final Evidence Registry / Mapping 0 checks.",
+    "state": "PRIV004_AUTHORITY_CLOSED_AUTH001_FRESH_DEV_EVIDENCE_ADMITTED_FINAL_MAPPING_BLOCKED",
+    "objective": "Preserve the admitted PRIV-004 production engineering authority, register fresh AUTH-001 development runtime evidence after the DEV/PROD policy split, and continue to the final Evidence Registry / Mapping 0 gate without promoting blocked global state.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "PRIV-004::production-readiness gate and policy-instance guard must PASS against the separate PRODUCTION policy artifact; the AUTH-001 development evidence path remains bound to the DEV artifact. Then continue to final Evidence Registry / Mapping 0 promotion checks.",
+    "nextGate": "Mapping 0 / Evidence Registry final promotion checks remain blocked by the canonical Mapping 0 NOT_GREEN state and unresolved feature/entity/evidence coverage. Do not infer GREEN from the new AUTH-001 evidence.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
     "supersededBlockers": [
-      "PRIV-004 production engineering policy authority is now admitted; the 730-day value is an internal engineering policy, not a jurisdiction-specific legal mandate.",
-      "Contract Admission DEVELOPMENT gate remains separately PASS_VERIFIED; it is not a production Evidence promotion.",
-      "AUTH-001 runtime evidence and final Evidence Registry / Mapping 0 promotion remain separate gates."
+      "PRIV-004 production engineering policy authority is admitted and production-readiness evidence passed.",
+      "AUTH-001 fresh controlled development runtime evidence after DEV/PROD policy separation is PASS_VERIFIED.",
+      "Global Evidence Registry remains NOT_GREEN.",
+      "Canonical Mapping 0 remains NOT_GREEN; no promotion is inferred."
     ]
   },
   "alreadyClosed": {
@@ -181,38 +182,25 @@
   "nextGate": "PRIV-004::first approved ACCOUNT_REGISTRATION / LEGAL_AUDIT production policy instance, followed by final Evidence Registry / Mapping 0 promotion checks. No production deployment is authorized.",
   "latestControlGate": {
     "workflow": ".github/workflows/priv004-production-readiness.yml",
-    "runId": null,
-    "headSha": "PENDING_ENV_POLICY_SPLIT_VALIDATION",
-    "conclusion": "PENDING_REEXECUTION",
+    "runId": "36386908554",
+    "headSha": "dd803fb465bf91e9bd8e22ecd34798cdaec42359",
+    "conclusion": "SUCCESS",
     "failedStep": null,
-    "meaning": "The previous successful PR gate used the wrong shared artifact path for DEV evidence isolation; environment-separated policy artifacts are now in place and require fresh gate evidence.",
-    "productionAuthorization": "PENDING_FRESH_GATE",
-    "evidenceBoundary": "Control-plane only until fresh guard/readiness evidence completes; no production runtime deployment or Evidence Registry promotion is inferred."
+    "meaning": "Production readiness gate passed against the dedicated PRODUCTION policy artifact on the PR head; the squash merge to current main preserved the same tree.",
+    "productionAuthorization": "AUTHORIZED_POLICY_INPUT_ONLY",
+    "evidenceBoundary": "Policy/control-plane admission only; no production deployment or global Evidence Registry/Mapping 0 promotion."
   },
   "runtimeEvidenceAdmission": {
     "status": "PASS_VERIFIED",
     "workflow": ".github/workflows/auth-001-registration-local-evidence.yml",
-    "runId": "36372326548",
-    "testedSourceSha": "b357ebe74f480f00c72f8fb0606226348570c105",
-    "artifactId": "10950235069",
-    "artifactRef": "https://github.com/wanghuinet/luckread/actions/runs/36372326548/artifacts/10950235069",
-    "checkId": "108771054689",
-    "result": "PASS",
+    "runId": "36386908500",
+    "testedSourceSha": "dd803fb465bf91e9bd8e22ecd34798cdaec42359",
+    "artifactId": "10954444469",
+    "artifactSha256": "c7bfc953c93abc83ec66d4bc289f8c2970a1dc536d38282fa3a30b4818d6fe39",
     "environment": "CONTROLLED_LOCAL_D1_OPENNEXT_WORKER",
-    "assertions": [
-      "native_payload_user_validation_and_hash_salt",
-      "plaintext_password_not_persisted",
-      "one_batch_user_consent_envelope_commit",
-      "canonical_response_digest",
-      "completed_replay_201",
-      "idempotency_key_reuse_422",
-      "forced_later_statement_rollback",
-      "duplicate_identity_single_authoritative_record",
-      "same_key_concurrent_canonical_replay_or_in_progress_semantics",
-      "no_w02_mutation"
-    ],
+    "assertions": "AUTH-001 registration batch, password material, replay/idempotency, rollback, concurrency and no-W02-mutation all passed after DEV/PROD policy separation.",
     "productionDeployment": "BLOCKED",
-    "productionBlocker": "real PRIV-004 legal/compliance authority is not yet admitted"
+    "evidenceAdmissionRef": "docs/change-control/CC-MAPPING-0-AUTH-001-FRESH-RUNTIME-EVIDENCE-RECONCILIATION-2026-09-28.md"
   },
   "contractDecisionBlocker": {
     "issueId": "CC-AUTH003-NORMALIZED-UNIQUENESS-SEMANTICS-2026-09-27",

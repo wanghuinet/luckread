@@ -58,3 +58,11 @@ The previous omission was based on an unresolved ownership/persistence boundary.
 ## Result
 
 This change closes only the previously missing AUTH-001 registry binding record. It preserves fail-closed status and existing evidence provenance.
+
+
+## Current-head PRIV-004 reconciliation — 2026-09-28
+
+- The previous production PRIV-004 authority blocker is now closed by the admitted production policy instance `PRIV-004-ACCOUNT-REGISTRATION-PROD / PROD-2026-09-28.1`.
+- This does not promote Mapping 0, ENT-IDENTITY, ENT-CREDENTIAL, or the global Evidence Registry.
+- Fresh AUTH-001 development runtime evidence is now available at run `36386908500` on exact tested source `dd803fb465bf91e9bd8e22ecd34798cdaec42359`.
+- Production deployment remains a separate gate and is not inferred from the policy admission or development runtime evidence.
