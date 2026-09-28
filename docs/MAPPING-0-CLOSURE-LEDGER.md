@@ -3610,3 +3610,15 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Current executable gate remains AUTH-002 `MIGRATION_EXECUTION` admissibility; a separate explicit authority/contract decision is required before any alternative admissibility rule can be introduced.
 - The implementation/source evidence boundary remains `e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd`; later changes through `694c1da911145cc4a3d1b152d12ed797a3b525b5` are governance-only for this gate.
 - No Runtime evidence is rerun.
+
+
+## 2026-09-28 — AUTH-002 historical migration execution evidence admission
+
+- Backup before this governance/evidence admission: `backup/main-before-auth002-historical-migration-admission-20260928`.
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTH-002-HISTORICAL-MIGRATION-EVIDENCE-ADMISSION-2026-09-28.md`.
+- Historical E5 run `35552919573` / job `106190897137` / artifact `10618729380` was independently inspected. The artifact contains controlled preflight, exact-source checkout/SHA validation, migration execution, post-schema/catalog validation, migration-history confirmation, integrity check, native schema stability and provenance.
+- The migration execution result is admitted as technical evidence: `EVD-AUTH002-B27-MIGRATION-EXECUTION-HISTORICAL-001` = `PASS / VERIFIED`.
+- Tested commit remains the exact historical source `fe1f2784d21f3f629bbad0baa971f1aa56520914`. The migration file blob is unchanged on current main (`2b43a7b08fe7c5be98793da7eb07ddd2cf9e6921`).
+- The historical execution was not authorized at the time and is not retroactively authorized. This is preserved as a separate governance fact; evidence admission does not rewrite that history.
+- No migration re-application, Runtime rerun, D1 rollback, Worker deployment, Contract change, or Mapping 0 GREEN promotion is performed by this admission.
+- AUTH-002 migration evidence is now closed; the remaining gate is final Evidence Registry / Mapping 0 / entity promotion.
