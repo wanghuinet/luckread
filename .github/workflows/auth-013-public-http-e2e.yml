@@ -106,22 +106,22 @@ jobs:
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: node evidence-tooling/scripts/auth-013-public-http-e2e-fixture.mjs
 
-      - name: Preflight fixture collision and journal availability
+      - name: Preflight fixture identity and collision
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W01-payload/wrangler.jsonc             --command "SELECT
-              (SELECT COUNT(*) FROM users WHERE id IN (${AUTH013_BASIC_USER_ID}, ${AUTH013_OPERATOR_USER_ID})) AS user_collision,
+              (SELECT COUNT(*) FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}', '${AUTH013_OPERATOR_EMAIL}')) AS email_collision,
+              (SELECT COUNT(*) FROM users WHERE username IN ('${AUTH013_BASIC_USERNAME}', '${AUTH013_OPERATOR_USERNAME}')) AS username_collision,
               (SELECT COUNT(*) FROM users_sessions WHERE id IN ('${AUTH013_BASIC_SESSION_ID}', '${AUTH013_OPERATOR_SESSION_ID}')) AS session_collision,
-              (SELECT COUNT(*) FROM role_assignments WHERE id IN ('${AUTH013_BASIC_ROLE_ID}', '${AUTH013_OPERATOR_ROLE_ID}')) AS role_collision,
-              (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id IN ('${AUTH013_BASIC_USER_ID}', '${AUTH013_OPERATOR_USER_ID}')) AS journal_collision" > /tmp/auth013-preflight.json
+              (SELECT COUNT(*) FROM role_assignments WHERE id IN ('${AUTH013_BASIC_ROLE_ID}', '${AUTH013_OPERATOR_ROLE_ID}')) AS role_collision" > /tmp/auth013-preflight.json
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs'
           const raw = JSON.parse(readFileSync('/tmp/auth013-preflight.json', 'utf8'))
           const row = (raw?.result?.results ?? raw?.results ?? [])[0] ?? {}
-          for (const key of ['user_collision','session_collision','role_collision','journal_collision']) {
+          for (const key of ['email_collision','username_collision','session_collision','role_collision']) {
             if (Number(row[key] ?? -1) !== 0) throw new Error('fixture collision: ' + key)
           }
           NODE
@@ -133,6 +133,26 @@ jobs:
         run: |
           set -euo pipefail
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --file=/tmp/auth013-seed.sql
+
+      - name: Resolve generated Payload user IDs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W01-payload/wrangler.jsonc             --command "SELECT id, email FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}', '${AUTH013_OPERATOR_EMAIL}') ORDER BY email" > /tmp/auth013-user-ids.json
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from 'node:fs'
+          const raw = JSON.parse(readFileSync('/tmp/auth013-user-ids.json', 'utf8'))
+          const rows = raw?.result?.results ?? raw?.results ?? []
+          if (rows.length !== 2) throw new Error('expected exactly two fixture users')
+          const byEmail = new Map(rows.map((row) => [String(row.email), String(row.id)]))
+          const basic = byEmail.get(process.env.AUTH013_BASIC_EMAIL)
+          const operator = byEmail.get(process.env.AUTH013_OPERATOR_EMAIL)
+          if (!basic || !operator || basic === operator) throw new Error('fixture user id resolution failed')
+          appendFileSync(process.env.GITHUB_ENV, `AUTH013_BASIC_USER_ID=${basic}\nAUTH013_OPERATOR_USER_ID=${operator}\n`)
+          console.log(JSON.stringify({ userIdAllocation: 'database_generated', resolved: true, secretMaterialIncluded: false }))
+          NODE
 
       - name: Execute public transport E2E
         env:
