@@ -3762,3 +3762,14 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Runtime/API/Worker/D1 contracts were not changed. AUTH-004 remains NOT_GREEN.
 - Change Control: `docs/change-control/CC-MAPPING-0-AUTH-004-E2E-SESSION-EXPECTATION-2026-09-29.md`.
 - Next authoritative execution gate: fresh controlled W01/W02 binding deployment of current main, then the existing AUTH-004 Remote HTTP E2E workflow.
+
+## 2026-09-29 — AUTH-004 reset-session native semantics correction
+
+- Backup before this batch: `backup/pre-auth004-reset-session-expectation-20260929-0110`.
+- AUTH-004 Remote HTTP E2E run `36454779860` reached the current deployed source and all Payload 3.90.2 migration preconditions successfully.
+- Password-change assertions now pass; the run stopped at the post-reset native-session assertion because the harness expected zero sessions.
+- Payload 3.90.2 native `resetPassword` clears prior sessions and creates one new native session as part of the reset operation. The LuckRead reset-confirm adapter intentionally discards the returned JWT to preserve the contract's 204 response.
+- `scripts/auth-004-remote-e2e.mjs` now asserts the pre-reset session is invalidated and exactly one reset-created native session remains.
+- Runtime/API/Worker/D1 contracts remain unchanged. AUTH-004 remains NOT_GREEN.
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTH-004-RESET-SESSION-EXPECTATION-2026-09-29.md`.
+- Next authoritative execution gate: fresh controlled W01/W02 binding deployment of current main, then the existing AUTH-004 Remote HTTP E2E workflow.
