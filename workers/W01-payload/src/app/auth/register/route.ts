@@ -75,23 +75,28 @@ const isExpired = (expiresAt: string, now: Date) => {
   return !Number.isFinite(value) || value <= now.getTime()
 }
 
-const getExistingEnvelope = async (payload: Awaited<ReturnType<typeof getPayload>>, idempotencyKey: string) => {
-  const result = await payload.find({
-    collection: 'auth-registration-envelopes',
-    where: {
-      and: [
-        { idempotencyKey: { equals: idempotencyKey } },
-        { scope: { equals: SCOPE } },
-        { endpoint: { equals: ENDPOINT } },
-      ],
-    },
-    sort: '-createdAt',
-    limit: 1,
-    depth: 0,
-    overrideAccess: true,
-  })
-  return (result.docs[0] as ExistingEnvelope | undefined) ?? null
+const getExistingEnvelope = async (db: D1Database, idempotencyKey: string): Promise<ExistingEnvelope | null> => {
+  return db
+    .prepare(
+      `
+        SELECT
+          id,
+          payload_hash AS payloadHash,
+          state,
+          committed_response AS committedResponse,
+          expires_at AS expiresAt
+        FROM auth_registration_envelopes
+        WHERE idempotency_key = ?
+          AND scope = ?
+          AND endpoint = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `,
+    )
+    .bind(idempotencyKey, SCOPE, ENDPOINT)
+    .first<ExistingEnvelope>()
 }
+
 
 const parseReplay = (value: ExistingEnvelope['committedResponse']): RegistrationResponse | null => {
   if (!value || typeof value.userId !== 'string' || value.accountState !== ACCOUNT_STATE) return null
@@ -180,8 +185,9 @@ export async function POST(request: Request): Promise<Response> {
       }),
     ),
   )
+  const { env } = await getCloudflareContext({ async: true })
+  const existing = await getExistingEnvelope(env.D1, idempotencyKey)
   const payload = await getPayload({ config })
-  const existing = await getExistingEnvelope(payload, idempotencyKey)
 
   if (existing && !isExpired(existing.expiresAt, now)) {
     if (existing.payloadHash !== payloadHash) return errorResponse(422, 'IDEMPOTENCY_KEY_REUSE_CONFLICT', 'Idempotency key cannot be reused with different input')
@@ -193,7 +199,6 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(409, 'REGISTRATION_RETRY_REQUIRED', 'The prior registration attempt is not replayable')
   }
 
-  const { env } = await getCloudflareContext({ async: true })
   const capture: { data: Record<string, unknown> | null } = { data: null }
 
   try {
@@ -203,7 +208,7 @@ export async function POST(request: Request): Promise<Response> {
         email: normalized.identity,
         password: normalized.credential,
         username: normalized.username,
-      },
+      } as any,
       overrideAccess: true,
       disableTransaction: true,
       context: {
@@ -239,7 +244,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const consentRecordId = crypto.randomUUID()
   const envelopeId = crypto.randomUUID()
-  const statements: D1PreparedStatement[] = []
+  const statements: Array<ReturnType<typeof env.D1.prepare>> = []
 
   if (existing && isExpired(existing.expiresAt, now)) {
     statements.push(
