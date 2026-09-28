@@ -84,3 +84,18 @@ Migration SQL/JSON diagnostics passed in isolation; the prior CI failure was onl
 ## 2026-09-28 Stash/rebase promotion checkpoint
 
 The native schema review passed. Promotion now stashes generated CLI artifacts before rebasing onto the latest main checkpoint, then restores and commits the exact generated migration.
+
+## 2026-09-28 Remote production compatibility gate — BLOCKED
+
+Status: RUNTIME_COMPATIBILITY_BLOCKED / NOT_GREEN
+
+- Controlled W01/W02 deployment attempt 7 completed successfully in run `36420996656`, deploying exact application source `6d574bb56222e0eaf44df663e04eb59535e84be6`.
+- AUTH-004 Remote HTTP E2E run `36426287424` passed exact deployment provenance, Payload 3.90.2 admission, and remote native migration/schema preconditions, then failed at the first registration setup request with HTTP 503.
+- The captured W01 runtime-tail artifact `10971074778` records Payload diagnostic `auth.register.native_validation_failure` with `errorName=NotSupportedError`.
+- The concrete runtime failure is the Payload native password hashing path using PBKDF2 with `600000` iterations while Cloudflare Workers production rejects PBKDF2 iteration counts above `100000`. This matches the current upstream Payload 3.90.x Cloudflare D1 issue and the Cloudflare Workers runtime limitation.
+- Payload 3.90.2 is the current stable Payload 3.x release at this checkpoint; there is no later stable 3.x release available to consume as a drop-in upstream correction.
+- No custom password hashing, Payload core fork, parallel authentication subsystem, or reduced-iteration security downgrade is admitted by this Change Control.
+- The previous request-context correction is therefore verified as deployed but is not sufficient to establish remote authentication runtime viability.
+- AUTH-004 remains `BLOCKED / NOT_GREEN`. Remote lifecycle assertions after registration have not executed and must not be promoted.
+- Next admissible upstream decision is limited to: an upstream/runtime-compatible Payload release, or an explicitly approved security/architecture Change Control that preserves the project's password-security requirements. No implementation workaround is to be inferred from this blocker.
+- Backup before this governance-only update: `backup/main-before-auth004-pbkdf2-runtime-blocker-20260928-2107`.
