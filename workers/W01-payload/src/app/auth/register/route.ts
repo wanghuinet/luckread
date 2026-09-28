@@ -333,11 +333,9 @@ export async function POST(request: Request): Promise<Response> {
             bio,
             avatar,
             locale,
-            timezone,
-            account_state,
-            account_state_version
+            timezone
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
       )
       .bind(
@@ -350,8 +348,6 @@ export async function POST(request: Request): Promise<Response> {
         typeof userData.avatar === 'string' ? userData.avatar : null,
         typeof userData.locale === 'string' ? userData.locale : 'en-US',
         typeof userData.timezone === 'string' ? userData.timezone : 'UTC',
-        ACCOUNT_STATE,
-        ACCOUNT_STATE_VERSION,
       ),
   )
 
