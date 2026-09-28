@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "d6a6cf225c4f5ac9599c30949fc4143df04c932b",
+  "sourceHead": "e47ffbcb91b6664f602a54a788d54f079e7ec9c8",
   "backupBranch": "backup/pre-priv004-baseline-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
@@ -63,7 +63,7 @@
     "Treat 36296831559 as execution checkpoint only; final schema correctness requires a later read-only exact-SHA postcheck.",
     "Do not promote AUTH-003 persistence status from the migration execution log alone."
   ],
-  "previousSourceHead": "1a1e097dff6334dee8878d098c772bedaa6cb87e",
+  "previousSourceHead": "c59c783217b6b0e37b970d5d7c3c795ec808bbeb",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
@@ -167,8 +167,8 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Controlled AUTH-001 development runtime probe 36361411407 exposed a real W01/D1 transaction capability mismatch: Payload generic SQLite BEGIN/ROLLBACK is rejected by D1. Change Control CC-MAPPING-0-AUTH-001-D1-ATOMIC-WRITE-BOUNDARY-2026-09-28 is now merged and supersedes direct runtime admission.",
-    "currentMainSha": "20a1a8bf43f9b3d0928a201fb72e5af0ac4c83c8",
+    "reason": "After the AUTH-001 Payload/D1 batch capability reconciliation control was merged, main advanced without changing the active runtime blocker. This sync updates only live-current SHA provenance; AUTH-001 remains blocked on the admitted D1-compatible atomic W01 boundary.",
+    "currentMainSha": "e47ffbcb91b6664f602a54a788d54f079e7ec9c8",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_CONTRACT_PRECONDITIONS_RECONCILED_RUNTIME_PENDING",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -239,7 +239,7 @@
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
-    "mainSha": "d6a6cf225c4f5ac9599c30949fc4143df04c932b",
+    "mainSha": "e47ffbcb91b6664f602a54a788d54f079e7ec9c8",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
