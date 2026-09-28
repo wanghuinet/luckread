@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   review:
@@ -34,14 +34,14 @@ jobs:
         env:
           NODE_ENV: development
           PAYLOAD_SECRET: ignore
-        run: pnpm exec payload migrate:create MIG-AUTH-004-PAYLOAD-3902-NATIVE-V1 --skip-empty
+        run: pnpm exec payload migrate:create MIG-PAYLOAD-3902-NATIVE-SCHEMA-V1 --skip-empty
       - name: Review generated delta against authoritative baseline snapshot
         working-directory: workers/W01-payload
         shell: bash
         run: |
           set +e
-          ts=$(find src/migrations -maxdepth 1 -type f -name '*MIG_AUTH_004_PAYLOAD_3902_NATIVE_V1.ts' | head -n 1)
-          json=$(find src/migrations -maxdepth 1 -type f -name '*MIG_AUTH_004_PAYLOAD_3902_NATIVE_V1.json' | head -n 1)
+          ts=$(find src/migrations -maxdepth 1 -type f -name '*MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.ts' | head -n 1)
+          json=$(find src/migrations -maxdepth 1 -type f -name '*MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.json' | head -n 1)
           review=0
           [ -n "$ts" ] || review=1
           [ -n "$json" ] || review=1
@@ -74,7 +74,8 @@ jobs:
           if [ -z "$json" ]; then echo "missing_json=1"; review=1; fi
           if [ -n "$ts" ]; then
             grep -q 'ALTER TABLE `users` ADD `reset_password_requested_at`' "$ts" || review=1
-            ! grep -Eq 'CREATE TABLE.*(users|users_sessions|media|payload_migrations|payload_locked_documents|payload_preferences|auth_session_state)' "$ts" || review=1
+            grep -q 'ALTER TABLE `media` ADD `_objectkey`' "$ts" || review=1
+            ! grep -Eq 'CREATE TABLE.*(users|users_sessions|media|payload_kv|payload_migrations|payload_locked_documents|payload_preferences|auth_session_state)' "$ts" || review=1
           fi
           if [ -n "$json" ]; then
             node - "$json" <<'NODE'
@@ -91,8 +92,14 @@ jobs:
           const genCopy = stable(generated)
           delete baseCopy.tables.users.columns.reset_password_requested_at
           delete genCopy.tables.users.columns.reset_password_requested_at
+          const mediaBase = Object.keys(baseline.tables.media.columns).sort()
+          const mediaGen = Object.keys(generated.tables.media.columns).sort()
+          const mediaAdded = mediaGen.filter((name) => !mediaBase.includes(name))
+          const mediaRemoved = mediaBase.filter((name) => !mediaGen.includes(name))
+          delete baseCopy.tables.media.columns._objectkey
+          delete genCopy.tables.media.columns._objectkey
           const exact = JSON.stringify(baseCopy) === JSON.stringify(genCopy)
-          if (!(removed.length === 0 && added.length === 1 && added[0] === 'reset_password_requested_at' && exact)) process.exit(1)
+          if (!(removed.length === 0 && added.length === 1 && added[0] === 'reset_password_requested_at' && mediaRemoved.length === 0 && mediaAdded.length === 1 && mediaAdded[0] === '_objectkey' && exact)) process.exit(1)
           NODE
             [ "$?" -eq 0 ] || review=1
           fi
@@ -102,22 +109,37 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: auth-004-payload-3902-native-migration-diagnostics-${{ github.run_id }}
+          name: payload-3902-native-schema-diagnostics-${{ github.run_id }}
           path: |
-            workers/W01-payload/src/migrations/*MIG_AUTH_004_PAYLOAD_3902_NATIVE_V1.ts
-            workers/W01-payload/src/migrations/*MIG_AUTH_004_PAYLOAD_3902_NATIVE_V1.json
+            workers/W01-payload/src/migrations/*MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.ts
+            workers/W01-payload/src/migrations/*MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.json
             workers/W01-payload/src/migrations/index.ts
             workers/W01-payload/auth004-native-migration-review.json
           if-no-files-found: error
           retention-days: 14
 
+      - name: Commit reviewed Payload native schema migration
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git rebase origin/main
+          rm -f .github/workflows/auth-004-payload-3902-native-migration-review.yml
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "build(payload): add 3.90.2 native schema alignment migration"
+          git push origin HEAD:main
+
       - name: Upload reviewed migration artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: auth-004-payload-3902-native-migration-${{ github.run_id }}
+          name: payload-3902-native-schema-migration-${{ github.run_id }}
           path: |
-            workers/W01-payload/src/migrations/*MIG_AUTH_004_PAYLOAD_3902_NATIVE_V1.ts
-            workers/W01-payload/src/migrations/*MIG_AUTH_004_PAYLOAD_3902_NATIVE_V1.json
+            workers/W01-payload/src/migrations/*MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.ts
+            workers/W01-payload/src/migrations/*MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.json
             workers/W01-payload/src/migrations/index.ts
           if-no-files-found: error
           retention-days: 14
