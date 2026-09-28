@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { getCloudflareContext } from '@opennextjs/cloudflare'
 
 const baseUrl = process.env.AUTH001_BASE_URL || 'http://127.0.0.1:3100'
 const runId = process.env.GITHUB_RUN_ID || 'local'
@@ -10,8 +9,36 @@ mkdirSync(artifactDir, { recursive: true })
 const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
 const policy = JSON.parse(readFileSync(new URL('../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json', import.meta.url), 'utf8'))
 if (policy.policyVersion !== 'DEV-2026-09-28.1') throw new Error('Unexpected development PRIV-004 policy version')
-const { env } = await getCloudflareContext({ async: true })
-const db = env.D1
+const escapeSql = (value) => "'" + String(value).replaceAll("'", "''") + "'"
+const renderSql = (sql, args) => {
+  let index = 0
+  return sql.replaceAll('?', () => escapeSql(args[index++]))
+}
+const d1Json = (command) => {
+  const output = execFileSync(
+    'npx',
+    ['--yes', 'wrangler@4.116.0', 'd1', 'execute', 'luckread', '--local', '--json', '--config', 'wrangler.jsonc', '--command', command],
+    { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 },
+  )
+  return JSON.parse(output)
+}
+const d1Rows = (command) => {
+  const value = d1Json(command)
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => {
+      if (Array.isArray(item)) return item
+      if (item && Array.isArray(item.results)) return item.results
+      if (item && Array.isArray(item.result)) return item.result
+      return []
+    })
+  }
+  if (value && Array.isArray(value.results)) return value.results
+  if (value && Array.isArray(value.result)) return value.result
+  return []
+}
+const scalar = async (sql, ...args) => d1Rows(renderSql(sql, args))[0] ?? null
+const all = (sql, ...args) => d1Rows(renderSql(sql, args))
+const runSql = (sql, ...args) => { d1Json(renderSql(sql, args)) }
 
 const canonicalize = (value) => {
   if (Array.isArray(value)) return value.map(canonicalize)
@@ -27,7 +54,6 @@ const responseJson = async (response) => {
   try { return JSON.parse(text) } catch { throw new Error('Expected JSON response, HTTP ' + response.status + ': ' + text.slice(0, 500)) }
 }
 const request = async (idempotencyKey, body) => fetch(baseUrl + '/auth/register', { method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(body) })
-const scalar = async (sql, ...args) => db.prepare(sql).bind(...args).first()
 
 const countsForEmail = async (email, username) => {
   const user = await scalar('SELECT COUNT(*) AS c, MIN(id) AS id, MIN(hash) AS hash, MIN(salt) AS salt, MIN(account_state) AS account_state, MIN(account_state_version) AS account_state_version FROM users WHERE email = ? AND username = ?', email, username)
@@ -36,7 +62,7 @@ const countsForEmail = async (email, username) => {
 }
 const envelopeForKey = async (idempotencyKey) => scalar('SELECT id, state, payload_hash, response_digest, committed_response, consent_record_id FROM auth_registration_envelopes WHERE idempotency_key = ? AND scope = ? AND endpoint = ? ORDER BY created_at DESC LIMIT 1', idempotencyKey, 'ACCOUNT_REGISTRATION', 'authRegister')
 
-const tableRows = await db.prepare("SELECT name, type FROM sqlite_master WHERE type IN ('table','index') AND name IN ('users','auth_registration_envelopes','consents') ORDER BY type,name").all()
+const tableRows = { results: all("SELECT name, type FROM sqlite_master WHERE type IN ('table','index') AND name IN ('users','auth_registration_envelopes','consents') ORDER BY type,name") }
 const requiredObjects = new Set((tableRows.results || []).map((row) => String(row.type) + ':' + String(row.name)))
 for (const required of ['table:users', 'table:auth_registration_envelopes', 'table:consents']) if (!requiredObjects.has(required)) throw new Error('Required local D1 object missing: ' + required)
 
@@ -54,14 +80,12 @@ const concurrentUsername = 'auth001ct' + suffix
 let triggerName = null
 
 const cleanup = async () => {
-  if (triggerName) { await db.prepare('DROP TRIGGER IF EXISTS ' + triggerName).run(); triggerName = null }
-  await db.batch([
-    db.prepare('DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email IN (?, ?))').bind(email, concurrentEmail),
-    db.prepare('DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE ?)').bind('auth001-rollback-' + suffix + '@luckread.local'),
-    db.prepare('DELETE FROM auth_registration_envelopes WHERE idempotency_key IN (?, ?, ?, ?)').bind(keySuccess, keyRollback, keyConcurrentA, keyConcurrentB),
-    db.prepare('DELETE FROM users WHERE email IN (?, ?)').bind(email, concurrentEmail),
-    db.prepare('DELETE FROM auth_registration_envelopes WHERE idempotency_key = ?').bind(keyRollback),
-  ])
+  if (triggerName) { runSql('DROP TRIGGER IF EXISTS ' + triggerName); triggerName = null }
+  runSql('DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email IN (?, ?))', email, concurrentEmail)
+  runSql('DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE ?)', 'auth001-rollback-' + suffix + '@luckread.local')
+  runSql('DELETE FROM auth_registration_envelopes WHERE idempotency_key IN (?, ?, ?, ?)', keySuccess, keyRollback, keyConcurrentA, keyConcurrentB)
+  runSql('DELETE FROM users WHERE email IN (?, ?)', email, concurrentEmail)
+  runSql('DELETE FROM auth_registration_envelopes WHERE idempotency_key = ?', keyRollback)
 }
 
 try {
@@ -75,8 +99,8 @@ try {
   if (successRows.users !== 1 || successRows.consents !== 1) throw new Error('Successful registration did not create exactly one User and one Consent')
   if (!successRows.userId || successRows.accountState !== 'PENDING_VERIFICATION' || successRows.accountStateVersion !== 1) throw new Error('User lifecycle state/version is not canonical')
   if (!successRows.hash || !successRows.salt) throw new Error('Native User hash/salt not persisted')
-  const columns = await db.prepare('PRAGMA table_info(users)').all()
-  if ((columns.results || []).some((column) => column.name === 'password')) throw new Error('Plaintext password column unexpectedly exists in User persistence')
+  const columns = { results: all('PRAGMA table_info(users)') }
+  if (columns.results.some((column) => column.name === 'password')) throw new Error('Plaintext password column unexpectedly exists in User persistence')
   const envelope = await envelopeForKey(keySuccess)
   if (!envelope || envelope.state !== 'COMPLETED') throw new Error('Completed registration envelope missing')
   const committedResponse = JSON.parse(String(envelope.committed_response))
@@ -101,7 +125,7 @@ try {
   if (rollbackResponse.status !== 503) throw new Error('Forced rollback should fail closed with 503, got ' + rollbackResponse.status)
   const rollbackRows = await countsForEmail(rollbackEmail, rollbackUsername)
   if (rollbackRows.users !== 0 || rollbackRows.consents !== 0) throw new Error('D1 batch rollback left a partial User or Consent record')
-  await db.prepare('DROP TRIGGER IF EXISTS ' + triggerName).run(); triggerName = null
+  runSql('DROP TRIGGER IF EXISTS ' + triggerName); triggerName = null
 
   const concurrentBody = { ...body, identity: concurrentEmail, username: concurrentUsername, credential: password + '-concurrent' }
   const pair = await Promise.all([request(keyConcurrentA, concurrentBody), request(keyConcurrentB, concurrentBody)])
