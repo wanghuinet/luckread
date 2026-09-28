@@ -21,6 +21,7 @@ const contractPath = path.join(root, 'contracts/privacy/PRIV-004-retention-polic
 
 const failures = []
 const fail = (message) => failures.push(message)
+const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
 const readJson = (file) => {
   if (!fs.existsSync(file)) {
     fail(`missing ${path.relative(root, file)}`)
