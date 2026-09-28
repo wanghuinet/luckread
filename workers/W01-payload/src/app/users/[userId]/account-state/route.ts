@@ -1,0 +1,121 @@
+import { getPayload } from 'payload'
+
+import config from '@payload-config'
+
+import { readVerifiedPayloadTokenVersion } from '../../../../auth/payload-access-token.js'
+import {
+  transitionAccountState,
+  validateSession,
+  W02AuthClientError,
+} from '../../../../auth/w02-session-client.js'
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  })
+
+const errorResponse = (status: number, code: string, message: string) =>
+  json(
+    {
+      error: {
+        code,
+        message,
+        details: {},
+      },
+      requestId: crypto.randomUUID(),
+    },
+    status,
+  )
+
+type AccountStateBody = {
+  to?: unknown
+  reason?: unknown
+}
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ userId: string }> },
+): Promise<Response> {
+  const { userId: targetUserId } = await context.params
+
+  if (!targetUserId || targetUserId.length > 128) {
+    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid userId')
+  }
+
+  const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
+  const expectedVersion = Number(ifMatch.replace(/^"|"$|^W\\//g, ''))
+  if (!ifMatch || !Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
+    return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match is required')
+  }
+
+  let body: AccountStateBody
+  try {
+    body = (await request.json()) as AccountStateBody
+  } catch {
+    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+  }
+
+  if (
+    typeof body.to !== 'string' ||
+    typeof body.reason !== 'string' ||
+    body.reason.trim().length === 0 ||
+    body.reason.length > 2048
+  ) {
+    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid account-state transition request')
+  }
+
+  const payload = await getPayload({ config })
+
+  let authResult: Awaited<ReturnType<typeof payload.auth>>
+  try {
+    authResult = await payload.auth({
+      headers: new Headers({
+        Authorization: request.headers.get('Authorization') ?? '',
+      }),
+      canSetHeaders: false,
+    })
+  } catch {
+    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
+  }
+
+  const user = authResult.user as ({ id?: unknown; _sid?: unknown } | null)
+  if (!user?.id || typeof user._sid !== 'string') {
+    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
+  }
+
+  const tokenVersion = readVerifiedPayloadTokenVersion(request)
+  if (tokenVersion === null) {
+    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
+  }
+
+  try {
+    const active = await validateSession({
+      sessionId: user._sid,
+      userId: String(user.id),
+      tokenVersion,
+    })
+    if (!active) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
+
+    const result = await transitionAccountState({
+      subjectId: String(user.id),
+      targetUserId,
+      to: body.to,
+      reason: body.reason,
+      expectedVersion,
+    })
+
+    return json(result, 200)
+  } catch (error) {
+    if (error instanceof W02AuthClientError) {
+      if (error.status === 401) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
+      if (error.status === 400) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid account-state transition request')
+      return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Account-state service unavailable')
+    }
+
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Account-state service unavailable')
+  }
+}
