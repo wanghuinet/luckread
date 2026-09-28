@@ -415,8 +415,6 @@ export async function POST(request: Request): Promise<Response> {
       .bind(
         String(userData.email),
         String(userData.username),
-        String(userData.email),
-        String(userData.username),
         now.toISOString(),
         envelopeId,
       ),
