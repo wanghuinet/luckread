@@ -834,6 +834,25 @@
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36377880967",
       "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
       "note": "Controlled remote D1-01 materializer evidence at exact implementation source SHA bd2791a4ca799126fac16afbc0506070e9074a77. Successful rerun after AUTH-001 registration/consent migration became physically present remotely. FAIL_CLOSED missing-key path was verified with no mutation; first valid pass created exactly one identity and two initial credentials; identity converged; credentials were active and hashed; second run created nothing; no raw secret appeared in the result; production Worker was not deployed. No relevant W02 materializer, credential-add, credential-hash-key or W02 index source changed between this tested SHA and current main 37b0473f7214dd4eaca0326d147973e44fe52e7e. Artifact 10953241430, sha256:9b65754f98d44453d7df598d1bdda40374f3aa5eb033239d6001e1d227f59062."
+    },
+    {
+      "evidenceId": "EVD-AUTH001-REGISTRATION-RUNTIME-LOCAL-ENV-POLICY-SPLIT-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-001::REGISTRATION_D1_BATCH",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-001",
+      "source": "GitHub Actions AUTH-001 Registration Local Runtime Evidence after DEV/PROD PRIV-004 policy separation",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36386908500/artifacts/10954444469",
+      "commitSha": "dd803fb465bf91e9bd8e22ecd34798cdaec42359",
+      "timestamp": "2026-09-28T06:34:16Z",
+      "producer": "AUTH-001 Registration Local Runtime Evidence / run 36386908500",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "108814085328",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36386908500",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-001-FRESH-RUNTIME-EVIDENCE-RECONCILIATION-2026-09-28.md",
+      "note": "Fresh controlled development runtime evidence after separating DEV and PROD PRIV-004 policy artifacts. Run passed the AUTH-001 registration batch assertions; production deployment was false. The current main merge preserves the tested PR tree, so the evidence remains valid for the current development scope under the inheritance rule."
     }
   ],
   "testedCommitSha": "37b0473f7214dd4eaca0326d147973e44fe52e7e"
