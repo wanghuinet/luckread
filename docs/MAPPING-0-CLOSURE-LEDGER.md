@@ -3569,3 +3569,16 @@ Current source: `5e571a79c11bd03123d0672ccdaaadb836dc40af`.
 - `ENT-IDENTITY` implementation evidence is reconciled to `IMPLEMENTED`, while canonical catalog status remains `PROPOSED` and evidence status remains `BLOCKED`.
 - AUTH-003 remains `PARTIAL`; global Mapping 0 / Five-Way and Evidence Registry remain `NOT_GREEN`.
 - No production deployment, new Worker, new D1, Queue, migration, or API/DTO authority change is introduced.
+
+
+## AUTH-002 executable evidence reconciliation — 2026-09-28
+
+Current source: `ea52038bdd58b550270dcd5b56bd1b4153ad5683`.
+
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTH-002-EVIDENCE-RECONCILIATION-2026-09-28.md`.
+- Existing Gate-1 schema evidence `36217784262` is `VERIFIED/PASS` at exact tested source `5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55`.
+- Existing native session runtime `36219132123` is `VERIFIED/PASS` at the same exact tested source.
+- Security-negative, concurrency and extension-correlation records `EVD-AUTH002-B24/B25/B26` are already `VERIFIED/PASS`.
+- The historical migration record `EVD-AUTH002-B10-MIGRATION-REMOTE-001` remains `CREATED`; it is not promoted or rewritten.
+- AUTH-002 remains `BLOCKED_NOT_GREEN`; the remaining executable evidence gap is migration execution admission, followed by final entity/Mapping-0 promotion.
+- No runtime rerun, Worker redeployment, second Session table, migration execution, or production deployment is introduced by this reconciliation.
