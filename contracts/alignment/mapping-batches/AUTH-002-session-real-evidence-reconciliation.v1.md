@@ -2,7 +2,7 @@
 
 ## Status
 
-`PASS_VERIFIED_RUNTIME_EVIDENCE / BLOCKED_MIGRATION_AND_MAPPING0_PROMOTION`
+`PASS_VERIFIED_RUNTIME_AND_MIGRATION_EVIDENCE / BLOCKED_MAPPING0_PROMOTION`
 
 ## Scope
 
@@ -97,13 +97,17 @@ Gate 2 native session runtime   = ACCEPTED / VERIFIED (run 36219132123)
 Extension correlation           = ACCEPTED / VERIFIED
 Security / E2E                  = ACCEPTED / VERIFIED
 Concurrency / E2E                = ACCEPTED / VERIFIED
-Migration execution             = BLOCKED_PENDING_CONTRACT_COMPLETE_EVIDENCE
-Evidence Registry               = RUNTIME GATES BOUND / MIGRATION UNIT UNADMITTED
+Migration execution             = ACCEPTED / VERIFIED (run 35552919573; historical technical execution)
+Evidence Registry               = RUNTIME + MIGRATION GATES BOUND
 ENT-SESSION                    = PROPOSED / PROMOTION BLOCKED
-AUTH-002                        = BLOCKED_NOT_GREEN
+AUTH-002                        = BLOCKED_MAPPING0
 Mapping 0                       = NOT_GREEN
 ```
 
 ## Next closure action
 
-Reconcile the exact-SHA migration execution evidence against the current persistence-evidence contract. The already-admitted Gate-1/runtime/security/concurrency/extension evidence must not be rerun unchanged. No second full Session table may be introduced.
+Migration execution evidence is now technically verified by the historical E5 artifact and admitted as unchanged-scope evidence. The historical execution is not retroactively authorized. Do not rerun Gate-1/runtime/security/concurrency/extension evidence unchanged, and do not re-apply the session migration. The next gate is final Mapping-0 / Evidence Registry / ENT-SESSION admission.
+
+## Migration execution evidence admission — 2026-09-28
+
+Historical E5 run `35552919573` provides the complete controlled execution and postcondition artifact. It is admitted as technical execution evidence with exact tested commit `fe1f2784d21f3f629bbad0baa971f1aa56520914` under unchanged migration-source scope. The historical authorization incident remains separately recorded and is not retroactively changed. No Contract, runtime, or D1 mutation is introduced.

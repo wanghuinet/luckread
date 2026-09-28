@@ -73,12 +73,15 @@
         "contracts/entity/AUTH-002-session-field-contract.v1.json",
         "docs/change-control/CC-MAPPING-0-AUTH-002-EVIDENCE-RECONCILIATION-2026-09-28.md",
         "https://github.com/wanghuinet/luckread/actions/runs/36217784262",
-        "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
+        "https://github.com/wanghuinet/luckread/actions/runs/36219132123",
+        "artifacts/mapping-0/auth-002-historical-migration-evidence-admission-2026-09-28.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-002-HISTORICAL-MIGRATION-EVIDENCE-ADMISSION-2026-09-28.md",
+        "https://github.com/wanghuinet/luckread/actions/runs/35552919573/artifacts/10618729380"
       ],
       "blockers": [
-        "AUTH-002 migration execution evidence unit is not yet admitted under the current persistence-evidence contract; the historical B10 record remains CREATED.",
         "ENT-SESSION catalog promotion remains blocked even though Gate-1, native runtime, security, concurrency and extension-correlation evidence are VERIFIED.",
-        "Mapping 0 / Five-Way remains globally NOT_GREEN."
+        "Mapping 0 / Five-Way remains globally NOT_GREEN.",
+        "ENT-SESSION catalog promotion remains blocked pending final Mapping 0 / Five-Way admission."
       ]
     },
     {
