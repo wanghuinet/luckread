@@ -131,6 +131,18 @@ jobs:
           if(!users.some((r)=>String(r.name)==='reset_password_requested_at')) throw new Error('AUTH-004 reset-requested-at schema precondition failed')
           console.log('AUTH-004 remote migration precondition PASS')
           NODE
+      - name: Start controlled W01 runtime tail
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/evidence/auth-004/remote-e2e
+          nohup npx --yes "wrangler@${WRANGLER_VERSION}" tail luckread-w01-payload --format json --search auth.register --sampling-rate 1 > ../../artifacts/evidence/auth-004/remote-e2e/w01-runtime-tail.jsonl 2>&1 &
+          echo $! > /tmp/auth004-w01-tail.pid
+          sleep 3
+
       - name: Run controlled AUTH-004 remote HTTP E2E
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -139,6 +151,15 @@ jobs:
           DATABASE_NAME: ${{ env.DATABASE_NAME }}
           WRANGLER_VERSION: ${{ env.WRANGLER_VERSION }}
         run: node scripts/auth-004-remote-e2e.mjs
+
+      - name: Stop controlled W01 runtime tail
+        if: always()
+        run: |
+          set +e
+          if [ -f /tmp/auth004-w01-tail.pid ]; then
+            kill "$(cat /tmp/auth004-w01-tail.pid)" >/dev/null 2>&1 || true
+            sleep 2
+          fi
       - name: Upload AUTH-004 remote E2E evidence
         if: always()
         uses: actions/upload-artifact@v4
