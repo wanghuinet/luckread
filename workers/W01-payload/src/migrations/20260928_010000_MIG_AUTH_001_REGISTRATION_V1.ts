@@ -10,9 +10,9 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   \`payload_hash\` text NOT NULL,
   \`state\` text NOT NULL,
   \`response_digest\` text,
-  \`committed_response\` text NOT NULL,
+  \`committed_response\` text,
   \`expires_at\` text NOT NULL,
-  \`consent_record_id\` text NOT NULL,
+  \`consent_record_id\` text,
   \`updated_at\` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
   \`created_at\` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
   );`)
