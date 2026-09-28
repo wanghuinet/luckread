@@ -91,3 +91,11 @@ The dedicated current-execution cursor is updated to the exact current `main` SH
 - Minimal CI correction committed at `65c3dd5423f7c841a64a486ca3a960fb4339e376`: derive the deployed source SHA from live `w01-w02-binding-deployment-*` artifacts belonging to the deployment run, require one unambiguous exact SHA, choose the newest duplicate artifact, and record the workflow trigger SHA separately.
 - Re-ran the already successful W01 deployment job `108923397358` to generate a new completion event using the same deployed source. Re-run attempt 2 is currently queued.
 - No business implementation, D1 schema, Worker topology, or Payload core change was introduced by this correction.
+
+## 2026-09-28 controlled runtime-tail diagnostic checkpoint
+
+- W01 deployment run `36420996656` attempt 2 successfully deployed the corrected implementation source `6d574bb56222e0eaf44df663e04eb59535e84be6`.
+- AUTH-004 Remote E2E `36421837195` reached the exact deployed source and remote migration precondition successfully, then failed at the first registration assertion with HTTP 503. The existing source logs a sanitized `auth.register` diagnostic event, but the E2E artifact did not capture live Worker logs.
+- CI-only diagnostic enhancement committed at `67e9080a2617e6c3c381aaaeb4bfd399ca84e1e68`: the existing controlled Remote E2E now starts a temporary `wrangler tail` session filtered to `auth.register`, captures the live W01 runtime diagnostic, and stops the tail after the probe. This does not alter application behavior, schema, topology, or production contracts.
+- The already successful W01 deployment job was safely rerun as attempt 3 solely to emit a new completion event for the diagnostic-enabled Remote E2E. The deployed source remains `6d574bb56222e0eaf44df663e04eb59535e84be6`.
+- AUTH-004 remains BLOCKED / NOT_GREEN pending the next Remote E2E result and evidence admission.
