@@ -2,7 +2,7 @@
 
 ## Status
 
-`CONTRACT_SHAPE_ADMITTED / POLICY_INSTANCE_BLOCKED`
+`CONTRACT_SHAPE_ADMITTED / PRODUCTION_ENGINEERING_POLICY_INSTANCE_ADMITTED / AUTHORITY_CLOSED`
 
 ## Purpose
 
@@ -33,27 +33,27 @@
 
 ## Intentionally not admitted
 
-- concrete retention duration;
-- concrete fixed-until timestamp;
-- jurisdiction-specific legal conclusion;
-- concrete production config instance;
-- runtime code or migration.
+- jurisdiction-specific legal conclusion or statutory retention mandate;
+- runtime code or migration;
+- Mapping 0 GREEN or Evidence Registry promotion.
 
 ## AUTH-001 impact
 
-AUTH-001 is still blocked from runtime implementation because it requires an actual applicable approved PRIV-004 policy instance before `ENT-CONSENT.retentionUntil` can be calculated.
+AUTH-001 now has an explicitly admitted production engineering policy instance for deterministic `ENT-CONSENT.retentionUntil` calculation. Runtime implementation/evidence remains governed by its own existing admission and evidence gates.
 
-The previous gap is therefore narrowed from:
-
-`no PRIV-004 authority structure`
-
-to:
+The previous gap is therefore closed from:
 
 `policy authority contract admitted / first approved policy instance pending`
 
-## Next gate
+to:
 
-`PRIV-004::admit the first approved policy instance for ACCOUNT_REGISTRATION / LEGAL_AUDIT, with version, scope, effective period, deterministic rule, approval and provenance evidence.`
+`production engineering policy authority admitted / versioned instance active`
+
+## Closed gate
+
+`PRIV-004::first approved ACCOUNT_REGISTRATION / LEGAL_AUDIT production engineering policy instance admitted with version, scope, effective period, deterministic rule, approval and provenance evidence.`
+
+The admitted production policy is explicitly an internal engineering authority and does not assert a jurisdiction-specific legal conclusion. A later formal legal/compliance schedule can replace it by normal policy versioning without changing the runtime architecture.
 
 ## Non-authorizations
 
