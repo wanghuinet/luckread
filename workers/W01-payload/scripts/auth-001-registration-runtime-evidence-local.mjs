@@ -53,7 +53,7 @@ const responseJson = async (response) => {
   const text = await response.text()
   try { return JSON.parse(text) } catch { throw new Error('Expected JSON response, HTTP ' + response.status + ': ' + text.slice(0, 500)) }
 }
-const request = async (idempotencyKey, body) => fetch(baseUrl + '/auth/register', { method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(body) })
+const request = async (idempotencyKey, body) => fetch(baseUrl + '/auth/register', { method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': idempotencyKey, connection: 'close' }, body: JSON.stringify(body) })
 
 const countsForEmail = async (email, username) => {
   const user = await scalar('SELECT COUNT(*) AS c, MIN(id) AS id, MIN(hash) AS hash, MIN(salt) AS salt, MIN(account_state) AS account_state, MIN(account_state_version) AS account_state_version FROM users WHERE email = ? AND username = ?', email, username)
