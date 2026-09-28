@@ -33,7 +33,7 @@
       "promotionState": "NOT_EVALUATED_UNTIL_EXECUTED",
       "passState": "GATE2_PASS",
       "requires": [
-        "Payload 3.87.1 runtime identity",
+        "Payload 3.90.2 runtime identity",
         "disposable controlled authentication flow",
         "login-to-session-id correlation",
         "native session persistence correlation",
