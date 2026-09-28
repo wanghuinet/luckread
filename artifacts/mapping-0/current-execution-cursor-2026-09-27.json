@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab",
+  "sourceHead": "0bd1fde03b2f2966092585b98f2d3e46cbd6d846",
   "backupBranch": "backup/main-before-auth004-pbkdf2-runtime-blocker-20260928-2107",
   "currentCursor": {
     "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
@@ -21,7 +21,7 @@
       "Remote E2E run 36426287424 reached the real Worker and failed before AUTH-004 lifecycle assertions because Payload native PBKDF2 requests 600000 iterations and Cloudflare Workers rejects counts above 100000.",
       "Upstream Payload issue #18274 remains OPEN / needs-triage; no stable Payload 3.x release after 3.90.2 is available with an admitted fix at this checkpoint."
     ],
-    "sourceHead": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab"
+    "sourceHead": "0bd1fde03b2f2966092585b98f2d3e46cbd6d846"
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -187,7 +187,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced by governance-only reconciliation after a fresh Payload/Cloudflare upstream recheck. No application runtime source changed; AUTH-004 remains externally blocked by the observed PBKDF2 compatibility issue.",
-    "currentMainSha": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab",
+    "currentMainSha": "0bd1fde03b2f2966092585b98f2d3e46cbd6d846",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
     "payloadWireCompatibilityStatus": "AUTH004_REMOTE_RUNTIME_BLOCKED_PBKDF2_COMPATIBILITY",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -195,11 +195,11 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab",
-    "governanceHeadDisposition": "AUTH-013 public HTTP E2E execution tooling is ready; no runtime business source or production deployment changed in this checkpoint.",
+    "actualGitMainHead": "0bd1fde03b2f2966092585b98f2d3e46cbd6d846",
+    "governanceHeadDisposition": "AUTH-013 public HTTP E2E tooling hardened with durable non-secret result artifacts; no runtime business source or deployment changed.",
     "reviewedAt": "2026-09-28",
     "implementationEvidenceSourceHead": "6d574bb56222e0eaf44df663e04eb59535e84be6",
-    "latestGovernanceCommit": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab"
+    "latestGovernanceCommit": "0bd1fde03b2f2966092585b98f2d3e46cbd6d846"
   },
   "nextGate": "AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY",
   "latestControlGate": {
@@ -280,9 +280,9 @@
     "capabilityFinding": "Payload native AUTH-004 capability is contractually aligned to 3.90.2, but the native password hashing implementation is incompatible with Cloudflare Workers production because it requests 600000 PBKDF2 iterations.",
     "implementationDisposition": "AUTH013_PUBLIC_TRANSPORT_SOURCE_UNIT_VERIFIED_PUBLIC_HTTP_E2E_EXECUTION_READY",
     "staleEvidenceCorrection": "The 3.87.1 cursor is historical and superseded by 3.90.2; the new blocker is external runtime compatibility, not a version-alignment gap.",
-    "currentMainSha": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab",
+    "currentMainSha": "0bd1fde03b2f2966092585b98f2d3e46cbd6d846",
     "implementationSourceSha": "6d574bb56222e0eaf44df663e04eb59535e84be6",
-    "currentSourceHead": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab",
+    "currentSourceHead": "0bd1fde03b2f2966092585b98f2d3e46cbd6d846",
     "evidenceAdmission": {
       "runId": "36431940464",
       "jobId": "108959464320",
@@ -306,6 +306,12 @@
       "fixture": "scripts/auth-013-public-http-e2e-fixture.mjs",
       "workflow": ".github/workflows/auth-013-public-http-e2e.yml",
       "testedSourceMustEqual": "exact W01/W02 binding deployment source",
+      "durableArtifacts": [
+        "public-http-result.json",
+        "stale-session-result.json",
+        "d1-result.json",
+        "provenance.json"
+      ],
       "productionDeployment": false
     }
   },
