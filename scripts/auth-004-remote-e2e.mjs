@@ -47,10 +47,22 @@ async function createUser(label) {
   const email = `auth004-${suffix}@example.com`
   const password = `Evd-AUTH004-${randomBytes(24).toString('base64url')}-Z9!`
   const username = `auth004_${label}_${suffix.replaceAll('-', '').slice(-18)}`
-  const res = await request('/api/users', { method: 'POST', body: { email, username, password } })
+  const res = await request('/auth/register', {
+    method: 'POST',
+    headers: { 'Idempotency-Key': `${TEST_ID}-register-${label}` },
+    body: {
+      identityType: 'email',
+      identity: email,
+      credential: password,
+      username,
+      consent: { purpose: 'ACCOUNT_REGISTRATION', policyVersion: 'PROD-2026-09-28.1' },
+    },
+  })
   expect(res.status, 201, `create user ${label}`)
-  const id = String(res.data?.doc?.id ?? res.data?.id ?? '')
-  if (!id) throw new Error(`create user ${label}: missing id`)
+  const id = String(res.data?.userId ?? '')
+  if (!id || res.data?.accountState !== 'PENDING_VERIFICATION') {
+    throw new Error(`create user ${label}: canonical registration response invalid`)
+  }
   created.push({ id, email })
   return { id, email, password }
 }
