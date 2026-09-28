@@ -83,3 +83,11 @@ The dedicated current-execution cursor is updated to the exact current `main` SH
 - Minimal source correction committed at `6d574bb56222e0eaf44df663e04eb59535e84be6`: `payload.create({ ..., req: request, context })`.
 - No new authentication subsystem, schema, Worker, D1, queue, transaction model, or Payload core change was introduced.
 - Fresh remote deployment/runtime evidence for this correction is still pending; AUTH-004 remains BLOCKED / NOT_GREEN until the corrected source is deployed through the existing controlled W01 deployment path and the remote lifecycle probe passes.
+
+## 2026-09-28 deployment workflow_run SHA semantics correction
+
+- Controlled W01 deployment run `36420996656` successfully deployed source `6d574bb56222e0eaf44df663e04eb59535e84be6`; its workflow-run `head_sha` was `30bc9030e470e5e8f9a8a43003425c36d6ee1f44` because the deployment is a `workflow_dispatch` against the then-current main branch.
+- AUTH-004 Remote E2E run `36421236449` correctly consumed the updated artifact selector but failed because it incorrectly compared the deployment workflow-run `head_sha` to the artifact name. That comparison confuses workflow trigger revision with the actual deployed `source_sha` input.
+- Minimal CI correction committed at `65c3dd5423f7c841a64a486ca3a960fb4339e376`: derive the deployed source SHA from live `w01-w02-binding-deployment-*` artifacts belonging to the deployment run, require one unambiguous exact SHA, choose the newest duplicate artifact, and record the workflow trigger SHA separately.
+- Re-ran the already successful W01 deployment job `108923397358` to generate a new completion event using the same deployed source. Re-run attempt 2 is currently queued.
+- No business implementation, D1 schema, Worker topology, or Payload core change was introduced by this correction.
