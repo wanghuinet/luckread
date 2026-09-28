@@ -31,3 +31,13 @@ Remote W01 behavior, HTTP E2E, protected-account enumeration resistance, session
 - no runtime rerun;
 - no entity promotion;
 - no Mapping 0 GREEN.
+
+## Fresh local evidence checkpoint — 2026-09-28
+
+- Local lifecycle evidence: `EVD-AUTH004-B11-NATIVE-LOCAL-LIFECYCLE-002`.
+- Exact source SHA: `1c7010b33ac8941293ab919413b1348df0593ee0`.
+- Actions run: `36411953998`; job `108894001186`; artifact `10964656503`.
+- Verified locally: password-change old credential rejection, changed-password acceptance, two prior native sessions revoked, post-reset session invalidation, reset-token replay rejection, expired-token rejection, and no secret emission.
+- Prior B09 3.87.1 local evidence remains preserved as historical and is marked `SUPERSEDED`; no historical result was rewritten.
+
+Promotion boundary remains unchanged: remote W01 behavior, HTTP E2E, protected-account enumeration resistance, lifecycle-event evidence, and final Mapping 0 admission remain blocked.
