@@ -1,16 +1,16 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "5c9d5cd22f478890089b9e01769a99550d114a80",
-  "backupBranch": "backup/main-before-auth004-cursor-sourcehead-reconcile-20260928-2235",
+  "sourceHead": "0913eb83e02bcee24efab93d3295891c4b2e3966",
+  "backupBranch": "backup/pre-w02-physical-deploy-cursor-reconcile-20260929",
   "currentCursor": {
-    "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
-    "state": "AUTH013_TRANSPORT_SOURCE_UNIT_VERIFIED_AUTH004_W02_PHYSICAL_DEPLOYMENT_GATE",
-    "objective": "Close independently authorized modules while resolving the current W02 physical runtime gate. AUTH-004 W01 source is deployed and login succeeds, but both AUTH-002 and AUTH-004 independently fail at GET /api/users/me with HTTP 401 on the same W01 source.",
-    "authoritativeControl": "docs/change-control/CC-AUTH-004-PAYLOAD-VERSION-ALIGNMENT-2026-09-28.md",
-    "nextGate": "Deploy exact current W02 source 5c9d5cd22f478890089b9e01769a99550d114a80 with the controlled W02 Identity Authorization Deploy workflow. Then rerun the failed AUTH-002 and AUTH-004 remote evidence jobs against the already-deployed W01 source 26a5a761c88a6bdb96ea353a30b609d3db300f31.",
+    "id": "AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001",
+    "state": "BLOCKED_EXTERNAL_DEPLOYMENT",
+    "objective": "Close the current W02 physical deployment gate, then deploy the current W01/W02 binding source and execute AUTH-004 remote lifecycle evidence.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-E6-W02-DEPLOYMENT-TRANSPORT-DECISION-2026-09-22.md",
+    "nextGate": "1) Dispatch `.github/workflows/w02-deploy.yml` with source_sha=5c9d5cd22f478890089b9e01769a99550d114a80 and confirm=DEPLOY. 2) Dispatch `.github/workflows/w01-w02-binding-deploy.yml` with source_sha=0913eb83e02bcee24efab93d3295891c4b2e3966 and confirm=DEPLOY_BINDING. 3) Execute AUTH-004 Remote E2E against the admitted deployment. AUTH-002 Remote Runtime Evidence run 36451907916 is PASS and must not be rerun unchanged.",
     "logicalOwnership": "W01 -> AUTH-004 Payload-native authority CLOSED",
-    "physicalBinding": "W01 luckread-w01-payload / W02_AUTH -> luckread-w02. W01 exact deployed source is 26a5a761c88a6bdb96ea353a30b609d3db300f31 (deployment run 36446769904). Current W02 physical deployment is not admitted at current session-runtime source; latest explicit repository W02 deployment evidence is older than the session validation transport added in source history.",
+    "physicalBinding": "W01 luckread-w01-payload / W02_AUTH -> luckread-w02. W01 admitted application source remains 26a5a761c88a6bdb96ea353a30b609d3db300f31 (run 36446769904). W02 physical deployment at current W02 source 5c9d5cd22f478890089b9e01769a99550d114a80 remains unadmitted. After W02 admission, the binding deployment must use current main 0913eb83e02bcee24efab93d3295891c4b2e3966 so the W01 PBKDF2 compatibility correction is actually deployed before AUTH-004 E2E.",
     "physicalRuntimeTarget": "W01 luckread-w01-payload / D1-01 luckread",
     "supersededBlockers": [
       "Payload 3.87.1 version-alignment gap is superseded by the merged 3.90.2 dependency baseline and successful W01 deployment run 36418911699.",
@@ -22,9 +22,10 @@
       "Upstream Payload issue #18274 remains OPEN / needs-triage; no stable Payload 3.x release after 3.90.2 is available with an admitted fix at this checkpoint.",
       "Remote E2E run 36444965855 reached /auth/login successfully but /api/users/me rejected the W01-issued access token because the adapter-generated JWT omitted Payload 3.90.2 protected-header authVersion=1; corrected by switching the adapter to Payload's exported native jwtSign().",
       "AUTH-002 remote run 36447031793 and AUTH-004 remote run 36447031539 both independently reached the same W01 source 26a5a761c88a6bdb96ea353a30b609d3db300f31 and failed at GET /api/users/me with HTTP 401 before lifecycle assertions. Native Payload login itself returned HTTP 200. This moves the active gate from W01 JWT-format debugging to W02 physical deployment/version admission.",
-      "Repository source history shows W02 authoritative session establishment transport was added in 2d9fa36..., while the authoritative session validation transport was added later in 867129c... and token-version validation in 19b99d.... The repository's explicit W02 deployment evidence currently recorded in the closure packet is older (source 0c0c250f...), so current W02 physical version must be deployment-admitted before further W01 changes."
+      "Repository source history shows W02 authoritative session establishment transport was added in 2d9fa36..., while the authoritative session validation transport was added later in 867129c... and token-version validation in 19b99d.... The repository's explicit W02 deployment evidence currently recorded in the closure packet is older (source 0c0c250f...), so current W02 physical version must be deployment-admitted before further W01 changes.",
+      "AUTH-002 remote evidence run 36451907916 completed SUCCESS at tested W01 source 26a5a761c88a6bdb96ea353a30b609d3db300f31 after the 3.90.2 validator/idempotent-concurrent-logout evidence corrections. Do not rerun it unchanged."
     ],
-    "sourceHead": "5c9d5cd22f478890089b9e01769a99550d114a80"
+    "sourceHead": "0913eb83e02bcee24efab93d3295891c4b2e3966"
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -190,7 +191,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced by governance-only reconciliation after a fresh Payload/Cloudflare upstream recheck. No application runtime source changed; AUTH-004 remains externally blocked by the observed PBKDF2 compatibility issue.",
-    "currentMainSha": "db72a9cd5693c7cd0b74cd25fb43341bbff1d098",
+    "currentMainSha": "0913eb83e02bcee24efab93d3295891c4b2e3966",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
     "payloadWireCompatibilityStatus": "AUTH004_REMOTE_RUNTIME_BLOCKED_PBKDF2_COMPATIBILITY",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -198,22 +199,23 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "db72a9cd5693c7cd0b74cd25fb43341bbff1d098",
-    "governanceHeadDisposition": "AUTH-004 Worker PBKDF2 platform-ceiling compatibility was admitted and implemented at W01 payload configuration boundary. Fresh deployment is required before runtime evidence is admissible.",
+    "actualGitMainHead": "0913eb83e02bcee24efab93d3295891c4b2e3966",
+    "governanceHeadDisposition": "AUTH-002 runtime evidence gate is PASS on run 36451907916; current main 0913 contains only evidence-governance corrections after W02 source 5c9d, while W02 physical deployment remains unadmitted and current W01 runtime changes require a fresh binding deployment before AUTH-004 E2E.",
     "reviewedAt": "2026-09-28",
     "implementationEvidenceSourceHead": "6d574bb56222e0eaf44df663e04eb59535e84be6",
     "latestGovernanceCommit": "0bd1fde03b2f2966092585b98f2d3e46cbd6d846"
   },
-  "nextGate": "AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY",
+  "nextGate": "AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001 / BLOCKED_EXTERNAL_DEPLOYMENT",
   "latestControlGate": {
-    "workflow": ".github/workflows/auth-002-e5-remote-migration-execution.yml",
-    "runId": "35552919573",
-    "headSha": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
-    "conclusion": "VERIFIED_HISTORICAL_TECHNICAL_EXECUTION",
+    "workflow": ".github/workflows/auth-002-remote-runtime-evidence.yml",
+    "runId": 36451907916,
+    "headSha": "0913eb83e02bcee24efab93d3295891c4b2e3966",
+    "testedApplicationSourceSha": "26a5a761c88a6bdb96ea353a30b609d3db300f31",
+    "conclusion": "PASS_VERIFIED_RUNTIME_EVIDENCE",
     "failedStep": null,
-    "meaning": "Historical E5 execution is verified as technical execution evidence. It was not authorized at the time and is not retroactively authorized.",
+    "meaning": "The remote evidence package validator passed after current 3.90.2 evidence-governance corrections. This closes the evidence-validation gate only; it does not prove current-main Worker deployment.",
     "productionAuthorization": "NO_NEW_PRODUCTION_DEPLOYMENT",
-    "evidenceBoundary": "Do not reapply the already-executed migration. The remaining gate is final Evidence Registry / Mapping 0 / entity admission."
+    "evidenceBoundary": "Do not rerun AUTH-002 unchanged. Proceed to W02 physical deployment admission, then current-source binding deployment and AUTH-004 E2E."
   },
   "runtimeEvidenceAdmission": {
     "status": "PASS_VERIFIED",
@@ -283,9 +285,9 @@
     "capabilityFinding": "Payload native AUTH-004 capability is contractually aligned to 3.90.2, but the native password hashing implementation is incompatible with Cloudflare Workers production because it requests 600000 PBKDF2 iterations.",
     "implementationDisposition": "AUTH004_W01_SOURCE_DEPLOYED_W02_PHYSICAL_DEPLOYMENT_ADMISSION_PENDING",
     "staleEvidenceCorrection": "The 3.87.1 cursor is historical and superseded by 3.90.2; the new blocker is external runtime compatibility, not a version-alignment gap.",
-    "currentMainSha": "5c9d5cd22f478890089b9e01769a99550d114a80",
+    "currentMainSha": "0913eb83e02bcee24efab93d3295891c4b2e3966",
     "implementationSourceSha": "26a5a761c88a6bdb96ea353a30b609d3db300f31",
-    "currentSourceHead": "5c9d5cd22f478890089b9e01769a99550d114a80",
+    "currentSourceHead": "0913eb83e02bcee24efab93d3295891c4b2e3966",
     "evidenceAdmission": {
       "runId": "36431940464",
       "jobId": "108959464320",
@@ -317,7 +319,7 @@
       ],
       "productionDeployment": false
     },
-    "governanceHeadDisposition": "W01 exact source 26a5 is deployed. AUTH-002/AUTH-004 common /me 401 now requires current W02 physical deployment admission before any additional W01 implementation change."
+    "governanceHeadDisposition": "W02 physical deployment admission remains pending. W01 latest admitted deployment is 26a5; current main 0913 must be freshly deployed through the controlled W01/W02 binding workflow before AUTH-004 runtime evidence."
   },
   "devTestPolicy": {
     "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
