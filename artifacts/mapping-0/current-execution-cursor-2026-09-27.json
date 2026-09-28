@@ -1,16 +1,16 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "db72a9cd5693c7cd0b74cd25fb43341bbff1d098",
+  "sourceHead": "26a5a761c88a6bdb96ea353a30b609d3db300f31",
   "backupBranch": "backup/main-before-auth004-cursor-sourcehead-reconcile-20260928-2235",
   "currentCursor": {
     "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
     "state": "AUTH013_TRANSPORT_SOURCE_UNIT_VERIFIED_REMOTE_E2E_PENDING",
     "objective": "Close independently authorized modules while AUTH-004 remains externally blocked. AUTH-013 source implementation is verified; remaining focused gate is public remote transport evidence.",
     "authoritativeControl": "docs/change-control/CC-AUTH-004-PAYLOAD-VERSION-ALIGNMENT-2026-09-28.md",
-    "nextGate": "Dispatch W01/W02 Auth Binding Deploy for source db72a9cd5693c7cd0b74cd25fb43341bbff1d098, then consume the resulting AUTH-004 Remote E2E. Do not reuse the prior 6d574bb56222e0eaf44df663e04eb59535e84be6 deployment as evidence for this fix.",
+    "nextGate": "Dispatch W01/W02 Auth Binding Deploy for exact source 26a5a761c88a6bdb96ea353a30b609d3db300f31, then consume the resulting AUTH-004 Remote E2E. Do not reuse prior deployment evidence.",
     "logicalOwnership": "W01 -> AUTH-004 Payload-native authority CLOSED",
-    "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding — deployed application source remains 6d574bb56222e0eaf44df663e04eb59535e84be6 until a new workflow_dispatch deploys db72a9cd5693c7cd0b74cd25fb43341bbff1d098.",
+    "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding — latest application deployment evidence is run 36444678534 for source 0a2e73d363ee63f3a3eeba1d287bb9b59c927cd0; source 26a5a761c88a6bdb96ea353a30b609d3db300f31 is not yet deployment-admitted.",
     "physicalRuntimeTarget": "W01 luckread-w01-payload / D1-01 luckread",
     "supersededBlockers": [
       "Payload 3.87.1 version-alignment gap is superseded by the merged 3.90.2 dependency baseline and successful W01 deployment run 36418911699.",
@@ -19,9 +19,10 @@
       "The remaining feature-level runtime gap is controlled remote HTTP/E2E evidence, including remote session invalidation and protected-account enumeration resistance.",
       "Global Evidence Registry and Mapping 0 remain NOT_GREEN; no promotion is inferred from build/deploy success.",
       "Remote E2E run 36426287424 reached the real Worker and failed before AUTH-004 lifecycle assertions because Payload native PBKDF2 requests 600000 iterations and Cloudflare Workers rejects counts above 100000.",
-      "Upstream Payload issue #18274 remains OPEN / needs-triage; no stable Payload 3.x release after 3.90.2 is available with an admitted fix at this checkpoint."
+      "Upstream Payload issue #18274 remains OPEN / needs-triage; no stable Payload 3.x release after 3.90.2 is available with an admitted fix at this checkpoint.",
+      "Remote E2E run 36444965855 reached /auth/login successfully but /api/users/me rejected the W01-issued access token because the adapter-generated JWT omitted Payload 3.90.2 protected-header authVersion=1; corrected by switching the adapter to Payload's exported native jwtSign()."
     ],
-    "sourceHead": "db72a9cd5693c7cd0b74cd25fb43341bbff1d098"
+    "sourceHead": "26a5a761c88a6bdb96ea353a30b609d3db300f31"
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -278,11 +279,11 @@
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.90.2",
     "capabilityFinding": "Payload native AUTH-004 capability is contractually aligned to 3.90.2, but the native password hashing implementation is incompatible with Cloudflare Workers production because it requests 600000 PBKDF2 iterations.",
-    "implementationDisposition": "AUTH004_PBKDF2_WORKER_COMPAT_MERGED_DEPLOYMENT_PENDING",
+    "implementationDisposition": "AUTH004_PBKDF2_WORKER_COMPAT_AND_PAYLOAD_NATIVE_JWT_ADAPTER_MERGED_DEPLOYMENT_PENDING",
     "staleEvidenceCorrection": "The 3.87.1 cursor is historical and superseded by 3.90.2; the new blocker is external runtime compatibility, not a version-alignment gap.",
-    "currentMainSha": "db72a9cd5693c7cd0b74cd25fb43341bbff1d098",
-    "implementationSourceSha": "6d574bb56222e0eaf44df663e04eb59535e84be6",
-    "currentSourceHead": "0bd1fde03b2f2966092585b98f2d3e46cbd6d846",
+    "currentMainSha": "26a5a761c88a6bdb96ea353a30b609d3db300f31",
+    "implementationSourceSha": "26a5a761c88a6bdb96ea353a30b609d3db300f31",
+    "currentSourceHead": "26a5a761c88a6bdb96ea353a30b609d3db300f31",
     "evidenceAdmission": {
       "runId": "36431940464",
       "jobId": "108959464320",
@@ -313,7 +314,8 @@
         "provenance.json"
       ],
       "productionDeployment": false
-    }
+    },
+    "governanceHeadDisposition": "AUTH-004 W01 compatibility shim and Payload-native JWT signing adapter are merged; fresh deployment is required before runtime evidence is admissible."
   },
   "devTestPolicy": {
     "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
