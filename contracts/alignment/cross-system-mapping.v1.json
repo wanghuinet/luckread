@@ -174,7 +174,7 @@
       ],
       "blockers": [
         "Controlled remote W01 behavior and HTTP E2E evidence remain missing",
-        "Protected-account enumeration resistance and session invalidation evidence remain missing",
+        "Protected-account enumeration resistance and controlled remote session invalidation evidence remain missing",
         "Lifecycle event evidence remains missing",
         "Final Evidence Registry / Mapping 0 admission remains NOT_GREEN"
       ]
