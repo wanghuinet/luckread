@@ -65,3 +65,12 @@ The dedicated current-execution cursor is updated to the exact current `main` SH
 - The deployment remains bound to implementation source 39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20.
 - No database migration is part of this deployment workflow.
 - No AUTH-004 Remote E2E result is admitted yet.
+
+## 2026-09-28 remote E2E provenance-selector correction
+
+- W01/W02 binding deployment run 36418911699 attempt 2 completed successfully against implementation source 39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20.
+- AUTH-004 Remote E2E run 36419964835 failed before the probe executed because the deployment provenance gate required exactly one live artifact while the controlled deployment rerun legitimately produced two live exact-SHA artifacts with the same artifact name.
+- The failure was a CI/provenance selector defect, not a Payload runtime, Worker deployment, migration, or AUTH-004 business-behavior failure.
+- Minimal correction committed at 7cd8c34e839db53a9798c64b8fa99a2ebeffa5bd: select live deployment artifacts by exact deployment SHA, require at least one, and deterministically use the newest matching artifact while recording ignored duplicate count.
+- A fresh controlled rerun of the same W01 deployment job has been started as attempt 3 solely to generate a new successful workflow_run event for the corrected Remote E2E workflow. No new business implementation or schema change was introduced.
+- AUTH-004 remains BLOCKED / NOT_GREEN until the corrected Remote E2E actually executes and produces admissible lifecycle evidence.
