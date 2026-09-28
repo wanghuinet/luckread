@@ -267,12 +267,18 @@ jobs:
         run: |
           set +e
           cat > /tmp/auth013-cleanup.sql <<SQL
-          DELETE FROM auth_013_publication_journal WHERE resource_id IN ('${AUTH013_BASIC_USER_ID}','${AUTH013_OPERATOR_USER_ID}');
+          DELETE FROM auth_013_publication_journal
+          WHERE resource_id IN (
+            SELECT CAST(id AS TEXT) FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}')
+          );
           DELETE FROM auth_session_state WHERE session_id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}');
           DELETE FROM users_sessions WHERE id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}');
           DELETE FROM role_assignments WHERE id IN ('${AUTH013_BASIC_ROLE_ID}','${AUTH013_OPERATOR_ROLE_ID}');
-          DELETE FROM role_authorization_versions WHERE subject_id IN ('${AUTH013_BASIC_USER_ID}','${AUTH013_OPERATOR_USER_ID}');
-          DELETE FROM users WHERE id IN (${AUTH013_BASIC_USER_ID},${AUTH013_OPERATOR_USER_ID});
+          DELETE FROM role_authorization_versions
+          WHERE subject_id IN (
+            SELECT CAST(id AS TEXT) FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}')
+          );
+          DELETE FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}');
           SQL
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --file=/tmp/auth013-cleanup.sql
 
@@ -284,11 +290,13 @@ jobs:
         run: |
           set -euo pipefail
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W01-payload/wrangler.jsonc             --command "SELECT
-              (SELECT COUNT(*) FROM users WHERE id IN (${AUTH013_BASIC_USER_ID},${AUTH013_OPERATOR_USER_ID})) AS users_remaining,
+              (SELECT COUNT(*) FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}')) AS users_remaining,
               (SELECT COUNT(*) FROM users_sessions WHERE id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}')) AS sessions_remaining,
               (SELECT COUNT(*) FROM auth_session_state WHERE session_id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}')) AS extensions_remaining,
               (SELECT COUNT(*) FROM role_assignments WHERE id IN ('${AUTH013_BASIC_ROLE_ID}','${AUTH013_OPERATOR_ROLE_ID}')) AS roles_remaining,
-              (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id IN ('${AUTH013_BASIC_USER_ID}','${AUTH013_OPERATOR_USER_ID}')) AS journals_remaining" > /tmp/auth013-cleanup-check.json
+              (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id IN (
+                SELECT CAST(id AS TEXT) FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}')
+              )) AS journals_remaining" > /tmp/auth013-cleanup-check.json
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs'
           const raw = JSON.parse(readFileSync('/tmp/auth013-cleanup-check.json', 'utf8'))
