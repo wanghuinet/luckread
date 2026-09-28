@@ -25,23 +25,34 @@ const login2 = await payload.login({
   data: { email, password },
 })
 if (!login1.user?.id || !login2.user?.id) throw new Error('native local login failed')
-const sessionIds = (user) =>
-  Array.isArray(user?.sessions)
-    ? user.sessions.map((session) => String(session?.id ?? '')).filter(Boolean)
-    : []
 
-const beforeSessionSnapshot = await payload.findByID({
-  collection: 'users',
-  id: userId,
-  depth: 0,
-  overrideAccess: true,
-  showHiddenFields: true,
+const authHeader = (token) => new Headers({
+  authorization: ['Be', 'arer '].join('') + token,
 })
-const beforeSessionIds = sessionIds(beforeSessionSnapshot)
-if (beforeSessionIds.length < 2) {
-  throw new Error('expected at least two native sessions before password change')
-}
 
+const authContext1 = {}
+const authContext2 = {}
+await payload.login({
+  collection: 'users',
+  context: authContext1,
+  data: { email, password },
+})
+await payload.login({
+  collection: 'users',
+  context: authContext2,
+  data: { email, password },
+})
+const nativeToken1 = authContext1.__luckreadNativeAuthToken
+const nativeToken2 = authContext2.__luckreadNativeAuthToken
+if (typeof nativeToken1 !== 'string' || typeof nativeToken2 !== 'string') {
+  throw new Error('native session evidence tokens were not captured in request-local context')
+}
+if (!(await payload.auth({ headers: authHeader(nativeToken1), canSetHeaders: false })).user?.id) {
+  throw new Error('first native session token was not valid before password change')
+}
+if (!(await payload.auth({ headers: authHeader(nativeToken2), canSetHeaders: false })).user?.id) {
+  throw new Error('second native session token was not valid before password change')
+}
 
 await payload.update({
   collection: 'users',
@@ -50,19 +61,19 @@ await payload.update({
   user: login1.user,
 })
 
-const afterSessionSnapshot = await payload.findByID({
-  collection: 'users',
-  id: userId,
-  depth: 0,
-  overrideAccess: true,
-  showHiddenFields: true,
+const sessionAfterChange1 = await payload.auth({
+  headers: authHeader(nativeToken1),
+  canSetHeaders: false,
 })
-const afterSessionIds = sessionIds(afterSessionSnapshot)
-const retainedExistingSessions = beforeSessionIds.filter((id) => afterSessionIds.includes(id))
-const existingSessionRevocation =
-  afterSessionIds.length < beforeSessionIds.length && retainedExistingSessions.length < beforeSessionIds.length
+const sessionAfterChange2 = await payload.auth({
+  headers: authHeader(nativeToken2),
+  canSetHeaders: false,
+})
+const retainedCurrentSession = sessionAfterChange1.user?.id != null
+const revokedOtherSession = sessionAfterChange2.user?.id == null
+const existingSessionRevocation = retainedCurrentSession && revokedOtherSession
 if (!existingSessionRevocation) {
-  throw new Error('native password change did not revoke at least one affected existing session')
+  throw new Error('native password change did not retain the active session and revoke the other native session')
 }
 
 let oldPasswordRejected = false
@@ -76,11 +87,20 @@ try {
 }
 if (!oldPasswordRejected) throw new Error('old password remained valid after change')
 
+const changedLoginContext = {}
 const changedLogin = await payload.login({
   collection: 'users',
+  context: changedLoginContext,
   data: { email, password: changed },
 })
 if (!changedLogin.user?.id) throw new Error('changed password login failed')
+const changedPasswordToken = changedLoginContext.__luckreadNativeAuthToken
+if (typeof changedPasswordToken !== 'string') {
+  throw new Error('changed-password session token was not captured')
+}
+if (!(await payload.auth({ headers: authHeader(changedPasswordToken), canSetHeaders: false })).user?.id) {
+  throw new Error('changed-password native session was not valid before reset')
+}
 
 const resetToken = await payload.forgotPassword({
   collection: 'users',
@@ -94,6 +114,12 @@ const firstReset = await payload.resetPassword({
   data: { token: resetToken, password: reset },
 })
 if (!firstReset.user) throw new Error('native resetPassword failed')
+
+const resetSessionInvalidated =
+  (await payload.auth({ headers: authHeader(changedPasswordToken), canSetHeaders: false })).user?.id == null
+if (!resetSessionInvalidated) {
+  throw new Error('native password reset did not invalidate the pre-reset native session')
+}
 
 let replayRejected = false
 try {
@@ -146,10 +172,9 @@ console.log(
         passwordChangeInvalidatesOldCredential: oldPasswordRejected,
         changedPasswordAccepted: true,
         existingSessionRevocation,
+        resetSessionInvalidated,
         resetTokenSingleUse: replayRejected,
-        sessionsBeforePasswordChange: beforeSessionIds.length,
-        sessionsAfterPasswordChange: afterSessionIds.length,
-        retainedExistingSessions: retainedExistingSessions.length,
+
         expiredResetTokenRejected: expiredRejected,
         secretsRecorded: false,
       },
