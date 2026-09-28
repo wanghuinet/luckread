@@ -238,6 +238,8 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Native registration persistence intent is unavailable')
   }
 
+  const consentRecordId = crypto.randomUUID()
+  const envelopeId = crypto.randomUUID()
   const statements: D1PreparedStatement[] = []
 
   if (existing && isExpired(existing.expiresAt, now)) {
@@ -334,7 +336,7 @@ export async function POST(request: Request): Promise<Response> {
         `,
       )
       .bind(
-        crypto.randomUUID(),
+        consentRecordId,
         String(userData.email),
         String(userData.username),
         String(userData.email),
@@ -346,9 +348,6 @@ export async function POST(request: Request): Promise<Response> {
         policy.sourceAuthority,
       ),
   )
-
-  const consentRecordId =
-    (statements[statements.length - 1] as D1PreparedStatement & { __consentRecordId?: string }).__consentRecordId
 
   const committedResponseSql = `
     '{"userId":"' ||
@@ -377,7 +376,7 @@ export async function POST(request: Request): Promise<Response> {
         `,
       )
       .bind(
-        crypto.randomUUID(),
+        envelopeId,
         idempotencyKey,
         idempotencyKey,
         SCOPE,
@@ -397,11 +396,11 @@ export async function POST(request: Request): Promise<Response> {
         `
           SELECT committed_response
           FROM auth_registration_envelopes
-          WHERE id = (SELECT id FROM auth_registration_envelopes WHERE idempotency_key = ? AND active_key = ? ORDER BY created_at DESC LIMIT 1)
+          WHERE id = ?
           LIMIT 1
         `,
       )
-      .bind(idempotencyKey, idempotencyKey),
+      .bind(envelopeId),
   )
 
   try {
