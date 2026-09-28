@@ -61,6 +61,7 @@
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
+        "artifacts/mapping-0/auth-002-historical-migration-evidence-admission-2026-09-28.json",
         "artifacts/mapping-0/auth-002-remote-baseline-evidence-2026-09-20.json",
         "contracts/alignment/mapping-batches/AUTH-002-003-batch-closure-gate.v1.md",
         "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
@@ -72,11 +73,10 @@
         "contracts/entity/AUTH-002-006-canonical-field-authority.v1.json",
         "contracts/entity/AUTH-002-session-field-contract.v1.json",
         "docs/change-control/CC-MAPPING-0-AUTH-002-EVIDENCE-RECONCILIATION-2026-09-28.md",
-        "https://github.com/wanghuinet/luckread/actions/runs/36217784262",
-        "https://github.com/wanghuinet/luckread/actions/runs/36219132123",
-        "artifacts/mapping-0/auth-002-historical-migration-evidence-admission-2026-09-28.json",
         "docs/change-control/CC-MAPPING-0-AUTH-002-HISTORICAL-MIGRATION-EVIDENCE-ADMISSION-2026-09-28.md",
-        "https://github.com/wanghuinet/luckread/actions/runs/35552919573/artifacts/10618729380"
+        "https://github.com/wanghuinet/luckread/actions/runs/35552919573/artifacts/10618729380",
+        "https://github.com/wanghuinet/luckread/actions/runs/36217784262",
+        "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
       ],
       "blockers": [
         "ENT-SESSION catalog promotion remains blocked even though Gate-1, native runtime, security, concurrency and extension-correlation evidence are VERIFIED.",
