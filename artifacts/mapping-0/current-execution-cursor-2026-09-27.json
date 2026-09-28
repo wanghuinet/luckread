@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "3395da99d8bb596faa706c33d1a4ef6467557780",
-  "backupBranch": "backup/main-before-mapping0-cursor-reconcile-20260928-v2",
+  "sourceHead": "9d8d2a43e758ff72018de1158f1b13fca12167bf",
+  "backupBranch": "backup/main-before-mapping0-cursor-reconcile-20260928-v3",
   "currentCursor": {
     "id": "AUTH-002-SESSION-MIGRATION-EVIDENCE-CLOSURE",
-    "state": "PRIV004_AUTHORITY_CLOSED_AUTH001_AUTH003_AUTH002_EVIDENCE_ADMITTED_FINAL_MAPPING_BLOCKED",
+    "state": "FINAL_MAPPING0_ENTITY_ADMISSION_BLOCKED",
     "objective": "Preserve all admitted PRIV-004, AUTH-001, AUTH-003 and AUTH-002 executable evidence while executing the final Evidence Registry / Mapping 0 / entity-promotion gate without promoting blocked global state.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-EVIDENCE-RECONCILIATION-2026-09-28.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "Final Evidence Registry / Mapping 0 / entity promotion checks. Canonical Mapping 0 and Five-Way remain NOT_GREEN; no global promotion is inferred.",
+    "nextGate": "Final Evidence Registry / Mapping 0 / entity promotion checks. AUTH-001 consistency is admitted and exact-SHA W02 materializer evidence is admitted; global Mapping 0 / Five-Way remain NOT_GREEN and no global promotion is inferred.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -21,7 +21,8 @@
       "Global Evidence Registry remains NOT_GREEN.",
       "Canonical Mapping 0 remains NOT_GREEN; no promotion is inferred.",
       "Migration file byte identity was confirmed, but the migration index changed after the historical E5 execution; no current-contract source-equivalence exception exists.",
-      "AUTH-002 migration execution evidence is now technically VERIFIED as EVD-AUTH002-B27-MIGRATION-EXECUTION-HISTORICAL-001; no re-execution or retroactive authorization is permitted."
+      "AUTH-002 migration execution evidence is now technically VERIFIED as EVD-AUTH002-B27-MIGRATION-EXECUTION-HISTORICAL-001; no re-execution or retroactive authorization is permitted.",
+      "AUTH-001 eventual-consistency model is admitted; exact-SHA W02 registration materializer evidence is PASS_VERIFIED."
     ],
     "alreadyClosed": {
       "auth003Wire": true,
@@ -45,7 +46,8 @@
       "auth002Security": "36219132123",
       "auth002Concurrency": "36219132123",
       "auth002ExtensionCorrelation": "36219132123",
-      "auth002MigrationExecutionEvidence": "35552919573"
+      "auth002MigrationExecutionEvidence": "35552919573",
+      "auth001EventualConsistency": true
     }
   },
   "alreadyClosed": {
@@ -103,7 +105,7 @@
     "Do not reapply the already-executed AUTH-002 E5 migration without a new explicit Change Control and controlled execution admission.",
     "Do not promote AUTH-002 or ENT-SESSION from runtime evidence alone; migration execution and final Mapping 0 admission remain required."
   ],
-  "previousSourceHead": "b6004470b5c9d63e66fbc7214a99621d1da401eb",
+  "previousSourceHead": "3395da99d8bb596faa706c33d1a4ef6467557780",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
@@ -207,8 +209,8 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Current GitHub main is now ec552c2047a6fb1eb7fd7e21efda7a3562b5c036 after PR #157 plus the automated mapping evidence-ref reconciliation. The intervening change is governance/evidence-only and does not alter Worker/D1/runtime implementation for the current gate.",
-    "currentMainSha": "ec552c2047a6fb1eb7fd7e21efda7a3562b5c036",
+    "reason": "Main advanced through PR #158–#161 with governance/evidence reconciliations only for the current gate; no Worker/D1/runtime implementation scope changed by those merges.",
+    "currentMainSha": "9d8d2a43e758ff72018de1158f1b13fca12167bf",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_RUNTIME_VERIFIED_DEV_ONLY_PRODUCTION_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -216,7 +218,7 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "ec552c2047a6fb1eb7fd7e21efda7a3562b5c036",
+    "actualGitMainHead": "9d8d2a43e758ff72018de1158f1b13fca12167bf",
     "governanceHeadDisposition": "PR #154, #155, #156 and #157 plus the subsequent evidence-ref reconciliation are governance/evidence changes only for the current gate. The relevant implementation/runtime evidence scopes remain unchanged and must not be rerun solely because main advanced."
   },
   "nextGate": "Final Evidence Registry / Mapping 0 / entity promotion checks. AUTH-002 migration execution evidence is closed; no production deployment is authorized by this cursor.",
@@ -260,7 +262,7 @@
       "ENT-IDENTITY",
       "ENT-CREDENTIAL"
     ],
-    "reason": "ENT-CREDENTIAL remains evidenced but not promoted. ENT-IDENTITY remains blocked. AUTH-001 requires explicit identity-type/native-auth reconciliation before implementation.",
+    "reason": "ENT-IDENTITY and ENT-CREDENTIAL have admitted implementation/runtime evidence, but canonical entity catalog promotion remains blocked by global Evidence Registry / Mapping 0 / Five-Way NOT_GREEN. AUTH-001 identity-type/native-auth reconciliation and eventual-consistency decision are closed; no implementation or promotion is inferred from them.",
     "evidenceRegistryStatus": "NOT_GREEN",
     "fiveWayStatus": "NOT_GREEN"
   },
@@ -291,8 +293,8 @@
     ".github/workflows/priv004-policy-instance-admission.yml"
   ],
   "currentSourceReconciliation": {
-    "reviewedAt": "2026-09-27",
-    "mainSha": "75d30eeeeedf09ee6a9d08de2a2345cf85edee26",
+    "reviewedAt": "2026-09-28",
+    "mainSha": "9d8d2a43e758ff72018de1158f1b13fca12167bf",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
@@ -377,7 +379,7 @@
     ],
     "evidenceRegistryId": "EVD-AUTH001-W02-MATERIALIZER-RUNTIME-REMOTE-001",
     "productionDeployment": "BLOCKED",
-    "currentMainAfterMerge": "e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd"
+    "currentMainAfterMerge": "9d8d2a43e758ff72018de1158f1b13fca12167bf"
   },
   "productionPolicyAuthority": {
     "status": "ADMITTED_ENGINEERING_PRODUCTION_AUTHORITY",
