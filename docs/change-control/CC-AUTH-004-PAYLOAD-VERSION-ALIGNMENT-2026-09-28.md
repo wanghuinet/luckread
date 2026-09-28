@@ -64,3 +64,7 @@ backup/main-before-auth004-payload-version-alignment-20260928
 ## 2026-09-28 Execution checkpoint
 
 The pre-upgrade Payload 3.87.1 schema snapshot was generated successfully in controlled CI run `36410882875` and is now queued for authoritative W01 migration-baseline restoration. The snapshot itself is not runtime evidence and will not be admitted as GREEN.
+
+## 2026-09-28 Migration diff checkpoint
+
+With the authoritative pre-upgrade snapshot now committed, the next executable gate is a Payload 3.90.2 native migration diff review. No migration application or GREEN admission is implied by generation.
