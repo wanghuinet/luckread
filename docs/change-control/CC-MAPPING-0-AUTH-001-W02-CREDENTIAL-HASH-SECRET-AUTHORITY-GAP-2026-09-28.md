@@ -17,10 +17,12 @@
 3. Existing `workers/W02-content/src/credentials/credential-add.ts` requires a runtime `secret` input and derives `value_hash` with HMAC-SHA-256.
 4. The W02 Worker configuration currently declares D1-01 and the existing AUTH-013 queue, but the repository does not contain an admitted W02 credential-HMAC secret binding/name or an authority artifact specifying which secret is used for AUTH-001 materialization.
 5. AUTH-003 migration evidence intentionally performs no credential backfill because no authorized application secret context exists.
+6. The global secret lifecycle contract requires rotation/revocation, while the current AUTH-003 persistence shape has no explicit key-version field or admitted rehash/rotation protocol for `value_hash`.
+7. The current AUTH-003 add implementation derives `value_hash` but the admitted contract does not define how an existing stored hash selects its historical key version during rotation.
 
 ## Consequence
 
-The AUTH-001 W02 materializer cannot safely create the required initial `ENT-CREDENTIAL` rows until the application-secret authority is explicitly admitted.
+The AUTH-001 W02 materializer cannot safely create the required initial `ENT-CREDENTIAL` rows until the application-secret authority is explicitly admitted. In addition, the key lifecycle/rotation semantics must be compatible with the already-admitted `value_hash` persistence shape.
 
 Inventing one of the following by implementation inference is forbidden:
 
@@ -36,7 +38,7 @@ Admit a single W02/D1-01 credential-hash secret authority that defines at minimu
 
 - canonical secret binding/name for the W02 Worker;
 - purpose scope limited to protected AUTH-003 credential hashing;
-- rotation/version semantics compatible with existing hashes;
+- rotation/version semantics compatible with the existing `value_hash` schema, including how old hashes remain verifiable during an overlap window and how retirement is proven safe;
 - runtime failure behavior when the secret is absent;
 - secret non-observability requirements;
 - controlled evidence proving the same secret authority is used by credential Add and AUTH-001 materialization.
@@ -55,4 +57,10 @@ Production secret material itself must never be committed to the repository or i
 
 ## Result
 
-The eventual materialization architecture is closed. The next implementation blocker is now explicitly reduced to one authority question: the W02 application secret/key boundary for `auth_credentials.value_hash`.
+The eventual materialization architecture is closed. The next implementation blocker is now explicitly reduced to the W02 credential-hash key authority **and its rotation-compatible key-version semantics**. No runtime materializer is admitted until both are closed.
+
+## Governing security references
+
+- `docs/169-SECURITY-SECRET-KEY-LIFECYCLE-INCIDENT-CONTRACT-v1.0.md` — secret lifecycle, storage, least privilege, rotation and revocation.
+- `docs/71-PLATFORM-OPERATIONS-GOVERNANCE-RELIABILITY-CONTRACT-v1.0.md` — server-side secret management and operational controls.
+- `contracts/entity/AUTH-003-credential-field-contract.v1.json` — `valueHash` is secret-derived material and schema changes require migration.
