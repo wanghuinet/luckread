@@ -133,6 +133,7 @@ jobs:
         run: |
           set -euo pipefail
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --file=/tmp/auth013-seed.sql
+          echo "AUTH013_FIXTURE_SEEDED=1" >> "$GITHUB_ENV"
 
       - name: Resolve generated Payload user IDs
         env:
@@ -260,7 +261,7 @@ jobs:
           EOF
 
       - name: Cleanup synthetic fixture
-        if: always()
+        if: ${{ always() && env.AUTH013_FIXTURE_SEEDED == '1' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -283,7 +284,7 @@ jobs:
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --file=/tmp/auth013-cleanup.sql
 
       - name: Verify fixture cleanup
-        if: always()
+        if: ${{ always() && env.AUTH013_FIXTURE_SEEDED == '1' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
