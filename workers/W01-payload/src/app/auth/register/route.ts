@@ -250,7 +250,6 @@ export async function POST(request: Request): Promise<Response> {
         event: 'auth.register.native_validation_failure',
         diagnosticCode: 'AUTH001_NATIVE_VALIDATION_FAILURE',
         errorName: error instanceof Error ? error.name : typeof error,
-        errorMessage: error instanceof Error ? error.message : String(error),
       }),
     )
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
