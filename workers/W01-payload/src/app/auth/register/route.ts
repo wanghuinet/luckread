@@ -77,7 +77,7 @@ const isExpired = (expiresAt: string, now: Date) => {
   return !Number.isFinite(value) || value <= now.getTime()
 }
 
-const getExistingEnvelope = async (db: D1Database, idempotencyKey: string): Promise<ExistingEnvelope | null> => {
+const getExistingEnvelope = async (db: D1Binding, idempotencyKey: string): Promise<ExistingEnvelope | null> => {
   return db
     .prepare(
       `
