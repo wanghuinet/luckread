@@ -4,6 +4,27 @@
   "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
   "records": [
     {
+      "featureId": "AUTH-001",
+      "domainId": "D1-01",
+      "entityIds": [
+        "ENT-USER",
+        "ENT-CONSENT",
+        "ENT-IDENTITY",
+        "ENT-CREDENTIAL"
+      ],
+      "persistenceMode": "MIXED",
+      "owner": "D1-01",
+      "status": "BLOCKED",
+      "evidenceRefs": [
+        "contracts/persistence/AUTH-001-registration-envelope-contract.v1.json",
+        "contracts/entity/PRIV-002-consent-field-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-WRITER-BOUNDARY-2026-09-27.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-27.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-ENTITY-PERSISTENCE-REGISTRY-RECONCILIATION-2026-09-28.md",
+        "https://github.com/wanghuinet/luckread/actions/runs/36372326548"
+      ]
+    },
+    {
       "featureId": "AUTH-002",
       "domainId": "D1-01",
       "entityIds": [
