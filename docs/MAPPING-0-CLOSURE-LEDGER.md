@@ -3504,3 +3504,13 @@ This note does not change any Blueprint, Contract, API, DTO, Entity, Field, Work
 - The dedicated execution cursor records this gate checkpoint while preserving the deliberate evidence source boundary at `e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd`; no closed Runtime evidence is rerun.
 - Active next gate remains: first approved `ACCOUNT_REGISTRATION / LEGAL_AUDIT` production PRIV-004 policy instance with explicit version, scope, effective period, deterministic rule, approval and provenance.
 - Backup branch before this governance change: `backup/main-before-priv004-gate-evidence-reconcile-20260928-1525`.
+
+
+## 2026-09-28 — PRIV-004 hardened production gate post-merge checkpoint
+
+- Production-readiness gate hardening was merged to `main` in `c4a8da1ff4eae375a83b0a085cbf0f048e638be1` via PR #147.
+- The hardened production gate then executed on the merged commit as run `36386044044` and returned `FAILURE_EXPECTED_FAIL_CLOSED` at `Validate explicit production admission state`.
+- This confirms the strengthened gate still rejects the unchanged development-only PRIV-004 instance; no production authorization is inferred.
+- The same merged change did not introduce runtime, migration, Worker/D1/Queue topology, retention values, legal conclusions, Evidence Registry promotion, entity promotion, or Mapping 0 GREEN.
+- The Contract Admission CI triggered by the merge remained in progress at this checkpoint; its incomplete execution is not represented as GREEN.
+- Backup branch before this cursor reconciliation: `backup/main-before-priv004-postmerge-cursor-reconcile-20260928-`.

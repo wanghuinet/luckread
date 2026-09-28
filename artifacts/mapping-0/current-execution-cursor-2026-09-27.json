@@ -181,13 +181,13 @@
   "nextGate": "PRIV-004::first approved ACCOUNT_REGISTRATION / LEGAL_AUDIT production policy instance, followed by final Evidence Registry / Mapping 0 promotion checks. No production deployment is authorized.",
   "latestControlGate": {
     "workflow": ".github/workflows/priv004-production-readiness.yml",
-    "runId": "36385607778",
-    "headSha": "af2e6a3256502f32f459f9960bccfc496127ffdc",
+    "runId": "36386044044",
+    "headSha": "c4a8da1ff4eae375a83b0a085cbf0f048e638be1",
     "conclusion": "FAILURE_EXPECTED_FAIL_CLOSED",
     "failedStep": "Validate explicit production admission state",
-    "meaning": "Current development-only PRIV-004 instance is correctly rejected for production use; no production authority is inferred.",
+    "meaning": "Post-merge hardened production gate correctly rejects the unchanged DEVELOPMENT-only PRIV-004 instance for production use.",
     "productionAuthorization": "BLOCKED",
-    "evidenceBoundary": "Control-plane gate result only; does not promote Runtime, Evidence Registry, entities, Mapping 0, or production deployment."
+    "evidenceBoundary": "Control-plane gate result only; no production authority, Runtime promotion, Evidence Registry GREEN, Mapping 0 GREEN, entity promotion or production deployment is inferred."
   },
   "runtimeEvidenceAdmission": {
     "status": "PASS_VERIFIED",
