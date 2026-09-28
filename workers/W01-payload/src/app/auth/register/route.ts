@@ -102,8 +102,30 @@ const getExistingEnvelope = async (db: D1Binding, idempotencyKey: string): Promi
 
 
 const parseReplay = (value: ExistingEnvelope['committedResponse']): RegistrationResponse | null => {
-  if (!value || typeof value.userId !== 'string' || value.accountState !== ACCOUNT_STATE) return null
-  return { userId: value.userId, accountState: ACCOUNT_STATE }
+  if (!value) return null
+
+  let parsed: unknown = value
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value)
+    } catch {
+      return null
+    }
+  }
+
+  if (
+    !parsed ||
+    typeof parsed !== 'object' ||
+    typeof (parsed as { userId?: unknown }).userId !== 'string' ||
+    (parsed as { accountState?: unknown }).accountState !== ACCOUNT_STATE
+  ) {
+    return null
+  }
+
+  return {
+    userId: (parsed as { userId: string }).userId,
+    accountState: ACCOUNT_STATE,
+  }
 }
 
 const isUniqueConstraintError = (error: unknown) => {
