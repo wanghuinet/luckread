@@ -3786,3 +3786,19 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - AUTH-004 is still `NOT_GREEN`: lifecycle-event evidence, final canonical Evidence Registry admission, and full Mapping 0/Five-Way traceability remain open.
 - No remote E2E rerun is required for the same tested scope. Next admissible action is governance/evidence-registry reconciliation against this exact run.
 
+## 2026-09-29 — AUTH-004 remote E2E evidence admitted into canonical Mapping 0 traceability
+
+- Backup before this admission batch: `backup/pre-auth004-registry-admission-20260929-1135`.
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTH-004-REMOTE-E2E-EVIDENCE-ADMISSION-2026-09-29.md`.
+- Canonical Evidence Registry now admits three verified records from the successful remote run `36455724050`: `EVD-AUTH004-B12-REMOTE-HTTP-E2E-001`, `EVD-AUTH004-B12-PROTECTED-ACCOUNT-ENUMERATION-001`, and `EVD-AUTH004-B12-SESSION-LIFECYCLE-REMOTE-001`.
+- The tested application source remains exact SHA `7104cc3d4e29ef62f1ae59d9ed5fcca770a12f0e`; subsequent commits in this batch are evidence/governance-only and do not invalidate the admitted runtime scope.
+- AUTH-004 canonical Mapping is now reduced to the actual remaining blockers: lifecycle-event evidence and final Evidence Registry / Mapping 0 / Five-Way admission. The remote HTTP/E2E, protected-account enumeration and remote session-lifecycle blockers are closed for the tested scope.
+- No runtime source, Contract, D1 schema, Payload version, Worker topology, or entity authority was changed.
+- No previously passed remote E2E is rerun.
+
+### Current continuation cursor
+
+- `NEXT_ITEM_ID: M0-FINAL-EVIDENCE-MAPPING-ENTITY-PROMOTION-001`
+- `NEXT_ITEM_STATE: TODO_FIX`
+- Focus: close only evidence-backed AUTH-004 lifecycle-event traceability and then reconcile the global Mapping 0 / Five-Way gate. Do not reopen completed AUTH-004 runtime/E2E work.
+
