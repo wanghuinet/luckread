@@ -1,4 +1,5 @@
 import fs from 'fs'
+import nodeCrypto from 'crypto'
 import path from 'path'
 import { sqliteD1Adapter } from '@payloadcms/db-d1-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
@@ -33,6 +34,20 @@ const isExplicitRemoteMigration = process.env.PAYLOAD_MIGRATION_REMOTE === 'true
 // process.argv-based detection fails in Next.js page-data collection workers.
 const isWorkerRuntime =
   typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers'
+
+// Cloudflare Workers rejects a single PBKDF2 derivation above 100000 iterations.
+// Payload 3.90.2's native local-auth path requests 600000 iterations. Keep the
+// native Payload auth/session/recovery pipeline intact, but clamp only the Worker
+// runtime crypto primitive to the platform ceiling. This is a compatibility seam,
+// not a second authentication implementation.
+const WORKER_PBKDF2_MAX_ITERATIONS = 100_000
+if (isWorkerRuntime) {
+  const nativePbkdf2 = nodeCrypto.pbkdf2.bind(nodeCrypto)
+  nodeCrypto.pbkdf2 = ((...args: Parameters<typeof nodeCrypto.pbkdf2>) => {
+    args[2] = Math.min(args[2], WORKER_PBKDF2_MAX_ITERATIONS)
+    return nativePbkdf2(...args)
+  }) as typeof nodeCrypto.pbkdf2
+}
 
 const createLog =
   (level: string, fn: typeof console.log) => (objOrMsg: object | string, msg?: string) => {
