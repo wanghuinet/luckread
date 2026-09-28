@@ -170,13 +170,15 @@
         "docs/change-control/CC-AUTH-004-PAYLOAD-NATIVE-ADAPTER-IMPLEMENTATION-ADMISSION-2026-09-28.md",
         "docs/change-control/CC-MAPPING-0-AUTH-004-DTO-REGISTRY-RECONCILIATION-2026-09-28.md",
         "docs/change-control/CC-MAPPING-0-AUTH-004-EVIDENCE-REGISTRY-BINDING-2026-09-28.md",
-        "https://github.com/wanghuinet/luckread/commit/7e9396460136a6ce083db0f600ec04c7829a9c99"
+        "https://github.com/wanghuinet/luckread/commit/7e9396460136a6ce083db0f600ec04c7829a9c99",
+        "contracts/evidence/mapping-0-evidence-registry.v1.json",
+        "EVD-AUTH004-B12-REMOTE-HTTP-E2E-001",
+        "EVD-AUTH004-B12-PROTECTED-ACCOUNT-ENUMERATION-001",
+        "EVD-AUTH004-B12-SESSION-LIFECYCLE-REMOTE-001"
       ],
       "blockers": [
-        "Controlled remote W01 behavior and HTTP E2E evidence remain missing",
-        "Protected-account enumeration resistance and controlled remote session invalidation evidence remain missing",
         "Lifecycle event evidence remains missing",
-        "Final Evidence Registry / Mapping 0 admission remains NOT_GREEN"
+        "Final Evidence Registry / Mapping 0 / Five-Way admission remains NOT_GREEN"
       ]
     },
     {
