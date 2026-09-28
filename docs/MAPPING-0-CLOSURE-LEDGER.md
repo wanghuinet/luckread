@@ -3638,3 +3638,14 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - `NEXT_ITEM_ID: M0-FINAL-EVIDENCE-MAPPING-ENTITY-PROMOTION-001`
 - `NEXT_ITEM_STATE: TODO_FIX`
 - Next required action: close the remaining canonical Mapping 0 / Five-Way blockers in evidence-backed batches, preserving fail-closed promotion and the existing fixed architecture.
+
+## 2026-09-28 — AUTH-004 deployment gate confirmed / stale Remote E2E attempt quarantined
+
+- Backup before this governance-only checkpoint: `backup/main-before-auth004-remote-e2e-gate-sync-20260928-2054`.
+- The existing W01/W02 deployment job `108931274751` completed successfully for the admitted Payload-native AUTH-004 source `6d574bb56222e0eaf44df663e04eb59535e84be6`; deployment artifact `10970425702` was finalized under deployment run `36420996656`.
+- This closes the external deployment prerequisite only. It does not constitute AUTH-004 remote HTTP/E2E lifecycle evidence.
+- Remote E2E run `36423592893` is retained as a failed historical attempt because its runtime-tail process used the pre-correction Wrangler invocation containing unsupported `--once`; no lifecycle evidence is admitted from that run.
+- Current `main` workflow `.github/workflows/auth-004-remote-e2e.yml` was independently inspected and now uses the corrected POST-only tail invocation: `--format json --method POST`.
+- Therefore the next admissible execution is a fresh Remote E2E workflow_run produced from a successful deployment completion under the corrected workflow definition. Do not rerun `36423592893` as evidence, and do not promote any lifecycle claim from the stale run.
+- AUTH-004 remains `BLOCKED / NOT_GREEN`; Mapping 0 remains `NOT_GREEN`.
+- No application behavior, schema, Worker topology, D1 topology, Payload version, or public contract changed in this checkpoint.
