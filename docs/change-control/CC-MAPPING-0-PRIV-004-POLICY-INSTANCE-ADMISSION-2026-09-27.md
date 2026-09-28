@@ -119,3 +119,26 @@ Boundary:
 - No Mapping 0 GREEN, Evidence Registry promotion, or production deployment is implied.
 
 The temporary instance is intentionally short-lived and must be replaced before any production authorization.
+
+
+## Production readiness gate — 2026-09-28
+
+A separate production-readiness gate is now established because the existing structural admission guard intentionally permits validation of the development-only temporary instance. Structural guard PASS is therefore not equivalent to production authorization.
+
+Control:
+- Script: `scripts/priv004-production-readiness.mjs`
+- Workflow: `.github/workflows/priv004-production-readiness.yml`
+
+The production gate fails closed unless all of the following are explicitly present in repository authority state:
+- canonical policy instance environment = `PRODUCTION`;
+- scope binds `authRegister / ACCOUNT_REGISTRATION / LEGAL_AUDIT`;
+- instance status = `APPROVED` or `ACTIVE`;
+- explicit `usage.productionUse = true`;
+- valid deterministic rule and effective period;
+- current-commit provenance;
+- admission packet status = `PRODUCTION_INSTANCE_ADMITTED`;
+- admission packet production runtime authorization = `AUTHORIZED`;
+- packet contains no unresolved `productionMissingInputs`;
+- packet admitted instance matches the canonical policy instance version and rule mode.
+
+This gate does not choose a retention duration, fixed-until date, jurisdiction, legal interpretation, or approval source. With the current development-only instance it is expected to remain BLOCKED.
