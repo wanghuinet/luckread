@@ -7,6 +7,7 @@ import priv004Policy from '../../../../../../artifacts/mapping-0/priv004-approve
 const SCOPE = 'ACCOUNT_REGISTRATION'
 const ENDPOINT = 'authRegister'
 const ACCOUNT_STATE = 'PENDING_VERIFICATION'
+const ACCOUNT_STATE_VERSION = 1
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
 
 type AuthRegisterRequest = {
