@@ -76,3 +76,7 @@ Payload 3.90.2 CLI review identified exactly two native schema deltas relative t
 ## 2026-09-28 Exact SQL delta checkpoint
 
 The executable gate now validates the Payload-generated migration directly: exactly four ALTER statements (two UP + two DOWN), no CREATE/DROP TABLE or index changes, required native snapshot fields, and the migration index entry. Historical JSON snapshot gaps are treated as migration-tool provenance, not as application schema deltas.
+
+## 2026-09-28 Fixed-string gate checkpoint
+
+Migration SQL/JSON diagnostics passed in isolation; the prior CI failure was only shell regex handling of escaped backticks. The gate now uses fixed-string matching with the same exact SQL requirements.
