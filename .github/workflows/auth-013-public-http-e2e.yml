@@ -129,12 +129,6 @@ jobs:
       - name: Execute public transport E2E
         env:
           W01_BASE_URL: ${{ inputs.w01_base_url }}
-          AUTH013_BASIC_USER_ID: ${{ env.AUTH013_BASIC_USER_ID }}
-          AUTH013_OPERATOR_USER_ID: ${{ env.AUTH013_OPERATOR_USER_ID }}
-          AUTH013_BASIC_REFRESH_TOKEN: ${{ env.AUTH013_BASIC_REFRESH_TOKEN }}
-          AUTH013_OPERATOR_REFRESH_TOKEN: ${{ env.AUTH013_OPERATOR_REFRESH_TOKEN }}
-          AUTH013_BASIC_DEVICE_ID: ${{ env.AUTH013_BASIC_DEVICE_ID }}
-          AUTH013_OPERATOR_DEVICE_ID: ${{ env.AUTH013_OPERATOR_DEVICE_ID }}
         run: node scripts/auth-013-public-transport-e2e.mjs
 
       - name: Revoke basic session for stale-session proof
@@ -150,8 +144,6 @@ jobs:
       - name: Verify stale-session public denial
         env:
           W01_BASE_URL: ${{ inputs.w01_base_url }}
-          AUTH013_BASIC_USER_ID: ${{ env.AUTH013_BASIC_USER_ID }}
-          AUTH013_BASIC_ACCESS_TOKEN: ${{ env.AUTH013_BASIC_ACCESS_TOKEN }}
         run: |
           node --input-type=module <<'NODE'
           const base = process.env.W01_BASE_URL.replace(/\/$/, '')
