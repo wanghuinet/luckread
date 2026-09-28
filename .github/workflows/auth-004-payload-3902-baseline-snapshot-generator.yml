@@ -7,13 +7,17 @@ on:
       - ".github/workflows/auth-004-payload-3902-baseline-snapshot-generator.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - name: Checkout pre-upgrade W01 baseline
         uses: actions/checkout@v4
         with:
@@ -35,10 +39,32 @@ jobs:
           NODE_ENV: development
           PAYLOAD_SECRET: ignore
         run: pnpm exec payload migrate:create AUTH004_BASELINE_3871_SNAPSHOT --skip-empty
+      - name: Validate and commit authoritative baseline snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          snapshot=$(find baseline/workers/W01-payload/src/migrations -maxdepth 1 -type f -name '*AUTH004_BASELINE_3871_SNAPSHOT.json' | head -n 1)
+          test -n "$snapshot"
+          test -f "$snapshot"
+          grep -q '"reset_password_token"' "$snapshot"
+          grep -q '"reset_password_expiration"' "$snapshot"
+          if grep -q '"reset_password_requested_at"' "$snapshot"; then exit 1; fi
+          grep -q '"auth_session_state"' "$snapshot"
+          target='workers/W01-payload/src/migrations/20250929_111647.json'
+          cp "$snapshot" "$target"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/auth-004-payload-3902-baseline-snapshot-generator.yml
+          rm -f .github/workflows/auth-004-payload-3902-migration-generator.yml
+          git add "$target" .github/workflows/auth-004-payload-3902-baseline-snapshot-generator.yml .github/workflows/auth-004-payload-3902-migration-generator.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "build(auth004): restore Payload baseline schema snapshot"
+          git push origin HEAD:main
+
       - name: Upload generated baseline snapshot
         uses: actions/upload-artifact@v4
         with:
           name: auth-004-payload-3871-baseline-snapshot-${{ github.run_id }}
-          path: baseline/workers/W01-payload/src/migrations/*.json
+          path: baseline/workers/W01-payload/src/migrations/*AUTH004_BASELINE_3871_SNAPSHOT.json
           if-no-files-found: error
           retention-days: 14
