@@ -37,6 +37,8 @@ The currently admitted AUTH-001 implementation contract requires:
 
 The current Payload Local API transaction mechanism cannot satisfy item 2 against the actual D1 adapter/runtime boundary.
 
+Exact Payload 3.87.1 capability reconciliation is recorded in `docs/change-control/CC-MAPPING-0-AUTH-001-PAYLOAD-D1-BATCH-CAPABILITY-RECONCILIATION-2026-09-28.md`. It confirms that the installed D1 adapter selects the generic Drizzle transaction path when `transactionOptions` is enabled; it does not translate the Payload transaction session into Cloudflare `D1Database.batch()`.
+
 This is a genuine capability mismatch, not a test-harness defect and not a reason to weaken the contract.
 
 ## Non-authorizations
