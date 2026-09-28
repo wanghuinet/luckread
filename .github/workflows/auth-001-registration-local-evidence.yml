@@ -70,24 +70,34 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm payload migrate
 
-      - name: Start exact W01 local Next runtime
+      - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
         run: |
           set -euo pipefail
-          pnpm exec next dev -p 3100 > auth-001-next-dev.log 2>&1 &
-          echo $! > auth-001-next-dev.pid
+          pnpm exec opennextjs-cloudflare build > auth-001-open-next-build.log 2>&1
+
+      - name: Start exact W01 local Worker runtime
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          pnpm exec opennextjs-cloudflare preview > auth-001-preview.log 2>&1 &
+          echo $! > auth-001-preview.pid
           ready=0
           for _ in $(seq 1 120); do
-            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:3100/ || true)
+            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8787/ || true)
             if [ "$code" != "000" ]; then ready=1; break; fi
             sleep 1
           done
-          if [ "$ready" -ne 1 ]; then cat auth-001-next-dev.log; exit 1; fi
+          if [ "$ready" -ne 1 ]; then
+            cat auth-001-open-next-build.log
+            cat auth-001-preview.log
+            exit 1
+          fi
 
       - name: Run AUTH-001 registration batch runtime evidence
         working-directory: workers/W01-payload
         env:
-          AUTH001_BASE_URL: http://127.0.0.1:3100
+          AUTH001_BASE_URL: http://127.0.0.1:8787
         run: |
           set -euo pipefail
           node --import=tsx/esm scripts/auth-001-registration-runtime-evidence-local.mjs
@@ -97,8 +107,10 @@ jobs:
         if: ${{ failure() }}
         working-directory: workers/W01-payload
         run: |
-          echo "===== W01 Next dev log ====="
-          tail -n 500 auth-001-next-dev.log || true
+          echo "===== W01 OpenNext build log ====="
+          tail -n 500 auth-001-open-next-build.log || true
+          echo "===== W01 local preview log ====="
+          tail -n 500 auth-001-preview.log || true
 
       - name: Upload same-SHA runtime evidence
         if: ${{ always() }}
@@ -107,7 +119,8 @@ jobs:
           name: auth-001-registration-runtime-local-${{ steps.source.outputs.sha }}
           path: |
             artifacts/mapping-0/auth-001-runtime-local/
-            workers/W01-payload/auth-001-next-dev.log
+            workers/W01-payload/auth-001-open-next-build.log
+            workers/W01-payload/auth-001-preview.log
           if-no-files-found: error
           retention-days: 30
 
@@ -115,6 +128,6 @@ jobs:
         if: ${{ always() }}
         working-directory: workers/W01-payload
         run: |
-          if [ -f auth-001-next-dev.pid ]; then kill "$(cat auth-001-next-dev.pid)" 2>/dev/null || true; fi
+          if [ -f auth-001-preview.pid ]; then kill "$(cat auth-001-preview.pid)" 2>/dev/null || true; fi
           pkill -TERM -x workerd 2>/dev/null || true
           pkill -TERM -x esbuild 2>/dev/null || true
