@@ -129,12 +129,14 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
 
-      - name: Materialize current runtime probe harness
+      - name: Materialize current runtime evidence harness
         run: |
           set -euo pipefail
           git fetch --no-tags origin main
           git show origin/main:scripts/auth-002-session-runtime-probe-remote.mjs > scripts/auth-002-session-runtime-probe-remote.mjs
+          git show origin/main:scripts/auth-session-runtime-evidence-validate.mjs > scripts/auth-session-runtime-evidence-validate.mjs
           test -s scripts/auth-002-session-runtime-probe-remote.mjs
+          test -s scripts/auth-session-runtime-evidence-validate.mjs
 
       - name: Verify runtime evidence admission
         env:
