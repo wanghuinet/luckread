@@ -115,3 +115,17 @@ export const validateSession = async (body: {
   const result = await callW02<{ active: boolean }>('/internal/auth/session/validate', body)
   return result.active
 }
+
+export type AccountStateTransitionResult = {
+  from: string
+  to: string
+  auditEventId: string
+}
+
+export const transitionAccountState = (body: {
+  subjectId: string
+  targetUserId: string
+  to: string
+  reason: string
+  expectedVersion: number
+}) => callW02<AccountStateTransitionResult>('/internal/account/transition', body)
