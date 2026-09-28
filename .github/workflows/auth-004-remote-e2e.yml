@@ -101,6 +101,28 @@ jobs:
           set -euo pipefail
           git show origin/main:scripts/auth-004-remote-e2e.mjs > scripts/auth-004-remote-e2e.mjs
           test -s scripts/auth-004-remote-e2e.mjs
+      - name: Verify controlled remote Payload migration precondition
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_NAME: ${{ env.DATABASE_NAME }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc \
+            --command "SELECT id,name,batch FROM payload_migrations WHERE name='20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1';" > /tmp/auth004-migration.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc \
+            --command 'PRAGMA table_info("users");' > /tmp/auth004-users.json
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const collect=(v,out=[])=>{if(Array.isArray(v)){for(const x of v)collect(x,out)}else if(v&&typeof v==='object'){if(Array.isArray(v.results))out.push(...v.results);if(Array.isArray(v.result))out.push(...v.result);for(const x of Object.values(v))collect(x,out)}return out}
+          const read=(p)=>JSON.parse(readFileSync(p,'utf8'))
+          const rows=(p)=>[...new Map(collect(read(p)).map(x=>[JSON.stringify(x),x])).values()]
+          const migration=rows('/tmp/auth004-migration.json')
+          const users=rows('/tmp/auth004-users.json')
+          if(migration.length!==1 || String(migration[0]?.name)!=='20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1') throw new Error('AUTH-004 remote migration precondition failed')
+          if(!users.some((r)=>String(r.name)==='reset_password_requested_at')) throw new Error('AUTH-004 reset-requested-at schema precondition failed')
+          console.log('AUTH-004 remote migration precondition PASS')
+          NODE
       - name: Run controlled AUTH-004 remote HTTP E2E
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
