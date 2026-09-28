@@ -3490,3 +3490,17 @@ This note does not change any Blueprint, Contract, API, DTO, Entity, Field, Work
 - Per the dedicated cursor source-head rule, governance-only commits are not chased as new implementation heads. The authoritative source reconciliation boundary therefore remains `e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd`.
 - `currentHeadReconciliation.currentMainSha` is aligned to that same governance/source boundary; the actual Git `main` head is preserved in this ledger entry for audit traceability.
 - No runtime validation is repeated and no production authorization changes.
+
+
+## 2026-09-28 — PRIV-004 production-readiness gate execution reconciliation
+
+- Current main control commit: `af2e6a3256502f32f459f9960bccfc496127ffdc`.
+- Production-readiness workflow: `.github/workflows/priv004-production-readiness.yml`.
+- Controlled gate run: `36385607778`.
+- Result: `FAILURE_EXPECTED_FAIL_CLOSED`; the failing step was `Validate explicit production admission state`.
+- The failure is the expected control outcome for the current development-only PRIV-004 instance: canonical environment is `DEVELOPMENT`, production use is false, and the admission packet still declares production `BLOCKED`.
+- This run proves the newly added production gate is active and does not infer production authority from the structurally admitted development test instance.
+- The gate result is control-plane evidence only. It does not promote AUTH-001, ENT-CONSENT, ENT-IDENTITY, ENT-CREDENTIAL, the Evidence Registry, Mapping 0, or production deployment.
+- The dedicated execution cursor records this gate checkpoint while preserving the deliberate evidence source boundary at `e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd`; no closed Runtime evidence is rerun.
+- Active next gate remains: first approved `ACCOUNT_REGISTRATION / LEGAL_AUDIT` production PRIV-004 policy instance with explicit version, scope, effective period, deterministic rule, approval and provenance.
+- Backup branch before this governance change: `backup/main-before-priv004-gate-evidence-reconcile-20260928-1525`.
