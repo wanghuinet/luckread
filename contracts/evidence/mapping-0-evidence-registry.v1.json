@@ -816,7 +816,25 @@
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36379124829",
       "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
       "note": "Controlled remote D1-01/`luckread` execution at exact current-main SHA b6eab1eae17a825103c0a3b3a6c80daf570e8ff3. Target migration 20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1 was applied exactly once. Post-migration evidence proved exact auth_registration_envelopes and consents column sets, all required indexes, unchanged Users row count and unchanged Users schema. No application fixtures were created and no production Worker was deployed. Artifact 10952236480, sha256:f896e02b45a70861918d76c993aa6ae034341c195aca3786d6df7b0323f87daa."
+    },
+    {
+      "evidenceId": "EVD-AUTH001-W02-MATERIALIZER-RUNTIME-REMOTE-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-001::W02_D1-01_MATERIALIZATION_RUNTIME",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-001",
+      "source": "GitHub Actions W02 AUTH-001 Registration Materializer Remote Evidence against controlled Cloudflare D1",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36377880967/artifacts/10953241430",
+      "commitSha": "bd2791a4ca799126fac16afbc0506070e9074a77",
+      "timestamp": "2026-09-28T05:28:53Z",
+      "producer": "W02 AUTH-001 Registration Materializer Remote Evidence / run 36377880967 / job 108799593871",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "108799593871",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36377880967",
+      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "note": "Controlled remote D1-01 materializer evidence at exact implementation source SHA bd2791a4ca799126fac16afbc0506070e9074a77. Successful rerun after AUTH-001 registration/consent migration became physically present remotely. FAIL_CLOSED missing-key path was verified with no mutation; first valid pass created exactly one identity and two initial credentials; identity converged; credentials were active and hashed; second run created nothing; no raw secret appeared in the result; production Worker was not deployed. No relevant W02 materializer, credential-add, credential-hash-key or W02 index source changed between this tested SHA and current main 37b0473f7214dd4eaca0326d147973e44fe52e7e. Artifact 10953241430, sha256:9b65754f98d44453d7df598d1bdda40374f3aa5eb033239d6001e1d227f59062."
     }
   ],
-  "testedCommitSha": "b6eab1eae17a825103c0a3b3a6c80daf570e8ff3"
+  "testedCommitSha": "37b0473f7214dd4eaca0326d147973e44fe52e7e"
 }
