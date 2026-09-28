@@ -417,7 +417,7 @@ function authorizationDb(
               }
               return null
             },
-            all: async <T>() => roles as T,
+            all: async <T>() => ({ results: roles } as T),
           }
         },
       }
