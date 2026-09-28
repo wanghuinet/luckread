@@ -1,6 +1,6 @@
 # CC-AUTH-004-PAYLOAD-VERSION-ALIGNMENT — 2026-09-28
 
-Status: GAP_CONFIRMED / VERSION_ALIGNMENT_REQUIRED
+Status: VERSION_ALIGNMENT_ACCEPTED / RUNTIME_COMPATIBILITY_BLOCKED
 
 ## Trigger
 
@@ -99,3 +99,12 @@ Status: RUNTIME_COMPATIBILITY_BLOCKED / NOT_GREEN
 - AUTH-004 remains `BLOCKED / NOT_GREEN`. Remote lifecycle assertions after registration have not executed and must not be promoted.
 - Next admissible upstream decision is limited to: an upstream/runtime-compatible Payload release, or an explicitly approved security/architecture Change Control that preserves the project's password-security requirements. No implementation workaround is to be inferred from this blocker.
 - Backup before this governance-only update: `backup/main-before-auth004-pbkdf2-runtime-blocker-20260928-2107`.
+
+
+## 2026-09-28 Closure classification — version alignment complete, runtime compatibility remains blocked
+
+- Payload 3.90.2 dependency-family alignment is accepted: lock consistency, native schema migration admission, W01 foundation/deployment, and local AUTH-004 native lifecycle evidence have all been established under the existing Change Control.
+- The subsequent controlled remote run `36426287424` proved the remaining blocker is not dependency version alignment: the exact deployed 3.90.2 source reaches the real Worker and fails during native password hashing with Cloudflare Workers' PBKDF2 iteration ceiling.
+- Upstream Payload issue `#18274` remains OPEN and is labeled `v3`; it reports the same 600000-vs-100000 Cloudflare Workers incompatibility. No stable Payload 3.x release after 3.90.2 is available at this checkpoint. citeturn187706search0turn187706search1
+- No supported Payload configuration hook was found in the 3.90.2 auth implementation for overriding `currentPasswordHashIterations`; the value is hard-coded in the native generator. This rules out a simple configuration-only closure path.
+- Therefore the completed gate is the **version-alignment gate**. The open gate is now explicitly **runtime compatibility**, not another Payload upgrade loop.
