@@ -3895,3 +3895,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No AUTH-013 runtime/Contract/schema/Payload/Worker authority changed. No behavior evidence is admitted from run `36497430139`.
 - `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
 - `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_EXECUTION`
+
+
+## 2026-09-29 — AUTH-013 public HTTP E2E fixture cleanup safety guard
+
+- The prior workflow used unconditional `if: always()` cleanup, although preflight can fail before fixture seeding. This was hardened to prevent any theoretical deletion of pre-existing records on an identity collision.
+- The workflow now records `AUTH013_FIXTURE_SEEDED=1` only after the remote seed succeeds; cleanup and cleanup verification run only when that flag is present.
+- Backup before correction: `backup/pre-auth013-cleanup-guard-20260929-202609290720`.
+- No AUTH-013 runtime/Contract/schema/Payload/Worker authority changed. No behavior evidence is admitted from `36497430139`.
+- `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
+- `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_EXECUTION`
