@@ -2,14 +2,14 @@
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
   "sourceHead": "3395da99d8bb596faa706c33d1a4ef6467557780",
-  "backupBranch": "backup/main-before-cursor-auth002-migration-gate-reconcile-20260928",
+  "backupBranch": "backup/main-before-auth002-migration-evidence-boundary-20260928",
   "currentCursor": {
     "id": "AUTH-002-SESSION-MIGRATION-EVIDENCE-CLOSURE",
     "state": "PRIV004_AUTHORITY_CLOSED_AUTH001_AUTH003_EVIDENCE_ADMITTED_AUTH002_RUNTIME_VERIFIED_MIGRATION_PENDING_FINAL_MAPPING_BLOCKED",
     "objective": "Preserve all admitted PRIV-004, AUTH-001, AUTH-003 and AUTH-002 executable evidence while closing the remaining AUTH-002 migration-execution evidence unit and then the final Mapping 0 / Evidence Registry promotion gate without promoting blocked global state.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-EVIDENCE-RECONCILIATION-2026-09-28.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-002 migration execution evidence must be admitted under the current persistence-evidence contract. After that, final Evidence Registry / Mapping 0 / entity promotion checks remain blocked by global Mapping 0 NOT_GREEN and unresolved feature/entity/evidence coverage.",
+    "nextGate": "AUTH-002 migration execution evidence remains blocked under the current persistence-evidence contract because the historical remote execution was unauthorized and the current migration index changed after that execution. A separate explicit authority/contract decision is required before any alternative admissibility rule can be introduced; no runtime rerun or remote D1 re-application is authorized.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -20,7 +20,8 @@
       "AUTH-002 Gate-1 schema, native session runtime, security-negative, concurrency and extension-correlation evidence are PASS_VERIFIED at exact tested source 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55.",
       "AUTH-002 migration execution evidence remains the remaining executable evidence unit.",
       "Global Evidence Registry remains NOT_GREEN.",
-      "Canonical Mapping 0 remains NOT_GREEN; no promotion is inferred."
+      "Canonical Mapping 0 remains NOT_GREEN; no promotion is inferred.",
+      "Migration file byte identity was confirmed, but the migration index changed after the historical E5 execution; no current-contract source-equivalence exception exists."
     ]
   },
   "alreadyClosed": {
@@ -189,18 +190,20 @@
     "idempotencySourceStatus": "CLOSED",
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
-    "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED"
+    "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
+    "actualGitMainHead": "694c1da911145cc4a3d1b152d12ed797a3b525b5",
+    "governanceHeadDisposition": "PR #154 is merged; it changes only governance cursor/ledger state. Implementation/source evidence boundary remains e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd."
   },
   "nextGate": "AUTH-002::MIGRATION_EXECUTION evidence admission, followed by final Evidence Registry / Mapping 0 / entity promotion checks. No production deployment is authorized by this cursor.",
   "latestControlGate": {
     "workflow": ".github/workflows/auth-002-e5-remote-migration-execution.yml",
     "runId": null,
-    "headSha": null,
-    "conclusion": "PENDING_CONTROLLED_EXECUTION_ADMISSION",
+    "headSha": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
+    "conclusion": "BLOCKED_CONTRACT_ADMISSIBILITY",
     "failedStep": null,
-    "meaning": "AUTH-002 runtime/schema/security/concurrency/extension evidence is admitted, but the migration execution evidence unit is not yet VERIFIED in the current Evidence Registry.",
+    "meaning": "Historical E5 remote execution exists as a technical fact, but was unauthorized at execution time and cannot be admitted as current MIGRATION_EXECUTION because the current persistence-evidence contract requires exact tested-commit binding and the migration index changed afterward.",
     "productionAuthorization": "NO_NEW_PRODUCTION_DEPLOYMENT",
-    "evidenceBoundary": "Only the controlled E5 migration evidence unit remains actionable; no runtime rerun or global Mapping 0 promotion is authorized."
+    "evidenceBoundary": "Do not reapply the already-executed migration. Do not promote the historical record to VERIFIED. Await an explicit authority/contract decision on any alternative admissibility rule."
   },
   "runtimeEvidenceAdmission": {
     "status": "PASS_VERIFIED",
@@ -368,5 +371,18 @@
     "development": "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json",
     "production": "artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json",
     "selectionBoundary": "W01 resolves by runtime environment; client cannot select policy."
+  },
+  "evidenceAdmissibilityBoundary": {
+    "status": "BLOCKED",
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-MIGRATION-EVIDENCE-ADMISSIBILITY-BOUNDARY-2026-09-28.md",
+    "historicalExecutionRunId": "35552919573",
+    "historicalExecutionSourceSha": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
+    "migrationFileBlobShaHistorical": "2b43a7b08fe7c5be98793da7eb07ddd2cf9e6921",
+    "migrationFileBlobShaCurrent": "2b43a7b08fe7c5be98793da7eb07ddd2cf9e6921",
+    "migrationIndexBlobShaHistorical": "436c37e395145017d9135f938d69a741a936c60b",
+    "migrationIndexBlobShaCurrent": "4a8ee2b68c1b845d06b9f4bb892e59d70a556376",
+    "admissibilityFinding": "CURRENT_CONTRACT_BLOCKS_HISTORICAL_EXECUTION",
+    "duplicateExecution": "PROHIBITED_FAIL_CLOSED",
+    "contractChange": "NOT_PROPOSED_BY_THIS_RECORD"
   }
 }
