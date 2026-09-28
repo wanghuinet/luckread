@@ -3440,3 +3440,13 @@ This note does not change any Blueprint, Contract, API, DTO, Entity, Field, Work
 - Active cursor remains `AUTH-001-REGISTRATION-CLOSURE / BLOCKED_PRIV004_POLICY_INSTANCE`.
 - Next governed gate remains the first approved `ACCOUNT_REGISTRATION / LEGAL_AUDIT` PRIV-004 policy instance with explicit version, scope, effective period, deterministic rule, approval and provenance.
 
+## 2026-09-28 — AUTH-001 post-migration cursor reconciliation
+
+- Current main: `37b0473f7214dd4eaca0326d147973e44fe52e7e`.
+- AUTH-001 controlled remote registration migration evidence from run `36379124829` is already admitted and merged.
+- The active development gate is now **W02/D1-01 registration materializer remote runtime evidence**.
+- Historical run `36377880967` remains `FAIL_CLOSED / synthetic_collision`; it is not promoted.
+- A failed-job rerun has been requested after the required registration/consent persistence migration became physically present on D1-01.
+- The cursor has been refreshed from the merged `main` head and no longer jumps directly to production PRIV-004 while the W02 materializer runtime gate remains open.
+- Production deployment, entity promotion, Evidence Registry GREEN and Mapping 0 GREEN remain unauthorized.
+
