@@ -3874,3 +3874,14 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No AUTH-013 runtime/Contract/schema/Payload/Worker authority changed. No behavior evidence is admitted from run `36478898506`.
 - `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
 - `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_EXECUTION`
+
+
+## 2026-09-29 — AUTH-013 public HTTP E2E database-generated fixture user IDs
+
+- Run `36479891510` reached the hardened checkout/evidence path and remote D1 preflight, then failed closed on `user_collision` despite negative randomized IDs; no public HTTP behavior evidence executed.
+- Further ID-space guessing is retired. The fixture now lets SQLite/Payload allocate native INTEGER user IDs, then resolves the exact two IDs by unique run-scoped email after seed and exports them for the existing HTTP/D1 assertions.
+- Preflight now checks email/username/session/role collisions only; cleanup and cleanup verification use unique fixture emails so they do not depend on a guessed or pre-resolved user ID.
+- Backup before correction: `backup/pre-auth013-db-generated-user-id-20260929-202609282045`.
+- No AUTH-013 runtime/Contract/schema/Payload/Worker authority changed. No behavior evidence is admitted from run `36479891510`.
+- `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
+- `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_EXECUTION`
