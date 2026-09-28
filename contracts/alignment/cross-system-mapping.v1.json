@@ -32,7 +32,9 @@
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/dto/auth-dto-contract.v1.json",
         "workers/W01-payload/src/collections/Users.ts",
-        "workers/W01-payload/src/payload.config.ts"
+        "workers/W01-payload/src/payload.config.ts",
+        "contracts/api/auth-operation-policy.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-EVENTUAL-MATERIALIZATION-ADMISSION-2026-09-28.md"
       ],
       "blockers": [
         "DTO mapping missing",
