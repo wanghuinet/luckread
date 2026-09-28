@@ -97,7 +97,12 @@ export default buildConfig({
     // request-local capture context can divert that one User write.
     const create = payload.db.create.bind(payload.db)
     payload.db.create = async (args) => {
-      const capture = args.req?.context?.[AUTH001_USER_CAPTURE_CONTEXT]
+      const requestContext =
+        args.req?.context ??
+        ('context' in args && args.context && typeof args.context === 'object'
+          ? (args.context as Record<string, unknown>)
+          : undefined)
+      const capture = requestContext?.[AUTH001_USER_CAPTURE_CONTEXT]
       if (args.collection !== Users.slug || !capture || typeof capture !== 'object') {
         return create(args)
       }
