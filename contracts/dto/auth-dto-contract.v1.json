@@ -90,13 +90,6 @@
       "status": "NO_BODY_DTO"
     },
     {
-      "featureId": "AUTH-004",
-      "operationId": null,
-      "requestDtoId": null,
-      "responseDtoId": null,
-      "status": "UNRESOLVED_NO_CANONICAL_OPERATION_EVIDENCE"
-    },
-    {
       "featureId": "AUTH-005",
       "operationId": null,
       "requestDtoId": null,
