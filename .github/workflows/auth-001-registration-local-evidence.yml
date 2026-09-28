@@ -72,12 +72,18 @@ jobs:
 
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
+        env:
+          NODE_ENV: production
+          PAYLOAD_SECRET: ignore
         run: |
           set -euo pipefail
           pnpm exec opennextjs-cloudflare build > auth-001-open-next-build.log 2>&1
 
       - name: Start exact W01 local Worker runtime
         working-directory: workers/W01-payload
+        env:
+          NODE_ENV: production
+          PAYLOAD_SECRET: ignore
         run: |
           set -euo pipefail
           pnpm exec opennextjs-cloudflare preview > auth-001-preview.log 2>&1 &
