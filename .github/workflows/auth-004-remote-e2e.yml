@@ -139,7 +139,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../../artifacts/evidence/auth-004/remote-e2e
-          nohup npx --yes "wrangler@${WRANGLER_VERSION}" tail luckread-w01-payload --format json --method POST --once > ../../artifacts/evidence/auth-004/remote-e2e/w01-runtime-tail.jsonl 2>&1 &
+          nohup npx --yes "wrangler@${WRANGLER_VERSION}" tail luckread-w01-payload --format json --method POST > ../../artifacts/evidence/auth-004/remote-e2e/w01-runtime-tail.jsonl 2>&1 &
           echo $! > /tmp/auth004-w01-tail.pid
           sleep 3
 
