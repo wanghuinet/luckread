@@ -20,7 +20,7 @@ The template's runtime structure, Cloudflare bindings, OpenNext integration, D1 
 
 ## Historical upstream observation
 
-The following dependency versions belong specifically to the upstream observation recorded by this manifest:
+The following dependency versions belong specifically to the original upstream observation recorded by this manifest:
 
 - Payload: `3.82.1`
 - `@payloadcms/db-d1-sqlite`: `3.82.1`
@@ -39,9 +39,15 @@ These versions MUST NOT be represented as the current W01 package baseline witho
 
 - W01 directory: `workers/W01-payload/`
 - Current W01 package manifest is the authoritative source for the repository's locked dependency versions.
-- Current W01 package lock is Payload `3.87.1`, `@opennextjs/cloudflare` `1.20.1`, Next `16.2.6`, React / React DOM `19.2.6`, Node `>=24.15.0`.
+- Current W01 package lock is Payload `3.90.2`, `@opennextjs/cloudflare` `1.20.1`, Next `16.2.6`, React / React DOM `19.2.6`, Node `>=24.15.0`.
 - W01 Wrangler binding targets D1 database `luckread`.
 - Existing LuckRead contracts and migrations remain protected; template reconciliation does not overwrite them.
+
+## 2026-09-28 release-tag observation
+
+The official Payload `v3.90.2` tag was inspected directly. Its `templates/with-cloudflare-d1/package.json` pins `payload` and the Payload package family to `3.90.0` (`package.json` blob `f10d83eb0f914b827bb5374e06136de7c525c8e2`). W01 is therefore a release-level package alignment to `3.90.2`, not a claim that the current upstream template manifest itself pins `3.90.2`.
+
+This distinction is authoritative: **template structure comes from `with-cloudflare-d1`; W01 dependency pins are governed by LuckRead Change Control.**
 
 ## Evidence rule
 
