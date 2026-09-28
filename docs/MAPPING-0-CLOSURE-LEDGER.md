@@ -3482,3 +3482,11 @@ This note does not change any Blueprint, Contract, API, DTO, Entity, Field, Work
 - Active next gate remains `PRIV-004::first approved ACCOUNT_REGISTRATION / LEGAL_AUDIT production policy instance`, followed by final Evidence Registry / Mapping 0 promotion checks.
 - Backup branch before this change: `backup/main-before-cursor-drift-reconcile-20260928-1500`.
 - No production deployment, entity promotion, Evidence Registry GREEN, or Mapping 0 GREEN is implied.
+
+## 2026-09-28 — current cursor source-boundary clarification
+
+- Main is now `ae18f93020165ee267be1219426bfa2488eca53a`, created by the cursor-reconciliation merge itself.
+- That merge is governance-only and does not change the tested W02 materializer implementation, contracts, authority inputs, runtime behavior, or Evidence scope.
+- Per the dedicated cursor source-head rule, governance-only commits are not chased as new implementation heads. The authoritative source reconciliation boundary therefore remains `e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd`.
+- `currentHeadReconciliation.currentMainSha` is aligned to that same governance/source boundary; the actual Git `main` head is preserved in this ledger entry for audit traceability.
+- No runtime validation is repeated and no production authorization changes.
