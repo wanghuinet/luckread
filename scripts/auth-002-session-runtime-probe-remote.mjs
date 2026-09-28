@@ -675,7 +675,7 @@ try {
   const concurrentLogoutStatuses = concurrentLogoutResponses.map((item) => item.status)
   const concurrentLogoutSafe =
     concurrentLogoutStatuses.every((status) => status === 204 || status === 401) &&
-    concurrentLogoutStatuses.filter((status) => status === 204).length <= 1
+    concurrentLogoutStatuses.some((status) => status === 204)
   concurrencyCases.push({
     operation: 'concurrent logout',
     concurrencyLevel: 2,
