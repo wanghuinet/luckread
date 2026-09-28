@@ -47,15 +47,15 @@ export async function POST(request: Request): Promise<Response> {
   const payload = await getPayload({ config })
 
   try {
-    // Payload owns token expiry, single-use semantics, password persistence
-    // and native session invalidation. The generated session token is not
-    // returned by this public contract.
+    // This route is anonymous/token-bound. Explicitly keep access checks
+    // enabled; the recovery token is the native Payload authorization boundary.
     await payload.resetPassword({
       collection: 'users',
       data: {
         token: body.recoveryToken,
         password: body.newPassword,
       },
+      overrideAccess: false,
     })
   } catch {
     // Invalid, expired, wrong-purpose and replayed recovery tokens converge
