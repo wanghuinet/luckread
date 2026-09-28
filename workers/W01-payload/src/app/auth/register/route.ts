@@ -288,10 +288,29 @@ export async function POST(request: Request): Promise<Response> {
     '","accountState":"${ACCOUNT_STATE}"}'
   `
 
-  // The first statement is the idempotency concurrency gate. A new active key
-  // is inserted as IN_PROGRESS. An expired active key may be reused atomically
-  // by the same statement. A non-expired conflict fails the whole batch before
-  // any User/Consent write, yielding the canonical 409.
+  // Idempotency reservation is part of the same D1 batch. If a stale
+  // reservation exists, remove only that expired row first. The following
+  // plain UNIQUE insert is the concurrency gate: exactly one request can
+  // reserve active_key; the losing concurrent request receives the canonical
+  // 409 instead of updating the winner's reservation.
+  const expiredReservationCleanup =
+    existing && isExpired(existing.expiresAt, now)
+      ? env.D1
+          .prepare(
+            `
+              DELETE FROM auth_registration_envelopes
+              WHERE id = ?
+                AND active_key = ?
+                AND expires_at <= ?
+            `,
+          )
+          .bind(existing.id, idempotencyKey, now.toISOString())
+      : null
+
+  if (expiredReservationCleanup) {
+    statements.push(expiredReservationCleanup)
+  }
+
   statements.push(
     env.D1
       .prepare(
@@ -312,20 +331,6 @@ export async function POST(request: Request): Promise<Response> {
             created_at
           )
           VALUES (?, ?, ?, ?, ?, ?, 'IN_PROGRESS', ?, NULL, ?, ?, ?, ?)
-          ON CONFLICT(active_key) DO UPDATE SET
-            id = excluded.id,
-            idempotency_key = excluded.idempotency_key,
-            scope = excluded.scope,
-            endpoint = excluded.endpoint,
-            payload_hash = excluded.payload_hash,
-            state = excluded.state,
-            response_digest = excluded.response_digest,
-            committed_response = excluded.committed_response,
-            expires_at = excluded.expires_at,
-            consent_record_id = excluded.consent_record_id,
-            updated_at = excluded.updated_at,
-            created_at = excluded.created_at
-          WHERE auth_registration_envelopes.expires_at <= excluded.created_at
         `,
       )
       .bind(
@@ -458,14 +463,16 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const batchResult = await env.D1.batch(statements)
-    const reservationIndex = 0
-    const userIndex = 1
-    const consentIndex = 2
-    const completionIndex = 3
-    const responseIndex = 4
+    const cleanupOffset = expiredReservationCleanup ? 1 : 0
+    const reservationIndex = cleanupOffset
+    const userIndex = reservationIndex + 1
+    const consentIndex = userIndex + 1
+    const completionIndex = consentIndex + 1
+    const responseIndex = completionIndex + 1
 
     if (
       batchResult.length !== statements.length ||
+      (cleanupOffset === 1 && batchResult[0]?.meta?.changes !== 1) ||
       batchResult[reservationIndex]?.meta?.changes !== 1 ||
       batchResult[userIndex]?.meta?.changes !== 1 ||
       batchResult[consentIndex]?.meta?.changes !== 1 ||
