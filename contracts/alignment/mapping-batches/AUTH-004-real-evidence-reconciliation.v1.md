@@ -3,7 +3,7 @@
 - Feature: `AUTH-004`
 - Name: password reset/change
 - Status: `BLOCKED_NOT_GREEN`
-- Implementation authorization: `false`
+- Implementation authorization: `true` (thin Payload-native adapter admission)
 - Source of truth: `docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md`
 - Capability contract: `contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json`
 - Identity/session authority: `docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md`
@@ -29,12 +29,12 @@
 - Account recovery authorization boundary: bound to anonymous reset request and token-bound reset confirm in the AUTH-004 feature contract and Auth Operation Policy.
 - Account/session invalidation semantics after password change/reset: contractually bound to native Payload session lifecycle; executable lifecycle evidence remains missing.
 - Event IDs for password change/reset and credential rotation: missing.
-- Worker/runtime implementation evidence: missing.
+- Worker/runtime implementation evidence: W01 thin-adapter implementation is now bound to exact main commit `7e9396460136a6ce083db0f600ec04c7829a9c99`; remote execution evidence remains missing.
 - D1 domain is `D1-01`; AUTH-004 custom migration is explicitly `NOT_REQUIRED_NATIVE`, while physical schema/runtime evidence remains unresolved.
 - Executed local integration tests now provide replay/expiry and credential non-disclosure evidence; protected-account enumeration and remote/E2E security evidence remain missing.
 - Local Payload API integration evidence is now registered; controlled remote W01 and HTTP E2E execution evidence remain missing.
 - Feature→Entity→Persistence registry binding is now recorded as `BLOCKED` using the existing contract and local executable evidence; no promotion is inferred.
-- Canonical Evidence Registry still contains the existing local PASS record for AUTH-004; remote/E2E/session-invalidation evidence remains missing..
+- Canonical Evidence Registry now contains both the existing local PASS record and the exact-SHA W01 adapter implementation record; remote/E2E/session-invalidation evidence remains missing.
 
 ## 3. Evidence interpretation rules
 
@@ -56,7 +56,7 @@ Definition-layer reconciliation was previously recorded at `3ab18252544ffb9a15da
 - Auth Operation Policy: reconciled
 - DTO registry: reconciled and bound in canonical Feature→Entity→Persistence registration
 - Canonical OpenAPI/DTO registry: AUTH-004 operations reconciled; runtime implementation remains separately gated
-- Runtime/persistence/security/integration evidence: local native integration evidence registered; remote/persistence/E2E/session-invalidation evidence still missing
+- Runtime implementation: exact-SHA W01 adapter implementation registered; local native integration evidence registered; remote/persistence/E2E/session-invalidation evidence still missing
 
 ## 7. Gate result
 
