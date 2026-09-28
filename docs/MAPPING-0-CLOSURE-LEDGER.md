@@ -3514,3 +3514,21 @@ This note does not change any Blueprint, Contract, API, DTO, Entity, Field, Work
 - The same merged change did not introduce runtime, migration, Worker/D1/Queue topology, retention values, legal conclusions, Evidence Registry promotion, entity promotion, or Mapping 0 GREEN.
 - The Contract Admission CI triggered by the merge remained in progress at this checkpoint; its incomplete execution is not represented as GREEN.
 - Backup branch before this cursor reconciliation: `backup/main-before-priv004-postmerge-cursor-reconcile-20260928-`.
+
+
+## 2026-09-28 — PRIV-004 production engineering authority admission
+
+- Backup branch created before the authority change: `backup/main-before-priv004-production-authority-close-20260928`.
+- Canonical production policy instance admitted on the working branch:
+  - `policyId = PRIV-004-ACCOUNT-REGISTRATION-PROD`
+  - `policyVersion = PROD-2026-09-28.1`
+  - `scope = authRegister / ACCOUNT_REGISTRATION / PRODUCTION`
+  - `status = APPROVED`
+  - `rule = DURATION / 63072000 seconds (730 days)`
+  - `sourceAuthority = LuckRead Internal Engineering Production Policy Authority`
+  - `approvalRef = ENG-DECISION-2026-09-28-PRIV004-PROD-730D`
+- Admission packet is reconciled to `PRODUCTION_INSTANCE_ADMITTED`, `productionMissingInputs = []`, and `runtimeAuthorization.production = AUTHORIZED`.
+- The 730-day rule is an internal engineering production policy selected under the user's explicit project-governance authorization. It is not represented as a jurisdiction-specific legal retention requirement.
+- No Worker, D1, Queue, Payload Core, migration, runtime implementation, or production deployment change is introduced by this authority admission.
+- Final production-readiness workflow execution is still required on the merged policy state before the control-plane gate can be recorded as PASS.
+- Final Evidence Registry / Mapping 0 promotion remains a separate downstream gate.

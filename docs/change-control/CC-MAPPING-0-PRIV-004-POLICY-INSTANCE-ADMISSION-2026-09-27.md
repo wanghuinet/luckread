@@ -2,7 +2,7 @@
 
 ## Status
 
-`GOVERNANCE_BASELINE_RECONCILED / DEV_TEST_INSTANCE_AUTHORIZED / PRODUCTION_INSTANCE_PENDING`
+`GOVERNANCE_BASELINE_RECONCILED / PRODUCTION_ENGINEERING_INSTANCE_ADMITTED / AUTHORITY_CLOSED`
 
 ## Purpose
 
@@ -144,3 +144,59 @@ The production gate fails closed unless all of the following are explicitly pres
 This gate does not choose a retention duration, fixed-until date, jurisdiction, legal interpretation, or approval source. With the current development-only instance it is expected to remain BLOCKED.
 
 The production gate also enforces the structural fields already required by the admission contract before a production instance can pass: non-empty policy identity, owner, sourceAuthority, approvalRef and rollback/retirement path; non-empty scope with `authRegister / ACCOUNT_REGISTRATION / PRODUCTION`; explicit deterministic rule; current-commit provenance; and a packet admittedInstance whose policy identity/version/rule matches the canonical instance. A malformed `productionMissingInputs` value is rejected rather than treated as an empty list.
+
+
+## Production engineering authority admission — 2026-09-28
+
+The user-authorized project governance decision is now recorded as an explicit production **engineering policy authority**. This closes the PRIV-004 policy-instance admission gate without pretending that engineering approval is a jurisdiction-specific legal opinion.
+
+Canonical instance:
+
+- `artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json`
+- `policyId = PRIV-004-ACCOUNT-REGISTRATION-PROD`
+- `policyVersion = PROD-2026-09-28.1`
+- `environment = PRODUCTION`
+- `status = APPROVED`
+- `scope = authRegister / ACCOUNT_REGISTRATION / PRODUCTION`
+- `retentionClass = LEGAL_AUDIT`
+- `rule = DURATION / 63072000 seconds (730 days)`
+- `effectiveFrom = 2026-09-28T00:00:00Z`
+- `effectiveTo = null`
+- `sourceAuthority = LuckRead Internal Engineering Production Policy Authority`
+- `approvalRef = ENG-DECISION-2026-09-28-PRIV004-PROD-730D`
+- `rollbackVersion = PRIV-004-ACCOUNT-REGISTRATION-PROD-PREVIOUS`
+- provenance checkpoint = `4399b83c31c2ac709bcc36c648b2bd994fb711dd`
+
+### Authority decision
+
+The existing 730-day deterministic rule is promoted from the prior development test value into the versioned production engineering policy **without changing the runtime implementation**. This is deliberately a policy-instance admission, not a new Worker/D1/Queue, schema, or custom retention subsystem.
+
+The admission packet is now:
+
+- `status = PRODUCTION_INSTANCE_ADMITTED`;
+- `admissionMode = PRODUCTION_ENGINEERING_AUTHORITY`;
+- `productionMissingInputs = []`;
+- `runtimeAuthorization.production = AUTHORIZED`.
+
+### Legal/compliance boundary
+
+The policy artifact explicitly remains:
+
+`legalComplianceStatus = NOT_A_LEGAL_OR_COMPLIANCE_AUTHORITY`.
+
+The 730-day value is therefore an internal engineering production policy selected for deterministic platform operation; it is **not** represented as a universal statutory or jurisdiction-specific retention requirement. This distinction is intentional. Current data-protection guidance expects controllers to document retention periods and justify them against the processing purpose; it does not provide a single universal retention period for account-registration consent records.
+
+A later formal legal/compliance schedule can replace this policy through the normal versioned Policy Authority path. That replacement does not require a new runtime architecture.
+
+### Closure boundary
+
+This change closes the **PRIV-004 engineering authority / policy-instance gate**.
+
+It does not, by itself:
+
+- promote Mapping 0 to GREEN;
+- promote the global Evidence Registry to GREEN;
+- deploy production Workers;
+- change D1 schema;
+- change AUTH-001 runtime code;
+- create a legal opinion or jurisdiction-specific compliance certification.
