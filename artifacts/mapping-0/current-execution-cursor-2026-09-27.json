@@ -1,14 +1,14 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "ccdb213b9d69369e7fef9cdfa8d101b5943fcdba",
+  "sourceHead": "b64994b88db397efbe19029c596afdafe940d125",
   "backupBranch": "backup/main-before-auth004-pbkdf2-runtime-blocker-20260928-2107",
   "currentCursor": {
     "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
-    "state": "AUTH013_SOURCE_VERIFIED_REMOTE_E2E_PENDING",
+    "state": "AUTH013_TRANSPORT_SOURCE_UNIT_VERIFIED_REMOTE_E2E_PENDING",
     "objective": "Close independently authorized modules while AUTH-004 remains externally blocked. AUTH-013 source implementation is verified; remaining focused gate is public remote transport evidence.",
     "authoritativeControl": "docs/change-control/CC-AUTH-004-PAYLOAD-VERSION-ALIGNMENT-2026-09-28.md",
-    "nextGate": "Controlled public W01 HTTP E2E for POST /v1/users/{userId}/account-state using an exact admitted W01/W02 deployment source; verify trusted principal/session validation, authorization derivation, If-Match semantics, atomic D1-01 state+journal result, and canonical response. Do not promote GREEN from source evidence alone.",
+    "nextGate": "Controlled public W01 HTTP E2E using the exact admitted W01/W02 deployment source. Verify bearer/session trust, authorization derivation, If-Match semantics, W02 D1-01 mutation+journal atomicity, and canonical response. Remote production deployment must remain explicitly controlled.",
     "logicalOwnership": "W01 -> AUTH-004 Payload-native authority CLOSED",
     "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding — deployment run 36420996656 attempt 7 SUCCESS; deployed application source 6d574bb56222e0eaf44df663e04eb59535e84be6.",
     "physicalRuntimeTarget": "W01 luckread-w01-payload / D1-01 luckread",
@@ -186,7 +186,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced by governance-only reconciliation after a fresh Payload/Cloudflare upstream recheck. No application runtime source changed; AUTH-004 remains externally blocked by the observed PBKDF2 compatibility issue.",
-    "currentMainSha": "ccdb213b9d69369e7fef9cdfa8d101b5943fcdba",
+    "currentMainSha": "b64994b88db397efbe19029c596afdafe940d125",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
     "payloadWireCompatibilityStatus": "AUTH004_REMOTE_RUNTIME_BLOCKED_PBKDF2_COMPATIBILITY",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -194,11 +194,11 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "ccdb213b9d69369e7fef9cdfa8d101b5943fcdba",
-    "governanceHeadDisposition": "AUTH-013 focused public transport source verification and evidence-governance reconciliation only. Exact W02 source SHA 0af2fcb66b6bb54ace065b7debe5559a80a285a4 passed typecheck and 23 source tests. No production deployment or public remote E2E claim is promoted.",
+    "actualGitMainHead": "b64994b88db397efbe19029c596afdafe940d125",
+    "governanceHeadDisposition": "AUTH-013 focused transport source/unit evidence governance only. W02 exact-source tests and W01 Foundation CI passed. No deployed W01 public HTTP E2E, production deployment, or global GREEN is claimed.",
     "reviewedAt": "2026-09-28",
     "implementationEvidenceSourceHead": "6d574bb56222e0eaf44df663e04eb59535e84be6",
-    "latestGovernanceCommit": "ccdb213b9d69369e7fef9cdfa8d101b5943fcdba"
+    "latestGovernanceCommit": "b64994b88db397efbe19029c596afdafe940d125"
   },
   "nextGate": "AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY",
   "latestControlGate": {
@@ -273,15 +273,15 @@
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-28",
-    "mainSha": "ccdb213b9d69369e7fef9cdfa8d101b5943fcdba",
+    "mainSha": "b64994b88db397efbe19029c596afdafe940d125",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.90.2",
     "capabilityFinding": "Payload native AUTH-004 capability is contractually aligned to 3.90.2, but the native password hashing implementation is incompatible with Cloudflare Workers production because it requests 600000 PBKDF2 iterations.",
-    "implementationDisposition": "AUTH013_PUBLIC_TRANSPORT_SOURCE_IMPLEMENTED_AND_VERIFIED_REMOTE_E2E_PENDING",
+    "implementationDisposition": "AUTH013_PUBLIC_TRANSPORT_SOURCE_AND_UNIT_VERIFIED_REMOTE_E2E_PENDING",
     "staleEvidenceCorrection": "The 3.87.1 cursor is historical and superseded by 3.90.2; the new blocker is external runtime compatibility, not a version-alignment gap.",
-    "currentMainSha": "ccdb213b9d69369e7fef9cdfa8d101b5943fcdba",
+    "currentMainSha": "b64994b88db397efbe19029c596afdafe940d125",
     "implementationSourceSha": "6d574bb56222e0eaf44df663e04eb59535e84be6",
-    "currentSourceHead": "ccdb213b9d69369e7fef9cdfa8d101b5943fcdba",
+    "currentSourceHead": "b64994b88db397efbe19029c596afdafe940d125",
     "evidenceAdmission": {
       "runId": "36431940464",
       "jobId": "108959464320",
@@ -291,6 +291,13 @@
       "status": "PASS_SOURCE_VERIFIED",
       "productionDeployment": false,
       "publicHttpE2E": "NOT_EXECUTED"
+    },
+    "w01TransportUnitEvidence": {
+      "runId": "36432420115",
+      "jobId": "108961689387",
+      "testedSourceSha": "faab246f89d287018da24134a5c0e9f0593ae8de",
+      "status": "PASS_SOURCE_UNIT_VERIFIED",
+      "productionDeployment": false
     }
   },
   "devTestPolicy": {
