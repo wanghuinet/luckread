@@ -84,7 +84,7 @@ const cleanup = async () => {
   if (triggerName) { runSql('DROP TRIGGER IF EXISTS ' + triggerName); triggerName = null }
   runSql('DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email IN (?, ?))', email, concurrentEmail)
   runSql('DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE ?)', 'auth001-rollback-' + suffix + '@luckread.local')
-  runSql('DELETE FROM auth_registration_envelopes WHERE idempotency_key IN (?, ?, ?, ?)', keySuccess, keyRollback, keyConcurrentA, keyConcurrentB)
+  runSql('DELETE FROM auth_registration_envelopes WHERE idempotency_key IN (?, ?, ?, ?, ?)', keySuccess, keyRollback, keyConcurrentA, keyConcurrentB, keySameKey)
   runSql('DELETE FROM users WHERE email IN (?, ?)', email, concurrentEmail)
   runSql('DELETE FROM auth_registration_envelopes WHERE idempotency_key = ?', keyRollback)
 }
@@ -156,7 +156,7 @@ try {
     throw new Error('Concurrent same Idempotency-Key produced more than one authoritative registration record')
   }
 
-  const result = { status: 'PASS', evidenceType: 'AUTH-001_REGISTRATION_D1_BATCH_LOCAL_RUNTIME', runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_NEXT_DEV', assertions: { successfulRegistration: true, exactlyOneUser: true, exactlyOneConsent: true, accountStatePendingVerificationVersion1: true, nativeHashAndSaltPersisted: true, plaintextPasswordNotPersisted: true, responseDigestMatchesAdmittedCommitment: true, replayReturnsOriginalResponse: true, idempotencyKeyReuseConflictCanonical: true, forcedLaterStatementRollback: true, concurrentDuplicateIdentitySingleWinner: true, downstreamW02Mutation: false }, observed: { userId: String(first.userId), accountState: first.accountState, hashLength: String(successRows.hash).length, saltLength: String(successRows.salt).length, concurrentStatuses: pair.map((response) => response.status) } }
+  const result = { status: 'PASS', evidenceType: 'AUTH-001_REGISTRATION_D1_BATCH_LOCAL_RUNTIME', runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_OPENNEXT_WORKER', assertions: { successfulRegistration: true, exactlyOneUser: true, exactlyOneConsent: true, accountStatePendingVerificationVersion1: true, nativeHashAndSaltPersisted: true, plaintextPasswordNotPersisted: true, responseDigestMatchesAdmittedCommitment: true, replayReturnsOriginalResponse: true, idempotencyKeyReuseConflictCanonical: true, forcedLaterStatementRollback: true, concurrentDuplicateIdentitySingleWinner: true, downstreamW02Mutation: false }, observed: { userId: String(first.userId), accountState: first.accountState, hashLength: String(successRows.hash).length, saltLength: String(successRows.salt).length, concurrentStatuses: pair.map((response) => response.status), sameKeyStatuses } }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))
 } finally {
