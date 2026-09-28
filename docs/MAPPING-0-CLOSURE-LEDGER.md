@@ -3851,3 +3851,15 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
   - `w01_base_url=https://luckread-w01-payload.wanghui-79b.workers.dev`
   - `database_name=luckread`
   - `confirm=RUN_AUTH013_E2E`
+
+
+## 2026-09-29 — AUTH-013 public HTTP E2E checkout isolation correction
+
+- Backup before correction: `backup/pre-auth013-multi-checkout-fix-20260929-202609282022`.
+- Manual run `36458036138` passed deployment provenance and evidence-tooling checkout, then failed before W01 dependency installation because the second `actions/checkout@v4` used the workspace root and removed the prior `deployed-source/` checkout.
+- Workflow-only correction committed at `2f25a61fbfe6504890a6f30a5056ce5b2f3b48b7`: current evidence tooling is checked out to `evidence-tooling/`; fixture and public HTTP scripts are invoked from that path; exact deployed runtime remains isolated at `deployed-source/`.
+- No AUTH-013 runtime route, Contract, D1 schema, Payload version, Worker topology, or session authority changed.
+- Run `36458036138` is not evidence of AUTH-013 behavior because HTTP assertions did not execute.
+- `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
+- `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_EXECUTION`
+- Next admissible action remains manual dispatch of the existing workflow with the already admitted deployment provenance.
