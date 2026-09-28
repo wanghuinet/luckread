@@ -66,6 +66,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tested_commit }}
+          path: deployed-source
+          fetch-depth: 0
+
+      - name: Checkout current evidence tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Setup runtime
@@ -79,11 +86,11 @@ jobs:
           run_install: false
 
       - name: Install locked W01 dependencies
-        working-directory: workers/W01-payload
+        working-directory: deployed-source/workers/W01-payload
         run: pnpm install --frozen-lockfile
 
       - name: Verify admitted Payload baseline
-        working-directory: workers/W01-payload
+        working-directory: deployed-source/workers/W01-payload
         run: |
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs'
@@ -104,7 +111,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config workers/W01-payload/wrangler.jsonc             --command "SELECT
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W01-payload/wrangler.jsonc             --command "SELECT
               (SELECT COUNT(*) FROM users WHERE id IN (${AUTH013_BASIC_USER_ID}, ${AUTH013_OPERATOR_USER_ID})) AS user_collision,
               (SELECT COUNT(*) FROM users_sessions WHERE id IN ('${AUTH013_BASIC_SESSION_ID}', '${AUTH013_OPERATOR_SESSION_ID}')) AS session_collision,
               (SELECT COUNT(*) FROM role_assignments WHERE id IN ('${AUTH013_BASIC_ROLE_ID}', '${AUTH013_OPERATOR_ROLE_ID}')) AS role_collision,
@@ -124,7 +131,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config workers/W01-payload/wrangler.jsonc --file=/tmp/auth013-seed.sql
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --file=/tmp/auth013-seed.sql
 
       - name: Execute public transport E2E
         env:
@@ -138,7 +145,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config workers/W01-payload/wrangler.jsonc             --command "UPDATE auth_session_state
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc             --command "UPDATE auth_session_state
               SET revoked_at='${AUTH013_NOW}', last_seen_at='${AUTH013_NOW}', token_version=token_version+1
               WHERE session_id='${AUTH013_BASIC_SESSION_ID}' AND revoked_at IS NULL;"
 
@@ -177,7 +184,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config workers/W01-payload/wrangler.jsonc             --command "SELECT
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W01-payload/wrangler.jsonc             --command "SELECT
               (SELECT account_state FROM users WHERE id=${AUTH013_OPERATOR_USER_ID}) AS operator_state,
               (SELECT account_state_version FROM users WHERE id=${AUTH013_OPERATOR_USER_ID}) AS operator_version,
               (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id='${AUTH013_OPERATOR_USER_ID}') AS operator_journal_count,
@@ -246,7 +253,7 @@ jobs:
           DELETE FROM role_authorization_versions WHERE subject_id IN ('${AUTH013_BASIC_USER_ID}','${AUTH013_OPERATOR_USER_ID}');
           DELETE FROM users WHERE id IN (${AUTH013_BASIC_USER_ID},${AUTH013_OPERATOR_USER_ID});
           SQL
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config workers/W01-payload/wrangler.jsonc --file=/tmp/auth013-cleanup.sql
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --file=/tmp/auth013-cleanup.sql
 
       - name: Verify fixture cleanup
         if: always()
@@ -255,7 +262,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config workers/W01-payload/wrangler.jsonc             --command "SELECT
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W01-payload/wrangler.jsonc             --command "SELECT
               (SELECT COUNT(*) FROM users WHERE id IN (${AUTH013_BASIC_USER_ID},${AUTH013_OPERATOR_USER_ID})) AS users_remaining,
               (SELECT COUNT(*) FROM users_sessions WHERE id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}')) AS sessions_remaining,
               (SELECT COUNT(*) FROM auth_session_state WHERE session_id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}')) AS extensions_remaining,
