@@ -3594,3 +3594,19 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - The historical AUTH-002 migration record `EVD-AUTH002-B10-MIGRATION-REMOTE-001` remains `CREATED` and is not promoted from documentation or stale provenance.
 - No global Evidence Registry or Mapping 0 GREEN claim is made.
 - No production deployment, new Worker/D1/Queue, or migration execution is performed by this cursor reconciliation.
+
+
+## 2026-09-28 — AUTH-002 migration evidence admissibility boundary reconciliation
+
+- Current Git `main` after PR #154 merge: `694c1da911145cc4a3d1b152d12ed797a3b525b5`.
+- Backup before this governance change: `backup/main-before-auth002-migration-evidence-boundary-20260928`.
+- New Change Control: `docs/change-control/CC-MAPPING-0-AUTH-002-MIGRATION-EVIDENCE-ADMISSIBILITY-BOUNDARY-2026-09-28.md`.
+- Historical E5 execution run `35552919573` is retained as a technical fact but remains unauthorized at execution time and is not retroactively classified as GREEN-authorized evidence.
+- The AUTH-002 migration SQL file is byte-identical between historical and current source: historical/current blob `2b43a7b08fe7c5be98793da7eb07ddd2cf9e6921`.
+- The migration index changed after historical execution: `436c37e395145017d9135f938d69a741a936c60b` -> `4a8ee2b68c1b845d06b9f4bb892e59d70a556376`.
+- The current persistence evidence contract requires exact tested-commit binding and provides no migration-file-only source-equivalence exception. Therefore the historical execution cannot be promoted to current `MIGRATION_EXECUTION=VERIFIED`.
+- The E5 migration must not be re-applied merely to manufacture fresh evidence; duplicate execution is fail-closed because the migration is already applied remotely.
+- No Contract, Blueprint, D1 schema, Worker, Queue, runtime implementation, Evidence Registry status, entity status, or Mapping 0 GREEN state is changed by this reconciliation.
+- Current executable gate remains AUTH-002 `MIGRATION_EXECUTION` admissibility; a separate explicit authority/contract decision is required before any alternative admissibility rule can be introduced.
+- The implementation/source evidence boundary remains `e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd`; later changes through `694c1da911145cc4a3d1b152d12ed797a3b525b5` are governance-only for this gate.
+- No Runtime evidence is rerun.
