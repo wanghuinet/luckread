@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "b6eab1eae17a825103c0a3b3a6c80daf570e8ff3",
+  "sourceHead": "37b0473f7214dd4eaca0326d147973e44fe52e7e",
   "backupBranch": "backup/pre-priv004-baseline-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "DEV_RUNTIME_EVIDENCE_PASS_IMPLEMENTATION_MERGED_PRODUCTION_BLOCKED",
-    "objective": "Admit the merged AUTH-001 W01 registration batch runtime evidence and close the development implementation gate without promoting production or Mapping 0.",
+    "state": "DEV_RUNTIME_EVIDENCE_PASS_IMPLEMENTATION_MERGED_EVIDENCE_REGISTERED_PRODUCTION_BLOCKED",
+    "objective": "Admit the merged AUTH-001 W01 registration batch and W02/D1-01 eventual materialization runtime evidence without promoting production or Mapping 0.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::development runtime evidence admitted; next controlled gate is production PRIV-004 authority plus Evidence Registry/Mapping 0 promotion. No production deployment is authorized.",
+    "nextGate": "AUTH-001::Evidence Registry admission is reconciled for W01 batch persistence and W02/D1-01 materialization runtime; next governed gate is production PRIV-004 ACCOUNT_REGISTRATION / LEGAL_AUDIT authority plus downstream Evidence Registry/Mapping 0 promotion checks. No production deployment is authorized.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -168,8 +168,8 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "AUTH-001 registration implementation is merged to main at ca3986f8ecbdf866d4ebc7b57b8c3dce880a22d7. Final diagnostic-only cleanup is merged at 75d30eeeeedf09ee6a9d08de2a2345cf85edee26. Exact final source SHA b357ebe74f480f00c72f8fb0606226348570c105 passed controlled local W01/OpenNext/D1 runtime evidence in run 36372326548. Controlled remote AUTH-001 registration migration execution run 36379124829 against exact current main SHA b6eab1eae17a825103c0a3b3a6c80daf570e8ff3 passed; D1-01 registration/consent persistence schema is now physically verified without production deployment.",
-    "currentMainSha": "b6eab1eae17a825103c0a3b3a6c80daf570e8ff3",
+    "reason": "AUTH-001 controlled remote migration evidence and W02/D1-01 materializer runtime evidence are now both physically verified. Migration run 36379124829 passed at b6eab1e; materializer run 36377880967 rerun passed at exact implementation SHA bd2791a4ca799126fac16afbc0506070e9074a77. Current main remains 37b0473f7214dd4eaca0326d147973e44fe52e7e with no relevant W02 materializer source changes after the tested implementation commit.",
+    "currentMainSha": "37b0473f7214dd4eaca0326d147973e44fe52e7e",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_RUNTIME_VERIFIED_DEV_ONLY_PRODUCTION_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -178,7 +178,7 @@
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED"
   },
-  "nextGate": "AUTH-001::development runtime evidence admitted; next controlled gate is production PRIV-004 authority plus Evidence Registry/Mapping 0 promotion. No production deployment is authorized.",
+  "nextGate": "AUTH-001::W02_D1-01 registration materializer remote runtime evidence; controlled same-implementation evidence must pass before Evidence Registry promotion. Production remains blocked on PRIV-004 authority.",
   "runtimeEvidenceAdmission": {
     "status": "PASS_VERIFIED",
     "workflow": ".github/workflows/auth-001-registration-local-evidence.yml",
@@ -313,6 +313,29 @@
       "no_application_fixtures_created",
       "no_production_worker_deployed"
     ],
+    "productionDeployment": "BLOCKED"
+  },
+  "runtimeMaterializerEvidenceAdmission": {
+    "status": "PASS_VERIFIED",
+    "workflow": "W02 AUTH-001 Registration Materializer Remote Evidence",
+    "runId": "36377880967",
+    "jobId": "108799593871",
+    "testedSourceSha": "bd2791a4ca799126fac16afbc0506070e9074a77",
+    "artifactId": "10953241430",
+    "artifactRef": "https://github.com/wanghuinet/luckread/actions/runs/36377880967/artifacts/10953241430",
+    "artifactSha256": "9b65754f98d44453d7df598d1bdda40374f3aa5eb033239d6001e1d227f59062",
+    "environment": "CONTROLLED_REMOTE_D1_AUTH001_MATERIALIZER",
+    "assertions": [
+      "missing_key_fails_closed_without_mutation",
+      "exactly_one_identity_after_first_materialization",
+      "two_initial_credentials_after_first_materialization",
+      "identity_converges",
+      "credentials_active_and_hashed",
+      "second_run_creates_nothing",
+      "no_raw_secret_in_result",
+      "no_production_worker_deployed"
+    ],
+    "evidenceRegistryId": "EVD-AUTH001-W02-MATERIALIZER-RUNTIME-REMOTE-001",
     "productionDeployment": "BLOCKED"
   }
 }
