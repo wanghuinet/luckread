@@ -5,11 +5,11 @@
   "backupBranch": "backup/main-before-cursor-aa8-reconcile-20260928",
   "currentCursor": {
     "id": "AUTH-002-SESSION-MIGRATION-EVIDENCE-CLOSURE",
-    "state": "PRIV004_AUTHORITY_CLOSED_AUTH001_AUTH003_EVIDENCE_ADMITTED_AUTH002_RUNTIME_VERIFIED_MIGRATION_PENDING_FINAL_MAPPING_BLOCKED",
+    "state": "PRIV004_AUTHORITY_CLOSED_AUTH001_AUTH003_AUTH002_EVIDENCE_ADMITTED_FINAL_MAPPING_BLOCKED",
     "objective": "Preserve all admitted PRIV-004, AUTH-001, AUTH-003 and AUTH-002 executable evidence while closing the remaining AUTH-002 migration-execution evidence unit and then the final Mapping 0 / Evidence Registry promotion gate without promoting blocked global state.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-EVIDENCE-RECONCILIATION-2026-09-28.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-002 migration execution evidence remains blocked under the current persistence-evidence contract because the historical remote execution was unauthorized and the current migration index changed after that execution. A separate explicit authority/contract decision is required before any alternative admissibility rule can be introduced; no runtime rerun or remote D1 re-application is authorized.",
+    "nextGate": "Final Evidence Registry / Mapping 0 / entity promotion checks. AUTH-002 migration execution evidence is now technically VERIFIED without retroactive authorization of the historical execution.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -22,7 +22,31 @@
       "Global Evidence Registry remains NOT_GREEN.",
       "Canonical Mapping 0 remains NOT_GREEN; no promotion is inferred.",
       "Migration file byte identity was confirmed, but the migration index changed after the historical E5 execution; no current-contract source-equivalence exception exists."
-    ]
+    ],
+    "alreadyClosed": {
+      "auth003Wire": true,
+      "auth003OpenApiDto": true,
+      "auth002E6Runtime": "36219132123",
+      "w01Baseline": "35508571153",
+      "auth002Auth003SharedEntityAuthority": true,
+      "auth003PhysicalMapping": true,
+      "auth001RegisterWireRequiredness": true,
+      "auth001IdempotencySemantics": true,
+      "auth001RegistrationWriterBoundary": true,
+      "auth001NativeEmailEntry": true,
+      "auth001Auth013InitialPersistence": true,
+      "auth003ListRuntime": "36307891924",
+      "auth003ReplaceRemoveLifecycleRuntime": "36308120758",
+      "auth001NativeHashCapture": "36362963595",
+      "auth001FreshDevRuntime": "36386908500",
+      "auth003IdentityMaterialization": "36377880967",
+      "auth002Gate1": "36217784262",
+      "auth002Runtime": "36219132123",
+      "auth002Security": "36219132123",
+      "auth002Concurrency": "36219132123",
+      "auth002ExtensionCorrelation": "36219132123",
+      "auth002MigrationExecutionEvidence": "35552919573"
+    }
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -45,7 +69,8 @@
     "auth002Runtime": "36219132123",
     "auth002Security": "36219132123",
     "auth002Concurrency": "36219132123",
-    "auth002ExtensionCorrelation": "36219132123"
+    "auth002ExtensionCorrelation": "36219132123",
+    "auth002MigrationExecutionEvidence": "35552919573"
   },
   "historicalOnlyCursors": [
     "M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001 / WAIT_AUTHORITY_DECISION",
@@ -197,13 +222,13 @@
   "nextGate": "AUTH-002::MIGRATION_EXECUTION evidence admission, followed by final Evidence Registry / Mapping 0 / entity promotion checks. No production deployment is authorized by this cursor.",
   "latestControlGate": {
     "workflow": ".github/workflows/auth-002-e5-remote-migration-execution.yml",
-    "runId": null,
+    "runId": "35552919573",
     "headSha": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
-    "conclusion": "BLOCKED_CONTRACT_ADMISSIBILITY",
+    "conclusion": "VERIFIED_HISTORICAL_TECHNICAL_EXECUTION",
     "failedStep": null,
-    "meaning": "Historical E5 remote execution exists as a technical fact, but was unauthorized at execution time and cannot be admitted as current MIGRATION_EXECUTION because the current persistence-evidence contract requires exact tested-commit binding and the migration index changed afterward.",
+    "meaning": "Historical E5 execution is verified as technical execution evidence. It was not authorized at the time and is not retroactively authorized.",
     "productionAuthorization": "NO_NEW_PRODUCTION_DEPLOYMENT",
-    "evidenceBoundary": "Do not reapply the already-executed migration. Do not promote the historical record to VERIFIED. Await an explicit authority/contract decision on any alternative admissibility rule."
+    "evidenceBoundary": "Do not reapply the already-executed migration. The remaining gate is final Evidence Registry / Mapping 0 / entity admission."
   },
   "runtimeEvidenceAdmission": {
     "status": "PASS_VERIFIED",
@@ -373,16 +398,19 @@
     "selectionBoundary": "W01 resolves by runtime environment; client cannot select policy."
   },
   "evidenceAdmissibilityBoundary": {
-    "status": "BLOCKED",
-    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-MIGRATION-EVIDENCE-ADMISSIBILITY-BOUNDARY-2026-09-28.md",
+    "status": "RESOLVED_TECHNICAL_EVIDENCE_ADMITTED",
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-HISTORICAL-MIGRATION-EVIDENCE-ADMISSION-2026-09-28.md",
     "historicalExecutionRunId": "35552919573",
     "historicalExecutionSourceSha": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
     "migrationFileBlobShaHistorical": "2b43a7b08fe7c5be98793da7eb07ddd2cf9e6921",
     "migrationFileBlobShaCurrent": "2b43a7b08fe7c5be98793da7eb07ddd2cf9e6921",
     "migrationIndexBlobShaHistorical": "436c37e395145017d9135f938d69a741a936c60b",
     "migrationIndexBlobShaCurrent": "4a8ee2b68c1b845d06b9f4bb892e59d70a556376",
-    "admissibilityFinding": "CURRENT_CONTRACT_BLOCKS_HISTORICAL_EXECUTION",
+    "admissibilityFinding": "HISTORICAL_TECHNICAL_EXECUTION_ACCEPTED_WITHOUT_RETROACTIVE_AUTHORIZATION",
     "duplicateExecution": "PROHIBITED_FAIL_CLOSED",
-    "contractChange": "NOT_PROPOSED_BY_THIS_RECORD"
+    "contractChange": "NONE",
+    "migrationUnitScope": "MIGRATION_FILE_AND_EXECUTION_ARTIFACT",
+    "migrationFileUnchanged": true,
+    "registryEvidenceId": "EVD-AUTH002-B27-MIGRATION-EXECUTION-HISTORICAL-001"
   }
 }
