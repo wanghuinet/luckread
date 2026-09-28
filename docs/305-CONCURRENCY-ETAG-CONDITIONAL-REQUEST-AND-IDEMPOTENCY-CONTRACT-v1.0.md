@@ -129,7 +129,8 @@ IdempotencyRecord {
   endpoint,              // 或 command 名
   payload_hash,          // 规范化请求体的 SHA-256
   state,                 // IN_PROGRESS | COMPLETED | FAILED
-  response_digest,       // COMPLETED 时保存
+  response_digest,       // COMPLETED 时保存；由具体操作合同定义其 replay commitment 语义
+
   created_at,
   expires_at             // 默认 24h
 }
@@ -149,7 +150,7 @@ IdempotencyRecord {
 
 - 幂等记录**必须**与业务写入在**同一事务**内落库（D1-01/D1-03 `ops_`）。
 - `payload_hash` 必须对**规范化**后的 JSON（排序键、去空白）计算。
-- 响应体 `digest` 保存需权衡体积：默认只保存状态码 + 关键 ID，完整响应可选。
+- 响应体 `digest` 的具体生成语义由操作合同定义；AUTH-001 使用预提交 replay commitment，实际重放 body 由 `committed_response` 权威保存。
 - 幂等记录过期由 W08 清理，默认保留 24h。
 
 ### 4.4 请求头
