@@ -11,7 +11,7 @@ describe('AUTH-003 credential hash key boundary', () => {
 
   it('requires the canonical active server-side key', () => {
     expect(resolveCredentialHashKeySet({ AUTH003_CREDENTIAL_HASH_KEY: active })).toEqual({ active })
-    expect(() => resolveCredentialHashKeySet({})).toThrowError(CredentialHashKeyError)
+    expect(() => resolveCredentialHashKeySet({})).toThrow(CredentialHashKeyError)
   })
 
   it('admits an optional previous key only for rotation overlap', () => {
@@ -36,16 +36,16 @@ describe('AUTH-003 credential hash key boundary', () => {
   })
 
   it('does not expose secret material through error messages', () => {
-    expect(() => resolveCredentialHashKeySet({
-      AUTH003_CREDENTIAL_HASH_KEY: 'short-secret-value',
-    })).not.toThrow(/short-secret-value/)
+    const secret = 'short-secret-value'
 
     try {
       resolveCredentialHashKeySet({
-        AUTH003_CREDENTIAL_HASH_KEY: 'short-secret-value',
+        AUTH003_CREDENTIAL_HASH_KEY: secret,
       })
+      throw new Error('expected missing active key failure')
     } catch (error) {
-      expect(String((error as Error).message)).not.toContain('short-secret-value')
+      expect(error).toBeInstanceOf(CredentialHashKeyError)
+      expect(String((error as Error).message)).not.toContain(secret)
     }
   })
 })
