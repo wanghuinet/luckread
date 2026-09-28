@@ -154,9 +154,9 @@ The production gate also enforces the structural fields already required by the 
 
 The user-authorized project governance decision is now recorded as an explicit production **engineering policy authority**. This closes the PRIV-004 policy-instance admission gate without pretending that engineering approval is a jurisdiction-specific legal opinion.
 
-Canonical instance:
+Canonical production instance:
 
-- `artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json`
+- `artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json`
 - `policyId = PRIV-004-ACCOUNT-REGISTRATION-PROD`
 - `policyVersion = PROD-2026-09-28.1`
 - `environment = PRODUCTION`
@@ -173,7 +173,7 @@ Canonical instance:
 
 ### Authority decision
 
-The existing 730-day deterministic rule is promoted from the prior development test value into the versioned production engineering policy **without changing the runtime implementation**. This is deliberately a policy-instance admission, not a new Worker/D1/Queue, schema, or custom retention subsystem.
+The existing 730-day deterministic rule is promoted into the versioned production engineering policy. W01 uses a minimal environment selector so development evidence continues to resolve the DEV policy artifact while production resolves the PROD artifact; no new Worker, Queue, D1 or retention subsystem is introduced. This is deliberately a policy-instance admission, not a new Worker/D1/Queue, schema, or custom retention subsystem.
 
 The admission packet is now:
 
