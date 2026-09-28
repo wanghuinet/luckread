@@ -1,0 +1,119 @@
+name: AUTH-004 Remote HTTP E2E Evidence
+
+on:
+  workflow_run:
+    workflows:
+      - W01 W02 Auth Binding Deploy
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tested_commit:
+        description: Exact W01 source commit deployed by W01 W02 Auth Binding Deploy
+        required: true
+        type: string
+      w01_base_url:
+        description: Controlled W01 public URL
+        required: true
+        default: https://luckread-w01-payload.wanghui-79b.workers.dev
+        type: string
+      database_name:
+        description: Controlled D1 database name
+        required: true
+        default: luckread
+        type: string
+      deployment_run_id:
+        description: Optional successful W01 W02 Auth Binding Deploy run ID
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  W01_BASE_URL: ${{ github.event_name == 'workflow_run' && 'https://luckread-w01-payload.wanghui-79b.workers.dev' || inputs.w01_base_url }}
+  DATABASE_NAME: ${{ github.event_name == 'workflow_run' && 'luckread' || inputs.database_name }}
+  DEPLOYMENT_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.deployment_run_id }}
+  DEPLOYMENT_HEAD_SHA: ${{ github.event_name == 'workflow_run' && '' || inputs.tested_commit }}
+
+jobs:
+  remote-e2e:
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Resolve exact deployed source SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_run" ]; then
+            test -n "${DEPLOYMENT_HEAD_SHA}"
+            exit 0
+          fi
+          test -n "${DEPLOYMENT_RUN_ID}"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}" > /tmp/deploy.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}/artifacts?per_page=100" > /tmp/deploy-artifacts.json
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from 'node:fs'
+          const run = JSON.parse(readFileSync('/tmp/deploy.json','utf8'))
+          const artifacts = JSON.parse(readFileSync('/tmp/deploy-artifacts.json','utf8'))
+          if (run.name !== 'W01 W02 Auth Binding Deploy' || run.conclusion !== 'success' || run.head_branch !== 'main') throw new Error('invalid deployment provenance')
+          const matches = (artifacts.artifacts ?? []).filter((a) => typeof a?.name === 'string' && a.name.startsWith('w01-w02-binding-deployment-') && !a.expired)
+          if (matches.length !== 1) throw new Error(`expected one live W01 deployment artifact, found ${matches.length}`)
+          const sha = matches[0].name.slice('w01-w02-binding-deployment-'.length)
+          if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('deployment source SHA invalid')
+          appendFileSync(process.env.GITHUB_ENV, `DEPLOYMENT_HEAD_SHA=${sha}\n`)
+          console.log(`Accepted W01 deployment run ${run.id}; exact source SHA=${sha}`)
+          NODE
+      - name: Checkout exact deployed source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOYMENT_HEAD_SHA }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+      - name: Install locked W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+      - name: Verify deployed source and current Payload baseline
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${DEPLOYMENT_HEAD_SHA}"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const p=JSON.parse(readFileSync('package.json','utf8'))
+          if (p.dependencies?.payload !== '3.90.2' || p.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.90.2') throw new Error('Payload 3.90.2 source admission failed')
+          NODE
+      - name: Materialize current AUTH-004 remote probe
+        run: |
+          set -euo pipefail
+          git show origin/main:scripts/auth-004-remote-e2e.mjs > scripts/auth-004-remote-e2e.mjs
+          test -s scripts/auth-004-remote-e2e.mjs
+      - name: Run controlled AUTH-004 remote HTTP E2E
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          W01_BASE_URL: ${{ env.W01_BASE_URL }}
+          DATABASE_NAME: ${{ env.DATABASE_NAME }}
+          WRANGLER_VERSION: ${{ env.WRANGLER_VERSION }}
+        run: node scripts/auth-004-remote-e2e.mjs
+      - name: Upload AUTH-004 remote E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-004-remote-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/evidence/auth-004/remote-e2e/
+          if-no-files-found: error
+          retention-days: 30
