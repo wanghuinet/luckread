@@ -76,6 +76,7 @@ export default {
         typeof body.targetUserId !== 'string' ||
         typeof body.to !== 'string' ||
         typeof body.reason !== 'string' ||
+        typeof body.expectedVersion !== 'number' ||
         !Number.isSafeInteger(body.expectedVersion) ||
         body.expectedVersion < 1
       ) {
@@ -96,7 +97,7 @@ export default {
           userId: body.targetUserId,
           to: body.to as AccountState,
           reason: body.reason,
-          expectedVersion: body.expectedVersion,
+          expectedVersion: body.expectedVersion as number,
           actor: authorization.actor,
           permission: authorization.permission,
           approvalLevel: authorization.approvalLevel,
