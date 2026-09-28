@@ -100,9 +100,13 @@ This is an authority-discovery checkpoint only. It does not authorize a retentio
 
 The project is explicitly authorizing a **development/test-only** PRIV-004 instance so AUTH-001 can proceed through deterministic engineering validation without fabricating a legal or compliance conclusion.
 
-Canonical instance:
+Canonical production instance:
+- `artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json`
 
+Development evidence instance remains separately isolated at:
 - `artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json`
+
+- `artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json`
 - `policyId = PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP`
 - `policyVersion = DEV-2026-09-28.1`
 - `environment = DEVELOPMENT`
