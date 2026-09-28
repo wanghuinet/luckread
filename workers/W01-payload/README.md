@@ -11,7 +11,7 @@ Locked boundary:
 Baseline:
 - Runtime baseline is the official Payload `templates/with-cloudflare-d1` structure.
 - The verified baseline source has been physically materialized under `workers/W01-payload/src/`.
-- The W01 dependency baseline follows the official Cloudflare D1 template structure recorded in `PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md`; the current W01 lock is Payload 3.87.1 per `workers/W01-payload/package.json`, while 3.82.1 remains only the historical upstream template observation.
+- The W01 dependency baseline follows the official Cloudflare D1 template structure recorded in `PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md`; the current W01 lock is Payload 3.90.2 per `workers/W01-payload/package.json`; the upstream `v3.90.2` Cloudflare-D1 template observation pins the Payload package family at 3.90.0, while the older 3.82.1 observation remains historical.
 - W01 must not substitute a standard Payload release line for the Cloudflare template baseline.
 
 Governance:
@@ -25,5 +25,6 @@ Next gate:
 2. Reconcile Payload app routes, admin runtime, collections, migrations, and generated types.
 3. Run dependency installation plus lint/type/build/test validation where environment permits.
 4. Record runtime/schema evidence and reconcile the AUTH-002 evidence contracts that still encode the former 3.82.1 upstream observation as the current baseline.
-5. Perform the Mapping 0 reverse-coverage check.
-6. Only then can the relevant gate be marked GREEN.
+5. Re-capture current-version runtime/schema evidence where the promotion gate requires it.
+6. Perform the Mapping 0 reverse-coverage check.
+7. Only then can the relevant gate be marked GREEN.
