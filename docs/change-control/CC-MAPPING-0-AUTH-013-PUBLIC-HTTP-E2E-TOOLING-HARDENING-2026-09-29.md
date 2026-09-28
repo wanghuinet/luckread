@@ -46,3 +46,12 @@ Admitted correction:
 - the exact deployed runtime remains isolated under `deployed-source/`.
 
 No runtime source or contract/schema authority changed.
+
+## Follow-up execution reconciliation — run 36478898506
+
+- Run `36478898506` passed deployment provenance, deployed-source isolation, locked W01 dependency installation, Payload 3.90.2 admission, and fixture generation.
+- The preflight failed on `user_collision`. The prior randomized positive INTEGER range is still reachable by existing remote users.
+- Cleanup/verification did not constitute behavior evidence because the fixture was never seeded; the cleanup verifier also reported the generated IDs as still present under the fail-closed workflow path.
+- Admitted tooling-only correction: disposable Payload user IDs are now randomized **negative** SQLite INTEGER values, outside the positive auto-generated Payload user-id sequence, while the existing collision preflight remains mandatory.
+- Backup before correction: `backup/pre-auth013-negative-fixture-20260929-202609282030`.
+- No AUTH-013 route, Contract, D1 schema, Payload version, Worker topology, or runtime authority changed.
