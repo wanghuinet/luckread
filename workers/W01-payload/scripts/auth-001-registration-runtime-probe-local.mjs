@@ -109,6 +109,9 @@ try {
     tested: { happyPath: true, duplicateReplay: true, keyReuseConflict: true, consentPersistence: true, rollbackNoPartialWrite: true },
     sourcePolicyVersion: consent.policyVersion,
   }, null, 2))
+} catch (error) {
+  console.error(error)
+  throw error
 } finally {
   if (cleanupIds.envelopeId) await payload.delete({ collection: 'auth-registration-envelopes', id: cleanupIds.envelopeId, overrideAccess: true })
   if (cleanupIds.consentId) await payload.delete({ collection: 'consents', id: cleanupIds.consentId, overrideAccess: true })
