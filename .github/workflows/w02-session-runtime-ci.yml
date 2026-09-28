@@ -18,6 +18,8 @@ on:
       - 'workers/W02-content/src/session/**'
       - 'workers/W02-content/src/credentials/credential-hash-key.ts'
       - 'workers/W02-content/src/credentials/credential-hash-key.test.ts'
+      - 'workers/W02-content/src/account/registration-materializer.ts'
+      - 'workers/W02-content/src/account/registration-materializer.test.ts'
       - 'workers/W02-content/src/index.ts'
       - '.github/workflows/w02-session-runtime-ci.yml'
       - 'package.json'
