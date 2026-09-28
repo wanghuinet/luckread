@@ -24,7 +24,7 @@ jobs:
           run_install: false
       - name: Install W01 dependencies
         working-directory: workers/W01-payload
-        run: pnpm install --frozen-lockfile --ignore-workspace
+        run: pnpm install --frozen-lockfile
       - name: Generate native Payload 3.90.2 migration
         working-directory: workers/W01-payload
         env:
