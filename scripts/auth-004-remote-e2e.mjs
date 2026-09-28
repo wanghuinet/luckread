@@ -41,6 +41,7 @@ const secretFree = (value, secrets) => {
 }
 
 const created = []
+const roleAssignments = []
 const errors = []
 async function createUser(label) {
   const suffix = `${TEST_ID}-${label}-${randomBytes(4).toString('hex')}`
@@ -66,6 +67,47 @@ async function createUser(label) {
   created.push({ id, email })
   return { id, email, password }
 }
+
+async function preparePositiveAuthSubject(user, label) {
+  const now = new Date().toISOString()
+  const roleAssignmentId = `${TEST_ID}-${label}-${randomBytes(6).toString('hex')}`
+  const before = query(`SELECT account_state,account_state_version FROM users WHERE CAST(id AS TEXT)=${sqlString(user.id)} LIMIT 1`)[0]
+  const existingAssignments = query(`SELECT id FROM role_assignments WHERE CAST(subject_id AS TEXT)=${sqlString(user.id)}`)
+  if (existingAssignments.length !== 0) throw new Error(`positive auth fixture ${label}: synthetic user already has role assignments`)
+  d1(`UPDATE users SET account_state='ACTIVE', account_state_version=COALESCE(account_state_version, 0) + 1 WHERE CAST(id AS TEXT)=${sqlString(user.id)}`)
+  d1(`INSERT INTO role_assignments
+    (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at)
+    VALUES (${sqlString(roleAssignmentId)}, ${sqlString(user.id)}, 'user', 'global', NULL, 'ACTIVE', ${sqlString(now)}, NULL, ${sqlString(now)}, ${sqlString(now)})`)
+  roleAssignments.push(roleAssignmentId)
+  const after = query(`SELECT account_state,account_state_version FROM users WHERE CAST(id AS TEXT)=${sqlString(user.id)} LIMIT 1`)[0]
+  const assignment = query(`SELECT id,subject_id,role_id,scope_type,status FROM role_assignments WHERE id=${sqlString(roleAssignmentId)} LIMIT 1`)[0]
+  if (String(after?.account_state ?? '') !== 'ACTIVE' || String(assignment?.subject_id ?? '') !== user.id || String(assignment?.role_id ?? '') !== 'user' || String(assignment?.scope_type ?? '') !== 'global' || String(assignment?.status ?? '') !== 'ACTIVE') {
+    throw new Error(`positive auth fixture ${label}: activation or role assignment failed`)
+  }
+  write(`remote-positive-auth-fixture-${label}.json`, {
+    featureId: 'AUTH-004',
+    mode: 'CONTROLLED_REMOTE_D1_POSITIVE_AUTH_FIXTURE',
+    userId: user.id,
+    precondition: {
+      accountState: before?.account_state ?? null,
+      accountStateVersion: Number(before?.account_state_version ?? 0),
+      roleAssignmentCountBefore: existingAssignments.length,
+    },
+    activated: {
+      accountState: String(after.account_state),
+      accountStateVersion: Number(after.account_state_version ?? 0),
+    },
+    roleAssignment: {
+      id: String(assignment.id),
+      subjectId: String(assignment.subject_id),
+      roleId: String(assignment.role_id),
+      scopeType: String(assignment.scope_type),
+      status: String(assignment.status),
+    },
+    secretsRecorded: false,
+  })
+}
+
 async function login(user, deviceId) {
   const res = await request('/auth/login', { method: 'POST', body: { identity: user.email, credential: user.password, deviceId } })
   expect(res.status, 200, `login ${deviceId}`)
@@ -83,7 +125,9 @@ try {
   if (dependency.dependencies?.payload !== '3.90.2' || dependency.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.90.2') throw new Error('W01 dependency contract mismatch')
 
   primary = await createUser('primary')
+  await preparePositiveAuthSubject(primary, 'primary')
   secondary = await createUser('secondary')
+  await preparePositiveAuthSubject(secondary, 'secondary')
 
   firstLogin = await login(primary, 'auth004-primary-a')
   secondLogin = await login(primary, 'auth004-primary-b')
@@ -196,6 +240,14 @@ try {
     },
   })
 } finally {
+  for (const roleAssignmentId of roleAssignments) {
+    try {
+      d1(`DELETE FROM role_assignments WHERE id=${sqlString(roleAssignmentId)}`)
+    } catch (error) {
+      errors.push(String(error))
+    }
+  }
+
   for (const user of [primary, secondary]) {
     if (!user?.id || !user?.email) continue
     try {
