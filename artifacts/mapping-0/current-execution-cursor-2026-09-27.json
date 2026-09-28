@@ -1,54 +1,24 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "0655c79e674bf4c8d63cfb3d463c311aac0cd814",
-  "backupBranch": "backup/main-before-mapping0-cursor-final-sync-20260928",
+  "sourceHead": "39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20",
+  "backupBranch": "backup/main-before-auth004-batch-20260928-2003",
   "currentCursor": {
-    "id": "AUTH-002-SESSION-MIGRATION-EVIDENCE-CLOSURE",
-    "state": "FINAL_MAPPING0_ENTITY_ADMISSION_BLOCKED",
-    "objective": "Preserve all admitted PRIV-004, AUTH-001, AUTH-003 and AUTH-002 executable evidence while executing the final Evidence Registry / Mapping 0 / entity-promotion gate without promoting blocked global state.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-EVIDENCE-RECONCILIATION-2026-09-28.md",
-    "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "Final Evidence Registry / Mapping 0 / entity promotion checks. AUTH-001 consistency is admitted and exact-SHA W02 materializer evidence is admitted; global Mapping 0 / Five-Way remain NOT_GREEN and no global promotion is inferred.",
-    "logicalOwnership": "W02 -> D1-01 CLOSED",
-    "physicalBinding": "W02/D1-01 physical target CLOSED",
-    "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
+    "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
+    "state": "BLOCKED_REMOTE_E2E",
+    "objective": "Close the AUTH-004 controlled remote HTTP/E2E lifecycle gate against the exact deployed W01 source without adding a custom auth subsystem, migration, Worker, D1 database, queue, or Payload core change.",
+    "authoritativeControl": "docs/change-control/CC-AUTH-004-PAYLOAD-VERSION-ALIGNMENT-2026-09-28.md",
+    "nextGate": "Execute/inspect the existing controlled AUTH-004 remote HTTP E2E evidence path against exact deployed source 39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20; then admit only durable evidence and run final Mapping 0 / Evidence Registry admission checks. Deployment success alone is not GREEN.",
+    "logicalOwnership": "W01 -> AUTH-004 Payload-native authority CLOSED",
+    "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding CLOSED for deployment run 36418911699",
+    "physicalRuntimeTarget": "W01 luckread-w01-payload / D1-01 luckread",
     "supersededBlockers": [
-      "PRIV-004 production engineering policy authority is admitted and production-readiness evidence passed.",
-      "AUTH-001 fresh controlled development runtime evidence after DEV/PROD policy separation is PASS_VERIFIED.",
-      "AUTH-003 credential List/Add/Replace/Remove runtime evidence is PASS_VERIFIED and ENT-IDENTITY materialization ownership evidence is admitted.",
-      "AUTH-002 Gate-1 schema, native session runtime, security-negative, concurrency and extension-correlation evidence are PASS_VERIFIED at exact tested source 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55.",
-      "Global Evidence Registry remains NOT_GREEN.",
-      "Canonical Mapping 0 remains NOT_GREEN; no promotion is inferred.",
-      "Migration file byte identity was confirmed, but the migration index changed after the historical E5 execution; no current-contract source-equivalence exception exists.",
-      "AUTH-002 migration execution evidence is now technically VERIFIED as EVD-AUTH002-B27-MIGRATION-EXECUTION-HISTORICAL-001; no re-execution or retroactive authorization is permitted.",
-      "AUTH-001 eventual-consistency model is admitted; exact-SHA W02 registration materializer evidence is PASS_VERIFIED."
-    ],
-    "alreadyClosed": {
-      "auth003Wire": true,
-      "auth003OpenApiDto": true,
-      "auth002E6Runtime": "36219132123",
-      "w01Baseline": "35508571153",
-      "auth002Auth003SharedEntityAuthority": true,
-      "auth003PhysicalMapping": true,
-      "auth001RegisterWireRequiredness": true,
-      "auth001IdempotencySemantics": true,
-      "auth001RegistrationWriterBoundary": true,
-      "auth001NativeEmailEntry": true,
-      "auth001Auth013InitialPersistence": true,
-      "auth003ListRuntime": "36307891924",
-      "auth003ReplaceRemoveLifecycleRuntime": "36308120758",
-      "auth001NativeHashCapture": "36362963595",
-      "auth001FreshDevRuntime": "36386908500",
-      "auth003IdentityMaterialization": "36377880967",
-      "auth002Gate1": "36217784262",
-      "auth002Runtime": "36219132123",
-      "auth002Security": "36219132123",
-      "auth002Concurrency": "36219132123",
-      "auth002ExtensionCorrelation": "36219132123",
-      "auth002MigrationExecutionEvidence": "35552919573",
-      "auth001EventualConsistency": true
-    }
+      "Payload 3.87.1 version-alignment gap is superseded by the merged 3.90.2 dependency baseline and successful W01 deployment run 36418911699.",
+      "AUTH-004 local native lifecycle evidence is already VERIFIED at run 36411953998 and must not be rerun unchanged.",
+      "AUTH-004 canonical API/DTO/field mapping is already reconciled and must not be reopened.",
+      "The remaining feature-level runtime gap is controlled remote HTTP/E2E evidence, including remote session invalidation and protected-account enumeration resistance.",
+      "Global Evidence Registry and Mapping 0 remain NOT_GREEN; no promotion is inferred from build/deploy success."
+    ]
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -72,13 +42,17 @@
     "auth002Security": "36219132123",
     "auth002Concurrency": "36219132123",
     "auth002ExtensionCorrelation": "36219132123",
-    "auth002MigrationExecutionEvidence": "35552919573"
+    "auth002MigrationExecutionEvidence": "35552919573",
+    "auth004PayloadVersionAlignment": "3.90.2",
+    "auth004LocalLifecycle": "36411953998",
+    "auth004W01BindingDeploy": "36418911699"
   },
   "historicalOnlyCursors": [
     "M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001 / WAIT_AUTHORITY_DECISION",
     "AUTH-003 WIRE_SCHEMA_CLOSED / RUNTIME_PERSISTENCE_BLOCKED",
     "AUTH-004 NEXT wording in pre-2026-09-27 queue header/body",
-    "W01-MIGRATION-BASELINE-AUTHORITY-001 / BLOCKED_EXTERNAL in historical ledger sections"
+    "W01-MIGRATION-BASELINE-AUTHORITY-001 / BLOCKED_EXTERNAL in historical ledger sections",
+    "AUTH-002-SESSION-MIGRATION-EVIDENCE-CLOSURE / FINAL_MAPPING0_ENTITY_ADMISSION_BLOCKED in the pre-AUTH-004 current cursor snapshot"
   ],
   "historicalRefs": [
     "docs/change-control/CC-MAPPING-0-AUTH-002-R4-ENTITY-EVIDENCE-DEPENDENCY-2026-09-26.md",
@@ -209,20 +183,20 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Main advanced through PR #158–#161 with governance/evidence reconciliations only for the current gate; no Worker/D1/runtime implementation scope changed by those merges.",
-    "currentMainSha": "0655c79e674bf4c8d63cfb3d463c311aac0cd814",
-    "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
-    "payloadWireCompatibilityStatus": "AUTH001_RUNTIME_VERIFIED_DEV_ONLY_PRODUCTION_BLOCKED",
+    "reason": "Main advanced through the AUTH-004 3.90.2 version-alignment, native migration review, local lifecycle evidence, remote E2E harness, and W01/W02 binding deployment checkpoints. The latest deployment succeeded; no remote E2E PASS is claimed yet.",
+    "currentMainSha": "39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20",
+    "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
+    "payloadWireCompatibilityStatus": "AUTH004_LOCAL_LIFECYCLE_VERIFIED_REMOTE_E2E_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
     "idempotencySourceStatus": "CLOSED",
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "0655c79e674bf4c8d63cfb3d463c311aac0cd814",
-    "governanceHeadDisposition": "PR #154, #155, #156 and #157 plus the subsequent evidence-ref reconciliation are governance/evidence changes only for the current gate. The relevant implementation/runtime evidence scopes remain unchanged and must not be rerun solely because main advanced.",
+    "actualGitMainHead": "39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20",
+    "governanceHeadDisposition": "This checkpoint is a current-head governance reconciliation. Existing closed AUTH-001/AUTH-002/AUTH-003 evidence remains inherited; AUTH-004 local lifecycle evidence remains exact-SHA verified; remote HTTP/E2E remains a separate gate.",
     "reviewedAt": "2026-09-28"
   },
-  "nextGate": "Final Evidence Registry / Mapping 0 / entity promotion checks. AUTH-002 migration execution evidence is closed; no production deployment is authorized by this cursor.",
+  "nextGate": "AUTH-004 controlled remote HTTP E2E evidence against exact deployed source 39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20; after evidence admission, final Evidence Registry / Mapping 0 checks.",
   "latestControlGate": {
     "workflow": ".github/workflows/auth-002-e5-remote-migration-execution.yml",
     "runId": "35552919573",
@@ -295,12 +269,12 @@
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-28",
-    "mainSha": "0655c79e674bf4c8d63cfb3d463c311aac0cd814",
+    "mainSha": "39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20",
     "payloadPackage": "workers/W01-payload/package.json",
-    "payloadVersion": "3.87.1",
-    "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
-    "implementationDisposition": "MERGED_RUNTIME_VERIFIED_DEV_ONLY_PRODUCTION_BLOCKED",
-    "staleEvidenceCorrection": "B19 historical fields:[] observation remains superseded by active W01 source; replay response and PRIV-002 decision boundary were reconciled at current main head."
+    "payloadVersion": "3.90.2",
+    "capabilityFinding": "Payload native AUTH-004 password lifecycle capability is aligned to the 3.90.2 baseline; no custom session invalidation subsystem is admitted.",
+    "implementationDisposition": "MERGED_RUNTIME_LOCAL_VERIFIED_REMOTE_E2E_BLOCKED",
+    "staleEvidenceCorrection": "The previous cursor's 3.87.1 source statement is historical and superseded by the current 3.90.2 main head."
   },
   "devTestPolicy": {
     "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
