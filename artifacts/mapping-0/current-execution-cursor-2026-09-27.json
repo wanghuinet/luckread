@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "b6004470b5c9d63e66fbc7214a99621d1da401eb",
+  "sourceHead": "e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd",
   "backupBranch": "backup/pre-priv004-baseline-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
@@ -64,7 +64,7 @@
     "Treat 36296831559 as execution checkpoint only; final schema correctness requires a later read-only exact-SHA postcheck.",
     "Do not promote AUTH-003 persistence status from the migration execution log alone."
   ],
-  "previousSourceHead": "37b0473f7214dd4eaca0326d147973e44fe52e7e",
+  "previousSourceHead": "b6004470b5c9d63e66fbc7214a99621d1da401eb",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
@@ -168,7 +168,7 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Current main advanced by the merged AUTH-001 materializer evidence reconciliation PR to b6004470b5c9d63e66fbc7214a99621d1da401eb. No W01/W02 runtime implementation source changed in that governance-only merge. Both AUTH-001 W01 registration migration and W02/D1-01 materializer runtime evidence are PASS_VERIFIED and registered. The remaining governed production blocker is PRIV-004 ACCOUNT_REGISTRATION / LEGAL_AUDIT authority.",
+    "reason": "Current main is now e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd after the cursor-only governance refresh merge. The intervening b6004470b5c9d63e66fbc7214a99621d1da401eb and e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd changes are governance/evidence-only; no relevant W02 materializer implementation source changed. AUTH-001 W01 registration migration and W02/D1-01 materializer runtime evidence remain PASS_VERIFIED and registered. The remaining governed production blocker is PRIV-004 ACCOUNT_REGISTRATION / LEGAL_AUDIT authority.",
     "currentMainSha": "b6004470b5c9d63e66fbc7214a99621d1da401eb",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_RUNTIME_VERIFIED_DEV_ONLY_PRODUCTION_BLOCKED",
@@ -337,6 +337,6 @@
     ],
     "evidenceRegistryId": "EVD-AUTH001-W02-MATERIALIZER-RUNTIME-REMOTE-001",
     "productionDeployment": "BLOCKED",
-    "currentMainAfterMerge": "b6004470b5c9d63e66fbc7214a99621d1da401eb"
+    "currentMainAfterMerge": "e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd"
   }
 }
