@@ -152,15 +152,17 @@ try {
   expect(change.status, 204, 'password change')
   if (change.bodyBytes !== 0) throw new Error('password change returned a response body')
 
-  const oldSessionResults = await Promise.all([
+  const postChangeSessionResults = await Promise.all([
     request('/api/users/me', { token: firstLogin.accessToken }),
     request('/api/users/me', { token: secondLogin.accessToken }),
   ])
-  expect(oldSessionResults[0].status, 401, 'first session after change')
-  expect(oldSessionResults[1].status, 401, 'second session after change')
+  // Payload-native password updates retain the authenticated request's current
+  // session and revoke the other affected native sessions.
+  expect(postChangeSessionResults[0].status, 200, 'current session after change')
+  expect(postChangeSessionResults[1].status, 401, 'other pre-change session after change')
 
   const changedSessionRows = sessionRows(primary.id)
-  if (changedSessionRows.length !== 0) throw new Error(`password change left ${changedSessionRows.length} native sessions`) 
+  if (changedSessionRows.length !== 1) throw new Error(`password change retained ${changedSessionRows.length} native sessions; expected exactly 1`) 
 
   primary.password = changedPassword
   changedLogin = await login(primary, 'auth004-primary-after-change')
@@ -222,8 +224,9 @@ try {
     assertions: {
       crossAccountChangeDenied: wrongAccount.status === 401,
       passwordChangeAccepted: change.status === 204 && change.bodyBytes === 0,
-      allPreChangeSessionsInvalidated: oldSessionResults.every((r) => r.status === 401),
-      nativeSessionRowsEmptyAfterChange: changedSessionRows.length === 0,
+      currentSessionRetainedAfterChange: postChangeSessionResults[0].status === 200,
+      otherPreChangeSessionInvalidated: postChangeSessionResults[1].status === 401,
+      exactlyOneNativeSessionRetainedAfterChange: changedSessionRows.length === 1,
       resetRequestEnumerationResistant: existingResetRequest.status === 202 && missingResetRequest.status === 202 && existingResetRequest.bodyBytes === 0 && missingResetRequest.bodyBytes === 0,
       passwordResetAccepted: reset.status === 204 && reset.bodyBytes === 0,
       preResetSessionInvalidated: (await request('/api/users/me', { token: changedLogin.accessToken })).status === 401,
