@@ -2,7 +2,8 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getPayload } from 'payload'
 
 import config, { AUTH001_USER_CAPTURE_CONTEXT } from '@payload-config'
-import priv004Policy from '../../../../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'
+import priv004DevPolicy from '../../../../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'
+import priv004ProdPolicy from '../../../../../../artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json'
 
 const SCOPE = 'ACCOUNT_REGISTRATION'
 const ENDPOINT = 'authRegister'
@@ -135,11 +136,12 @@ const isUniqueConstraintError = (error: unknown) => {
 
 const validatePolicy = (now: Date) => {
   const runtimeEnvironment = process.env.CLOUDFLARE_ENV ?? (process.env.NODE_ENV === 'production' ? 'production' : 'development')
+  const priv004Policy = runtimeEnvironment.toLowerCase() === 'production' ? priv004ProdPolicy : priv004DevPolicy
   if (
-    runtimeEnvironment.toLowerCase() === 'production' ||
     priv004Policy.status !== 'APPROVED' ||
-    priv004Policy.environment !== 'DEVELOPMENT' ||
-    priv004Policy.usage.productionUse !== false ||
+    (runtimeEnvironment.toLowerCase() === 'production'
+      ? priv004Policy.environment !== 'PRODUCTION' || priv004Policy.usage.productionUse !== true
+      : priv004Policy.environment !== 'DEVELOPMENT' || priv004Policy.usage.productionUse !== false) ||
     priv004Policy.rule.mode !== 'DURATION' ||
     !Number.isSafeInteger(priv004Policy.rule.durationSeconds) ||
     priv004Policy.rule.durationSeconds <= 0 ||
@@ -148,8 +150,8 @@ const validatePolicy = (now: Date) => {
   ) throw new Error('PRIV004_POLICY_NOT_ADMISSIBLE')
 
   const effectiveFrom = Date.parse(priv004Policy.effectiveFrom)
-  const effectiveTo = Date.parse(priv004Policy.effectiveTo)
-  if (!Number.isFinite(effectiveFrom) || !Number.isFinite(effectiveTo) || now.getTime() < effectiveFrom || now.getTime() > effectiveTo) {
+  const effectiveTo = priv004Policy.effectiveTo === null ? Number.POSITIVE_INFINITY : Date.parse(priv004Policy.effectiveTo)
+  if (!Number.isFinite(effectiveFrom) || (!Number.isFinite(effectiveTo) && effectiveTo !== Number.POSITIVE_INFINITY) || now.getTime() < effectiveFrom || now.getTime() > effectiveTo) {
     throw new Error('PRIV004_POLICY_OUTSIDE_WINDOW')
   }
 
