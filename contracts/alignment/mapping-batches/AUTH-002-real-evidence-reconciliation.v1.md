@@ -2,7 +2,7 @@
 
 ## Status
 
-`PASS_VERIFIED_RUNTIME_EVIDENCE / BLOCKED_MIGRATION_AND_MAPPING0_PROMOTION`
+`PASS_VERIFIED_RUNTIME_AND_MIGRATION_EVIDENCE / BLOCKED_MAPPING0_PROMOTION`
 
 ## Authority
 
@@ -46,11 +46,11 @@ These facts supersede older wording that described the Session field contract as
 | Extension correlation | `ACCEPTED / VERIFIED` | Canonical record `EVD-AUTH002-B26-EXTENSION-CORRELATION-REMOTE-001` |
 | Security E2E | `ACCEPTED / VERIFIED` | Canonical record `EVD-AUTH002-B24-SECURITY-NEGATIVE-REMOTE-001` |
 | Concurrency E2E | `ACCEPTED / VERIFIED` | Canonical record `EVD-AUTH002-B25-CONCURRENCY-REMOTE-001` |
-| Migration execution | `BLOCKED_PENDING_CONTRACT_COMPLETE_EVIDENCE` | Current persistence evidence unit requires explicit migration execution/postcondition proof |
-| Evidence Registry | `RUNTIME GATES BOUND / MIGRATION UNIT UNADMITTED` | Migration evidence must be verified without stale-commit inheritance |
+| Migration execution | `ACCEPTED / VERIFIED` | Historical E5 technical execution evidence admitted by CC; exact tested commit `fe1f2784d21f3f629bbad0baa971f1aa56520914` |
+| Evidence Registry | `RUNTIME + MIGRATION GATES BOUND` | Final Mapping-0/entity admission remains |
 | Mapping-0 | `NOT_GREEN` | Global Mapping-0 validation remains required |
 | ENT-SESSION | `PROPOSED / PROMOTION BLOCKED` | Final entity/persistence admission required |
-| AUTH-002 | `BLOCKED_NOT_GREEN` | All required gates accepted |
+| AUTH-002 | `BLOCKED_MAPPING0` | Migration execution evidence is verified; final Mapping-0/entity admission remains |
 
 ## Evidence reconciliation
 
@@ -62,7 +62,7 @@ The canonical Evidence Registry already contains verified exact-SHA records for 
 - `EVD-AUTH002-B25-CONCURRENCY-REMOTE-001`
 - `EVD-AUTH002-B26-EXTENSION-CORRELATION-REMOTE-001`
 
-The older `EVD-AUTH002-B10-MIGRATION-REMOTE-001` record is `CREATED` with a historical validity window and is not sufficient to satisfy the current `MIGRATION_EXECUTION` evidence unit. No runtime rerun is required for this reconciliation.
+The older `EVD-AUTH002-B10-MIGRATION-REMOTE-001` record remains preserved. The current migration execution claim is satisfied by `EVD-AUTH002-B27-MIGRATION-EXECUTION-HISTORICAL-001`, which is bound to exact historical tested commit `fe1f2784d21f3f629bbad0baa971f1aa56520914` and admitted as unchanged-scope technical execution evidence. No runtime rerun or migration re-application is required.
 
 ## Execution work packages
 
@@ -222,3 +222,8 @@ AUTH-002 remains **not GREEN** because the current persistence-evidence contract
 ## Immediate next action
 
 Reconcile the exact-SHA migration execution evidence against the current persistence-evidence contract. Do not rerun AUTH-002 runtime evidence `36219132123`, do not redeploy W01/W02 unchanged, and do not apply another session migration.
+
+
+## Migration execution admission — 2026-09-28
+
+The historical E5 execution artifact `10618729380` was inspected and contains the complete migration execution evidence chain. The migration source file is byte-identical on current main. The execution remains historically unauthorized, but the technical execution fact is independently complete and is admitted as `EVD-AUTH002-B27-MIGRATION-EXECUTION-HISTORICAL-001` under `INHERITED_UNCHANGED_SCOPE`. No Contract change or remote re-execution is required. AUTH-002 is now blocked only by final Mapping 0 / entity admission.
