@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "1.0",
-  "status": "NOT_GREEN",
+  "status": "CURRENT_EVIDENCE_REGISTRY",
   "sourceOfTruth": "docs/176-EVIDENCE-REGISTRY-ACCEPTANCE-TRACEABILITY-CONTRACT-v1.0.md",
   "records": [
     {
@@ -908,6 +908,60 @@
       "status": "VERIFIED",
       "freshnessMode": "EXACT_SHA",
       "note": "The admitted W01 implementation exposes authPasswordChange, authPasswordResetRequest and authPasswordResetConfirm as thin adapters over Payload-native password update, forgotPassword and resetPassword operations. This verifies implementation presence and exact source provenance only; it does not establish remote HTTP E2E, protected-account enumeration resistance, session invalidation, lifecycle events, or Mapping 0 GREEN."
+    },
+    {
+      "evidenceId": "EVD-AUTH001-REGISTRATION-RUNTIME-LOCAL-002",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-001::REGISTRATION_D1_BATCH",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-001",
+      "source": "GitHub Actions AUTH-001 Registration Local Runtime Evidence against current main implementation",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36429956815/artifacts/10972624632",
+      "commitSha": "10885288b7115e3f967e6b01772e2063f0d55d6d",
+      "timestamp": "2026-09-28T13:41:00Z",
+      "producer": "AUTH-001 Registration Local Runtime Evidence / run 36429956815 / job 108953279163",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "108953279163",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36429956815",
+      "freshnessMode": "EXACT_SHA",
+      "note": "Controlled local W01 OpenNext Cloudflare Worker runtime at exact source SHA 10885288b7115e3f967e6b01772e2063f0d55d6d. PASS assertions: successful registration; exactly one User and one Consent; canonical PENDING_VERIFICATION/version 1; Payload-native hash/salt persisted without plaintext password; admitted response_digest commitment matches; completed replay returns original response; same-key reuse conflict is canonical; forced later-statement rollback leaves no partial User/Consent; concurrent duplicate identity has one winner; same-key concurrent path is canonical 201/201 replay or 201/409 IN_PROGRESS; no W02 mutation; no production Worker deployment. Artifact 10972624632, sha256:7a16a8d0e2b178d3e5ecdef3cd47151b487c096a36b6c60963b90dd5e78e6ae2."
+    },
+    {
+      "evidenceId": "EVD-AUTH001-REGISTRATION-SECURITY-LOCAL-002",
+      "type": "SECURITY",
+      "claimId": "AUTH-001::PASSWORD_MATERIAL",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-001",
+      "source": "GitHub Actions AUTH-001 Registration Local Runtime Evidence password-material assertions",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36429956815/artifacts/10972624632",
+      "commitSha": "10885288b7115e3f967e6b01772e2063f0d55d6d",
+      "timestamp": "2026-09-28T13:41:00Z",
+      "producer": "AUTH-001 Registration Local Runtime Evidence / run 36429956815 / job 108953279163",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "108953279163",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36429956815",
+      "freshnessMode": "EXACT_SHA",
+      "note": "Exact-SHA controlled W01 local evidence confirmed native password hash/salt persistence, absence of plaintext password persistence, canonical response_digest semantics, replay behavior, and no secret material in the evidence result. Production deployment was not performed. Artifact 10972624632."
+    },
+    {
+      "evidenceId": "EVD-AUTH001-REGISTRATION-CONCURRENCY-LOCAL-002",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-001::CONCURRENCY",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-001",
+      "source": "GitHub Actions AUTH-001 Registration Local Runtime Evidence concurrency assertions",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36429956815/artifacts/10972624632",
+      "commitSha": "10885288b7115e3f967e6b01772e2063f0d55d6d",
+      "timestamp": "2026-09-28T13:41:00Z",
+      "producer": "AUTH-001 Registration Local Runtime Evidence / run 36429956815 / job 108953279163",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "108953279163",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36429956815",
+      "freshnessMode": "EXACT_SHA",
+      "note": "Exact-SHA concurrency evidence: duplicate normalized identity produced exactly one authoritative User/Consent with statuses 201/422; concurrent same-key requests produced two identical 201 replay responses in this run; no duplicate authoritative registration record and no W02 mutation. Artifact 10972624632."
     }
   ],
   "testedCommitSha": "37b0473f7214dd4eaca0326d147973e44fe52e7e"
