@@ -3555,3 +3555,17 @@ This note does not change any Blueprint, Contract, API, DTO, Entity, Field, Work
 - Canonical Evidence Registry receives a new VERIFIED record for the fresh run. The global registry remains `NOT_GREEN`; no Mapping 0 promotion is inferred.
 - PRIV-004 Production Readiness run `36386908554` and Policy Instance Admission Guard run `36386908507` remain SUCCESS evidence from the same PR tree.
 - Current next gate is global Evidence Registry / Mapping 0 closure; unresolved canonical Mapping 0 records and entity/evidence coverage remain blockers.
+
+
+## AUTH-003 identity materialization evidence admission — 2026-09-28
+
+Current source: `5e571a79c11bd03123d0672ccdaaadb836dc40af`.
+
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTH-003-IDENTITY-MATERIALIZATION-EVIDENCE-ADMISSION-2026-09-28.md`.
+- Existing controlled remote runtime evidence `36377880967` / artifact `10953241430` is admitted as executable evidence for `ENT-IDENTITY` materialization ownership.
+- Exact tested implementation source: `bd2791a4ca799126fac16afbc0506070e9074a77`.
+- The evidence established one identity + two initial credentials on first valid materialization, convergence on the second pass, and fail-closed missing-key no-mutation behavior.
+- No W02 materializer / credential persistence implementation files changed between the tested source and current `main`; no runtime rerun is required.
+- `ENT-IDENTITY` implementation evidence is reconciled to `IMPLEMENTED`, while canonical catalog status remains `PROPOSED` and evidence status remains `BLOCKED`.
+- AUTH-003 remains `PARTIAL`; global Mapping 0 / Five-Way and Evidence Registry remain `NOT_GREEN`.
+- No production deployment, new Worker, new D1, Queue, migration, or API/DTO authority change is introduced.
