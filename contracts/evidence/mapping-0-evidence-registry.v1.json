@@ -732,7 +732,61 @@
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
       "freshnessMode": "FRESH_EXACT_SHA",
       "note": "Controlled remote concurrency evidence passed at exact source SHA c96b39569c7505ade615b15e63d87f5afb8066cc: concurrent Remove attempts produced exactly one winner and one conflict, with the atomic active-count predicate preserving the single-winner lifecycle rule. Synthetic fixtures were cleaned after execution."
+    },
+    {
+      "evidenceId": "EVD-AUTH001-REGISTRATION-RUNTIME-LOCAL-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-001::REGISTRATION_D1_BATCH",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-001",
+      "source": "GitHub Actions AUTH-001 Registration Local Runtime Evidence against exact W01 implementation",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36372326548/artifacts/10950235069",
+      "commitSha": "b357ebe74f480f00c72f8fb0606226348570c105",
+      "timestamp": "2026-09-28T03:08:09Z",
+      "producer": "AUTH-001 Registration Local Runtime Evidence / run 36372326548 / job 108771054689",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "108771054689",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36372326548",
+      "freshnessMode": "FRESH_EXACT_SHA",
+      "note": "Controlled local W01 OpenNext Cloudflare Worker runtime against exact source SHA b357ebe74f480f00c72f8fb0606226348570c105. Local D1 included the already-admitted AUTH-013 lifecycle schema. PASS assertions: one-batch User + Consent + registration envelope; Payload-native hash/salt persisted with no plaintext password; canonical response_digest; completed replay; same-key reuse conflict; forced later-statement rollback with no partial User/Consent; duplicate-identity concurrency safety; same-key concurrent canonical replay/IN_PROGRESS semantics; no W02 mutation; no production Worker deployment. Development-only PRIV-004 policy DEV-2026-09-28.1 remained in force. Artifact 10950235069."
+    },
+    {
+      "evidenceId": "EVD-AUTH001-REGISTRATION-SECURITY-LOCAL-001",
+      "type": "SECURITY",
+      "claimId": "AUTH-001::PASSWORD_MATERIAL",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-001",
+      "source": "GitHub Actions AUTH-001 Registration Local Runtime Evidence password-material assertions",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36372326548/artifacts/10950235069",
+      "commitSha": "b357ebe74f480f00c72f8fb0606226348570c105",
+      "timestamp": "2026-09-28T03:08:09Z",
+      "producer": "AUTH-001 Registration Local Runtime Evidence / run 36372326548 / job 108771054689",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "108771054689",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36372326548",
+      "freshnessMode": "FRESH_EXACT_SHA",
+      "note": "Payload-native registration produced hash and salt before the W01 persistence seam; the evidence found no plaintext password persistence. Replay and key-reuse behavior were also exercised. No production deployment occurred."
+    },
+    {
+      "evidenceId": "EVD-AUTH001-REGISTRATION-CONCURRENCY-LOCAL-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-001::CONCURRENCY",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-001",
+      "source": "GitHub Actions AUTH-001 Registration Local Runtime Evidence concurrency assertions",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36372326548/artifacts/10950235069",
+      "commitSha": "b357ebe74f480f00c72f8fb0606226348570c105",
+      "timestamp": "2026-09-28T03:08:09Z",
+      "producer": "AUTH-001 Registration Local Runtime Evidence / run 36372326548 / job 108771054689",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "108771054689",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36372326548",
+      "freshnessMode": "FRESH_EXACT_SHA",
+      "note": "Duplicate normalized identity produced exactly one authoritative User and Consent. Same-key concurrent requests satisfied canonical idempotency semantics: either one replaying 201 plus one 409 IN_PROGRESS, or two identical 201 replays after completion; no duplicate authoritative registration record was committed."
     }
   ],
-  "testedCommitSha": "5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55"
+  "testedCommitSha": "b357ebe74f480f00c72f8fb0606226348570c105"
 }

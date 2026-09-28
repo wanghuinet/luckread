@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "78a90c70dbc7c7ea7c42475642ba5842fd778914",
+  "sourceHead": "75d30eeeeedf09ee6a9d08de2a2345cf85edee26",
   "backupBranch": "backup/pre-priv004-baseline-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "CONTRACT_SEMANTICS_RECONCILED_RUNTIME_IMPLEMENTATION_ADMITTED",
-    "objective": "Reconcile a D1-compatible atomic W01 registration commit boundary before resuming AUTH-001 runtime implementation.",
+    "state": "DEV_RUNTIME_EVIDENCE_PASS_IMPLEMENTATION_MERGED_PRODUCTION_BLOCKED",
+    "objective": "Admit the merged AUTH-001 W01 registration batch runtime evidence and close the development implementation gate without promoting production or Mapping 0.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::focused W01 registration-scoped D1 batch implementation + same-SHA success/rollback/replay/concurrency evidence; production remains blocked on PRIV-004 authority.",
+    "nextGate": "AUTH-001::development runtime evidence admitted; next controlled gate is production PRIV-004 authority plus Evidence Registry/Mapping 0 promotion. No production deployment is authorized.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -168,27 +168,41 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Response_digest semantics are now explicitly reconciled as a pre-commit replay commitment. The generated User ID remains only in committed_response, so the one-batch W01 atomic registration design no longer requires post-commit envelope mutation.",
-    "currentMainSha": "78a90c70dbc7c7ea7c42475642ba5842fd778914",
+    "reason": "AUTH-001 registration implementation is merged to main at ca3986f8ecbdf866d4ebc7b57b8c3dce880a22d7. Final diagnostic-only cleanup is merged at 75d30eeeeedf09ee6a9d08de2a2345cf85edee26. Exact final source SHA b357ebe74f480f00c72f8fb0606226348570c105 passed controlled local W01/OpenNext/D1 runtime evidence in run 36372326548.",
+    "currentMainSha": "75d30eeeeedf09ee6a9d08de2a2345cf85edee26",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
-    "payloadWireCompatibilityStatus": "AUTH001_CONTRACT_PRECONDITIONS_RECONCILED_RUNTIME_PENDING",
+    "payloadWireCompatibilityStatus": "AUTH001_RUNTIME_VERIFIED_DEV_ONLY_PRODUCTION_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
     "idempotencySourceStatus": "CLOSED",
-    "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_DESIGN_ADMITTED_RESPONSE_DIGEST_PRECOMPUTABLE",
+    "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED"
   },
-  "nextGate": "AUTH-001::development runtime implementation + controlled evidence using DEV-2026-09-28.1; production remains blocked on real PRIV-004 authority.",
+  "nextGate": "AUTH-001::development runtime evidence admitted; next controlled gate is production PRIV-004 authority plus Evidence Registry/Mapping 0 promotion. No production deployment is authorized.",
   "runtimeEvidenceAdmission": {
-    "status": "BLOCKED_D1_ATOMICITY_CAPABILITY",
-    "workflow": ".github/workflows/auth-001-development-local-runtime-evidence.yml",
-    "runId": 36361411407,
-    "testedSourceSha": "cf443d44d58aab6e5ca8569285345f188df1d714",
-    "failurePhase": "PAYLOAD_D1_SCHEMA_INITIALIZATION",
-    "failureClass": "D1_REJECTS_SQL_BEGIN_TRANSACTION",
-    "controlRef": "docs/change-control/CC-MAPPING-0-AUTH-001-D1-ATOMIC-WRITE-BOUNDARY-2026-09-28.md",
+    "status": "PASS_VERIFIED",
+    "workflow": ".github/workflows/auth-001-registration-local-evidence.yml",
+    "runId": "36372326548",
+    "testedSourceSha": "b357ebe74f480f00c72f8fb0606226348570c105",
+    "artifactId": "10950235069",
+    "artifactRef": "https://github.com/wanghuinet/luckread/actions/runs/36372326548/artifacts/10950235069",
+    "checkId": "108771054689",
+    "result": "PASS",
+    "environment": "CONTROLLED_LOCAL_D1_OPENNEXT_WORKER",
+    "assertions": [
+      "native_payload_user_validation_and_hash_salt",
+      "plaintext_password_not_persisted",
+      "one_batch_user_consent_envelope_commit",
+      "canonical_response_digest",
+      "completed_replay_201",
+      "idempotency_key_reuse_422",
+      "forced_later_statement_rollback",
+      "duplicate_identity_single_authoritative_record",
+      "same_key_concurrent_canonical_replay_or_in_progress_semantics",
+      "no_w02_mutation"
+    ],
     "productionDeployment": "BLOCKED",
-    "implementationMerge": "BLOCKED"
+    "productionBlocker": "real PRIV-004 legal/compliance authority is not yet admitted"
   },
   "contractDecisionBlocker": {
     "issueId": "CC-AUTH003-NORMALIZED-UNIQUENESS-SEMANTICS-2026-09-27",
@@ -240,11 +254,11 @@
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
-    "mainSha": "78a90c70dbc7c7ea7c42475642ba5842fd778914",
+    "mainSha": "75d30eeeeedf09ee6a9d08de2a2345cf85edee26",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
-    "implementationDisposition": "NO_CODE_CHANGE_AUTHORIZED_BY_CAPABILITY_CONTROL",
+    "implementationDisposition": "MERGED_RUNTIME_VERIFIED_DEV_ONLY_PRODUCTION_BLOCKED",
     "staleEvidenceCorrection": "B19 historical fields:[] observation remains superseded by active W01 source; replay response and PRIV-002 decision boundary were reconciled at current main head."
   },
   "devTestPolicy": {
