@@ -93,7 +93,15 @@ jobs:
           node --import=tsx/esm scripts/auth-001-registration-runtime-evidence-local.mjs
           test -s ../../artifacts/mapping-0/auth-001-runtime-local/runtime-result.json
 
+      - name: Dump W01 runtime log on evidence failure
+        if: ${{ failure() }}
+        working-directory: workers/W01-payload
+        run: |
+          echo "===== W01 Next dev log ====="
+          tail -n 500 auth-001-next-dev.log || true
+
       - name: Upload same-SHA runtime evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: auth-001-registration-runtime-local-${{ steps.source.outputs.sha }}
