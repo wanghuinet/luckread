@@ -59,7 +59,7 @@
         "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md",
         "contracts/entity/AUTH-003-credential-field-contract.v1.json",
         "contracts/entity/AUTH-003-identity-field-contract.v1.json",
-        "contracts/persistence/AUTH-003-credential-persistence-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-MIGRATION-ADMISSION-2026-09-27.md",
         "docs/change-control/CC-MAPPING-0-AUTH-003-ENTITY-EVIDENCE-BINDING-2026-09-27.md",
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
         "https://github.com/wanghuinet/luckread/actions/runs/36299334577"
