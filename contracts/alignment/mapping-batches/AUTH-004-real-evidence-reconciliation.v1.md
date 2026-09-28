@@ -63,3 +63,18 @@ Definition-layer reconciliation was previously recorded at `3ab18252544ffb9a15da
 `AUTH-004 = BLOCKED_NOT_GREEN`
 
 Reason: local native password/recovery integration evidence is now registered and native session invalidation is verified locally, but controlled remote W01 behavior, HTTP E2E transport, protected-account enumeration resistance, lifecycle event evidence, and full canonical traceability are not yet established. Runtime/worker code must not be added merely to force this feature to GREEN.
+
+## 8. Current remote HTTP E2E admission checkpoint — 2026-09-29
+
+The prior statements in this document that controlled remote W01/HTTP E2E evidence was missing are superseded by the following exact current-head evidence:
+
+- Deployed source SHA: `7104cc3d4e29ef62f1ae59d9ed5fcca770a12f0e`.
+- W01/W02 deployment run: `36455540585` = SUCCESS.
+- AUTH-004 Remote HTTP E2E run: `36455724050` = SUCCESS.
+- Job: `109041444298`.
+- Evidence artifact: `10984999026`, SHA-256 `cd7578a21af534567f4372c1bd44658391832a5dd3b1fddc3616198a75218b10`.
+- The successful run passed exact deployment provenance, Payload 3.90.2 admission, remote migration/schema preconditions, and the complete controlled AUTH-004 remote HTTP E2E probe, including the corrected Payload-native session semantics.
+- Reset-request existing/missing-account behavior is exercised by the remote probe; therefore the previously open remote protected-account enumeration-resistance execution gap is covered for this tested scope.
+- The remote run is evidence of the deployed runtime behavior only. It does not by itself satisfy lifecycle-event evidence, canonical Evidence Registry admission, Entity promotion, Five-Way completion, or Mapping 0 GREEN.
+- AUTH-004 remains `BLOCKED_NOT_GREEN` until those remaining authoritative traceability/evidence requirements are separately admitted. No runtime or contract change is implied by this evidence checkpoint.
+
