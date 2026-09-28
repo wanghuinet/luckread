@@ -134,9 +134,9 @@
         "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
       ],
       "blockers": [
-        "ENT-SESSION catalog status remains PROPOSED until final Mapping 0 entity/persistence admission.",
-        "AUTH-002 Feature→Entity→Persistence registry remains BLOCKED.",
-        "Final Five-Way/R4 Mapping 0 validation remains NOT_GREEN."
+        "Gate-1 schema, native session runtime, security-negative, concurrency and extension-correlation evidence are now VERIFIED at the exact tested source 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55.",
+        "Migration execution evidence remains unadmitted under the current persistence-evidence contract.",
+        "ENT-SESSION catalog promotion remains blocked pending final Mapping 0 / Five-Way admission."
       ],
       "status": "BLOCKED"
     },

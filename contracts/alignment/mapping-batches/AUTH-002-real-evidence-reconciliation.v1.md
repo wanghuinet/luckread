@@ -2,7 +2,7 @@
 
 ## Status
 
-`BLOCKED_NOT_GREEN`
+`PASS_VERIFIED_RUNTIME_EVIDENCE / BLOCKED_MIGRATION_AND_MAPPING0_PROMOTION`
 
 ## Authority
 
@@ -41,16 +41,28 @@ These facts supersede older wording that described the Session field contract as
 |---|---|---|
 | Contract | `CLOSED` | Canonical contracts frozen |
 | Gate 1 workflow | `IMPLEMENTED` | Workflow exists and is fail-closed |
-| Gate 1 execution | `NOT VERIFIED` | Controlled remote D1 execution + accepted artifacts |
-| Native session runtime | `NOT EXECUTED` | Real Payload login/session/validation/logout correlation |
-| Extension schema | `NOT VERIFIED` | Actual D1 schema must match accepted evidence |
-| Migration | `NOT PROMOTED` | Versioned migration + successful execution + postconditions |
-| Security E2E | `NOT VERIFIED` | Negative/security suite passes |
-| Concurrency E2E | `NOT VERIFIED` | Refresh/logout/validation invariants pass |
-| Evidence Registry | `NOT BOUND` | Non-empty records bound to exact commit |
-| Mapping-0 | `NOT VERIFIED` | Validator passes against same commit/evidence |
-| ENT-SESSION | `PROPOSED / CONTRACTED_NOT_VERIFIED` | All required runtime/persistence evidence accepted |
+| Gate 1 execution | `ACCEPTED / VERIFIED` | Run `36217784262`, exact tested source `5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55` |
+| Native session runtime | `ACCEPTED / VERIFIED` | Run `36219132123`, same exact tested source |
+| Extension correlation | `ACCEPTED / VERIFIED` | Canonical record `EVD-AUTH002-B26-EXTENSION-CORRELATION-REMOTE-001` |
+| Security E2E | `ACCEPTED / VERIFIED` | Canonical record `EVD-AUTH002-B24-SECURITY-NEGATIVE-REMOTE-001` |
+| Concurrency E2E | `ACCEPTED / VERIFIED` | Canonical record `EVD-AUTH002-B25-CONCURRENCY-REMOTE-001` |
+| Migration execution | `BLOCKED_PENDING_CONTRACT_COMPLETE_EVIDENCE` | Current persistence evidence unit requires explicit migration execution/postcondition proof |
+| Evidence Registry | `RUNTIME GATES BOUND / MIGRATION UNIT UNADMITTED` | Migration evidence must be verified without stale-commit inheritance |
+| Mapping-0 | `NOT_GREEN` | Global Mapping-0 validation remains required |
+| ENT-SESSION | `PROPOSED / PROMOTION BLOCKED` | Final entity/persistence admission required |
 | AUTH-002 | `BLOCKED_NOT_GREEN` | All required gates accepted |
+
+## Evidence reconciliation
+
+The canonical Evidence Registry already contains verified exact-SHA records for Gate-1 schema, native runtime, security-negative, concurrency, and extension correlation:
+
+- `EVD-AUTH002-B22-GATE1-SCHEMA-REMOTE-001`
+- `EVD-AUTH002-B23-RUNTIME-SESSION-REMOTE-001`
+- `EVD-AUTH002-B24-SECURITY-NEGATIVE-REMOTE-001`
+- `EVD-AUTH002-B25-CONCURRENCY-REMOTE-001`
+- `EVD-AUTH002-B26-EXTENSION-CORRELATION-REMOTE-001`
+
+The older `EVD-AUTH002-B10-MIGRATION-REMOTE-001` record is `CREATED` with a historical validity window and is not sufficient to satisfy the current `MIGRATION_EXECUTION` evidence unit. No runtime rerun is required for this reconciliation.
 
 ## Execution work packages
 
@@ -203,8 +215,10 @@ A failed work package blocks all dependent work packages. Status text may never 
 
 ## Current conclusion
 
-`AUTH-002` remains **not GREEN**. The repository has the contract, fail-closed promotion matrix, schema-evidence gate, runtime-evidence gate, migration gate, and Mapping-0 binding required to perform verification, but the controlled D1/Payload execution evidence has not yet been accepted. Therefore migration promotion, `ENT-SESSION` verification, and Mapping-0 promotion remain blocked.
+AUTH-002 now has accepted executable evidence for the remote schema/catalog, native session lifecycle, extension correlation, security negatives and concurrency at the exact tested source `5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55`.
+
+AUTH-002 remains **not GREEN** because the current persistence-evidence contract still requires an explicitly admitted `MIGRATION_EXECUTION` unit and final Mapping-0/entity admission. This reconciliation does not create or execute a migration.
 
 ## Immediate next action
 
-Execute **WP-1 Gate-1 remote schema evidence** on a named controlled D1 target using the exact tested commit SHA. Preserve the generated artifact package and run `scripts/auth-session-schema-evidence-validate.mjs`. Only an accepted Gate-1 result for that exact commit may unlock WP-2.
+Reconcile the exact-SHA migration execution evidence against the current persistence-evidence contract. Do not rerun AUTH-002 runtime evidence `36219132123`, do not redeploy W01/W02 unchanged, and do not apply another session migration.
