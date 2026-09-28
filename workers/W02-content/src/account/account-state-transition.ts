@@ -1,4 +1,6 @@
 import accountStateMachine from '../../../../contracts/state-machines/account.json'
+import permissions from '../../../../contracts/authz/permissions.json'
+import layers from '../../../../contracts/authz/layers.json'
 
 export type AccountState =
   | 'UNREGISTERED'
@@ -124,6 +126,93 @@ function assertInput(input: AccountStateTransitionInput): void {
     if (value !== undefined && (value.length === 0 || value.length > 255)) {
       throw new AccountStateTransitionError('INVALID_INPUT', field + ' must be 1-255 characters')
     }
+  }
+}
+
+type AccountAuthorizationResult = {
+  actor: AccountStateTransitionInput['actor']
+  permission: string | null
+  approvalLevel: string | null
+}
+
+const permissionMinLayer = new Map(
+  permissions['x-permissions'].map((permission) => [permission.name, permission.minLayer]),
+)
+
+const roleToLayer = new Map<string, number>()
+for (const layer of layers['x-layers']) {
+  for (const role of layer.roles ?? []) roleToLayer.set(role, Number(layer.id.slice(1)))
+}
+
+async function resolveSubjectLayer(db: D1Database, subjectId: string, now: string): Promise<number> {
+  const rows = await db.prepare(
+    `SELECT role_id AS roleId, scope_type AS scopeType, status, valid_from AS validFrom, valid_until AS validUntil
+     FROM role_assignments
+     WHERE subject_id = ? AND status = 'ACTIVE' AND valid_from <= ?
+       AND (valid_until IS NULL OR ? < valid_until)`,
+  ).bind(subjectId, now, now).all<{ roleId: string; scopeType: string; status: string; validFrom: string; validUntil: string | null }>()
+
+  let maxLayer = 0
+  for (const row of rows.results) {
+    if (row.scopeType !== 'global') continue
+    const layer = roleToLayer.get(row.roleId)
+    if (layer && layer > maxLayer) maxLayer = layer
+  }
+  return maxLayer
+}
+
+export async function authorizeAccountStateTransition(
+  db: D1Database,
+  input: { subjectId: string; targetUserId: string; to: AccountState; now?: string },
+): Promise<AccountAuthorizationResult> {
+  const now = input.now ?? new Date().toISOString()
+  if (!input.subjectId || !input.targetUserId) {
+    throw new AccountStateTransitionError('FORBIDDEN', 'authenticated subject is required')
+  }
+
+  const current = await db
+    .prepare(
+      'SELECT account_state AS accountState FROM users WHERE id = ? LIMIT 1',
+    )
+    .bind(input.targetUserId)
+    .first<{ accountState: AccountState }>()
+
+  if (!current) throw new AccountStateTransitionError('NOT_FOUND', 'user account not found')
+  const rule = findTransition(current.accountState, input.to)
+
+  if (rule.actor === 'user') {
+    if (input.subjectId !== input.targetUserId) {
+      throw new AccountStateTransitionError('FORBIDDEN', 'user transition requires the target user as actor')
+    }
+    if (!rule.permission) {
+      return { actor: { id: input.subjectId, type: 'user' }, permission: null, approvalLevel: null }
+    }
+  }
+
+  if (!rule.permission) {
+    throw new AccountStateTransitionError('FORBIDDEN', 'transition authorization is missing')
+  }
+
+  const minimumLayer = permissionMinLayer.get(rule.permission)
+  if (typeof minimumLayer !== 'string' || !/^L[0-8]$/.test(minimumLayer)) {
+    throw new AccountStateTransitionError('FORBIDDEN', 'transition permission authority is unavailable')
+  }
+
+  const requiredLayer = Number(minimumLayer.slice(1))
+  const subjectLayer = await resolveSubjectLayer(db, input.subjectId, now)
+  if (subjectLayer < requiredLayer) {
+    throw new AccountStateTransitionError('FORBIDDEN', 'transition permission denied')
+  }
+
+  const actorType = rule.actor
+  if (actorType !== 'operator' && actorType !== 'admin') {
+    throw new AccountStateTransitionError('FORBIDDEN', 'transition actor authority is unavailable')
+  }
+
+  return {
+    actor: { id: input.subjectId, type: actorType },
+    permission: rule.permission,
+    approvalLevel: rule.requiresApproval ? (rule.requiresApproval === true ? 'L7' : rule.requiresApproval) : null,
   }
 }
 
