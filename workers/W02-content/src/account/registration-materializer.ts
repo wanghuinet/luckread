@@ -62,16 +62,14 @@ export function parseCommittedRegistrationUserId(value: unknown): string | null 
 
   try {
     const parsed: unknown = JSON.parse(value)
-    if (
-      !parsed ||
-      typeof parsed !== 'object' ||
-      typeof (parsed as { userId?: unknown }).userId !== 'string' ||
-      (parsed as { userId?: string }).userId.trim().length === 0
-    ) {
+    if (!parsed || typeof parsed !== 'object') return null
+
+    const userId = (parsed as { userId?: unknown }).userId
+    if (typeof userId !== 'string' || userId.trim().length === 0) {
       return null
     }
 
-    return String((parsed as { userId: string }).userId)
+    return userId
   } catch {
     return null
   }
@@ -250,7 +248,7 @@ export async function reconcileCompletedRegistrationMaterialization(
   now = new Date().toISOString(),
 ): Promise<RegistrationMaterializationReport> {
   const keys = resolveCredentialHashKeySet(env)
-  const envelopes = await getCompletedRegistrationEnvelopes(db, now)
+  const envelopes = await getPendingRegistrationEnvelopes(db, now)
   const report: RegistrationMaterializationReport = {
     scanned: envelopes.length,
     materialized: 0,
@@ -263,15 +261,14 @@ export async function reconcileCompletedRegistrationMaterialization(
       const userId = parseCommittedRegistrationUserId(envelope.committed_response)
       if (!userId) throw new Error('AUTH001_MATERIALIZATION_COMMITTED_RESPONSE_INVALID')
 
-      const candidate = envelopes.find((entry) => entry.id === envelope.id)
-      if (!candidate || candidate.user_id !== userId) {
+      if (envelope.user_id !== userId) {
         throw new Error('AUTH001_MATERIALIZATION_USER_NOT_FOUND')
       }
 
       const user: UserRow = {
-        id: candidate.user_id,
-        email: candidate.email,
-        username: candidate.username,
+        id: envelope.user_id,
+        email: envelope.email,
+        username: envelope.username,
       }
 
       const { identity, created } = await ensureIdentity(db, user)
