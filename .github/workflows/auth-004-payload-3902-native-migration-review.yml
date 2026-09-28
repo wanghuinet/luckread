@@ -44,10 +44,10 @@ jobs:
           json=$(find src/migrations -maxdepth 1 -type f -name '*MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.json' | head -n 1)
           test -n "$ts"
           test -n "$json"
-          grep -q 'ALTER TABLE \`users\` ADD \`reset_password_requested_at\` text;' "$ts"
-          grep -q 'ALTER TABLE \`media\` ADD \`_objectkey\` text;' "$ts"
-          grep -q 'ALTER TABLE \`users\` DROP COLUMN \`reset_password_requested_at\`;' "$ts"
-          grep -q 'ALTER TABLE \`media\` DROP COLUMN \`_objectkey\`;' "$ts"
+          grep -Fq 'ALTER TABLE \`users\` ADD \`reset_password_requested_at\` text;' "$ts"
+          grep -Fq 'ALTER TABLE \`media\` ADD \`_objectkey\` text;' "$ts"
+          grep -Fq 'ALTER TABLE \`users\` DROP COLUMN \`reset_password_requested_at\`;' "$ts"
+          grep -Fq 'ALTER TABLE \`media\` DROP COLUMN \`_objectkey\`;' "$ts"
           ! grep -Eq 'CREATE TABLE|DROP TABLE|CREATE INDEX|DROP INDEX' "$ts"
           test "$(grep -c 'ALTER TABLE' "$ts")" -eq 4
           grep -q 'MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1' src/migrations/index.ts
