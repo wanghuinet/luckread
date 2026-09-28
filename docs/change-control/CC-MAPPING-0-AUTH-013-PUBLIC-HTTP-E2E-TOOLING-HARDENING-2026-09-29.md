@@ -65,3 +65,12 @@ No runtime source or contract/schema authority changed.
 - Cleanup now resolves fixture users by their unique emails, so partial seed failure cannot leave cleanup dependent on an unresolved generated user ID.
 - Backup before this correction: `backup/pre-auth013-db-generated-user-id-20260929-202609282045`.
 - Runtime route, Contract, D1 schema, Payload version, Worker topology, and authority remain unchanged.
+
+
+## Follow-up execution reconciliation — run 36497430139
+
+- Run `36497430139` successfully reached the revised database-generated user-id path, but failed closed at preflight on `email_collision`; no fixture seed or public HTTP assertions executed.
+- To remove any dependency on GitHub run-id uniqueness or assumptions about remote historical cleanup, fixture emails and usernames are now based on a fresh random UUID generated for each workflow execution. Existing collision preflight remains mandatory.
+- User IDs continue to be allocated by SQLite/Payload and resolved after seed; cleanup remains keyed by the same unique fixture emails.
+- Backup before this correction: `backup/pre-auth013-random-fixture-identity-20260929-202609290715`.
+- No AUTH-013 runtime route, Contract, D1 schema, Payload version, Worker topology, or authority changed.
