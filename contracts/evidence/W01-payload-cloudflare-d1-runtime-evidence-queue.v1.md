@@ -8,8 +8,8 @@ Purpose: close the remaining runtime/evidence gap for Mapping-0 without promotin
 
 - Runtime: `workers/W01-payload/`
 - Package contract: `workers/W01-payload/package.json`
-- Official Cloudflare template structure: recorded in `PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md`; the current W01 lock is Payload `3.87.1` (`3.82.1` remains only the historical upstream template observation)
-- D1 adapter: `@payloadcms/db-d1-sqlite@3.87.1`
+- Official Cloudflare template structure: recorded in `PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md`; the current W01 lock is Payload `3.90.2` (`3.82.1` remains only the historical upstream template observation)
+- D1 adapter: `@payloadcms/db-d1-sqlite@3.90.2`
 - Database binding: `D1`
 - Migration directory: `workers/W01-payload/src/migrations/`
 - Mapping gate: `contracts/alignment/mapping-batches/`
@@ -20,12 +20,12 @@ Purpose: close the remaining runtime/evidence gap for Mapping-0 without promotin
 1. The W01 source tree now contains the physical Cloudflare D1 Payload baseline.
 2. `Users.ts` uses Payload authentication (`auth: true`).
 3. `payload.config.ts` uses the D1 SQLite adapter with migration directory configured and `push: false`.
-4. W01 is locked to the current Cloudflare D1 template-aligned dependency baseline recorded by `workers/W01-payload/package.json`; the current Payload lock is `3.87.1` (`3.82.1` remains only the historical upstream template observation).
+4. W01 is locked to the current Cloudflare D1 template-aligned dependency baseline recorded by `workers/W01-payload/package.json`; the current Payload lock is `3.90.2` (`3.82.1` remains only the historical upstream template observation).
 5. W01 contains a committed `pnpm-lock.yaml`; dependency installation/resolution against the exact lock remains an evidence gate.
 6. Physical source materialization is not runtime verification and does not make Mapping-0 GREEN.
 7. Payload issue evidence reports an `upsert` behavior defect for `@payloadcms/db-d1-sqlite@3.82.1`; W01 must explicitly test the affected persistence path before the D1 runtime gate can pass. This is a test requirement, not an assumption that the defect remains present after installation.
-8. The active AUTH-002 schema evidence validator and runtime evidence validator are bound to W01 and the current 3.87.1 Cloudflare-template-aligned lock.
-9. Older AUTH-002 artifacts that explicitly pin the 3.82.1 upstream template observation are not current W01 runtime authority; they are the historical baseline until each artifact is reconciled or archived. The current W01 lock is 3.87.1; no global search-and-replace is authorized.
+8. The active AUTH-002 schema evidence validator and runtime evidence validator are bound to W01 and the current 3.90.2 W01 lock.
+9. Older AUTH-002 artifacts that explicitly pin the 3.82.1 upstream template observation are not current W01 runtime authority; they are the historical baseline until each artifact is reconciled or archived. The current W01 lock is 3.90.2; no global search-and-replace is authorized.
 
 ## Historical baseline handling
 
@@ -37,7 +37,7 @@ The following artifacts are retained for traceability and must not be silently r
 - `contracts/migration/AUTH-002-migration-generation-admission.v1.md` prior revisions that pinned 3.82.1
 - `contracts/persistence/AUTH-002-payload-native-session-compatibility-audit.v1.md` prior revisions that pinned 3.82.1
 
-The current W01 runtime authority is the 3.87.1 lock recorded in `workers/W01-payload/package.json` plus `workers/W01-payload/*`. Historical 3.82.1 artifacts may be archived through normal Change Control after their replacement relationships are recorded.
+The current W01 runtime authority is the 3.90.2 lock recorded in `workers/W01-payload/package.json` plus `workers/W01-payload/*`. Historical 3.82.1 artifacts may be archived through normal Change Control after their replacement relationships are recorded.
 
 ## Required evidence batch
 
