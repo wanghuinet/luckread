@@ -3693,3 +3693,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - This does not close the LuckRead gate yet. The project remains on the released Payload 3.90.2 baseline, with no local Payload Core patch/fork, dependency override, custom hashing implementation, or parallel authentication subsystem admitted.
 - AUTH-004 remains `BLOCKED / NOT_GREEN`; no new remote lifecycle evidence is promoted from the unmerged upstream candidate.
 - Current admissible cursor remains `AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY`. Reopen execution only after an official released upstream fix (or another authority-approved compatible runtime path) exists and can be verified end-to-end.
+
+## 2026-09-28 — AUTH-013 public transport source verification closure
+
+- Focused source implementation admitted by `CC-MAPPING-0-AUTH-013-PUBLIC-TRANSPORT-IMPLEMENTATION-ADMISSION-2026-09-28`.
+- Exact tested source SHA: `0af2fcb66b6bb54ace065b7debe5559a80a285a4`.
+- W02 AUTH-013 Runtime Source Verification: run `36431940464`, job `108959464320`, artifact `10973254137`.
+- Typecheck PASS; 23 focused tests PASS, including trusted-principal authorization, privilege-layer denial, L7 approval derivation, lifecycle preconditions, stale If-Match, atomic publication-journal behavior and session invalidation.
+- Artifact SHA-256: `5c154a9322abc0d3aa7afd078d81d5646b978ce55392cc3f2320e8a39b6bb8d9`.
+- Evidence Registry record `EVD-AUTH013-RUNTIME-SOURCE-LOCAL-001` is recorded as `CREATED` / exact-SHA source evidence. It is intentionally not promoted to global VERIFIED/GREEN by this governance step.
+- AUTH-013 remains NOT_GREEN. Public W01 HTTP E2E against an exact admitted W01/W02 deployment is the next focused gate. Existing W02/W06/Queue/D1-03 evidence is inherited and must not be repeated unchanged.
