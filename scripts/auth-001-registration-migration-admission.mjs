@@ -7,7 +7,7 @@ const migrationName = '20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1'
 const migrationPath = `workers/W01-payload/src/migrations/${migrationName}.ts`
 const indexPath = 'workers/W01-payload/src/migrations/index.ts'
 const changeControlPath = 'docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-MIGRATION-EXECUTION-2026-09-28.md'
-const expectedMigrationBlob = '79c95ffb5f10ca4ff11a5e1e0dbcf8e7b8a0d3c6'
+const expectedMigrationBlob = '77ae87a7ecb6275d64c149b02347d1e4464491cc'
 const expectedChangeControlStatus = /^- Status:\s*GREEN — DEV CONTROLLED EXECUTION ADMITTED \/ PRODUCTION BLOCKED\s*$/m
 
 function gitBlob(path) {
