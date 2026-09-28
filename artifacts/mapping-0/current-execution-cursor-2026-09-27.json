@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "76a9a0697a687a72fdfc793060df57d230ae2779",
+  "sourceHead": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab",
   "backupBranch": "backup/main-before-auth004-pbkdf2-runtime-blocker-20260928-2107",
   "currentCursor": {
     "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
@@ -20,7 +20,8 @@
       "Global Evidence Registry and Mapping 0 remain NOT_GREEN; no promotion is inferred from build/deploy success.",
       "Remote E2E run 36426287424 reached the real Worker and failed before AUTH-004 lifecycle assertions because Payload native PBKDF2 requests 600000 iterations and Cloudflare Workers rejects counts above 100000.",
       "Upstream Payload issue #18274 remains OPEN / needs-triage; no stable Payload 3.x release after 3.90.2 is available with an admitted fix at this checkpoint."
-    ]
+    ],
+    "sourceHead": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab"
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -186,7 +187,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced by governance-only reconciliation after a fresh Payload/Cloudflare upstream recheck. No application runtime source changed; AUTH-004 remains externally blocked by the observed PBKDF2 compatibility issue.",
-    "currentMainSha": "76a9a0697a687a72fdfc793060df57d230ae2779",
+    "currentMainSha": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
     "payloadWireCompatibilityStatus": "AUTH004_REMOTE_RUNTIME_BLOCKED_PBKDF2_COMPATIBILITY",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -194,11 +195,11 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "76a9a0697a687a72fdfc793060df57d230ae2779",
-    "governanceHeadDisposition": "Final head synchronization after AUTH-013 W01 transport-unit evidence reconciliation. No runtime behavior changed in this cursor-only commit.",
+    "actualGitMainHead": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab",
+    "governanceHeadDisposition": "AUTH-013 public HTTP E2E execution tooling is ready; no runtime business source or production deployment changed in this checkpoint.",
     "reviewedAt": "2026-09-28",
     "implementationEvidenceSourceHead": "6d574bb56222e0eaf44df663e04eb59535e84be6",
-    "latestGovernanceCommit": "76a9a0697a687a72fdfc793060df57d230ae2779"
+    "latestGovernanceCommit": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab"
   },
   "nextGate": "AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY",
   "latestControlGate": {
@@ -277,11 +278,11 @@
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.90.2",
     "capabilityFinding": "Payload native AUTH-004 capability is contractually aligned to 3.90.2, but the native password hashing implementation is incompatible with Cloudflare Workers production because it requests 600000 PBKDF2 iterations.",
-    "implementationDisposition": "AUTH013_PUBLIC_TRANSPORT_SOURCE_AND_UNIT_VERIFIED_REMOTE_E2E_PENDING",
+    "implementationDisposition": "AUTH013_PUBLIC_TRANSPORT_SOURCE_UNIT_VERIFIED_PUBLIC_HTTP_E2E_EXECUTION_READY",
     "staleEvidenceCorrection": "The 3.87.1 cursor is historical and superseded by 3.90.2; the new blocker is external runtime compatibility, not a version-alignment gap.",
-    "currentMainSha": "76a9a0697a687a72fdfc793060df57d230ae2779",
+    "currentMainSha": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab",
     "implementationSourceSha": "6d574bb56222e0eaf44df663e04eb59535e84be6",
-    "currentSourceHead": "76a9a0697a687a72fdfc793060df57d230ae2779",
+    "currentSourceHead": "d7b9610f5f49f5a244b32e6e5e67ac365f9b57ab",
     "evidenceAdmission": {
       "runId": "36431940464",
       "jobId": "108959464320",
@@ -297,6 +298,14 @@
       "jobId": "108961689387",
       "testedSourceSha": "faab246f89d287018da24134a5c0e9f0593ae8de",
       "status": "PASS_SOURCE_UNIT_VERIFIED",
+      "productionDeployment": false
+    },
+    "publicHttpE2eExecution": {
+      "status": "READY_NOT_EXECUTED",
+      "probe": "scripts/auth-013-public-transport-e2e.mjs",
+      "fixture": "scripts/auth-013-public-http-e2e-fixture.mjs",
+      "workflow": ".github/workflows/auth-013-public-http-e2e.yml",
+      "testedSourceMustEqual": "exact W01/W02 binding deployment source",
       "productionDeployment": false
     }
   },
