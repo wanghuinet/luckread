@@ -1,14 +1,4 @@
-const textEncoder = new TextEncoder()
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
-}
-
-function encodeJson(value: unknown): string {
-  return bytesToBase64Url(textEncoder.encode(JSON.stringify(value)))
-}
+import { jwtSign } from 'payload'
 
 // Payload's native auth() must succeed before this non-verifying claim read is used.
 export function readVerifiedPayloadTokenVersion(request: Request): number | null {
@@ -57,32 +47,21 @@ export async function issuePayloadAccessToken(input: {
     throw new Error('Payload session expiry is invalid')
   }
 
-  const header = encodeJson({ alg: 'HS256', typ: 'JWT' })
-  const claims = encodeJson({
-    id: input.userId,
-    collection: 'users',
-    email: input.email,
-    sid: input.sessionId,
-    tokenVersion: input.tokenVersion,
-    iat: nowSeconds,
-    exp,
+  const result = await jwtSign({
+    fieldsToSign: {
+      id: input.userId,
+      collection: 'users',
+      email: input.email,
+      sid: input.sessionId,
+      tokenVersion: input.tokenVersion,
+    },
+    secret: input.payloadSecret,
+    tokenExpiration: Math.max(1, exp - nowSeconds),
   })
 
-  const signingInput = `${header}.${claims}`
-  const key = await crypto.subtle.importKey(
-    'raw',
-    textEncoder.encode(input.payloadSecret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-  const signature = new Uint8Array(
-    await crypto.subtle.sign('HMAC', key, textEncoder.encode(signingInput)),
-  )
-
   return {
-    token: `${signingInput}.${bytesToBase64Url(signature)}`,
-    exp,
-    expiresIn: Math.max(0, exp - nowSeconds),
+    token: result.token,
+    exp: result.exp,
+    expiresIn: Math.max(0, result.exp - nowSeconds),
   }
 }
