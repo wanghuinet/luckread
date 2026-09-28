@@ -184,7 +184,7 @@ The policy artifact explicitly remains:
 
 `legalComplianceStatus = NOT_A_LEGAL_OR_COMPLIANCE_AUTHORITY`.
 
-The 730-day value is therefore an internal engineering production policy selected for deterministic platform operation; it is **not** represented as a universal statutory or jurisdiction-specific retention requirement. This distinction is intentional. Current data-protection guidance expects controllers to document retention periods and justify them against the processing purpose; it does not provide a single universal retention period for account-registration consent records. citeturn1search0turn2search13
+The 730-day value is therefore an internal engineering production policy selected for deterministic platform operation; it is **not** represented as a universal statutory or jurisdiction-specific retention requirement. This distinction is intentional. Current data-protection guidance expects controllers to document retention periods and justify them against the processing purpose; it does not provide a single universal retention period for account-registration consent records.
 
 A later formal legal/compliance schedule can replace this policy through the normal versioned Policy Authority path. That replacement does not require a new runtime architecture.
 
