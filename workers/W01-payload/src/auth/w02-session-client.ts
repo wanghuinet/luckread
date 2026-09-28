@@ -79,6 +79,18 @@ async function callW02<T>(path: string, body: unknown): Promise<T> {
     if (code === 'VALIDATION_FAILED') {
       throw new W02AuthClientError(400, 'invalid authentication request')
     }
+    if (code === 'PERMISSION_DENIED') {
+      throw new W02AuthClientError(403, 'permission denied')
+    }
+    if (code === 'NOT_FOUND') {
+      throw new W02AuthClientError(404, 'resource not found')
+    }
+    if (code === 'INVALID_STATE') {
+      throw new W02AuthClientError(409, 'invalid state')
+    }
+    if (code === 'PRECONDITION_FAILED') {
+      throw new W02AuthClientError(412, 'precondition failed')
+    }
 
     throw new W02AuthClientError(503, 'authentication service unavailable')
   }
