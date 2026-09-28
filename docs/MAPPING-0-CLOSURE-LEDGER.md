@@ -3802,3 +3802,28 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - `NEXT_ITEM_STATE: TODO_FIX`
 - Focus: close only evidence-backed AUTH-004 lifecycle-event traceability and then reconcile the global Mapping 0 / Five-Way gate. Do not reopen completed AUTH-004 runtime/E2E work.
 
+## 2026-09-29 — AUTH-004 lifecycle-event authority gap closed as WAIT_AUTHORITY_DECISION
+
+- Backup before this cursor transition: `backup/pre-auth004-event-authority-next-cursor-20260929-1145`.
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTH-004-LIFECYCLE-EVENT-AUTHORITY-GAP-2026-09-29.md`.
+- The remaining AUTH-004 lifecycle-event blocker cannot be closed from existing evidence: no canonical password-change/password-reset Event ID or event contract is established in the current authoritative event inventory.
+- The successful AUTH-004 remote artifact `10984999026` contains runtime HTTP/session evidence but no canonical lifecycle Event ID. No event identifier, event contract, or runtime emitter is invented.
+- AUTH-004 lifecycle-event item state is therefore `WAIT_AUTHORITY_DECISION`; the previously admitted remote HTTP/E2E, enumeration-resistant reset request, session lifecycle, replay and expiry evidence remains valid and requires no rerun.
+
+## 2026-09-29 — Continue global Mapping 0 closure at AUTH-013 public HTTP E2E
+
+- AUTH-013 public HTTP E2E execution path is already implemented and contractually admitted; no new runtime implementation is required.
+- The exact deployed source `7104cc3d4e29ef62f1ae59d9ed5fcca770a12f0e` contains the same W01 public account-state route as current main (`43ee5ae8453831e7d4978c800dbbf3f1ff1175bf`), while subsequent main changes are governance/evidence-only.
+- Existing successful W01/W02 binding deployment run `36455540585` deployed that exact source and can be used as the required provenance input for AUTH-013 public HTTP E2E.
+- Next execution inputs:
+  - workflow: `.github/workflows/auth-013-public-http-e2e.yml`
+  - `tested_commit=7104cc3d4e29ef62f1ae59d9ed5fcca770a12f0e`
+  - `deployment_run_id=36455540585`
+  - `w01_base_url=https://luckread-w01-payload.wanghui-79b.workers.dev`
+  - `database_name=luckread`
+  - `confirm=RUN_AUTH013_E2E`
+- This is an external/manual execution gate; no runtime deployment or D1 mutation is performed by this cursor change.
+- `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
+- `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_EXECUTION`
+- AUTH-004 is not reopened until authoritative Event ID/contract input exists.
+
