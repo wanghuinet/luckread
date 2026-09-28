@@ -56,3 +56,20 @@ After this evidence-tooling correction is accepted on `main`:
 3. admit evidence only from a successful artifact with exact provenance.
 
 AUTH-013 and Mapping 0 remain `NOT_GREEN` until that evidence path succeeds.
+
+## 2026-09-29 — Follow-up: client authority assertion isolation
+
+Run `36500346422` reached the first protected public assertion and passed the
+previous unauthenticated isolation. It then failed at the client-authority
+injection assertion because that request also omitted `If-Match`, so the
+deployed handler returned HTTP 428 `PRECONDITION_REQUIRED` before the
+intended HTTP 403 `PERMISSION_DENIED` authorization check.
+
+Authorized correction is limited to the evidence probe: send a valid
+`If-Match: 1` header on the authenticated/basic-user client-authority
+injection request only. The existing authenticated/missing-`If-Match`
+assertion remains the dedicated 428 check.
+
+No AUTH-013 runtime, Contract, D1 schema, Payload version, Worker topology,
+W02 authority implementation, or Evidence Registry status is changed by this
+correction.
