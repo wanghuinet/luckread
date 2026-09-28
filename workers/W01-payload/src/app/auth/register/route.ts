@@ -1,3 +1,4 @@
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
@@ -22,10 +23,10 @@ type RegistrationResponse = {
 }
 
 type ExistingEnvelope = {
-  id: string | number
+  id: string
   payloadHash: string
   state: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
-  committedResponse?: string | null
+  committedResponse?: { userId?: unknown; accountState?: unknown } | null
   expiresAt: string
 }
 
@@ -39,19 +40,10 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
     },
   })
 
-const errorResponse = (
-  status: number,
-  code: string,
-  message: string,
-  headers: Record<string, string> = {},
-) =>
+const errorResponse = (status: number, code: string, message: string, headers: Record<string, string> = {}) =>
   json(
     {
-      error: {
-        code,
-        message,
-        details: {},
-      },
+      error: { code, message, details: {} },
       requestId: crypto.randomUUID(),
     },
     status,
@@ -75,30 +67,15 @@ const sha256Hex = async (value: string): Promise<string> => {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-const normalizePayloadForHash = (body: {
-  identityType: string
-  identity: string
-  credential: string
-  username: string
-  consent: { purpose: string; policyVersion: string }
-}) =>
-  JSON.stringify(
-    canonicalize({
-      identityType: body.identityType,
-      identity: body.identity,
-      credential: body.credential,
-      username: body.username,
-      consent: body.consent,
-    }),
-  )
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
-const getExistingEnvelope = async (
-  payload: Awaited<ReturnType<typeof getPayload>>,
-  idempotencyKey: string,
-): Promise<ExistingEnvelope | null> => {
+const isExpired = (expiresAt: string, now: Date) => {
+  const value = Date.parse(expiresAt)
+  return !Number.isFinite(value) || value <= now.getTime()
+}
+
+const getExistingEnvelope = async (payload: Awaited<ReturnType<typeof getPayload>>, idempotencyKey: string) => {
   const result = await payload.find({
     collection: 'auth-registration-envelopes',
     where: {
@@ -108,32 +85,17 @@ const getExistingEnvelope = async (
         { endpoint: { equals: ENDPOINT } },
       ],
     },
-    depth: 0,
+    sort: '-createdAt',
     limit: 1,
+    depth: 0,
     overrideAccess: true,
   })
-  return (result.docs[0] as unknown as ExistingEnvelope | undefined) ?? null
+  return (result.docs[0] as ExistingEnvelope | undefined) ?? null
 }
 
-const isExpired = (expiresAt: string, now: Date) => {
-  const expires = Date.parse(expiresAt)
-  return !Number.isFinite(expires) || expires <= now.getTime()
-}
-
-const parseCommittedResponse = (raw: string | null | undefined): RegistrationResponse | null => {
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw) as Partial<RegistrationResponse>
-    if (typeof parsed.userId === 'string' && parsed.accountState === ACCOUNT_STATE) {
-      return {
-        userId: parsed.userId,
-        accountState: ACCOUNT_STATE,
-      }
-    }
-  } catch {
-    // Fail closed below.
-  }
-  return null
+const parseReplay = (value: ExistingEnvelope['committedResponse']): RegistrationResponse | null => {
+  if (!value || typeof value.userId !== 'string' || value.accountState !== ACCOUNT_STATE) return null
+  return { userId: value.userId, accountState: ACCOUNT_STATE }
 }
 
 const isUniqueConstraintError = (error: unknown) => {
@@ -142,7 +104,9 @@ const isUniqueConstraintError = (error: unknown) => {
 }
 
 const validatePolicy = (now: Date) => {
+  const runtimeEnvironment = process.env.CLOUDFLARE_ENV ?? (process.env.NODE_ENV === 'production' ? 'production' : 'development')
   if (
+    runtimeEnvironment.toLowerCase() === 'production' ||
     priv004Policy.status !== 'APPROVED' ||
     priv004Policy.environment !== 'DEVELOPMENT' ||
     priv004Policy.usage.productionUse !== false ||
@@ -151,19 +115,12 @@ const validatePolicy = (now: Date) => {
     priv004Policy.rule.durationSeconds <= 0 ||
     priv004Policy.scope.operationId !== ENDPOINT ||
     priv004Policy.scope.purpose !== SCOPE
-  ) {
-    throw new Error('PRIV-004 development policy is unavailable or invalid')
-  }
+  ) throw new Error('PRIV004_POLICY_NOT_ADMISSIBLE')
 
   const effectiveFrom = Date.parse(priv004Policy.effectiveFrom)
   const effectiveTo = Date.parse(priv004Policy.effectiveTo)
-  if (
-    !Number.isFinite(effectiveFrom) ||
-    !Number.isFinite(effectiveTo) ||
-    now.getTime() < effectiveFrom ||
-    now.getTime() > effectiveTo
-  ) {
-    throw new Error('PRIV-004 development policy is outside its effective window')
+  if (!Number.isFinite(effectiveFrom) || !Number.isFinite(effectiveTo) || now.getTime() < effectiveFrom || now.getTime() > effectiveTo) {
+    throw new Error('PRIV004_POLICY_OUTSIDE_WINDOW')
   }
 
   return {
@@ -174,117 +131,64 @@ const validatePolicy = (now: Date) => {
   }
 }
 
-const classifyExisting = async (
-  payload: Awaited<ReturnType<typeof getPayload>>,
-  existing: ExistingEnvelope,
-  payloadHash: string,
-  now: Date,
-): Promise<Response | null> => {
-  if (!isExpired(existing.expiresAt, now)) {
-    if (existing.payloadHash !== payloadHash) {
-      return errorResponse(
-        422,
-        'IDEMPOTENCY_KEY_REUSE_CONFLICT',
-        'Idempotency key cannot be reused with a different request',
-      )
-    }
-
-    if (existing.state === 'COMPLETED') {
-      const replay = parseCommittedResponse(existing.committedResponse)
-      if (!replay) {
-        return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration replay record is unavailable')
-      }
-      return json(replay, 201)
-    }
-
-    if (existing.state === 'IN_PROGRESS') {
-      return errorResponse(
-        409,
-        'IDEMPOTENCY_IN_PROGRESS',
-        'A registration with this Idempotency-Key is already in progress',
-        { 'retry-after': '1' },
-      )
-    }
-
-    return errorResponse(409, 'REGISTRATION_RETRY_REQUIRED', 'The prior registration attempt is not replayable')
-  }
-
-  return null
-}
-
 export async function POST(request: Request): Promise<Response> {
-  const idempotencyKey = request.headers.get('Idempotency-Key')
-  if (!idempotencyKey || idempotencyKey.length === 0 || idempotencyKey.length > 255) {
-    return errorResponse(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key is required')
-  }
+  const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+  if (!idempotencyKey || idempotencyKey.length > 255) return errorResponse(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key is required')
 
-  let rawBody: unknown
-  try {
-    rawBody = await request.json()
-  } catch {
-    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
-  }
+  let body: unknown
+  try { body = await request.json() } catch { return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body') }
+  if (!isRecord(body) || !isRecord(body.consent)) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid registration request')
 
-  if (!isRecord(rawBody)) {
-    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
-  }
-
-  const body: AuthRegisterRequest = rawBody
+  const identityType = body.identityType
+  const identity = body.identity
+  const credential = body.credential
+  const username = body.username
+  const consent = body.consent
   if (
-    body.identityType !== 'email' ||
-    typeof body.identity !== 'string' ||
-    body.identity.length === 0 ||
-    typeof body.credential !== 'string' ||
-    body.credential.length === 0 ||
-    typeof body.username !== 'string' ||
-    body.username.length === 0 ||
-    !isRecord(body.consent) ||
-    body.consent.purpose !== 'ACCOUNT_REGISTRATION' ||
-    typeof body.consent.policyVersion !== 'string' ||
-    body.consent.policyVersion.length === 0 ||
-    Object.keys(body.consent).some((key) => !['purpose', 'policyVersion'].includes(key))
-  ) {
-    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid registration request')
-  }
-
-  const normalized = {
-    identityType: body.identityType,
-    identity: body.identity,
-    credential: body.credential,
-    username: body.username,
-    consent: {
-      purpose: body.consent.purpose as 'ACCOUNT_REGISTRATION',
-      policyVersion: body.consent.policyVersion,
-    },
-  }
-
-  let policy: ReturnType<typeof validatePolicy>
-  try {
-    policy = validatePolicy(new Date())
-  } catch {
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration policy is unavailable')
-  }
-
-  if (normalized.consent.policyVersion !== policy.policyVersion) {
-    return errorResponse(422, 'VALIDATION_FAILED', 'Consent policyVersion is not admitted for registration')
-  }
+    identityType !== 'email' ||
+    typeof identity !== 'string' || identity.trim().length === 0 ||
+    typeof credential !== 'string' || credential.length === 0 ||
+    typeof username !== 'string' || username.trim().length === 0 || username.length > 128 ||
+    consent.purpose !== SCOPE ||
+    typeof consent.policyVersion !== 'string' || consent.policyVersion.length === 0 ||
+    Object.keys(consent).some((key) => !['purpose', 'policyVersion'].includes(key))
+  ) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid registration request')
 
   const now = new Date()
-  const payloadHash = await sha256Hex(normalizePayloadForHash(normalized))
-  const payload = await getPayload({ config })
+  let policy: ReturnType<typeof validatePolicy>
+  try { policy = validatePolicy(now) } catch { return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration policy is unavailable') }
+  if (consent.policyVersion !== policy.policyVersion) return errorResponse(422, 'VALIDATION_FAILED', 'Consent policyVersion is not admitted for registration')
 
-  let existing = await getExistingEnvelope(payload, idempotencyKey)
-  const replay = existing ? await classifyExisting(payload, existing, payloadHash, now) : null
-  if (replay) return replay
+  const normalized = {
+    identityType: 'email',
+    identity: identity.trim().toLowerCase(),
+    credential,
+    username: username.trim(),
+    consent: { purpose: SCOPE, policyVersion: consent.policyVersion },
+  }
+  const payloadHash = await sha256Hex(JSON.stringify(canonicalize(normalized)))
+  const payload = await getPayload({ config })
+  const existing = await getExistingEnvelope(payload, idempotencyKey)
+
+  if (existing && !isExpired(existing.expiresAt, now)) {
+    if (existing.payloadHash !== payloadHash) return errorResponse(422, 'IDEMPOTENCY_KEY_REUSE_CONFLICT', 'Idempotency key cannot be reused with different input')
+    if (existing.state === 'IN_PROGRESS') return errorResponse(409, 'IDEMPOTENCY_IN_PROGRESS', 'A registration with this Idempotency-Key is already in progress', { 'retry-after': '1' })
+    if (existing.state === 'COMPLETED') {
+      const replay = parseReplay(existing.committedResponse)
+      return replay ? json(replay, 201) : errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration replay record is unavailable')
+    }
+    return errorResponse(409, 'REGISTRATION_RETRY_REQUIRED', 'The prior registration attempt is not replayable')
+  }
 
   let transactionID: string | number | undefined
   try {
     transactionID = await payload.db.beginTransaction()
 
     if (existing && isExpired(existing.expiresAt, now)) {
-      await payload.delete({
+      await payload.update({
         collection: 'auth-registration-envelopes',
         id: existing.id,
+        data: { activeKey: null },
         overrideAccess: true,
         req: { transactionID },
       })
@@ -295,52 +199,52 @@ export async function POST(request: Request): Promise<Response> {
       envelope = await payload.create({
         collection: 'auth-registration-envelopes',
         data: {
+          id: crypto.randomUUID(),
           idempotencyKey,
+          activeKey: idempotencyKey,
           scope: SCOPE,
           endpoint: ENDPOINT,
           payloadHash,
           state: 'IN_PROGRESS',
+          committedResponse: {},
           expiresAt: new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString(),
         },
         overrideAccess: true,
         req: { transactionID },
+        depth: 0,
       })
     } catch (error) {
       if (!isUniqueConstraintError(error)) throw error
       await payload.db.rollbackTransaction(transactionID)
       transactionID = undefined
-      existing = await getExistingEnvelope(payload, idempotencyKey)
-      if (!existing) return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration idempotency state is unavailable')
-      return (await classifyExisting(payload, existing, payloadHash, new Date())) ??
-        errorResponse(409, 'IDEMPOTENCY_IN_PROGRESS', 'A registration with this Idempotency-Key is already in progress', {
-          'retry-after': '1',
-        })
+      const winner = await getExistingEnvelope(payload, idempotencyKey)
+      if (!winner) return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration idempotency state is unavailable')
+      if (winner.payloadHash !== payloadHash) return errorResponse(422, 'IDEMPOTENCY_KEY_REUSE_CONFLICT', 'Idempotency key cannot be reused with different input')
+      if (winner.state === 'COMPLETED') {
+        const replay = parseReplay(winner.committedResponse)
+        return replay ? json(replay, 201) : errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration replay record is unavailable')
+      }
+      return errorResponse(409, 'IDEMPOTENCY_IN_PROGRESS', 'A registration with this Idempotency-Key is already in progress', { 'retry-after': '1' })
     }
 
     const user = await payload.create({
       collection: 'users',
-      data: {
-        email: normalized.identity,
-        password: normalized.credential,
-        username: normalized.username,
-      },
+      data: { email: normalized.identity, password: normalized.credential, username: normalized.username },
+      overrideAccess: true,
       req: { transactionID },
+      depth: 0,
     })
 
-    const userId = String(user.id)
-    const accountState: RegistrationResponse = {
-      userId,
-      accountState: ACCOUNT_STATE,
-    }
-
+    const responseBody: RegistrationResponse = { userId: String(user.id), accountState: ACCOUNT_STATE }
     const consent = await payload.create({
       collection: 'consents',
       data: {
-        actorSubjectId: userId,
-        ownerSubjectId: userId,
-        resourceId: userId,
+        id: crypto.randomUUID(),
+        actorSubjectId: responseBody.userId,
+        ownerSubjectId: responseBody.userId,
+        resourceId: responseBody.userId,
         resourceType: 'User',
-        purpose: 'ACCOUNT_REGISTRATION',
+        purpose: SCOPE,
         state: 'GRANTED',
         policyVersion: policy.policyVersion,
         legalBasis: 'CONSENT',
@@ -350,47 +254,42 @@ export async function POST(request: Request): Promise<Response> {
       },
       overrideAccess: true,
       req: { transactionID },
+      depth: 0,
     })
 
-    const responseDigest = await sha256Hex(JSON.stringify(accountState))
-
+    const responseDigest = await sha256Hex(JSON.stringify(responseBody))
     await payload.update({
       collection: 'auth-registration-envelopes',
       id: envelope.id,
       data: {
         state: 'COMPLETED',
         responseDigest,
-        committedResponse: JSON.stringify(accountState),
+        committedResponse: responseBody,
         consentRecordId: String(consent.id),
       },
       overrideAccess: true,
       req: { transactionID },
+      depth: 0,
     })
 
     await payload.db.commitTransaction(transactionID)
     transactionID = undefined
 
-    return json(accountState, 201)
+    try {
+      const { env } = await getCloudflareContext({ async: true })
+      const row = await env.D1.prepare('SELECT account_state, account_state_version FROM users WHERE id = ? LIMIT 1').bind(String(user.id)).first<{ account_state: string; account_state_version: number }>()
+      if (row?.account_state !== ACCOUNT_STATE || row.account_state_version !== 1) return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration state could not be verified')
+    } catch {
+      return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration state could not be verified')
+    }
+
+    return json(responseBody, 201)
   } catch (error) {
     if (transactionID !== undefined) {
-      try {
-        await payload.db.rollbackTransaction(transactionID)
-      } catch {
-        // Preserve the original failure.
-      }
+      try { await payload.db.rollbackTransaction(transactionID) } catch {}
     }
-
-    if (isUniqueConstraintError(error)) {
-      return errorResponse(409, 'REGISTRATION_CONFLICT', 'Registration could not be completed')
-    }
-
-    console.error(
-      JSON.stringify({
-        event: 'auth.register.runtime_failure',
-        diagnosticCode: 'AUTH001_REGISTRATION_FAILURE',
-        errorName: error instanceof Error ? error.name : typeof error,
-      }),
-    )
+    console.error(JSON.stringify({ event: 'auth.register.runtime_failure', diagnosticCode: 'AUTH001_REGISTRATION_FAILURE', errorName: error instanceof Error ? error.name : typeof error }))
+    if (isUniqueConstraintError(error)) return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
 }
