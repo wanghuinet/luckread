@@ -184,7 +184,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced through the AUTH-004 3.90.2 version-alignment, native migration review, local lifecycle evidence, remote E2E harness, and W01/W02 binding deployment checkpoints. The latest deployment succeeded; no remote E2E PASS is claimed yet.",
-    "currentMainSha": "39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20",
+    "currentMainSha": "f0fc9b8fefa3394cfe44d44b2364debb3d71b423",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
     "payloadWireCompatibilityStatus": "AUTH004_LOCAL_LIFECYCLE_VERIFIED_REMOTE_E2E_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -192,9 +192,10 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20",
-    "governanceHeadDisposition": "This checkpoint is a current-head governance reconciliation. Existing closed AUTH-001/AUTH-002/AUTH-003 evidence remains inherited; AUTH-004 local lifecycle evidence remains exact-SHA verified; remote HTTP/E2E remains a separate gate.",
-    "reviewedAt": "2026-09-28"
+    "actualGitMainHead": "f0fc9b8fefa3394cfe44d44b2364debb3d71b423",
+    "governanceHeadDisposition": "CI-only correction after deployment: remote E2E probe is now read from the exact deployed source SHA. This governance/CI change does not alter the deployed implementation evidence boundary.",
+    "reviewedAt": "2026-09-28",
+    "implementationEvidenceSourceHead": "39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20"
   },
   "nextGate": "AUTH-004 controlled remote HTTP E2E evidence against exact deployed source 39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20; after evidence admission, final Evidence Registry / Mapping 0 checks.",
   "latestControlGate": {
@@ -274,7 +275,9 @@
     "payloadVersion": "3.90.2",
     "capabilityFinding": "Payload native AUTH-004 password lifecycle capability is aligned to the 3.90.2 baseline; no custom session invalidation subsystem is admitted.",
     "implementationDisposition": "MERGED_RUNTIME_LOCAL_VERIFIED_REMOTE_E2E_BLOCKED",
-    "staleEvidenceCorrection": "The previous cursor's 3.87.1 source statement is historical and superseded by the current 3.90.2 main head."
+    "staleEvidenceCorrection": "The previous cursor's 3.87.1 source statement is historical and superseded by the current 3.90.2 main head.",
+    "currentMainSha": "f0fc9b8fefa3394cfe44d44b2364debb3d71b423",
+    "implementationSourceSha": "39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20"
   },
   "devTestPolicy": {
     "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
