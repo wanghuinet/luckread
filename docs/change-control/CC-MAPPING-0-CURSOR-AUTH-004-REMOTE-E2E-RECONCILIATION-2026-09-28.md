@@ -99,3 +99,11 @@ The dedicated current-execution cursor is updated to the exact current `main` SH
 - CI-only diagnostic enhancement committed at `67e9080a2617e6c3c381aaaeb4bfd399ca84e1e8`: the existing controlled Remote E2E now starts a temporary `wrangler tail` session filtered to `auth.register`, captures the live W01 runtime diagnostic, and stops the tail after the probe. This does not alter application behavior, schema, topology, or production contracts.
 - The already successful W01 deployment job was safely rerun as attempt 3 solely to emit a new completion event for the diagnostic-enabled Remote E2E. The deployed source remains `6d574bb56222e0eaf44df663e04eb59535e84be6`.
 - AUTH-004 remains BLOCKED / NOT_GREEN pending the next Remote E2E result and evidence admission.
+
+## Current-head reconciliation override — 2026-09-28
+
+- Authoritative current `main` after the deployment-completion cursor sync: `692f5904c7dcf2f162a68759690decfc790a6a8a`.
+- The deployed application source for the current W01 binding remains `6d574bb56222e0eaf44df663e04eb59535e84be6`.
+- W01/W02 binding deployment run `36420996656` attempt 3 is `success`; its three live deployment artifacts all resolve to the same application source SHA.
+- The earlier `39489d6...`, `30bc903...`, attempt-1/attempt-2 entries above are retained as historical checkpoints and must not be treated as the current execution source.
+- AUTH-004 remains `BLOCKED / NOT_GREEN` until the diagnostic-enabled remote HTTP/E2E run produces durable admissible lifecycle evidence.
