@@ -13,6 +13,8 @@
       "requestSchemaRef": "#/paths/~1auth~1register/post/requestBody/content/application~1json/schema",
       "responseSchemaRef": "#/paths/~1auth~1register/post/responses/201/content/application~1json/schema",
       "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-IDENTITY",
         "ENT-USER"
       ],
       "status": "CONTRACT_BOUND"
