@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 
 const root = resolve(process.cwd())
 const packetPath = resolve(root, 'artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json')
-const instancePath = resolve(root, 'artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json')
+const instancePath = resolve(root, 'artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json')
 const contractPath = resolve(root, 'contracts/privacy/PRIV-004-retention-policy-authority.v1.json')
 
 const packet = JSON.parse(readFileSync(packetPath, 'utf8'))
@@ -121,7 +121,7 @@ requireNonEmptyString(instance.provenance.sourcePath, 'provenance.sourcePath')
 const currentCommitSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
 const instanceSourceCommitSha = execFileSync(
   'git',
-  ['log', '-1', '--format=%H', '--', 'artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'],
+  ['log', '-1', '--format=%H', '--', 'artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json'],
   { encoding: 'utf8' },
 ).trim()
 
@@ -145,7 +145,7 @@ try {
   )
 }
 
-if (instance.provenance.sourcePath !== 'artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json') {
+if (instance.provenance.sourcePath !== 'artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json') {
   fail('provenance.sourcePath must identify the canonical approved policy instance artifact')
 }
 
