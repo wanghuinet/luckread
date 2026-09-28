@@ -3582,3 +3582,15 @@ Current source: `ea52038bdd58b550270dcd5b56bd1b4153ad5683`.
 - The historical migration record `EVD-AUTH002-B10-MIGRATION-REMOTE-001` remains `CREATED`; it is not promoted or rewritten.
 - AUTH-002 remains `BLOCKED_NOT_GREEN`; the remaining executable evidence gap is migration execution admission, followed by final entity/Mapping-0 promotion.
 - No runtime rerun, Worker redeployment, second Session table, migration execution, or production deployment is introduced by this reconciliation.
+
+
+## Current execution cursor reconciliation — 2026-09-28
+
+Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
+
+- Previous cursor wording still pointed to the already-closed PRIV-004 authority gate; that wording is superseded.
+- Current executable gate is AUTH-002 migration execution evidence admission.
+- AUTH-002 Gate-1 schema, native runtime, security-negative, concurrency and extension-correlation evidence are already VERIFIED/PASS and must not be rerun unchanged.
+- The historical AUTH-002 migration record `EVD-AUTH002-B10-MIGRATION-REMOTE-001` remains `CREATED` and is not promoted from documentation or stale provenance.
+- No global Evidence Registry or Mapping 0 GREEN claim is made.
+- No production deployment, new Worker/D1/Queue, or migration execution is performed by this cursor reconciliation.

@@ -1,21 +1,24 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "4399b83c31c2ac709bcc36c648b2bd994fb711dd",
-  "backupBranch": "backup/main-before-auth001-fresh-evidence-admission-20260928",
+  "sourceHead": "3395da99d8bb596faa706c33d1a4ef6467557780",
+  "backupBranch": "backup/main-before-cursor-auth002-migration-gate-reconcile-20260928",
   "currentCursor": {
-    "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "PRIV004_AUTHORITY_CLOSED_AUTH001_FRESH_DEV_EVIDENCE_ADMITTED_FINAL_MAPPING_BLOCKED",
-    "objective": "Preserve the admitted PRIV-004 production engineering authority, register fresh AUTH-001 development runtime evidence after the DEV/PROD policy split, and continue to the final Evidence Registry / Mapping 0 gate without promoting blocked global state.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
+    "id": "AUTH-002-SESSION-MIGRATION-EVIDENCE-CLOSURE",
+    "state": "PRIV004_AUTHORITY_CLOSED_AUTH001_AUTH003_EVIDENCE_ADMITTED_AUTH002_RUNTIME_VERIFIED_MIGRATION_PENDING_FINAL_MAPPING_BLOCKED",
+    "objective": "Preserve all admitted PRIV-004, AUTH-001, AUTH-003 and AUTH-002 executable evidence while closing the remaining AUTH-002 migration-execution evidence unit and then the final Mapping 0 / Evidence Registry promotion gate without promoting blocked global state.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-EVIDENCE-RECONCILIATION-2026-09-28.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "Mapping 0 / Evidence Registry final promotion checks remain blocked by the canonical Mapping 0 NOT_GREEN state and unresolved feature/entity/evidence coverage. Do not infer GREEN from the new AUTH-001 evidence.",
+    "nextGate": "AUTH-002 migration execution evidence must be admitted under the current persistence-evidence contract. After that, final Evidence Registry / Mapping 0 / entity promotion checks remain blocked by global Mapping 0 NOT_GREEN and unresolved feature/entity/evidence coverage.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
     "supersededBlockers": [
       "PRIV-004 production engineering policy authority is admitted and production-readiness evidence passed.",
       "AUTH-001 fresh controlled development runtime evidence after DEV/PROD policy separation is PASS_VERIFIED.",
+      "AUTH-003 credential List/Add/Replace/Remove runtime evidence is PASS_VERIFIED and ENT-IDENTITY materialization ownership evidence is admitted.",
+      "AUTH-002 Gate-1 schema, native session runtime, security-negative, concurrency and extension-correlation evidence are PASS_VERIFIED at exact tested source 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55.",
+      "AUTH-002 migration execution evidence remains the remaining executable evidence unit.",
       "Global Evidence Registry remains NOT_GREEN.",
       "Canonical Mapping 0 remains NOT_GREEN; no promotion is inferred."
     ]
@@ -34,7 +37,14 @@
     "auth001Auth013InitialPersistence": true,
     "auth003ListRuntime": "36307891924",
     "auth003ReplaceRemoveLifecycleRuntime": "36308120758",
-    "auth001NativeHashCapture": "36362963595"
+    "auth001NativeHashCapture": "36362963595",
+    "auth001FreshDevRuntime": "36386908500",
+    "auth003IdentityMaterialization": "36377880967",
+    "auth002Gate1": "36217784262",
+    "auth002Runtime": "36219132123",
+    "auth002Security": "36219132123",
+    "auth002Concurrency": "36219132123",
+    "auth002ExtensionCorrelation": "36219132123"
   },
   "historicalOnlyCursors": [
     "M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001 / WAIT_AUTHORITY_DECISION",
@@ -51,7 +61,6 @@
   "rules": [
     "Historical cursor text must not be treated as the current execution instruction.",
     "Do not rerun W01 baseline 35508571153 unchanged.",
-    "Do not rerun AUTH-002 E6 runtime 36219132123 unchanged.",
     "Do not reopen AUTH-003 wire/OpenAPI/DTO authority unless an authoritative input changes.",
     "Do not infer AUTH-003 physical table, column, index or constraint names.",
     "Do not promote ENT-IDENTITY or ENT-CREDENTIAL.",
@@ -63,7 +72,10 @@
     "Do not inherit AUTH-003 runtime correctness from earlier W02 deployment evidence; same-SHA evidence is required.",
     "Do not rerun remote migration 36296831559 or reapply 0004_auth_003_credentials.sql; remote DDL execution has already occurred.",
     "Treat 36296831559 as execution checkpoint only; final schema correctness requires a later read-only exact-SHA postcheck.",
-    "Do not promote AUTH-003 persistence status from the migration execution log alone."
+    "Do not promote AUTH-003 persistence status from the migration execution log alone.",
+    "Do not rerun AUTH-002 runtime evidence 36219132123 unchanged.",
+    "Do not reapply the already-executed AUTH-002 E5 migration without a new explicit Change Control and controlled execution admission.",
+    "Do not promote AUTH-002 or ENT-SESSION from runtime evidence alone; migration execution and final Mapping 0 admission remain required."
   ],
   "previousSourceHead": "b6004470b5c9d63e66fbc7214a99621d1da401eb",
   "authorityDiscovery": {
@@ -179,16 +191,16 @@
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED"
   },
-  "nextGate": "PRIV-004::first approved ACCOUNT_REGISTRATION / LEGAL_AUDIT production policy instance, followed by final Evidence Registry / Mapping 0 promotion checks. No production deployment is authorized.",
+  "nextGate": "AUTH-002::MIGRATION_EXECUTION evidence admission, followed by final Evidence Registry / Mapping 0 / entity promotion checks. No production deployment is authorized by this cursor.",
   "latestControlGate": {
-    "workflow": ".github/workflows/priv004-production-readiness.yml",
-    "runId": "36386908554",
-    "headSha": "dd803fb465bf91e9bd8e22ecd34798cdaec42359",
-    "conclusion": "SUCCESS",
+    "workflow": ".github/workflows/auth-002-e5-remote-migration-execution.yml",
+    "runId": null,
+    "headSha": null,
+    "conclusion": "PENDING_CONTROLLED_EXECUTION_ADMISSION",
     "failedStep": null,
-    "meaning": "Production readiness gate passed against the dedicated PRODUCTION policy artifact on the PR head; the squash merge to current main preserved the same tree.",
-    "productionAuthorization": "AUTHORIZED_POLICY_INPUT_ONLY",
-    "evidenceBoundary": "Policy/control-plane admission only; no production deployment or global Evidence Registry/Mapping 0 promotion."
+    "meaning": "AUTH-002 runtime/schema/security/concurrency/extension evidence is admitted, but the migration execution evidence unit is not yet VERIFIED in the current Evidence Registry.",
+    "productionAuthorization": "NO_NEW_PRODUCTION_DEPLOYMENT",
+    "evidenceBoundary": "Only the controlled E5 migration evidence unit remains actionable; no runtime rerun or global Mapping 0 promotion is authorized."
   },
   "runtimeEvidenceAdmission": {
     "status": "PASS_VERIFIED",
