@@ -108,9 +108,20 @@ provenance and a durable artifact:
   — controlled E2E workflow
 - `e944c6b44da5f21528f3307833f12f70739bcec5`
   — generated-fixture environment propagation correction
+- `9ce0b99885485c4e67060c8a42fa5d832af9249c`
+  — persist non-secret public HTTP assertion result
+- `91d8bb9e7fc237671427f4979fe4978fbeb04107`
+  — persist stale-session and D1 assertion results
+- `0baf20e2c23156ef98dd6e0116f0e25ccf1c1ec7`
+  — correct controlled E2E workflow heredoc/import issues
 
 These commits add only evidence-execution tooling; they do not change the
 AUTH-013 business runtime implementation or the fixed architecture.
+
+The current evidence tooling head is `0baf20e2c23156ef98dd6e0116f0e25ccf1c1ec7`.
+The actual deployment source must still be produced by the controlled W01/W02
+binding deployment workflow; no current public runtime deployment is inferred
+from these tooling commits.
 
 ## Current next action
 
