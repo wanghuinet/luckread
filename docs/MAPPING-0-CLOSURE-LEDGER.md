@@ -3827,3 +3827,27 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_EXECUTION`
 - AUTH-004 is not reopened until authoritative Event ID/contract input exists.
 
+
+
+## 2026-09-29 — AUTH-013 public HTTP E2E tooling hardening after run 36457473345
+
+- Backup before this batch: `backup/pre-auth013-workflow-collision-d1-transaction-20260929-1205`.
+- Failed run: `36457473345`. The run reached exact deployment provenance and Payload 3.90.2 admission, then stopped at fixture preflight because the deterministic synthetic numeric user IDs collided with existing remote D1 rows.
+- The same run also exposed a cleanup incompatibility: active Wrangler/D1 rejected explicit SQL `BEGIN TRANSACTION` / `COMMIT` statements. The public HTTP assertions did not execute, so no AUTH-013 behavior evidence is admitted from this run.
+- Evidence tooling was corrected only:
+  - synthetic numeric user IDs are cryptographically randomized while retaining the existing fail-closed collision preflight;
+  - seed and cleanup SQL no longer use explicit transaction wrappers;
+  - exact deployed runtime source is isolated under `deployed-source/`;
+  - current `main` is checked out separately as evidence-tooling source, so fixture and E2E scripts are not accidentally taken from the older deployed runtime commit;
+  - D1 config/dependency checks remain anchored to the exact deployed source.
+- No AUTH-013 runtime route, Contract, D1 schema, Payload version, Worker topology, or session-authority implementation changed.
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-TOOLING-HARDENING-2026-09-29.md`.
+- No Evidence Registry promotion and no Mapping 0 GREEN is claimed.
+- `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
+- `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_EXECUTION`
+- Next admissible action: manually dispatch the existing AUTH-013 public HTTP E2E workflow from current `main` with the already admitted deployment provenance:
+  - `tested_commit=7104cc3d4e29ef62f1ae59d9ed5fcca770a12f0e`
+  - `deployment_run_id=36455540585`
+  - `w01_base_url=https://luckread-w01-payload.wanghui-79b.workers.dev`
+  - `database_name=luckread`
+  - `confirm=RUN_AUTH013_E2E`
