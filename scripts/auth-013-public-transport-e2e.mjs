@@ -90,7 +90,7 @@ assertError(
     actor: { id: 'client', type: 'admin' },
     permission: 'user.ban',
     approvalLevel: 'L8',
-  }, basicToken),
+  }, basicToken, { 'If-Match': '1' }),
   403,
   'PERMISSION_DENIED',
   'client authority injection',
