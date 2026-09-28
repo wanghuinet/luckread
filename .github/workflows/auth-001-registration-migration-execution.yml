@@ -1,0 +1,271 @@
+name: AUTH-001 Registration Migration Execution
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Exact Git commit containing the admitted AUTH-001 registration migration"
+        required: true
+        default: "bd2791a4ca799126fac16afbc0506070e9074a77"
+        type: string
+      database_name:
+        description: "Controlled D1 database name"
+        required: true
+        default: "luckread"
+        type: string
+      confirm:
+        description: "Type APPLY_AUTH001_REGISTRATION_MIGRATION to permit the controlled remote migration"
+        required: true
+        default: "APPLY_AUTH001_REGISTRATION_MIGRATION"
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  TARGET_MIGRATION: 20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1
+  D1_01_ID: "2f80471e-3756-49f9-8db1-7707a433ad64"
+
+jobs:
+  execute-auth001-registration-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Validate dispatch inputs
+        env:
+          DATABASE_NAME: ${{ inputs.database_name }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          test "$DATABASE_NAME" = "luckread"
+          test "$CONFIRM" = "APPLY_AUTH001_REGISTRATION_MIGRATION"
+
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Validate exact source SHA
+        env:
+          REQUESTED_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$REQUESTED_SHA"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.34.5 --activate
+
+      - name: Install W01 locked dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-workspace
+
+      - name: Validate AUTH-001 migration execution admission
+        run: node scripts/auth-001-registration-migration-admission.mjs
+
+      - name: Configure Cloudflare access
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+      - name: Capture controlled D1 preflight
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/evidence/auth-001/registration-migration
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;'             > ../../artifacts/evidence/auth-001/registration-migration/preflight-migrations.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'SELECT COUNT(*) AS user_count FROM users;'             > ../../artifacts/evidence/auth-001/registration-migration/preflight-user-count.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'PRAGMA table_info("users");'             > ../../artifacts/evidence/auth-001/registration-migration/preflight-users-schema.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE type IN ("table","index","trigger") ORDER BY type,name;'             > ../../artifacts/evidence/auth-001/registration-migration/preflight-catalog.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 info "$DATABASE_NAME" --json --config wrangler.jsonc             > ../../artifacts/evidence/auth-001/registration-migration/preflight-d1-info.json
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const dir = '../../artifacts/evidence/auth-001/registration-migration'
+          const read = (name) => JSON.parse(fs.readFileSync(dir + '/' + name, 'utf8'))
+          const collectRows = (value, out = []) => {
+            if (Array.isArray(value)) { for (const item of value) collectRows(item, out); return out }
+            if (!value || typeof value !== 'object') return out
+            if (Array.isArray(value.results)) out.push(...value.results)
+            if (Array.isArray(value.result)) out.push(...value.result)
+            for (const child of Object.values(value)) collectRows(child, out)
+            return out
+          }
+          const rows = (name) => [...new Map(collectRows(read(name)).map((row) => [JSON.stringify(row), row])).values()]
+          const migrations = rows('preflight-migrations.json').sort((a,b) => Number(a.id) - Number(b.id))
+          const catalog = rows('preflight-catalog.json')
+          const usersSchema = rows('preflight-users-schema.json')
+          const userCountRows = rows('preflight-user-count.json')
+          const userCount = Number(userCountRows[0]?.user_count ?? -1)
+
+          const migrationNames = migrations.map((row) => String(row.name)).filter(Boolean)
+          const expectedTarget = process.env.TARGET_MIGRATION
+          const namesFromRepo = require('node:fs')
+            .readFileSync('src/migrations/index.ts', 'utf8')
+            .match(/name:\s*'([^']+)'/g)
+            .map((line) => line.match(/'([^']+)'/)[1])
+          const targetIndex = namesFromRepo.indexOf(expectedTarget)
+          if (targetIndex < 0) throw new Error('target migration is not registered in source index')
+          const expectedPredecessors = namesFromRepo.slice(0, targetIndex)
+          if (JSON.stringify(migrationNames) !== JSON.stringify(expectedPredecessors)) {
+            throw new Error('AUTH-001 registration migration preflight history mismatch: expected ' + JSON.stringify(expectedPredecessors) + ', got ' + JSON.stringify(migrationNames))
+          }
+          if (catalog.some((row) => row.tbl_name === 'auth_registration_envelopes' || row.name === 'auth_registration_envelopes')) {
+            throw new Error('AUTH-001 registration migration target already exists; refusing duplicate execution')
+          }
+          if (catalog.some((row) => row.tbl_name === 'consents' || row.name === 'consents')) {
+            throw new Error('AUTH-001 registration migration consent target already exists; refusing duplicate execution')
+          }
+
+          fs.writeFileSync(
+            dir + '/preflight-summary.json',
+            JSON.stringify({
+              databaseName: process.env.DATABASE_NAME,
+              databaseId: process.env.D1_01_ID,
+              migrationHistory: migrations,
+              expectedPredecessors,
+              userCount,
+              usersSchema,
+              targetTablesPresent: false,
+              result: 'PASS',
+            }, null, 2) + '\n',
+          )
+          console.log('AUTH-001_REGISTRATION_MIGRATION_PREFLIGHT=PASS')
+          NODE
+
+      - name: Execute admitted AUTH-001 registration migration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ENV: production
+          NODE_ENV: production
+          PAYLOAD_MIGRATION_REMOTE: "true"
+          PAYLOAD_SECRET: ignore
+          DATABASE_NAME: ${{ inputs.database_name }}
+        working-directory: workers/W01-payload
+        run: pnpm exec payload migrate
+
+      - name: Capture and validate post-migration evidence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;'             > ../../artifacts/evidence/auth-001/registration-migration/post-migration-history.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE type IN ("table","index","trigger") AND (tbl_name IN ("auth_registration_envelopes","consents") OR name LIKE "auth_registration_envelopes_%" OR name LIKE "consents_%") ORDER BY type,name;'             > ../../artifacts/evidence/auth-001/registration-migration/post-catalog.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'PRAGMA table_info("auth_registration_envelopes");'             > ../../artifacts/evidence/auth-001/registration-migration/envelope-schema.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'PRAGMA table_info("consents");'             > ../../artifacts/evidence/auth-001/registration-migration/consent-schema.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'SELECT COUNT(*) AS user_count FROM users;'             > ../../artifacts/evidence/auth-001/registration-migration/post-user-count.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc             --command 'PRAGMA table_info("users");'             > ../../artifacts/evidence/auth-001/registration-migration/post-users-schema.json
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const dir = '../../artifacts/evidence/auth-001/registration-migration'
+          const read = (name) => JSON.parse(fs.readFileSync(dir + '/' + name, 'utf8'))
+          const collectRows = (value, out = []) => {
+            if (Array.isArray(value)) { for (const item of value) collectRows(item, out); return out }
+            if (!value || typeof value !== 'object') return out
+            if (Array.isArray(value.results)) out.push(...value.results)
+            if (Array.isArray(value.result)) out.push(...value.result)
+            for (const child of Object.values(value)) collectRows(child, out)
+            return out
+          }
+          const rows = (name) => [...new Map(collectRows(read(name)).map((row) => [JSON.stringify(row), row])).values()]
+          const migrations = rows('post-migration-history.json').sort((a,b) => Number(a.id) - Number(b.id))
+          const catalog = rows('post-catalog.json')
+          const envelopeColumns = rows('envelope-schema.json').map((row) => String(row.name))
+          const consentColumns = rows('consent-schema.json').map((row) => String(row.name))
+          const preflightUsers = rows('preflight-users-schema.json')
+          const postUsers = rows('post-users-schema.json')
+          const preflightCount = Number(rows('preflight-user-count.json')[0]?.user_count ?? -1)
+          const postCount = Number(rows('post-user-count.json')[0]?.user_count ?? -1)
+          const expectedEnvelopeColumns = ['id','idempotency_key','active_key','scope','endpoint','payload_hash','state','response_digest','committed_response','expires_at','consent_record_id','updated_at','created_at']
+          const expectedConsentColumns = ['id','actor_subject_id','owner_subject_id','resource_id','resource_type','purpose','state','policy_version','legal_basis','withdrawn_at','retention_class','retention_until','source_authority','legal_hold_ref','updated_at','created_at']
+          const expectedIndexes = [
+            'auth_registration_envelopes_idempotency_key_idx',
+            'auth_registration_envelopes_active_key_idx',
+            'auth_registration_envelopes_scope_endpoint_idx',
+            'auth_registration_envelopes_payload_hash_idx',
+            'auth_registration_envelopes_state_idx',
+            'auth_registration_envelopes_expires_at_idx',
+            'auth_registration_envelopes_consent_record_id_idx',
+            'consents_actor_subject_id_idx',
+            'consents_owner_subject_id_idx',
+            'consents_resource_id_idx',
+            'consents_resource_type_idx',
+            'consents_purpose_idx',
+            'consents_state_idx',
+            'consents_policy_version_idx',
+            'consents_legal_basis_idx',
+            'consents_withdrawn_at_idx',
+            'consents_retention_class_idx',
+            'consents_retention_until_idx',
+            'consents_source_authority_idx',
+            'consents_legal_hold_ref_idx'
+          ]
+          const indexNames = catalog.filter((row) => row.type === 'index').map((row) => String(row.name)).sort()
+          const summary = {
+            databaseName: process.env.DATABASE_NAME,
+            targetMigration: process.env.TARGET_MIGRATION,
+            migrationAppliedExactlyOnce: migrations.filter((row) => row.name === process.env.TARGET_MIGRATION).length === 1,
+            envelopeColumns,
+            consentColumns,
+            envelopeSchemaExact: JSON.stringify(envelopeColumns) === JSON.stringify(expectedEnvelopeColumns),
+            consentSchemaExact: JSON.stringify(consentColumns) === JSON.stringify(expectedConsentColumns),
+            requiredIndexesPresent: expectedIndexes.every((name) => indexNames.includes(name)),
+            userCountUnchanged: preflightCount === postCount,
+            userSchemaUnchanged: JSON.stringify(preflightUsers) === JSON.stringify(postUsers),
+            migrationHistory: migrations,
+            result: 'PASS'
+          }
+          console.log(JSON.stringify(summary, null, 2))
+          if (!summary.migrationAppliedExactlyOnce || !summary.envelopeSchemaExact || !summary.consentSchemaExact || !summary.requiredIndexesPresent || !summary.userCountUnchanged || !summary.userSchemaUnchanged) process.exit(1)
+          fs.writeFileSync(dir + '/post-migration-summary.json', JSON.stringify(summary, null, 2) + '\n')
+          NODE
+
+      - name: Record controlled execution provenance
+        if: always()
+        env:
+          DATABASE_NAME: ${{ inputs.database_name }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/evidence/auth-001/registration-migration
+          cat > artifacts/evidence/auth-001/registration-migration/provenance.json <<EOF
+          {
+            "repository": "${GITHUB_REPOSITORY}",
+            "workflow": "${GITHUB_WORKFLOW}",
+            "runId": ${GITHUB_RUN_ID},
+            "runAttempt": ${GITHUB_RUN_ATTEMPT},
+            "sourceSha": "${SOURCE_SHA}",
+            "databaseName": "${DATABASE_NAME}",
+            "databaseId": "${D1_01_ID}",
+            "migration": "${TARGET_MIGRATION}",
+            "environmentClass": "CONTROLLED_REMOTE_D1",
+            "productionWorkerDeployed": false,
+            "applicationDataFixturesCreated": false
+          }
+          EOF
+
+      - name: Upload migration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-001-registration-migration-evidence-${{ github.run_id }}
+          path: artifacts/evidence/auth-001/registration-migration/
+          if-no-files-found: error
+          retention-days: 30
