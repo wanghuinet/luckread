@@ -105,6 +105,6 @@ Status: RUNTIME_COMPATIBILITY_BLOCKED / NOT_GREEN
 
 - Payload 3.90.2 dependency-family alignment is accepted: lock consistency, native schema migration admission, W01 foundation/deployment, and local AUTH-004 native lifecycle evidence have all been established under the existing Change Control.
 - The subsequent controlled remote run `36426287424` proved the remaining blocker is not dependency version alignment: the exact deployed 3.90.2 source reaches the real Worker and fails during native password hashing with Cloudflare Workers' PBKDF2 iteration ceiling.
-- Upstream Payload issue `#18274` remains OPEN and is labeled `v3`; it reports the same 600000-vs-100000 Cloudflare Workers incompatibility. No stable Payload 3.x release after 3.90.2 is available at this checkpoint. citeturn187706search0turn187706search1
+- Upstream Payload issue `#18274` remains OPEN and is labeled `v3`; it reports the same 600000-vs-100000 Cloudflare Workers incompatibility. No stable Payload 3.x release after 3.90.2 is available at this checkpoint. Source: https://github.com/payloadcms/payload/issues/18274 ; https://github.com/payloadcms/payload/releases
 - No supported Payload configuration hook was found in the 3.90.2 auth implementation for overriding `currentPasswordHashIterations`; the value is hard-coded in the native generator. This rules out a simple configuration-only closure path.
 - Therefore the completed gate is the **version-alignment gate**. The open gate is now explicitly **runtime compatibility**, not another Payload upgrade loop.
