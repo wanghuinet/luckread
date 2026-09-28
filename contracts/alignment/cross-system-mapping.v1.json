@@ -20,6 +20,8 @@
         "authRegister"
       ],
       "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-IDENTITY",
         "ENT-USER"
       ],
       "payloadCollections": [
