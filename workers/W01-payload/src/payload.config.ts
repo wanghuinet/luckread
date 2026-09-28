@@ -11,7 +11,6 @@ import { r2Storage } from '@payloadcms/storage-r2'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
-import { AuthRegistrationEnvelopes, Consents } from './collections/AuthRegistrationRecords'
 import { authSessionStateSchemaHook } from './db/auth-session-state-schema'
 
 export const AUTH001_USER_CAPTURE_CONTEXT = '__luckreadAuth001UserCapture'
@@ -66,7 +65,7 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [Users, Media, AuthRegistrationEnvelopes, Consents],
+  collections: [Users, Media],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
