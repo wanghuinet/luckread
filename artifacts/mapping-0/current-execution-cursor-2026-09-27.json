@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "9d8d2a43e758ff72018de1158f1b13fca12167bf",
-  "backupBranch": "backup/main-before-mapping0-cursor-reconcile-20260928-v3",
+  "sourceHead": "0655c79e674bf4c8d63cfb3d463c311aac0cd814",
+  "backupBranch": "backup/main-before-mapping0-cursor-final-sync-20260928",
   "currentCursor": {
     "id": "AUTH-002-SESSION-MIGRATION-EVIDENCE-CLOSURE",
     "state": "FINAL_MAPPING0_ENTITY_ADMISSION_BLOCKED",
@@ -105,7 +105,7 @@
     "Do not reapply the already-executed AUTH-002 E5 migration without a new explicit Change Control and controlled execution admission.",
     "Do not promote AUTH-002 or ENT-SESSION from runtime evidence alone; migration execution and final Mapping 0 admission remain required."
   ],
-  "previousSourceHead": "3395da99d8bb596faa706c33d1a4ef6467557780",
+  "previousSourceHead": "9d8d2a43e758ff72018de1158f1b13fca12167bf",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
@@ -210,7 +210,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced through PR #158–#161 with governance/evidence reconciliations only for the current gate; no Worker/D1/runtime implementation scope changed by those merges.",
-    "currentMainSha": "9d8d2a43e758ff72018de1158f1b13fca12167bf",
+    "currentMainSha": "0655c79e674bf4c8d63cfb3d463c311aac0cd814",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_RUNTIME_VERIFIED_DEV_ONLY_PRODUCTION_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -218,8 +218,9 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "9d8d2a43e758ff72018de1158f1b13fca12167bf",
-    "governanceHeadDisposition": "PR #154, #155, #156 and #157 plus the subsequent evidence-ref reconciliation are governance/evidence changes only for the current gate. The relevant implementation/runtime evidence scopes remain unchanged and must not be rerun solely because main advanced."
+    "actualGitMainHead": "0655c79e674bf4c8d63cfb3d463c311aac0cd814",
+    "governanceHeadDisposition": "PR #154, #155, #156 and #157 plus the subsequent evidence-ref reconciliation are governance/evidence changes only for the current gate. The relevant implementation/runtime evidence scopes remain unchanged and must not be rerun solely because main advanced.",
+    "reviewedAt": "2026-09-28"
   },
   "nextGate": "Final Evidence Registry / Mapping 0 / entity promotion checks. AUTH-002 migration execution evidence is closed; no production deployment is authorized by this cursor.",
   "latestControlGate": {
@@ -294,7 +295,7 @@
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-28",
-    "mainSha": "9d8d2a43e758ff72018de1158f1b13fca12167bf",
+    "mainSha": "0655c79e674bf4c8d63cfb3d463c311aac0cd814",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
@@ -379,7 +380,7 @@
     ],
     "evidenceRegistryId": "EVD-AUTH001-W02-MATERIALIZER-RUNTIME-REMOTE-001",
     "productionDeployment": "BLOCKED",
-    "currentMainAfterMerge": "9d8d2a43e758ff72018de1158f1b13fca12167bf"
+    "currentMainAfterMerge": "0655c79e674bf4c8d63cfb3d463c311aac0cd814"
   },
   "productionPolicyAuthority": {
     "status": "ADMITTED_ENGINEERING_PRODUCTION_AUTHORITY",
