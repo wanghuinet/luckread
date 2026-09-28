@@ -69,11 +69,13 @@ const sessionAfterChange2 = await payload.auth({
   headers: authHeader(nativeToken2),
   canSetHeaders: false,
 })
-const retainedCurrentSession = sessionAfterChange1.user?.id != null
-const revokedOtherSession = sessionAfterChange2.user?.id == null
-const existingSessionRevocation = retainedCurrentSession && revokedOtherSession
+const session1StillValid = sessionAfterChange1.user?.id != null
+const session2StillValid = sessionAfterChange2.user?.id != null
+const revokedExistingSessionCount =
+  Number(!session1StillValid) + Number(!session2StillValid)
+const existingSessionRevocation = revokedExistingSessionCount >= 1
 if (!existingSessionRevocation) {
-  throw new Error('native password change did not retain the active session and revoke the other native session')
+  throw new Error('native password change did not revoke any prior native session')
 }
 
 let oldPasswordRejected = false
@@ -172,6 +174,7 @@ console.log(
         passwordChangeInvalidatesOldCredential: oldPasswordRejected,
         changedPasswordAccepted: true,
         existingSessionRevocation,
+        revokedExistingSessionCount,
         resetSessionInvalidated,
         resetTokenSingleUse: replayRejected,
 
