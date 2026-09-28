@@ -3728,3 +3728,16 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No Evidence Registry promotion, no global GREEN, no Mapping 0 closure, and no production success is claimed by this checkpoint.
 - Next focused action: controlled deployment of the exact current source followed by manual execution of the AUTH-013 public HTTP E2E workflow.
 
+## 2026-09-28 — AUTH-013 public HTTP E2E evidence tooling hardening
+
+- Backup before this batch: `backup/main-before-auth013-cursor-sync-20260928-2240`.
+- AUTH-013 runtime business source remains unchanged from the previously verified W01/W02 transport slice.
+- Evidence tooling was hardened to persist non-secret assertion results as durable workflow artifacts:
+  - public HTTP assertion result;
+  - stale-session denial result;
+  - controlled D1 authoritative-state result.
+- A workflow static defect involving nested heredoc termination and the D1 artifact writer import was corrected before any remote execution was attempted.
+- Current evidence tooling head before this ledger append: `0baf20e2c23156ef98dd6e0116f0e25ccf1c1ec7`.
+- This checkpoint remains `AUTH-013_NOT_GREEN / REMOTE_E2E_NOT_EXECUTED`.
+- The old deployed application source `6d574bb56222e0eaf44df663e04eb59535e84be6` is confirmed to predate the AUTH-013 public W01 route; therefore it is not admissible as AUTH-013 public HTTP evidence.
+- No runtime deployment, Evidence Registry promotion, or Mapping 0 GREEN promotion is claimed.
