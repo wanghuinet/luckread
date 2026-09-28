@@ -70,6 +70,8 @@ const sha256Hex = async (value: string): Promise<string> => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
+type D1Binding = Awaited<ReturnType<typeof getCloudflareContext>>['env']['D1']
+
 const isExpired = (expiresAt: string, now: Date) => {
   const value = Date.parse(expiresAt)
   return !Number.isFinite(value) || value <= now.getTime()
