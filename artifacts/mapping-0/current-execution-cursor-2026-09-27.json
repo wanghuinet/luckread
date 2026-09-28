@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "fd193cc4c9b0dcd67d6d2308651dd7ab2d546775",
+  "sourceHead": "a213680f7eaead23337643030a6fda2400651acb",
   "backupBranch": "backup/main-before-auth004-pbkdf2-runtime-blocker-20260928-2107",
   "currentCursor": {
     "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
@@ -186,7 +186,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced by governance-only reconciliation after a fresh Payload/Cloudflare upstream recheck. No application runtime source changed; AUTH-004 remains externally blocked by the observed PBKDF2 compatibility issue.",
-    "currentMainSha": "fd193cc4c9b0dcd67d6d2308651dd7ab2d546775",
+    "currentMainSha": "a213680f7eaead23337643030a6fda2400651acb",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
     "payloadWireCompatibilityStatus": "AUTH004_REMOTE_RUNTIME_BLOCKED_PBKDF2_COMPATIBILITY",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -194,10 +194,11 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "fd193cc4c9b0dcd67d6d2308651dd7ab2d546775",
-    "governanceHeadDisposition": "Governance-only Ledger/cursor update. Application source remains 6d574bb56222e0eaf44df663e04eb59535e84be6; no runtime implementation or topology change.",
+    "actualGitMainHead": "a213680f7eaead23337643030a6fda2400651acb",
+    "governanceHeadDisposition": "Governance-only cursor-head reconciliation. No application runtime source, contract, schema, migration, Worker topology, or public API changed.",
     "reviewedAt": "2026-09-28",
-    "implementationEvidenceSourceHead": "6d574bb56222e0eaf44df663e04eb59535e84be6"
+    "implementationEvidenceSourceHead": "6d574bb56222e0eaf44df663e04eb59535e84be6",
+    "latestGovernanceCommit": "a213680f7eaead23337643030a6fda2400651acb"
   },
   "nextGate": "AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY",
   "latestControlGate": {
@@ -272,15 +273,15 @@
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-28",
-    "mainSha": "fd193cc4c9b0dcd67d6d2308651dd7ab2d546775",
+    "mainSha": "a213680f7eaead23337643030a6fda2400651acb",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.90.2",
     "capabilityFinding": "Payload native AUTH-004 capability is contractually aligned to 3.90.2, but the native password hashing implementation is incompatible with Cloudflare Workers production because it requests 600000 PBKDF2 iterations.",
     "implementationDisposition": "REMOTE_E2E_BLOCKED_PAYLOAD_PBKDF2_COMPATIBILITY",
     "staleEvidenceCorrection": "The 3.87.1 cursor is historical and superseded by 3.90.2; the new blocker is external runtime compatibility, not a version-alignment gap.",
-    "currentMainSha": "fd193cc4c9b0dcd67d6d2308651dd7ab2d546775",
+    "currentMainSha": "a213680f7eaead23337643030a6fda2400651acb",
     "implementationSourceSha": "6d574bb56222e0eaf44df663e04eb59535e84be6",
-    "currentSourceHead": "fd193cc4c9b0dcd67d6d2308651dd7ab2d546775"
+    "currentSourceHead": "a213680f7eaead23337643030a6fda2400651acb"
   },
   "devTestPolicy": {
     "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
