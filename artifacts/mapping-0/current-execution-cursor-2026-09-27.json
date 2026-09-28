@@ -1,14 +1,14 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "4982164892fa0db673fe1a884faafad606acbd0d",
+  "sourceHead": "fd193cc4c9b0dcd67d6d2308651dd7ab2d546775",
   "backupBranch": "backup/main-before-auth004-pbkdf2-runtime-blocker-20260928-2107",
   "currentCursor": {
     "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
     "state": "BLOCKED_EXTERNAL_COMPATIBILITY",
     "objective": "Close the AUTH-004 controlled remote HTTP/E2E lifecycle gate against the exact deployed W01 source without adding a custom auth subsystem, migration, Worker, D1 database, queue, or Payload core change.",
     "authoritativeControl": "docs/change-control/CC-AUTH-004-PAYLOAD-VERSION-ALIGNMENT-2026-09-28.md",
-    "nextGate": "Resolve the Payload 3.90.2 × Cloudflare Workers native PBKDF2 compatibility blocker under approved upstream/runtime-compatible authority; no supported configuration override exists in the 3.90.2 native auth generator.",
+    "nextGate": "Resolve the Payload 3.90.2 × Cloudflare Workers native PBKDF2 compatibility blocker under approved upstream/runtime-compatible authority; upstream recheck confirms no stable Payload 3.x fix or supported configuration override.",
     "logicalOwnership": "W01 -> AUTH-004 Payload-native authority CLOSED",
     "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding — deployment run 36420996656 attempt 7 SUCCESS; deployed application source 6d574bb56222e0eaf44df663e04eb59535e84be6.",
     "physicalRuntimeTarget": "W01 luckread-w01-payload / D1-01 luckread",
@@ -185,8 +185,8 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Main advanced through the corrected Remote E2E deployment attempt. The new remote run reached real Worker execution and exposed the external Payload 3.90.2 × Cloudflare Workers PBKDF2 compatibility blocker; no lifecycle PASS is claimed.",
-    "currentMainSha": "4982164892fa0db673fe1a884faafad606acbd0d",
+    "reason": "Main advanced by governance-only reconciliation after a fresh Payload/Cloudflare upstream recheck. No application runtime source changed; AUTH-004 remains externally blocked by the observed PBKDF2 compatibility issue.",
+    "currentMainSha": "fd193cc4c9b0dcd67d6d2308651dd7ab2d546775",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
     "payloadWireCompatibilityStatus": "AUTH004_REMOTE_RUNTIME_BLOCKED_PBKDF2_COMPATIBILITY",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -194,8 +194,8 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "4982164892fa0db673fe1a884faafad606acbd0d",
-    "governanceHeadDisposition": "Governance-only reconciliation records the external PBKDF2 compatibility blocker. Application source remains 6d574bb56222e0eaf44df663e04eb59535e84be6; no business implementation or topology change.",
+    "actualGitMainHead": "fd193cc4c9b0dcd67d6d2308651dd7ab2d546775",
+    "governanceHeadDisposition": "Governance-only Ledger/cursor update. Application source remains 6d574bb56222e0eaf44df663e04eb59535e84be6; no runtime implementation or topology change.",
     "reviewedAt": "2026-09-28",
     "implementationEvidenceSourceHead": "6d574bb56222e0eaf44df663e04eb59535e84be6"
   },
@@ -272,15 +272,15 @@
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-28",
-    "mainSha": "4982164892fa0db673fe1a884faafad606acbd0d",
+    "mainSha": "fd193cc4c9b0dcd67d6d2308651dd7ab2d546775",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.90.2",
     "capabilityFinding": "Payload native AUTH-004 capability is contractually aligned to 3.90.2, but the native password hashing implementation is incompatible with Cloudflare Workers production because it requests 600000 PBKDF2 iterations.",
     "implementationDisposition": "REMOTE_E2E_BLOCKED_PAYLOAD_PBKDF2_COMPATIBILITY",
     "staleEvidenceCorrection": "The 3.87.1 cursor is historical and superseded by 3.90.2; the new blocker is external runtime compatibility, not a version-alignment gap.",
-    "currentMainSha": "4982164892fa0db673fe1a884faafad606acbd0d",
+    "currentMainSha": "fd193cc4c9b0dcd67d6d2308651dd7ab2d546775",
     "implementationSourceSha": "6d574bb56222e0eaf44df663e04eb59535e84be6",
-    "currentSourceHead": "4982164892fa0db673fe1a884faafad606acbd0d"
+    "currentSourceHead": "fd193cc4c9b0dcd67d6d2308651dd7ab2d546775"
   },
   "devTestPolicy": {
     "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
