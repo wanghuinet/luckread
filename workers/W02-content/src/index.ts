@@ -7,7 +7,12 @@ import {
   validateAuthoritativeSession,
 } from './session/session-runtime.js'
 
-interface Env { D1_01: D1Database; AUTH013_QUEUE: Queue }
+interface Env {
+  D1_01: D1Database
+  AUTH013_QUEUE: Queue
+  AUTH003_CREDENTIAL_HASH_KEY?: string
+  AUTH003_CREDENTIAL_HASH_KEY_PREVIOUS?: string
+}
 
 type ResolveLayerRequest = {
   subjectId: string
