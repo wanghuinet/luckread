@@ -199,6 +199,16 @@ try {
   for (const user of [primary, secondary]) {
     if (!user?.id || !user?.email) continue
     try {
+      d1(`DELETE FROM auth_registration_envelopes WHERE consent_record_id IN (
+        SELECT id FROM consents
+        WHERE actor_subject_id=${sqlString(user.id)}
+           OR owner_subject_id=${sqlString(user.id)}
+           OR resource_id=${sqlString(user.id)}
+      )`)
+      d1(`DELETE FROM consents
+        WHERE actor_subject_id=${sqlString(user.id)}
+           OR owner_subject_id=${sqlString(user.id)}
+           OR resource_id=${sqlString(user.id)}`)
       d1(`DELETE FROM auth_session_state WHERE user_id=${sqlString(user.id)}`)
       d1(`DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)=${sqlString(user.id)}`)
       const match = query(`SELECT id,email FROM users WHERE CAST(id AS TEXT)=${sqlString(user.id)} LIMIT 1`)[0]
