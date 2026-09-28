@@ -117,7 +117,7 @@ try {
   if (reuseResponse.status !== 422 || !reuse.error || reuse.error.code !== 'IDEMPOTENCY_KEY_REUSE_CONFLICT') throw new Error('Idempotency key reuse conflict was not canonical')
 
   triggerName = 'auth001_evidence_fail_' + suffix
-  await db.prepare('CREATE TRIGGER ' + triggerName + " BEFORE INSERT ON auth_registration_envelopes BEGIN SELECT RAISE(ABORT, 'AUTH001_FORCED_ROLLBACK'); END").run()
+  runSql('CREATE TRIGGER ' + triggerName + " BEFORE INSERT ON auth_registration_envelopes BEGIN SELECT RAISE(ABORT, 'AUTH001_FORCED_ROLLBACK'); END")
   const rollbackEmail = 'auth001-rollback-' + suffix + '@luckread.local'
   const rollbackUsername = 'auth001rb' + suffix
   const rollbackResponse = await request(keyRollback, { ...body, identity: rollbackEmail, username: rollbackUsername })
