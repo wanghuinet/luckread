@@ -41,6 +41,29 @@
         "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
         "contracts/entity/AUTH-002-session-field-contract.v1.json"
       ]
+    },
+    {
+      "featureId": "AUTH-003",
+      "domainId": "D1-01",
+      "entityIds": [
+        "ENT-IDENTITY",
+        "ENT-CREDENTIAL"
+      ],
+      "persistenceMode": "MIXED",
+      "owner": "D1-01",
+      "status": "BLOCKED",
+      "evidenceRefs": [
+        "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-003-006-dto-schema-closure-gate.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-003-006-openapi-operation-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md",
+        "contracts/entity/AUTH-003-credential-field-contract.v1.json",
+        "contracts/entity/AUTH-003-identity-field-contract.v1.json",
+        "contracts/persistence/AUTH-003-credential-persistence-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-ENTITY-EVIDENCE-BINDING-2026-09-27.md",
+        "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
+        "https://github.com/wanghuinet/luckread/actions/runs/36299334577"
+      ]
     }
   ]
 }
