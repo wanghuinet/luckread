@@ -2,7 +2,7 @@
 
 ## Status
 
-`BLOCKED_NOT_GREEN`
+`PASS_VERIFIED_RUNTIME_EVIDENCE / BLOCKED_MIGRATION_AND_MAPPING0_PROMOTION`
 
 ## Scope
 
@@ -90,23 +90,20 @@ A physical foreign key from `auth_session_state.session_id` to a native embedded
 Contract layer                  = CLOSED
 Payload 3.87.1 source analysis  = COMPLETE
 Native direct equivalence       = REJECTED
-Minimum integration contract    = CLOSED
-Extension persistence contract  = CLOSED_FOR_IMPLEMENTATION_INPUT
-Gate 1 contract                 = CLOSED
+Minimum integration contract    = CLOSED_FOR_IMPLEMENTATION_INPUT
 Gate 1 workflow                 = IMPLEMENTED
-Gate 1 execution                = NOT_EXECUTED
-Actual D1 schema                = NOT VERIFIED
-Gate 2 runtime evidence         = NOT_EXECUTED
-Migration artifact              = NOT VERIFIED
-Migration applied               = NOT VERIFIED
-Runtime implementation          = NOT VERIFIED
-Security/E2E                    = NOT VERIFIED
-Concurrency/E2E                 = NOT VERIFIED
-Evidence Registry               = NOT BOUND
-ENT-SESSION                     = PROPOSED
+Gate 1 execution                = ACCEPTED / VERIFIED (run 36217784262)
+Gate 2 native session runtime   = ACCEPTED / VERIFIED (run 36219132123)
+Extension correlation           = ACCEPTED / VERIFIED
+Security / E2E                  = ACCEPTED / VERIFIED
+Concurrency / E2E                = ACCEPTED / VERIFIED
+Migration execution             = BLOCKED_PENDING_CONTRACT_COMPLETE_EVIDENCE
+Evidence Registry               = RUNTIME GATES BOUND / MIGRATION UNIT UNADMITTED
+ENT-SESSION                    = PROPOSED / PROMOTION BLOCKED
 AUTH-002                        = BLOCKED_NOT_GREEN
+Mapping 0                       = NOT_GREEN
 ```
 
 ## Next closure action
 
-Run Gate 1 manually against a controlled remote D1 target using the actual database name and repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Review the generated evidence artifact package. Only after Gate 1 is accepted should the separate runtime correlation work begin. No second full Session table may be introduced.
+Reconcile the exact-SHA migration execution evidence against the current persistence-evidence contract. The already-admitted Gate-1/runtime/security/concurrency/extension evidence must not be rerun unchanged. No second full Session table may be introduced.
