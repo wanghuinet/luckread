@@ -22,7 +22,7 @@ Decision-B authority and physical D1 allocation are now resolved. This record ad
 - Native Payload `sid` remains the only canonical session identifier.
 - `auth_session_state.session_id` must correlate to the native `sid`; it must not replace it.
 - Existing AUTH-002 E6 runtime contracts and runbook remain normative.
-- Current W01 package baseline remains Payload 3.87.1 and `@payloadcms/db-d1-sqlite` 3.87.1.
+- Current W01 package baseline is now Payload 3.90.2 and `@payloadcms/db-d1-sqlite` 3.90.2; the prior 3.87.1 runtime evidence is historical and does not satisfy current-version runtime admission.
 - Existing E5 schema and migration are not to be redesigned.
 - No D1-Fabric dependency or architecture may be introduced.
 
