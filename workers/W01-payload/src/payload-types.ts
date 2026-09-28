@@ -199,21 +199,26 @@ export interface Media {
   height?: number | null;
 }
 export interface AuthRegistrationEnvelope {
-  id: number;
+  id: string;
   idempotencyKey: string;
+  activeKey?: string | null;
   scope: string;
   endpoint: string;
   payloadHash: string;
   state: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
   responseDigest?: string | null;
-  committedResponse?: string | null;
+  committedResponse?: {
+    userId?: string;
+    accountState?: string;
+  } | null;
   expiresAt: string;
   consentRecordId?: string | null;
   updatedAt: string;
   createdAt: string;
+  collection: 'auth-registration-envelopes';
 }
 export interface Consent {
-  id: number;
+  id: string;
   actorSubjectId: string;
   ownerSubjectId: string;
   resourceId: string;
@@ -229,6 +234,7 @@ export interface Consent {
   legalHoldRef?: string | null;
   updatedAt: string;
   createdAt: string;
+  collection: 'consents';
 }
 export interface PayloadKv {
   id: number;
@@ -333,7 +339,9 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
 }
 export interface AuthRegistrationEnvelopesSelect<T extends boolean = true> {
+  id?: T;
   idempotencyKey?: T;
+  activeKey?: T;
   scope?: T;
   endpoint?: T;
   payloadHash?: T;
@@ -346,6 +354,7 @@ export interface AuthRegistrationEnvelopesSelect<T extends boolean = true> {
   createdAt?: T;
 }
 export interface ConsentsSelect<T extends boolean = true> {
+  id?: T;
   actorSubjectId?: T;
   ownerSubjectId?: T;
   resourceId?: T;
@@ -401,37 +410,3 @@ declare module 'payload' {
 }
 
 
-export interface AuthRegistrationEnvelopeSelect<T extends boolean = true> {
-  id?: T
-  idempotencyKey?: T
-  activeKey?: T
-  scope?: T
-  endpoint?: T
-  payloadHash?: T
-  state?: T
-  responseDigest?: T
-  committedResponse?: T
-  expiresAt?: T
-  consentRecordId?: T
-  updatedAt?: T
-  createdAt?: T
-}
-
-export interface ConsentRecordSelect<T extends boolean = true> {
-  id?: T
-  actorSubjectId?: T
-  ownerSubjectId?: T
-  resourceId?: T
-  resourceType?: T
-  purpose?: T
-  state?: T
-  policyVersion?: T
-  legalBasis?: T
-  withdrawnAt?: T
-  retentionClass?: T
-  retentionUntil?: T
-  sourceAuthority?: T
-  legalHoldRef?: T
-  updatedAt?: T
-  createdAt?: T
-}
