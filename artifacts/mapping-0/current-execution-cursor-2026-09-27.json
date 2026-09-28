@@ -1,22 +1,22 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd",
-  "backupBranch": "backup/pre-priv004-baseline-reconciliation-20260927",
+  "sourceHead": "4399b83c31c2ac709bcc36c648b2bd994fb711dd",
+  "backupBranch": "backup/main-before-priv004-production-authority-close-20260928",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "DEV_RUNTIME_EVIDENCE_PASS_IMPLEMENTATION_MERGED_EVIDENCE_REGISTERED_PRODUCTION_BLOCKED",
-    "objective": "Complete AUTH-001 development evidence closure and reconcile the current main head; do not invent or infer the missing production privacy/legal authority.",
+    "state": "PRODUCTION_ENGINEERING_POLICY_AUTHORITY_ADMITTED_FINAL_EVIDENCE_PROMOTION_PENDING",
+    "objective": "Close the PRIV-004 production engineering policy authority under an explicit versioned policy instance; do not fabricate a jurisdiction-specific legal conclusion. After the production gate passes, continue only to final Evidence Registry / Mapping 0 promotion checks.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "PRIV-004::first approved ACCOUNT_REGISTRATION / LEGAL_AUDIT production policy instance, followed by final Evidence Registry / Mapping 0 promotion checks. No production deployment is authorized.",
+    "nextGate": "PRIV-004::production-readiness gate must PASS against the newly admitted production engineering policy instance, followed by final Evidence Registry / Mapping 0 promotion checks. No production deployment is implied.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
     "supersededBlockers": [
-      "PRIV-004 production legal/compliance authority remains pending; development-only policy is not production authority.",
-      "Contract Admission DEVELOPMENT gate is PASS_VERIFIED on run 36356226141.",
-      "AUTH-001 runtime evidence remains a separate gate; no GREEN is inferred from Contract admission."
+      "PRIV-004 production engineering policy authority is now admitted; the 730-day value is an internal engineering policy, not a jurisdiction-specific legal mandate.",
+      "Contract Admission DEVELOPMENT gate remains separately PASS_VERIFIED; it is not a production Evidence promotion.",
+      "AUTH-001 runtime evidence and final Evidence Registry / Mapping 0 promotion remain separate gates."
     ]
   },
   "alreadyClosed": {
@@ -181,13 +181,13 @@
   "nextGate": "PRIV-004::first approved ACCOUNT_REGISTRATION / LEGAL_AUDIT production policy instance, followed by final Evidence Registry / Mapping 0 promotion checks. No production deployment is authorized.",
   "latestControlGate": {
     "workflow": ".github/workflows/priv004-production-readiness.yml",
-    "runId": "36386044044",
-    "headSha": "c4a8da1ff4eae375a83b0a085cbf0f048e638be1",
-    "conclusion": "FAILURE_EXPECTED_FAIL_CLOSED",
-    "failedStep": "Validate explicit production admission state",
-    "meaning": "Post-merge hardened production gate correctly rejects the unchanged DEVELOPMENT-only PRIV-004 instance for production use.",
-    "productionAuthorization": "BLOCKED",
-    "evidenceBoundary": "Control-plane gate result only; no production authority, Runtime promotion, Evidence Registry GREEN, Mapping 0 GREEN, entity promotion or production deployment is inferred."
+    "runId": null,
+    "headSha": "PENDING_POLICY_ADMISSION_HEAD",
+    "conclusion": "PENDING_REEXECUTION",
+    "failedStep": null,
+    "meaning": "The prior fail-closed result is superseded as a historical checkpoint; the gate must be evaluated against the newly admitted production engineering policy instance.",
+    "productionAuthorization": "PENDING_GATE",
+    "evidenceBoundary": "Control-plane policy-admission state only until the post-change production-readiness workflow completes."
   },
   "runtimeEvidenceAdmission": {
     "status": "PASS_VERIFIED",
@@ -276,7 +276,9 @@
     "policyVersion": "DEV-2026-09-28.1",
     "durationSeconds": 63072000,
     "productionUse": false,
-    "expires": "2026-12-31T23:59:59Z"
+    "expires": "2026-12-31T23:59:59Z",
+    "status": "HISTORICAL_DEVELOPMENT_ONLY",
+    "replacedBy": "PRIV-004-ACCOUNT-REGISTRATION-PROD / PROD-2026-09-28.1"
   },
   "contractAdmission": {
     "workflow": ".github/workflows/contract-admission-v2.yml",
@@ -348,5 +350,18 @@
     "evidenceRegistryId": "EVD-AUTH001-W02-MATERIALIZER-RUNTIME-REMOTE-001",
     "productionDeployment": "BLOCKED",
     "currentMainAfterMerge": "e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd"
+  },
+  "productionPolicyAuthority": {
+    "status": "ADMITTED_ENGINEERING_PRODUCTION_AUTHORITY",
+    "policyId": "PRIV-004-ACCOUNT-REGISTRATION-PROD",
+    "policyVersion": "PROD-2026-09-28.1",
+    "rule": {
+      "mode": "DURATION",
+      "durationSeconds": 63072000
+    },
+    "sourceAuthority": "LuckRead Internal Engineering Production Policy Authority",
+    "approvalRef": "ENG-DECISION-2026-09-28-PRIV004-PROD-730D",
+    "legalComplianceStatus": "NOT_A_LEGAL_OR_COMPLIANCE_AUTHORITY",
+    "provenanceCheckpoint": "4399b83c31c2ac709bcc36c648b2bd994fb711dd"
   }
 }
