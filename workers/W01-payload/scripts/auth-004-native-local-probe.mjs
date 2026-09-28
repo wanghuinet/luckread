@@ -35,6 +35,7 @@ const beforeSessionSnapshot = await payload.findByID({
   id: userId,
   depth: 0,
   overrideAccess: true,
+  showHiddenFields: true,
 })
 const beforeSessionIds = sessionIds(beforeSessionSnapshot)
 if (beforeSessionIds.length < 2) {
@@ -54,6 +55,7 @@ const afterSessionSnapshot = await payload.findByID({
   id: userId,
   depth: 0,
   overrideAccess: true,
+  showHiddenFields: true,
 })
 const afterSessionIds = sessionIds(afterSessionSnapshot)
 const retainedExistingSessions = beforeSessionIds.filter((id) => afterSessionIds.includes(id))
