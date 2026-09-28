@@ -3622,3 +3622,18 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - The historical execution was not authorized at the time and is not retroactively authorized. This is preserved as a separate governance fact; evidence admission does not rewrite that history.
 - No migration re-application, Runtime rerun, D1 rollback, Worker deployment, Contract change, or Mapping 0 GREEN promotion is performed by this admission.
 - AUTH-002 migration evidence is now closed; the remaining gate is final Evidence Registry / Mapping 0 / entity promotion.
+
+## 2026-09-28 — final Mapping 0 continuation checkpoint after PR #157
+
+- Current GitHub `main`: `56a9623b7021a1baead37007b5ac69bbba037a69`.
+- PR #157 admitted `EVD-AUTH002-B27-MIGRATION-EXECUTION-HISTORICAL-001` as `PASS / VERIFIED`; the historical execution remains unauthorized at the time and is not retroactively authorized.
+- Post-merge Contract Admission CI run `36390199068` = SUCCESS. Its core Contract/Structural, Payload, Semantic, Feature Inventory and Capability Graph jobs all succeeded. The Five-Way Alignment and Strict Downstream R4/Evidence/R5 jobs were skipped because their global prerequisites remain unresolved; no GREEN is inferred from the skipped jobs.
+- Mapping 0 Structural/Contract run `36390199082`, schema-evidence run `36390198998`, API Contract run `36390199012`, reconcile run `36390199163`, and Feature Inventory run `36390199203` all completed SUCCESS on the same `main` head.
+- Canonical Mapping 0 remains `NOT_GREEN`: 449 records = 429 `UNRESOLVED`, 19 `PARTIAL`, 1 `MISSING`, with 462 blocker entries.
+- Canonical Five-Way remains `NOT_GREEN`: 449 records = 433 `UNRESOLVED`, 14 `PARTIAL`, 2 `MISSING`, with 457 blocker entries.
+- Evidence Registry remains `NOT_GREEN`: 50 records, including 28 `VERIFIED`, 17 `CREATED`, 3 `EXPIRED`, and 2 `SUPERSEDED`. No documentation-only change is used to promote the registry.
+- ENT-IDENTITY, ENT-CREDENTIAL and ENT-SESSION remain blocked from catalog promotion; no entity promotion is inferred from their admitted implementation evidence.
+- No AUTH-002 Runtime rerun, no migration re-application, no D1 rollback, no Worker deployment, and no topology expansion is performed by this checkpoint.
+- `NEXT_ITEM_ID: M0-FINAL-EVIDENCE-MAPPING-ENTITY-PROMOTION-001`
+- `NEXT_ITEM_STATE: TODO_FIX`
+- Next required action: close the remaining canonical Mapping 0 / Five-Way blockers in evidence-backed batches, preserving fail-closed promotion and the existing fixed architecture.
