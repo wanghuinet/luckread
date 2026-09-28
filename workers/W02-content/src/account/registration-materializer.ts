@@ -13,11 +13,15 @@ const MATERIALIZATION_ENDPOINT = 'authRegister'
 const NORMALIZATION_VERSION = 'AUTH-003-NORM-V1'
 const MAX_ENVELOPES_PER_RUN = 10
 
-type RegistrationEnvelopeRow = {
+type RegistrationEnvelopeCandidate = {
   id: string
   idempotency_key: string
   committed_response: string
   created_at: string
+  user_id: string
+  email: string
+  username: string
+  identity_id: string | null
 }
 
 type UserRow = {
@@ -96,34 +100,34 @@ async function deriveMaterializedCredentialIdempotencyKey(
   return 'auth1m_' + digest
 }
 
-async function getCompletedRegistrationEnvelopes(
+async function getPendingRegistrationEnvelopes(
   db: D1Database,
   now: string,
-): Promise<RegistrationEnvelopeRow[]> {
+): Promise<RegistrationEnvelopeCandidate[]> {
   const result = await db
     .prepare(
-      'SELECT id, idempotency_key, committed_response, created_at ' +
-      'FROM auth_registration_envelopes ' +
-      'WHERE state = \'COMPLETED\' ' +
-      'AND scope = ? ' +
-      'AND endpoint = ? ' +
-      'AND expires_at > ? ' +
-      'ORDER BY created_at ASC ' +
+      'SELECT e.id, e.idempotency_key, e.committed_response, e.created_at, ' +
+      'CAST(u.id AS TEXT) AS user_id, u.email, u.username, i.id AS identity_id ' +
+      'FROM auth_registration_envelopes e ' +
+      'INNER JOIN users u ' +
+      '  ON CAST(u.id AS TEXT) = CAST(json_extract(e.committed_response, \'$.userId\') AS TEXT) ' +
+      'LEFT JOIN auth_identities i ON i.user_id = CAST(u.id AS TEXT) ' +
+      'LEFT JOIN auth_credentials ce ' +
+      '  ON ce.identity_id = i.id AND ce.kind = \'email\' AND ce.active = 1 ' +
+      'LEFT JOIN auth_credentials cu ' +
+      '  ON cu.identity_id = i.id AND cu.kind = \'username\' AND cu.active = 1 ' +
+      'WHERE e.state = \'COMPLETED\' ' +
+      '  AND e.scope = ? ' +
+      '  AND e.endpoint = ? ' +
+      '  AND e.expires_at > ? ' +
+      '  AND (i.id IS NULL OR ce.id IS NULL OR cu.id IS NULL) ' +
+      'ORDER BY e.created_at ASC ' +
       'LIMIT ' + MAX_ENVELOPES_PER_RUN,
     )
     .bind(MATERIALIZATION_SCOPE, MATERIALIZATION_ENDPOINT, now)
-    .all<RegistrationEnvelopeRow>()
+    .all<RegistrationEnvelopeCandidate>()
 
   return result.results ?? []
-}
-
-async function getUser(db: D1Database, userId: string): Promise<UserRow | null> {
-  const row = await db
-    .prepare('SELECT id, email, username FROM users WHERE CAST(id AS TEXT) = ? LIMIT 1')
-    .bind(userId)
-    .first<UserRow>()
-
-  return row ?? null
 }
 
 async function getIdentity(db: D1Database, userId: string): Promise<IdentityRow | null> {
@@ -259,8 +263,16 @@ export async function reconcileCompletedRegistrationMaterialization(
       const userId = parseCommittedRegistrationUserId(envelope.committed_response)
       if (!userId) throw new Error('AUTH001_MATERIALIZATION_COMMITTED_RESPONSE_INVALID')
 
-      const user = await getUser(db, userId)
-      if (!user) throw new Error('AUTH001_MATERIALIZATION_USER_NOT_FOUND')
+      const candidate = envelopes.find((entry) => entry.id === envelope.id)
+      if (!candidate || candidate.user_id !== userId) {
+        throw new Error('AUTH001_MATERIALIZATION_USER_NOT_FOUND')
+      }
+
+      const user: UserRow = {
+        id: candidate.user_id,
+        email: candidate.email,
+        username: candidate.username,
+      }
 
       const { identity, created } = await ensureIdentity(db, user)
 
