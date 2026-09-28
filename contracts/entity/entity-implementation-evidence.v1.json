@@ -31,8 +31,10 @@
     {
       "entityId": "ENT-IDENTITY",
       "catalogStatus": "PROPOSED",
-      "implementationStatus": "BLOCKED",
-      "implementationRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-content/src/account/registration-materializer.ts"
+      ],
       "schemaEvidenceRefs": [
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
       ],
@@ -45,12 +47,13 @@
         "workers/W02-content/src/credentials/credential-add.ts",
         "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
         "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
-        "https://github.com/wanghuinet/luckread/actions/runs/36308120758"
+        "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
+        "https://github.com/wanghuinet/luckread/actions/runs/36377880967",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-IDENTITY-MATERIALIZATION-EVIDENCE-ADMISSION-2026-09-28.md"
       ],
       "blockers": [
-        "ENT-IDENTITY schema and migration evidence exist, but no independently evidenced production identity materialization/CRUD lifecycle implementation exists.",
-        "AUTH-003 runtime evidence uses seeded auth_identities fixtures as a dependency and does not itself establish identity lifecycle ownership.",
-        "Final Mapping 0 / Five-Way validation remains NOT_GREEN."
+        "AUTH-001 W02 scheduled registration materializer now provides exact-SHA executable identity materialization evidence; no independent public identity CRUD lifecycle is claimed by this admission.",
+        "Canonical entity catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and global Mapping 0 / Five-Way remains NOT_GREEN."
       ],
       "status": "BLOCKED"
     },
