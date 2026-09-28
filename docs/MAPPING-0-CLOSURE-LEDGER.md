@@ -3673,3 +3673,14 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No downgrade of PBKDF2 iterations, custom hashing implementation, Payload Core fork, parallel auth subsystem, or topology expansion is admitted by existing controls.
 - AUTH-004 remains `BLOCKED / NOT_GREEN`. Evidence Registry, Five-Way and Mapping 0 remain fail-closed.
 - Next admissible cursor: `AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY`.
+
+## 2026-09-28 — AUTH-004 upstream recheck / retired-CI boundary confirmation
+
+- Backup before this governance-only checkpoint: `backup/main-before-auth004-upstream-recheck-20260928-2128`.
+- Current `main`: `1f08435fdd75f7fe4092ec9e43fcd6d381df743b` before this ledger-only append.
+- Upstream Payload recheck: latest stable Payload 3.x remains `v3.90.2`; Payload `#18274` remains `OPEN / needs-triage / v3` and still describes the same 600000-PBKDF2-on-Workers failure. Payload `v4.0.0-canary.37` also still contains the same native `600000` PBKDF2 iteration constant, so the prerelease does not provide an already-admitted compatibility path either.
+- Cloudflare workerd `#1346` remains `OPEN`; its documented runtime limit remains the external constraint relevant to the observed W01 failure.
+- No stable upstream release or approved native configuration override is available that closes AUTH-004 without changing the project's password-security or architecture constraints.
+- Latest push-triggered failures for `contract-ci.yml` / `contract-admission-ci.yml` are not the current contract gate: both workflow files on current `main` are explicitly named `retired` and declare `workflow_dispatch` only. Those historical/retired workflow results must not be used to infer current application or Contract failure; the active gates remain their dedicated current workflows and the fail-closed Mapping 0 status.
+- AUTH-004 remains `BLOCKED / NOT_GREEN`. No new runtime implementation, Payload downgrade/upgrade, password-hash weakening, Payload Core fork, or custom authentication subsystem is admitted.
+- Next cursor remains `AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY`.
