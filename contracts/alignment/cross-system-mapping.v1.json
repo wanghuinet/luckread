@@ -120,11 +120,12 @@
         "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
         "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
         "workers/W02-content/migrations/0004_auth_003_credentials.sql",
-        "workers/W02-content/src/credentials/credential-add.ts"
+        "workers/W02-content/src/credentials/credential-add.ts",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-IDENTITY-MATERIALIZATION-EVIDENCE-ADMISSION-2026-09-28.md"
       ],
       "blockers": [
-        "Final AUTH-003 entity/field reconciliation and Entity promotion remain open; Mapping 0 / Five-Way remains globally NOT_GREEN.",
-        "ENT-IDENTITY / ENT-CREDENTIAL catalog promotion remains BLOCKED pending complete lifecycle reconciliation.",
+        "ENT-IDENTITY materialization ownership is now executable-evidence verified through the AUTH-001 W02 scheduled materializer; final entity catalog promotion remains blocked.",
+        "ENT-IDENTITY / ENT-CREDENTIAL catalog promotion remains BLOCKED while global Mapping 0 / Five-Way is NOT_GREEN.",
         "Mapping 0 / Five-Way remains globally NOT_GREEN."
       ]
     },
