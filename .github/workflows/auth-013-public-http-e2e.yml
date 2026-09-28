@@ -170,7 +170,6 @@ jobs:
             JSON.stringify({ status: 'PASS', check: 'stale_session_denial', secretMaterialIncluded: false }, null, 2) + '\n',
           )
           NODE
-          NODE
 
       - name: Verify D1 authoritative result
         env:
@@ -190,7 +189,7 @@ jobs:
               (SELECT revoked_at FROM auth_session_state WHERE session_id='${AUTH013_BASIC_SESSION_ID}') AS basic_revoked_at,
               (SELECT token_version FROM auth_session_state WHERE session_id='${AUTH013_BASIC_SESSION_ID}') AS basic_token_version" > /tmp/auth013-final.json
           node --input-type=module <<'NODE'
-          import { readFileSync } from 'node:fs'
+          import { readFileSync, writeFileSync } from 'node:fs'
           const raw = JSON.parse(readFileSync('/tmp/auth013-final.json', 'utf8'))
           const row = (raw?.result?.results ?? raw?.results ?? [])[0] ?? {}
           const checks = {
