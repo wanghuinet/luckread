@@ -45,8 +45,8 @@ if (manifest.testedCommitSha !== expectedCommit) fail('manifest testedCommitSha 
 if (dependency.repository !== 'wanghuinet/luckread') fail('repository mismatch')
 if (dependency.testedCommitSha !== manifest.testedCommitSha) fail('dependency commit mismatch')
 if (dependency.workerPath !== 'workers/W01-payload') fail('worker path mismatch')
-if (dependency.payloadVersion !== '3.87.1') fail('Payload version mismatch')
-if (dependency.d1AdapterVersion !== '3.87.1') fail('D1 adapter version mismatch')
+if (dependency.payloadVersion !== '3.90.2') fail('Payload version mismatch')
+if (dependency.d1AdapterVersion !== '3.90.2') fail('D1 adapter version mismatch')
 if (!String(dependency.nodeVersion ?? '').startsWith('v24.')) fail('Node 24 required')
 if (!dependency.lockfileReference) fail('lockfile reference missing')
 
