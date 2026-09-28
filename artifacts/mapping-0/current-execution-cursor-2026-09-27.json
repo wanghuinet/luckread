@@ -1,14 +1,14 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "10885288b7115e3f967e6b01772e2063f0d55d6d",
+  "sourceHead": "6c25655a81fa6e49333940c9638e9f84c49437f6",
   "backupBranch": "backup/main-before-auth004-pbkdf2-runtime-blocker-20260928-2107",
   "currentCursor": {
     "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
-    "state": "AUTH001_SAME_SHA_EVIDENCE_IN_PROGRESS",
-    "objective": "Close the AUTH-004 controlled remote HTTP/E2E lifecycle gate against the exact deployed W01 source without adding a custom auth subsystem, migration, Worker, D1 database, queue, or Payload core change.",
+    "state": "AUTH001_DEVELOPMENT_EVIDENCE_CLOSED",
+    "objective": "Keep closing independently authorized modules while AUTH-004 remains blocked by the external Payload 3.90.2 × Cloudflare Workers PBKDF2 compatibility gate.",
     "authoritativeControl": "docs/change-control/CC-AUTH-004-PAYLOAD-VERSION-ALIGNMENT-2026-09-28.md",
-    "nextGate": "Complete same-SHA controlled W01 AUTH-001 registration evidence for main 10885288b7115e3f967e6b01772e2063f0d55d6d; do not promote GREEN until executable evidence is uploaded and reconciled.",
+    "nextGate": "Select the next independently authorized module slice. AUTH-005/AUTH-006 remain blocked on explicit public wire-contract authority; AUTH-013 downstream remote positive evidence is the next existing controlled gate and must not be replaced by inferred implementation.",
     "logicalOwnership": "W01 -> AUTH-004 Payload-native authority CLOSED",
     "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding — deployment run 36420996656 attempt 7 SUCCESS; deployed application source 6d574bb56222e0eaf44df663e04eb59535e84be6.",
     "physicalRuntimeTarget": "W01 luckread-w01-payload / D1-01 luckread",
@@ -186,7 +186,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced by governance-only reconciliation after a fresh Payload/Cloudflare upstream recheck. No application runtime source changed; AUTH-004 remains externally blocked by the observed PBKDF2 compatibility issue.",
-    "currentMainSha": "10885288b7115e3f967e6b01772e2063f0d55d6d",
+    "currentMainSha": "6c25655a81fa6e49333940c9638e9f84c49437f6",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
     "payloadWireCompatibilityStatus": "AUTH004_REMOTE_RUNTIME_BLOCKED_PBKDF2_COMPATIBILITY",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -194,11 +194,11 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "10885288b7115e3f967e6b01772e2063f0d55d6d",
-    "governanceHeadDisposition": "CI-only AUTH-001 evidence-gate enablement. No product runtime, schema, migration, Worker topology, or public contract changed.",
+    "actualGitMainHead": "6c25655a81fa6e49333940c9638e9f84c49437f6",
+    "governanceHeadDisposition": "Governance/evidence admission only. AUTH-001 runtime source was tested at exact SHA 10885288b7115e3f967e6b01772e2063f0d55d6d; subsequent commits are evidence-registry/change-control/cursor reconciliations only.",
     "reviewedAt": "2026-09-28",
     "implementationEvidenceSourceHead": "6d574bb56222e0eaf44df663e04eb59535e84be6",
-    "latestGovernanceCommit": "10885288b7115e3f967e6b01772e2063f0d55d6d"
+    "latestGovernanceCommit": "6c25655a81fa6e49333940c9638e9f84c49437f6"
   },
   "nextGate": "AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY",
   "latestControlGate": {
@@ -273,15 +273,24 @@
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-28",
-    "mainSha": "10885288b7115e3f967e6b01772e2063f0d55d6d",
+    "mainSha": "6c25655a81fa6e49333940c9638e9f84c49437f6",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.90.2",
     "capabilityFinding": "Payload native AUTH-004 capability is contractually aligned to 3.90.2, but the native password hashing implementation is incompatible with Cloudflare Workers production because it requests 600000 PBKDF2 iterations.",
-    "implementationDisposition": "AUTH001_FOCUSED_SLICE_IMPLEMENTED_AWAITING_SAME_SHA_EVIDENCE",
+    "implementationDisposition": "AUTH001_FOCUSED_SLICE_DEVELOPMENT_AND_SAME_SHA_EVIDENCE_CLOSED",
     "staleEvidenceCorrection": "The 3.87.1 cursor is historical and superseded by 3.90.2; the new blocker is external runtime compatibility, not a version-alignment gap.",
-    "currentMainSha": "10885288b7115e3f967e6b01772e2063f0d55d6d",
+    "currentMainSha": "6c25655a81fa6e49333940c9638e9f84c49437f6",
     "implementationSourceSha": "6d574bb56222e0eaf44df663e04eb59535e84be6",
-    "currentSourceHead": "10885288b7115e3f967e6b01772e2063f0d55d6d"
+    "currentSourceHead": "6c25655a81fa6e49333940c9638e9f84c49437f6",
+    "evidenceAdmission": {
+      "runId": "36429956815",
+      "jobId": "108953279163",
+      "testedSourceSha": "10885288b7115e3f967e6b01772e2063f0d55d6d",
+      "artifactId": "10972624632",
+      "artifactSha256": "7a16a8d0e2b178d3e5ecdef3cd47151b487c096a36b6c60963b90dd5e78e6ae2",
+      "status": "PASS_VERIFIED",
+      "productionDeployment": false
+    }
   },
   "devTestPolicy": {
     "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
