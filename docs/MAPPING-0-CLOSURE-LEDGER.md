@@ -3915,3 +3915,14 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Backup before correction: `backup/pre-auth013-d1-json-shape-20260929`.
 - No public HTTP behavior evidence is admitted from attempts 1 or 2. The authoritative cursor remains `AUTH-013-PUBLIC-HTTP-E2E-001 / BLOCKED_EXTERNAL_EXECUTION`.
 - Next execution uses the corrected evidence tooling with tested source `7104cc3d4e29ef62f1ae59d9ed5fcca770a12f0e` and deployment run `36455540585`.
+## 2026-09-29 — AUTH-013 public route-prefix GAP identified from run 36498199164
+
+- Run `36498199164` passed deployment provenance, exact deployed-source checkout, Payload `3.90.2` admission, randomized fixture preflight, fixture seeding, generated user-ID resolution, and fixture cleanup.
+- The real public HTTP probe failed at its first protected endpoint call because `/v1/users/20/account-state` returned non-JSON. No AUTH-013 behavior evidence is admitted from this run.
+- The exact deployment run `36455540585` build output lists the shipped App Routes as `/auth/*` and `/users/[userId]/account-state`; it does not list `/v1/users/[userId]/account-state`.
+- The canonical AUTH-013 Contract already requires `POST /v1/users/{userId}/account-state`; therefore this is an implementation-to-Contract route-prefix GAP, not a reason to alter the evidence probe or Contract.
+- Correction scope: expose the existing handler at the already-contracted `/v1/users/[userId]/account-state` boundary without changing its business logic or authority model.
+- Backup before implementation correction: `backup/pre-auth013-v1-route-alias-20260929`.
+- No D1 schema, Payload version, Worker topology, W02 authority, or Contract change is authorized. AUTH-013 remains `NOT_GREEN` until a fresh deployment of the corrected source and a successful controlled public HTTP E2E artifact.
+- `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
+- `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_DEPLOYMENT`
