@@ -9,8 +9,8 @@
 - Repository source of truth: `wanghuinet/luckread`
 - Active runtime: `workers/W01-payload/`
 - Active Payload baseline: official `templates/with-cloudflare-d1` structure; current W01 lock recorded by W01 package manifest
-- Payload version: `3.87.1`
-- D1 adapter version: `3.87.1`
+- Payload version: `3.90.2`
+- D1 adapter version: `3.90.2`
 - Payload migration directory: `workers/W01-payload/src/migrations`
 
 Historical evidence referring to the 3.82.1 upstream template observation or root `src/migrations` is not current W01 runtime evidence and must not satisfy this gate.
