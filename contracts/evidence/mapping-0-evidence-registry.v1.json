@@ -962,6 +962,24 @@
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36429956815",
       "freshnessMode": "EXACT_SHA",
       "note": "Exact-SHA concurrency evidence: duplicate normalized identity produced exactly one authoritative User/Consent with statuses 201/422; concurrent same-key requests produced two identical 201 replay responses in this run; no duplicate authoritative registration record and no W02 mutation. Artifact 10972624632."
+    },
+    {
+      "evidenceId": "EVD-AUTH013-RUNTIME-SOURCE-LOCAL-001",
+      "type": "UNIT_TEST",
+      "claimId": "AUTH-013::W02_RUNTIME_SOURCE",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-013",
+      "source": "GitHub Actions W02 AUTH-013 Runtime Source Verification",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36431940464/artifacts/10973254137",
+      "commitSha": "0af2fcb66b6bb54ace065b7debe5559a80a285a4",
+      "timestamp": "2026-09-28T13:54:45Z",
+      "producer": "W02 AUTH-013 Runtime Source Verification / run 36431940464 / job 108959464320",
+      "result": "PASS",
+      "status": "CREATED",
+      "checkId": "108959464320",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36431940464",
+      "freshnessMode": "EXACT_SHA",
+      "note": "Exact-source W02 typecheck and AUTH-013 account-state/publication-journal tests passed at source SHA 0af2fcb66b6bb54ace065b7debe5559a80a285a4. Test scope includes atomic state+journal writes, stale If-Match rejection, rollback, canonical permission/approval enforcement, lifecycle preconditions, session invalidation side effect, and trusted-principal authorization tests. Artifact 10973254137, sha256:5c154a9322abc0d3aa7afd078d81d5646b978ce55392cc3f2320e8a39b6bb8d9. This is source-level evidence only; it does not prove public W01 HTTP E2E or production deployment."
     }
   ],
   "testedCommitSha": "10885288b7115e3f967e6b01772e2063f0d55d6d"
