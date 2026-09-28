@@ -74,6 +74,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+          path: evidence-tooling
 
       - name: Setup runtime
         uses: actions/setup-node@v4
@@ -103,7 +104,7 @@ jobs:
         env:
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
-        run: node scripts/auth-013-public-http-e2e-fixture.mjs
+        run: node evidence-tooling/scripts/auth-013-public-http-e2e-fixture.mjs
 
       - name: Preflight fixture collision and journal availability
         env:
@@ -137,7 +138,7 @@ jobs:
         env:
           W01_BASE_URL: ${{ inputs.w01_base_url }}
           AUTH013_ARTIFACT_DIR: artifacts/mapping-0/auth-013-public-http-e2e
-        run: node scripts/auth-013-public-transport-e2e.mjs
+        run: node evidence-tooling/scripts/auth-013-public-transport-e2e.mjs
 
       - name: Revoke basic session for stale-session proof
         env:
