@@ -239,14 +239,12 @@ jobs:
         run: |
           set +e
           cat > /tmp/auth013-cleanup.sql <<SQL
-          BEGIN;
           DELETE FROM auth_013_publication_journal WHERE resource_id IN ('${AUTH013_BASIC_USER_ID}','${AUTH013_OPERATOR_USER_ID}');
           DELETE FROM auth_session_state WHERE session_id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}');
           DELETE FROM users_sessions WHERE id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}');
           DELETE FROM role_assignments WHERE id IN ('${AUTH013_BASIC_ROLE_ID}','${AUTH013_OPERATOR_ROLE_ID}');
           DELETE FROM role_authorization_versions WHERE subject_id IN ('${AUTH013_BASIC_USER_ID}','${AUTH013_OPERATOR_USER_ID}');
           DELETE FROM users WHERE id IN (${AUTH013_BASIC_USER_ID},${AUTH013_OPERATOR_USER_ID});
-          COMMIT;
           SQL
           npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config workers/W01-payload/wrangler.jsonc --file=/tmp/auth013-cleanup.sql
 
