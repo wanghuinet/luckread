@@ -3905,3 +3905,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No AUTH-013 runtime/Contract/schema/Payload/Worker authority changed. No behavior evidence is admitted from `36497430139`.
 - `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
 - `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_EXECUTION`
+
+## 2026-09-29 — AUTH-013 public HTTP E2E D1 JSON parser correction
+
+- Failed run `36497771528` attempts 1 and 2 stopped at fixture preflight with `fixture collision: email_collision`; the harness did not reach any public HTTP assertion.
+- Both attempts generated distinct random UUID fixture identities. The collision message was therefore not accepted as sufficient proof of a real identity collision.
+- Root tooling defect: Wrangler `d1 execute --json` remote query output is an array of query-result objects, while the preflight/user-id/final/cleanup parsers expected a nested `result.results` shape. A missing parsed row was converted to `-1` and surfaced as the misleading `fixture collision` error.
+- Correction is evidence-tooling only: normalize the current array-shaped Wrangler JSON result while retaining compatibility with the prior nested shape. No AUTH-013 runtime route, Contract, D1 schema, Payload version, Worker topology, or authority changes.
+- Backup before correction: `backup/pre-auth013-d1-json-shape-20260929`.
+- No public HTTP behavior evidence is admitted from attempts 1 or 2. The authoritative cursor remains `AUTH-013-PUBLIC-HTTP-E2E-001 / BLOCKED_EXTERNAL_EXECUTION`.
+- Next execution uses the corrected evidence tooling with tested source `7104cc3d4e29ef62f1ae59d9ed5fcca770a12f0e` and deployment run `36455540585`.
