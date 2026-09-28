@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
   "sourceHead": "3395da99d8bb596faa706c33d1a4ef6467557780",
-  "backupBranch": "backup/main-before-auth002-migration-evidence-boundary-20260928",
+  "backupBranch": "backup/main-before-cursor-aa8-reconcile-20260928",
   "currentCursor": {
     "id": "AUTH-002-SESSION-MIGRATION-EVIDENCE-CLOSURE",
     "state": "PRIV004_AUTHORITY_CLOSED_AUTH001_AUTH003_EVIDENCE_ADMITTED_AUTH002_RUNTIME_VERIFIED_MIGRATION_PENDING_FINAL_MAPPING_BLOCKED",
@@ -191,8 +191,8 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "694c1da911145cc4a3d1b152d12ed797a3b525b5",
-    "governanceHeadDisposition": "PR #154 is merged; it changes only governance cursor/ledger state. Implementation/source evidence boundary remains e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd."
+    "actualGitMainHead": "aa8af7b173b8abaaff09254149613b4b0f1a590d",
+    "governanceHeadDisposition": "PR #154 and PR #155 are merged; both change governance cursor/evidence-boundary state only. Implementation/source evidence boundary remains e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd."
   },
   "nextGate": "AUTH-002::MIGRATION_EXECUTION evidence admission, followed by final Evidence Registry / Mapping 0 / entity promotion checks. No production deployment is authorized by this cursor.",
   "latestControlGate": {
