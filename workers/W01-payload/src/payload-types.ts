@@ -148,6 +148,43 @@ export interface User {
   password?: string | null;
   collection: 'users';
 }
+export interface AuthRegistrationEnvelope {
+  id: string
+  idempotencyKey: string
+  activeKey?: string | null
+  scope: string
+  endpoint: string
+  payloadHash: string
+  state: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
+  responseDigest?: string | null
+  committedResponse?: { userId?: string; accountState?: string } | null
+  expiresAt: string
+  consentRecordId?: string | null
+  updatedAt: string
+  createdAt: string
+  collection: 'auth-registration-envelopes'
+}
+
+export interface ConsentRecord {
+  id: string
+  actorSubjectId: string
+  ownerSubjectId: string
+  resourceId: string
+  resourceType: string
+  purpose: 'ACCOUNT_REGISTRATION'
+  state: 'GRANTED' | 'REVOKED' | 'RESTRICTED_PROCESSING'
+  policyVersion: string
+  legalBasis: 'CONSENT'
+  withdrawnAt?: string | null
+  retentionClass: 'LEGAL_AUDIT'
+  retentionUntil: string
+  sourceAuthority: string
+  legalHoldRef?: string | null
+  updatedAt: string
+  createdAt: string
+  collection: 'consents'
+}
+
 export interface Media {
   id: number;
   alt: string;
@@ -361,4 +398,40 @@ export interface Auth {
 
 declare module 'payload' {
   export interface GeneratedTypes extends Config {}
+}
+
+
+export interface AuthRegistrationEnvelopeSelect<T extends boolean = true> {
+  id?: T
+  idempotencyKey?: T
+  activeKey?: T
+  scope?: T
+  endpoint?: T
+  payloadHash?: T
+  state?: T
+  responseDigest?: T
+  committedResponse?: T
+  expiresAt?: T
+  consentRecordId?: T
+  updatedAt?: T
+  createdAt?: T
+}
+
+export interface ConsentRecordSelect<T extends boolean = true> {
+  id?: T
+  actorSubjectId?: T
+  ownerSubjectId?: T
+  resourceId?: T
+  resourceType?: T
+  purpose?: T
+  state?: T
+  policyVersion?: T
+  legalBasis?: T
+  withdrawnAt?: T
+  retentionClass?: T
+  retentionUntil?: T
+  sourceAuthority?: T
+  legalHoldRef?: T
+  updatedAt?: T
+  createdAt?: T
 }
