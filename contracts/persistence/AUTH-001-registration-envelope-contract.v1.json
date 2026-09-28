@@ -40,7 +40,9 @@
     "response_digest": {
       "type": "string",
       "requiredWhen": "state=COMPLETED",
-      "source": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+      "source": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
+      "description": "Pre-commit replay commitment digest. It is SHA-256 of the canonical AUTH-001.response-digest.v1 commitment object; it is not a digest of committed_response because the generated User ID is allocated inside the atomic D1 batch.",
+      "encoding": "SHA-256 over canonical UTF-8 JSON of {schema, operationId, endpoint, idempotencyKey, payloadHash, status, accountState}"
     },
     "committed_response": {
       "type": "object",
@@ -93,15 +95,16 @@
     "accountState in committed_response is sourced from users.account_state; the admitted initial value is PENDING_VERIFICATION with account_state_version 1",
     "HTTP 201 is a deterministic operation-level response status from the canonical authRegister contract and does not require a second persisted status field",
     "the registration envelope records consent_record_id for the committed ENT-CONSENT record",
-    "a COMPLETED replay does not create another consent record and reuses the first committed consent_record_id"
+    "a COMPLETED replay does not create another consent record and reuses the first committed consent_record_id",
+    "response_digest is a pre-commit replay commitment; committed_response remains the authoritative lossless replay body"
   ],
   "blockedBindings": {},
   "nonAuthorizations": [
     "No generic idempotency platform",
     "No new Worker/D1/Queue",
-    "No runtime implementation",
     "No migration",
-    "No Mapping 0 GREEN"
+    "No Mapping 0 GREEN",
+    "Runtime implementation remains limited to the admitted W01 registration-scoped D1 batch seam"
   ],
   "consentBinding": {
     "status": "CONTRACTED",
