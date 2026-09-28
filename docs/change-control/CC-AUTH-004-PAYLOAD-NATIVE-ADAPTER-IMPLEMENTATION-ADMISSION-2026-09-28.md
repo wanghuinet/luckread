@@ -90,3 +90,12 @@ Pre-change backup branch:
 ## Governing principle
 
 **Payload native capability > thin adapter if necessary > custom subsystem only by explicit later Change Control.**
+
+## Remote evidence execution checkpoint — 2026-09-28
+
+- Local native lifecycle evidence is now VERIFIED at run `36411953998`.
+- Remote E2E automation is now present at `.github/workflows/auth-004-remote-e2e.yml` with exact deployment-artifact provenance binding.
+- The remote probe exercises the three contracted public password operations, cross-account denial, anonymous reset-request enumeration resistance, session invalidation, replay/expiry rejection, empty-success bodies, and secret non-disclosure.
+- The workflow is deployment-bound to `W01 W02 Auth Binding Deploy`; no alternate deployment path is introduced.
+- A current W01 deployment of the 3.90.2 source remains the required external execution boundary.
+- Until that deployment and the resulting remote evidence succeed, AUTH-004 remains `BLOCKED / NOT_GREEN`.
