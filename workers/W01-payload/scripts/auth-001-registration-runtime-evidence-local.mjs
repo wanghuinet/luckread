@@ -75,6 +75,7 @@ const keySuccess = 'auth001-local-success-' + suffix
 const keyRollback = 'auth001-local-rollback-' + suffix
 const keyConcurrentA = 'auth001-local-concurrent-a-' + suffix
 const keyConcurrentB = 'auth001-local-concurrent-b-' + suffix
+const keySameKey = 'auth001-local-same-key-' + suffix
 const concurrentEmail = 'auth001-concurrent-' + suffix + '@luckread.local'
 const concurrentUsername = 'auth001ct' + suffix
 let triggerName = null
@@ -117,7 +118,7 @@ try {
   if (reuseResponse.status !== 422 || !reuse.error || reuse.error.code !== 'IDEMPOTENCY_KEY_REUSE_CONFLICT') throw new Error('Idempotency key reuse conflict was not canonical')
 
   triggerName = 'auth001_evidence_fail_' + suffix
-  runSql('CREATE TRIGGER ' + triggerName + " BEFORE INSERT ON auth_registration_envelopes BEGIN SELECT RAISE(ABORT, 'AUTH001_FORCED_ROLLBACK'); END")
+  runSql('CREATE TRIGGER ' + triggerName + " BEFORE UPDATE ON auth_registration_envelopes BEGIN SELECT RAISE(ABORT, 'AUTH001_FORCED_ROLLBACK'); END")
   const rollbackEmail = 'auth001-rollback-' + suffix + '@luckread.local'
   const rollbackUsername = 'auth001rb' + suffix
   const rollbackResponse = await request(keyRollback, { ...body, identity: rollbackEmail, username: rollbackUsername })
@@ -133,6 +134,27 @@ try {
   if (statuses[0] !== 201 || statuses[1] !== 422) throw new Error('Concurrent duplicate identity did not produce exactly one success and one conflict: ' + statuses.join(','))
   const concurrentRows = await countsForEmail(concurrentEmail, concurrentUsername)
   if (concurrentRows.users !== 1 || concurrentRows.consents !== 1) throw new Error('Concurrent duplicate identity produced more than one authoritative registration record')
+
+  const sameKeyEmail = 'auth001-same-key-' + suffix + '@luckread.local'
+  const sameKeyUsername = 'auth001sk' + suffix
+  const sameKeyBody = {
+    ...body,
+    identity: sameKeyEmail,
+    username: sameKeyUsername,
+    credential: password + '-same-key',
+  }
+  const sameKeyPair = await Promise.all([
+    request(keySameKey, sameKeyBody),
+    request(keySameKey, sameKeyBody),
+  ])
+  const sameKeyStatuses = sameKeyPair.map((response) => response.status).sort((a, b) => a - b)
+  if (sameKeyStatuses[0] !== 201 || sameKeyStatuses[1] !== 409) {
+    throw new Error('Concurrent same Idempotency-Key did not produce exactly one success and one in-progress conflict: ' + sameKeyStatuses.join(','))
+  }
+  const sameKeyRows = await countsForEmail(sameKeyEmail, sameKeyUsername)
+  if (sameKeyRows.users !== 1 || sameKeyRows.consents !== 1) {
+    throw new Error('Concurrent same Idempotency-Key produced more than one authoritative registration record')
+  }
 
   const result = { status: 'PASS', evidenceType: 'AUTH-001_REGISTRATION_D1_BATCH_LOCAL_RUNTIME', runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_NEXT_DEV', assertions: { successfulRegistration: true, exactlyOneUser: true, exactlyOneConsent: true, accountStatePendingVerificationVersion1: true, nativeHashAndSaltPersisted: true, plaintextPasswordNotPersisted: true, responseDigestMatchesAdmittedCommitment: true, replayReturnsOriginalResponse: true, idempotencyKeyReuseConflictCanonical: true, forcedLaterStatementRollback: true, concurrentDuplicateIdentitySingleWinner: true, downstreamW02Mutation: false }, observed: { userId: String(first.userId), accountState: first.accountState, hashLength: String(successRows.hash).length, saltLength: String(successRows.salt).length, concurrentStatuses: pair.map((response) => response.status) } }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
