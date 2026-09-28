@@ -3462,3 +3462,12 @@ This note does not change any Blueprint, Contract, API, DTO, Entity, Field, Work
 - Production remains blocked on the first approved `ACCOUNT_REGISTRATION / LEGAL_AUDIT` PRIV-004 policy instance with explicit version, scope, effective period, deterministic rule, approval and provenance.
 - No production Worker deployment, entity promotion, Evidence Registry GREEN, or Mapping 0 GREEN is implied.
 
+## 2026-09-28 — current-head cursor refresh after AUTH-001 evidence merge
+
+- Current main: `b6004470b5c9d63e66fbc7214a99621d1da401eb`.
+- AUTH-001 W01 registration migration evidence: `PASS_VERIFIED`.
+- AUTH-001 W02/D1-01 materializer runtime evidence: `PASS_VERIFIED`, Evidence Registry admitted as `EVD-AUTH001-W02-MATERIALIZER-RUNTIME-REMOTE-001`.
+- The prior materializer runtime implementation commit `bd2791a4ca799126fac16afbc0506070e9074a77` remains the exact tested implementation scope; the subsequent current-main changes are governance/evidence-only and did not modify the relevant W02 runtime implementation.
+- The active governed blocker is now the first approved production `ACCOUNT_REGISTRATION / LEGAL_AUDIT` PRIV-004 policy instance.
+- No production deployment, entity promotion, Evidence Registry GREEN, or Mapping 0 GREEN is implied by this cursor refresh.
+
