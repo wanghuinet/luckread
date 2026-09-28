@@ -123,7 +123,10 @@
       "migrationEvidenceRefs": [
         "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
         "https://github.com/wanghuinet/luckread/actions/runs/36217784262",
-        "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
+        "https://github.com/wanghuinet/luckread/actions/runs/36219132123",
+        "artifacts/mapping-0/auth-002-historical-migration-evidence-admission-2026-09-28.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-002-HISTORICAL-MIGRATION-EVIDENCE-ADMISSION-2026-09-28.md",
+        "https://github.com/wanghuinet/luckread/actions/runs/35552919573/artifacts/10618729380"
       ],
       "payloadNativeEvidenceRefs": [
         "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
@@ -135,7 +138,6 @@
       ],
       "blockers": [
         "Gate-1 schema, native session runtime, security-negative, concurrency and extension-correlation evidence are now VERIFIED at the exact tested source 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55.",
-        "Migration execution evidence remains unadmitted under the current persistence-evidence contract.",
         "ENT-SESSION catalog promotion remains blocked pending final Mapping 0 / Five-Way admission."
       ],
       "status": "BLOCKED"
