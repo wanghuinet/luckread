@@ -1,0 +1,44 @@
+name: AUTH-004 Payload 3.87.1 Baseline Snapshot Generator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/auth-004-payload-3902-baseline-snapshot-generator.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout pre-upgrade W01 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 51e081e7859681f1b0250b1f9d7bf269aee60e35
+          path: baseline
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+      - name: Install 3.87.1 W01 dependencies
+        working-directory: baseline/workers/W01-payload
+        run: pnpm install --frozen-lockfile
+      - name: Generate pre-upgrade Payload schema snapshot
+        working-directory: baseline/workers/W01-payload
+        env:
+          NODE_ENV: development
+          PAYLOAD_SECRET: ignore
+        run: pnpm exec payload migrate:create AUTH004_BASELINE_3871_SNAPSHOT --skip-empty
+      - name: Upload generated baseline snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-004-payload-3871-baseline-snapshot-${{ github.run_id }}
+          path: baseline/workers/W01-payload/src/migrations/*.json
+          if-no-files-found: error
+          retention-days: 14
