@@ -3885,3 +3885,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No AUTH-013 runtime/Contract/schema/Payload/Worker authority changed. No behavior evidence is admitted from run `36479891510`.
 - `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
 - `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_EXECUTION`
+
+
+## 2026-09-29 — AUTH-013 public HTTP E2E fixture identity hardening
+
+- Run `36497430139` reached the database-generated user-id implementation but failed closed at preflight on `email_collision`; no seed or public HTTP behavior evidence executed.
+- Fixture email/username uniqueness is now based on a fresh random UUID per workflow execution, removing dependence on GitHub run-id uniqueness or historical remote cleanup. User IDs remain database-generated and are resolved by the unique fixture emails after seed.
+- Backup before correction: `backup/pre-auth013-random-fixture-identity-20260929-202609290715`.
+- No AUTH-013 runtime/Contract/schema/Payload/Worker authority changed. No behavior evidence is admitted from run `36497430139`.
+- `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
+- `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_EXECUTION`
