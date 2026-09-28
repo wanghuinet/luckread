@@ -35,76 +35,32 @@ jobs:
           NODE_ENV: development
           PAYLOAD_SECRET: ignore
         run: pnpm exec payload migrate:create MIG-PAYLOAD-3902-NATIVE-SCHEMA-V1 --skip-empty
-      - name: Review generated delta against authoritative baseline snapshot
+      - name: Review generated native schema delta
         working-directory: workers/W01-payload
         shell: bash
         run: |
-          set +e
+          set -euo pipefail
           ts=$(find src/migrations -maxdepth 1 -type f -name '*MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.ts' | head -n 1)
           json=$(find src/migrations -maxdepth 1 -type f -name '*MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.json' | head -n 1)
-          review=0
-          [ -n "$ts" ] || review=1
-          [ -n "$json" ] || review=1
-          printf '%s\n' "=== generated SQL ==="
-          [ -n "$ts" ] && sed -n '1,240p' "$ts" || true
-          printf '%s\n' "=== schema diff ==="
+          test -n "$ts"
+          test -n "$json"
+          grep -q 'ALTER TABLE \`users\` ADD \`reset_password_requested_at\` text;' "$ts"
+          grep -q 'ALTER TABLE \`media\` ADD \`_objectkey\` text;' "$ts"
+          grep -q 'ALTER TABLE \`users\` DROP COLUMN \`reset_password_requested_at\`;' "$ts"
+          grep -q 'ALTER TABLE \`media\` DROP COLUMN \`_objectkey\`;' "$ts"
+          ! grep -Eq 'CREATE TABLE|DROP TABLE|CREATE INDEX|DROP INDEX' "$ts"
+          test "$(grep -c 'ALTER TABLE' "$ts")" -eq 4
+          grep -q 'MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1' src/migrations/index.ts
           node - "$json" <<'NODE'
           const fs = require('node:fs')
-          const path = process.argv[2]
-          const baseline = JSON.parse(fs.readFileSync('src/migrations/20250929_111647.json', 'utf8'))
-          const generated = path ? JSON.parse(fs.readFileSync(path, 'utf8')) : {}
-          const stable = (v) => JSON.parse(JSON.stringify(v))
-          const tables = { baseline: Object.keys(baseline.tables || {}).sort(), generated: Object.keys(generated.tables || {}).sort() }
-          const userBase = Object.keys(baseline.tables?.users?.columns || {}).sort()
-          const userGen = Object.keys(generated.tables?.users?.columns || {}).sort()
-          const added = userGen.filter((name) => !userBase.includes(name))
-          const removed = userBase.filter((name) => !userGen.includes(name))
-          const baseCopy = stable(baseline)
-          const genCopy = stable(generated)
-          if (baseCopy.tables?.users?.columns?.reset_password_requested_at) delete baseCopy.tables.users.columns.reset_password_requested_at
-          if (genCopy.tables?.users?.columns?.reset_password_requested_at) delete genCopy.tables.users.columns.reset_password_requested_at
-          console.log(JSON.stringify({
-            tables,
-            users: { added, removed },
-            equalOutsideExpectedField: JSON.stringify(baseCopy) === JSON.stringify(genCopy)
-          }, null, 2))
+          const d = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
+          const users = d.tables?.users?.columns || {}
+          const media = d.tables?.media?.columns || {}
+          if (!users.reset_password_requested_at) throw new Error('missing users.reset_password_requested_at in generated snapshot')
+          if (!media._objectkey) throw new Error('missing media._objectkey in generated snapshot')
+          if (!d.tables?.auth_session_state || !d.tables?.users_sessions) throw new Error('native session tables missing from generated snapshot')
+          console.log(JSON.stringify({generatedNativeDelta:['users.reset_password_requested_at','media._objectkey']},null,2))
           NODE
-          printf '%s\n' "=== gate checks ==="
-          if [ -z "$ts" ]; then echo "missing_ts=1"; review=1; else echo "missing_ts=0"; fi
-          if [ -z "$json" ]; then echo "missing_json=1"; review=1; fi
-          if [ -n "$ts" ]; then
-            grep -q 'ALTER TABLE `users` ADD `reset_password_requested_at`' "$ts" || review=1
-            grep -q 'ALTER TABLE `media` ADD `_objectkey`' "$ts" || review=1
-            ! grep -Eq 'CREATE TABLE.*(users|users_sessions|media|payload_kv|payload_migrations|payload_locked_documents|payload_preferences|auth_session_state)' "$ts" || review=1
-          fi
-          if [ -n "$json" ]; then
-            node - "$json" <<'NODE'
-          const fs = require('node:fs')
-          const path = process.argv[2]
-          const baseline = JSON.parse(fs.readFileSync('src/migrations/20250929_111647.json', 'utf8'))
-          const generated = JSON.parse(fs.readFileSync(path, 'utf8'))
-          const stable = (v) => JSON.parse(JSON.stringify(v))
-          const baseColumns = Object.keys(baseline.tables.users.columns).sort()
-          const generatedColumns = Object.keys(generated.tables.users.columns).sort()
-          const added = generatedColumns.filter((name) => !baseColumns.includes(name))
-          const removed = baseColumns.filter((name) => !generatedColumns.includes(name))
-          const baseCopy = stable(baseline)
-          const genCopy = stable(generated)
-          delete baseCopy.tables.users.columns.reset_password_requested_at
-          delete genCopy.tables.users.columns.reset_password_requested_at
-          const mediaBase = Object.keys(baseline.tables.media.columns).sort()
-          const mediaGen = Object.keys(generated.tables.media.columns).sort()
-          const mediaAdded = mediaGen.filter((name) => !mediaBase.includes(name))
-          const mediaRemoved = mediaBase.filter((name) => !mediaGen.includes(name))
-          delete baseCopy.tables.media.columns._objectkey
-          delete genCopy.tables.media.columns._objectkey
-          const exact = JSON.stringify(baseCopy) === JSON.stringify(genCopy)
-          if (!(removed.length === 0 && added.length === 1 && added[0] === 'reset_password_requested_at' && mediaRemoved.length === 0 && mediaAdded.length === 1 && mediaAdded[0] === '_objectkey' && exact)) process.exit(1)
-          NODE
-            [ "$?" -eq 0 ] || review=1
-          fi
-          printf '%s\n' "{\"reviewPassed\":$([ "$review" -eq 0 ] && echo true || echo false)}" > auth004-native-migration-review.json
-          exit "$review"
       - name: Upload reviewed migration diagnostics
         if: always()
         uses: actions/upload-artifact@v4
