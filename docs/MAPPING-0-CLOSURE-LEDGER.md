@@ -3773,3 +3773,16 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Runtime/API/Worker/D1 contracts remain unchanged. AUTH-004 remains NOT_GREEN.
 - Change Control: `docs/change-control/CC-MAPPING-0-AUTH-004-RESET-SESSION-EXPECTATION-2026-09-29.md`.
 - Next authoritative execution gate: fresh controlled W01/W02 binding deployment of current main, then the existing AUTH-004 Remote HTTP E2E workflow.
+
+## 2026-09-29 — AUTH-004 remote HTTP E2E evidence passed
+
+- Backup before this governance/evidence checkpoint: `backup/pre-auth004-remote-e2e-evidence-close-20260929-1130`.
+- Current deployed application source was resolved exactly to main SHA `7104cc3d4e29ef62f1ae59d9ed5fcca770a12f0e`; deployment run `36455540585` completed successfully.
+- AUTH-004 Remote HTTP E2E run `36455724050` completed SUCCESS; job `109041444298`.
+- The run passed exact deployed-source admission, Payload `3.90.2` source admission, remote migration/schema preconditions, controlled W01 runtime startup, and the full `scripts/auth-004-remote-e2e.mjs` remote HTTP lifecycle probe.
+- Durable evidence artifact: `10984999026`, SHA-256 `cd7578a21af534567f4372c1bd44658391832a5dd3b1fddc3616198a75218b10`.
+- This closes the previously missing **remote W01 behavior / HTTP E2E execution evidence** for the tested AUTH-004 deployment scope. The two earlier failed runs remain historical harness-correction evidence and are not reused as PASS.
+- No W01 runtime contract, D1 schema, Payload version, Worker topology, or public API contract changed as part of this evidence admission.
+- AUTH-004 is still `NOT_GREEN`: lifecycle-event evidence, final canonical Evidence Registry admission, and full Mapping 0/Five-Way traceability remain open.
+- No remote E2E rerun is required for the same tested scope. Next admissible action is governance/evidence-registry reconciliation against this exact run.
+
