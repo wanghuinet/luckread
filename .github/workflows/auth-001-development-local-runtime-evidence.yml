@@ -1,0 +1,90 @@
+name: AUTH-001 Development Local Runtime Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      tested_commit:
+        description: Exact AUTH-001 source commit to test
+        required: true
+        type: string
+      base_url:
+        description: Local W01 URL
+        required: false
+        default: http://127.0.0.1:3100
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tested_commit }}
+          fetch-depth: 0
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
+      - name: Install locked W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
+      - name: Initialize local Payload D1 schema
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: development
+          PAYLOAD_SECRET: ignore
+        run: pnpm payload migrate
+
+      - name: Start W01 local runtime
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: development
+          PAYLOAD_SECRET: ignore
+          CLOUDFLARE_ENV: development
+        run: |
+          set -euo pipefail
+          nohup pnpm dev -- --hostname 127.0.0.1 -p 3100 > /tmp/auth-001-next.log 2>&1 &
+          echo $! > /tmp/auth-001-next.pid
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3100/api >/dev/null 2>&1; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/auth-001-next.log
+          exit 1
+
+      - name: Run AUTH-001 runtime probe
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: development
+          PAYLOAD_SECRET: ignore
+          CLOUDFLARE_ENV: development
+          AUTH001_BASE_URL: ${{ inputs.base_url }}
+        run: node --import=tsx/esm scripts/auth-001-registration-runtime-probe-local.mjs
+
+      - name: Upload local runtime log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-001-local-runtime-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/auth-001-next.log
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Stop W01 local runtime
+        if: always()
+        run: |
+          if [ -f /tmp/auth-001-next.pid ]; then kill "$(cat /tmp/auth-001-next.pid)" >/dev/null 2>&1 || true; fi
