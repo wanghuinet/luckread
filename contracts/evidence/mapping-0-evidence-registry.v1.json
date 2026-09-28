@@ -798,7 +798,25 @@
       "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
       "note": "Duplicate normalized identity produced exactly one authoritative User and Consent. Same-key concurrent requests satisfied canonical idempotency semantics: either one replaying 201 plus one 409 IN_PROGRESS, or two identical 201 replays after completion; no duplicate authoritative registration record was committed.",
       "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-EVIDENCE-ADMISSION-2026-09-28.md"
+    },
+    {
+      "evidenceId": "EVD-AUTH001-REGISTRATION-MIGRATION-REMOTE-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-001::REGISTRATION_PERSISTENCE_SCHEMA",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-001",
+      "source": "GitHub Actions AUTH-001 Registration Migration Execution against controlled Cloudflare D1",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36379124829/artifacts/10952236480",
+      "commitSha": "b6eab1eae17a825103c0a3b3a6c80daf570e8ff3",
+      "timestamp": "2026-09-28T04:47:57Z",
+      "producer": "AUTH-001 Registration Migration Execution / run 36379124829 / job 108790999719",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "108790999719",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36379124829",
+      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "note": "Controlled remote D1-01/`luckread` execution at exact current-main SHA b6eab1eae17a825103c0a3b3a6c80daf570e8ff3. Target migration 20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1 was applied exactly once. Post-migration evidence proved exact auth_registration_envelopes and consents column sets, all required indexes, unchanged Users row count and unchanged Users schema. No application fixtures were created and no production Worker was deployed. Artifact 10952236480, sha256:f896e02b45a70861918d76c993aa6ae034341c195aca3786d6df7b0323f87daa."
     }
   ],
-  "testedCommitSha": "75d30eeeeedf09ee6a9d08de2a2345cf85edee26"
+  "testedCommitSha": "b6eab1eae17a825103c0a3b3a6c80daf570e8ff3"
 }
