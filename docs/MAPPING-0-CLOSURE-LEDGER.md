@@ -3741,3 +3741,14 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - This checkpoint remains `AUTH-013_NOT_GREEN / REMOTE_E2E_NOT_EXECUTED`.
 - The old deployed application source `6d574bb56222e0eaf44df663e04eb59535e84be6` is confirmed to predate the AUTH-013 public W01 route; therefore it is not admissible as AUTH-013 public HTTP evidence.
 - No runtime deployment, Evidence Registry promotion, or Mapping 0 GREEN promotion is claimed.
+
+## 2026-09-29 — AUTH-002 evidence gate closure / W02 physical deployment handoff
+
+- Current GitHub main: 95914bb5155e6e635ac608420262101ffa16e5d3.
+- AUTH-002 Remote Runtime Evidence run 36451907916 completed SUCCESS. Its runtime-evidence job and runtime-evidence package validator both passed; the run used the already admitted W01 deployment source 26a5a761c88a6bdb96ea353a30b609d3db300f31.
+- This closes the current AUTH-002 evidence-validation gate for that tested deployment scope. No AUTH-002 runtime rerun is admitted unchanged.
+- Current W02 implementation source remains 5c9d5cd22f478890089b9e01769a99550d114a80; no W02 source files changed between that source and current main. Physical W02 deployment is still not admitted by current evidence.
+- Current main 0913eb83e02bcee24efab93d3295891c4b2e3966 contains the current W01 runtime source plus AUTH-002 evidence-governance corrections. A fresh W01/W02 binding deployment using current main is required before AUTH-004 remote E2E so the current W01 runtime source is actually deployed.
+- The authoritative execution cursor is now AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001 / BLOCKED_EXTERNAL_DEPLOYMENT.
+- No Evidence Registry GREEN, Entity promotion, or Mapping-0 GREEN is inferred from this governance reconciliation.
+- Change Control: docs/change-control/CC-MAPPING-0-CURSOR-AUTH002-EVIDENCE-CLOSURE-2026-09-29.md.
