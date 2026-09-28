@@ -157,13 +157,39 @@ try {
     request(keySameKey, sameKeyBody),
     request(keySameKey, sameKeyBody),
   ])
+  const sameKeyPayloads = await Promise.all(sameKeyPair.map(responseJson))
   const sameKeyStatuses = sameKeyPair.map((response) => response.status).sort((a, b) => a - b)
-  if (sameKeyStatuses[0] !== 201 || sameKeyStatuses[1] !== 409) {
-    throw new Error('Concurrent same Idempotency-Key did not produce exactly one success and one in-progress conflict: ' + sameKeyStatuses.join(','))
+
+  const sameKeyReplayPath =
+    sameKeyStatuses[0] === 201 &&
+    sameKeyStatuses[1] === 201 &&
+    JSON.stringify(sameKeyPayloads[0]) === JSON.stringify(sameKeyPayloads[1])
+
+  const sameKeyInProgressPath =
+    sameKeyStatuses[0] === 201 &&
+    sameKeyStatuses[1] === 409 &&
+    sameKeyPayloads.some(
+      (value) => value && value.error && value.error.code === 'IDEMPOTENCY_IN_PROGRESS',
+    )
+
+  if (!sameKeyReplayPath && !sameKeyInProgressPath) {
+    throw new Error(
+      'Concurrent same Idempotency-Key did not satisfy canonical replay/in-progress semantics: ' +
+        sameKeyStatuses.join(',') +
+        ' payloads=' +
+        JSON.stringify(sameKeyPayloads),
+    )
   }
+
   const sameKeyRows = await countsForEmail(sameKeyEmail, sameKeyUsername)
   if (sameKeyRows.users !== 1 || sameKeyRows.consents !== 1) {
     throw new Error('Concurrent same Idempotency-Key produced more than one authoritative registration record')
+  }
+  if (
+    sameKeyReplayPath &&
+    !sameKeyPayloads.some((value) => value && value.userId === sameKeyRows.userId)
+  ) {
+    throw new Error('Concurrent same-key replay did not return the canonical committed User')
   }
 
   const result = { status: 'PASS', evidenceType: 'AUTH-001_REGISTRATION_D1_BATCH_LOCAL_RUNTIME', runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_OPENNEXT_WORKER', assertions: { successfulRegistration: true, exactlyOneUser: true, exactlyOneConsent: true, accountStatePendingVerificationVersion1: true, nativeHashAndSaltPersisted: true, plaintextPasswordNotPersisted: true, responseDigestMatchesAdmittedCommitment: true, replayReturnsOriginalResponse: true, idempotencyKeyReuseConflictCanonical: true, forcedLaterStatementRollback: true, concurrentDuplicateIdentitySingleWinner: true, downstreamW02Mutation: false }, observed: { userId: String(first.userId), accountState: first.accountState, hashLength: String(successRows.hash).length, saltLength: String(successRows.salt).length, concurrentStatuses: pair.map((response) => response.status), sameKeyStatuses } }
