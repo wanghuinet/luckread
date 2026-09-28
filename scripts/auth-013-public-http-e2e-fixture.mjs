@@ -7,7 +7,10 @@ const makeNumericId = () => {
   const bytes = randomBytes(7)
   let value = 0n
   for (const byte of bytes) value = (value << 8n) | BigInt(byte)
-  return String(1000000000000n + (value % 8000000000000n))
+  // Payload-native auto-generated INTEGER ids are positive. Keep disposable
+  // fixture ids negative so they cannot collide with the existing positive id
+  // sequence while remaining valid SQLite INTEGER PRIMARY KEY values.
+  return String(-(1000000000000n + (value % 8000000000000n)))
 }
 
 const basicUserId = makeNumericId()
