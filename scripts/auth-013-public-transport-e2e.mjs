@@ -15,12 +15,13 @@ const fs = await import('node:fs')
 const artifactDir = process.env.AUTH013_ARTIFACT_DIR ?? 'artifacts/mapping-0/auth-013-public-http-e2e'
 fs.mkdirSync(artifactDir, { recursive: true })
 
-async function post(path, body, token) {
+async function post(path, body, token, extraHeaders = {}) {
   const response = await fetch(base + path, {
     method: 'POST',
     headers: {
       accept: 'application/json',
       'content-type': 'application/json',
+      ...extraHeaders,
       ...(token ? { authorization: 'Bearer ' + token } : {}),
     },
     body: JSON.stringify(body),
@@ -64,7 +65,7 @@ assertError(
     actor: { id: 'client', type: 'admin' },
     permission: 'user.ban',
     approvalLevel: 'L8',
-  }),
+  }, undefined, { 'If-Match': '1' }),
   401,
   'UNAUTHENTICATED',
   'unauthenticated',
