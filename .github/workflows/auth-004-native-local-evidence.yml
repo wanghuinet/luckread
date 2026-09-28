@@ -34,4 +34,18 @@ jobs:
         env:
           NODE_ENV: development
           PAYLOAD_SECRET: ignore
-        run: node --import=tsx/esm scripts/auth-004-native-local-probe.mjs
+        run: |
+          set +e
+          node --import=tsx/esm scripts/auth-004-native-local-probe.mjs 2>&1 | tee auth004-native-local-probe.log
+          status=${PIPESTATUS[0]}
+          printf '%s\n' "{\"probeExitCode\":${status}}" > auth004-native-local-probe-status.json
+          exit ${status}
+      - name: Upload AUTH-004 local probe diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-004-native-local-diagnostics
+          path: |
+            workers/W01-payload/auth004-native-local-probe.log
+            workers/W01-payload/auth004-native-local-probe-status.json
+          if-no-files-found: error
