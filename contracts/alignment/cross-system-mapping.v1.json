@@ -70,11 +70,15 @@
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/dto/auth-dto-contract.v1.json",
         "contracts/entity/AUTH-002-006-canonical-field-authority.v1.json",
-        "contracts/entity/AUTH-002-session-field-contract.v1.json"
+        "contracts/entity/AUTH-002-session-field-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-002-EVIDENCE-RECONCILIATION-2026-09-28.md",
+        "https://github.com/wanghuinet/luckread/actions/runs/36217784262",
+        "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
       ],
       "blockers": [
-        "session DTO/entity mappings incomplete",
-        "state/security E2E evidence missing"
+        "AUTH-002 migration execution evidence unit is not yet admitted under the current persistence-evidence contract; the historical B10 record remains CREATED.",
+        "ENT-SESSION catalog promotion remains blocked even though Gate-1, native runtime, security, concurrency and extension-correlation evidence are VERIFIED.",
+        "Mapping 0 / Five-Way remains globally NOT_GREEN."
       ]
     },
     {
