@@ -28,3 +28,32 @@
 `AUTH-001::W02_D1-01 registration materializer remote runtime evidence`
 
 A successful controlled runtime evidence result is required before this gate can advance to canonical Evidence Registry admission and subsequent production-authority review.
+
+## 2026-09-28 — W02 materializer runtime evidence PASS
+
+The previously failed controlled materializer probe was rerun after the AUTH-001 registration/consent migration was physically present on D1-01.
+
+- Run: `36377880967`
+- Job: `108799593871`
+- Tested implementation SHA: `bd2791a4ca799126fac16afbc0506070e9074a77`
+- Artifact: `10953241430`
+- Artifact SHA-256: `9b65754f98d44453d7df598d1bdda40374f3aa5eb033239d6001e1d227f59062`
+- Result: `PASS`
+
+Assertions passed:
+
+1. Missing credential-hash key fails closed without mutation.
+2. First valid materialization creates exactly one identity and two initial credentials.
+3. Identity converges to the authoritative Payload User source.
+4. Credentials are active and hashed.
+5. A second materialization run creates nothing.
+6. Raw secret material is absent from the result.
+7. No production Worker was deployed.
+
+The tested implementation scope is unchanged in current main: no relevant changes to the W02 materializer, credential-add, credential-hash-key or W02 runtime source were introduced after the tested implementation commit.
+
+Canonical Evidence Registry admission:
+`EVD-AUTH001-W02-MATERIALIZER-RUNTIME-REMOTE-001` = `PASS / VERIFIED`.
+
+The active development evidence gate is therefore closed. The remaining governed blocker is production PRIV-004 authority and the subsequent global Evidence Registry / Mapping 0 promotion checks. No production deployment or Mapping 0 GREEN is implied.
+
