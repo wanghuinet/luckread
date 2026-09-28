@@ -62,6 +62,7 @@ assertError(
     to: 'RESTRICTED',
     reason: 'AUTH-013 unauthenticated denial',
     actor: { id: 'client', type: 'admin' },
+    headers: { 'If-Match': '1' },
     permission: 'user.ban',
     approvalLevel: 'L8',
   }),
