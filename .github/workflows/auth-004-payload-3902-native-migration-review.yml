@@ -81,8 +81,10 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git stash push -u -m "auth004-generated-native-schema"
           git fetch origin main
           git rebase origin/main
+          git stash pop
           rm -f .github/workflows/auth-004-payload-3902-native-migration-review.yml
           git add -A
           git diff --cached --quiet && exit 0
