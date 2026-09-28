@@ -87,3 +87,12 @@ lifecycle-side-effect evidence are reconciled.
 
 This closes the **source implementation verification** gate for the focused slice.
 It does not promote AUTH-013 to GREEN and does not establish public W01 HTTP E2E, Cloudflare production deployment, or the complete downstream lifecycle/security evidence chain.
+
+## W01 transport-boundary verification — 2026-09-28
+
+- Exact current tested source SHA: `faab246f89d287018da24134a5c0e9f0593ae8de`
+- Payload Foundation CI: run `36432420115`, job `108961689387` = **PASS**.
+- Typecheck, W01 Security unit tests, lint, production build, remote migration admission-state check and Payload implementation admission all passed.
+- The W01 Security unit-test suite now covers the AUTH-013 public route security boundary: unauthenticated denial, inactive authoritative-session denial, and forwarding only the verified principal plus canonical public fields to W02; client-supplied actor/permission/approval values are not forwarded.
+
+This closes the **W01 source/unit transport-boundary gate** for the focused slice. It does not establish a deployed public HTTP E2E result and does not authorize production deployment.
