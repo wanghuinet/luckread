@@ -64,3 +64,15 @@ The admitted production policy is explicitly an internal engineering authority a
 - no client-selected retention;
 - no Mapping 0 GREEN;
 - no AUTH-001 runtime evidence admission.
+
+
+## Environment-separated policy reconciliation — 2026-09-28
+
+The development and production policy instances are intentionally separate:
+
+- DEV/integration: `artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json`
+- PROD: `artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json`
+
+W01 resolves the policy by runtime environment only. The client cannot choose the policy artifact or retention rule. This preserves the already-admitted development evidence path while making the production authority independently auditable.
+
+The change is configuration binding plus minimal environment selection in the existing AUTH-001 route; it does not create a second retention subsystem or new Worker/D1/Queue topology.
