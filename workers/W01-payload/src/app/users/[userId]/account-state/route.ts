@@ -113,6 +113,10 @@ export async function POST(
     if (error instanceof W02AuthClientError) {
       if (error.status === 401) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
       if (error.status === 400) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid account-state transition request')
+      if (error.status === 403) return errorResponse(403, 'PERMISSION_DENIED', 'Permission denied')
+      if (error.status === 404) return errorResponse(404, 'NOT_FOUND', 'User account not found')
+      if (error.status === 409) return errorResponse(409, 'INVALID_STATE', 'Invalid account-state transition')
+      if (error.status === 412) return errorResponse(412, 'PRECONDITION_FAILED', 'Account-state precondition failed')
       return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Account-state service unavailable')
     }
 
