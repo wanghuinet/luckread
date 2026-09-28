@@ -1,6 +1,16 @@
 name: AUTH-001 Development Local Runtime Evidence
 
 on:
+  push:
+    paths:
+      - '.github/workflows/auth-001-development-local-runtime-evidence.yml'
+      - 'workers/W01-payload/src/app/auth/register/route.ts'
+      - 'workers/W01-payload/src/collections/AuthRegistrationRecords.ts'
+      - 'workers/W01-payload/src/migrations/**'
+      - 'workers/W01-payload/src/payload.config.ts'
+      - 'workers/W01-payload/src/payload-types.ts'
+      - 'workers/W01-payload/scripts/auth-001-registration-runtime-probe-local.mjs'
+      - 'artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'
   workflow_dispatch:
     inputs:
       tested_commit:
@@ -16,6 +26,10 @@ on:
 permissions:
   contents: read
 
+env:
+  TESTED_COMMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.tested_commit || github.sha }}
+  BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.base_url || 'http://127.0.0.1:3100' }}
+
 jobs:
   runtime:
     runs-on: ubuntu-latest
@@ -24,7 +38,7 @@ jobs:
       - name: Checkout exact source commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tested_commit }}
+          ref: ${{ env.TESTED_COMMIT }}
           fetch-depth: 0
 
       - name: Setup Node 24
@@ -72,7 +86,7 @@ jobs:
           NODE_ENV: development
           PAYLOAD_SECRET: ignore
           CLOUDFLARE_ENV: development
-          AUTH001_BASE_URL: ${{ inputs.base_url }}
+          AUTH001_BASE_URL: ${{ env.BASE_URL }}
         run: node --import=tsx/esm scripts/auth-001-registration-runtime-probe-local.mjs
 
       - name: Upload local runtime log
