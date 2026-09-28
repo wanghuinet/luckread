@@ -29,12 +29,12 @@ const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
 // The upstream Cloudflare-template observation (3.82.1 family) is recorded
 // separately in workers/W01-payload/PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md.
 const required = {
-  payload: '3.87.1',
-  '@payloadcms/db-d1-sqlite': '3.87.1',
-  '@payloadcms/next': '3.87.1',
-  '@payloadcms/richtext-lexical': '3.87.1',
-  '@payloadcms/storage-r2': '3.87.1',
-  '@payloadcms/ui': '3.87.1',
+  payload: '3.90.2',
+  '@payloadcms/db-d1-sqlite': '3.90.2',
+  '@payloadcms/next': '3.90.2',
+  '@payloadcms/richtext-lexical': '3.90.2',
+  '@payloadcms/storage-r2': '3.90.2',
+  '@payloadcms/ui': '3.90.2',
   next: '16.2.6',
   react: '19.2.6',
   'react-dom': '19.2.6',
