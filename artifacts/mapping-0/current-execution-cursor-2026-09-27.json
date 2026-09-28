@@ -1,16 +1,16 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "174bdc7f09d2222f32276ae2fd9b51c1485e5f19",
+  "sourceHead": "79273ac91d70c85682207ea20e68b1c5e59e369d",
   "backupBranch": "backup/main-before-auth004-batch-20260928-2003",
   "currentCursor": {
     "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
     "state": "BLOCKED_REMOTE_E2E",
     "objective": "Close the AUTH-004 controlled remote HTTP/E2E lifecycle gate against the exact deployed W01 source without adding a custom auth subsystem, migration, Worker, D1 database, queue, or Payload core change.",
     "authoritativeControl": "docs/change-control/CC-AUTH-004-PAYLOAD-VERSION-ALIGNMENT-2026-09-28.md",
-    "nextGate": "Deploy exact corrected W01 source 6d574bb56222e0eaf44df663e04eb59535e84be6 through the existing controlled W01/W02 binding deployment path, then execute the exact-SHA AUTH-004 remote HTTP E2E and admit only durable evidence. Deployment/build success alone is not GREEN.",
+    "nextGate": "Consume the completion of W01/W02 binding deployment run 36420996656 attempt 2, verify the deployed artifact's exact implementation source is 6d574bb56222e0eaf44df663e04eb59535e84be6, then admit only the resulting exact-SHA AUTH-004 remote HTTP E2E evidence. Deployment success alone is not GREEN.",
     "logicalOwnership": "W01 -> AUTH-004 Payload-native authority CLOSED",
-    "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding — previous exact-source deployment 39489d6 succeeded; corrected source 6d574bb has not yet been remotely deployed.",
+    "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding — corrected-source deployment run 36420996656 attempt 2 is IN_PROGRESS at W01 build.",
     "physicalRuntimeTarget": "W01 luckread-w01-payload / D1-01 luckread",
     "supersededBlockers": [
       "Payload 3.87.1 version-alignment gap is superseded by the merged 3.90.2 dependency baseline and successful W01 deployment run 36418911699.",
@@ -184,7 +184,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced through the AUTH-004 3.90.2 version-alignment, native migration review, local lifecycle evidence, remote E2E harness, and W01/W02 binding deployment checkpoints. The latest deployment succeeded; no remote E2E PASS is claimed yet.",
-    "currentMainSha": "174bdc7f09d2222f32276ae2fd9b51c1485e5f19",
+    "currentMainSha": "79273ac91d70c85682207ea20e68b1c5e59e369d",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
     "payloadWireCompatibilityStatus": "AUTH004_LOCAL_LIFECYCLE_VERIFIED_REMOTE_E2E_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -192,8 +192,8 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "174bdc7f09d2222f32276ae2fd9b51c1485e5f19",
-    "governanceHeadDisposition": "AUTH-001 native Local API seam correction merged after remote 503 at /auth/register. Change is limited to passing the existing Request into Payload Local API create; remote corrected-source evidence is pending.",
+    "actualGitMainHead": "79273ac91d70c85682207ea20e68b1c5e59e369d",
+    "governanceHeadDisposition": "Latest governance main head is synchronized to 79273ac. Corrected-source W01 deployment attempt 2 is still in progress; no new remote E2E evidence is available yet.",
     "reviewedAt": "2026-09-28",
     "implementationEvidenceSourceHead": "6d574bb56222e0eaf44df663e04eb59535e84be6"
   },
@@ -274,9 +274,9 @@
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.90.2",
     "capabilityFinding": "Payload native AUTH-004 password lifecycle capability is aligned to the 3.90.2 baseline; no custom session invalidation subsystem is admitted.",
-    "implementationDisposition": "MERGED_REMOTE_E2E_BLOCKED_CORRECTED_SOURCE_DEPLOYMENT_PENDING",
+    "implementationDisposition": "MERGED_CORRECTED_REMOTE_E2E_BLOCKED_DEPLOYMENT_ATTEMPT_2_IN_PROGRESS",
     "staleEvidenceCorrection": "The previous cursor's 3.87.1 source statement is historical and superseded by the current 3.90.2 main head.",
-    "currentMainSha": "174bdc7f09d2222f32276ae2fd9b51c1485e5f19",
+    "currentMainSha": "79273ac91d70c85682207ea20e68b1c5e59e369d",
     "implementationSourceSha": "6d574bb56222e0eaf44df663e04eb59535e84be6",
     "currentSourceHead": "40f41903806c247aa946067901df6b219efabe1e"
   },
