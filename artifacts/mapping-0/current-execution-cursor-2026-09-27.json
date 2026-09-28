@@ -1,16 +1,16 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "c78b6296911648bc85821cbae2534501e4fc4fa5",
+  "sourceHead": "7082e3ced331ceb9b891a175306db3a479a528f2",
   "backupBranch": "backup/main-before-auth004-batch-20260928-2003",
   "currentCursor": {
     "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
     "state": "BLOCKED_REMOTE_E2E",
     "objective": "Close the AUTH-004 controlled remote HTTP/E2E lifecycle gate against the exact deployed W01 source without adding a custom auth subsystem, migration, Worker, D1 database, queue, or Payload core change.",
     "authoritativeControl": "docs/change-control/CC-AUTH-004-PAYLOAD-VERSION-ALIGNMENT-2026-09-28.md",
-    "nextGate": "Consume W01/W02 binding deployment run 36420996656 attempt 4 completion. Its application source must remain 6d574bb56222e0eaf44df663e04eb59535e84be6; then admit only the corrected diagnostic-enabled AUTH-004 Remote E2E evidence.",
+    "nextGate": "Consume W01/W02 binding deployment run 36420996656 attempt 6 completion. Application source must remain 6d574bb56222e0eaf44df663e04eb59535e84be6; then admit only the corrected POST-only AUTH-004 Remote E2E evidence.",
     "logicalOwnership": "W01 -> AUTH-004 Payload-native authority CLOSED",
-    "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding — attempt 3 deployed 6d574bb56222e0eaf44df663e04eb59535e84be6. Attempt 4 is a controlled same-source rerun solely to emit a new workflow_run event after the CI-only tail diagnostic fix.",
+    "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding — attempt 5 deployed 6d574bb56222e0eaf44df663e04eb59535e84be6. Attempt 6 is a controlled same-source rerun solely to emit a fresh workflow_run event after the CI-only tail diagnostic correction.",
     "physicalRuntimeTarget": "W01 luckread-w01-payload / D1-01 luckread",
     "supersededBlockers": [
       "Payload 3.87.1 version-alignment gap is superseded by the merged 3.90.2 dependency baseline and successful W01 deployment run 36418911699.",
@@ -184,7 +184,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced through the AUTH-004 3.90.2 version-alignment, native migration review, local lifecycle evidence, remote E2E harness, and W01/W02 binding deployment checkpoints. The latest deployment succeeded; no remote E2E PASS is claimed yet.",
-    "currentMainSha": "c78b6296911648bc85821cbae2534501e4fc4fa5",
+    "currentMainSha": "7082e3ced331ceb9b891a175306db3a479a528f2",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
     "payloadWireCompatibilityStatus": "AUTH004_LOCAL_LIFECYCLE_VERIFIED_REMOTE_E2E_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -192,8 +192,8 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "c78b6296911648bc85821cbae2534501e4fc4fa5",
-    "governanceHeadDisposition": "CI-only AUTH-004 tail diagnostic was corrected after Wrangler 4.116.0 rejected --sampling-rate 1. No application/schema/topology change. Same application source 6d574bb56222e0eaf44df663e04eb59535e84be6 is being redeployed solely to emit the corrected workflow_run event.",
+    "actualGitMainHead": "7082e3ced331ceb9b891a175306db3a479a528f2",
+    "governanceHeadDisposition": "Current main includes only a CI-only AUTH-004 diagnostic correction: Wrangler 4.116.0 rejected --once, so the tail now uses POST-only filtering without --search/--once. Application source remains 6d574bb56222e0eaf44df663e04eb59535e84be6; deployment attempt 6 is in progress.",
     "reviewedAt": "2026-09-28",
     "implementationEvidenceSourceHead": "6d574bb56222e0eaf44df663e04eb59535e84be6"
   },
@@ -274,9 +274,9 @@
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.90.2",
     "capabilityFinding": "Payload native AUTH-004 password lifecycle capability is aligned to the 3.90.2 baseline; no custom session invalidation subsystem is admitted.",
-    "implementationDisposition": "MERGED_REMOTE_E2E_BLOCKED_TAIL_DIAGNOSTIC_FIXED_DEPLOYMENT_ATTEMPT_4_QUEUED",
+    "implementationDisposition": "MERGED_REMOTE_E2E_BLOCKED_POST_ONLY_TAIL_DIAGNOSTIC_DEPLOYMENT_ATTEMPT_6_IN_PROGRESS",
     "staleEvidenceCorrection": "The previous cursor's 3.87.1 source statement is historical and superseded by the current 3.90.2 main head.",
-    "currentMainSha": "c78b6296911648bc85821cbae2534501e4fc4fa5",
+    "currentMainSha": "7082e3ced331ceb9b891a175306db3a479a528f2",
     "implementationSourceSha": "6d574bb56222e0eaf44df663e04eb59535e84be6",
     "currentSourceHead": "40f41903806c247aa946067901df6b219efabe1e"
   },
