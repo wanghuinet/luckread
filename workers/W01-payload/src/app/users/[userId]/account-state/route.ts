@@ -47,7 +47,11 @@ export async function POST(
   }
 
   const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
-  const ifMatchValue = ifMatch.replace(/^W\\//, '').replace(/^"|"$/g, '')
+  let ifMatchValue = ifMatch
+  if (ifMatchValue.startsWith('W/')) ifMatchValue = ifMatchValue.slice(2)
+  if (ifMatchValue.startsWith('"') && ifMatchValue.endsWith('"')) {
+    ifMatchValue = ifMatchValue.slice(1, -1)
+  }
   const expectedVersion = Number(ifMatchValue)
   if (!ifMatch || !Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
     return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match is required')
