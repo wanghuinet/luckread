@@ -23,13 +23,15 @@ The repository's currently locked W01 dependency baseline is the dependency set 
 
 Current W01 lock:
 
-- Payload package family: `3.87.1`
+- Payload package family: `3.90.2`
 - `@opennextjs/cloudflare`: `1.20.1`
 - Next.js: `16.2.6`
 - React / React DOM: `19.2.6`
 - Node engine: `>=24.15.0`
 
 This repository lock is distinct from the previously observed upstream Cloudflare-template manifest. The upstream manifest is evidence of an upstream observation; it is not permission to claim that the current W01 package is still on that older observation.
+
+The Payload `v3.90.2` release tag's Cloudflare-D1 template pins the package family at `3.90.0`; W01 is intentionally aligned to the released `3.90.2` package family while retaining the official template's Cloudflare runtime shape.
 
 Any future upstream template change requires a new observation and reconciliation before the W01 baseline is changed.
 
