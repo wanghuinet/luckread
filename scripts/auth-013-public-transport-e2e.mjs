@@ -11,6 +11,9 @@ const basicRefresh = need('AUTH013_BASIC_REFRESH_TOKEN')
 const operatorRefresh = need('AUTH013_OPERATOR_REFRESH_TOKEN')
 const basicDevice = need('AUTH013_BASIC_DEVICE_ID')
 const operatorDevice = need('AUTH013_OPERATOR_DEVICE_ID')
+const fs = await import('node:fs')
+const artifactDir = process.env.AUTH013_ARTIFACT_DIR ?? 'artifacts/mapping-0/auth-013-public-http-e2e'
+fs.mkdirSync(artifactDir, { recursive: true })
 
 async function post(path, body, token) {
   const response = await fetch(base + path, {
@@ -45,12 +48,12 @@ async function refresh(refreshToken, deviceId, label) {
   console.log('::add-mask::' + result.json.accessToken)
   if (process.env.GITHUB_ENV) {
     const name = 'AUTH013_' + label.toUpperCase() + '_ACCESS_TOKEN'
-    const fs = await import('node:fs')
     fs.appendFileSync(process.env.GITHUB_ENV, name + '=' + result.json.accessToken + '\n')
   }
   return result.json.accessToken
 }
 
+const checks = []
 const basicToken = await refresh(basicRefresh, basicDevice, 'basic')
 const operatorToken = await refresh(operatorRefresh, operatorDevice, 'operator')
 
@@ -66,6 +69,7 @@ assertError(
   'UNAUTHENTICATED',
   'unauthenticated',
 )
+checks.push('unauthenticated_denial')
 
 assertError(
   await post('/v1/users/' + operatorId + '/account-state', {
@@ -76,6 +80,7 @@ assertError(
   'PRECONDITION_REQUIRED',
   'missing If-Match',
 )
+checks.push('mandatory_if_match')
 
 assertError(
   await post('/v1/users/' + basicId + '/account-state', {
@@ -89,6 +94,7 @@ assertError(
   'PERMISSION_DENIED',
   'client authority injection',
 )
+checks.push('client_authority_injection_denial')
 
 const success = await post('/v1/users/' + operatorId + '/account-state', {
   to: 'RESTRICTED',
@@ -105,6 +111,7 @@ if (
   typeof success.json?.auditEventId !== 'string' ||
   Object.keys(success.json).length !== 3
 ) throw new Error('successful transition response mismatch')
+checks.push('public_operator_transition')
 
 assertError(
   await post('/v1/users/' + operatorId + '/account-state', {
@@ -115,14 +122,15 @@ assertError(
   'PRECONDITION_FAILED',
   'stale If-Match',
 )
+checks.push('stale_if_match_denial')
 
-console.log(JSON.stringify({
+const result = {
   status: 'PASS',
-  checks: [
-    'unauthenticated_denial',
-    'mandatory_if_match',
-    'client_authority_injection_denial',
-    'public_operator_transition',
-    'stale_if_match_denial',
-  ],
-}))
+  deploymentPublicPath: '/v1/users/{userId}/account-state',
+  operationId: 'transitionAccountState',
+  checks,
+  syntheticFixture: true,
+  secretsPersistedInArtifact: false,
+}
+fs.writeFileSync(artifactDir + '/public-http-result.json', JSON.stringify(result, null, 2) + '\n')
+console.log(JSON.stringify(result, null, 2))
