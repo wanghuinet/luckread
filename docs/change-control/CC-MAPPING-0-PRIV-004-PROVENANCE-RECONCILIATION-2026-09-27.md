@@ -44,13 +44,15 @@ It does not:
 
 ## Current blocker remains unchanged
 
-The canonical approved policy-instance artifact is still absent on main.
+The **development/test** canonical policy-instance artifact is now present on `main` as `DEV-2026-09-28.1`.
+
+The **production** approved/active PRIV-004 policy instance is still absent. Production therefore remains fail-closed.
 
 Therefore the repository remains:
 
-`PRIV-004 INPUT_REQUIRED -> AUTH-001 RUNTIME BLOCKED`
+`PRIV-004 PRODUCTION_INPUT_REQUIRED -> AUTH-001 PRODUCTION_RUNTIME_BLOCKED`
 
-The repair only ensures that a future authoritative approved instance can be admitted through a mechanically realizable provenance rule. The provenance checkpoint is traceability evidence; it is not itself a legal/compliance authority.
+The provenance repair ensures that a future production-authoritative policy instance can be admitted through a mechanically realizable provenance rule. The existing development instance remains limited to controlled engineering validation. The provenance checkpoint is traceability evidence; it is not itself a legal/compliance authority.
 
 ## Current-main development approval checkpoint — 2026-09-28
 
