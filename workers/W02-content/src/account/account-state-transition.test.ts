@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyAccountStateTransition,
+  authorizeAccountStateTransition,
   type AccountStateTransitionInput,
 } from './account-state-transition.js'
 
@@ -397,5 +398,73 @@ describe('AUTH-013 account-state transition kernel', () => {
     const event = JSON.parse(String(fake.journal()?.payload))
     expect(event.correlationId).toBe('corr-123456789012')
     expect(event.causationId).toBe('cause-123456789012')
+  })
+})
+
+
+function authorizationDb(
+  state: string,
+  roles: Array<{ roleId: string; scopeType: string }> = [],
+) {
+  return {
+    prepare(sql: string) {
+      return {
+        bind() {
+          return {
+            first: async <T>() => {
+              if (sql.includes('FROM users')) {
+                return { accountState: state } as T
+              }
+              return null
+            },
+            all: async <T>() => roles as T,
+          }
+        },
+      }
+    },
+  } as unknown as D1Database
+}
+
+describe('AUTH-013 trusted-principal authorization boundary', () => {
+  it('derives operator permission and actor class from canonical role layer', async () => {
+    const result = await authorizeAccountStateTransition(
+      authorizationDb('ACTIVE', [{ roleId: 'operator', scopeType: 'global' }]),
+      { subjectId: 'operator-1', targetUserId: '42', to: 'RESTRICTED', now: '2026-09-28T12:00:00.000Z' },
+    )
+
+    expect(result).toEqual({
+      actor: { id: 'operator-1', type: 'operator' },
+      permission: 'user.restrict.limited',
+      approvalLevel: null,
+    })
+  })
+
+  it('fails closed when a lower layer cannot authorize a privileged transition', async () => {
+    await expect(
+      authorizeAccountStateTransition(
+        authorizationDb('ACTIVE', [{ roleId: 'mcn_admin', scopeType: 'global' }]),
+        { subjectId: 'operator-1', targetUserId: '42', to: 'RESTRICTED' },
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+  })
+
+  it('derives L7 approval for ban instead of trusting client input', async () => {
+    const result = await authorizeAccountStateTransition(
+      authorizationDb('ACTIVE', [{ roleId: 'admin', scopeType: 'global' }]),
+      { subjectId: 'admin-1', targetUserId: '42', to: 'BANNED' },
+    )
+
+    expect(result.actor).toEqual({ id: 'admin-1', type: 'admin' })
+    expect(result.permission).toBe('user.ban')
+    expect(result.approvalLevel).toBe('L7')
+  })
+
+  it('requires a self principal for permissionless user-owned transitions', async () => {
+    await expect(
+      authorizeAccountStateTransition(
+        authorizationDb('ACTIVE'),
+        { subjectId: 'other-user', targetUserId: '42', to: 'DELETION_REQUESTED' },
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
   })
 })
