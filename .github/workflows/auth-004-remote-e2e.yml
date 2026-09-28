@@ -96,11 +96,16 @@ jobs:
           const p=JSON.parse(readFileSync('package.json','utf8'))
           if (p.dependencies?.payload !== '3.90.2' || p.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.90.2') throw new Error('Payload 3.90.2 source admission failed')
           NODE
-      - name: Materialize current AUTH-004 remote probe
+      - name: Materialize exact deployed-source AUTH-004 remote probe
+        working-directory: workers/W01-payload
+        env:
+          DEPLOYED_SHA: ${{ env.DEPLOYMENT_HEAD_SHA }}
         run: |
           set -euo pipefail
-          git show origin/main:scripts/auth-004-remote-e2e.mjs > scripts/auth-004-remote-e2e.mjs
-          test -s scripts/auth-004-remote-e2e.mjs
+          test "$(git rev-parse HEAD)" = "$DEPLOYED_SHA"
+          mkdir -p ../../scripts
+          git show "$DEPLOYED_SHA:scripts/auth-004-remote-e2e.mjs" > ../../scripts/auth-004-remote-e2e.mjs
+          test -s ../../scripts/auth-004-remote-e2e.mjs
       - name: Verify controlled remote Payload migration precondition
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
