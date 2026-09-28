@@ -31,12 +31,12 @@
       "evidence": [
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
         "contracts/alignment/mapping-batches/B19-AUTH-001-real-evidence-reconciliation.v1.md",
+        "contracts/api/auth-operation-policy.v1.json",
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/dto/auth-dto-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-EVENTUAL-MATERIALIZATION-ADMISSION-2026-09-28.md",
         "workers/W01-payload/src/collections/Users.ts",
-        "workers/W01-payload/src/payload.config.ts",
-        "contracts/api/auth-operation-policy.v1.json",
-        "docs/change-control/CC-MAPPING-0-AUTH-001-EVENTUAL-MATERIALIZATION-ADMISSION-2026-09-28.md"
+        "workers/W01-payload/src/payload.config.ts"
       ],
       "blockers": [
         "DTO mapping missing",
@@ -118,14 +118,14 @@
         "contracts/entity/AUTH-003-identity-field-contract.v1.json",
         "contracts/entity/entity-implementation-evidence.v1.json",
         "contracts/evidence/mapping-0-evidence-registry.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-IDENTITY-MATERIALIZATION-EVIDENCE-ADMISSION-2026-09-28.md",
         "docs/change-control/CC-MAPPING-0-AUTH-003-LIFECYCLE-EVIDENCE-ADMISSION-2026-09-27.md",
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
         "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
         "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
         "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
         "workers/W02-content/migrations/0004_auth_003_credentials.sql",
-        "workers/W02-content/src/credentials/credential-add.ts",
-        "docs/change-control/CC-MAPPING-0-AUTH-003-IDENTITY-MATERIALIZATION-EVIDENCE-ADMISSION-2026-09-28.md"
+        "workers/W02-content/src/credentials/credential-add.ts"
       ],
       "blockers": [
         "ENT-IDENTITY materialization ownership is now executable-evidence verified through the AUTH-001 W02 scheduled materializer; final entity catalog promotion remains blocked.",
