@@ -162,11 +162,15 @@
         "contracts/entity/AUTH-002-006-canonical-field-authority.v1.json",
         "contracts/entity/AUTH-002-session-field-contract.v1.json",
         "contracts/entity/AUTH-003-credential-field-contract.v1.json",
-        "contracts/entity/AUTH-004-password-recovery-field-contract.v1.json"
+        "contracts/entity/AUTH-004-password-recovery-field-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-004-DTO-REGISTRY-RECONCILIATION-2026-09-28.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-004-EVIDENCE-REGISTRY-BINDING-2026-09-28.md"
       ],
       "blockers": [
-        "DTO/entity/field binding remains incomplete",
-        "single-use token evidence missing"
+        "Controlled remote W01 behavior and HTTP E2E evidence remain missing",
+        "Protected-account enumeration resistance and session invalidation evidence remain missing",
+        "Lifecycle event evidence remains missing",
+        "Final Evidence Registry / Mapping 0 admission remains NOT_GREEN"
       ]
     },
     {

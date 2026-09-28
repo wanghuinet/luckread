@@ -65,6 +65,27 @@
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
         "https://github.com/wanghuinet/luckread/actions/runs/36299334577"
       ]
+    },
+    {
+      "featureId": "AUTH-004",
+      "domainId": "D1-01",
+      "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-SESSION",
+        "ENT-VERIFICATION"
+      ],
+      "persistenceMode": "PAYLOAD_NATIVE",
+      "owner": "W01-PAYLOAD",
+      "status": "BLOCKED",
+      "evidenceRefs": [
+        "contracts/api/AUTH-004-password-recovery-contract.v1.json",
+        "contracts/dto/auth-dto-contract.v1.json",
+        "contracts/entity/AUTH-004-password-recovery-field-contract.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-004-real-evidence-reconciliation.v1.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-004-DTO-REGISTRY-RECONCILIATION-2026-09-28.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-004-EVIDENCE-REGISTRY-BINDING-2026-09-28.md",
+        "https://github.com/wanghuinet/luckread/actions/runs/36288319530"
+      ]
     }
   ]
 }

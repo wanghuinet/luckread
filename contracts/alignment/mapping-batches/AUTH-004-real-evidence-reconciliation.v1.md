@@ -33,7 +33,8 @@
 - D1 domain is `D1-01`; AUTH-004 custom migration is explicitly `NOT_REQUIRED_NATIVE`, while physical schema/runtime evidence remains unresolved.
 - Executed local integration tests now provide replay/expiry and credential non-disclosure evidence; protected-account enumeration and remote/E2E security evidence remain missing.
 - Local Payload API integration evidence is now registered; controlled remote W01 and HTTP E2E execution evidence remain missing.
-- Evidence Registry IDs bound to `AUTH-004`: missing.
+- Feature→Entity→Persistence registry binding is now recorded as `BLOCKED` using the existing contract and local executable evidence; no promotion is inferred.
+- Canonical Evidence Registry still contains the existing local PASS record for AUTH-004; remote/E2E/session-invalidation evidence remains missing..
 
 ## 3. Evidence interpretation rules
 
@@ -53,6 +54,7 @@ Definition-layer reconciliation was previously recorded at `3ab18252544ffb9a15da
 
 - Wire contract: reconciled
 - Auth Operation Policy: reconciled
+- DTO registry: reconciled and bound in canonical Feature→Entity→Persistence registration
 - Canonical OpenAPI/DTO registry: AUTH-004 operations reconciled; runtime implementation remains separately gated
 - Runtime/persistence/security/integration evidence: local native integration evidence registered; remote/persistence/E2E/session-invalidation evidence still missing
 
