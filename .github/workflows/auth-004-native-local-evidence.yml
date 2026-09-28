@@ -5,6 +5,8 @@ on:
     paths:
       - ".github/workflows/auth-004-native-local-evidence.yml"
       - "workers/W01-payload/scripts/auth-004-native-local-probe.mjs"
+      - "workers/W01-payload/package.json"
+      - "workers/W01-payload/pnpm-lock.yaml"
 permissions:
   contents: read
 jobs:
