@@ -71,3 +71,20 @@ Fresh controlled evidence:
 The fresh run passed the same AUTH-001 registration assertions as the previously admitted development evidence while proving the environment-separated policy resolution does not break the controlled development path.
 
 This evidence does not authorize production deployment. Production policy authority is now separately admitted by PRIV-004; production deployment remains a separate deployment/evidence gate.
+
+## Current exact-SHA evidence refresh — 2026-09-28
+
+The same controlled development runtime evidence was rerun against the post-policy-separation implementation source used for current development admission.
+
+- Exact tested source SHA: `10885288b7115e3f967e6b01772e2063f0d55d6d`
+- GitHub Actions run: `36429956815`
+- Job: `108953279163`
+- Artifact: `10972624632`
+- Artifact SHA-256: `7a16a8d0e2b178d3e5ecdef3cd47151b487c096a36b6c60963b90dd5e78e6ae2`
+- Environment: controlled local W01 OpenNext Worker + Wrangler local D1
+- Development policy: `DEV-2026-09-28.1`
+- Production deployment: **false**
+
+The artifact reports PASS for successful registration, exactly one User and Consent, canonical initial account state/version, native hash/salt persistence with no plaintext password, admitted response-digest commitment, completed replay, same-key reuse conflict, forced batch rollback, duplicate-identity concurrency, same-key concurrent replay semantics, and no W02 mutation.
+
+This refresh supersedes the older exact-SHA development evidence for current-head admission without changing the underlying runtime scope. The development implementation gate is now closed at the current tested source. Mapping 0 remains **NOT_GREEN** and production deployment remains separately blocked.
