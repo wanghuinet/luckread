@@ -3752,3 +3752,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - The authoritative execution cursor is now AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001 / BLOCKED_EXTERNAL_DEPLOYMENT.
 - No Evidence Registry GREEN, Entity promotion, or Mapping-0 GREEN is inferred from this governance reconciliation.
 - Change Control: docs/change-control/CC-MAPPING-0-CURSOR-AUTH002-EVIDENCE-CLOSURE-2026-09-29.md.
+
+## 2026-09-29 — AUTH-004 remote E2E session-semantics correction
+
+- Backup before this batch: `backup/pre-batch-close-20260929-0050`.
+- Run `36453411549` reached the deployed W01 source, Payload 3.90.2 baseline, and remote migration preconditions successfully; it failed only because the evidence harness expected every native session to be revoked after password change.
+- Canonical Payload-native behavior is to retain the authenticated request's current native session and revoke the other affected sessions.
+- `scripts/auth-004-remote-e2e.mjs` now asserts HTTP 200 for the current password-change session, HTTP 401 for the other pre-change session, and exactly one native session row after the change.
+- Runtime/API/Worker/D1 contracts were not changed. AUTH-004 remains NOT_GREEN.
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTH-004-E2E-SESSION-EXPECTATION-2026-09-29.md`.
+- Next authoritative execution gate: fresh controlled W01/W02 binding deployment of current main, then the existing AUTH-004 Remote HTTP E2E workflow.
