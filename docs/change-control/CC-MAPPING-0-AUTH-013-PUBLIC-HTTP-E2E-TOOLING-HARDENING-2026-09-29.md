@@ -74,3 +74,11 @@ No runtime source or contract/schema authority changed.
 - User IDs continue to be allocated by SQLite/Payload and resolved after seed; cleanup remains keyed by the same unique fixture emails.
 - Backup before this correction: `backup/pre-auth013-random-fixture-identity-20260929-202609290715`.
 - No AUTH-013 runtime route, Contract, D1 schema, Payload version, Worker topology, or authority changed.
+
+
+## Follow-up safety reconciliation — cleanup guard
+
+- The workflow previously ran synthetic-fixture cleanup under `if: always()` even when preflight failed before seeding. That created a theoretical risk that a pre-existing row matching the fixture identity could be deleted if the identity check ever collided.
+- The admitted correction sets `AUTH013_FIXTURE_SEEDED=1` only after the remote seed command succeeds, and gates both cleanup and cleanup verification on that flag.
+- Backup before correction: `backup/pre-auth013-cleanup-guard-20260929-202609290720`.
+- This is evidence-tooling safety hardening only; runtime Contract, D1 schema, Payload version, Worker topology, and authority are unchanged.
