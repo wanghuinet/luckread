@@ -74,3 +74,16 @@ After implementation, the same-SHA controlled evidence MUST prove at minimum:
 
 AUTH-013 remains NOT_GREEN until downstream audit/queue/session/E2E and complete
 lifecycle-side-effect evidence are reconciled.
+
+## Source verification closure — 2026-09-28
+
+- Exact tested source SHA: `0af2fcb66b6bb54ace065b7debe5559a80a285a4`
+- W02 AUTH-013 Runtime Source Verification run: `36431940464`
+- Job: `108959464320`
+- Artifact: `10973254137`
+- Artifact SHA-256: `5c154a9322abc0d3aa7afd078d81d5646b978ce55392cc3f2320e8a39b6bb8d9`
+- Typecheck: PASS
+- AUTH-013 account-state + publication-journal tests: PASS (23 total, including trusted-principal authorization tests)
+
+This closes the **source implementation verification** gate for the focused slice.
+It does not promote AUTH-013 to GREEN and does not establish public W01 HTTP E2E, Cloudflare production deployment, or the complete downstream lifecycle/security evidence chain.
