@@ -64,12 +64,15 @@ jobs:
           const run = JSON.parse(readFileSync('/tmp/deploy.json','utf8'))
           const artifacts = JSON.parse(readFileSync('/tmp/deploy-artifacts.json','utf8'))
           if (run.name !== 'W01 W02 Auth Binding Deploy' || run.conclusion !== 'success' || run.head_branch !== 'main') throw new Error('invalid deployment provenance')
-          const matches = (artifacts.artifacts ?? []).filter((a) => typeof a?.name === 'string' && a.name.startsWith('w01-w02-binding-deployment-') && !a.expired)
-          if (matches.length !== 1) throw new Error(`expected one live W01 deployment artifact, found ${matches.length}`)
+          const expectedArtifactName = `w01-w02-binding-deployment-${run.head_sha}`
+          const matches = (artifacts.artifacts ?? [])
+            .filter((a) => typeof a?.name === 'string' && a.name === expectedArtifactName && !a.expired)
+            .sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')))
+          if (matches.length < 1) throw new Error(`expected a live W01 deployment artifact named ${expectedArtifactName}, found ${matches.length}`)
           const sha = matches[0].name.slice('w01-w02-binding-deployment-'.length)
           if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('deployment source SHA invalid')
           appendFileSync(process.env.GITHUB_ENV, `DEPLOYMENT_HEAD_SHA=${sha}\n`)
-          console.log(`Accepted W01 deployment run ${run.id}; exact source SHA=${sha}`)
+          console.log(`Accepted W01 deployment run ${run.id}; exact source SHA=${sha}; artifactId=${matches[0].id}; duplicateLiveArtifactsIgnored=${matches.length - 1}`)
           NODE
       - name: Checkout exact deployed source
         uses: actions/checkout@v4
