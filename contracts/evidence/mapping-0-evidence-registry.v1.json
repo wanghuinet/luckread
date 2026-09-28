@@ -496,8 +496,9 @@
       "result": "PASS",
       "status": "VERIFIED",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36217784262",
-      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
-      "note": "Controlled remote D1 Gate-1 evidence against database luckread. Read-only migration history and schema/catalog probes completed successfully; manifest binds evidence to GITHUB_SHA 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55. Remote payload_migrations is queryable and includes 20250929_111647, 20260921_003203_MIG_AUTH_002_SESSION_V1, and 20260925_111503_MIG_ENT_USER_PROFILE_V1. auth_session_state schema/indexes were captured successfully. This verifies the Gate-1 D1 schema evidence claim only; AUTH-002 overall remains NOT_GREEN."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Controlled remote D1 Gate-1 evidence against database luckread. Read-only migration history and schema/catalog probes completed successfully; manifest binds evidence to GITHUB_SHA 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55. Remote payload_migrations is queryable and includes 20250929_111647, 20260921_003203_MIG_AUTH_002_SESSION_V1, and 20260925_111503_MIG_ENT_USER_PROFILE_V1. auth_session_state schema/indexes were captured successfully. This verifies the Gate-1 D1 schema evidence claim only; AUTH-002 overall remains NOT_GREEN.",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "subjectType": "FEATURE",
@@ -510,11 +511,12 @@
       "result": "PASS",
       "status": "VERIFIED",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36219132123",
-      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
       "note": "Fresh controlled remote D1 runtime evidence executed at exact tested commit 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55. Provenance is preserved from the exact workflow run and artifact; environmentClass=CONTROLLED_REMOTE_D1, database=luckread. No re-run or W01 redeployment is represented by this registry admission. Native Payload login/session creation, validation, logout, second-logout idempotency and post-logout denial passed; runtime-manifest cleanup completed without errors.",
       "evidenceId": "EVD-AUTH002-B23-RUNTIME-SESSION-REMOTE-001",
       "type": "INTEGRATION_TEST",
-      "claimId": "AUTH-002::SESSION-RUNTIME"
+      "claimId": "AUTH-002::SESSION-RUNTIME",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "subjectType": "FEATURE",
@@ -527,11 +529,12 @@
       "result": "PASS",
       "status": "VERIFIED",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36219132123",
-      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
       "note": "Fresh controlled remote D1 runtime evidence executed at exact tested commit 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55. Provenance is preserved from the exact workflow run and artifact; environmentClass=CONTROLLED_REMOTE_D1, database=luckread. No re-run or W01 redeployment is represented by this registry admission. Remote negative-security suite passed predecessor replay, wrong-device binding, canonical revocation precedence, post-logout denial, expiry denial, missing extension state, wrong-user binding and stale tokenVersion invalidation.",
       "evidenceId": "EVD-AUTH002-B24-SECURITY-NEGATIVE-REMOTE-001",
       "type": "SECURITY",
-      "claimId": "AUTH-002::SECURITY_NEGATIVE"
+      "claimId": "AUTH-002::SECURITY_NEGATIVE",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "subjectType": "FEATURE",
@@ -544,11 +547,12 @@
       "result": "PASS",
       "status": "VERIFIED",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36219132123",
-      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
       "note": "Fresh controlled remote D1 runtime evidence executed at exact tested commit 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55. Provenance is preserved from the exact workflow run and artifact; environmentClass=CONTROLLED_REMOTE_D1, database=luckread. No re-run or W01 redeployment is represented by this registry admission. Remote concurrency suite passed one-winner refresh race (1 success/3 denials), concurrent logout safety (401/204), and validation after revocation (401/401).",
       "evidenceId": "EVD-AUTH002-B25-CONCURRENCY-REMOTE-001",
       "type": "INTEGRATION_TEST",
-      "claimId": "AUTH-002::CONCURRENCY"
+      "claimId": "AUTH-002::CONCURRENCY",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "subjectType": "FEATURE",
@@ -561,11 +565,12 @@
       "result": "PASS",
       "status": "VERIFIED",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36219132123",
-      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
       "note": "Fresh controlled remote D1 runtime evidence executed at exact tested commit 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55. Provenance is preserved from the exact workflow run and artifact; environmentClass=CONTROLLED_REMOTE_D1, database=luckread. No re-run or W01 redeployment is represented by this registry admission. Native session identity matched extension lookup identity; unsupported dimensions were observed and mismatch handling remained fail-closed.",
       "evidenceId": "EVD-AUTH002-B26-EXTENSION-CORRELATION-REMOTE-001",
       "type": "INTEGRATION_TEST",
-      "claimId": "AUTH-002::EXTENSION-CORRELATION"
+      "claimId": "AUTH-002::EXTENSION-CORRELATION",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "evidenceId": "EVD-AUTH004-B09-NATIVE-LOCAL-LIFECYCLE-001",
@@ -677,7 +682,8 @@
       "checkId": "36307891924",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
       "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
-      "note": "Controlled remote D1 list runtime passed at exact tested source SHA 8a649ff602daaa0d4143324a52bcfa6c7443af6c on luckread / D1-01. Verified canonical public projection, deterministic createdAt/credentialId DESC ordering, correct cursor continuation with terminal hasMore=false, self-scope isolation, endpoint-bound and malformed cursor rejection, max-limit enforcement, request-trace propagation, and synthetic cleanup. Production Worker deployment was false. Artifact 10927373190, sha256:3be328033f2bb13474c1beddfd8c85d2f5e496028afd0bb3875fbb552bad7850."
+      "note": "Controlled remote D1 list runtime passed at exact tested source SHA 8a649ff602daaa0d4143324a52bcfa6c7443af6c on luckread / D1-01. Verified canonical public projection, deterministic createdAt/credentialId DESC ordering, correct cursor continuation with terminal hasMore=false, self-scope isolation, endpoint-bound and malformed cursor rejection, max-limit enforcement, request-trace propagation, and synthetic cleanup. Production Worker deployment was false. Artifact 10927373190, sha256:3be328033f2bb13474c1beddfd8c85d2f5e496028afd0bb3875fbb552bad7850.",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-003-LIFECYCLE-EVIDENCE-ADMISSION-2026-09-27.md"
     },
     {
       "evidenceId": "EVD-AUTH003-B20-LIFECYCLE-RUNTIME-REMOTE-001",
@@ -694,8 +700,9 @@
       "status": "VERIFIED",
       "checkId": "36308120758",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
-      "freshnessMode": "FRESH_EXACT_SHA",
-      "note": "Controlled remote D1 lifecycle runtime passed at exact tested source SHA c96b39569c7505ade615b15e63d87f5afb8066cc on luckread / D1-01. Replace/Remove checks passed: cross-account denial, public projection only, normalized-value persistence, generic uniqueness conflict, idempotent Replace replay, Remove 204/no body, inactive persistence, harmless Remove replay, true concurrent Remove one-winner behavior, only-active removal block, cross-account Remove denial, and protected-material exclusion. Synthetic rows were cleaned and production Worker deployment was false. Artifact 10928266844, sha256:a31d07cdf6ad9008e36faf410980e06f136aefc6e929aa18ba51ce50851ea56a."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Controlled remote D1 lifecycle runtime passed at exact tested source SHA c96b39569c7505ade615b15e63d87f5afb8066cc on luckread / D1-01. Replace/Remove checks passed: cross-account denial, public projection only, normalized-value persistence, generic uniqueness conflict, idempotent Replace replay, Remove 204/no body, inactive persistence, harmless Remove replay, true concurrent Remove one-winner behavior, only-active removal block, cross-account Remove denial, and protected-material exclusion. Synthetic rows were cleaned and production Worker deployment was false. Artifact 10928266844, sha256:a31d07cdf6ad9008e36faf410980e06f136aefc6e929aa18ba51ce50851ea56a.",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-003-LIFECYCLE-EVIDENCE-ADMISSION-2026-09-27.md"
     },
     {
       "evidenceId": "EVD-AUTH003-B21-LIFECYCLE-SECURITY-REMOTE-001",
@@ -712,8 +719,9 @@
       "status": "VERIFIED",
       "checkId": "36308120758",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
-      "freshnessMode": "FRESH_EXACT_SHA",
-      "note": "Lifecycle security-negative evidence passed at exact source SHA c96b39569c7505ade615b15e63d87f5afb8066cc: cross-account Replace/Remove denied, protected credential material absent from public projections, uniqueness conflicts remained generic, and only-active removal was blocked. No production Worker deployment occurred."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Lifecycle security-negative evidence passed at exact source SHA c96b39569c7505ade615b15e63d87f5afb8066cc: cross-account Replace/Remove denied, protected credential material absent from public projections, uniqueness conflicts remained generic, and only-active removal was blocked. No production Worker deployment occurred.",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-003-LIFECYCLE-EVIDENCE-ADMISSION-2026-09-27.md"
     },
     {
       "evidenceId": "EVD-AUTH003-B22-LIFECYCLE-CONCURRENCY-REMOTE-001",
@@ -730,8 +738,9 @@
       "status": "VERIFIED",
       "checkId": "36308120758",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
-      "freshnessMode": "FRESH_EXACT_SHA",
-      "note": "Controlled remote concurrency evidence passed at exact source SHA c96b39569c7505ade615b15e63d87f5afb8066cc: concurrent Remove attempts produced exactly one winner and one conflict, with the atomic active-count predicate preserving the single-winner lifecycle rule. Synthetic fixtures were cleaned after execution."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Controlled remote concurrency evidence passed at exact source SHA c96b39569c7505ade615b15e63d87f5afb8066cc: concurrent Remove attempts produced exactly one winner and one conflict, with the atomic active-count predicate preserving the single-winner lifecycle rule. Synthetic fixtures were cleaned after execution.",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-003-LIFECYCLE-EVIDENCE-ADMISSION-2026-09-27.md"
     },
     {
       "evidenceId": "EVD-AUTH001-REGISTRATION-RUNTIME-LOCAL-001",
@@ -748,8 +757,9 @@
       "status": "VERIFIED",
       "checkId": "108771054689",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36372326548",
-      "freshnessMode": "FRESH_EXACT_SHA",
-      "note": "Controlled local W01 OpenNext Cloudflare Worker runtime against exact source SHA b357ebe74f480f00c72f8fb0606226348570c105. Local D1 included the already-admitted AUTH-013 lifecycle schema. PASS assertions: one-batch User + Consent + registration envelope; Payload-native hash/salt persisted with no plaintext password; canonical response_digest; completed replay; same-key reuse conflict; forced later-statement rollback with no partial User/Consent; duplicate-identity concurrency safety; same-key concurrent canonical replay/IN_PROGRESS semantics; no W02 mutation; no production Worker deployment. Development-only PRIV-004 policy DEV-2026-09-28.1 remained in force. Artifact 10950235069."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Controlled local W01 OpenNext Cloudflare Worker runtime against exact source SHA b357ebe74f480f00c72f8fb0606226348570c105. Local D1 included the already-admitted AUTH-013 lifecycle schema. PASS assertions: one-batch User + Consent + registration envelope; Payload-native hash/salt persisted with no plaintext password; canonical response_digest; completed replay; same-key reuse conflict; forced later-statement rollback with no partial User/Consent; duplicate-identity concurrency safety; same-key concurrent canonical replay/IN_PROGRESS semantics; no W02 mutation; no production Worker deployment. Development-only PRIV-004 policy DEV-2026-09-28.1 remained in force. Artifact 10950235069.",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-EVIDENCE-ADMISSION-2026-09-28.md"
     },
     {
       "evidenceId": "EVD-AUTH001-REGISTRATION-SECURITY-LOCAL-001",
@@ -766,8 +776,9 @@
       "status": "VERIFIED",
       "checkId": "108771054689",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36372326548",
-      "freshnessMode": "FRESH_EXACT_SHA",
-      "note": "Payload-native registration produced hash and salt before the W01 persistence seam; the evidence found no plaintext password persistence. Replay and key-reuse behavior were also exercised. No production deployment occurred."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Payload-native registration produced hash and salt before the W01 persistence seam; the evidence found no plaintext password persistence. Replay and key-reuse behavior were also exercised. No production deployment occurred.",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-EVIDENCE-ADMISSION-2026-09-28.md"
     },
     {
       "evidenceId": "EVD-AUTH001-REGISTRATION-CONCURRENCY-LOCAL-001",
@@ -784,9 +795,10 @@
       "status": "VERIFIED",
       "checkId": "108771054689",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36372326548",
-      "freshnessMode": "FRESH_EXACT_SHA",
-      "note": "Duplicate normalized identity produced exactly one authoritative User and Consent. Same-key concurrent requests satisfied canonical idempotency semantics: either one replaying 201 plus one 409 IN_PROGRESS, or two identical 201 replays after completion; no duplicate authoritative registration record was committed."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Duplicate normalized identity produced exactly one authoritative User and Consent. Same-key concurrent requests satisfied canonical idempotency semantics: either one replaying 201 plus one 409 IN_PROGRESS, or two identical 201 replays after completion; no duplicate authoritative registration record was committed.",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-EVIDENCE-ADMISSION-2026-09-28.md"
     }
   ],
-  "testedCommitSha": "b357ebe74f480f00c72f8fb0606226348570c105"
+  "testedCommitSha": "75d30eeeeedf09ee6a9d08de2a2345cf85edee26"
 }
