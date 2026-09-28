@@ -3926,3 +3926,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No D1 schema, Payload version, Worker topology, W02 authority, or Contract change is authorized. AUTH-013 remains `NOT_GREEN` until a fresh deployment of the corrected source and a successful controlled public HTTP E2E artifact.
 - `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
 - `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_DEPLOYMENT`
+
+
+## 2026-09-29 — AUTH-013 public HTTP E2E unauthenticated assertion isolation
+
+- Run `36499324052` reached the real public AUTH-013 HTTP probe after successful deployment provenance, Payload 3.90.2 admission, randomized fixture preflight, seed, generated user-ID resolution and cleanup.
+- The first assertion omitted both bearer authentication and `If-Match`; the deployed AUTH-013 handler correctly evaluated the mandatory precondition first and returned HTTP 428, while the evidence probe expected 401. No AUTH-013 behavior evidence is admitted from this run.
+- Authorized evidence-tooling correction: extend the HTTP probe helper with optional request headers and send `If-Match: 1` on the unauthenticated assertion, while retaining the separate authenticated/missing-`If-Match` 428 assertion.
+- Backup before correction: `backup/pre-auth013-e2e-unauthenticated-ifmatch-isolation-20260929`.
+- No AUTH-013 runtime, Contract, D1 schema, Payload version, Worker topology, W02 authority, or Evidence Registry status changed.
+- The authoritative cursor remains `AUTH-013-PUBLIC-HTTP-E2E-001 / BLOCKED_EXTERNAL_DEPLOYMENT` until a fresh deployment of the corrected source and a successful controlled public HTTP E2E artifact.
