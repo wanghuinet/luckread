@@ -3661,3 +3661,15 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - AUTH-004 remains `BLOCKED / NOT_GREEN`; Evidence Registry and Mapping 0 remain fail-closed.
 - Historical failed Remote E2E runs remain evidence-negative and are not reinterpreted as lifecycle results.
 - Next cursor: `AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY`.
+
+## 2026-09-28 — AUTH-004 external compatibility gate final reconciliation
+
+- Backup before this governance-only checkpoint: `backup/main-before-auth004-external-gate-final-reconcile-20260928-2118`.
+- Current `main`: `f1267d32dfeed078ed94289f1c59f2227e90b5c8`.
+- Payload 3.90.2 remains the latest stable Payload 3.x release at this checkpoint. Upstream Payload issue #18274 remains OPEN / needs-triage / v3 and describes the same Cloudflare Workers PBKDF2 incompatibility; Cloudflare workerd issue #1346 also remains OPEN. No stable upstream release with an admitted correction is available for this gate.
+- Exact-source remote E2E run `36426287424` reached the deployed W01 Worker and remote Payload 3.90.2 schema precondition successfully. It then failed at registration setup with HTTP 503 because native Payload password hashing requested 600000 PBKDF2 iterations while Workers rejected counts above 100000. No AUTH-004 lifecycle assertion is promoted from this run.
+- Compare proof from deployed application source `6d574bb56222e0eaf44df663e04eb59535e84be6` to current `main` `f1267d32dfeed078ed94289f1c59f2227e90b5c8` shows only five changed paths: AUTH-004 Remote E2E workflow, current execution cursor, Mapping 0 Ledger, AUTH-004 Payload-version Change Control, and AUTH-004 remote-E2E cursor Change Control. No application runtime source, collection, migration, D1 schema, Worker topology, or public contract changed after the deployed application source.
+- Version-alignment work is therefore closed. The remaining blocker is external runtime compatibility only.
+- No downgrade of PBKDF2 iterations, custom hashing implementation, Payload Core fork, parallel auth subsystem, or topology expansion is admitted by existing controls.
+- AUTH-004 remains `BLOCKED / NOT_GREEN`. Evidence Registry, Five-Way and Mapping 0 remain fail-closed.
+- Next admissible cursor: `AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY`.
