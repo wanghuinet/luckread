@@ -227,12 +227,15 @@ export default {
         },
       })
     } catch (error) {
+      const message = String(error && error.message ? error.message : 'unknown')
+      const safeMessage = message.includes(env.AUTH003_CREDENTIAL_HASH_KEY) ? 'secret-containing-error-suppressed' : message
       return json({
         status: 'RUNTIME_EXCEPTION',
         environment: 'CONTROLLED_REMOTE_D1_AUTH001_MATERIALIZER',
         error: {
           name: String(error && error.name ? error.name : 'Error'),
           code: String(error && error.code ? error.code : 'UNKNOWN'),
+          message: safeMessage,
         },
       }, 500)
     } finally {
