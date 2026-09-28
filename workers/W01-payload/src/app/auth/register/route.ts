@@ -238,6 +238,7 @@ export async function POST(request: Request): Promise<Response> {
       } as any,
       overrideAccess: true,
       disableTransaction: true,
+      req: request,
       context: {
         [AUTH001_USER_CAPTURE_CONTEXT]: capture,
       },
