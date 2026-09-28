@@ -3863,3 +3863,14 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
 - `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_EXECUTION`
 - Next admissible action remains manual dispatch of the existing workflow with the already admitted deployment provenance.
+
+
+## 2026-09-29 — AUTH-013 public HTTP E2E fixture-id collision correction
+
+- Run `36478898506` reached the intended evidence-tooling path successfully through fixture generation, then failed closed at remote D1 preflight on `user_collision`; public HTTP assertions were skipped.
+- The positive randomized INTEGER fixture range is not sufficiently isolated from existing remote Payload users.
+- Backup before correction: `backup/pre-auth013-negative-fixture-20260929-202609282030`.
+- Fixture tooling commit: `1fc370f09fed89d181ce40f080ed310acb95fabf`; disposable user IDs are now randomized negative SQLite INTEGER values, while collision preflight remains mandatory.
+- No AUTH-013 runtime/Contract/schema/Payload/Worker authority changed. No behavior evidence is admitted from run `36478898506`.
+- `NEXT_ITEM_ID: AUTH-013-PUBLIC-HTTP-E2E-001`
+- `NEXT_ITEM_STATE: BLOCKED_EXTERNAL_EXECUTION`
