@@ -1,0 +1,145 @@
+name: AUTH-001 Registration Local Runtime Evidence
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/auth-001-registration-local-evidence.yml"
+      - "workers/W01-payload/src/app/auth/register/**"
+      - "workers/W01-payload/src/collections/Users.ts"
+      - "workers/W01-payload/src/migrations/**"
+      - "workers/W01-payload/src/payload.config.ts"
+      - "workers/W01-payload/scripts/auth-001-registration-runtime-evidence-local.mjs"
+      - "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json"
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source SHA to test
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_ENV: development
+      PAYLOAD_SECRET: ignore
+    steps:
+      - name: Resolve exact source SHA
+        id: source
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "sha=${{ inputs.source_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout exact tested source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
+      - name: Verify exact source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.source.outputs.sha }}"
+          test -s workers/W01-payload/src/app/auth/register/route.ts
+          test -s workers/W01-payload/src/migrations/20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts
+          test -s workers/W01-payload/scripts/auth-001-registration-runtime-evidence-local.mjs
+          test -z "$(git status --short)"
+
+      - name: Install W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply exact W01 local migrations
+        working-directory: workers/W01-payload
+        run: pnpm payload migrate
+
+      - name: Apply already-admitted AUTH-013 D1-01 schema locally
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file ../W02-content/migrations/0002_auth_013_account_state.sql
+
+      - name: Build exact W01 OpenNext worker
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: production
+          PAYLOAD_SECRET: ignore
+        run: |
+          set -euo pipefail
+          pnpm exec opennextjs-cloudflare build > auth-001-open-next-build.log 2>&1
+
+      - name: Start exact W01 local Worker runtime
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: production
+          PAYLOAD_SECRET: ignore
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler dev --local --port 8787 --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" --var "CLOUDFLARE_ENV:development" > auth-001-preview.log 2>&1 &
+          echo $! > auth-001-preview.pid
+          ready=0
+          for _ in $(seq 1 120); do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8787/ || true)
+            if [ "$code" != "000" ]; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat auth-001-open-next-build.log
+            cat auth-001-preview.log
+            exit 1
+          fi
+
+      - name: Run AUTH-001 registration batch runtime evidence
+        working-directory: workers/W01-payload
+        env:
+          AUTH001_BASE_URL: http://127.0.0.1:8787
+        run: |
+          set -euo pipefail
+          node --import=tsx/esm scripts/auth-001-registration-runtime-evidence-local.mjs
+          test -s ../../artifacts/mapping-0/auth-001-runtime-local/runtime-result.json
+
+      - name: Dump W01 runtime log on evidence failure
+        if: ${{ failure() }}
+        working-directory: workers/W01-payload
+        run: |
+          echo "===== W01 OpenNext build log ====="
+          tail -n 500 auth-001-open-next-build.log || true
+          echo "===== W01 local preview log ====="
+          tail -n 500 auth-001-preview.log || true
+
+      - name: Upload same-SHA runtime evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-001-registration-runtime-local-${{ steps.source.outputs.sha }}
+          path: |
+            artifacts/mapping-0/auth-001-runtime-local/
+            workers/W01-payload/auth-001-open-next-build.log
+            workers/W01-payload/auth-001-preview.log
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Cleanup local runtime
+        if: ${{ always() }}
+        working-directory: workers/W01-payload
+        run: |
+          if [ -f auth-001-preview.pid ]; then kill "$(cat auth-001-preview.pid)" 2>/dev/null || true; fi
+          pkill -TERM -x workerd 2>/dev/null || true
+          pkill -TERM -x esbuild 2>/dev/null || true
