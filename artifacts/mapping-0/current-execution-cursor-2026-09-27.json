@@ -179,6 +179,16 @@
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED"
   },
   "nextGate": "PRIV-004::first approved ACCOUNT_REGISTRATION / LEGAL_AUDIT production policy instance, followed by final Evidence Registry / Mapping 0 promotion checks. No production deployment is authorized.",
+  "latestControlGate": {
+    "workflow": ".github/workflows/priv004-production-readiness.yml",
+    "runId": "36385607778",
+    "headSha": "af2e6a3256502f32f459f9960bccfc496127ffdc",
+    "conclusion": "FAILURE_EXPECTED_FAIL_CLOSED",
+    "failedStep": "Validate explicit production admission state",
+    "meaning": "Current development-only PRIV-004 instance is correctly rejected for production use; no production authority is inferred.",
+    "productionAuthorization": "BLOCKED",
+    "evidenceBoundary": "Control-plane gate result only; does not promote Runtime, Evidence Registry, entities, Mapping 0, or production deployment."
+  },
   "runtimeEvidenceAdmission": {
     "status": "PASS_VERIFIED",
     "workflow": ".github/workflows/auth-001-registration-local-evidence.yml",
