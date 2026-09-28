@@ -9,7 +9,7 @@
     "objective": "Admit the merged AUTH-001 W01 registration batch runtime evidence and close the development implementation gate without promoting production or Mapping 0.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::development runtime evidence admitted; next controlled gate is production PRIV-004 authority plus Evidence Registry/Mapping 0 promotion. No production deployment is authorized.",
+    "nextGate": "AUTH-001::W02 identity/credential materialization secret/key authority. No W02 materializer implementation is authorized until the application secret/key boundary for AUTH-003 value_hash derivation is explicitly admitted.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -178,7 +178,7 @@
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED"
   },
-  "nextGate": "AUTH-001::development runtime evidence admitted; next controlled gate is production PRIV-004 authority plus Evidence Registry/Mapping 0 promotion. No production deployment is authorized.",
+  "nextGate": "AUTH-001::W02 identity/credential materialization secret/key authority; application secret/key binding must be admitted before runtime implementation. Production deployment remains blocked by PRIV-004 and Evidence Registry/Mapping 0 gates.",
   "runtimeEvidenceAdmission": {
     "status": "PASS_VERIFIED",
     "workflow": ".github/workflows/auth-001-registration-local-evidence.yml",
@@ -250,7 +250,8 @@
     "docs/176-PRIVACY-DATA-RETENTION-POLICY-v0.1.md",
     "docs/change-control/CC-MAPPING-0-PRIVACY-DATA-RETENTION-POLICY-BASELINE-2026-09-27.md",
     "docs/change-control/CC-MAPPING-0-PRIV-004-ADMISSION-GUARD-2026-09-27.md",
-    ".github/workflows/priv004-policy-instance-admission.yml"
+    ".github/workflows/priv004-policy-instance-admission.yml",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-CREDENTIAL-HASH-SECRET-AUTHORITY-GAP-2026-09-28.md"
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
