@@ -1,0 +1,128 @@
+name: AUTH-004 Remote HTTP Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      tested_source_sha:
+        description: Exact deployed W01 source SHA to test
+        required: true
+        default: 7e9396460136a6ce083db0f600ec04c7829a9c99
+        type: string
+      w01_base_url:
+        description: Controlled W01 public base URL
+        required: true
+        default: https://luckread-w01-payload.wanghui-79b.workers.dev
+        type: string
+      database_name:
+        description: Controlled D1 database name for ephemeral evidence fixture
+        required: true
+        default: luckread
+        type: string
+      confirm:
+        description: Type RUN_AUTH004_REMOTE_E2E to allow controlled remote evidence execution
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  remote-http-evidence:
+    if: ${{ inputs.confirm == 'RUN_AUTH004_REMOTE_E2E' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TESTED_SOURCE_SHA: ${{ inputs.tested_source_sha }}
+      W01_BASE_URL: ${{ inputs.w01_base_url }}
+      DATABASE_NAME: ${{ inputs.database_name }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_VERSION: 4.116.0
+      WRANGLER_CONFIG: workers/W01-payload/wrangler.jsonc
+
+    steps:
+      - name: Checkout canonical main evidence harness
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify exact source and route surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${TESTED_SOURCE_SHA}"
+          git cat-file -e "${TESTED_SOURCE_SHA}^{commit}"
+          test -s workers/W01-payload/src/app/auth/password/change/route.ts
+          test -s workers/W01-payload/src/app/auth/password/reset/request/route.ts
+          test -s workers/W01-payload/src/app/auth/password/reset/confirm/route.ts
+          echo "workflow_head_sha=$(git rev-parse HEAD)"
+          echo "tested_source_sha=${TESTED_SOURCE_SHA}"
+
+      - name: Resolve exact successful W01 deployment artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/w01-w02-binding-deploy.yml/runs?branch=main&status=success&per_page=100" > /tmp/auth004-deploy-runs.json
+          selected_run_id=""
+          while IFS= read -r run_id; do
+            artifact_names="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" --jq '.artifacts[].name')"
+            if printf '%s\n' "${artifact_names}" | grep -Fqx "w01-w02-binding-deployment-${TESTED_SOURCE_SHA}"; then
+              selected_run_id="${run_id}"
+              break
+            fi
+          done < <(
+            jq -r '.workflow_runs[] | select(.name == "W01 W02 Auth Binding Deploy" and .head_branch == "main" and .conclusion == "success") | .id' /tmp/auth004-deploy-runs.json
+          )
+          rm -f /tmp/auth004-deploy-runs.json
+          if [ -z "${selected_run_id}" ]; then
+            echo "No successful W01 deployment artifact exists for exact source SHA ${TESTED_SOURCE_SHA}" >&2
+            exit 1
+          fi
+          echo "DEPLOYMENT_RUN_ID=${selected_run_id}" >> "${GITHUB_ENV}"
+          echo "Resolved existing successful deployment run: ${selected_run_id}"
+
+      - name: Verify deployment provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}" > /tmp/auth004-deployment.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}/artifacts?per_page=100" > /tmp/auth004-artifacts.json
+          DEPLOYMENT_RUN_ID="${DEPLOYMENT_RUN_ID}" TESTED_SOURCE_SHA="${TESTED_SOURCE_SHA}" node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const deployment = JSON.parse(readFileSync('/tmp/auth004-deployment.json', 'utf8'))
+          const artifacts = JSON.parse(readFileSync('/tmp/auth004-artifacts.json', 'utf8'))
+          const expected = 'w01-w02-binding-deployment-' + process.env.TESTED_SOURCE_SHA
+          if (deployment.name !== 'W01 W02 Auth Binding Deploy') throw new Error('deployment workflow mismatch')
+          if (deployment.conclusion !== 'success') throw new Error('deployment is not successful')
+          if (deployment.head_branch !== 'main') throw new Error('deployment was not run from main')
+          const match = (artifacts.artifacts || []).find((item) => item && item.name === expected && item.expired_at == null)
+          if (!match) throw new Error('exact deployment artifact missing: ' + expected)
+          console.log(JSON.stringify({ deploymentRunId: deployment.id, deploymentHeadSha: deployment.head_sha, testedSourceSha: process.env.TESTED_SOURCE_SHA, exactArtifact: expected }, null, 2))
+          NODE
+          rm -f /tmp/auth004-deployment.json /tmp/auth004-artifacts.json
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Execute controlled AUTH-004 HTTP/security probe
+        run: node scripts/auth-004-remote-http-evidence.mjs
+        env:
+          DEPLOYMENT_RUN_ID: ${{ env.DEPLOYMENT_RUN_ID }}
+          WORKFLOW_HEAD_SHA: ${{ github.sha }}
+
+      - name: Upload AUTH-004 remote evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-004-remote-http-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/evidence/auth-004/remote/
+          if-no-files-found: error
+          retention-days: 30
