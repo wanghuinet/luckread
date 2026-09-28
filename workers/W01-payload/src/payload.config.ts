@@ -117,7 +117,7 @@ export default buildConfig({
 
       target.data = { ...data }
       return { ...data, id: 0 }
-    })
+    }
   },
   plugins: [
     r2Storage({
