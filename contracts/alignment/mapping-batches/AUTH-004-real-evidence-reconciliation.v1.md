@@ -22,7 +22,7 @@
 ## 2. Missing canonical traceability
 
 - Canonical API operation IDs and wire-contract fields/statuses are now bound by `contracts/api/AUTH-004-password-recovery-contract.v1.json`.
-- Request/response DTO IDs: bound in the AUTH-004 feature contract; canonical DTO Registry admission remains pending canonical OpenAPI admission.
+- Request DTO IDs are now canonically bound in `contracts/dto/auth-dto-contract.v1.json` to the three existing OpenAPI operations; the stale AUTH-004 null-operation placeholder has been removed. Response bodies remain `NO_BODY_DTO` for 204/202 and require no response DTO.
 - Credential/session entity references are now bound for the native implementation mapping; runtime field/schema evidence remains missing.
 - Recovery-token persistence mapping now points to Payload-native `resetPasswordToken` / `resetPasswordExpiration`; actual D1 runtime schema evidence remains missing.
 - Permission/scoped authorization mapping for authenticated password change: bound to `user.credential.manage` + `self` in the AUTH-004 feature contract and Auth Operation Policy.
@@ -49,11 +49,11 @@ The Payload-native implementation boundary is now explicitly recorded in code an
 
 ## 6. Contract-reconciliation result
 
-Definition-layer reconciliation is recorded at main commit `3ab18252544ffb9a15da3380b5878d5c6b6fc63a`.
+Definition-layer reconciliation was previously recorded at `3ab18252544ffb9a15da3380b5878d5c6b6fc63a`; this DTO placeholder reconciliation is a governance-only follow-up.
 
 - Wire contract: reconciled
 - Auth Operation Policy: reconciled
-- Canonical OpenAPI/DTO registry: still pending
+- Canonical OpenAPI/DTO registry: AUTH-004 operations reconciled; runtime implementation remains separately gated
 - Runtime/persistence/security/integration evidence: local native integration evidence registered; remote/persistence/E2E/session-invalidation evidence still missing
 
 ## 7. Gate result
