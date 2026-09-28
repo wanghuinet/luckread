@@ -72,3 +72,7 @@ With the authoritative pre-upgrade snapshot now committed, the next executable g
 ## 2026-09-28 Native schema execution checkpoint
 
 Payload 3.90.2 CLI review identified exactly two native schema deltas relative to the verified 3.87.1 baseline snapshot: `users.reset_password_requested_at` and `media._objectkey`. The approved path is to admit only these CLI-generated changes as the Payload native schema alignment migration; no custom AUTH-004 persistence is introduced.
+
+## 2026-09-28 Exact SQL delta checkpoint
+
+The executable gate now validates the Payload-generated migration directly: exactly four ALTER statements (two UP + two DOWN), no CREATE/DROP TABLE or index changes, required native snapshot fields, and the migration index entry. Historical JSON snapshot gaps are treated as migration-tool provenance, not as application schema deltas.
