@@ -853,6 +853,27 @@
       "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
       "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-001-FRESH-RUNTIME-EVIDENCE-RECONCILIATION-2026-09-28.md",
       "note": "Fresh controlled development runtime evidence after separating DEV and PROD PRIV-004 policy artifacts. Run passed the AUTH-001 registration batch assertions; production deployment was false. The current main merge preserves the tested PR tree, so the evidence remains valid for the current development scope under the inheritance rule."
+    },
+    {
+      "evidenceId": "EVD-AUTH002-B27-MIGRATION-EXECUTION-HISTORICAL-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-002::MIGRATION_EXECUTION",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-002",
+      "source": "GitHub Actions AUTH-002 E5 Remote Migration Execution against controlled Cloudflare D1",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/35552919573/artifacts/10618729380",
+      "commitSha": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
+      "timestamp": "2026-09-21T02:05:36Z",
+      "producer": "AUTH-002 E5 Remote Migration Execution / run 35552919573 / job 106190897137",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "validUntil": "2026-10-21T02:05:35Z",
+      "checkId": "106190897137",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/35552919573",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-002-HISTORICAL-MIGRATION-EVIDENCE-ADMISSION-2026-09-28.md",
+      "evidenceArtifact": "artifacts/mapping-0/auth-002-historical-migration-evidence-admission-2026-09-28.json",
+      "note": "Historical technical migration execution evidence is admitted without retroactive authorization. The exact tested commit is fe1f2784d21f3f629bbad0baa971f1aa56520914; the migration file blob is byte-identical on current main. The E5 artifact contains controlled preflight, successful migration execution, post-schema validation, migration-history proof, integrity check, native users/users_sessions schema stability, and provenance. No Runtime rerun, migration reapplication, or production deployment is performed by this admission."
     }
   ],
   "testedCommitSha": "37b0473f7214dd4eaca0326d147973e44fe52e7e"
