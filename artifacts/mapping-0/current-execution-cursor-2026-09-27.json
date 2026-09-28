@@ -2,14 +2,14 @@
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
   "sourceHead": "4399b83c31c2ac709bcc36c648b2bd994fb711dd",
-  "backupBranch": "backup/main-before-priv004-production-authority-close-20260928",
+  "backupBranch": "backup/main-before-priv004-env-policy-split-20260928",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "PRODUCTION_ENGINEERING_POLICY_AUTHORITY_ADMITTED_FINAL_EVIDENCE_PROMOTION_PENDING",
-    "objective": "Close the PRIV-004 production engineering policy authority under an explicit versioned policy instance; do not fabricate a jurisdiction-specific legal conclusion. After the production gate passes, continue only to final Evidence Registry / Mapping 0 promotion checks.",
+    "state": "PRIV004_ENVIRONMENT_POLICY_SEPARATED_PRODUCTION_GATE_PENDING",
+    "objective": "Keep development evidence bound to the DEVELOPMENT policy instance and production runtime authority bound to the separate PRODUCTION policy instance; then admit the resulting production gate evidence and continue to final Evidence Registry / Mapping 0 checks.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "PRIV-004::production-readiness gate must PASS against the newly admitted production engineering policy instance, followed by final Evidence Registry / Mapping 0 promotion checks. No production deployment is implied.",
+    "nextGate": "PRIV-004::production-readiness gate and policy-instance guard must PASS against the separate PRODUCTION policy artifact; the AUTH-001 development evidence path remains bound to the DEV artifact. Then continue to final Evidence Registry / Mapping 0 promotion checks.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -182,12 +182,12 @@
   "latestControlGate": {
     "workflow": ".github/workflows/priv004-production-readiness.yml",
     "runId": null,
-    "headSha": "PENDING_POLICY_ADMISSION_HEAD",
+    "headSha": "PENDING_ENV_POLICY_SPLIT_VALIDATION",
     "conclusion": "PENDING_REEXECUTION",
     "failedStep": null,
-    "meaning": "The prior fail-closed result is superseded as a historical checkpoint; the gate must be evaluated against the newly admitted production engineering policy instance.",
-    "productionAuthorization": "PENDING_GATE",
-    "evidenceBoundary": "Control-plane policy-admission state only until the post-change production-readiness workflow completes."
+    "meaning": "The previous successful PR gate used the wrong shared artifact path for DEV evidence isolation; environment-separated policy artifacts are now in place and require fresh gate evidence.",
+    "productionAuthorization": "PENDING_FRESH_GATE",
+    "evidenceBoundary": "Control-plane only until fresh guard/readiness evidence completes; no production runtime deployment or Evidence Registry promotion is inferred."
   },
   "runtimeEvidenceAdmission": {
     "status": "PASS_VERIFIED",
@@ -363,5 +363,10 @@
     "approvalRef": "ENG-DECISION-2026-09-28-PRIV004-PROD-730D",
     "legalComplianceStatus": "NOT_A_LEGAL_OR_COMPLIANCE_AUTHORITY",
     "provenanceCheckpoint": "4399b83c31c2ac709bcc36c648b2bd994fb711dd"
+  },
+  "policyArtifacts": {
+    "development": "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json",
+    "production": "artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json",
+    "selectionBoundary": "W01 resolves by runtime environment; client cannot select policy."
   }
 }
