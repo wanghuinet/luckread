@@ -7,7 +7,7 @@
 ## Runtime authority
 
 The active runtime authority is `workers/W01-payload/`.
-The active dependency baseline is the official `templates/with-cloudflare-d1` structure with the current W01 lock: Payload `3.87.1` and `@payloadcms/db-d1-sqlite` `3.87.1`. The `3.82.1` family is the historical upstream template observation recorded by the W01 upstream manifest.
+The active dependency baseline is the official `templates/with-cloudflare-d1` structure with the current W01 lock: Payload `3.90.2` and `@payloadcms/db-d1-sqlite` `3.90.2`. The `3.82.1` family is the historical upstream template observation recorded by the W01 upstream manifest.
 
 The older `3.82.1` references are historical upstream observations and are not valid current W01 runtime evidence.
 
