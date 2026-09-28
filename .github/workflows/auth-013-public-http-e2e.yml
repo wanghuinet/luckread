@@ -50,7 +50,7 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}" > /tmp/auth013-deploy.json
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}/artifacts?per_page=100" > /tmp/auth013-artifacts.json
           node --input-type=module <<'NODE'
-          import { readFileSync } from 'node:fs'
+          import { readFileSync, writeFileSync } from 'node:fs'
           const deployment = JSON.parse(readFileSync('/tmp/auth013-deploy.json', 'utf8'))
           const artifacts = JSON.parse(readFileSync('/tmp/auth013-artifacts.json', 'utf8'))
           const expected = process.env.TESTED_COMMIT
@@ -129,6 +129,7 @@ jobs:
       - name: Execute public transport E2E
         env:
           W01_BASE_URL: ${{ inputs.w01_base_url }}
+          AUTH013_ARTIFACT_DIR: artifacts/mapping-0/auth-013-public-http-e2e
         run: node scripts/auth-013-public-transport-e2e.mjs
 
       - name: Revoke basic session for stale-session proof
@@ -162,6 +163,13 @@ jobs:
             throw new Error('stale-session denial failed')
           }
           console.log('AUTH-013 stale-session denial PASS')
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs'
+          writeFileSync(
+            'artifacts/mapping-0/auth-013-public-http-e2e/stale-session-result.json',
+            JSON.stringify({ status: 'PASS', check: 'stale_session_denial', secretMaterialIncluded: false }, null, 2) + '\n',
+          )
+          NODE
           NODE
 
       - name: Verify D1 authoritative result
@@ -198,6 +206,10 @@ jobs:
             basicTokenVersion: Number(row.basic_token_version) === 2,
           }
           for (const [name, ok] of Object.entries(checks)) if (!ok) throw new Error('AUTH-013 D1 check failed: ' + name)
+          writeFileSync(
+            'artifacts/mapping-0/auth-013-public-http-e2e/d1-result.json',
+            JSON.stringify({ status: 'PASS', environment: 'CONTROLLED_REMOTE_D1', checks, secretMaterialIncluded: false }, null, 2) + '\n',
+          )
           console.log(JSON.stringify({ status: 'PASS', checks }, null, 2))
           NODE
 
