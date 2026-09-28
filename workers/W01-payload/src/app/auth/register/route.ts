@@ -438,18 +438,20 @@ export async function POST(request: Request): Promise<Response> {
   )
 
 
+  try {
     const batchResult = await env.D1.batch(statements)
-    const cleanupOffset = existing && isExpired(existing.expiresAt, now) ? 1 : 0
-    const userIndex = cleanupOffset
-    const consentIndex = userIndex + 1
-    const envelopeIndex = consentIndex + 1
-    const responseIndex = envelopeIndex + 1
+    const reservationIndex = 0
+    const userIndex = 1
+    const consentIndex = 2
+    const completionIndex = 3
+    const responseIndex = 4
 
     if (
       batchResult.length !== statements.length ||
+      batchResult[reservationIndex]?.meta?.changes !== 1 ||
       batchResult[userIndex]?.meta?.changes !== 1 ||
       batchResult[consentIndex]?.meta?.changes !== 1 ||
-      batchResult[envelopeIndex]?.meta?.changes !== 1 ||
+      batchResult[completionIndex]?.meta?.changes !== 1 ||
       !batchResult[responseIndex]
     ) {
       throw new Error('AUTH001_BATCH_RESULT_INCOMPLETE')
