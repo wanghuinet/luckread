@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/auth-004-payload-3902-baseline-snapshot-generator.yml"
+      - "docs/change-control/CC-AUTH-004-PAYLOAD-VERSION-ALIGNMENT-2026-09-28.md"
 
 permissions:
   contents: write
