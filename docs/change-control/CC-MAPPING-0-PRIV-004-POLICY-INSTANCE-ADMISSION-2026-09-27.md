@@ -142,3 +142,5 @@ The production gate fails closed unless all of the following are explicitly pres
 - packet admitted instance matches the canonical policy instance version and rule mode.
 
 This gate does not choose a retention duration, fixed-until date, jurisdiction, legal interpretation, or approval source. With the current development-only instance it is expected to remain BLOCKED.
+
+The production gate also enforces the structural fields already required by the admission contract before a production instance can pass: non-empty policy identity, owner, sourceAuthority, approvalRef and rollback/retirement path; non-empty scope with `authRegister / ACCOUNT_REGISTRATION / PRODUCTION`; explicit deterministic rule; current-commit provenance; and a packet admittedInstance whose policy identity/version/rule matches the canonical instance. A malformed `productionMissingInputs` value is rejected rather than treated as an empty list.

@@ -51,6 +51,18 @@ if (instance.environment !== 'PRODUCTION') {
   fail(`policy instance environment must be PRODUCTION; found ${instance.environment ?? 'missing'}`)
 }
 
+for (const [field, value] of [['policyId', instance.policyId], ['owner', instance.owner], ['rollbackVersion', instance.rollbackVersion], ['sourceAuthority', instance.sourceAuthority], ['approvalRef', instance.approvalRef]]) {
+  if (typeof value !== 'string' || value.trim() === '') fail(`${field} is required`)
+}
+
+if (!isRecord(instance.scope) || Object.keys(instance.scope).length === 0) {
+  fail('production policy scope must be a non-empty object')
+}
+
+if (instance.scope.environment !== 'PRODUCTION') {
+  fail(`production policy scope.environment must be PRODUCTION; found ${instance.scope.environment ?? 'missing'}`)
+}
+
 if (!['APPROVED', 'ACTIVE'].includes(instance.status)) {
   fail(`policy instance status must be APPROVED or ACTIVE; found ${instance.status ?? 'missing'}`)
 }
@@ -162,8 +174,18 @@ if (packet.runtimeAuthorization?.production !== 'AUTHORIZED') {
   fail('admission packet runtimeAuthorization.production must be AUTHORIZED')
 }
 
-if (Array.isArray(packet.productionMissingInputs) && packet.productionMissingInputs.length > 0) {
+if (!Array.isArray(packet.productionMissingInputs)) {
+  fail('admission packet productionMissingInputs must be an array')
+} else if (packet.productionMissingInputs.length > 0) {
   fail('admission packet still contains productionMissingInputs')
+}
+
+if (!isRecord(packet.admittedInstance)) {
+  fail('admission packet admittedInstance is required')
+}
+
+if (packet.admittedInstance?.policyId !== instance.policyId) {
+  fail('packet admittedInstance.policyId must match the canonical production policy instance')
 }
 
 if (packet.admittedInstance?.environment !== 'PRODUCTION') {
