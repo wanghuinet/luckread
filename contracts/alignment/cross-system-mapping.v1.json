@@ -150,7 +150,11 @@
         "ENT-VERIFICATION"
       ],
       "payloadCollections": [],
-      "codeEvidenceRefs": [],
+      "codeEvidenceRefs": [
+        "workers/W01-payload/src/app/auth/password/change/route.ts",
+        "workers/W01-payload/src/app/auth/password/reset/request/route.ts",
+        "workers/W01-payload/src/app/auth/password/reset/confirm/route.ts"
+      ],
       "evidence": [
         "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
         "contracts/alignment/mapping-batches/AUTH-003-006-dto-schema-closure-gate.v1.md",
@@ -164,7 +168,9 @@
         "contracts/entity/AUTH-003-credential-field-contract.v1.json",
         "contracts/entity/AUTH-004-password-recovery-field-contract.v1.json",
         "docs/change-control/CC-MAPPING-0-AUTH-004-DTO-REGISTRY-RECONCILIATION-2026-09-28.md",
-        "docs/change-control/CC-MAPPING-0-AUTH-004-EVIDENCE-REGISTRY-BINDING-2026-09-28.md"
+        "docs/change-control/CC-MAPPING-0-AUTH-004-EVIDENCE-REGISTRY-BINDING-2026-09-28.md",
+        "docs/change-control/CC-AUTH-004-PAYLOAD-NATIVE-ADAPTER-IMPLEMENTATION-ADMISSION-2026-09-28.md",
+        "https://github.com/wanghuinet/luckread/commit/7e9396460136a6ce083db0f600ec04c7829a9c99"
       ],
       "blockers": [
         "Controlled remote W01 behavior and HTTP E2E evidence remain missing",
