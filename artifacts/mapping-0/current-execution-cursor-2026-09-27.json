@@ -169,7 +169,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "Current main is now e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd after the cursor-only governance refresh merge. The intervening b6004470b5c9d63e66fbc7214a99621d1da401eb and e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd changes are governance/evidence-only; no relevant W02 materializer implementation source changed. AUTH-001 W01 registration migration and W02/D1-01 materializer runtime evidence remain PASS_VERIFIED and registered. The remaining governed production blocker is PRIV-004 ACCOUNT_REGISTRATION / LEGAL_AUDIT authority.",
-    "currentMainSha": "b6004470b5c9d63e66fbc7214a99621d1da401eb",
+    "currentMainSha": "e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_RUNTIME_VERIFIED_DEV_ONLY_PRODUCTION_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
