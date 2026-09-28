@@ -2,14 +2,14 @@
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
   "sourceHead": "3395da99d8bb596faa706c33d1a4ef6467557780",
-  "backupBranch": "backup/main-before-cursor-aa8-reconcile-20260928",
+  "backupBranch": "backup/main-before-mapping0-cursor-reconcile-20260928",
   "currentCursor": {
     "id": "AUTH-002-SESSION-MIGRATION-EVIDENCE-CLOSURE",
     "state": "PRIV004_AUTHORITY_CLOSED_AUTH001_AUTH003_AUTH002_EVIDENCE_ADMITTED_FINAL_MAPPING_BLOCKED",
-    "objective": "Preserve all admitted PRIV-004, AUTH-001, AUTH-003 and AUTH-002 executable evidence while closing the remaining AUTH-002 migration-execution evidence unit and then the final Mapping 0 / Evidence Registry promotion gate without promoting blocked global state.",
+    "objective": "Preserve all admitted PRIV-004, AUTH-001, AUTH-003 and AUTH-002 executable evidence while executing the final Evidence Registry / Mapping 0 / entity-promotion gate without promoting blocked global state.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-EVIDENCE-RECONCILIATION-2026-09-28.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "Final Evidence Registry / Mapping 0 / entity promotion checks. AUTH-002 migration execution evidence is now technically VERIFIED without retroactive authorization of the historical execution.",
+    "nextGate": "Final Evidence Registry / Mapping 0 / entity promotion checks. Canonical Mapping 0 and Five-Way remain NOT_GREEN; no global promotion is inferred.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -18,10 +18,10 @@
       "AUTH-001 fresh controlled development runtime evidence after DEV/PROD policy separation is PASS_VERIFIED.",
       "AUTH-003 credential List/Add/Replace/Remove runtime evidence is PASS_VERIFIED and ENT-IDENTITY materialization ownership evidence is admitted.",
       "AUTH-002 Gate-1 schema, native session runtime, security-negative, concurrency and extension-correlation evidence are PASS_VERIFIED at exact tested source 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55.",
-      "AUTH-002 migration execution evidence remains the remaining executable evidence unit.",
       "Global Evidence Registry remains NOT_GREEN.",
       "Canonical Mapping 0 remains NOT_GREEN; no promotion is inferred.",
-      "Migration file byte identity was confirmed, but the migration index changed after the historical E5 execution; no current-contract source-equivalence exception exists."
+      "Migration file byte identity was confirmed, but the migration index changed after the historical E5 execution; no current-contract source-equivalence exception exists.",
+      "AUTH-002 migration execution evidence is now technically VERIFIED as EVD-AUTH002-B27-MIGRATION-EXECUTION-HISTORICAL-001; no re-execution or retroactive authorization is permitted."
     ],
     "alreadyClosed": {
       "auth003Wire": true,
@@ -207,8 +207,8 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Current main is now e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd after the cursor-only governance refresh merge. The intervening b6004470b5c9d63e66fbc7214a99621d1da401eb and e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd changes are governance/evidence-only; no relevant W02 materializer implementation source changed. AUTH-001 W01 registration migration and W02/D1-01 materializer runtime evidence remain PASS_VERIFIED and registered. The remaining governed production blocker is PRIV-004 ACCOUNT_REGISTRATION / LEGAL_AUDIT authority.",
-    "currentMainSha": "e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd",
+    "reason": "Current GitHub main is now 56a9623b7021a1baead37007b5ac69bbba037a69 after PR #157. PR #157 is governance/evidence-only for this boundary: it admits the historical AUTH-002 migration execution evidence and reconciles Mapping 0 inputs, without changing Worker/D1/runtime implementation.",
+    "currentMainSha": "56a9623b7021a1baead37007b5ac69bbba037a69",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_RUNTIME_VERIFIED_DEV_ONLY_PRODUCTION_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -216,10 +216,10 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "aa8af7b173b8abaaff09254149613b4b0f1a590d",
-    "governanceHeadDisposition": "PR #154 and PR #155 are merged; both change governance cursor/evidence-boundary state only. Implementation/source evidence boundary remains e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd."
+    "actualGitMainHead": "56a9623b7021a1baead37007b5ac69bbba037a69",
+    "governanceHeadDisposition": "PR #154, #155, #156 and #157 are merged; these changes are governance/evidence reconciliation only for the current gate. The relevant implementation/runtime evidence scopes remain unchanged and must not be rerun solely because main advanced."
   },
-  "nextGate": "AUTH-002::MIGRATION_EXECUTION evidence admission, followed by final Evidence Registry / Mapping 0 / entity promotion checks. No production deployment is authorized by this cursor.",
+  "nextGate": "Final Evidence Registry / Mapping 0 / entity promotion checks. AUTH-002 migration execution evidence is closed; no production deployment is authorized by this cursor.",
   "latestControlGate": {
     "workflow": ".github/workflows/auth-002-e5-remote-migration-execution.yml",
     "runId": "35552919573",
