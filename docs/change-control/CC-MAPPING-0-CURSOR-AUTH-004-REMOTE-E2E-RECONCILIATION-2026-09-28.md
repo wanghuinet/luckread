@@ -115,3 +115,11 @@ The dedicated current-execution cursor is updated to the exact current `main` SH
 - CI-only correction committed at `c78b6296911648bc85821cbae2534501e4fc4fa5`: remove the invalid explicit tail sampling argument while retaining the `auth.register` search filter. No application behavior, schema, topology, or Payload version change.
 - W01/W02 binding deployment job `108927254265` was re-run as attempt 4 solely to emit a fresh `workflow_run` event for the corrected diagnostic workflow; application source remains `6d574bb56222e0eaf44df663e04eb59535e84be6`.
 - AUTH-004 remains `BLOCKED / NOT_GREEN`.
+
+## 2026-09-28 POST-only runtime-tail correction checkpoint
+
+- AUTH-004 Remote E2E run `36423592893` reached the exact deployed source and migration precondition, but its runtime-tail artifact showed Wrangler `4.116.0` rejected `--once`; the artifact therefore contained no Worker runtime diagnostic.
+- CI-only correction committed at `7082e3ced331ceb9b891a175306db3a479a528f2`: retain only `--format json --method POST` for the temporary tail; remove both `--search` and unsupported `--once`. This is intended to capture the request-scoped Worker console/exception output without relying on Wrangler text-search semantics or unsupported flags.
+- Backup created before the correction: `backup/main-before-auth004-tail-filter-only-20260928-2054`.
+- W01/W02 deployment job `108931274751` was rerun as attempt 6 using the same application source `6d574bb56222e0eaf44df663e04eb59535e84be6`; no application/schema/topology/Payload version change.
+- As of the latest checkpoint, deployment attempt 6 is still in progress at W01 build. AUTH-004 remains `BLOCKED / NOT_GREEN`; no remote lifecycle PASS is claimed.
