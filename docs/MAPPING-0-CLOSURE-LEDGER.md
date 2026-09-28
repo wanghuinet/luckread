@@ -3936,3 +3936,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Backup before correction: `backup/pre-auth013-e2e-unauthenticated-ifmatch-isolation-20260929`.
 - No AUTH-013 runtime, Contract, D1 schema, Payload version, Worker topology, W02 authority, or Evidence Registry status changed.
 - The authoritative cursor remains `AUTH-013-PUBLIC-HTTP-E2E-001 / BLOCKED_EXTERNAL_DEPLOYMENT` until a fresh deployment of the corrected source and a successful controlled public HTTP E2E artifact.
+
+
+## 2026-09-29 — AUTH-013 public HTTP E2E client-authority assertion isolation
+
+- Run `36500346422` reached the first protected public HTTP assertion; the prior unauthenticated isolation therefore worked as intended.
+- The next authenticated basic-user client-authority injection request omitted `If-Match`, so the deployed handler returned HTTP 428 `PRECONDITION_REQUIRED` before the intended 403 authorization assertion. No AUTH-013 behavior evidence is admitted from this run.
+- Authorized evidence-tooling correction: send a valid `If-Match: 1` header on the client-authority injection request only. Keep the existing authenticated/missing-`If-Match` assertion as the dedicated 428 check.
+- Backup before correction: `backup/pre-auth013-e2e-client-authority-ifmatch-isolation-20260929`.
+- No AUTH-013 runtime, Contract, D1 schema, Payload version, Worker topology, W02 authority, or Evidence Registry status changed.
+- Authoritative cursor remains `AUTH-013-PUBLIC-HTTP-E2E-001 / BLOCKED_EXTERNAL_DEPLOYMENT` until a fresh exact-source deployment and successful controlled public HTTP E2E artifact.
