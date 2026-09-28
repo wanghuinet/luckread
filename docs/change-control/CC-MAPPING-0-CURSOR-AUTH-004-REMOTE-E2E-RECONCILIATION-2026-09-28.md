@@ -74,3 +74,12 @@ The dedicated current-execution cursor is updated to the exact current `main` SH
 - Minimal correction committed at 7cd8c34e839db53a9798c64b8fa99a2ebeffa5bd: select live deployment artifacts by exact deployment SHA, require at least one, and deterministically use the newest matching artifact while recording ignored duplicate count.
 - A fresh controlled rerun of the same W01 deployment job has been started as attempt 3 solely to generate a new successful workflow_run event for the corrected Remote E2E workflow. No new business implementation or schema change was introduced.
 - AUTH-004 remains BLOCKED / NOT_GREEN until the corrected Remote E2E actually executes and produces admissible lifecycle evidence.
+
+## 2026-09-28 AUTH-001 native Local API production-runtime correction
+
+- AUTH-004 remote E2E run 36420515576 reached the real W01 runtime and passed exact deployment provenance, Payload 3.90.2 source admission, exact deployed-source probe materialization, and remote Payload migration preconditions.
+- The first business assertion then failed at canonical `POST /auth/register`: HTTP 503 from the W01 registration adapter. No AUTH-004 password lifecycle assertion executed after that point.
+- The inspected registration seam called `payload.create()` with `context` but did not pass the existing HTTP `Request` object. Payload Local API documents `req` as a supported create option and recommends threading the request through Local API operations; context is propagated to `req.context` for hooks.
+- Minimal source correction committed at `6d574bb56222e0eaf44df663e04eb59535e84be6`: `payload.create({ ..., req: request, context })`.
+- No new authentication subsystem, schema, Worker, D1, queue, transaction model, or Payload core change was introduced.
+- Fresh remote deployment/runtime evidence for this correction is still pending; AUTH-004 remains BLOCKED / NOT_GREEN until the corrected source is deployed through the existing controlled W01 deployment path and the remote lifecycle probe passes.
