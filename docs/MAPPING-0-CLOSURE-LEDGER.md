@@ -3703,3 +3703,11 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Artifact SHA-256: `5c154a9322abc0d3aa7afd078d81d5646b978ce55392cc3f2320e8a39b6bb8d9`.
 - Evidence Registry record `EVD-AUTH013-RUNTIME-SOURCE-LOCAL-001` is recorded as `CREATED` / exact-SHA source evidence. It is intentionally not promoted to global VERIFIED/GREEN by this governance step.
 - AUTH-013 remains NOT_GREEN. Public W01 HTTP E2E against an exact admitted W01/W02 deployment is the next focused gate. Existing W02/W06/Queue/D1-03 evidence is inherited and must not be repeated unchanged.
+
+## 2026-09-28 — AUTH-013 W01 transport unit closure
+
+- W02 AUTH-013 focused source implementation is verified at exact source SHA `0af2fcb66b6bb54ace065b7debe5559a80a285a4` via run `36431940464`.
+- W01 public account-state route source is verified in current Foundation CI at exact source SHA `faab246f89d287018da24134a5c0e9f0593ae8de` via run `36432420115`, job `108961689387`.
+- W01 Foundation CI passed TypeScript, security unit tests, lint, production build, remote migration admission-state verification and Payload implementation admission.
+- New Evidence Registry record `EVD-AUTH013-W01-PUBLIC-ROUTE-UNIT-001` records exact-SHA source/unit evidence as `CREATED`; it is not promoted to global VERIFIED by this checkpoint.
+- AUTH-013 focused source/unit closure is now complete. The only remaining focused gate is deployed **public W01 HTTP E2E**. No automatic production deployment is triggered by this closure step.
