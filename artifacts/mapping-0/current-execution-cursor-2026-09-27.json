@@ -1,16 +1,16 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20",
+  "sourceHead": "40f41903806c247aa946067901df6b219efabe1e",
   "backupBranch": "backup/main-before-auth004-batch-20260928-2003",
   "currentCursor": {
     "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
     "state": "BLOCKED_REMOTE_E2E",
     "objective": "Close the AUTH-004 controlled remote HTTP/E2E lifecycle gate against the exact deployed W01 source without adding a custom auth subsystem, migration, Worker, D1 database, queue, or Payload core change.",
     "authoritativeControl": "docs/change-control/CC-AUTH-004-PAYLOAD-VERSION-ALIGNMENT-2026-09-28.md",
-    "nextGate": "Execute/inspect the existing controlled AUTH-004 remote HTTP E2E evidence path against exact deployed source 39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20; then admit only durable evidence and run final Mapping 0 / Evidence Registry admission checks. Deployment success alone is not GREEN.",
+    "nextGate": "Inspect the exact-source W01 deployment attempt 2 (run 36418911699); if successful, consume its workflow_run-triggered AUTH-004 remote HTTP E2E evidence against deployed source 39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20, then admit only durable evidence and run final Evidence Registry / Mapping 0 checks. Deployment success alone is not GREEN.",
     "logicalOwnership": "W01 -> AUTH-004 Payload-native authority CLOSED",
-    "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding CLOSED for deployment run 36418911699",
+    "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding — deployment run 36418911699 attempt 2 currently IN_PROGRESS.",
     "physicalRuntimeTarget": "W01 luckread-w01-payload / D1-01 luckread",
     "supersededBlockers": [
       "Payload 3.87.1 version-alignment gap is superseded by the merged 3.90.2 dependency baseline and successful W01 deployment run 36418911699.",
@@ -184,7 +184,7 @@
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced through the AUTH-004 3.90.2 version-alignment, native migration review, local lifecycle evidence, remote E2E harness, and W01/W02 binding deployment checkpoints. The latest deployment succeeded; no remote E2E PASS is claimed yet.",
-    "currentMainSha": "f0fc9b8fefa3394cfe44d44b2364debb3d71b423",
+    "currentMainSha": "40f41903806c247aa946067901df6b219efabe1e",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
     "payloadWireCompatibilityStatus": "AUTH004_LOCAL_LIFECYCLE_VERIFIED_REMOTE_E2E_BLOCKED",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -192,8 +192,8 @@
     "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "f0fc9b8fefa3394cfe44d44b2364debb3d71b423",
-    "governanceHeadDisposition": "CI-only correction after deployment: remote E2E probe is now read from the exact deployed source SHA. This governance/CI change does not alter the deployed implementation evidence boundary.",
+    "actualGitMainHead": "40f41903806c247aa946067901df6b219efabe1e",
+    "governanceHeadDisposition": "CI-only correction is committed; controlled W01 deployment attempt 2 is in progress against implementation source 39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20. Current governance synchronization does not alter the deployed implementation evidence boundary.",
     "reviewedAt": "2026-09-28",
     "implementationEvidenceSourceHead": "39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20"
   },
@@ -274,10 +274,11 @@
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.90.2",
     "capabilityFinding": "Payload native AUTH-004 password lifecycle capability is aligned to the 3.90.2 baseline; no custom session invalidation subsystem is admitted.",
-    "implementationDisposition": "MERGED_RUNTIME_LOCAL_VERIFIED_REMOTE_E2E_BLOCKED",
+    "implementationDisposition": "MERGED_RUNTIME_LOCAL_VERIFIED_REMOTE_E2E_BLOCKED_DEPLOYMENT_ATTEMPT_2_IN_PROGRESS",
     "staleEvidenceCorrection": "The previous cursor's 3.87.1 source statement is historical and superseded by the current 3.90.2 main head.",
-    "currentMainSha": "f0fc9b8fefa3394cfe44d44b2364debb3d71b423",
-    "implementationSourceSha": "39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20"
+    "currentMainSha": "40f41903806c247aa946067901df6b219efabe1e",
+    "implementationSourceSha": "39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20",
+    "currentSourceHead": "40f41903806c247aa946067901df6b219efabe1e"
   },
   "devTestPolicy": {
     "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
