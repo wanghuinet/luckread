@@ -51,7 +51,10 @@ const evidenceGovernanceRelPaths = new Set([
   '.github/workflows/auth-002-remote-runtime-evidence.yml',
   'contracts/evidence/mapping-0-evidence-registry.v1.schema.json',
   'scripts/mapping-0-evidence-registry-check.mjs',
-  'scripts/mapping-0-evidence-registry-final-check.mjs'
+  'scripts/mapping-0-evidence-registry-final-check.mjs',
+  'artifacts/mapping-0/current-execution-cursor-2026-09-27.json',
+  'docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-EVIDENCE-ADMISSION-2026-09-28.md',
+  'docs/change-control/CC-MAPPING-0-PRIV-004-PROVENANCE-RECONCILIATION-2026-09-27.md'
 ])
 const testedCommit = registry?.testedCommitSha || currentCommit
 
