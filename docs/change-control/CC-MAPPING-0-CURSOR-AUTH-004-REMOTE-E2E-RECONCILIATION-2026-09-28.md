@@ -57,3 +57,11 @@ No new authentication subsystem, custom session invalidation store, Worker, D1 d
 `AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001` / `BLOCKED_REMOTE_E2E`
 
 The dedicated current-execution cursor is updated to the exact current `main` SHA and Payload `3.90.2` baseline. Historical cursor text remains historical and must not drive work selection.
+
+## 2026-09-28 controlled rerun checkpoint
+
+- Reused the existing W01/W02 deployment job 108916624653 from run 36418911699; no new business implementation was introduced.
+- Attempt 2 is currently in_progress at the W01 build step after exact-source checkout, dependency install, W02 binding validation, and PAYLOAD_SECRET verification passed.
+- The deployment remains bound to implementation source 39489d6bddcc9a768c9b8c2bd9c18de5c26c0b20.
+- No database migration is part of this deployment workflow.
+- No AUTH-004 Remote E2E result is admitted yet.
