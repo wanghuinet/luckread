@@ -3544,3 +3544,14 @@ This note does not change any Blueprint, Contract, API, DTO, Entity, Field, Work
 - The production readiness and admission guards are now bound to the dedicated PROD artifact.
 - No new Worker/D1/Queue, migration, retention subsystem, or Payload Core architecture is introduced.
 - Fresh PR/current-head guard and production-readiness evidence are required; the earlier PR #149 success is retained as historical evidence for that earlier artifact state and is not inherited across this input change.
+
+
+## 2026-09-28 — AUTH-001 fresh development runtime evidence admission after PRIV-004 environment split
+
+- Backup before this governance/evidence admission: `backup/main-before-auth001-fresh-evidence-admission-20260928`.
+- PR #150 environment-policy correction was merged to `main` as `5a3adce7e74547efb33225be8d2a8fdb0e72f63d`.
+- Fresh controlled AUTH-001 development runtime evidence: run `36386908500`, exact tested PR source `dd803fb465bf91e9bd8e22ecd34798cdaec42359`, artifact `10954444469`, SHA-256 `c7bfc953c93abc83ec66d4bc289f8c2970a1dc536d38282fa3a30b4818d6fe39`.
+- The fresh run passed the AUTH-001 registration batch assertions after DEV/PROD PRIV-004 policy separation.
+- Canonical Evidence Registry receives a new VERIFIED record for the fresh run. The global registry remains `NOT_GREEN`; no Mapping 0 promotion is inferred.
+- PRIV-004 Production Readiness run `36386908554` and Policy Instance Admission Guard run `36386908507` remain SUCCESS evidence from the same PR tree.
+- Current next gate is global Evidence Registry / Mapping 0 closure; unresolved canonical Mapping 0 records and entity/evidence coverage remain blockers.
