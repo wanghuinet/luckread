@@ -193,7 +193,13 @@ try {
   if (reset.bodyBytes !== 0) throw new Error('reset confirm returned a response body')
 
   expect((await request('/api/users/me', { token: changedLogin.accessToken })).status, 401, 'pre-reset session after reset')
-  if (sessionRows(primary.id).length !== 0) throw new Error('password reset left native sessions')
+  const postResetSessionRows = sessionRows(primary.id)
+  // Payload-native resetPassword clears prior sessions and creates one fresh
+  // native session for the reset operation itself. The route intentionally
+  // discards Payload's returned JWT to preserve the 204 contract.
+  if (postResetSessionRows.length !== 1) {
+    throw new Error(`password reset left ${postResetSessionRows.length} native sessions; expected exactly 1 reset-created session`)
+  }
 
   const replay = await request('/auth/password/reset/confirm', {
     method: 'POST',
@@ -230,7 +236,7 @@ try {
       resetRequestEnumerationResistant: existingResetRequest.status === 202 && missingResetRequest.status === 202 && existingResetRequest.bodyBytes === 0 && missingResetRequest.bodyBytes === 0,
       passwordResetAccepted: reset.status === 204 && reset.bodyBytes === 0,
       preResetSessionInvalidated: (await request('/api/users/me', { token: changedLogin.accessToken })).status === 401,
-      nativeSessionRowsEmptyAfterReset: sessionRows(primary.id).length === 0,
+      exactlyOneResetCreatedNativeSession: postResetSessionRows.length === 1,
       resetTokenReplayDenied: replay.status === 422,
       expiredResetTokenDenied: expiredConfirm.status === 422,
       secretsRecorded: false,
