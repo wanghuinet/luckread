@@ -1,16 +1,16 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "26a5a761c88a6bdb96ea353a30b609d3db300f31",
+  "sourceHead": "5c9d5cd22f478890089b9e01769a99550d114a80",
   "backupBranch": "backup/main-before-auth004-cursor-sourcehead-reconcile-20260928-2235",
   "currentCursor": {
     "id": "AUTH-004-REMOTE-E2E-LIFECYCLE-CLOSURE-001",
-    "state": "AUTH013_TRANSPORT_SOURCE_UNIT_VERIFIED_REMOTE_E2E_PENDING",
-    "objective": "Close independently authorized modules while AUTH-004 remains externally blocked. AUTH-013 source implementation is verified; remaining focused gate is public remote transport evidence.",
+    "state": "AUTH013_TRANSPORT_SOURCE_UNIT_VERIFIED_AUTH004_W02_PHYSICAL_DEPLOYMENT_GATE",
+    "objective": "Close independently authorized modules while resolving the current W02 physical runtime gate. AUTH-004 W01 source is deployed and login succeeds, but both AUTH-002 and AUTH-004 independently fail at GET /api/users/me with HTTP 401 on the same W01 source.",
     "authoritativeControl": "docs/change-control/CC-AUTH-004-PAYLOAD-VERSION-ALIGNMENT-2026-09-28.md",
-    "nextGate": "Dispatch W01/W02 Auth Binding Deploy for exact source 26a5a761c88a6bdb96ea353a30b609d3db300f31, then consume the resulting AUTH-004 Remote E2E. Do not reuse prior deployment evidence.",
+    "nextGate": "Deploy exact current W02 source 5c9d5cd22f478890089b9e01769a99550d114a80 with the controlled W02 Identity Authorization Deploy workflow. Then rerun the failed AUTH-002 and AUTH-004 remote evidence jobs against the already-deployed W01 source 26a5a761c88a6bdb96ea353a30b609d3db300f31.",
     "logicalOwnership": "W01 -> AUTH-004 Payload-native authority CLOSED",
-    "physicalBinding": "W01 luckread-w01-payload / W01-W02 service binding — latest application deployment evidence is run 36444678534 for source 0a2e73d363ee63f3a3eeba1d287bb9b59c927cd0; source 26a5a761c88a6bdb96ea353a30b609d3db300f31 is not yet deployment-admitted.",
+    "physicalBinding": "W01 luckread-w01-payload / W02_AUTH -> luckread-w02. W01 exact deployed source is 26a5a761c88a6bdb96ea353a30b609d3db300f31 (deployment run 36446769904). Current W02 physical deployment is not admitted at current session-runtime source; latest explicit repository W02 deployment evidence is older than the session validation transport added in source history.",
     "physicalRuntimeTarget": "W01 luckread-w01-payload / D1-01 luckread",
     "supersededBlockers": [
       "Payload 3.87.1 version-alignment gap is superseded by the merged 3.90.2 dependency baseline and successful W01 deployment run 36418911699.",
@@ -20,9 +20,11 @@
       "Global Evidence Registry and Mapping 0 remain NOT_GREEN; no promotion is inferred from build/deploy success.",
       "Remote E2E run 36426287424 reached the real Worker and failed before AUTH-004 lifecycle assertions because Payload native PBKDF2 requests 600000 iterations and Cloudflare Workers rejects counts above 100000.",
       "Upstream Payload issue #18274 remains OPEN / needs-triage; no stable Payload 3.x release after 3.90.2 is available with an admitted fix at this checkpoint.",
-      "Remote E2E run 36444965855 reached /auth/login successfully but /api/users/me rejected the W01-issued access token because the adapter-generated JWT omitted Payload 3.90.2 protected-header authVersion=1; corrected by switching the adapter to Payload's exported native jwtSign()."
+      "Remote E2E run 36444965855 reached /auth/login successfully but /api/users/me rejected the W01-issued access token because the adapter-generated JWT omitted Payload 3.90.2 protected-header authVersion=1; corrected by switching the adapter to Payload's exported native jwtSign().",
+      "AUTH-002 remote run 36447031793 and AUTH-004 remote run 36447031539 both independently reached the same W01 source 26a5a761c88a6bdb96ea353a30b609d3db300f31 and failed at GET /api/users/me with HTTP 401 before lifecycle assertions. Native Payload login itself returned HTTP 200. This moves the active gate from W01 JWT-format debugging to W02 physical deployment/version admission.",
+      "Repository source history shows W02 authoritative session establishment transport was added in 2d9fa36..., while the authoritative session validation transport was added later in 867129c... and token-version validation in 19b99d.... The repository's explicit W02 deployment evidence currently recorded in the closure packet is older (source 0c0c250f...), so current W02 physical version must be deployment-admitted before further W01 changes."
     ],
-    "sourceHead": "26a5a761c88a6bdb96ea353a30b609d3db300f31"
+    "sourceHead": "5c9d5cd22f478890089b9e01769a99550d114a80"
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -279,11 +281,11 @@
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.90.2",
     "capabilityFinding": "Payload native AUTH-004 capability is contractually aligned to 3.90.2, but the native password hashing implementation is incompatible with Cloudflare Workers production because it requests 600000 PBKDF2 iterations.",
-    "implementationDisposition": "AUTH004_PBKDF2_WORKER_COMPAT_AND_PAYLOAD_NATIVE_JWT_ADAPTER_MERGED_DEPLOYMENT_PENDING",
+    "implementationDisposition": "AUTH004_W01_SOURCE_DEPLOYED_W02_PHYSICAL_DEPLOYMENT_ADMISSION_PENDING",
     "staleEvidenceCorrection": "The 3.87.1 cursor is historical and superseded by 3.90.2; the new blocker is external runtime compatibility, not a version-alignment gap.",
-    "currentMainSha": "26a5a761c88a6bdb96ea353a30b609d3db300f31",
+    "currentMainSha": "5c9d5cd22f478890089b9e01769a99550d114a80",
     "implementationSourceSha": "26a5a761c88a6bdb96ea353a30b609d3db300f31",
-    "currentSourceHead": "26a5a761c88a6bdb96ea353a30b609d3db300f31",
+    "currentSourceHead": "5c9d5cd22f478890089b9e01769a99550d114a80",
     "evidenceAdmission": {
       "runId": "36431940464",
       "jobId": "108959464320",
@@ -315,7 +317,7 @@
       ],
       "productionDeployment": false
     },
-    "governanceHeadDisposition": "AUTH-004 W01 compatibility shim and Payload-native JWT signing adapter are merged; fresh deployment is required before runtime evidence is admissible."
+    "governanceHeadDisposition": "W01 exact source 26a5 is deployed. AUTH-002/AUTH-004 common /me 401 now requires current W02 physical deployment admission before any additional W01 implementation change."
   },
   "devTestPolicy": {
     "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
