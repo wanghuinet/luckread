@@ -26,13 +26,13 @@ const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
 const config = readFileSync(payloadConfigPath, 'utf8')
 const users = readFileSync(usersPath, 'utf8')
 
-// Current W01 lock is Payload 3.87.1; 3.82.1 remains only the upstream
+// Current W01 lock is Payload 3.90.2; 3.82.1 remains only the upstream
 // Cloudflare-template observation (see PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md).
-if (pkg.dependencies?.payload !== '3.87.1') {
-  fail(`W01 payload dependency must be exactly 3.87.1, found ${pkg.dependencies?.payload ?? 'missing'}`)
+if (pkg.dependencies?.payload !== '3.90.2') {
+  fail(`W01 payload dependency must be exactly 3.90.2, found ${pkg.dependencies?.payload ?? 'missing'}`)
 }
-if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.87.1') {
-  fail(`W01 @payloadcms/db-d1-sqlite dependency must be exactly 3.87.1, found ${pkg.dependencies?.['@payloadcms/db-d1-sqlite'] ?? 'missing'}`)
+if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.90.2') {
+  fail(`W01 @payloadcms/db-d1-sqlite dependency must be exactly 3.90.2, found ${pkg.dependencies?.['@payloadcms/db-d1-sqlite'] ?? 'missing'}`)
 }
 
 // Payload supports native auth as a boolean or as an auth-options object.
