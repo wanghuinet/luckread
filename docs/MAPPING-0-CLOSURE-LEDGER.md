@@ -3426,3 +3426,17 @@ The dedicated current-execution cursor already records its deliberate source rec
 ### Boundary
 
 This note does not change any Blueprint, Contract, API, DTO, Entity, Field, Worker, D1, Queue, migration, runtime, Evidence status, or Mapping 0 GREEN state. No PRIV-004 retention value is inferred.
+
+## 2026-09-28 — AUTH-001 controlled remote registration migration evidence reconciliation
+
+- Current main at reconciliation: `b6eab1eae17a825103c0a3b3a6c80daf570e8ff3`.
+- Controlled remote execution run: `36379124829`; job `108790999719`.
+- Target: W02/D1-01 `luckread` (UUID `2f80471e-3756-49f9-8db1-7707a433ad64`).
+- Migration: `20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1`.
+- Result: PASS; migration applied exactly once; `auth_registration_envelopes` and `consents` schemas/indexes matched the admitted contract; existing Users count/schema remained unchanged; no fixtures or production Worker deployment occurred.
+- Evidence artifact: `10952236480`, SHA-256 `f896e02b45a70861918d76c993aa6ae034341c195aca3786d6df7b0323f87daa`.
+- Canonical Evidence Registry record added: `EVD-AUTH001-REGISTRATION-MIGRATION-REMOTE-001` / `AUTH-001::REGISTRATION_PERSISTENCE_SCHEMA` / `PASS` / `VERIFIED`.
+- This is a physical persistence/migration evidence reconciliation only. AUTH-001, entity promotion, Mapping 0 and global Evidence Registry GREEN remain blocked.
+- Active cursor remains `AUTH-001-REGISTRATION-CLOSURE / BLOCKED_PRIV004_POLICY_INSTANCE`.
+- Next governed gate remains the first approved `ACCOUNT_REGISTRATION / LEGAL_AUDIT` PRIV-004 policy instance with explicit version, scope, effective period, deterministic rule, approval and provenance.
+
