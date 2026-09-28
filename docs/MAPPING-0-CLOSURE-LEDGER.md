@@ -3684,3 +3684,12 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Latest push-triggered failures for `contract-ci.yml` / `contract-admission-ci.yml` are not the current contract gate: both workflow files on current `main` are explicitly named `retired` and declare `workflow_dispatch` only. Those historical/retired workflow results must not be used to infer current application or Contract failure; the active gates remain their dedicated current workflows and the fail-closed Mapping 0 status.
 - AUTH-004 remains `BLOCKED / NOT_GREEN`. No new runtime implementation, Payload downgrade/upgrade, password-hash weakening, Payload Core fork, or custom authentication subsystem is admitted.
 - Next cursor remains `AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY`.
+
+## 2026-09-28 — AUTH-004 upstream fix candidate reviewed (Payload PR #18276)
+
+- Backup before this governance-only checkpoint: `backup/main-before-auth004-upstream-pr-candidate-reconcile-20260928-2135`.
+- Payload upstream now has PR #18276, `fix: cap PBKDF2 iterations on Cloudflare Workers`, directly linked to issue #18274. The PR is still `OPEN` and unmerged at this checkpoint; it is not a released Payload 3.x version and therefore is not an admissible runtime dependency change.
+- The proposed fix is technically relevant: it introduces an encoded v2 password-hash format carrying iteration/key-length parameters and caps newly created Workers hashes at 100000 while preserving 600000 outside Workers. Review comments also identify the cross-runtime verification problem in the original draft; the PR was revised to embed parameters in the hash.
+- This does not close the LuckRead gate yet. The project remains on the released Payload 3.90.2 baseline, with no local Payload Core patch/fork, dependency override, custom hashing implementation, or parallel authentication subsystem admitted.
+- AUTH-004 remains `BLOCKED / NOT_GREEN`; no new remote lifecycle evidence is promoted from the unmerged upstream candidate.
+- Current admissible cursor remains `AUTH-004-UPSTREAM-RUNTIME-COMPATIBILITY-DECISION-001 / BLOCKED_EXTERNAL_COMPATIBILITY`. Reopen execution only after an official released upstream fix (or another authority-approved compatible runtime path) exists and can be verified end-to-end.
