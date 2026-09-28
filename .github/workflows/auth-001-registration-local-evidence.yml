@@ -86,7 +86,7 @@ jobs:
           PAYLOAD_SECRET: ignore
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --port 8787 > auth-001-preview.log 2>&1 &
+          pnpm exec wrangler dev --local --port 8787 --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" > auth-001-preview.log 2>&1 &
           echo $! > auth-001-preview.pid
           ready=0
           for _ in $(seq 1 120); do
