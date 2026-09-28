@@ -3471,3 +3471,14 @@ This note does not change any Blueprint, Contract, API, DTO, Entity, Field, Work
 - The active governed blocker is now the first approved production `ACCOUNT_REGISTRATION / LEGAL_AUDIT` PRIV-004 policy instance.
 - No production deployment, entity promotion, Evidence Registry GREEN, or Mapping 0 GREEN is implied by this cursor refresh.
 
+
+## 2026-09-28 — current-head cursor reconciliation after PR #142
+
+- Current main is `e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd`, the squash-merge result of PR #142 (`governance(auth001): refresh cursor to current main`).
+- The dedicated cursor had remained internally stale at `sourceHead = b6004470b5c9d63e66fbc7214a99621d1da401eb` even though `main` had advanced to `e6bcc64cb1c28c4a84f9f3266d26c0ade81e08bd`.
+- This reconciliation corrects only the governance pointer: `sourceHead`, `previousSourceHead`, `currentHeadReconciliation.currentMainSha`, and the materializer evidence record's `currentMainAfterMerge` now point to the real current `main` head.
+- Compare from the exact tested W02 materializer implementation SHA `bd2791a4ca799126fac16afbc0506070e9074a77` through current `main` shows only governance/evidence/workflow-file changes; the relevant W02 materializer, credential-add, credential-hash-key and W02 index implementation paths remain unchanged.
+- Therefore the existing `EVD-AUTH001-W02-MATERIALIZER-RUNTIME-REMOTE-001` remains valid for inheritance at the same implementation scope; no runtime rerun is authorized by this pointer correction.
+- Active next gate remains `PRIV-004::first approved ACCOUNT_REGISTRATION / LEGAL_AUDIT production policy instance`, followed by final Evidence Registry / Mapping 0 promotion checks.
+- Backup branch before this change: `backup/main-before-cursor-drift-reconcile-20260928-1500`.
+- No production deployment, entity promotion, Evidence Registry GREEN, or Mapping 0 GREEN is implied.
