@@ -37,6 +37,13 @@ jobs:
         with:
           node-version: 24
 
+      - name: Restore evidence harness from PR head
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.head.sha }}"
+          git show "${{ github.event.pull_request.head.sha }}:.auth001-materializer-runtime-harness.ts" > .auth001-materializer-runtime-harness.ts
+          test -s .auth001-materializer-runtime-harness.ts
+
       - name: Validate source and install
         run: |
           set -euo pipefail
