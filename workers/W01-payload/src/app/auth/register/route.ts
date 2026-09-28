@@ -247,57 +247,8 @@ export async function POST(request: Request): Promise<Response> {
   const consentRecordId = crypto.randomUUID()
   const envelopeId = crypto.randomUUID()
   const statements: Array<ReturnType<typeof env.D1.prepare>> = []
-
-  if (existing && isExpired(existing.expiresAt, now)) {
-    statements.push(
-      env.D1
-        .prepare(
-          `
-            UPDATE auth_registration_envelopes
-            SET active_key = NULL,
-                updated_at = ?
-            WHERE id = ?
-              AND active_key = ?
-          `,
-        )
-        .bind(now.toISOString(), existing.id, idempotencyKey),
-    )
-  }
-
-  const userStatement = env.D1
-    .prepare(
-      `
-        INSERT INTO users (
-          email,
-          username,
-          salt,
-          hash,
-          display_name,
-          bio,
-          avatar,
-          locale,
-          timezone,
-          account_state,
-          account_state_version
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-    )
-    .bind(
-      String(userData.email),
-      String(userData.username),
-      String(userData.salt),
-      String(userData.hash),
-      typeof userData.displayName === 'string' ? userData.displayName : null,
-      typeof userData.bio === 'string' ? userData.bio : null,
-      typeof userData.avatar === 'string' ? userData.avatar : null,
-      typeof userData.locale === 'string' ? userData.locale : 'en-US',
-      typeof userData.timezone === 'string' ? userData.timezone : 'UTC',
-      ACCOUNT_STATE,
-      1,
-    )
-
-  statements.push(userStatement)
+  const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
+  const committedAt = now.toISOString()
 
   const userIdSubquery = `
     SELECT id
@@ -306,6 +257,102 @@ export async function POST(request: Request): Promise<Response> {
       AND username = ?
     LIMIT 1
   `
+
+  const committedResponseSql = `
+    '{"userId":"' ||
+    CAST((${userIdSubquery}) AS TEXT) ||
+    '","accountState":"${ACCOUNT_STATE}"}'
+  `
+
+  // The first statement is the idempotency concurrency gate. A new active key
+  // is inserted as IN_PROGRESS. An expired active key may be reused atomically
+  // by the same statement. A non-expired conflict fails the whole batch before
+  // any User/Consent write, yielding the canonical 409.
+  statements.push(
+    env.D1
+      .prepare(
+        `
+          INSERT INTO auth_registration_envelopes (
+            id,
+            idempotency_key,
+            active_key,
+            scope,
+            endpoint,
+            payload_hash,
+            state,
+            response_digest,
+            committed_response,
+            expires_at,
+            consent_record_id,
+            updated_at,
+            created_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'IN_PROGRESS', ?, NULL, ?, ?, ?, ?)
+          ON CONFLICT(active_key) DO UPDATE SET
+            id = excluded.id,
+            idempotency_key = excluded.idempotency_key,
+            scope = excluded.scope,
+            endpoint = excluded.endpoint,
+            payload_hash = excluded.payload_hash,
+            state = excluded.state,
+            response_digest = excluded.response_digest,
+            committed_response = excluded.committed_response,
+            expires_at = excluded.expires_at,
+            consent_record_id = excluded.consent_record_id,
+            updated_at = excluded.updated_at,
+            created_at = excluded.created_at
+          WHERE auth_registration_envelopes.expires_at <= excluded.created_at
+        `,
+      )
+      .bind(
+        envelopeId,
+        idempotencyKey,
+        idempotencyKey,
+        SCOPE,
+        'authRegister',
+        payloadHash,
+        responseDigest,
+        expiresAt,
+        consentRecordId,
+        committedAt,
+        committedAt,
+      ),
+  )
+
+  statements.push(
+    env.D1
+      .prepare(
+        `
+          INSERT INTO users (
+            email,
+            username,
+            salt,
+            hash,
+            display_name,
+            bio,
+            avatar,
+            locale,
+            timezone,
+            account_state,
+            account_state_version
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .bind(
+        String(userData.email),
+        String(userData.username),
+        String(userData.salt),
+        String(userData.hash),
+        typeof userData.displayName === 'string' ? userData.displayName : null,
+        typeof userData.bio === 'string' ? userData.bio : null,
+        typeof userData.avatar === 'string' ? userData.avatar : null,
+        typeof userData.locale === 'string' ? userData.locale : 'en-US',
+        typeof userData.timezone === 'string' ? userData.timezone : 'UTC',
+        ACCOUNT_STATE,
+        ACCOUNT_STATE_VERSION,
+      ),
+  )
 
   statements.push(
     env.D1
@@ -355,44 +402,25 @@ export async function POST(request: Request): Promise<Response> {
       ),
   )
 
-  const committedResponseSql = `
-    '{"userId":"' ||
-    CAST((${userIdSubquery}) AS TEXT) ||
-    '","accountState":"${ACCOUNT_STATE}"}'
-  `
-
   statements.push(
     env.D1
       .prepare(
         `
-          INSERT INTO auth_registration_envelopes (
-            id,
-            idempotency_key,
-            active_key,
-            scope,
-            endpoint,
-            payload_hash,
-            state,
-            response_digest,
-            committed_response,
-            expires_at,
-            consent_record_id
-          )
-          VALUES (?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ${committedResponseSql}, ?, ?)
+          UPDATE auth_registration_envelopes
+          SET state = 'COMPLETED',
+              committed_response = ${committedResponseSql},
+              updated_at = ?
+          WHERE id = ?
+            AND state = 'IN_PROGRESS'
         `,
       )
       .bind(
-        envelopeId,
-        idempotencyKey,
-        idempotencyKey,
-        SCOPE,
-        'authRegister',
-        payloadHash,
-        responseDigest,
         String(userData.email),
         String(userData.username),
-        new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString(),
-        consentRecordId,
+        String(userData.email),
+        String(userData.username),
+        now.toISOString(),
+        envelopeId,
       ),
   )
 
@@ -409,7 +437,7 @@ export async function POST(request: Request): Promise<Response> {
       .bind(envelopeId),
   )
 
-  try {
+
     const batchResult = await env.D1.batch(statements)
     const cleanupOffset = existing && isExpired(existing.expiresAt, now) ? 1 : 0
     const userIndex = cleanupOffset
