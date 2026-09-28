@@ -107,3 +107,11 @@ The dedicated current-execution cursor is updated to the exact current `main` SH
 - W01/W02 binding deployment run `36420996656` attempt 3 is `success`; its three live deployment artifacts all resolve to the same application source SHA.
 - The earlier `39489d6...`, `30bc903...`, attempt-1/attempt-2 entries above are retained as historical checkpoints and must not be treated as the current execution source.
 - AUTH-004 remains `BLOCKED / NOT_GREEN` until the diagnostic-enabled remote HTTP/E2E run produces durable admissible lifecycle evidence.
+
+## 2026-09-28 diagnostic invocation correction checkpoint
+
+- Diagnostic-enabled AUTH-004 Remote E2E run `36422378143` passed exact deployed-source admission and remote migration precondition, but the `wrangler tail` step itself produced no runtime logs because Wrangler `4.116.0` rejected the explicit `--sampling-rate 1` CLI argument.
+- The uploaded artifact `10970077451` contains only `remote-e2e-cleanup.json` and the tail CLI error; therefore it is not runtime lifecycle evidence and is not admitted.
+- CI-only correction committed at `c78b6296911648bc85821cbae2534501e4fc4fa5`: remove the invalid explicit tail sampling argument while retaining the `auth.register` search filter. No application behavior, schema, topology, or Payload version change.
+- W01/W02 binding deployment job `108927254265` was re-run as attempt 4 solely to emit a fresh `workflow_run` event for the corrected diagnostic workflow; application source remains `6d574bb56222e0eaf44df663e04eb59535e84be6`.
+- AUTH-004 remains `BLOCKED / NOT_GREEN`.
