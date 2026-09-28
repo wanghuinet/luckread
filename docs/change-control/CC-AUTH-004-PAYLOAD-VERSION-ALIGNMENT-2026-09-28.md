@@ -80,3 +80,7 @@ The executable gate now validates the Payload-generated migration directly: exac
 ## 2026-09-28 Fixed-string gate checkpoint
 
 Migration SQL/JSON diagnostics passed in isolation; the prior CI failure was only shell regex handling of escaped backticks. The gate now uses fixed-string matching with the same exact SQL requirements.
+
+## 2026-09-28 Stash/rebase promotion checkpoint
+
+The native schema review passed. Promotion now stashes generated CLI artifacts before rebasing onto the latest main checkpoint, then restores and commits the exact generated migration.
