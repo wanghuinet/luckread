@@ -3,6 +3,7 @@ import { appendFileSync, writeFileSync } from 'node:fs'
 
 const runId = process.env.GITHUB_RUN_ID ?? String(Date.now())
 const attempt = process.env.GITHUB_RUN_ATTEMPT ?? '1'
+const fixtureNonce = randomUUID()
 
 const esc = (value) => String(value).replace(/'/g, "''")
 const now = new Date().toISOString()
@@ -13,10 +14,10 @@ const basicRefresh = makeToken()
 const operatorRefresh = makeToken()
 
 const fixture = {
-  basicEmail: 'auth013-e2e-basic-' + runId + '-' + attempt + '@luckread.test',
-  operatorEmail: 'auth013-e2e-operator-' + runId + '-' + attempt + '@luckread.test',
-  basicUsername: 'auth013-e2e-basic-' + runId + '-' + attempt,
-  operatorUsername: 'auth013-e2e-operator-' + runId + '-' + attempt,
+  basicEmail: 'auth013-e2e-basic-' + fixtureNonce + '@luckread.test',
+  operatorEmail: 'auth013-e2e-operator-' + fixtureNonce + '@luckread.test',
+  basicUsername: 'auth013-e2e-basic-' + fixtureNonce,
+  operatorUsername: 'auth013-e2e-operator-' + fixtureNonce,
   basicSessionId: 'auth013-basic-' + randomUUID(),
   operatorSessionId: 'auth013-operator-' + randomUUID(),
   basicRoleId: randomUUID(),
