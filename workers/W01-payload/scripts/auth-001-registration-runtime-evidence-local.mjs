@@ -112,7 +112,17 @@ try {
 
   const replayResponse = await request(keySuccess, body)
   const replay = await responseJson(replayResponse)
-  if (replayResponse.status !== 201 || JSON.stringify(replay) !== JSON.stringify(first)) throw new Error('Idempotent replay did not return the original response')
+  if (replayResponse.status !== 201 || JSON.stringify(replay) !== JSON.stringify(first)) {
+    const replayEnvelope = await envelopeForKey(keySuccess)
+    throw new Error(
+      'Idempotent replay did not return the original response: status=' +
+        replayResponse.status +
+        ' body=' +
+        JSON.stringify(replay) +
+        ' envelope=' +
+        JSON.stringify(replayEnvelope),
+    )
+  }
   const reuseResponse = await request(keySuccess, { ...body, credential: password + '-changed' })
   const reuse = await responseJson(reuseResponse)
   if (reuseResponse.status !== 422 || !reuse.error || reuse.error.code !== 'IDEMPOTENCY_KEY_REUSE_CONFLICT') throw new Error('Idempotency key reuse conflict was not canonical')
