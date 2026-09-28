@@ -73,6 +73,7 @@ export default buildConfig({
   db: sqliteD1Adapter({
     binding: cloudflare.env.D1,
     push: false,
+    transactionOptions: {},
     migrationDir: path.resolve(dirname, 'migrations'),
     beforeSchemaInit: [authSessionStateSchemaHook],
   }),
