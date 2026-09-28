@@ -55,3 +55,13 @@ No runtime source or contract/schema authority changed.
 - Admitted tooling-only correction: disposable Payload user IDs are now randomized **negative** SQLite INTEGER values, outside the positive auto-generated Payload user-id sequence, while the existing collision preflight remains mandatory.
 - Backup before correction: `backup/pre-auth013-negative-fixture-20260929-202609282030`.
 - No AUTH-013 route, Contract, D1 schema, Payload version, Worker topology, or runtime authority changed.
+
+
+## Follow-up execution reconciliation — run 36479891510
+
+- Run `36479891510` used the corrected checkout isolation and reached the remote D1 preflight, but still failed closed on `user_collision` even with negative randomly generated INTEGER IDs. This proves the remote `users` table contains IDs outside the assumed positive-only namespace; further random signed-ID selection is not an acceptable control strategy.
+- Admitted correction: fixture users no longer provide explicit IDs. The seed lets SQLite/Payload allocate native INTEGER primary keys, then resolves the two fixture IDs by their unique run-scoped emails and exports them to the workflow environment for the HTTP/D1 assertions.
+- Preflight now checks collision of unique fixture emails/usernames plus session/role IDs; user primary-key collision is eliminated by database allocation rather than by guessing an unused integer.
+- Cleanup now resolves fixture users by their unique emails, so partial seed failure cannot leave cleanup dependent on an unresolved generated user ID.
+- Backup before this correction: `backup/pre-auth013-db-generated-user-id-20260929-202609282045`.
+- Runtime route, Contract, D1 schema, Payload version, Worker topology, and authority remain unchanged.
