@@ -874,6 +874,22 @@
       "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-002-HISTORICAL-MIGRATION-EVIDENCE-ADMISSION-2026-09-28.md",
       "evidenceArtifact": "artifacts/mapping-0/auth-002-historical-migration-evidence-admission-2026-09-28.json",
       "note": "Historical technical migration execution evidence is admitted without retroactive authorization. The exact tested commit is fe1f2784d21f3f629bbad0baa971f1aa56520914; the migration file blob is byte-identical on current main. The E5 artifact contains controlled preflight, successful migration execution, post-schema validation, migration-history proof, integrity check, native users/users_sessions schema stability, and provenance. No Runtime rerun, migration reapplication, or production deployment is performed by this admission."
+    },
+    {
+      "evidenceId": "EVD-AUTH004-B10-W01-ADAPTER-IMPLEMENTATION-001",
+      "type": "DOCUMENT",
+      "claimId": "AUTH-004::W01-ADAPTER-IMPLEMENTATION",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-004",
+      "source": "W01 Payload-native thin adapters merged to main",
+      "sourceRef": "https://github.com/wanghuinet/luckread/commit/7e9396460136a6ce083db0f600ec04c7829a9c99",
+      "commitSha": "7e9396460136a6ce083db0f600ec04c7829a9c99",
+      "timestamp": "2026-09-28T09:30:00Z",
+      "producer": "GitHub merged implementation PR #167",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "freshnessMode": "EXACT_SHA",
+      "note": "The admitted W01 implementation exposes authPasswordChange, authPasswordResetRequest and authPasswordResetConfirm as thin adapters over Payload-native password update, forgotPassword and resetPassword operations. This verifies implementation presence and exact source provenance only; it does not establish remote HTTP E2E, protected-account enumeration resistance, session invalidation, lifecycle events, or Mapping 0 GREEN."
     }
   ],
   "testedCommitSha": "37b0473f7214dd4eaca0326d147973e44fe52e7e"
