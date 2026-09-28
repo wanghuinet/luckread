@@ -3532,3 +3532,15 @@ This note does not change any Blueprint, Contract, API, DTO, Entity, Field, Work
 - No Worker, D1, Queue, Payload Core, migration, runtime implementation, or production deployment change is introduced by this authority admission.
 - Final production-readiness workflow execution is still required on the merged policy state before the control-plane gate can be recorded as PASS.
 - Final Evidence Registry / Mapping 0 promotion remains a separate downstream gate.
+
+
+## 2026-09-28 — PRIV-004 DEV/PROD policy environment separation correction
+
+- Backup before this correction: `backup/main-before-priv004-env-policy-split-20260928`.
+- PR #149 established the production authority and its production-readiness check passed on the PR head (`36386530489`), but the AUTH-001 local evidence workflow also ran and failed because it expected the dedicated DEVELOPMENT policy version `DEV-2026-09-28.1` while the canonical artifact had been replaced by the PROD instance.
+- Root cause: one repository path was incorrectly serving two environment-specific policy roles.
+- Correction: restore `artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json` as the DEVELOPMENT/controlled-test instance and add `artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json` as the independent PRODUCTION authority instance.
+- W01 now resolves the policy by runtime environment only: DEVELOPMENT uses the DEV artifact; PRODUCTION uses the PROD artifact. The client cannot select either artifact.
+- The production readiness and admission guards are now bound to the dedicated PROD artifact.
+- No new Worker/D1/Queue, migration, retention subsystem, or Payload Core architecture is introduced.
+- Fresh PR/current-head guard and production-readiness evidence are required; the earlier PR #149 success is retained as historical evidence for that earlier artifact state and is not inherited across this input change.

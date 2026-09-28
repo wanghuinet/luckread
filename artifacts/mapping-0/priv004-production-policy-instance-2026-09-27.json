@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "policyId": "PRIV-004-ACCOUNT-REGISTRATION-PROD",
+  "policyVersion": "PROD-2026-09-28.1",
+  "owner": "LuckRead Engineering",
+  "scope": {
+    "operationId": "authRegister",
+    "purpose": "ACCOUNT_REGISTRATION",
+    "environment": "PRODUCTION"
+  },
+  "environment": "PRODUCTION",
+  "status": "APPROVED",
+  "effectiveFrom": "2026-09-28T00:00:00Z",
+  "effectiveTo": null,
+  "retentionClass": "LEGAL_AUDIT",
+  "rule": {
+    "mode": "DURATION",
+    "durationSeconds": 63072000
+  },
+  "sourceAuthority": "LuckRead Internal Engineering Production Policy Authority",
+  "approvalRef": "ENG-DECISION-2026-09-28-PRIV004-PROD-730D",
+  "rollbackVersion": "PRIV-004-ACCOUNT-REGISTRATION-PROD-PREVIOUS",
+  "provenance": {
+    "commitSha": "89d314557fa5985466fee2e841f5284ff29fe2e7",
+    "sourcePath": "artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json",
+    "kind": "ENGINEERING_PRODUCTION_AUTHORITY_CHECKPOINT"
+  },
+  "usage": {
+    "mode": "PRODUCTION_ENGINEERING_POLICY",
+    "productionUse": true,
+    "replacementRequiredBeforeProduction": false,
+    "legalComplianceStatus": "NOT_A_LEGAL_OR_COMPLIANCE_AUTHORITY",
+    "retentionMeaning": "730-day internal engineering production policy for ACCOUNT_REGISTRATION / LEGAL_AUDIT; not a claim that any jurisdiction requires 730 days.",
+    "engineeringRationale": "User-authorized project governance selects the already-tested deterministic 730-day rule for production engineering policy without changing runtime architecture. A formal jurisdiction-specific legal/compliance schedule, if later supplied, replaces this version through normal policy versioning.",
+    "publicClaimRestriction": "This artifact is not by itself a jurisdiction-specific legal opinion or legal retention mandate."
+  }
+}

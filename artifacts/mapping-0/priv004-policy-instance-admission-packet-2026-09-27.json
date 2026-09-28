@@ -52,7 +52,7 @@
   },
   "admissionMode": "PRODUCTION_ENGINEERING_AUTHORITY",
   "admittedInstance": {
-    "path": "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json",
+    "path": "artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json",
     "policyId": "PRIV-004-ACCOUNT-REGISTRATION-PROD",
     "policyVersion": "PROD-2026-09-28.1",
     "environment": "PRODUCTION",

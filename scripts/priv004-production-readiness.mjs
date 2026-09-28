@@ -15,7 +15,7 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 
 const root = process.cwd()
-const instancePath = path.join(root, 'artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json')
+const instancePath = path.join(root, 'artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json')
 const packetPath = path.join(root, 'artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json')
 const contractPath = path.join(root, 'contracts/privacy/PRIV-004-retention-policy-authority.v1.json')
 
@@ -134,7 +134,7 @@ if (!isRecord(instance.provenance)) {
   if (!/^[0-9a-f]{40}$/.test(instance.provenance.commitSha ?? '')) {
     fail('provenance.commitSha must be an exact 40-hex commit SHA')
   }
-  if (instance.provenance.sourcePath !== 'artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json') {
+  if (instance.provenance.sourcePath !== 'artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json') {
     fail('provenance.sourcePath must identify the canonical policy-instance artifact')
   }
 
@@ -142,7 +142,7 @@ if (!isRecord(instance.provenance)) {
     const currentCommitSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
     const instanceSourceCommitSha = execFileSync(
       'git',
-      ['log', '-1', '--format=%H', '--', 'artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'],
+      ['log', '-1', '--format=%H', '--', 'artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json'],
       { encoding: 'utf8' },
     ).trim()
 

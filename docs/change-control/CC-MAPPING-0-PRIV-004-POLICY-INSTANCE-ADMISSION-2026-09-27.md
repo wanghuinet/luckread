@@ -98,9 +98,13 @@ This is an authority-discovery checkpoint only. It does not authorize a retentio
 
 ## Development-only temporary policy instance — 2026-09-28
 
-The project is explicitly authorizing a **development/test-only** PRIV-004 instance so AUTH-001 can proceed through deterministic engineering validation without fabricating a legal or compliance conclusion.
+The project retains an explicitly **development/test-only** PRIV-004 instance so AUTH-001 deterministic engineering validation remains isolated from production authority.
 
-Canonical instance:
+Canonical development/test instance:
+- `artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json`
+
+Canonical production instance is maintained separately at:
+- `artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json`
 
 - `artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json`
 - `policyId = PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP`
@@ -115,10 +119,10 @@ Boundary:
 - 730 days is an engineering test parameter, not a legal retention requirement.
 - `LEGAL_AUDIT` remains the contract retention class label; it is not a jurisdiction-specific legal conclusion.
 - This instance is not valid for production data or public-facing privacy/compliance claims.
-- Production remains fail-closed until a real production policy authority is admitted.
+- Production uses a separately admitted production policy artifact; the development instance remains invalid for production data or production authorization.
 - No Mapping 0 GREEN, Evidence Registry promotion, or production deployment is implied.
 
-The temporary instance is intentionally short-lived and must be replaced before any production authorization.
+The development instance remains available only for controlled development/integration evidence and is never used as production authority.
 
 
 ## Production readiness gate — 2026-09-28
@@ -150,9 +154,9 @@ The production gate also enforces the structural fields already required by the 
 
 The user-authorized project governance decision is now recorded as an explicit production **engineering policy authority**. This closes the PRIV-004 policy-instance admission gate without pretending that engineering approval is a jurisdiction-specific legal opinion.
 
-Canonical instance:
+Canonical production instance:
 
-- `artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json`
+- `artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json`
 - `policyId = PRIV-004-ACCOUNT-REGISTRATION-PROD`
 - `policyVersion = PROD-2026-09-28.1`
 - `environment = PRODUCTION`
@@ -169,7 +173,7 @@ Canonical instance:
 
 ### Authority decision
 
-The existing 730-day deterministic rule is promoted from the prior development test value into the versioned production engineering policy **without changing the runtime implementation**. This is deliberately a policy-instance admission, not a new Worker/D1/Queue, schema, or custom retention subsystem.
+The existing 730-day deterministic rule is promoted into the versioned production engineering policy. W01 uses a minimal environment selector so development evidence continues to resolve the DEV policy artifact while production resolves the PROD artifact; no new Worker, Queue, D1 or retention subsystem is introduced. This is deliberately a policy-instance admission, not a new Worker/D1/Queue, schema, or custom retention subsystem.
 
 The admission packet is now:
 
@@ -186,7 +190,7 @@ The policy artifact explicitly remains:
 
 The 730-day value is therefore an internal engineering production policy selected for deterministic platform operation; it is **not** represented as a universal statutory or jurisdiction-specific retention requirement. This distinction is intentional. Current data-protection guidance expects controllers to document retention periods and justify them against the processing purpose; it does not provide a single universal retention period for account-registration consent records.
 
-A later formal legal/compliance schedule can replace this policy through the normal versioned Policy Authority path. That replacement does not require a new runtime architecture.
+A later formal legal/compliance schedule can replace the production policy through the normal versioned Policy Authority path. That replacement does not require a new runtime architecture.
 
 ### Closure boundary
 
@@ -198,5 +202,4 @@ It does not, by itself:
 - promote the global Evidence Registry to GREEN;
 - deploy production Workers;
 - change D1 schema;
-- change AUTH-001 runtime code;
 - create a legal opinion or jurisdiction-specific compliance certification.
