@@ -68,3 +68,7 @@ The pre-upgrade Payload 3.87.1 schema snapshot was generated successfully in con
 ## 2026-09-28 Migration diff checkpoint
 
 With the authoritative pre-upgrade snapshot now committed, the next executable gate is a Payload 3.90.2 native migration diff review. No migration application or GREEN admission is implied by generation.
+
+## 2026-09-28 Native schema execution checkpoint
+
+Payload 3.90.2 CLI review identified exactly two native schema deltas relative to the verified 3.87.1 baseline snapshot: `users.reset_password_requested_at` and `media._objectkey`. The approved path is to admit only these CLI-generated changes as the Payload native schema alignment migration; no custom AUTH-004 persistence is introduced.
