@@ -2,29 +2,30 @@ import { MigrateDownArgs, MigrateUpArgs, sql } from '@payloadcms/db-d1-sqlite'
 
 export async function up({ db }: MigrateUpArgs): Promise<void> {
   await db.run(sql`CREATE TABLE \`auth_registration_envelopes\` (
-  \`id\` integer PRIMARY KEY NOT NULL,
+  \`id\` text PRIMARY KEY NOT NULL,
   \`idempotency_key\` text NOT NULL,
+  \`active_key\` text,
   \`scope\` text NOT NULL,
   \`endpoint\` text NOT NULL,
   \`payload_hash\` text NOT NULL,
   \`state\` text NOT NULL,
   \`response_digest\` text,
-  \`committed_response\` text,
+  \`committed_response\` text NOT NULL,
   \`expires_at\` text NOT NULL,
-  \`consent_record_id\` text,
+  \`consent_record_id\` text NOT NULL,
   \`updated_at\` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
   \`created_at\` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
   );`)
-  await db.run(sql`CREATE UNIQUE INDEX \`auth_registration_envelopes_idempotency_key_idx\` ON \`auth_registration_envelopes\` (\`idempotency_key\`);`)
-  await db.run(sql`CREATE INDEX \`auth_registration_envelopes_scope_idx\` ON \`auth_registration_envelopes\` (\`scope\`);`)
-  await db.run(sql`CREATE INDEX \`auth_registration_envelopes_endpoint_idx\` ON \`auth_registration_envelopes\` (\`endpoint\`);`)
+  await db.run(sql`CREATE INDEX \`auth_registration_envelopes_idempotency_key_idx\` ON \`auth_registration_envelopes\` (\`idempotency_key\`);`)
+  await db.run(sql`CREATE UNIQUE INDEX \`auth_registration_envelopes_active_key_idx\` ON \`auth_registration_envelopes\` (\`active_key\`);`)
+  await db.run(sql`CREATE INDEX \`auth_registration_envelopes_scope_endpoint_idx\` ON \`auth_registration_envelopes\` (\`scope\`, \`endpoint\`);`)
   await db.run(sql`CREATE INDEX \`auth_registration_envelopes_payload_hash_idx\` ON \`auth_registration_envelopes\` (\`payload_hash\`);`)
   await db.run(sql`CREATE INDEX \`auth_registration_envelopes_state_idx\` ON \`auth_registration_envelopes\` (\`state\`);`)
   await db.run(sql`CREATE INDEX \`auth_registration_envelopes_expires_at_idx\` ON \`auth_registration_envelopes\` (\`expires_at\`);`)
   await db.run(sql`CREATE INDEX \`auth_registration_envelopes_consent_record_id_idx\` ON \`auth_registration_envelopes\` (\`consent_record_id\`);`)
 
   await db.run(sql`CREATE TABLE \`consents\` (
-  \`id\` integer PRIMARY KEY NOT NULL,
+  \`id\` text PRIMARY KEY NOT NULL,
   \`actor_subject_id\` text NOT NULL,
   \`owner_subject_id\` text NOT NULL,
   \`resource_id\` text NOT NULL,
