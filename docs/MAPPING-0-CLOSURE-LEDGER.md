@@ -3711,3 +3711,20 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - W01 Foundation CI passed TypeScript, security unit tests, lint, production build, remote migration admission-state verification and Payload implementation admission.
 - New Evidence Registry record `EVD-AUTH013-W01-PUBLIC-ROUTE-UNIT-001` records exact-SHA source/unit evidence as `CREATED`; it is not promoted to global VERIFIED by this checkpoint.
 - AUTH-013 focused source/unit closure is now complete. The only remaining focused gate is deployed **public W01 HTTP E2E**. No automatic production deployment is triggered by this closure step.
+
+## 2026-09-28 — AUTH-013 public HTTP E2E execution readiness
+
+- Backup before this governance checkpoint: `backup/main-before-auth013-e2e-readiness-ledger-sync-20260928-2220`.
+- AUTH-013 focused source/unit closure remains unchanged and remains NOT_GREEN.
+- A controlled public HTTP E2E evidence path is now implemented without changing the AUTH-013 business runtime:
+  - `scripts/auth-013-public-transport-e2e.mjs`
+  - `scripts/auth-013-public-http-e2e-fixture.mjs`
+  - `.github/workflows/auth-013-public-http-e2e.yml`
+  - `docs/change-control/CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-EXECUTION-READINESS-2026-09-28.md`
+- The evidence path uses the existing public `/auth/refresh` route to obtain real W01 Payload access JWTs from controlled synthetic D1 session state. It does not bypass W01 Payload authentication or introduce a second authentication path.
+- Synthetic fixture scope is two disposable users, one canonical `user` role and one canonical `operator` role; refresh credentials are persisted only as SHA-256 hashes.
+- Required public assertions cover unauthenticated denial, mandatory `If-Match`, client authority injection denial, canonical operator transition, stale `If-Match`, stale-session denial, D1-01 state/journal results, and fixture cleanup.
+- The workflow requires explicit `RUN_AUTH013_E2E` confirmation and exact deployment provenance. It does not deploy Workers automatically.
+- No Evidence Registry promotion, no global GREEN, no Mapping 0 closure, and no production success is claimed by this checkpoint.
+- Next focused action: controlled deployment of the exact current source followed by manual execution of the AUTH-013 public HTTP E2E workflow.
+
