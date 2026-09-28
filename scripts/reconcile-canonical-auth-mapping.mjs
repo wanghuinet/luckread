@@ -22,6 +22,7 @@ const auth011GatePath = path.join(root, 'contracts/alignment/mapping-batches/AUT
 const auth013StateMachinePath = path.join(root, 'contracts/state-machines/account.json')
 const auth013EntityCatalogPath = path.join(root, 'contracts/entity/entity-catalog.v1.json')
 const authDtoContractPath = path.join(root, 'contracts/dto/auth-dto-contract.v1.json')
+const authOperationPolicyPath = path.join(root, 'contracts/api/auth-operation-policy.v1.json')
 
 const apiContractPaths = {
   'AUTH-003': path.join(root, 'contracts/api/AUTH-003-credential-management-contract.v1.json'),
@@ -48,12 +49,22 @@ const jsonBinding = readJson(jsonBindingPath)
 const authDtoContract = readJson(authDtoContractPath)
 const auth013StateMachine = readJson(auth013StateMachinePath)
 const auth013EntityCatalog = readJson(auth013EntityCatalogPath)
+const authOperationPolicy = readJson(authOperationPolicyPath)
 
 if (!Array.isArray(mapping.records)) throw new Error('canonical mapping records must be an array')
 if (!Array.isArray(jsonBinding.bindings)) throw new Error('AUTH-002..006 binding records must be an array')
 if (!Array.isArray(authDtoContract.records)) throw new Error('AUTH DTO contract records must be an array')
 if (auth013StateMachine?.['x-luckread']?.entity !== 'User') throw new Error('AUTH-013 state machine must bind entity User')
 if (!Array.isArray(auth013EntityCatalog.records)) throw new Error('AUTH-013 entity catalog records must be an array')
+const authRegisterPolicy = authOperationPolicy.operations?.find((record) => record?.operationId === 'authRegister')
+if (!authRegisterPolicy) throw new Error('AUTH-001 requires canonical authRegister operation policy')
+const consistency = authRegisterPolicy.consistency ?? {}
+if (consistency.identityCredentialMaterialization !== 'EVENTUAL') throw new Error('AUTH-001 requires EVENTUAL identity/credential materialization')
+if (consistency.materializerAuthority !== 'W02_D1-01') throw new Error('AUTH-001 materializer authority must be W02_D1-01')
+if (consistency.materializationSource !== 'AUTH-001_REGISTRATION_ENVELOPE + PAYLOAD_USERS_NATIVE_AUTH_SOURCE') throw new Error('AUTH-001 materialization source drift detected')
+if (consistency.recovery !== 'W02_SCHEDULED_RECONCILIATION') throw new Error('AUTH-001 recovery authority must remain W02 scheduled reconciliation')
+if (consistency.crossWorkerTransaction !== false || consistency.crossD1Transaction !== false) throw new Error('AUTH-001 cannot admit cross-worker/cross-D1 registration transaction')
+
 const auth013UserEntities = auth013EntityCatalog.records.filter((record) => record?.name === 'User' && record?.entityId === 'ENT-USER' && record?.status === 'VERIFIED')
 if (auth013UserEntities.length !== 1) throw new Error('AUTH-013 requires exactly one VERIFIED ENT-USER entity catalog binding for User')
 
@@ -123,6 +134,10 @@ for (const featureId of ['AUTH-001', 'AUTH-002', 'AUTH-010']) {
     apiOperationIdsByFeature.set(featureId, dtoOperationIds)
   }
   addEvidenceRef(featureId, 'contracts/dto/auth-dto-contract.v1.json')
+  if (featureId === 'AUTH-001') {
+    addEvidenceRef(featureId, 'contracts/api/auth-operation-policy.v1.json')
+    addEvidenceRef(featureId, 'docs/change-control/CC-MAPPING-0-AUTH-001-EVENTUAL-MATERIALIZATION-ADMISSION-2026-09-28.md')
+  }
 }
 
 const addApiContractBinding = (featureId, file) => {
