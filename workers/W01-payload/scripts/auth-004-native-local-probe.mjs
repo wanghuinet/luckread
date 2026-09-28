@@ -25,6 +25,22 @@ const login2 = await payload.login({
   data: { email, password },
 })
 if (!login1.user?.id || !login2.user?.id) throw new Error('native local login failed')
+const sessionIds = (user) =>
+  Array.isArray(user?.sessions)
+    ? user.sessions.map((session) => String(session?.id ?? '')).filter(Boolean)
+    : []
+
+const beforeSessionSnapshot = await payload.findByID({
+  collection: 'users',
+  id: userId,
+  depth: 0,
+  overrideAccess: true,
+})
+const beforeSessionIds = sessionIds(beforeSessionSnapshot)
+if (beforeSessionIds.length < 2) {
+  throw new Error('expected at least two native sessions before password change')
+}
+
 
 await payload.update({
   collection: 'users',
@@ -32,6 +48,20 @@ await payload.update({
   data: { password: changed },
   user: login1.user,
 })
+
+const afterSessionSnapshot = await payload.findByID({
+  collection: 'users',
+  id: userId,
+  depth: 0,
+  overrideAccess: true,
+})
+const afterSessionIds = sessionIds(afterSessionSnapshot)
+const retainedExistingSessions = beforeSessionIds.filter((id) => afterSessionIds.includes(id))
+const existingSessionRevocation =
+  afterSessionIds.length < beforeSessionIds.length && retainedExistingSessions.length < beforeSessionIds.length
+if (!existingSessionRevocation) {
+  throw new Error('native password change did not revoke at least one affected existing session')
+}
 
 let oldPasswordRejected = false
 try {
@@ -113,8 +143,11 @@ console.log(
       assertions: {
         passwordChangeInvalidatesOldCredential: oldPasswordRejected,
         changedPasswordAccepted: true,
-        existingSessionRevocation: 'NOT_TESTED',
+        existingSessionRevocation,
         resetTokenSingleUse: replayRejected,
+        sessionsBeforePasswordChange: beforeSessionIds.length,
+        sessionsAfterPasswordChange: afterSessionIds.length,
+        retainedExistingSessions: retainedExistingSessions.length,
         expiredResetTokenRejected: expiredRejected,
         secretsRecorded: false,
       },
