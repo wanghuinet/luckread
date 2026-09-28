@@ -1,15 +1,15 @@
 {
   "version": "1.0.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "b430a1559f73bf336a1f6bdf28624a9a94aad262",
+  "sourceHead": "78a90c70dbc7c7ea7c42475642ba5842fd778914",
   "backupBranch": "backup/pre-priv004-baseline-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "DEV_TEST_POLICY_ADMITTED_RESPONSE_DIGEST_ATOMICITY_BLOCKED",
+    "state": "CONTRACT_SEMANTICS_RECONCILED_RUNTIME_IMPLEMENTATION_ADMITTED",
     "objective": "Reconcile a D1-compatible atomic W01 registration commit boundary before resuming AUTH-001 runtime implementation.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::explicit response_digest semantic reconciliation or D1-native atomic digest capability; do not weaken the one-batch registration commit.",
+    "nextGate": "AUTH-001::focused W01 registration-scoped D1 batch implementation + same-SHA success/rollback/replay/concurrency evidence; production remains blocked on PRIV-004 authority.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -64,7 +64,7 @@
     "Treat 36296831559 as execution checkpoint only; final schema correctness requires a later read-only exact-SHA postcheck.",
     "Do not promote AUTH-003 persistence status from the migration execution log alone."
   ],
-  "previousSourceHead": "a17c9adffd665383b8b356536a47c0385fe2c067",
+  "previousSourceHead": "78a90c70dbc7c7ea7c42475642ba5842fd778914",
   "authorityDiscovery": {
     "reviewedAt": "2026-09-27",
     "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
@@ -168,13 +168,13 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Native Payload hash capture and the D1 batch-seam design are admitted. Final implementation is blocked on the existing response_digest requirement because the generated User ID is only available after D1 execution and current D1 SQL does not document a cryptographic hash function. No pseudo-digest or second-phase commit is authorized.",
-    "currentMainSha": "b430a1559f73bf336a1f6bdf28624a9a94aad262",
+    "reason": "Response_digest semantics are now explicitly reconciled as a pre-commit replay commitment. The generated User ID remains only in committed_response, so the one-batch W01 atomic registration design no longer requires post-commit envelope mutation.",
+    "currentMainSha": "78a90c70dbc7c7ea7c42475642ba5842fd778914",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_CONTRACT_PRECONDITIONS_RECONCILED_RUNTIME_PENDING",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
     "idempotencySourceStatus": "CLOSED",
-    "atomicityStatus": "W01_USER_ENVELOPE_CONSENT_SAME_TRANSACTION_W02_EVENTUAL_MATERIALIZATION",
+    "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_DESIGN_ADMITTED_RESPONSE_DIGEST_PRECOMPUTABLE",
     "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
     "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED"
   },
@@ -240,7 +240,7 @@
   ],
   "currentSourceReconciliation": {
     "reviewedAt": "2026-09-27",
-    "mainSha": "b430a1559f73bf336a1f6bdf28624a9a94aad262",
+    "mainSha": "78a90c70dbc7c7ea7c42475642ba5842fd778914",
     "payloadPackage": "workers/W01-payload/package.json",
     "payloadVersion": "3.87.1",
     "capabilityFinding": "Payload native loginWithUsername and requireEmail=false are available capabilities; current W01 Users.ts does not enable them.",
