@@ -5,11 +5,11 @@
   "backupBranch": "backup/pre-priv004-baseline-reconciliation-20260927",
   "currentCursor": {
     "id": "AUTH-001-REGISTRATION-CLOSURE",
-    "state": "DEV_TEST_POLICY_ADMITTED_CONTRACT_VERIFIED",
-    "objective": "Execute the AUTH-001 development/integration runtime slice using DEV-2026-09-28.1 while keeping production authorization fail-closed.",
+    "state": "DEV_TEST_POLICY_ADMITTED_D1_ATOMICITY_BLOCKED",
+    "objective": "Reconcile a D1-compatible atomic W01 registration commit boundary before resuming AUTH-001 runtime implementation.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
     "admissionPacket": "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
-    "nextGate": "AUTH-001::development runtime implementation + controlled evidence using DEV-2026-09-28.1; production remains blocked on real PRIV-004 authority.",
+    "nextGate": "AUTH-001::D1-compatible atomic commit boundary reconciliation; retain Payload-native User/password authority; production remains blocked.",
     "logicalOwnership": "W02 -> D1-01 CLOSED",
     "physicalBinding": "W02/D1-01 physical target CLOSED",
     "physicalRuntimeTarget": "W02 luckread-w02 / D1-01 luckread(UUID 2f80471e-...) CLOSED",
@@ -167,8 +167,8 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Development-only PRIV-004 deterministic test instance is admitted; current main Guard is PASS_VERIFIED and Contract Admission DEVELOPMENT is PASS_VERIFIED on the same current main.",
-    "currentMainSha": "e5d94ccb1c0fe6eceb39db2027cb23305fb63aa0",
+    "reason": "Controlled AUTH-001 development runtime probe 36361411407 exposed a real W01/D1 transaction capability mismatch: Payload generic SQLite BEGIN/ROLLBACK is rejected by D1. Change Control CC-MAPPING-0-AUTH-001-D1-ATOMIC-WRITE-BOUNDARY-2026-09-28 is now merged and supersedes direct runtime admission.",
+    "currentMainSha": "20a1a8bf43f9b3d0928a201fb72e5af0ac4c83c8",
     "nativeAuthStatus": "PAYLOAD_NATIVE_USERNAME_CAPABILITY_CONFIRMED_NOT_ENABLED; PHONE_STRATEGY_ABSENT",
     "payloadWireCompatibilityStatus": "AUTH001_CONTRACT_PRECONDITIONS_RECONCILED_RUNTIME_PENDING",
     "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
@@ -179,24 +179,15 @@
   },
   "nextGate": "AUTH-001::development runtime implementation + controlled evidence using DEV-2026-09-28.1; production remains blocked on real PRIV-004 authority.",
   "runtimeEvidenceAdmission": {
-    "list": {
-      "workflow": ".github/workflows/w02-auth-003-credential-list-runtime-evidence.yml",
-      "runId": "36307891924",
-      "sourceSha": "8a649ff602daaa0d4143324a52bcfa6c7443af6c",
-      "artifactId": "10927373190",
-      "artifactSha256": "3be328033f2bb13474c1beddfd8c85d2f5e496028afd0bb3875fbb552bad7850",
-      "status": "PASS_VERIFIED",
-      "productionWorkerDeployed": false
-    },
-    "lifecycle": {
-      "workflow": ".github/workflows/w02-auth-003-credential-lifecycle-runtime-evidence.yml",
-      "runId": "36308120758",
-      "sourceSha": "c96b39569c7505ade615b15e63d87f5afb8066cc",
-      "artifactId": "10928266844",
-      "artifactSha256": "a31d07cdf6ad9008e36faf410980e06f136aefc6e929aa18ba51ce50851ea56a",
-      "status": "PASS_VERIFIED",
-      "productionWorkerDeployed": false
-    }
+    "status": "BLOCKED_D1_ATOMICITY_CAPABILITY",
+    "workflow": ".github/workflows/auth-001-development-local-runtime-evidence.yml",
+    "runId": 36361411407,
+    "testedSourceSha": "cf443d44d58aab6e5ca8569285345f188df1d714",
+    "failurePhase": "PAYLOAD_D1_SCHEMA_INITIALIZATION",
+    "failureClass": "D1_REJECTS_SQL_BEGIN_TRANSACTION",
+    "controlRef": "docs/change-control/CC-MAPPING-0-AUTH-001-D1-ATOMIC-WRITE-BOUNDARY-2026-09-28.md",
+    "productionDeployment": "BLOCKED",
+    "implementationMerge": "BLOCKED"
   },
   "contractDecisionBlocker": {
     "issueId": "CC-AUTH003-NORMALIZED-UNIQUENESS-SEMANTICS-2026-09-27",
