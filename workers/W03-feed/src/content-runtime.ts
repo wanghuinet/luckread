@@ -12,8 +12,6 @@ export type ContentState =
   | 'DELETED'
   | 'RESTORED'
 
-export type PrincipalLayer = 'L3' | 'L6' | 'L7' | 'L8'
-
 export interface ContentInput {
   title: string
   bodyRef: string
@@ -78,24 +76,11 @@ export class ContentRuntimeError extends Error {
 }
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
-const PUBLIC_STATES = new Set<ContentState>(['PUBLISHED'])
 const EDITABLE_STATES = new Set<ContentState>(['DRAFT', 'REJECTED', 'PENDING_REVIEW'])
-
-const json = (body: unknown, status = 200): Response =>
-  Response.json(body, {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-  })
-
-const errorResponse = (error: ContentRuntimeError): Response =>
-  json({
-    error: {
-      code: error.code,
-      message: publicMessage(error.code),
-      details: {},
-    },
-    requestId: crypto.randomUUID(),
-  }, error.status)
+const ALL_STATES: readonly ContentState[] = [
+  'DRAFT','PENDING_REVIEW','REJECTED','APPROVED','SCHEDULED',
+  'PUBLISHED','UNPUBLISHED','ARCHIVED','DELETED','RESTORED',
+]
 
 const publicMessage = (code: string): string => {
   switch (code) {
@@ -112,6 +97,15 @@ const publicMessage = (code: string): string => {
     default: return 'Content request failed'
   }
 }
+
+const errorResponse = (error: ContentRuntimeError): Response =>
+  Response.json({
+    error: { code: error.code, message: publicMessage(error.code), details: {} },
+    requestId: crypto.randomUUID(),
+  }, {
+    status: error.status,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+  })
 
 const toContent = (row: ContentRow): ContentRecord => ({
   id: row.id,
@@ -153,12 +147,6 @@ const assertEtag = (actual: string, expected: string): void => {
   }
 }
 
-const isState = (value: unknown): value is ContentState =>
-  typeof value === 'string' && [
-    'DRAFT','PENDING_REVIEW','REJECTED','APPROVED','SCHEDULED',
-    'PUBLISHED','UNPUBLISHED','ARCHIVED','DELETED','RESTORED',
-  ].includes(value)
-
 const assertResourceId = (value: string): void => {
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value)) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
@@ -197,7 +185,7 @@ const canonicalize = (value: unknown): unknown => {
 
 const sha256Hex = async (value: string): Promise<string> => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
 const requestHash = async (operationId: string, input: unknown): Promise<string> =>
@@ -208,13 +196,17 @@ const parseResponseJson = (value: string | null): unknown => {
   try { return JSON.parse(value) } catch { return null }
 }
 
-const assertIdempotency = (
+const isActiveIdempotency = (row: IdempotencyRow | null, now: Date): boolean =>
+  !!row?.idem_id && !!row.idem_expires_at && Date.parse(row.idem_expires_at) > now.getTime()
+
+const replayIdempotency = (
   row: IdempotencyRow | null,
   ownerUserId: string,
   requestHashValue: string,
-): Response | null => {
-  if (!row?.idem_id) return null
-  if (row.idem_owner_user_id !== ownerUserId) {
+  now: Date,
+): unknown | null => {
+  if (!isActiveIdempotency(row, now)) return null
+  if (row?.idem_owner_user_id !== ownerUserId) {
     throw new ContentRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
   }
   if (row.idem_request_hash !== requestHashValue) {
@@ -223,82 +215,122 @@ const assertIdempotency = (
   if (row.idem_status === 'IN_PROGRESS') {
     throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
   }
-  const status = row.idem_response_status ?? 200
-  return new Response(row.idem_response_json ?? '', {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-  })
+  return parseResponseJson(row.idem_response_json)
 }
 
-const rowFromJoined = (row: ContentWithIdempotencyRow): {
-  content: ContentRecord
-  idempotency: IdempotencyRow
-} => ({
-  content: toContent(row),
-  idempotency: {
-    idem_id: row.idem_id,
-    idem_owner_user_id: row.idem_owner_user_id,
-    idem_request_hash: row.idem_request_hash,
-    idem_status: row.idem_status,
-    idem_response_status: row.idem_response_status,
-    idem_response_json: row.idem_response_json,
-    idem_expires_at: row.idem_expires_at,
-  },
+const emptyIdempotency = (): IdempotencyRow => ({
+  idem_id: null,
+  idem_owner_user_id: null,
+  idem_request_hash: null,
+  idem_status: null,
+  idem_response_status: null,
+  idem_response_json: null,
+  idem_expires_at: null,
 })
 
-const purgeExpiredIdempotency = (db: ContentD1, ownerUserId: string, operationId: string, key: string, nowIso: string) =>
-  db.prepare(
-    `DELETE FROM content_mutation_idempotency
-     WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?`,
-  ).bind(ownerUserId, operationId, key, nowIso)
+const loadMutationRow = async (
+  db: ContentD1,
+  contentId: string,
+  operationId: string,
+  idempotencyKey: string,
+): Promise<{ content: ContentRecord | null; idempotency: IdempotencyRow }> => {
+  const row = await db.prepare(
+    `SELECT
+        c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state, c.version, c.revision,
+        c.title, c.body_ref, c.etag, c.created_at, c.updated_at,
+        i.id AS idem_id,
+        i.owner_user_id AS idem_owner_user_id,
+        i.request_hash AS idem_request_hash,
+        i.status AS idem_status,
+        i.response_status AS idem_response_status,
+        i.response_json AS idem_response_json,
+        i.expires_at AS idem_expires_at
+       FROM contents c
+       LEFT JOIN (
+         SELECT id, owner_user_id, request_hash, status, response_status, response_json, expires_at
+         FROM content_mutation_idempotency
+         WHERE operation_id = ? AND idempotency_key = ?
+         ORDER BY created_at DESC
+         LIMIT 1
+       ) i ON 1 = 1
+      WHERE c.id = ?`,
+  ).bind(operationId, idempotencyKey, contentId).first<ContentWithIdempotencyRow>()
 
-const buildIdempotencyInsert = (
-  id: string,
+  if (!row) return { content: null, idempotency: emptyIdempotency() }
+
+  return {
+    content: toContent(row),
+    idempotency: {
+      idem_id: row.idem_id,
+      idem_owner_user_id: row.idem_owner_user_id,
+      idem_request_hash: row.idem_request_hash,
+      idem_status: row.idem_status,
+      idem_response_status: row.idem_response_status,
+      idem_response_json: row.idem_response_json,
+      idem_expires_at: row.idem_expires_at,
+    },
+  }
+}
+
+const expireMutationRow = (
+  db: ContentD1,
   ownerUserId: string,
   operationId: string,
-  key: string,
+  idempotencyKey: string,
+  nowIso: string,
+): D1PreparedStatement =>
+  db.prepare(
+    `DELETE FROM content_mutation_idempotency
+      WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?`,
+  ).bind(ownerUserId, operationId, idempotencyKey, nowIso)
+
+const insertCompletedIdempotency = (
+  db: ContentD1,
+  ownerUserId: string,
+  operationId: string,
+  idempotencyKey: string,
   requestHashValue: string,
-  status: 'COMPLETED',
   responseStatus: number,
   responseJson: string,
   nowIso: string,
   expiresAt: string,
-) => dbStatement(
-  `INSERT INTO content_mutation_idempotency
-    (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  [id, ownerUserId, operationId, key, requestHashValue, status, responseStatus, responseJson, nowIso, expiresAt],
-)
+): D1PreparedStatement =>
+  db.prepare(
+    `INSERT INTO content_mutation_idempotency
+      (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
+     VALUES (?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(),
+    ownerUserId,
+    operationId,
+    idempotencyKey,
+    requestHashValue,
+    responseStatus,
+    responseJson,
+    nowIso,
+    expiresAt,
+  )
 
-const dbStatement = (query: string, args: unknown[]): D1PreparedStatement =>
-  (globalThis as unknown as { __contentPrepare?: (query: string, args: unknown[]) => D1PreparedStatement }).__contentPrepare?.(query, args)
-    ?? (() => { throw new Error('INTERNAL_PREPARE_UNAVAILABLE') })()
+const atomicGuard = (db: ContentD1): D1PreparedStatement =>
+  db.prepare(
+    `INSERT OR REPLACE INTO content_txn_guard(id, successful)
+     VALUES (1, changes())`,
+  )
 
-export const makePrepared = (db: ContentD1, query: string, ...args: unknown[]): D1PreparedStatement =>
-  db.prepare(query).bind(...args)
+const isUniqueConstraint = (error: unknown): boolean =>
+  /unique constraint|constraint failed|UNIQUE constraint/i.test(error instanceof Error ? error.message : String(error))
 
-const insertOutbox = (
+const batchMutation = async (
   db: ContentD1,
-  eventId: string,
-  operationId: string,
-  eventType: string,
-  contentId: string,
-  version: number,
-  payload: unknown,
-  createdAt: string,
-) => makePrepared(
-  db,
-  `INSERT INTO content_outbox_events
-    (event_id, operation_id, event_type, content_id, aggregate_version, payload_json, created_at, published_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
-  eventId,
-  operationId,
-  eventType,
-  contentId,
-  version,
-  JSON.stringify(payload),
-  createdAt,
-)
+  statements: D1PreparedStatement[],
+): Promise<void> => {
+  try {
+    await db.batch(statements)
+  } catch (error) {
+    if (isUniqueConstraint(error)) throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+}
 
 export async function getContent(
   db: ContentD1,
@@ -364,30 +396,72 @@ export async function createContent(
   if (!idempotencyKey || idempotencyKey.length > 256) {
     throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
   }
+
   const normalized = validateInput(input)
   const operationId = 'createContent'
-  const hash = await requestHash(operationId, normalized)
+  const hash = await requestHash(operationId, { ownerUserId, input: normalized })
+
   const existing = await db.prepare(
     `SELECT id AS idem_id, owner_user_id AS idem_owner_user_id, request_hash AS idem_request_hash,
             status AS idem_status, response_status AS idem_response_status, response_json AS idem_response_json,
             expires_at AS idem_expires_at
        FROM content_mutation_idempotency
       WHERE operation_id = ? AND idempotency_key = ?
-      ORDER BY created_at DESC
-      LIMIT 1`,
+      ORDER BY created_at DESC LIMIT 1`,
   ).bind(operationId, idempotencyKey).first<IdempotencyRow>()
-  const replay = assertIdempotency(existing, ownerUserId, hash)
+
+  const replay = replayIdempotency(existing, ownerUserId, hash, now)
   if (replay) {
-    const payload = parseResponseJson(existing?.idem_response_json ?? null)
-    if (!payload || typeof payload !== 'object') throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
-    const replayContent = await Promise.resolve(payload as ContentRecord)
-    return replayContent
+    const parsed = replay as { id?: unknown; state?: unknown; version?: unknown; etag?: unknown; title?: unknown; bodyRef?: unknown }
+    if (
+      typeof parsed.id !== 'string' ||
+      !isState(parsed.state) ||
+      typeof parsed.version !== 'number' ||
+      typeof parsed.etag !== 'string' ||
+      typeof parsed.title !== 'string' ||
+      typeof parsed.bodyRef !== 'string'
+    ) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+    return {
+      id: parsed.id,
+      contentType: 'article',
+      ownerUserId,
+      creatorId: ownerUserId,
+      ipId: null,
+      state: parsed.state,
+      version: parsed.version,
+      revision: 1,
+      title: parsed.title,
+      bodyRef: parsed.bodyRef,
+      etag: parsed.etag,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    }
   }
 
   const contentId = crypto.randomUUID()
   const createdAt = now.toISOString()
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  const content: ContentRecord = {
+  const responseBody = {
+    id: contentId,
+    state: 'DRAFT' as const,
+    version: 1,
+    etag: etagForVersion(1),
+    title: normalized.title,
+    bodyRef: normalized.bodyRef,
+  }
+
+  await batchMutation(db, [
+    expireMutationRow(db, ownerUserId, operationId, idempotencyKey, createdAt),
+    insertCompletedIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(responseBody), createdAt, expiresAt),
+    db.prepare(
+      `INSERT INTO contents
+        (id, content_type, owner_user_id, creator_id, ip_id, state, version, revision, title, body_ref, etag, created_at, updated_at)
+       VALUES (?, 'article', ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?)`,
+    ).bind(contentId, ownerUserId, ownerUserId, normalized.title, normalized.bodyRef, responseBody.etag, createdAt, createdAt),
+    atomicGuard(db),
+  ])
+
+  return {
     id: contentId,
     contentType: 'article',
     ownerUserId,
@@ -398,66 +472,10 @@ export async function createContent(
     revision: 1,
     title: normalized.title,
     bodyRef: normalized.bodyRef,
-    etag: etagForVersion(1),
+    etag: responseBody.etag,
     createdAt,
     updatedAt: createdAt,
   }
-  const responseBody = publicContent(content)
-  const statements = [
-    purgeExpiredIdempotency(db, ownerUserId, operationId, idempotencyKey, createdAt),
-    makePrepared(db,
-      `INSERT INTO contents
-        (id, content_type, owner_user_id, creator_id, ip_id, state, version, revision, title, body_ref, etag, created_at, updated_at)
-       VALUES (?, 'article', ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?)`,
-      content.id, ownerUserId, ownerUserId, normalized.title, normalized.bodyRef, content.etag, createdAt, createdAt),
-    insertOutbox(db, crypto.randomUUID(), operationId, 'content.created', content.id, 1, responseBody, createdAt),
-    makePrepared(db,
-      `INSERT INTO content_mutation_idempotency
-        (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
-       VALUES (?, ?, ?, ?, ?, 'COMPLETED', 201, ?, ?, ?)`,
-      crypto.randomUUID(), ownerUserId, operationId, idempotencyKey, hash, JSON.stringify(responseBody), createdAt, expiresAt),
-  ]
-  try {
-    await db.batch(statements)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    if (/unique|constraint/i.test(message)) {
-      throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
-    }
-    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
-  }
-  return content
-}
-
-const loadMutationRow = async (
-  db: ContentD1,
-  contentId: string,
-  operationId: string,
-  idempotencyKey: string,
-): Promise<{ content: ContentRecord | null; idempotency: IdempotencyRow }> => {
-  const row = await db.prepare(
-    `SELECT
-        c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state, c.version, c.revision,
-        c.title, c.body_ref, c.etag, c.created_at, c.updated_at,
-        i.id AS idem_id,
-        i.owner_user_id AS idem_owner_user_id,
-        i.request_hash AS idem_request_hash,
-        i.status AS idem_status,
-        i.response_status AS idem_response_status,
-        i.response_json AS idem_response_json,
-        i.expires_at AS idem_expires_at
-       FROM contents c
-       LEFT JOIN (
-         SELECT id, owner_user_id, request_hash, status, response_status, response_json, expires_at
-         FROM content_mutation_idempotency
-         WHERE operation_id = ? AND idempotency_key = ?
-         ORDER BY created_at DESC
-         LIMIT 1
-       ) i ON 1 = 1
-      WHERE c.id = ?`,
-  ).bind(operationId, idempotencyKey, contentId).first<ContentWithIdempotencyRow>()
-  if (!row) return { content: null, idempotency: {idem_id:null,idem_owner_user_id:null,idem_request_hash:null,idem_status:null,idem_response_status:null,idem_response_json:null,idem_expires_at:null} }
-  return rowFromJoined(row)
 }
 
 export async function updateContent(
@@ -472,16 +490,13 @@ export async function updateContent(
   assertResourceId(principalUserId)
   assertResourceId(contentId)
   if (!ifMatch || !idempotencyKey) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
+
   const normalized = validateInput(input)
   const operationId = 'updateContent'
   const hash = await requestHash(operationId, { contentId, input: normalized, ifMatch: normalizeEtag(ifMatch) })
   const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey)
-  const replay = assertIdempotency(idempotency, principalUserId, hash)
-  if (replay) {
-    const payload = parseResponseJson(idempotency.idem_response_json)
-    if (!payload) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
-    return payload as ContentRecord
-  }
+  const replay = replayIdempotency(idempotency, principalUserId, hash, now)
+  if (replay) return replay as ContentRecord
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
   if (content.ownerUserId !== principalUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   assertEtag(content.etag, ifMatch)
@@ -501,27 +516,18 @@ export async function updateContent(
   }
   const responseBody = publicContent(updated)
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  try {
-    await db.batch([
-      purgeExpiredIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
-      makePrepared(db,
-        `UPDATE contents
-            SET title = ?, body_ref = ?, version = ?, revision = ?, etag = ?, updated_at = ?
-          WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`,
-        updated.title, updated.bodyRef, nextVersion, nextRevision, updated.etag, updatedAt,
-        content.id, principalUserId, content.version, content.etag),
-      insertOutbox(db, crypto.randomUUID(), operationId, 'content.updated', updated.id, nextVersion, responseBody, updatedAt),
-      makePrepared(db,
-        `INSERT INTO content_mutation_idempotency
-          (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
-         VALUES (?, ?, ?, ?, ?, 'COMPLETED', 200, ?, ?, ?)`,
-        crypto.randomUUID(), principalUserId, operationId, idempotencyKey, hash, JSON.stringify(responseBody), updatedAt, expiresAt),
-    ])
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    if (/unique|constraint/i.test(message)) throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
-    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
-  }
+
+  await batchMutation(db, [
+    expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
+    insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(responseBody), updatedAt, expiresAt),
+    db.prepare(
+      `UPDATE contents
+          SET title = ?, body_ref = ?, version = ?, revision = ?, etag = ?, updated_at = ?
+        WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`,
+    ).bind(updated.title, updated.bodyRef, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
+    atomicGuard(db),
+  ])
+
   return updated
 }
 
@@ -536,10 +542,11 @@ export async function deleteContent(
   assertResourceId(principalUserId)
   assertResourceId(contentId)
   if (!ifMatch || !idempotencyKey) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
+
   const operationId = 'deleteContent'
   const hash = await requestHash(operationId, { contentId, ifMatch: normalizeEtag(ifMatch) })
   const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey)
-  const replay = assertIdempotency(idempotency, principalUserId, hash)
+  const replay = replayIdempotency(idempotency, principalUserId, hash, now)
   if (replay) return
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
   if (content.ownerUserId !== principalUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
@@ -547,29 +554,21 @@ export async function deleteContent(
   if (!['DRAFT','PUBLISHED','UNPUBLISHED','ARCHIVED'].includes(content.state)) {
     throw new ContentRuntimeError('INVALID_STATE', 409)
   }
+
   const updatedAt = now.toISOString()
   const deletedVersion = content.version + 1
   const updatedEtag = etagForVersion(deletedVersion)
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  try {
-    await db.batch([
-      purgeExpiredIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
-      makePrepared(db,
-        `UPDATE contents SET state='DELETED', version=?, etag=?, updated_at=?
-          WHERE id=? AND owner_user_id=? AND version=? AND etag=?`,
-        deletedVersion, updatedEtag, updatedAt, content.id, principalUserId, content.version, content.etag),
-      insertOutbox(db, crypto.randomUUID(), operationId, 'content.deleted', content.id, deletedVersion, { from: content.state, to: 'DELETED' }, updatedAt),
-      makePrepared(db,
-        `INSERT INTO content_mutation_idempotency
-          (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
-         VALUES (?, ?, ?, ?, ?, 'COMPLETED', 204, '', ?, ?)`,
-        crypto.randomUUID(), principalUserId, operationId, idempotencyKey, hash, updatedAt, expiresAt),
-    ])
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    if (/unique|constraint/i.test(message)) throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
-    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
-  }
+
+  await batchMutation(db, [
+    expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
+    insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 204, '', updatedAt, expiresAt),
+    db.prepare(
+      `UPDATE contents SET state='DELETED', version=?, etag=?, updated_at=?
+        WHERE id=? AND owner_user_id=? AND version=? AND etag=?`,
+    ).bind(deletedVersion, updatedEtag, updatedAt, content.id, principalUserId, content.version, content.etag),
+    atomicGuard(db),
+  ])
 }
 
 const actorKindForLayer = (layer: string): 'CREATOR' | 'MODERATOR' | null =>
@@ -583,12 +582,12 @@ const transitionAllowed = (
   reason?: string,
 ): boolean => {
   if (kind === 'MODERATOR') {
-    return (to === 'APPROVED' || to === 'REJECTED') && from === 'PENDING_REVIEW'
+    return from === 'PENDING_REVIEW' && (to === 'APPROVED' || to === 'REJECTED')
   }
   if (!owns) return false
   if (from === 'DRAFT' && to === 'PENDING_REVIEW') return true
   if (from === 'REJECTED' && to === 'DRAFT') return true
-  if (from === 'APPROVED' && (to === 'PUBLISHED' || to === 'SCHEDULED')) return to !== 'SCHEDULED'
+  if (from === 'APPROVED' && to === 'PUBLISHED') return true
   if (from === 'SCHEDULED' && to === 'DRAFT') return true
   if (from === 'PUBLISHED' && (to === 'UNPUBLISHED' || to === 'ARCHIVED')) return true
   if (from === 'PUBLISHED' && to === 'PENDING_REVIEW') return reason === 'material_edit_requires_review'
@@ -611,26 +610,22 @@ export async function transitionContentState(
 ): Promise<{ from: ContentState; to: ContentState; version: number; etag: string }> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
-  if (!isState(to) || !ifMatch || !idempotencyKey) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
-  if (principalLayer === 'L0' || principalLayer === 'L1' || principalLayer === 'L2') {
-    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  if (!isState(to) || !ifMatch || !idempotencyKey) {
+    throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
   }
+
   const kind = actorKindForLayer(principalLayer)
   if (!kind) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
 
   const operationId = 'transitionContentState'
   const hash = await requestHash(operationId, { contentId, to, reason: reason ?? null, ifMatch: normalizeEtag(ifMatch) })
   const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey)
-  const replay = assertIdempotency(idempotency, principalUserId, hash)
-  if (replay) {
-    const payload = parseResponseJson(idempotency.idem_response_json) as { from: ContentState; to: ContentState; version: number; etag: string } | null
-    if (!payload) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
-    return payload
-  }
+  const replay = replayIdempotency(idempotency, principalUserId, hash, now)
+  if (replay) return replay as { from: ContentState; to: ContentState; version: number; etag: string }
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
+
   assertEtag(content.etag, ifMatch)
-  const owns = content.ownerUserId === principalUserId
-  if (!transitionAllowed(content.state, to, kind, owns, reason)) {
+  if (!transitionAllowed(content.state, to, kind, content.ownerUserId === principalUserId, reason)) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   }
 
@@ -638,26 +633,26 @@ export async function transitionContentState(
   const updatedAt = now.toISOString()
   const result = { from: content.state, to, version: nextVersion, etag: etagForVersion(nextVersion) }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  await db.batch([
-    purgeExpiredIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
-    makePrepared(db,
+
+  await batchMutation(db, [
+    expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
+    insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
+    db.prepare(
       `UPDATE contents SET state=?, version=?, etag=?, updated_at=?
         WHERE id=? AND version=? AND etag=?`,
-      to, nextVersion, result.etag, updatedAt, content.id, content.version, content.etag),
-    insertOutbox(db, crypto.randomUUID(), operationId, 'content.state_changed', content.id, nextVersion, result, updatedAt),
-    makePrepared(db,
-      `INSERT INTO content_mutation_idempotency
-        (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
-       VALUES (?, ?, ?, ?, ?, 'COMPLETED', 200, ?, ?, ?)`,
-      crypto.randomUUID(), principalUserId, operationId, idempotencyKey, hash, JSON.stringify(result), updatedAt, expiresAt),
+    ).bind(to, nextVersion, result.etag, updatedAt, content.id, content.version, content.etag),
+    atomicGuard(db),
   ])
+
   return result
 }
 
 export function encodeCursor(updatedAt: string, id: string): string {
   const raw = JSON.stringify({ updatedAt, id })
-  return btoa(String.fromCharCode(...new TextEncoder().encode(raw)))
-    .replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+  const bytes = new TextEncoder().encode(raw)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
 }
 
 export function decodeCursor(value: string): { updatedAt: string; id: string } {
@@ -673,6 +668,10 @@ export function decodeCursor(value: string): { updatedAt: string; id: string } {
   } catch {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
+}
+
+export function isState(value: unknown): value is ContentState {
+  return typeof value === 'string' && (ALL_STATES as readonly string[]).includes(value)
 }
 
 export function toErrorResponse(error: unknown): Response {
