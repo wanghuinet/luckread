@@ -12,14 +12,19 @@ export type ContentState =
   | 'DELETED'
   | 'RESTORED'
 
+export type ContentType = 'article' | 'post' | 'video'
+
 export interface ContentInput {
+  contentType?: ContentType
   title: string
   bodyRef: string
+  mediaRefs?: string[]
+  coverRef?: string | null
 }
 
 export interface ContentRecord {
   id: string
-  contentType: 'article'
+  contentType: ContentType
   ownerUserId: string
   creatorId: string | null
   ipId: string | null
@@ -28,6 +33,8 @@ export interface ContentRecord {
   revision: number
   title: string
   bodyRef: string
+  mediaRefs: string[]
+  coverRef: string | null
   etag: string
   createdAt: string
   updatedAt: string
@@ -40,7 +47,7 @@ export interface ContentD1 {
 
 interface ContentRow {
   id: string
-  content_type: 'article'
+  content_type: ContentType
   owner_user_id: string
   creator_id: string | null
   ip_id: string | null
@@ -49,6 +56,8 @@ interface ContentRow {
   revision: number
   title: string
   body_ref: string
+  media_refs_json: string
+  cover_ref: string | null
   etag: string
   created_at: string
   updated_at: string
@@ -118,6 +127,8 @@ const toContent = (row: ContentRow): ContentRecord => ({
   revision: row.revision,
   title: row.title,
   bodyRef: row.body_ref,
+  mediaRefs: JSON.parse(row.media_refs_json || '[]') as string[],
+  coverRef: row.cover_ref,
   etag: row.etag,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -130,6 +141,8 @@ export const publicContent = (content: ContentRecord) => ({
   etag: content.etag,
   title: content.title,
   bodyRef: content.bodyRef,
+  mediaRefs: content.mediaRefs,
+  coverRef: content.coverRef,
 })
 
 const normalizeEtag = (value: string): string => {
@@ -157,8 +170,14 @@ const validateInput = (input: unknown): ContentInput => {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  const candidate = input as { title?: unknown; bodyRef?: unknown }
+  const candidate = input as { contentType?: unknown; title?: unknown; bodyRef?: unknown; mediaRefs?: unknown; coverRef?: unknown }
+  const contentType = candidate.contentType === undefined ? 'article' : candidate.contentType
+  const mediaRefs = candidate.mediaRefs === undefined ? [] : candidate.mediaRefs
   if (
+    !['article', 'post', 'video'].includes(String(contentType)) ||
+    !Array.isArray(mediaRefs) || mediaRefs.length > 20 ||
+    mediaRefs.some(ref => typeof ref !== 'string' || ref.trim().length === 0 || ref.length > 2048) ||
+    (candidate.coverRef !== undefined && candidate.coverRef !== null && (typeof candidate.coverRef !== 'string' || candidate.coverRef.length > 2048)) ||
     typeof candidate.title !== 'string' ||
     candidate.title.trim().length === 0 ||
     candidate.title.length > 512 ||
@@ -168,7 +187,7 @@ const validateInput = (input: unknown): ContentInput => {
   ) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  return { title: candidate.title.trim(), bodyRef: candidate.bodyRef.trim() }
+  return { contentType: contentType as ContentType, title: candidate.title.trim(), bodyRef: candidate.bodyRef.trim(), mediaRefs: mediaRefs.map(ref => ref.trim()), coverRef: candidate.coverRef === undefined || candidate.coverRef === null ? null : candidate.coverRef.trim() }
 }
 
 const canonicalize = (value: unknown): unknown => {
@@ -239,7 +258,7 @@ const loadMutationRow = async (
   const row = await db.prepare(
     `SELECT
         c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state, c.version, c.revision,
-        c.title, c.body_ref, c.etag, c.created_at, c.updated_at,
+        c.title, c.body_ref, c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at,
         i.id AS idem_id,
         i.owner_user_id AS idem_owner_user_id,
         i.request_hash AS idem_request_hash,
@@ -342,7 +361,7 @@ export async function getContent(
   assertResourceId(contentId)
   const row = await db.prepare(
     `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
-            title, body_ref, etag, created_at, updated_at
+            title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE id = ?
         AND (state = 'PUBLISHED' OR owner_user_id = ?)`,
@@ -414,13 +433,13 @@ export async function createContent(
 
   const replay = inspectIdempotency(existing, ownerUserId, hash, now)
   if (replay.replayed) {
-    const parsed = replay.body as { id?: unknown; state?: unknown; version?: unknown; etag?: unknown; title?: unknown; bodyRef?: unknown } | null
-    if (!parsed || typeof parsed.id !== 'string' || !isState(parsed.state) || typeof parsed.version !== 'number' || typeof parsed.etag !== 'string' || typeof parsed.title !== 'string' || typeof parsed.bodyRef !== 'string') {
+    const parsed = replay.body as { id?: unknown; state?: unknown; version?: unknown; etag?: unknown; title?: unknown; bodyRef?: unknown; contentType?: unknown; mediaRefs?: unknown; coverRef?: unknown } | null
+    if (!parsed || typeof parsed.id !== 'string' || !isState(parsed.state) || typeof parsed.version !== 'number' || typeof parsed.etag !== 'string' || typeof parsed.title !== 'string' || typeof parsed.bodyRef !== 'string' || !['article','post','video'].includes(String(parsed.contentType)) || !Array.isArray(parsed.mediaRefs) || parsed.mediaRefs.some(ref => typeof ref !== 'string')) {
       throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
     }
     return {
       id: parsed.id,
-      contentType: 'article',
+      contentType: parsed.contentType as ContentType,
       ownerUserId,
       creatorId: ownerUserId,
       ipId: null,
@@ -429,6 +448,8 @@ export async function createContent(
       revision: 1,
       title: parsed.title,
       bodyRef: parsed.bodyRef,
+      mediaRefs: parsed.mediaRefs as string[],
+      coverRef: typeof parsed.coverRef === 'string' ? parsed.coverRef : null,
       etag: parsed.etag,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
@@ -445,6 +466,9 @@ export async function createContent(
     etag: etagForVersion(1),
     title: normalized.title,
     bodyRef: normalized.bodyRef,
+    contentType: normalized.contentType,
+    mediaRefs: normalized.mediaRefs,
+    coverRef: normalized.coverRef,
   }
 
   await batchMutation(db, [
@@ -453,14 +477,14 @@ export async function createContent(
     db.prepare(
       `INSERT INTO contents
         (id, content_type, owner_user_id, creator_id, ip_id, state, version, revision, title, body_ref, etag, created_at, updated_at)
-       VALUES (?, 'article', ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?)`,
-    ).bind(contentId, ownerUserId, ownerUserId, normalized.title, normalized.bodyRef, responseBody.etag, createdAt, createdAt),
+       VALUES (?, ?, ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?, ?, ?) `,
+    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, responseBody.etag, createdAt, createdAt),
     atomicGuard(db),
   ])
 
   return {
     id: contentId,
-    contentType: 'article',
+    contentType: normalized.contentType,
     ownerUserId,
     creatorId: ownerUserId,
     ipId: null,
@@ -469,6 +493,8 @@ export async function createContent(
     revision: 1,
     title: normalized.title,
     bodyRef: normalized.bodyRef,
+    mediaRefs: normalized.mediaRefs,
+    coverRef: normalized.coverRef,
     etag: responseBody.etag,
     createdAt,
     updatedAt: createdAt,
@@ -509,6 +535,8 @@ export async function updateContent(
     ...content,
     title: normalized.title,
     bodyRef: normalized.bodyRef,
+    mediaRefs: normalized.mediaRefs,
+    coverRef: normalized.coverRef,
     version: nextVersion,
     revision: nextRevision,
     etag: etagForVersion(nextVersion),
@@ -522,9 +550,9 @@ export async function updateContent(
     insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(responseBody), updatedAt, expiresAt),
     db.prepare(
       `UPDATE contents
-          SET title = ?, body_ref = ?, version = ?, revision = ?, etag = ?, updated_at = ?
+          SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, version = ?, revision = ?, etag = ?, updated_at = ?
         WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`,
-    ).bind(updated.title, updated.bodyRef, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
+    ).bind(updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
     atomicGuard(db),
   ])
 
