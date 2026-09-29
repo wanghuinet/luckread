@@ -103,7 +103,7 @@ const success = await post('/v1/users/' + operatorId + '/account-state', {
   actor: { id: 'client', type: 'admin' },
   permission: 'user.ban',
   approvalLevel: 'L8',
-}, operatorToken)
+}, operatorToken, { 'If-Match': '1' })
 
 if (
   success.status !== 200 ||
@@ -118,7 +118,7 @@ assertError(
   await post('/v1/users/' + operatorId + '/account-state', {
     to: 'ACTIVE',
     reason: 'AUTH-013 stale If-Match',
-  }, operatorToken),
+  }, operatorToken, { 'If-Match': '1' }),
   412,
   'PRECONDITION_FAILED',
   'stale If-Match',

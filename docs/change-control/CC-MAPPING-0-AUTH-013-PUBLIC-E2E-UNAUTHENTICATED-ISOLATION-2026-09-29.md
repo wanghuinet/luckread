@@ -73,3 +73,9 @@ assertion remains the dedicated 428 check.
 No AUTH-013 runtime, Contract, D1 schema, Payload version, Worker topology,
 W02 authority implementation, or Evidence Registry status is changed by this
 correction.
+
+## 2026-09-29 — Follow-up: success and stale If-Match assertion isolation
+
+Run `36501207751` passed the deployment provenance and reached the public HTTP E2E. The unauthenticated, mandatory-If-Match, and client-authority assertions were no longer the blocker. The next success transition request omitted `If-Match`, so the handler could not reach the expected 200 transition assertion. The subsequent stale assertion also omitted the header, so it could not exercise stale-version 412 behavior.
+
+Authorized evidence-tooling correction only: send `If-Match: 1` on the successful operator transition, and send the same prior version `If-Match: 1` after that successful transition to exercise the stale-version 412 assertion. No runtime, Contract, D1, Payload, W02 authority, Worker topology, or Evidence Registry change is authorized.
