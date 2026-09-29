@@ -140,7 +140,10 @@ export default function CreatorContentList() {
     }
   }, [router, status])
 
-  useEffect(() => { void load(null, false) }, [load])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(null, false) }, 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
 
   const summary = useMemo(() => {
     if (loading && !items.length) return '正在加载…'
