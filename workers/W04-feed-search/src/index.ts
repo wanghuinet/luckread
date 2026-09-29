@@ -1,4 +1,5 @@
 // AUTH-013 W04 binding CI trigger: runtime implementation unchanged.
+// Runtime evidence gate follows the admitted destination and queue binding.
 import { applyAccountStateProjection, parseAccountStateChanged } from './auth-013-projection.js'
 
 interface Env {
