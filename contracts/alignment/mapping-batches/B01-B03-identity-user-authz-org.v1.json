@@ -70,9 +70,18 @@
       ],
       "entityIds": [],
       "payloadCollections": [],
-      "codeEvidenceRefs": [],
+      "codeEvidenceRefs": [
+        "workers/W02-content/src/session/session-runtime.ts",
+        "workers/W02-content/src/session/session-runtime.test.ts",
+        "workers/W02-content/src/index.ts",
+        "workers/W01-payload/src/app/auth/login/route.ts",
+        "workers/W01-payload/src/app/auth/logout/route.ts"
+      ],
       "evidence": [
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-002-real-evidence-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-002-session-real-evidence-reconciliation.v1.md",
+        "artifacts/mapping-0/auth-002-e6-runtime-evidence-reconciliation-2026-09-26.json"
       ],
       "blockers": [
         "session DTO/entity/field/worker/D1/security/test/evidence mapping remains incomplete"
