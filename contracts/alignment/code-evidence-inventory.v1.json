@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "DISCOVERED",
-  "sourceOfTruth": "contracts/entity/entity-catalog.v1.json + contracts/entity/entity-implementation-evidence.v1.json + contracts/entity/entity-field-contract.v1.json + contracts/alignment/payload-inventory.v1.json + contracts/alignment/api-inventory.v1.json",
+  "sourceOfTruth": "contracts/entity/entity-catalog.v1.json + contracts/entity/entity-implementation-evidence.v1.json + contracts/entity/entity-field-contract.v1.json + contracts/alignment/payload-inventory.v1.json + contracts/alignment/api-inventory.v1.json + contracts/alignment/cross-system-mapping.v1.json",
   "generatedBy": "scripts/build-code-evidence-inventory.mjs",
   "records": [
     {
@@ -56,17 +56,23 @@
       "evidenceId": "API_OPERATION:authRegister",
       "subjectType": "API_OPERATION",
       "subjectId": "authRegister",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/app/auth/register/route.ts",
+        "workers/W01-payload/src/collections/Users.ts",
+        "workers/W01-payload/src/payload.config.ts",
+        "workers/W02-content/src/credentials/credential-add.ts"
+      ],
+      "testRefs": [
+        "workers/W02-content/src/credentials/credential-add.test.ts"
+      ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
       ],
-      "blockers": [
-        "Runtime API implementation evidence is not yet mechanically discovered"
-      ]
+      "blockers": []
     },
     {
       "evidenceId": "API_OPERATION:batchUpdateNotifications",
@@ -2296,17 +2302,22 @@
       "evidenceId": "API_OPERATION:transitionAccountState",
       "subjectType": "API_OPERATION",
       "subjectId": "transitionAccountState",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-content/src/account/account-state-transition.ts",
+        "workers/W01-payload/src/app/users/[userId]/account-state/route.ts",
+        "workers/W01-payload/src/app/v1/users/[userId]/account-state/route.ts"
+      ],
+      "testRefs": [
+        "workers/W02-content/src/account/account-state-transition.test.ts"
+      ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/cross-system-mapping.v1.json"
       ],
-      "blockers": [
-        "Runtime API implementation evidence is not yet mechanically discovered"
-      ]
+      "blockers": []
     },
     {
       "evidenceId": "API_OPERATION:transitionContentState",
