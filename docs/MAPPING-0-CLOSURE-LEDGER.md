@@ -4297,3 +4297,16 @@ Objective: run the controlled W04 side-effect matrix workflow above against the 
 - Backup: backup/pre-auth010-remote-evidence-channel-20260929.
 - **NEXT_ITEM_ID:** AUTH-010-REMOTE-RUNTIME-EVIDENCE-001
 - **NEXT_ITEM_STATE:** TODO_VERIFY
+
+
+## 2026-09-29 — AUTH-011 current-head refresh runtime reconciliation
+
+- Current source baseline reviewed: a1ff69e01c8e0294480f24f9c50721051a3f9547.
+- Current main already contains canonical authRefresh OpenAPI/DTO bindings, user.session.refresh permission, W01 /auth/refresh handler, W01→W02 refresh client, and W02 refreshSessionFromAuthoritativeD1 implementation.
+- Added focused W02 refresh tests for rotation, predecessor replay denial, wrong-device denial, authoritative authorization denial, and concurrent predecessor CAS single-winner behavior.
+- No Session entity/storage redesign, no D1 topology change, no Worker topology change, and no production deployment was introduced.
+- AUTH-011 remains NOT_GREEN / remote evidence pending. Static implementation/tests are not treated as runtime evidence.
+- Change Control: docs/change-control/CC-MAPPING-0-AUTH-011-CURRENT-HEAD-REFRESH-RUNTIME-RECONCILIATION-2026-09-29.md.
+- Backup: backup/pre-auth011-refresh-runtime-tests-20260929.
+- **NEXT_ITEM_ID:** AUTH-011-REMOTE-RUNTIME-EVIDENCE-001
+- **NEXT_ITEM_STATE:** TODO_VERIFY
