@@ -76,7 +76,9 @@ export default function CreatorContentList() {
   }, [status, type])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0)
+    const timer = window.setTimeout((): void => {
+      void load()
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [load])
 
