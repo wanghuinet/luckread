@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "status": "AUTHORIZED_FOR_CONTROLLED_PROVISIONING",
+  "date": "2026-09-29",
+  "sourceOfAuthority": "Explicit project-owner authorization in current work session",
+  "canonicalWorker": {
+    "id": "W04",
+    "responsibility": "Feed / Recommendation / Search",
+    "physicalName": "luckread-w04",
+    "sourcePath": "workers/W04-feed-search",
+    "entrypoint": "workers/W04-feed-search/src/index.ts"
+  },
+  "topology": "12 Workers / 4 D1",
+  "d1": {
+    "binding": "NONE",
+    "authoritativeOwnership": "NONE"
+  },
+  "scope": "Create the W04 physical Worker resource with a minimal /health bootstrap shell. Do not add D1, Service Binding, route, queue consumer, projection store, or public API behavior in this provisioning slice.",
+  "deploymentMethod": "Controlled GitHub Actions deployment using pinned Wrangler 4.116.0 and Cloudflare account secrets.",
+  "trigger": "Push of this authorization marker to main after protected PR merge."
+}

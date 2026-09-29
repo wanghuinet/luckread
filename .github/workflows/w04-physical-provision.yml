@@ -1,0 +1,58 @@
+name: W04 Physical Worker Provision
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "artifacts/mapping-0/w04-physical-provisioning-authorized-2026-09-29.json"
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify W04 provisioning authority
+        working-directory: workers/W04-feed-search
+        run: |
+          set -euo pipefail
+          test -f wrangler.jsonc
+          test -f src/index.ts
+          test -f ../../artifacts/mapping-0/w04-physical-provisioning-authorized-2026-09-29.json
+          node - <<'NODE'
+          const fs = require('fs')
+          const cfg = fs.readFileSync('wrangler.jsonc', 'utf8')
+          for (const value of [
+            '"name": "luckread-w04"',
+            '"main": "src/index.ts"',
+            '"workers_dev": false'
+          ]) {
+            if (!cfg.includes(value)) throw new Error("Missing W04 provisioning assertion: " + value)
+          }
+          NODE
+
+      - name: TypeScript verification
+        run: |
+          set -euo pipefail
+          npx --yes tsc@5.9.3 --noEmit             --target ES2022             --module ESNext             --moduleResolution Bundler             --strict             --skipLibCheck             --types @cloudflare/workers-types             workers/W04-feed-search/src/index.ts
+
+      - name: Deploy W04 with pinned Wrangler
+        working-directory: workers/W04-feed-search
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
