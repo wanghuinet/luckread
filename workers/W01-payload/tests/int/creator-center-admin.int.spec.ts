@@ -80,6 +80,22 @@ describe('Creator Center admin extension', () => {
     expect(stateRoute).toContain('/internal/content/contents/')
   })
 
+  it('exposes the creator-owned content management read slice', () => {
+    const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const list = read('src/app/(payload)/admin/CreatorContentList.tsx')
+    const route = read('src/app/(payload)/api/creator/contents/route.ts')
+    const client = read('src/content/w03-content-client.ts')
+
+    expect(view).toContain("import CreatorContentList from './CreatorContentList'")
+    expect(view).toContain('<CreatorContentList />')
+    expect(list).toContain("/api/creator/contents?")
+    expect(list).toContain("['DRAFT', 'REJECTED'].includes(item.state)")
+    expect(list).toContain('加载更多')
+    expect(route).toContain('export async function GET')
+    expect(route).toContain('/internal/content/creator-contents')
+    expect(client).toContain('X-LuckRead-Principal-User-Id')
+  })
+
   it('keeps frontend and Admin on the same Payload cookie session lifecycle', () => {
     const login = read('src/app/auth/login/route.ts')
     const logout = read('src/app/auth/logout/route.ts')
