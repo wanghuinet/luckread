@@ -1,6 +1,6 @@
 'use client'
 
-import { ChangeEvent, useEffect, useState } from 'react'
+import { ChangeEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type ContentType = 'article' | 'post' | 'video'
@@ -48,20 +48,37 @@ async function refreshAccessToken() {
 
 async function authorizedFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   let token = sessionStorage.getItem(ACCESS_KEY)
-  if (!token) throw new Error('AUTH_REQUIRED')
   const headers = new Headers(init.headers)
-  headers.set('Authorization', 'Bearer ' + token)
-  let response = await fetch(input, { ...init, headers })
-  if (response.status === 401) {
+  if (token) headers.set('Authorization', 'Bearer ' + token)
+
+  let response = await fetch(input, {
+    ...init,
+    headers,
+    credentials: 'include',
+  })
+
+  if (response.status === 401 && token) {
     token = await refreshAccessToken()
     if (!token) throw new Error('AUTH_REQUIRED')
     headers.set('Authorization', 'Bearer ' + token)
-    response = await fetch(input, { ...init, headers })
+    response = await fetch(input, {
+      ...init,
+      headers,
+      credentials: 'include',
+    })
   }
+
+  if (response.status === 401) throw new Error('AUTH_REQUIRED')
   return response
 }
 
-export default function PublishComposer() {
+type PublishComposerProps = {
+  contentBasePath?: string
+}
+
+export default function PublishComposer({
+  contentBasePath = '/api/v1/contents',
+}: PublishComposerProps) {
   const router = useRouter()
   const [type, setType] = useState<ContentType>('article')
   const [title, setTitle] = useState('')
@@ -71,10 +88,6 @@ export default function PublishComposer() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (!sessionStorage.getItem(ACCESS_KEY)) router.replace('/login')
-  }, [router])
 
   async function uploadFile(file: File): Promise<UploadedAsset> {
     const form = new FormData()
@@ -130,7 +143,7 @@ export default function PublishComposer() {
       mediaRefs: assets.map((asset) => asset.url),
       coverRef: coverRef.trim() || assets[0]?.url || null,
     }
-    const response = await authorizedFetch('/api/v1/contents', {
+    const response = await authorizedFetch(contentBasePath, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -155,7 +168,9 @@ export default function PublishComposer() {
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : ''
       setError(code === 'AUTH_REQUIRED' ? '登录已失效，请重新登录。' : '草稿保存失败，请稍后重试。')
-      if (code === 'AUTH_REQUIRED') router.replace('/login')
+      if (code === 'AUTH_REQUIRED') {
+        router.replace(window.location.pathname.startsWith('/admin/') ? '/admin/login' : '/login')
+      }
     } finally {
       setBusy(false)
     }
@@ -169,7 +184,7 @@ export default function PublishComposer() {
         return
       }
       const draft = await createDraft()
-      const response = await authorizedFetch(`/api/v1/contents/${encodeURIComponent(draft.id)}/state`, {
+      const response = await authorizedFetch(`${contentBasePath}/${encodeURIComponent(draft.id)}/state`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -184,7 +199,9 @@ export default function PublishComposer() {
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : ''
       setError(code === 'AUTH_REQUIRED' ? '登录已失效，请重新登录。' : '提交失败，请稍后重试。')
-      if (code === 'AUTH_REQUIRED') router.replace('/login')
+      if (code === 'AUTH_REQUIRED') {
+        router.replace(window.location.pathname.startsWith('/admin/') ? '/admin/login' : '/login')
+      }
     } finally {
       setBusy(false)
     }
