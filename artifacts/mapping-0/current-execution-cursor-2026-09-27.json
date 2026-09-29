@@ -1,16 +1,16 @@
 {
   "version": "1.1.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "091a2879598402d7e360bf48b57fcaa6c80660ea",
-  "backupBranch": "backup/pre-mapping0-current-cursor-auth013-w04-20260929",
+  "sourceHead": "41326efd01e04bbaa767bfa1b7a3f1a1bf2a43b3",
+  "backupBranch": "backup/pre-auth013-w04-provision-evidence-20260929",
   "currentCursor": {
     "id": "AUTH-013-W04-PROJECTION-DEINDEX-ADMISSION-001",
-    "state": "BLOCKED_EXTERNAL",
+    "state": "PHYSICAL_RESOURCE_ADMITTED / IMPLEMENTATION_ADMISSION_PENDING",
     "objective": "Resolve concrete current W04 resource/entrypoint/binding admission, then implement the minimum projection/deindex consumer using the existing identity.account_state_changed boundary and collect controlled convergence evidence.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-W04-PROJECTION-DEINDEX-GAP-2026-09-29.md",
-    "nextGate": "1) Dispatch the read-only Cloudflare Resource Inventory workflow and record the actual current W04 Worker resource identity if present. 2) If W04 is absent, stop at the external provisioning/change-control gate; do not invent a resource name, Service Binding, route or Wrangler binding. 3) Once resource/entrypoint authority exists, proceed with the minimum W04 projection/deindex admission slice.",
+    "nextGate": "Begin the minimum W04 projection/deindex implementation admission using the existing identity.account_state_changed event boundary. Before runtime feature implementation, bind only the already-admitted W04 entrypoint/resources required by the W04 GAP record and define the contracted projection/cache behavior. Do not add authoritative D1.",
     "logicalOwnership": "W04 -> Feed / Recommendation / Search derived/projection boundary",
-    "physicalBinding": "NOT_ADMITTED. Current main contains no authoritative W04 resourceId, no current W04 deployment workflow, no Service Binding, and no admitted T08/T09/T10 runtime entrypoint. Historical workers/W04-social is non-authoritative and cannot be promoted by path inference.",
+    "physicalBinding": "ADMITTED. Cloudflare Worker luckread-w04 was created by the controlled provisioning workflow from exact main source 41326efd01e04bbaa767bfa1b7a3f1a1bf2a43b3; Current Version ID 1b0df573-8a27-40b0-bf04-f1d2e86c692c. No D1, Service Binding or public route was configured.",
     "physicalRuntimeTarget": "T08/T09/T10 -> W04; derived/projection only; no new authoritative D1",
     "supersededBlockers": [
       "AUTH-013 public HTTP E2E/security/D1 evidence is PASS_VERIFIED by run 36503534440 and must not be rerun unchanged.",
@@ -19,7 +19,7 @@
       "No executable canonical W04 runtime or current physical Cloudflare W04 resource is currently evidenced on main.",
       "No new Worker, D1, authoritative projection store, Payload Core modification or public API redesign is authorized by the W04 GAP record."
     ],
-    "sourceHead": "091a2879598402d7e360bf48b57fcaa6c80660ea"
+    "sourceHead": "41326efd01e04bbaa767bfa1b7a3f1a1bf2a43b3"
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -191,13 +191,13 @@
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced through AUTH-013 response/evidence corrections and AUTH-002 mapping evidence binding. AUTH-013 public HTTP E2E is now PASS_VERIFIED; the next admissible slice is the W04 projection/deindex gap. No W04 resource or runtime is inferred.",
-    "currentMainSha": "091a2879598402d7e360bf48b57fcaa6c80660ea",
-    "actualGitMainHead": "091a2879598402d7e360bf48b57fcaa6c80660ea",
+    "currentMainSha": "41326efd01e04bbaa767bfa1b7a3f1a1bf2a43b3",
+    "actualGitMainHead": "41326efd01e04bbaa767bfa1b7a3f1a1bf2a43b3",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
     "auth013PublicHttpE2eRun": "36503534440",
     "auth013PublicHttpE2eStatus": "PASS_VERIFIED",
-    "w04ProjectionStatus": "GAP_IDENTIFIED / IMPLEMENTATION_NOT_AUTHORIZED",
-    "w04ResourceStatus": "NOT_VERIFIED_EXTERNAL",
+    "w04ProjectionStatus": "GAP_IDENTIFIED / IMPLEMENTATION_ADMISSION_PENDING",
+    "w04ResourceStatus": "PASS_VERIFIED_PHYSICAL_PROVISION / luckread-w04 / version 1b0df573-8a27-40b0-bf04-f1d2e86c692c",
     "reviewedAt": "2026-09-29",
     "previousCursorSuperseded": "AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001"
   },
@@ -450,5 +450,20 @@
       "T10"
     ],
     "eventBoundary": "contracts/events/identity-account-state-changed.v1.json"
+  },
+  "externalVerification": {
+    "w04Provisioning": {
+      "reviewedAt": "2026-09-29",
+      "status": "PASS_VERIFIED_PHYSICAL_PROVISION",
+      "workflow": ".github/workflows/w04-physical-provision.yml",
+      "runId": 36509211004,
+      "jobId": 109217402488,
+      "testedHeadSha": "41326efd01e04bbaa767bfa1b7a3f1a1bf2a43b3",
+      "workerName": "luckread-w04",
+      "currentVersionId": "1b0df573-8a27-40b0-bf04-f1d2e86c692c",
+      "deploymentConclusion": "success",
+      "scope": "Minimal /health bootstrap shell only; no D1, queue, Service Binding, or public route.",
+      "evidenceBoundary": "Physical Worker creation/version evidence only; W04 business projection/deindex behavior remains unimplemented and non-GREEN."
+    }
   }
 }
