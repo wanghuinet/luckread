@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - docs/release/ADMIN-READONLY-AUDIT-2026-09-30-R2.md
+      - docs/release/ADMIN-READONLY-AUDIT-2026-09-30-R4.md
 
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - name: Verify audit marker
         run: |
           test -f docs/release/ADMIN-READONLY-AUDIT-2026-09-30-R3.md
-          grep -q "ADMIN_READONLY_AUDIT_R3=AUTHORIZED_BY_MAIN_MERGE" docs/release/ADMIN-READONLY-AUDIT-2026-09-30-R3.md
+          grep -q "ADMIN_READONLY_AUDIT_R4=AUTHORIZED_BY_MAIN_MERGE" docs/release/ADMIN-READONLY-AUDIT-2026-09-30-R3.md
 
       - name: Read production admin roles
         env:
