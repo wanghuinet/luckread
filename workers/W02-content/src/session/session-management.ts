@@ -24,7 +24,7 @@ export class SessionManagementError extends Error {
 }
 
 const permissionMinLayer = new Map(
-  ((permissions.permissions ?? []) as PermissionDefinition[])
+  ((permissions['x-permissions'] ?? []) as PermissionDefinition[])
     .filter((entry) => typeof entry.name === 'string' && typeof entry.minLayer === 'string')
     .map((entry) => [entry.name, entry.minLayer as string]),
 )
