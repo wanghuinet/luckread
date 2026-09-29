@@ -21,8 +21,8 @@
     ],
     "sourceHead": "e73cced0eca9e3a630f06ac793dd8648298725f1",
     "currentHeadReconciliation": {
-      "reason": "W04 physical resource and W05-W12 physical topology are now evidenced on current main; the remaining blocker is event transport authority, not resource creation.",
-      "currentMainSha": "31aac14e281e481e9294233344d40af5ac83b146",
+      "reason": "Current main now records completion of W04/W05-W12 physical provisioning, W04 projection queue/DLQ provisioning, and W02 dual-destination fan-out CI; the remaining blocker is concrete projection destination/cache semantics.",
+      "currentMainSha": "fa984e9af5d3ae8e6c178f1109120b0c4452e082",
       "w04PhysicalProvisionRun": "36509211004",
       "w04PhysicalWorker": "luckread-w04",
       "w05w12ProvisionRun": "36509821604",
@@ -38,7 +38,7 @@
       "w05w12Preexisting": [
         "luckread-w06"
       ],
-      "w04ProjectionStatus": "EVENT_TRANSPORT_AUTHORITY_ADMITTED_QUEUE_PROVISIONING_PENDING",
+      "w04ProjectionStatus": "DESTINATION_AUTHORITY_PENDING",
       "w04ResourceStatus": "PASS_VERIFIED",
       "reviewedAt": "2026-09-29",
       "eventTransportDecision": "W02_DIRECT_MULTI_DESTINATION",
