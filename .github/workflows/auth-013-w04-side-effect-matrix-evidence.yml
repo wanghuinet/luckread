@@ -4,9 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: "Type RUN to execute controlled projection/deindex evidence"
+        description: "Select RUN to execute controlled projection/deindex evidence"
         required: true
-        type: string
+        type: choice
+        options:
+          - RUN
 
 permissions:
   contents: read
