@@ -5,18 +5,69 @@
   "sourceOfAuthority": "Explicit project-owner authorization in current work session",
   "topology": "12 Workers / 4 D1",
   "workers": [
-    {"id":"W05","responsibility":"Transaction / Monetization","physicalName":"luckread-w05","sourcePath":"workers/W05-transaction"},
-    {"id":"W06","responsibility":"Rights / Trust & Safety / Governance","physicalName":"luckread-w06","sourcePath":"workers/W06-governance"},
-    {"id":"W07","responsibility":"Async / Event","physicalName":"luckread-w07","sourcePath":"workers/W07-async"},
-    {"id":"W08","responsibility":"Search","physicalName":"luckread-w08","sourcePath":"workers/W08-search"},
-    {"id":"W09","responsibility":"Index / Recommendation","physicalName":"luckread-w09","sourcePath":"workers/W09-index-recommendation"},
-    {"id":"W10","responsibility":"Market / IP","physicalName":"luckread-w10","sourcePath":"workers/W10-market-ip"},
-    {"id":"W11","responsibility":"Analytics / Ads","physicalName":"luckread-w11","sourcePath":"workers/W11-analytics-ads"},
-    {"id":"W12","responsibility":"Open / Extension","physicalName":"luckread-w12","sourcePath":"workers/W12-open-extension"}
+    {
+      "id": "W05",
+      "responsibility": "Transaction / Monetization",
+      "physicalName": "luckread-w05",
+      "sourcePath": "workers/W05-transaction"
+    },
+    {
+      "id": "W06",
+      "responsibility": "Rights / Trust & Safety / Governance",
+      "physicalName": "luckread-w06",
+      "sourcePath": "workers/W06-governance"
+    },
+    {
+      "id": "W07",
+      "responsibility": "Async / Event",
+      "physicalName": "luckread-w07",
+      "sourcePath": "workers/W07-async"
+    },
+    {
+      "id": "W08",
+      "responsibility": "Search",
+      "physicalName": "luckread-w08",
+      "sourcePath": "workers/W08-search"
+    },
+    {
+      "id": "W09",
+      "responsibility": "Index / Recommendation",
+      "physicalName": "luckread-w09",
+      "sourcePath": "workers/W09-index-recommendation"
+    },
+    {
+      "id": "W10",
+      "responsibility": "Market / IP",
+      "physicalName": "luckread-w10",
+      "sourcePath": "workers/W10-market-ip"
+    },
+    {
+      "id": "W11",
+      "responsibility": "Analytics / Ads",
+      "physicalName": "luckread-w11",
+      "sourcePath": "workers/W11-analytics-ads"
+    },
+    {
+      "id": "W12",
+      "responsibility": "Open / Extension",
+      "physicalName": "luckread-w12",
+      "sourcePath": "workers/W12-open-extension"
+    }
   ],
   "scope": "Provision only the physical Cloudflare Worker resources that are missing. Existing Workers are verified and not redeployed by this slice.",
   "bootstrapRule": "New resources receive only a minimal health-compatible bootstrap shell with no D1, Service Binding, route, queue consumer, projection store, or public API behavior.",
-  "workerResourceNames": ["luckread-w05","luckread-w06","luckread-w07","luckread-w08","luckread-w09","luckread-w10","luckread-w11","luckread-w12"],
+  "workerResourceNames": [
+    "luckread-w05",
+    "luckread-w06",
+    "luckread-w07",
+    "luckread-w08",
+    "luckread-w09",
+    "luckread-w10",
+    "luckread-w11",
+    "luckread-w12"
+  ],
   "deploymentMethod": "Controlled GitHub Actions deployment using pinned Wrangler 4.116.0 and Cloudflare account secrets.",
-  "noBusinessImplementation": true
+  "noBusinessImplementation": true,
+  "workflowRevision": 2,
+  "retryReason": "First run had no initialized job; simplify workflow to match validated project provisioning pattern and retain idempotent missing-only creation."
 }
