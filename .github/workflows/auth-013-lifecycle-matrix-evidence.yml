@@ -136,16 +136,36 @@ jobs:
           echo $! > auth-013-lifecycle-harness.pid
           ready=0
           for _ in $(seq 1 90); do
+            if ! kill -0 "$(cat auth-013-lifecycle-harness.pid)" 2>/dev/null; then
+              cat auth-013-lifecycle-harness.log
+              exit 1
+            fi
             code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8788/__auth013_lifecycle_probe || true)
-            if [ "$code" != "000" ]; then ready=1; break; fi
+            if [ "$code" != "000" ]; then
+              sleep 2
+              if ! kill -0 "$(cat auth-013-lifecycle-harness.pid)" 2>/dev/null; then
+                cat auth-013-lifecycle-harness.log
+                exit 1
+              fi
+              verify_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8788/__auth013_lifecycle_probe || true)
+              if [ "$verify_code" != "000" ]; then ready=1; break; fi
+            fi
             sleep 1
           done
-          if [ "$ready" -ne 1 ]; then cat auth-013-lifecycle-harness.log; exit 1; fi
+          if [ "$ready" -ne 1 ]; then
+            cat auth-013-lifecycle-harness.log
+            exit 1
+          fi
       - name: Execute lifecycle matrix evidence
         run: |
           set -euo pipefail
           mkdir -p artifacts/mapping-0/auth-013-lifecycle
-          http_code=$(curl -sS -o artifacts/mapping-0/auth-013-lifecycle/runtime-result.json -w '%{http_code}' -X POST http://127.0.0.1:8788/__auth013_lifecycle_probe)
+          http_code=000
+          for _ in $(seq 1 30); do
+            http_code=$(curl -sS -o artifacts/mapping-0/auth-013-lifecycle/runtime-result.json -w '%{http_code}' -X POST --max-time 10 http://127.0.0.1:8788/__auth013_lifecycle_probe || true)
+            if [ "$http_code" != "000" ]; then break; fi
+            sleep 1
+          done
           test "$http_code" = "200"
           node - <<'NODE'
           const fs=require('node:fs'), r=JSON.parse(fs.readFileSync('artifacts/mapping-0/auth-013-lifecycle/runtime-result.json','utf8'))
