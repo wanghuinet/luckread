@@ -434,6 +434,7 @@ describe('AUTH-002 native session binding boundaries', () => {
             expiresAt: '2026-09-22T12:59:59.000Z',
             accountState: 'ACTIVE',
           } as T),
+          run: async () => ({ meta: { changes: 0 } }),
         }),
       }),
     } as unknown as D1Database
