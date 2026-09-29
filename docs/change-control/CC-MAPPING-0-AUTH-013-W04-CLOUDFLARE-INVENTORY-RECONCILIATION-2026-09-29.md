@@ -80,3 +80,35 @@ W04 implementation, queue binding, projection writes/deletes, cache invalidation
 - Backup: `backup/pre-auth013-w04-cloudflare-inventory-confirmed-20260929`
 - Prior blocker: `docs/change-control/CC-MAPPING-0-AUTH-013-W04-PROJECTION-DESTINATION-AUTHORITY-EXHAUSTED-2026-09-29.md`
 - Inventory workflow: `.github/workflows/cloudflare-resource-inventory.yml`
+
+## Live W04 binding evidence
+
+A subsequent read-only Cloudflare inventory was executed from current `main` and successfully queried the live Worker settings for `luckread-w04`.
+
+- Workflow: `.github/workflows/cloudflare-resource-inventory.yml`
+- Run: `36519177221`
+- Tested main SHA: `b09c6cd7630019c4f663c7cf77f9498fdbab4f9b`
+- Overall Run: `success`
+- Live binding artifact: `cloudflare-w04-binding-inventory`
+- Artifact ID: `11011833636`
+- Artifact digest: `sha256:031baca1f955e9bea27a60e1d1f7ff300ee37feda5b8855b265351991d197f73`
+- Observed result:
+```json
+{
+  "worker": "luckread-w04",
+  "status": "AVAILABLE",
+  "source": "script-settings",
+  "bindings": []
+}
+```
+
+This is valid online evidence that the deployed `luckread-w04` Worker currently has no non-secret D1/KV/R2/Queue/Service/Search binding exposed through the live Worker settings response captured by the inventory workflow.
+
+The result does not authorize creation of a replacement destination and does not by itself select any external search/cache implementation.
+
+## Final reconciliation
+
+The combined repository and Cloudflare evidence is now consistent: W04 exists and is deployed, the dedicated AUTH-013 projection transport queue exists, but `luckread-w04` has no live non-secret resource binding and no concrete derived projection/cache destination has been admitted.
+
+Therefore `AUTH-013-W04-PROJECTION-CONSUMER-001` remains `BLOCKED_EXTERNAL`. No consumer implementation, queue binding, projection write/delete, cache invalidation, or search-index mutation is authorized until a concrete derived destination and its operational semantics are admitted through infrastructure/change control.
+
