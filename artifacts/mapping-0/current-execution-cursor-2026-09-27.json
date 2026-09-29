@@ -8,7 +8,7 @@
     "state": "BLOCKED_EXTERNAL",
     "objective": "Implement the minimum W04 consumer for identity.account_state_changed after confirming the admitted projection destination and cache/deindex semantics; W04 remains derived/projection only and must not acquire D1 authority.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-W04-PROJECTION-EVENT-TRANSPORT-AUTHORITY-2026-09-29.md",
-    "nextGate": "1) Resolve whether account-state lifecycle effects are satisfied by serving-time eligibility/versioned cache semantics or require an existing concrete derived index destination. 2) Admit only an existing destination/configuration; do not invent a projection store. 3) Then bind luckread-auth013-account-state-projection to luckread-w04 with bounded retry/DLQ and implement idempotent stale-event rejection plus the admitted projection/deindex action.",
+    "nextGate": "1) Obtain/admit a concrete existing W04 derived destination/configuration through explicit infrastructure/change-control authority. 2) Confirm cache/deindex/version semantics for that concrete destination. 3) Only then bind luckread-auth013-account-state-projection to luckread-w04 with bounded retry/DLQ and implement idempotent stale-event rejection plus the admitted projection/deindex action.",
     "logicalOwnership": "W04 -> Feed / Recommendation / Search derived/projection boundary",
     "physicalBinding": "VERIFIED. W04 physical Worker luckread-w04 and W05-W12 physical Worker inventory are verified. Dedicated W04 projection queue and DLQ are created and verified by Run 36510919222.",
     "physicalRuntimeTarget": "T08/T09/T10 -> W04; derived/projection only; no new authoritative D1",
@@ -21,8 +21,8 @@
     ],
     "sourceHead": "e73cced0eca9e3a630f06ac793dd8648298725f1",
     "currentHeadReconciliation": {
-      "reason": "Current main now records completion of W04/W05-W12 physical provisioning, W04 projection queue/DLQ provisioning, and W02 dual-destination fan-out CI; the remaining blocker is concrete projection destination/cache semantics.",
-      "currentMainSha": "fa984e9af5d3ae8e6c178f1109120b0c4452e082",
+      "reason": "Current main records completion of W04/W05-W12 physical provisioning, W04 projection queue/DLQ provisioning, and W02 dual-destination fan-out CI. Repository authority search is exhausted without a concrete W04 projection destination or cache runtime binding; implementation remains blocked until such authority is explicitly admitted.",
+      "currentMainSha": "554ff8084aab3e9237a09b3534f04733fa00c0ce",
       "w04PhysicalProvisionRun": "36509211004",
       "w04PhysicalWorker": "luckread-w04",
       "w05w12ProvisionRun": "36509821604",
@@ -38,7 +38,7 @@
       "w05w12Preexisting": [
         "luckread-w06"
       ],
-      "w04ProjectionStatus": "DESTINATION_AUTHORITY_PENDING",
+      "w04ProjectionStatus": "DESTINATION_AUTHORITY_EXHAUSTED",
       "w04ResourceStatus": "PASS_VERIFIED",
       "reviewedAt": "2026-09-29",
       "eventTransportDecision": "W02_DIRECT_MULTI_DESTINATION",
@@ -51,7 +51,18 @@
       "w02FanoutImplementationCommit": "31aac14e281e481e9294233344d40af5ac83b146",
       "w02FanoutCiRun": "36511115240",
       "w02FanoutCiStatus": "PASS_VERIFIED_UNIT_AND_CONFIG",
-      "w04ProjectionRuntimeStatus": "IMPLEMENTATION_PENDING_DESTINATION_AUTHORITY"
+      "w04ProjectionRuntimeStatus": "IMPLEMENTATION_PENDING_DESTINATION_AUTHORITY",
+      "destinationAuthorityAudit": "REPO_EVIDENCE_EXHAUSTED",
+      "destinationAuthoritySourcesChecked": [
+        "docs/53-SEARCH-DISCOVERY-SYSTEM-CONTRACT-v1.0.md",
+        "docs/55-FEED-RECOMMENDATION-PERSONALIZATION-TRENDING-SYSTEM-CONTRACT-v1.0.md",
+        "docs/71-PLATFORM-OPERATIONS-GOVERNANCE-RELIABILITY-CONTRACT-v1.0.md",
+        "docs/189-L5-L6-FEED-RECOMMENDATION-PERSONALIZATION-TRENDING-INSTANCE-REGISTRY-v1.0.md",
+        "docs/194-L5-L6-SEARCH-DISCOVERY-ANALYTICS-GROWTH-INSTANCE-REGISTRY-v1.0.md",
+        "docs/167-CACHE-INVALIDATION-HOT-KEY-STAMPEDE-CONTRACT-v1.0.md",
+        "workers/W04-feed-search/wrangler.jsonc",
+        "workers/W04-feed-search/src/index.ts"
+      ]
     }
   },
   "alreadyClosed": {
