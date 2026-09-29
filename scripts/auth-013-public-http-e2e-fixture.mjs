@@ -18,6 +18,8 @@ const fixture = {
   operatorEmail: 'auth013-e2e-operator-' + fixtureNonce + '@luckread.test',
   basicUsername: 'auth013-e2e-basic-' + fixtureNonce,
   operatorUsername: 'auth013-e2e-operator-' + fixtureNonce,
+  targetEmail: 'auth013-e2e-target-' + fixtureNonce + '@luckread.test',
+  targetUsername: 'auth013-e2e-target-' + fixtureNonce,
   basicSessionId: 'auth013-basic-' + randomUUID(),
   operatorSessionId: 'auth013-operator-' + randomUUID(),
   basicRoleId: randomUUID(),
@@ -42,7 +44,8 @@ const sql = `INSERT INTO users
   (username, display_name, locale, timezone, email, account_state, account_state_version, created_at, updated_at)
 VALUES
   ('${esc(fixture.basicUsername)}', 'AUTH013 E2E Basic', 'en-US', 'UTC', '${esc(fixture.basicEmail)}', 'ACTIVE', 1, '${fixture.now}', '${fixture.now}'),
-  ('${esc(fixture.operatorUsername)}', 'AUTH013 E2E Operator', 'en-US', 'UTC', '${esc(fixture.operatorEmail)}', 'ACTIVE', 1, '${fixture.now}', '${fixture.now}');
+  ('${esc(fixture.operatorUsername)}', 'AUTH013 E2E Operator', 'en-US', 'UTC', '${esc(fixture.operatorEmail)}', 'ACTIVE', 1, '${fixture.now}', '${fixture.now}'),
+  ('${esc(fixture.targetUsername)}', 'AUTH013 E2E Target', 'en-US', 'UTC', '${esc(fixture.targetEmail)}', 'ACTIVE', 1, '${fixture.now}', '${fixture.now}');
 
 INSERT INTO users_sessions (_order, _parent_id, id, created_at, expires_at)
 VALUES
