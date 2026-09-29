@@ -255,6 +255,10 @@ export default function PublishComposer({
         setError('请先填写标题和正文。')
         return
       }
+      if (type === 'video' && assets.length === 0) {
+        setError('视频至少需要添加一个媒体文件。')
+        return
+      }
       await persistDraft()
       setMessage('草稿已保存。')
     } catch (caught) {
@@ -320,6 +324,10 @@ export default function PublishComposer({
     try {
       if (!title.trim() || !body.trim()) {
         setError('请先填写标题和正文。')
+        return
+      }
+      if (type === 'video' && assets.length === 0) {
+        setError('视频至少需要添加一个媒体文件。')
         return
       }
       const savedDraft = await persistDraft()
