@@ -1,3 +1,4 @@
+// AUTH-013 W04 binding CI trigger: runtime implementation unchanged.
 import { applyAccountStateProjection, parseAccountStateChanged } from './auth-013-projection.js'
 
 interface Env {
