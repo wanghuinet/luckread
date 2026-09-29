@@ -144,6 +144,8 @@ jobs:
           set -euo pipefail
           umask 077
           mkdir -p artifacts
+          auth_header=(-H "Authorization: Bearer $CF_API_TOKEN")
+          json_header=(-H "Content-Type: application/json")
 
           extract_bindings() {
             local source="$1"
@@ -162,64 +164,37 @@ jobs:
             }'
           }
 
-          beta_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/workers/luckread-w04/versions/latest"
-          beta_body="artifacts/cloudflare-w04-beta-version.body"
-          beta_status="$(curl -sS --retry 3 --retry-all-errors -o "$beta_body" -w '%{http_code}' "$beta_url" "${auth_header[@]}" "${json_header[@]}")" || true
-          if [[ "$beta_status" == 2* ]]; then
-            jq '{bindings:(.result.bindings // [])}' "$beta_body" | extract_bindings "beta-worker-version-latest" > artifacts/cloudflare-w04-bindings-inventory.json
+          settings_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/settings"
+          settings_body="artifacts/cloudflare-w04-settings.body"
+          settings_status="$(curl -sS --retry 3 --retry-all-errors -o "$settings_body" -w '%{http_code}' "$settings_url" "${auth_header[@]}" "${json_header[@]}")" || true
+          if [[ "$settings_status" == 2* ]]; then
+            jq '{bindings:(.result.bindings // [])}' "$settings_body" | extract_bindings "script-settings" > artifacts/cloudflare-w04-bindings-inventory.json
           else
-            settings_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/settings"
-            settings_body="artifacts/cloudflare-w04-settings.body"
-            settings_status="$(curl -sS --retry 3 --retry-all-errors -o "$settings_body" -w '%{http_code}' "$settings_url" "${auth_header[@]}" "${json_header[@]}")" || true
-            if [[ "$settings_status" == 2* ]]; then
-              jq '{bindings:(.result.bindings // [])}' "$settings_body" | extract_bindings "script-settings" > artifacts/cloudflare-w04-bindings-inventory.json
+            deployment_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/deployments?per_page=1"
+            deployment_body="artifacts/cloudflare-w04-deployment.body"
+            deployment_status="$(curl -sS --retry 3 --retry-all-errors -o "$deployment_body" -w '%{http_code}' "$deployment_url" "${auth_header[@]}" "${json_header[@]}")" || true
+            if [[ "$deployment_status" == 2* ]]; then
+              version_id="$(jq -r '.result[0].versions[0].version_id // empty' "$deployment_body")"
             else
-              deployment_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/deployments?per_page=1"
-              deployment_body="artifacts/cloudflare-w04-deployment.body"
-              deployment_status="$(curl -sS --retry 3 --retry-all-errors -o "$deployment_body" -w '%{http_code}' "$deployment_url" "${auth_header[@]}" "${json_header[@]}")" || true
-              if [[ "$deployment_status" == 2* ]]; then
-                deployment_version="$(jq -r '.result[0].versions[0].version_id // empty' "$deployment_body")"
+              version_id=""
+            fi
+            if [[ -n "$version_id" ]]; then
+              version_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/versions/${version_id}"
+              version_body="artifacts/cloudflare-w04-version.body"
+              version_status="$(curl -sS --retry 3 --retry-all-errors -o "$version_body" -w '%{http_code}' "$version_url" "${auth_header[@]}" "${json_header[@]}")" || true
+              if [[ "$version_status" == 2* ]]; then
+                jq '{bindings:(.result.resources.bindings // [])}' "$version_body" | extract_bindings "active-deployment-version" > artifacts/cloudflare-w04-bindings-inventory.json
               else
-                deployment_version=""
+                jq -n --arg settings "$settings_status" --arg deployment "$deployment_status" --arg version "$version_status" '{worker:"luckread-w04",status:"UNAVAILABLE",reason:"w04_binding_read_failed",settingsHttpStatus:$settings,deploymentHttpStatus:$deployment,versionHttpStatus:$version}' > artifacts/cloudflare-w04-bindings-inventory.json
               fi
-
-              if [[ -n "$deployment_version" ]]; then
-                version_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/versions/${deployment_version}"
-                version_body="artifacts/cloudflare-w04-version.body"
-                version_status="$(curl -sS --retry 3 --retry-all-errors -o "$version_body" -w '%{http_code}' "$version_url" "${auth_header[@]}" "${json_header[@]}")" || true
-                if [[ "$version_status" == 2* ]]; then
-                  jq '{bindings:(.result.resources.bindings // [])}' "$version_body" | extract_bindings "active-deployment-version" > artifacts/cloudflare-w04-bindings-inventory.json
-                else
-                  jq -n --arg beta "$beta_status" --arg settings "$settings_status" --arg deployment "$deployment_status" --arg version "$version_status" '{worker:"luckread-w04",status:"UNAVAILABLE",reason:"w04_binding_read_failed",betaVersionHttpStatus:$beta,settingsHttpStatus:$settings,deploymentHttpStatus:$deployment,versionHttpStatus:$version}' > artifacts/cloudflare-w04-bindings-inventory.json
-                fi
-              elif [[ "$deployment_status" == 2* ]]; then
-                jq -n --arg beta "$beta_status" --arg settings "$settings_status" --arg deployment "$deployment_status" '{worker:"luckread-w04",status:"AVAILABLE",source:"deployment-inventory",bindings:[],note:"no_active_deployment_version_identified",betaVersionHttpStatus:$beta,settingsHttpStatus:$settings,deploymentHttpStatus:$deployment}' > artifacts/cloudflare-w04-bindings-inventory.json
-              else
-                version_list_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/versions?per_page=1"
-                version_list_body="artifacts/cloudflare-w04-version-list.body"
-                version_list_status="$(curl -sS --retry 3 --retry-all-errors -o "$version_list_body" -w '%{http_code}' "$version_list_url" "${auth_header[@]}" "${json_header[@]}")" || true
-                if [[ "$version_list_status" == 2* ]]; then
-                  version_id="$(jq -r '.result[0].id // empty' "$version_list_body")"
-                else
-                  version_id=""
-                fi
-                if [[ -n "$version_id" ]]; then
-                  version_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/versions/${version_id}"
-                  version_body="artifacts/cloudflare-w04-version.body"
-                  version_status="$(curl -sS --retry 3 --retry-all-errors -o "$version_body" -w '%{http_code}' "$version_url" "${auth_header[@]}" "${json_header[@]}")" || true
-                  if [[ "$version_status" == 2* ]]; then
-                    jq '{bindings:(.result.resources.bindings // [])}' "$version_body" | extract_bindings "latest-version" > artifacts/cloudflare-w04-bindings-inventory.json
-                  else
-                    jq -n --arg beta "$beta_status" --arg settings "$settings_status" --arg deployment "$deployment_status" --arg versionList "$version_list_status" --arg version "$version_status" '{worker:"luckread-w04",status:"UNAVAILABLE",reason:"all_w04_binding_read_paths_failed",betaVersionHttpStatus:$beta,settingsHttpStatus:$settings,deploymentHttpStatus:$deployment,versionListHttpStatus:$versionList,versionHttpStatus:$version}' > artifacts/cloudflare-w04-bindings-inventory.json
-                  fi
-                else
-                  jq -n --arg beta "$beta_status" --arg settings "$settings_status" --arg deployment "$deployment_status" --arg versionList "$version_list_status" '{worker:"luckread-w04",status:"UNAVAILABLE",reason:"all_w04_binding_read_paths_failed",betaVersionHttpStatus:$beta,settingsHttpStatus:$settings,deploymentHttpStatus:$deployment,versionListHttpStatus:$versionList}' > artifacts/cloudflare-w04-bindings-inventory.json
-                fi
-              fi
+            elif [[ "$deployment_status" == 2* ]]; then
+              jq -n --arg settings "$settings_status" --arg deployment "$deployment_status" '{worker:"luckread-w04",status:"AVAILABLE",source:"deployment-inventory",bindings:[],note:"no_active_deployment_version_identified",settingsHttpStatus:$settings,deploymentHttpStatus:$deployment}' > artifacts/cloudflare-w04-bindings-inventory.json
+            else
+              jq -n --arg settings "$settings_status" --arg deployment "$deployment_status" '{worker:"luckread-w04",status:"UNAVAILABLE",reason:"w04_live_binding_inventory_unavailable",settingsHttpStatus:$settings,deploymentHttpStatus:$deployment}' > artifacts/cloudflare-w04-bindings-inventory.json
             fi
           fi
 
-          rm -f "$beta_body" "${settings_body:-}" "${deployment_body:-}" "${version_list_body:-}" "${version_body:-}"
+          rm -f "$settings_body" "${deployment_body:-}" "${version_body:-}"
           jq . artifacts/cloudflare-w04-bindings-inventory.json
       - name: Publish W04 binding inventory artifact
         uses: actions/upload-artifact@v4
