@@ -22,6 +22,7 @@ import {
 interface Env {
   D1_01: D1Database
   AUTH013_QUEUE: Queue
+  AUTH013_PROJECTION_QUEUE: Queue
   AUTH003_CREDENTIAL_HASH_KEY?: string
   AUTH003_CREDENTIAL_HASH_KEY_PREVIOUS?: string
 }
