@@ -21,9 +21,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-        with: { ref: ${{ github.sha }} }
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v4
-        with: { node-version: 24, cache: npm }
+        with:
+          node-version: 24
+          cache: npm
       - run: npm ci
       - run: npx vitest run workers/W04-feed-search/src/auth-013-projection.test.ts
       - run: npx tsc --noEmit
@@ -52,9 +55,11 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-        with: { ref: ${{ github.sha }} }
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/setup-node@v4
-        with: { node-version: 24 }
+        with:
+          node-version: 24
       - name: Deploy W04 with admitted bindings
         working-directory: workers/W04-feed-search
         run: npx --yes wrangler@4.116.0 deploy
