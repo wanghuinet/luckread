@@ -4090,3 +4090,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No Entity Catalog promotion or global GREEN status was performed.
 - Change Control: `CC-MAPPING-0-CODE-EVIDENCE-ENTITY-DRIFT-2026-09-29.md`.
 - Backup: `backup/pre-code-evidence-entity-drift-fix-20260929`.
+
+
+## 2026-09-29 — AUTH-002 code evidence binding
+
+- Bound the already-admitted AUTH-002 native session runtime implementation/test sources into the B01-B03 mapping batch `codeEvidenceRefs`.
+- Evidence basis: current AUTH-002 real-evidence reconciliation and exact-SHA runtime evidence artifact; no new runtime execution was performed.
+- ENT-SESSION and AUTH-002 remain blocked by final Mapping 0 / entity admission.
+- No API, DTO, D1, Worker topology, or Evidence Registry promotion occurred.
+- Change Control: `CC-MAPPING-0-AUTH-002-CODE-EVIDENCE-BINDING-2026-09-29.md`.
+- Backup: `backup/pre-auth002-code-evidence-bind-20260929`.
