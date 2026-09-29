@@ -88,6 +88,59 @@ export default {
       const url = new URL(request.url)
       const path = getPath(url.pathname)
 
+      if (request.method === 'GET' && url.pathname === '/internal/content/creator/contents') {
+        const principal = requiredPrincipal(request)
+        const cursor = url.searchParams.get('cursor')
+        const limitParam = url.searchParams.get('limit')
+        const limit = limitParam ? Number(limitParam) : 20
+        const requestedState = url.searchParams.get('state')
+        const requestedType = url.searchParams.get('contentType')
+        const state = requestedState && requestedState !== 'ALL'
+          ? requestedState as ContentState
+          : null
+        const contentType = requestedType && requestedType !== 'ALL'
+          ? requestedType as 'article' | 'post' | 'video'
+          : null
+
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (state && !['DRAFT','PENDING_REVIEW','REJECTED','APPROVED','SCHEDULED','PUBLISHED','UNPUBLISHED','ARCHIVED','DELETED','RESTORED'].includes(state)) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        if (contentType && !['article','post','video'].includes(contentType)) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+
+        const page = await listOwnedContents(
+          env.D1_02,
+          principal.userId,
+          cursor,
+          limit,
+          state,
+          contentType,
+        )
+        return json({
+          data: {
+            items: page.items.map(item => ({
+              id: item.id,
+              contentType: item.contentType,
+              state: item.state,
+              version: item.version,
+              revision: item.revision,
+              etag: item.etag,
+              title: item.title,
+              bodyRef: item.bodyRef,
+              mediaRefs: item.mediaRefs,
+              coverRef: item.coverRef,
+              createdAt: item.createdAt,
+              updatedAt: item.updatedAt,
+            })),
+            nextCursor: page.nextCursor,
+            hasMore: page.hasMore,
+          },
+          requestId: crypto.randomUUID(),
+        })
+      }
+
       if (request.method === 'GET' && url.pathname === '/internal/content/contents') {
         const cursor = url.searchParams.get('cursor')
         const limitParam = url.searchParams.get('limit')
