@@ -20,14 +20,18 @@ Reconcile the remaining AUTH-004 lifecycle-event evidence blocker without invent
 ## Findings
 
 1. AUTH-004 requires lifecycle-event traceability for Mapping 0 closure.
-2. The current canonical AUTH-004 API/field contracts do not define an AUTH-004 password-change or password-reset event identifier.
-3. The current event-contract inventory contains `identity.account_state_changed` for AUTH-013 but no canonical credential/password lifecycle event contract that can be safely reused for AUTH-004.
-4. The successful AUTH-004 runtime artifact proves HTTP/security/session behavior, but does not contain a canonical password-change/password-reset event ID or an authoritative event contract.
-5. Therefore no Event ID, event contract, event payload, or runtime emission may be invented during Mapping 0 closure.
+2. The current canonical AUTH-004 API/field contracts do not admit a password-change or password-reset event identifier.
+3. Product/account-lifecycle contract `docs/72-USER-CENTER-PROFILE-SETTINGS-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md` names `user.password.changed` as a user-readable security-history event, but this reference does not itself define a canonical event schema, producer, version, queue, or consumer authority.
+4. The cross-cutting event contract `docs/163-EVENT-SEMANTICS-DELIVERY-ORDERING-REPLAY-DLQ-CONTRACT-v1.0.md` defines the generic event envelope and delivery semantics, but does not admit `user.password.changed` as a concrete canonical event contract.
+5. The canonical `contracts/events/` inventory currently contains `identity.account_state_changed` but no admitted credential/password lifecycle event contract.
+6. The successful AUTH-004 runtime artifact proves HTTP/security/session behavior, but does not contain an admitted password lifecycle Event ID or concrete event contract.
+7. Therefore no Event ID, event contract, event payload, producer, or runtime emission may be invented during Mapping 0 closure.
 
 ## Decision
 
-AUTH-004 lifecycle-event closure is `WAIT_AUTHORITY_DECISION`.
+AUTH-004 lifecycle-event closure remains `WAIT_AUTHORITY_DECISION`.
+
+The candidate event name `user.password.changed` is recorded only as a reference from the User Center lifecycle contract. It is not promoted to canonical event authority by this reconciliation.
 
 This is a governance blocker only. It does not invalidate the successful AUTH-004 remote E2E evidence already admitted.
 

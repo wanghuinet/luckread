@@ -4060,3 +4060,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - AUTH-001 remains `PARTIAL`: no page mapping is inferred; global Worker/D1 promotion remains governed by Mapping 0 / Five-Way gates; remote production/public registration E2E and complete security/anti-abuse evidence remain open.
 - No runtime code, migration, Worker topology, D1 topology or Evidence Registry promotion was performed.
 - Backup: `backup/pre-auth001-mapping-reconciliation-20260929`.
+
+
+## 2026-09-29 — AUTH-004 password lifecycle event authority gap narrowed
+
+- `docs/72-USER-CENTER-PROFILE-SETTINGS-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md` names `user.password.changed` as a user-readable security-history event.
+- `docs/163-EVENT-SEMANTICS-DELIVERY-ORDERING-REPLAY-DLQ-CONTRACT-v1.0.md` supplies the generic event envelope/delivery rules but does not define a concrete `user.password.changed` schema or authority.
+- No admitted concrete password lifecycle event contract, producer, queue binding or consumer authority was found under `contracts/events/`.
+- AUTH-004 therefore remains `WAIT_AUTHORITY_DECISION`; the candidate event name is recorded as reference only and must not be promoted or emitted by inference.
+- Existing AUTH-004 runtime/E2E evidence remains valid and is not rerun.
+- Backup: `backup/pre-auth004-event-envelope-authority-gap-20260929`.
