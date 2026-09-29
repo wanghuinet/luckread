@@ -7,14 +7,14 @@
 ## Authority
 
 - Repository authority: GitHub `main`
-- Current main: `18780de74b232b90f40cee1bda6492fa01b1e168`
+- Current main: `f49cdd879d4583b31447b93e051b4adca8be58eb`
 - Frozen topology: 12 Workers / 4 D1
-- Backup: `backup/pre-current-main-execution-cursor-reconciliation-20260929`
+- Backup: `backup/pre-current-main-cursor-postmerge-reconcile-20260929`
 - Working branch: `reconcile/current-execution-cursor-20260929`
 
 ## Reconciliation
 
-The persisted Mapping 0 execution cursor carried historical source-head values even though subsequent controlled changes had already advanced GitHub `main`.
+The persisted Mapping 0 execution cursor carried the pre-merge source-head value; after PR #264 merged, GitHub `main` advanced to the post-merge commit.
 
 This reconciliation updates the execution cursor to the actual current `main` head and explicitly preserves historical evidence provenance.
 
