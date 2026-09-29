@@ -132,7 +132,9 @@ for (const operation of api.records ?? []) {
     implementationRefs,
     testRefs,
     schemaEvidenceRefs: operation.schemaRef ? [operation.schemaRef] : [],
-    sourceRefs: [...new Set([...(operation.sourceRefs ?? [apiPath]), mappingPath])],
+    sourceRefs: implemented
+      ? [...new Set([...(operation.sourceRefs ?? [apiPath]), mappingPath])]
+      : (operation.sourceRefs ?? [apiPath]),
     blockers: implemented ? [] : ['Runtime API implementation evidence is not yet mechanically discovered'],
   });
 }
