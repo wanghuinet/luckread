@@ -46,9 +46,9 @@ jobs:
       - name: TypeScript verification
         run: |
           set -euo pipefail
-          npx --yes -p typescript@5.9.3 -p @cloudflare/workers-types@5.20260914.1 tsc \
+          npx --yes -p typescript@5.9.3 tsc \
             --noEmit --target ES2022 --module ESNext --moduleResolution Bundler \
-            --strict --skipLibCheck --types @cloudflare/workers-types \
+            --strict --skipLibCheck \
             workers/W04-feed-search/src/index.ts
 
       - name: Deploy W04 with pinned Wrangler
