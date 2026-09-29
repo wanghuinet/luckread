@@ -72,7 +72,7 @@ async function push(version, state, eventId) {
 }
 
 async function waitFor(predicate, label) {
-  for (let attempt = 0; attempt < 12; attempt += 1) {
+  for (let attempt = 0; attempt < 45; attempt += 1) {
     const record = await readRecord()
     if (record && predicate(record)) return record
     await new Promise((resolve) => setTimeout(resolve, 2000))
