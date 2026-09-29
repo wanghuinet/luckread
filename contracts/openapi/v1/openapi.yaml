@@ -513,6 +513,7 @@ paths:
       operationId: updateContent
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       requestBody:
         required: true
         content:
@@ -532,6 +533,7 @@ paths:
       operationId: deleteContent
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
         '204':
           description: Soft-deleted.
