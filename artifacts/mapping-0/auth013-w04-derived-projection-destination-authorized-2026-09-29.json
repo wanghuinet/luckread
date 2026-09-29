@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "status": "AUTHORIZED_FOR_CONTROLLED_PROVISIONING",
+  "auth": "AUTH-013",
+  "worker": "W04",
+  "topology": "12 Workers / 4 D1",
+  "destination": {
+    "type": "cloudflare_kv",
+    "logicalBinding": "AUTH013_W04_DERIVED_PROJECTION",
+    "requestedName": "luckread-w04-auth013-projection",
+    "authority": "NONE",
+    "owner": "W04",
+    "sourceAuthority": "D1-01",
+    "eventType": "identity.account_state_changed"
+  },
+  "transport": {
+    "queue": "luckread-auth013-account-state-projection",
+    "dlq": "luckread-auth013-account-state-projection-dlq",
+    "consumerWorker": "luckread-w04"
+  },
+  "constraints": {
+    "newD1": false,
+    "newWorker": false,
+    "newPublicApi": false,
+    "additionalProjectionDestination": false
+  },
+  "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-W04-DERIVED-PROJECTION-DESTINATION-2026-09-29.md"
+}
