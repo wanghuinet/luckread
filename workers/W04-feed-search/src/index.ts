@@ -7,6 +7,7 @@
 // Final live W04 gate trigger.
 // Runtime artifact emission simplified.
 // Final jq evidence trigger.
+// Final runtime gate trigger.
 import { applyAccountStateProjection, parseAccountStateChanged } from './auth-013-projection.js'
 
 interface ProjectionKV {
