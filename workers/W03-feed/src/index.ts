@@ -98,11 +98,14 @@ export default {
           data: {
             items: page.items.map(item => ({
               id: item.id,
+              contentType: item.contentType,
               state: item.state,
               version: item.version,
               etag: item.etag,
               title: item.title,
               bodyRef: item.bodyRef,
+              mediaRefs: item.mediaRefs,
+              coverRef: item.coverRef,
             })),
             nextCursor: page.nextCursor,
             hasMore: page.hasMore,
@@ -143,11 +146,14 @@ export default {
         )
         return json({
           id: content.id,
+          contentType: content.contentType,
           state: content.state,
           version: content.version,
           etag: content.etag,
           title: content.title,
           bodyRef: content.bodyRef,
+          mediaRefs: content.mediaRefs,
+          coverRef: content.coverRef,
         }, 201)
       }
 
