@@ -1,0 +1,261 @@
+.shell {
+  display: grid;
+  gap: 24px;
+  padding-bottom: 40px;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: end;
+  padding: 28px 32px;
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 90% 10%, color-mix(in srgb, var(--theme-success-500) 10%, transparent), transparent 32%),
+    radial-gradient(circle at 10% 100%, color-mix(in srgb, var(--theme-warning-500) 10%, transparent), transparent 30%),
+    var(--theme-elevation-0);
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--theme-elevation-500);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.hero h1,
+.panel h2 {
+  margin: 0;
+  color: var(--theme-elevation-1000);
+  letter-spacing: -.035em;
+}
+
+.hero h1 {
+  font-size: clamp(34px, 5vw, 54px);
+  line-height: 1.02;
+}
+
+.hero p,
+.panel p {
+  max-width: 760px;
+  margin: 14px 0 0;
+  color: var(--theme-elevation-600);
+  line-height: 1.7;
+}
+
+.identity {
+  min-width: 190px;
+  padding: 14px 16px;
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--theme-elevation-50) 72%, transparent);
+}
+
+.identityLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--theme-elevation-500);
+  font-size: 12px;
+}
+
+.identity strong {
+  display: block;
+  overflow: hidden;
+  color: var(--theme-elevation-1000);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quickGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.actionCard {
+  display: grid;
+  gap: 6px;
+  min-height: 150px;
+  padding: 22px;
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: 20px;
+  background: var(--theme-elevation-0);
+  color: inherit;
+  text-decoration: none;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.actionCard:hover {
+  transform: translateY(-2px);
+  border-color: var(--theme-elevation-300);
+  box-shadow: 0 14px 38px color-mix(in srgb, var(--theme-elevation-1000) 8%, transparent);
+}
+
+.actionCard strong {
+  color: var(--theme-elevation-1000);
+  font-size: 21px;
+}
+
+.actionCard > span:last-child {
+  color: var(--theme-elevation-600);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.actionKicker {
+  color: var(--theme-elevation-500);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, .8fr);
+  gap: 14px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: 20px;
+  background: var(--theme-elevation-0);
+}
+
+.panelHeading {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.panelHeading h2 {
+  font-size: 24px;
+}
+
+.panelBadge {
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: var(--theme-elevation-100);
+  color: var(--theme-elevation-600);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.progress {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.progress > div {
+  display: grid;
+  gap: 4px;
+  padding: 13px 14px;
+  border-radius: 14px;
+  background: var(--theme-elevation-50);
+}
+
+.progress span {
+  color: var(--theme-elevation-500);
+  font-size: 12px;
+}
+
+.progress strong {
+  color: var(--theme-elevation-900);
+  font-size: 13px;
+}
+
+.primaryButton,
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.primaryButton {
+  background: var(--theme-elevation-1000);
+  color: var(--theme-elevation-0);
+}
+
+.secondaryButton {
+  margin-top: 20px;
+  border: 1px solid var(--theme-elevation-200);
+  background: var(--theme-elevation-0);
+  color: var(--theme-elevation-900);
+}
+
+.authRequired {
+  max-width: 720px;
+  margin: 48px auto;
+  padding: 32px;
+  border: 1px solid var(--theme-elevation-150);
+  border-radius: 20px;
+  background: var(--theme-elevation-0);
+}
+
+.authRequired h1 {
+  margin: 0;
+  color: var(--theme-elevation-1000);
+}
+
+.authRequired p {
+  margin: 12px 0 20px;
+  color: var(--theme-elevation-600);
+}
+
+@media (max-width: 900px) {
+  .hero,
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .identity {
+    min-width: 0;
+  }
+
+  .quickGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero,
+  .panel {
+    padding: 20px;
+    border-radius: 18px;
+  }
+
+  .progress {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actionCard {
+    transition: none;
+  }
+
+  .actionCard:hover {
+    transform: none;
+  }
+}
