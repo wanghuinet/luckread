@@ -48,6 +48,7 @@ export default function CreatorContentList() {
   const [page, setPage] = useState<Page>({ items: [], nextCursor: null, hasMore: false })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [actionId, setActionId] = useState<string | null>(null)
 
   const load = useCallback(async (cursor: string | null = null) => {
     setLoading(true)
@@ -82,6 +83,34 @@ export default function CreatorContentList() {
     return () => window.clearTimeout(timer)
   }, [load])
 
+  async function transition(item: Item, to: 'PUBLISHED' | 'UNPUBLISHED') {
+    const verb = to === 'UNPUBLISHED' ? '下线' : '重新发布'
+    if (!window.confirm(`确定要${verb}“${item.title}”吗？`)) return
+
+    setActionId(item.id)
+    setError('')
+    try {
+      const response = await fetch(`/api/creator/contents/${encodeURIComponent(item.id)}/state`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'If-Match': `W/"${item.version}"`,
+          'Idempotency-Key': crypto.randomUUID(),
+        },
+        body: JSON.stringify({ to }),
+      })
+      const data = await response.json().catch((): null => null)
+      if (!response.ok) throw new Error(data?.error?.message || `${verb}失败`)
+      await load()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : `${verb}失败`)
+    } finally {
+      setActionId(null)
+    }
+  }
+
   return (
     <section className={styles.contentManageSection}>
       <div className={styles.contentManageHeading}>
@@ -100,6 +129,7 @@ export default function CreatorContentList() {
           ['DRAFT', '草稿'],
           ['PENDING_REVIEW', '审核中'],
           ['PUBLISHED', '已发布'],
+          ['UNPUBLISHED', '已下线'],
         ].map(([value, label]) => (
           <button
             className={status === value ? styles.filterActive : styles.filterButton}
@@ -161,9 +191,29 @@ export default function CreatorContentList() {
                     </Link>
                   ) : null}
                   {item.state === 'PUBLISHED' ? (
-                    <Link className={styles.secondaryButton} href={`/content/${encodeURIComponent(item.id)}`}>
-                      查看内容
-                    </Link>
+                    <>
+                      <Link className={styles.secondaryButton} href={`/content/${encodeURIComponent(item.id)}`}>
+                        查看内容
+                      </Link>
+                      <button
+                        className={styles.secondaryButton}
+                        disabled={actionId !== null}
+                        onClick={() => void transition(item, 'UNPUBLISHED')}
+                        type="button"
+                      >
+                        {actionId === item.id ? '处理中…' : '下线'}
+                      </button>
+                    </>
+                  ) : null}
+                  {item.state === 'UNPUBLISHED' ? (
+                    <button
+                      className={styles.secondaryButton}
+                      disabled={actionId !== null}
+                      onClick={() => void transition(item, 'PUBLISHED')}
+                      type="button"
+                    >
+                      {actionId === item.id ? '处理中…' : '重新发布'}
+                    </button>
                   ) : null}
                 </div>
               </article>
