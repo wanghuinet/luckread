@@ -76,7 +76,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
         }),
       })
 
-      const payload = (await response.json().catch(() => null)) as
+      const payload = (await response.json().catch((): null => null)) as
         | RegistrationResponse
         | ApiError
         | null
