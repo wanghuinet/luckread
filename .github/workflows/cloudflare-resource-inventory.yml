@@ -182,8 +182,16 @@ jobs:
             }'
           }
 
+          beta_latest_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/workers/luckread-w04/versions/latest"
+          beta_latest_body="artifacts/cloudflare-w04-beta-version.body"
+          beta_http_code="$(curl -sS --retry 3 --retry-all-errors -o "$beta_latest_body" -w '%{http_code}' "$beta_latest_url" "${auth_header[@]}" "${json_header[@]}")" || true
+          if [[ "$beta_http_code" == 2* ]]; then
+            jq '{bindings:(.result.bindings // []), source:"beta-worker-version-latest"}' "$beta_latest_body" | extract_bindings "beta-worker-version-latest" > artifacts/cloudflare-w04-bindings-inventory.json
+          else
           settings_http_code="$(curl -sS --retry 3 --retry-all-errors -o "$settings_body" -w '%{http_code}' "$settings_url" "${auth_header[@]}" "${json_header[@]}")" || true
-          if [[ "$settings_http_code" == 2* ]]; then
+          if [[ "$beta_http_code" == 2* ]]; then
+            :
+          elif [[ "$settings_http_code" == 2* ]]; then
             jq '{bindings:(.result.bindings // [])}' "$settings_body" | extract_bindings "script-settings" > artifacts/cloudflare-w04-bindings-inventory.json
           else
             deployment_http_code="$(curl -sS --retry 3 --retry-all-errors -o "$deployment_body" -w '%{http_code}' "$deployment_url" "${auth_header[@]}" "${json_header[@]}")" || true
@@ -253,7 +261,7 @@ jobs:
             fi
           fi
 
-          rm -f "$settings_body" "$deployment_body" "$version_list_body" "$version_body"
+          rm -f "$beta_latest_body" "$settings_body" "$deployment_body" "$version_list_body" "$version_body"
           jq . artifacts/cloudflare-w04-bindings-inventory.json
       - name: Publish W04 binding inventory artifact
         uses: actions/upload-artifact@v4
