@@ -333,3 +333,73 @@ describe('AUTH-011 refresh runtime', () => {
     expect((rejected[0] as PromiseRejectedResult).reason).toMatchObject({ code: 'UNAUTHENTICATED' })
   })
 })
+
+
+describe('AUTH-002 native session binding boundaries', () => {
+  it('binds extension state to the native sid and preserves the native expiry', async () => {
+    const db = {
+      prepare: () => ({
+        bind: (..._args: unknown[]) => ({
+          first: async <T>() => ({
+            sessionId: 'native-sid-7',
+            userId: '42',
+            createdAt: '2026-09-22T12:00:00.000Z',
+            expiresAt: '2026-09-22T14:00:00.000Z',
+            accountState: 'ACTIVE',
+          } as T),
+        }),
+      }),
+    } as unknown as D1Database
+
+    const result = await establishSessionFromAuthoritativeD1(db, {
+      sessionId: 'native-sid-7',
+      userId: '42',
+      deviceId: 'device-a',
+      now: NOW,
+      resolveLayer: async () => ({ decision: 'ALLOW', layer: 'L2' }),
+      randomToken: () => 'refresh-7',
+      execute: async (_db, sql, bindings) => {
+        expect(sql).toContain('INSERT INTO auth_session_state')
+        expect(bindings).toContain('native-sid-7')
+        expect(bindings).toContain('42')
+        expect(bindings).toContain('device-a')
+        return { meta: { changes: 1 } }
+      },
+    })
+
+    expect(result).toEqual({
+      sessionId: 'native-sid-7',
+      refreshToken: 'v1.refresh-7',
+      tokenVersion: 1,
+      layer: 'L2',
+      nativeExpiresAt: '2026-09-22T14:00:00.000Z',
+    })
+  })
+
+  it('fails closed on an expired native session before extension persistence', async () => {
+    const db = {
+      prepare: () => ({
+        bind: (..._args: unknown[]) => ({
+          first: async <T>() => ({
+            sessionId: 'native-sid-expired',
+            userId: '42',
+            createdAt: '2026-09-22T10:00:00.000Z',
+            expiresAt: '2026-09-22T12:59:59.000Z',
+            accountState: 'ACTIVE',
+          } as T),
+        }),
+      }),
+    } as unknown as D1Database
+
+    await expect(establishSessionFromAuthoritativeD1(db, {
+      sessionId: 'native-sid-expired',
+      userId: '42',
+      deviceId: 'device-a',
+      now: NOW,
+      resolveLayer: async () => ({ decision: 'ALLOW', layer: 'L2' }),
+      execute: async () => {
+        throw new Error('extension persistence must not run for expired native session')
+      },
+    })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
+  })
+})
