@@ -129,9 +129,10 @@ jobs:
             }
           }
           EOF
-      - name: Start ephemeral remote Worker harness
+      - name: Start and execute ephemeral remote Worker lifecycle harness
         run: |
           set -euo pipefail
+          mkdir -p artifacts/mapping-0/auth-013-lifecycle
           npx --yes wrangler@4.116.0 dev --remote --config .auth-013-lifecycle.wrangler.jsonc --ip 127.0.0.1 --port 8788 > auth-013-lifecycle-harness.log 2>&1 &
           echo $! > auth-013-lifecycle-harness.pid
           ready=0
@@ -156,24 +157,27 @@ jobs:
             cat auth-013-lifecycle-harness.log
             exit 1
           fi
-      - name: Execute lifecycle matrix evidence
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts/mapping-0/auth-013-lifecycle
-          http_code=000
-          for _ in $(seq 1 30); do
-            http_code=$(curl -sS -o artifacts/mapping-0/auth-013-lifecycle/runtime-result.json -w '%{http_code}' -X POST --max-time 10 http://127.0.0.1:8788/__auth013_lifecycle_probe || true)
-            if [ "$http_code" != "000" ]; then break; fi
-            sleep 1
-          done
+
+          set +e
+          http_code=$(curl -sS -o artifacts/mapping-0/auth-013-lifecycle/runtime-result.json -w '%{http_code}' -X POST --max-time 30 http://127.0.0.1:8788/__auth013_lifecycle_probe)
+          curl_exit=$?
+          set -e
+          echo "AUTH_013_LIFECYCLE_HTTP_STATUS=$http_code"
+          echo "AUTH_013_LIFECYCLE_CURL_EXIT=$curl_exit"
+          echo "--- runtime result ---"
+          cat artifacts/mapping-0/auth-013-lifecycle/runtime-result.json || true
+          echo "--- wrangler harness log ---"
+          cat auth-013-lifecycle-harness.log || true
+          test "$curl_exit" = "0"
           test "$http_code" = "200"
+
           node - <<'NODE'
-          const fs=require('node:fs'), r=JSON.parse(fs.readFileSync('artifacts/mapping-0/auth-013-lifecycle/runtime-result.json','utf8'))
+          const fs=require('node:fs')
+          const r=JSON.parse(fs.readFileSync('artifacts/mapping-0/auth-013-lifecycle/runtime-result.json','utf8'))
           if(r.status!=='PASS') throw new Error('AUTH-013 lifecycle matrix did not PASS')
           for(const [k,v] of Object.entries(r.checks||{})) if(!v) throw new Error('AUTH-013 lifecycle assertion failed: '+k)
           console.log('AUTH_013_LIFECYCLE_MATRIX=PASS')
           NODE
-          cat artifacts/mapping-0/auth-013-lifecycle/runtime-result.json
       - name: Capture provenance
         run: |
           cat > artifacts/mapping-0/auth-013-lifecycle/provenance.txt <<EOF
