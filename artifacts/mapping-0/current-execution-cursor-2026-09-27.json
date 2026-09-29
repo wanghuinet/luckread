@@ -1,8 +1,8 @@
 {
-  "version": "1.4.0",
+  "version": "1.5.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "53e3bcbb855be8e1240171390c69dd034bf04f8b",
-  "backupBranch": "backup/pre-auth013-w04-evidence-admission-20260929",
+  "sourceHead": "18780de74b232b90f40cee1bda6492fa01b1e168",
+  "backupBranch": "backup/pre-current-main-execution-cursor-reconciliation-20260929",
   "currentCursor": {
     "id": "AUTH-013-LIFECYCLE-SIDE-EFFECT-COVERAGE-001",
     "state": "TODO_VERIFY",
@@ -23,7 +23,10 @@
       "w04RuntimeRun": "36522900537",
       "w04WorkerVersion": "83e69e13-104c-482f-bc4c-2176bc9ef824",
       "evidenceId": "EVD-AUTH013-W04-PROJECTION-RUNTIME-001"
-    }
+    },
+    "currentMainSha": "18780de74b232b90f40cee1bda6492fa01b1e168",
+    "sourceHead": "18780de74b232b90f40cee1bda6492fa01b1e168",
+    "reconciliationNote": "Current execution source is main at 18780de74b232b90f40cee1bda6492fa01b1e168. The W04 runtime evidence source/version remains pinned to the previously deployed exact source; later main changes are retained as current repository state and are not retroactively claimed as deployed."
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -490,5 +493,38 @@
     "runId": "36522900537",
     "jobId": "109259476025",
     "headSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
+  },
+  "currentMainReconciliation": {
+    "reviewedAt": "2026-09-29",
+    "currentMainSha": "18780de74b232b90f40cee1bda6492fa01b1e168",
+    "latestMergedCommits": [
+      "18780de74b232b90f40cee1bda6492fa01b1e168",
+      "820cb6bbcbf8725fd4a5d89ee7443cfe3e10ecfa",
+      "191403af04b44e8f71022855b4b63eb89980d265"
+    ],
+    "executionDisposition": "CURRENT_MAIN_RECONCILED_EXTERNAL_EVIDENCE_PENDING",
+    "auth013NextGate": {
+      "status": "BLOCKED_EXTERNAL",
+      "workflow": ".github/workflows/auth-013-w04-side-effect-matrix-evidence.yml",
+      "executionMode": "workflow_dispatch",
+      "requiredConfirmation": "RUN",
+      "deployedSourceSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b",
+      "deployedWorkerVersion": "83e69e13-104c-482f-bc4c-2176bc9ef824",
+      "note": "No new code/topology is authorized or needed for this gate; runtime evidence must be executed against the admitted live W04 version."
+    },
+    "otherExternalGates": [
+      {
+        "feature": "AUTH-004",
+        "workflow": ".github/workflows/w01-w02-binding-deploy.yml",
+        "status": "EXTERNAL_DEPLOYMENT_REQUIRED",
+        "note": "Fresh current-source W01/W02 binding deployment is required before remote AUTH-004 E2E evidence."
+      },
+      {
+        "feature": "AUTH-010",
+        "workflow": ".github/workflows/w01-w02-binding-deploy.yml",
+        "status": "EXTERNAL_DEPLOYMENT_REQUIRED",
+        "note": "Fresh current-source W01/W02 binding deployment is required before remote AUTH-010 E2E evidence."
+      }
+    ]
   }
 }
