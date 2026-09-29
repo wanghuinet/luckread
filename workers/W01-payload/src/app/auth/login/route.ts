@@ -146,12 +146,29 @@ export async function POST(request: Request): Promise<Response> {
       tokenVersion: session.tokenVersion,
     })
 
-    return json({
-      accessToken: access.token,
-      refreshToken: session.refreshToken,
-      expiresIn: access.expiresIn,
-      layer: session.layer,
-    })
+    return new Response(
+      JSON.stringify({
+        accessToken: access.token,
+        refreshToken: session.refreshToken,
+        expiresIn: access.expiresIn,
+        layer: session.layer,
+      }),
+      {
+        status: 200,
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'no-store',
+          'set-cookie': [
+            `payload-token=${encodeURIComponent(access.token)}`,
+            'Path=/',
+            'HttpOnly',
+            process.env.NODE_ENV === 'production' ? 'Secure' : '',
+            'SameSite=Lax',
+            `Max-Age=${Math.max(1, Math.floor(access.expiresIn))}`,
+          ].filter(Boolean).join('; '),
+        },
+      },
+    )
   } catch (error) {
     if (error instanceof W02AuthClientError) {
       return errorResponse(
