@@ -406,6 +406,53 @@ export async function listContents(
   }
 }
 
+export async function listOwnedContents(
+  db: ContentD1,
+  ownerUserId: string,
+  cursor: string | null,
+  limit: number,
+  state: ContentState | null,
+  contentType: ContentType | null,
+): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
+  assertResourceId(ownerUserId)
+  const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
+  const decoded = cursor ? decodeCursor(cursor) : null
+
+  const conditions = ['owner_user_id = ?']
+  const bindings: Array<string | number> = [ownerUserId]
+  if (state) {
+    conditions.push('state = ?')
+    bindings.push(state)
+  }
+  if (contentType) {
+    conditions.push('content_type = ?')
+    bindings.push(contentType)
+  }
+  if (decoded) {
+    conditions.push('(updated_at < ? OR (updated_at = ? AND id < ?))')
+    bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
+  }
+
+  const result = await db.prepare(
+    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
+            title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
+       FROM contents
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY updated_at DESC, id DESC
+      LIMIT ?`,
+  ).bind(...bindings, pageSize + 1).all<ContentRow>()
+
+  const hasMore = result.results.length > pageSize
+  const page = result.results.slice(0, pageSize).map(toContent)
+  const last = page.at(-1)
+
+  return {
+    items: page,
+    hasMore,
+    nextCursor: hasMore && last ? encodeCursor(last.updatedAt, last.id) : null,
+  }
+}
+
 export async function createContent(
   db: ContentD1,
   ownerUserId: string,
