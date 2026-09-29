@@ -4,6 +4,7 @@
 // Consumer/DLQ live verification uses the dedicated Queue API.
 // Final runtime evidence execution.
 // Response-shape-safe consumer verification.
+// Final live W04 gate trigger.
 import { applyAccountStateProjection, parseAccountStateChanged } from './auth-013-projection.js'
 
 interface ProjectionKV {
