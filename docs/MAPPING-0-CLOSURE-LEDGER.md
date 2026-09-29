@@ -3991,3 +3991,15 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Change Control: `CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-STALE-SESSION-HEREDOC-2026-09-29.md`.
 - No runtime, Contract/OpenAPI, D1 schema, Payload version, Worker topology, Service Binding, authorization-rule, or Evidence Registry promotion change.
 - AUTH-013 and Mapping 0 remain `NOT_GREEN` until a fresh controlled E2E run executes the stale-session proof and all final D1 assertions successfully.
+
+
+## 2026-09-29 — AUTH-013 public HTTP E2E full execution evidence captured
+
+- Run `36503534440` completed successfully on main commit `b91b49d6262ced5631d4d246d1573fa03583752c`.
+- The run used exact deployed source `f4c329b74f7110af76c7ba7339bfd9d3cb81f910` and successful binding deployment Run `36502171590`.
+- All required public assertions passed: unauthenticated 401, mandatory If-Match 428, client-authority injection 403, authorized operator 200 with the admitted three-field response, stale If-Match 412, revoked-session 401.
+- Authoritative D1 checks passed: independent target reached `RESTRICTED` version 2 with exactly one `identity.account_state_changed` journal row; operator/basic accounts remained unchanged; basic session revocation/token-version side effect was observed.
+- Synthetic fixture cleanup and zero-row verification passed.
+- Evidence artifact `11006620069` is non-expired and has digest `sha256:5a2ef6ead447dc908fa374aa2c9632d76ef3050080afb8dc81fd03f6901311f3`.
+- Change Control: `CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-SUCCESS-2026-09-29.md`.
+- This closes the **public HTTP execution evidence** sub-gate for the tested deployment scope. It does not promote the canonical Evidence Registry or Mapping 0 GREEN; those remain subject to their own freshness and full-graph admission rules.
