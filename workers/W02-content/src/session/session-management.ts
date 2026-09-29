@@ -282,19 +282,20 @@ export async function revokeCurrentUserSession(
           AND current_state.revoked_at IS NULL
           AND current_session.expires_at > ?
       ) AS currentSessionValid,
-      (
-        EXISTS (
-          SELECT 1
-          FROM auth_session_state AS target_extension
-          WHERE CAST(target_extension.session_id AS TEXT) = ?
-            AND target_extension.user_id = ?
-        )
-        AND EXISTS (
-          SELECT 1
-          FROM users_sessions AS target_native
-          WHERE CAST(target_native.id AS TEXT) = ?
-            AND CAST(target_native._parent_id AS TEXT) = ?
-        )
+      EXISTS (
+        SELECT 1
+        FROM auth_session_state AS target_extension
+        WHERE CAST(target_extension.session_id AS TEXT) = ?
+          AND target_extension.user_id = ?
+          AND (
+            target_extension.revoked_at IS NOT NULL
+            OR EXISTS (
+              SELECT 1
+              FROM users_sessions AS target_native
+              WHERE CAST(target_native.id AS TEXT) = ?
+                AND CAST(target_native._parent_id AS TEXT) = ?
+            )
+          )
       ) AS targetOwned
   `
 
