@@ -5,6 +5,9 @@ on:
   push:
     paths:
       - ".github/workflows/cloudflare-resource-inventory.yml"
+  pull_request:
+    paths:
+      - ".github/workflows/cloudflare-resource-inventory.yml"
   workflow_dispatch:
 
 permissions:
