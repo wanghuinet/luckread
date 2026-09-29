@@ -138,6 +138,71 @@ jobs:
           collect "queues" "${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/queues?page=1&per_page=100" artifacts/cloudflare-queue-inventory.json
           cat artifacts/cloudflare-kv-inventory.json artifacts/cloudflare-r2-inventory.json artifacts/cloudflare-queue-inventory.json
 
+      - name: Collect read-only W04 live binding inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p artifacts
+          auth_header=(-H "Authorization: Bearer $CF_API_TOKEN")
+          json_header=(-H "Content-Type: application/json")
+
+          extract_bindings() {
+            local source="$1"
+            jq --arg source "$source" '{
+              worker: "luckread-w04",
+              status: "AVAILABLE",
+              source: $source,
+              bindings: (
+                (.bindings // [])
+                | map(select((.type // "") | test("secret"; "i") | not))
+                | map(with_entries(select(
+                    .key
+                    | IN("name","type","namespace_id","bucket_name","queue_name","service","script_name","instance_name","namespace","workflow_name","class_name","id")
+                  )))
+              )
+            }'
+          }
+
+          settings_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/settings"
+          settings_body="artifacts/cloudflare-w04-settings.body"
+          settings_status="$(curl -sS --retry 3 --retry-all-errors -o "$settings_body" -w '%{http_code}' "$settings_url" "${auth_header[@]}" "${json_header[@]}")" || true
+          if [[ "$settings_status" == 2* ]]; then
+            jq '{bindings:(.result.bindings // [])}' "$settings_body" | extract_bindings "script-settings" > artifacts/cloudflare-w04-bindings-inventory.json
+          else
+            deployment_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/deployments?per_page=1"
+            deployment_body="artifacts/cloudflare-w04-deployment.body"
+            deployment_status="$(curl -sS --retry 3 --retry-all-errors -o "$deployment_body" -w '%{http_code}' "$deployment_url" "${auth_header[@]}" "${json_header[@]}")" || true
+            if [[ "$deployment_status" == 2* ]]; then
+              version_id="$(jq -r '.result[0].versions[0].version_id // empty' "$deployment_body")"
+            else
+              version_id=""
+            fi
+            if [[ -n "$version_id" ]]; then
+              version_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/versions/${version_id}"
+              version_body="artifacts/cloudflare-w04-version.body"
+              version_status="$(curl -sS --retry 3 --retry-all-errors -o "$version_body" -w '%{http_code}' "$version_url" "${auth_header[@]}" "${json_header[@]}")" || true
+              if [[ "$version_status" == 2* ]]; then
+                jq '{bindings:(.result.resources.bindings // [])}' "$version_body" | extract_bindings "active-deployment-version" > artifacts/cloudflare-w04-bindings-inventory.json
+              else
+                jq -n --arg settings "$settings_status" --arg deployment "$deployment_status" --arg version "$version_status" '{worker:"luckread-w04",status:"UNAVAILABLE",reason:"w04_binding_read_failed",settingsHttpStatus:$settings,deploymentHttpStatus:$deployment,versionHttpStatus:$version}' > artifacts/cloudflare-w04-bindings-inventory.json
+              fi
+            elif [[ "$deployment_status" == 2* ]]; then
+              jq -n --arg settings "$settings_status" --arg deployment "$deployment_status" '{worker:"luckread-w04",status:"AVAILABLE",source:"deployment-inventory",bindings:[],note:"no_active_deployment_version_identified",settingsHttpStatus:$settings,deploymentHttpStatus:$deployment}' > artifacts/cloudflare-w04-bindings-inventory.json
+            else
+              jq -n --arg settings "$settings_status" --arg deployment "$deployment_status" '{worker:"luckread-w04",status:"UNAVAILABLE",reason:"w04_live_binding_inventory_unavailable",settingsHttpStatus:$settings,deploymentHttpStatus:$deployment}' > artifacts/cloudflare-w04-bindings-inventory.json
+            fi
+          fi
+
+          rm -f "$settings_body" "${deployment_body:-}" "${version_body:-}"
+          jq . artifacts/cloudflare-w04-bindings-inventory.json
+      - name: Publish W04 binding inventory artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-w04-binding-inventory
+          path: artifacts/cloudflare-w04-bindings-inventory.json
+          if-no-files-found: error
+
       - name: Publish extended inventory artifact
         uses: actions/upload-artifact@v4
         with:
