@@ -1,91 +1,28 @@
 {
   "version": "1.4.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "86e6c0b7b75722177ae2d5adc48b15b9abf97156",
-  "backupBranch": "backup/pre-auth013-w04-cloudflare-inventory-confirmed-20260929",
+  "sourceHead": "53e3bcbb855be8e1240171390c69dd034bf04f8b",
+  "backupBranch": "backup/pre-auth013-w04-evidence-admission-20260929",
   "currentCursor": {
-    "id": "AUTH-013-W04-PROJECTION-CONSUMER-001",
-    "state": "BLOCKED_EXTERNAL",
-    "objective": "Implement the minimum W04 consumer for identity.account_state_changed after confirming the admitted projection destination and cache/deindex semantics; W04 remains derived/projection only and must not acquire D1 authority.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-W04-CLOUDFLARE-INVENTORY-RECONCILIATION-2026-09-29.md",
-    "nextGate": "1) Obtain/admit a concrete existing W04 derived destination/configuration through explicit infrastructure/change-control authority. 2) Confirm cache/deindex/version semantics for that concrete destination. 3) Only then bind luckread-auth013-account-state-projection to luckread-w04 with bounded retry/DLQ and implement idempotent stale-event rejection plus the admitted projection/deindex action.",
-    "logicalOwnership": "W04 -> Feed / Recommendation / Search derived/projection boundary",
-    "physicalBinding": "VERIFIED. W04 physical Worker luckread-w04 and W05-W12 physical Worker inventory are verified. Dedicated W04 projection queue and DLQ are created and verified by Run 36510919222.",
-    "physicalRuntimeTarget": "T08/T09/T10 -> W04; derived/projection only; no new authoritative D1",
+    "id": "AUTH-013-LIFECYCLE-SIDE-EFFECT-COVERAGE-001",
+    "state": "TODO_VERIFY",
+    "objective": "Complete the remaining AUTH-013 lifecycle transition and side-effect evidence using the existing W01/W02 authoritative path and already-admitted W04/W06 consumers, without adding Worker/D1 topology.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-SIDE-EFFECT-DECISION-RECONCILIATION-2026-09-29.md",
+    "nextGate": "Build the minimum controlled evidence slice for FROZEN, SUSPENDED, BANNED (approval required), escalation/reinstatement/restore paths and contracted cache/deindex convergence; reuse existing deployed resources and do not create a new public route or data store.",
+    "logicalOwnership": "W02 -> D1-01 account authority; W06 -> D1-03 audit; W04 -> derived Feed / Recommendation / Search projection",
+    "physicalBinding": "VERIFIED. W04 luckread-w04, W06 audit consumer, W02 authority path, dedicated W04 projection queue/DLQ, and existing globe KV derived destination are admitted/verified.",
+    "physicalRuntimeTarget": "T01 -> W02/D1-01; audit -> W06/D1-03; T08/T09/T10 -> W04 derived projection",
     "supersededBlockers": [
-      "W04 physical resource is PASS_VERIFIED.",
-      "W04 projection queue and dedicated DLQ are PASS_VERIFIED.",
-      "W02 canonical event fan-out implementation is unit/config PASS_VERIFIED by Run 36511115240; no production deployment evidence is claimed.",
-      "Current contracts do not identify a concrete W04 projection/deindex destination or cache invalidation implementation that can be bound without inference.",
-      "Do not invent a D1 projection store, KV/R2 store, search engine endpoint, Service Binding, public API, or arbitrary cache key."
+      "W04 destination authority missing — resolved by adopted existing globe KV Change Control.",
+      "W04 projection queue consumer missing — resolved and verified by Run 36522900537.",
+      "W04 projection runtime evidence pending — resolved by Run 36522900537.",
+      "Do not add D1, Worker, Queue, KV, public API, or alternate event authority."
     ],
-    "sourceHead": "e73cced0eca9e3a630f06ac793dd8648298725f1",
-    "currentHeadReconciliation": {
-      "reason": "Current main has a successful read-only Cloudflare account inventory and a successful live W04 Worker settings inventory. The account inventory finds no admitted W04 derived destination; the live W04 settings response explicitly reports bindings: []. The dedicated AUTH-013 W04 projection queue exists with zero consumers. Implementation remains blocked until a concrete destination authority is explicitly admitted.",
-      "currentMainSha": "b09c6cd7630019c4f663c7cf77f9498fdbab4f9b",
-      "w04PhysicalProvisionRun": "36509211004",
-      "w04PhysicalWorker": "luckread-w04",
-      "w05w12ProvisionRun": "36509821604",
-      "w05w12Provisioned": [
-        "luckread-w05",
-        "luckread-w07",
-        "luckread-w08",
-        "luckread-w09",
-        "luckread-w10",
-        "luckread-w11",
-        "luckread-w12"
-      ],
-      "w05w12Preexisting": [
-        "luckread-w06"
-      ],
-      "w04ProjectionStatus": "DESTINATION_AUTHORITY_CONFIRMED_MISSING",
-      "w04ResourceStatus": "PASS_VERIFIED",
-      "reviewedAt": "2026-09-29",
-      "eventTransportDecision": "W02_DIRECT_MULTI_DESTINATION",
-      "projectionQueue": "luckread-auth013-account-state-projection",
-      "projectionDlq": "luckread-auth013-account-state-projection-dlq",
-      "w04QueueProvisionRun": "36510919222",
-      "w04QueueProvisionStatus": "PASS_VERIFIED",
-      "w04ProjectionQueue": "luckread-auth013-account-state-projection",
-      "w04ProjectionDlq": "luckread-auth013-account-state-projection-dlq",
-      "w02FanoutImplementationCommit": "31aac14e281e481e9294233344d40af5ac83b146",
-      "w02FanoutCiRun": "36511115240",
-      "w02FanoutCiStatus": "PASS_VERIFIED_UNIT_AND_CONFIG",
-      "w04ProjectionRuntimeStatus": "IMPLEMENTATION_PENDING_DESTINATION_AUTHORITY",
-      "destinationAuthorityAudit": "CLOUDFLARE_ACCOUNT_AND_W04_LIVE_BINDING_INVENTORY_VERIFIED_NO_W04_DESTINATION",
-      "destinationAuthoritySourcesChecked": [
-        "docs/53-SEARCH-DISCOVERY-SYSTEM-CONTRACT-v1.0.md",
-        "docs/55-FEED-RECOMMENDATION-PERSONALIZATION-TRENDING-SYSTEM-CONTRACT-v1.0.md",
-        "docs/71-PLATFORM-OPERATIONS-GOVERNANCE-RELIABILITY-CONTRACT-v1.0.md",
-        "docs/189-L5-L6-FEED-RECOMMENDATION-PERSONALIZATION-TRENDING-INSTANCE-REGISTRY-v1.0.md",
-        "docs/194-L5-L6-SEARCH-DISCOVERY-ANALYTICS-GROWTH-INSTANCE-REGISTRY-v1.0.md",
-        "docs/167-CACHE-INVALIDATION-HOT-KEY-STAMPEDE-CONTRACT-v1.0.md",
-        "workers/W04-feed-search/wrangler.jsonc",
-        "workers/W04-feed-search/src/index.ts"
-      ],
-      "cloudflareInventoryRunId": "36519177221",
-      "cloudflareInventoryArtifactId": "11011833636",
-      "cloudflareInventoryArtifactDigest": "sha256:031baca1f955e9bea27a60e1d1f7ff300ee37feda5b8855b265351991d197f73",
-      "cloudflareObservedKv": [
-        "globe"
-      ],
-      "cloudflareObservedR2": [
-        "fanshut",
-        "globe",
-        "luckread-w01-assets-placeholder",
-        "openthem"
-      ],
-      "cloudflareObservedAuth013Queues": {
-        "projection": "luckread-auth013-account-state-projection",
-        "projectionConsumers": 0,
-        "projectionDlq": "luckread-auth013-account-state-projection-dlq"
-      },
-      "cloudflareW04LiveBindingStatus": "PASS_VERIFIED",
-      "cloudflareW04LiveBindingSource": "script-settings",
-      "cloudflareW04LiveBindings": [],
-      "cloudflareW04LiveBindingRunId": "36519177221",
-      "cloudflareW04LiveBindingArtifactId": "11011833636",
-      "cloudflareW04LiveBindingArtifactDigest": "sha256:031baca1f955e9bea27a60e1d1f7ff300ee37feda5b8855b265351991d197f73"
+    "sourceEvidence": {
+      "mainSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b",
+      "w04RuntimeRun": "36522900537",
+      "w04WorkerVersion": "83e69e13-104c-482f-bc4c-2176bc9ef824",
+      "evidenceId": "EVD-AUTH013-W04-PROJECTION-RUNTIME-001"
     }
   },
   "alreadyClosed": {
@@ -546,5 +483,12 @@
     "worker": "luckread-w04",
     "source": "script-settings",
     "bindings": []
+  },
+  "latestRuntimeEvidence": {
+    "auth013W04Projection": "PASS_VERIFIED",
+    "workflow": ".github/workflows/w04-physical-provision.yml",
+    "runId": "36522900537",
+    "jobId": "109259476025",
+    "headSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
   }
 }
