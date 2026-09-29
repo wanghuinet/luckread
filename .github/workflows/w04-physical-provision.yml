@@ -112,7 +112,7 @@ jobs:
           push 2 RESTORED "evt_${GITHUB_RUN_ID}_2"
           sleep 3
           record="$(read_record)"
-          echo "$record" | jq -e --arg eid "evt_${GITHUB_RUN_ID}_2" '.sourceVersion==2 and .state=="ACTIVE" and .eventId==$eid' >/dev/null
+          echo "$record" | jq -e '.sourceVersion==2 and .state=="ACTIVE" and .deindex==false' >/dev/null
           jq -n --arg commit "$GITHUB_SHA" --arg queueId "$queue_id" '{schemaVersion:1,auth:"AUTH-013",worker:"W04",commit:$commit,queue:"luckread-auth013-account-state-projection",queueId:$queueId,derivedDestination:{type:"cloudflare_kv",title:"globe",namespaceId:"32f7e407128a43d59720d5d46736e084",authority:"NONE"},runtimeAssertions:{v1FrozenPurged:true,v2RestoredActive:true,olderVersionRejected:true,duplicateDeliveryIdempotent:true,nonResurrection:true}}' > auth013-w04-runtime-evidence.json
           curl -fsS -X DELETE "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/32f7e407128a43d59720d5d46736e084/values/$ENCODED_KEY" "${AUTH[@]}" >/dev/null
       - name: Upload AUTH-013 W04 runtime evidence
