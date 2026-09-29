@@ -6,6 +6,8 @@ import {
   deleteContent,
   getContent,
   listContents,
+  listCreatorContents,
+  validateListFilters,
   toErrorResponse,
   transitionContentState,
   updateContent,
@@ -87,6 +89,36 @@ export default {
       requireTransport(request)
       const url = new URL(request.url)
       const path = getPath(url.pathname)
+
+      if (request.method === 'GET' && url.pathname === '/internal/content/creator-contents') {
+        const principal = requiredPrincipal(request)
+        const cursor = url.searchParams.get('cursor')
+        const limitParam = url.searchParams.get('limit')
+        const limit = limitParam ? Number(limitParam) : 20
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const filters = validateListFilters(url.searchParams.get('status'), url.searchParams.get('type'))
+        const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, filters)
+        return json({
+          data: {
+            items: page.items.map(item => ({
+              id: item.id,
+              contentType: item.contentType,
+              state: item.state,
+              version: item.version,
+              revision: item.revision,
+              etag: item.etag,
+              title: item.title,
+              bodyRef: item.bodyRef,
+              mediaRefs: item.mediaRefs,
+              coverRef: item.coverRef,
+              updatedAt: item.updatedAt,
+            })),
+            nextCursor: page.nextCursor,
+            hasMore: page.hasMore,
+          },
+          requestId: crypto.randomUUID(),
+        })
+      }
 
       if (request.method === 'GET' && url.pathname === '/internal/content/contents') {
         const cursor = url.searchParams.get('cursor')
