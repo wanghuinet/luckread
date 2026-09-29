@@ -90,6 +90,8 @@ describe('Creator Center admin extension', () => {
     expect(view).toContain('<CreatorContentList />')
     expect(list).toContain("/api/creator/contents?")
     expect(list).toContain("['DRAFT', 'REJECTED'].includes(item.state)")
+    expect(list).toContain("item.state === 'PUBLISHED'")
+    expect(list).toContain("href={\`/content/\${encodeURIComponent(item.id)}\`}")
     expect(list).toContain('加载更多')
     expect(route).toContain('export async function GET')
     expect(route).toContain('/internal/content/creator-contents')
