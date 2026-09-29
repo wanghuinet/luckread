@@ -199,3 +199,136 @@ describe('authenticated session orchestration', () => {
   })
 
 })
+
+describe('AUTH-011 refresh runtime', () => {
+  const refreshSession = {
+    sessionId: 'sid-refresh',
+    userId: '42',
+    deviceId: 'device-a',
+    tokenVersion: 3,
+    refreshCredentialHash: 'hash:v3.old',
+    revokedAt: null,
+    lastSeenAt: NOW,
+    nativeExpiresAt: '2026-09-22T14:00:00.000Z',
+  }
+
+  function refreshDb(state = { ...refreshSession }) {
+    let current = state
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => ({
+          first: async <T>() => {
+            if (sql.includes('FROM auth_session_state AS a')) {
+              return {
+                ...current,
+                accountState: 'ACTIVE',
+                email: 'user@example.com',
+              } as T
+            }
+            return null as T
+          },
+          run: async () => {
+            if (sql.includes('UPDATE auth_session_state')) {
+              const expectedHash = String(args[3] ?? '')
+              if (current.refreshCredentialHash !== expectedHash || current.revokedAt !== null) {
+                return { meta: { changes: 0 } }
+              }
+              current = {
+                ...current,
+                refreshCredentialHash: String(args[0]),
+                lastSeenAt: String(args[1]),
+              }
+              return { meta: { changes: 1 } }
+            }
+            return { meta: { changes: 0 } }
+          },
+        }),
+      }),
+    }
+    return db as unknown as D1Database
+  }
+
+  it('rotates the predecessor credential exactly once', async () => {
+    const db = refreshDb()
+    const result = await refreshSessionFromAuthoritativeD1(db, {
+      refreshToken: 'v3.old',
+      deviceId: 'device-a',
+      now: NOW,
+      randomToken: () => 'next',
+      hashToken: async (value) => 'hash:' + value,
+      resolveLayer: async () => ({ decision: 'ALLOW', layer: 'L2' }),
+    })
+
+    expect(result).toEqual({
+      sessionId: 'sid-refresh',
+      userId: '42',
+      refreshToken: 'v3.next',
+      tokenVersion: 3,
+      layer: 'L2',
+      nativeExpiresAt: '2026-09-22T14:00:00.000Z',
+      email: 'user@example.com',
+    })
+
+    await expect(refreshSessionFromAuthoritativeD1(db, {
+      refreshToken: 'v3.old',
+      deviceId: 'device-a',
+      now: NOW,
+      randomToken: () => 'replay',
+      hashToken: async (value) => 'hash:' + value,
+      resolveLayer: async () => ({ decision: 'ALLOW', layer: 'L2' }),
+    })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
+  })
+
+  it('fails closed on wrong device binding before rotation', async () => {
+    const db = refreshDb()
+    await expect(refreshSessionFromAuthoritativeD1(db, {
+      refreshToken: 'v3.old',
+      deviceId: 'device-wrong',
+      now: NOW,
+      randomToken: () => 'unused',
+      hashToken: async (value) => 'hash:' + value,
+      resolveLayer: async () => ({ decision: 'ALLOW', layer: 'L2' }),
+    })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
+  })
+
+  it('denies when authoritative authorization rejects the account', async () => {
+    const db = refreshDb()
+    await expect(refreshSessionFromAuthoritativeD1(db, {
+      refreshToken: 'v3.old',
+      deviceId: 'device-a',
+      now: NOW,
+      randomToken: () => 'unused',
+      hashToken: async (value) => 'hash:' + value,
+      resolveLayer: async () => ({ decision: 'DENY' }),
+    })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
+  })
+
+  it('allows at most one concurrent rotation for the same predecessor', async () => {
+    const db = refreshDb()
+    const results = await Promise.allSettled([
+      refreshSessionFromAuthoritativeD1(db, {
+        refreshToken: 'v3.old',
+        deviceId: 'device-a',
+        now: NOW,
+        randomToken: () => 'next-a',
+        hashToken: async (value) => 'hash:' + value,
+        resolveLayer: async () => ({ decision: 'ALLOW', layer: 'L2' }),
+      }),
+      refreshSessionFromAuthoritativeD1(db, {
+        refreshToken: 'v3.old',
+        deviceId: 'device-a',
+        now: NOW,
+        randomToken: () => 'next-b',
+        hashToken: async (value) => 'hash:' + value,
+        resolveLayer: async () => ({ decision: 'ALLOW', layer: 'L2' }),
+      }),
+    ])
+
+    const fulfilled = results.filter((result) => result.status === 'fulfilled')
+    const rejected = results.filter((result) => result.status === 'rejected')
+
+    expect(fulfilled).toHaveLength(1)
+    expect(rejected).toHaveLength(1)
+    expect((rejected[0] as PromiseRejectedResult).reason).toMatchObject({ code: 'UNAUTHENTICATED' })
+  })
+})
