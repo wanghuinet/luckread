@@ -1,6 +1,7 @@
 // AUTH-013 W04 binding CI trigger: runtime implementation unchanged.
 // Runtime evidence gate follows the admitted destination and queue binding.
 // Final controlled runtime trigger.
+// Consumer/DLQ live verification uses the dedicated Queue API.
 import { applyAccountStateProjection, parseAccountStateChanged } from './auth-013-projection.js'
 
 interface ProjectionKV {
