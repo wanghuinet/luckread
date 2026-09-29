@@ -2,7 +2,7 @@ import {
   callW03Content,
   resolveCookieContentPrincipal,
   W03ContentClientError,
-} from '../../../../content/w03-content-client.js'
+} from '../../../../../content/w03-content-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
