@@ -48,6 +48,19 @@ jobs:
           npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W03-feed/src/content-runtime.ts workers/W03-feed/src/index.ts
           npx --yes vitest@3.2.4 run workers/W03-feed/src/content-runtime.test.ts
 
+      - name: W02 typecheck and tests
+        run: |
+          npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W02-content/src/index.ts
+          npx --yes vitest@3.2.4 run workers/W02-content/src/authz/role-assignment.test.ts workers/W02-content/src/session/session-runtime.test.ts workers/W02-content/src/session/session-management.test.ts
+
+      - name: Deploy W02
+        working-directory: workers/W02-content
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+
       - name: Apply pending D1-02 migrations
         working-directory: workers/W03-feed
         env:

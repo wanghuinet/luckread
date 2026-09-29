@@ -226,6 +226,60 @@ type AuthoritativeSessionContext = {
   accountState: string
 }
 
+async function ensureRegisteredBaseRole(
+  db: D1Database,
+  userId: string,
+  accountState: string,
+  now: string,
+): Promise<void> {
+  if (!userId || (accountState !== 'PENDING_VERIFICATION' && accountState !== 'ACTIVE')) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'account is not eligible for authentication')
+  }
+
+  const existing = await db
+    .prepare(
+      `SELECT id
+       FROM role_assignments
+       WHERE subject_id = ?
+         AND role_id = 'user'
+         AND scope_type = 'global'
+         AND scope_id IS NULL
+         AND status = 'ACTIVE'
+         AND valid_from <= ?
+         AND (valid_until IS NULL OR ? < valid_until)
+       LIMIT 1`,
+    )
+    .bind(userId, now, now)
+    .first<{ id: string }>()
+
+  if (existing?.id) return
+
+  const roleId = 'base-user-' + userId
+  const result = await db
+    .prepare(
+      `INSERT OR IGNORE INTO role_assignments
+        (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at)
+       SELECT ?, ?, 'user', 'global', NULL, 'ACTIVE', ?, NULL, ?, ?
+       WHERE NOT EXISTS (
+         SELECT 1
+         FROM role_assignments
+         WHERE subject_id = ?
+           AND role_id = 'user'
+           AND scope_type = 'global'
+           AND scope_id IS NULL
+           AND status = 'ACTIVE'
+           AND valid_from <= ?
+           AND (valid_until IS NULL OR ? < valid_until)
+       )`,
+    )
+    .bind(roleId, userId, now, now, now, userId, now, now)
+    .run()
+
+  if (result.meta?.changes !== undefined && result.meta.changes > 1) {
+    throw new SessionRuntimeError('CONFLICT', 'base role assignment materialization was ambiguous')
+  }
+}
+
 async function loadAuthoritativeLoginSession(
   db: D1Database,
   userId: string,
@@ -296,6 +350,7 @@ export async function establishSessionFromAuthoritativeD1(
 ): Promise<{ sessionId: string; refreshToken: string; tokenVersion: number; layer: string; nativeExpiresAt: string }> {
   const now = input.now ?? new Date().toISOString()
   const context = await loadAuthoritativeLoginSession(db, input.userId, input.sessionId)
+  await ensureRegisteredBaseRole(db, input.userId, context.accountState, now)
   const extension = await establishAuthenticatedSession(
     db,
     context.session,
@@ -485,7 +540,7 @@ export async function resolveAuthenticatedPrincipal(
     if (String(row.userId) !== String(input.userId)) return { active: false }
     if (String(row.extensionUserId) !== String(input.userId)) return { active: false }
     if (row.tokenVersion !== input.tokenVersion) return { active: false }
-    if (row.accountState !== 'ACTIVE' || row.revokedAt) return { active: false }
+    if ((row.accountState !== 'PENDING_VERIFICATION' && row.accountState !== 'ACTIVE') || row.revokedAt) return { active: false }
     if (Number.isNaN(Date.parse(row.expiresAt)) || Date.parse(row.expiresAt) <= Date.parse(now)) {
       return { active: false }
     }
@@ -553,7 +608,7 @@ export async function validateAuthoritativeSession(
     if (String(row.userId) !== String(input.userId)) return { active: false }
     if (String(row.extensionUserId) !== String(input.userId)) return { active: false }
     if (row.tokenVersion !== input.tokenVersion) return { active: false }
-    if (row.accountState !== 'ACTIVE' || row.revokedAt) return { active: false }
+    if ((row.accountState !== 'PENDING_VERIFICATION' && row.accountState !== 'ACTIVE') || row.revokedAt) return { active: false }
     if (Number.isNaN(Date.parse(row.expiresAt)) || Date.parse(row.expiresAt) <= Date.parse(now)) {
       return { active: false }
     }
