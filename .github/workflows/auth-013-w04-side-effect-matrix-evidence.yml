@@ -156,7 +156,7 @@ jobs:
           push 6 DELETION_PENDING DELETED "evt_$GITHUB_RUN_ID_6_old"
           sleep 3
           test "$(get_record)" = "200"
-          jq -e --arg eid "evt_$GITHUB_RUN_ID_10" '.sourceVersion==10 and .projectionVersion==10 and .state=="ACTIVE" and .deindex==false and .eventId==$eid' /tmp/auth013-record.json >/dev/null
+          jq -e --arg eid "evt-$GITHUB_RUN_ID-10" '.sourceVersion==10 and .projectionVersion==10 and .state=="ACTIVE" and .deindex==false and .eventId==$eid' /tmp/auth013-record.json >/dev/null
 
           node - /tmp/auth013-record.json <<'NODE'
           const fs=require('node:fs')
