@@ -3956,3 +3956,14 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Backup before correction: `backup/pre-auth013-success-stale-ifmatch-isolation-20260929`.
 - No AUTH-013 runtime, Contract, D1 schema, Payload version, Worker topology, W02 authority, or Evidence Registry status changed.
 - Authoritative cursor remains `AUTH-013-PUBLIC-HTTP-E2E-001 / BLOCKED_EXTERNAL_DEPLOYMENT` until a fresh exact-source deployment and successful controlled E2E artifact.
+
+
+## 2026-09-29 — AUTH-013 public response boundary alignment
+
+- Run `36501207751` passed deployment provenance and the preceding AUTH-013 authentication/authorization assertions, then failed at the authorized operator 200 response-shape assertion.
+- Root cause: W02's internal transition result includes `accountStateVersion` and `journalId`; W01 directly serialized that internal object instead of projecting the already-contracted `from` + `to` + `auditEventId` response.
+- Authorized runtime correction is limited to W01 public response projection. W02 business logic and its internal result remain unchanged.
+- Backup before correction: `backup/pre-auth013-public-response-boundary-current-main-20260929`.
+- PR `#175` was independently merged into main and its valid evidence-tooling changes are retained by rebasing from current main.
+- No Contract/OpenAPI, D1, Payload, Worker topology, Service Binding, authorization-rule, or Evidence Registry promotion change.
+- Authoritative cursor remains `AUTH-013-PUBLIC-HTTP-E2E-001 / BLOCKED_EXTERNAL_DEPLOYMENT` until fresh exact-source deployment and successful controlled E2E evidence.
