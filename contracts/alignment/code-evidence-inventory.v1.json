@@ -2435,16 +2435,25 @@
       "evidenceId": "ENTITY:ENT-CREDENTIAL",
       "subjectType": "ENTITY",
       "subjectId": "ENT-CREDENTIAL",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-content/src/credentials/credential-add.ts",
+        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
+        "workers/W02-content/src/credentials/credential-list.ts",
+        "workers/W02-content/src/credentials/credential-lifecycle.ts"
+      ],
       "testRefs": [],
-      "schemaEvidenceRefs": [],
+      "schemaEvidenceRefs": [
+        "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
+      ],
       "sourceRefs": [
         "contracts/entity/entity-catalog.v1.json",
         "contracts/entity/entity-implementation-evidence.v1.json"
       ],
       "blockers": [
-        "No concrete implementation evidence recorded."
+        "ENT-CREDENTIAL runtime/persistence evidence is complete for the admitted AUTH-003 List/Add/Replace/Remove slice.",
+        "Canonical catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and final Mapping 0 / Five-Way reconciliation is NOT_GREEN.",
+        "No promotion is inferred from the credential entity's dependency on auth_identities."
       ]
     },
     {
@@ -2483,16 +2492,21 @@
       "evidenceId": "ENTITY:ENT-IDENTITY",
       "subjectType": "ENTITY",
       "subjectId": "ENT-IDENTITY",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-content/src/account/registration-materializer.ts"
+      ],
       "testRefs": [],
-      "schemaEvidenceRefs": [],
+      "schemaEvidenceRefs": [
+        "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
+      ],
       "sourceRefs": [
         "contracts/entity/entity-catalog.v1.json",
         "contracts/entity/entity-implementation-evidence.v1.json"
       ],
       "blockers": [
-        "No concrete implementation evidence recorded."
+        "AUTH-001 W02 scheduled registration materializer now provides exact-SHA executable identity materialization evidence; no independent public identity CRUD lifecycle is claimed by this admission.",
+        "Canonical entity catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and global Mapping 0 / Five-Way remains NOT_GREEN."
       ]
     },
     {
@@ -2529,26 +2543,35 @@
         "contracts/entity/entity-implementation-evidence.v1.json"
       ],
       "blockers": [
-        "Remote D1-01 migration execution evidence is pending.",
-        "Controlled W02 deployment/version/source evidence is pending.",
-        "role_version mutation/invalidation runtime evidence is pending.",
-        "Controlled authLogin/authRefresh runtime evidence is pending."
+        "Controlled authLogin/authRefresh runtime evidence is pending.",
+        "Controlled authLogin/authRefresh runtime evidence and W01 Service Binding deployment evidence are pending."
       ]
     },
     {
       "evidenceId": "ENTITY:ENT-SESSION",
       "subjectType": "ENTITY",
       "subjectId": "ENT-SESSION",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-content/src/session/session-runtime.ts",
+        "workers/W02-content/src/index.ts",
+        "workers/W01-payload/src/app/auth/login/route.ts",
+        "workers/W01-payload/src/app/auth/refresh/route.ts",
+        "workers/W01-payload/src/app/auth/logout/route.ts"
+      ],
       "testRefs": [],
-      "schemaEvidenceRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
+        "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
+        "artifacts/mapping-0/auth-002-e6-runtime-evidence-reconciliation-2026-09-26.json"
+      ],
       "sourceRefs": [
         "contracts/entity/entity-catalog.v1.json",
         "contracts/entity/entity-implementation-evidence.v1.json"
       ],
       "blockers": [
-        "No concrete implementation evidence recorded."
+        "Gate-1 schema, native session runtime, security-negative, concurrency and extension-correlation evidence are now VERIFIED at the exact tested source 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55.",
+        "ENT-SESSION catalog promotion remains blocked pending final Mapping 0 / Five-Way admission."
       ]
     },
     {
@@ -2585,7 +2608,7 @@
         "contracts/entity/entity-implementation-evidence.v1.json"
       ],
       "blockers": [
-        "Migration execution evidence is not yet independently recorded."
+        "AUTH-002 native session runtime, extension correlation, and final Evidence Registry promotion remain open."
       ]
     },
     {
