@@ -4165,3 +4165,17 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Reconciled the cursor's stale current-head reason text to the same destination-authority blocker. The deliberate `currentMainSha = 86e6c0b7b75722177ae2d5adc48b15b9abf97156` source checkpoint is not advanced merely by this governance-only merge.
 - No W04 consumer implementation, Worker/D1/Queue/Service Binding change, cache key, search instance, production deployment, or Evidence Registry promotion was performed.
 - Backup: `backup/pre-auth013-w04-destination-control-reconcile-20260929`.
+
+## 2026-09-29 — AUTH-013 W04 Cloudflare inventory reconciliation
+
+- Read-only Cloudflare account inventory completed successfully on current `main`.
+- Run: `36518463292`; tested main SHA: `b39a5a104f351c2bb9b10abe4b7a4fb4a2edebb0`.
+- Extended artifact: `11011922070`; digest: `sha256:e98c5c3ab24b5319cbd74cfa5752d72cf6f773020415a602dd15d7e30304de09`.
+- Inventory observed one KV namespace (`globe`) and four R2 buckets (`fanshut`, `globe`, `luckread-w01-assets-placeholder`, `openthem`); no resource is identified or admitted as a W04 derived projection/cache destination.
+- The dedicated AUTH-013 W04 projection queue exists and reports zero consumers. The queue remains transport only and is not treated as a projection datastore.
+- External inventory therefore strengthens the existing blocker rather than clearing it: no concrete W04 derived destination is admitted.
+- Current cursor remains `AUTH-013-W04-PROJECTION-CONSUMER-001 / BLOCKED_EXTERNAL`.
+- Current control reconciled to `docs/change-control/CC-MAPPING-0-AUTH-013-W04-CLOUDFLARE-INVENTORY-RECONCILIATION-2026-09-29.md`.
+- No Worker/D1/KV/R2/search resource was created, no Queue binding changed, no W04 runtime code changed, and no prior GREEN/PASS evidence was rerun.
+- Backup: `backup/pre-auth013-w04-cloudflare-inventory-confirmed-20260929`.
+
