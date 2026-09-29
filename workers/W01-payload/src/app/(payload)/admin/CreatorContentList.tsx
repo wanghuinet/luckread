@@ -83,6 +83,14 @@ export default function CreatorContentList() {
     return () => window.clearTimeout(timer)
   }, [load])
 
+  useEffect(() => {
+    const handleContentMutation = () => {
+      void load()
+    }
+    window.addEventListener('luckread:content-mutated', handleContentMutation)
+    return () => window.removeEventListener('luckread:content-mutated', handleContentMutation)
+  }, [load])
+
   async function transition(item: Item, to: 'PUBLISHED' | 'UNPUBLISHED') {
     const verb = to === 'UNPUBLISHED' ? '下线' : '重新发布'
     if (!window.confirm(`确定要${verb}“${item.title}”吗？`)) return
