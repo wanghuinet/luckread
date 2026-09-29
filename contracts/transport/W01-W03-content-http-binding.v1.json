@@ -20,7 +20,7 @@
     "targetWorker": "luckread-w03",
     "publicExposure": false
   },
-  "wireRule": "W01 maps the public /api/v1/contents family to the exact internal operations below; W03 never owns a public API namespace.",
+  "wireRule": "W01 maps the public /api/v1/contents family to the exact internal operations below; Creator Center also uses the authenticated application route /api/creator/contents for owner-scoped reads; W03 never owns a public API namespace.",
   "operations": [
     {
       "operationId": "listContents",
@@ -28,6 +28,14 @@
       "publicPath": "/api/v1/contents",
       "internalPath": "/internal/content/contents",
       "principalRequired": false,
+      "idempotency": false
+    },
+    {
+      "operationId": "listCreatorContents",
+      "method": "GET",
+      "publicPath": "/api/creator/contents",
+      "internalPath": "/internal/content/creator-contents",
+      "principalRequired": true,
       "idempotency": false
     },
     {
@@ -125,7 +133,10 @@
     "negative ownership and stale If-Match evidence",
     "idempotency replay evidence",
     "no-secret-forwarding evidence",
-    "principal layer resolution/correlation evidence"
+    "principal layer resolution/correlation evidence",
+    "creator-owned list evidence",
+    "cross-user exclusion evidence",
+    "creator list filter/cursor evidence"
   ],
   "nonGoals": [
     "No RPC surface.",
