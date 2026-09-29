@@ -37,7 +37,7 @@ async function getW03Service(): Promise<W03ContentService> {
 
 const getPayloadCookieToken = (request: Request): string | null => {
   const cookieHeader = request.headers.get('cookie') ?? ''
-  const cookieName = `${typeof config.cookiePrefix === 'string' ? config.cookiePrefix : 'payload'}-token`
+  const cookieName = 'payload-token'
   for (const part of cookieHeader.split(';')) {
     const [rawName, ...rawValue] = part.trim().split('=')
     if (rawName !== cookieName || rawValue.length === 0) continue
