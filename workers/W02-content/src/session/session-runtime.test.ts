@@ -4,6 +4,7 @@ import {
   establishAuthenticatedSession,
   revokeSessionExtension,
   validateAuthoritativeSession,
+  refreshSessionFromAuthoritativeD1,
   type NativeSessionAuthority,
   type SessionRecord,
 } from './session-runtime.js'
