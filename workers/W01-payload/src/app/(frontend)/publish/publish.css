@@ -34,6 +34,8 @@
 .lr-actions button:disabled { opacity:.55; cursor:wait; }
 .lr-actions .secondary { background:#eef2f7; color:#111827; }
 .lr-actions .primary { background:#111827; color:white; }
+.lr-actions .danger { background:#fff1f2; color:#be123c; }
+.lr-actions .danger:hover { background:#ffe4e6; }
 .lr-note { margin:14px 0 0; font-size:12px; line-height:1.5; color:#6b7280; }
 @media (max-width:640px) {
   .lr-publish-shell { padding:16px; }
