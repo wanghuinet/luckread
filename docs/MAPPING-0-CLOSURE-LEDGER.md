@@ -4255,3 +4255,17 @@ Objective: run the controlled W04 side-effect matrix workflow above against the 
 - NEXT_ITEM_ID: AUTH-010-HANDLER-BOUNDARY-001
 - NEXT_ITEM_STATE: TODO_FIX
 - Objective: freeze the smallest W01 public authentication → W02 session-management handler boundary from already-admitted contracts, then implement focused list/revoke runtime only after the handler boundary is explicit; do not infer new topology or persistence.
+
+
+## 2026-09-29 — AUTH-010 handler boundary frozen
+
+- Source head before this governance step: f1247b5fa3564bfdca40610dd52a308fe34ad052.
+- Frozen public boundary: W01 owns HTTP authentication/transport using the existing Payload-native auth and verified token-version claim; W02 remains the session/D1-01 authority.
+- Frozen internal chain: W01 HTTP -> Payload authentication/session validation -> existing W02_AUTH Service Binding -> W02 authorization/ownership -> D1-01 session read or revoke -> W01 DTO/status projection.
+- No client-supplied owner/user ID is accepted as authorization authority; Payload native session timestamps remain source of truth; auth_session_state remains the extension state.
+- The smallest implementation slice is now admitted by handler-boundary governance: W01 list/revoke routes, W02 client calls, W02 internal session list/revoke handlers, and focused tests only. No new Worker/D1/Queue/Service Binding/cache/auth subsystem.
+- Runtime GREEN/evidence admission remains separate and is not promoted here.
+- Change Control: docs/change-control/CC-MAPPING-0-AUTH-010-HANDLER-BOUNDARY-2026-09-29.md.
+- Backup: backup/pre-auth010-handler-boundary-20260929.
+- **NEXT_ITEM_ID:** AUTH-010-RUNTIME-LIST-REVOKE-001
+- **NEXT_ITEM_STATE:** TODO_FIX
