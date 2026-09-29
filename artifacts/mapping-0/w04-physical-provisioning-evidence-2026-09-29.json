@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "status": "PASS_VERIFIED_PHYSICAL_PROVISION",
+  "worker": "luckread-w04",
+  "canonicalWorker": "W04",
+  "sourcePath": "workers/W04-feed-search",
+  "entrypoint": "workers/W04-feed-search/src/index.ts",
+  "mainSha": "41326efd01e04bbaa767bfa1b7a3f1a1bf2a43b3",
+  "workflow": ".github/workflows/w04-physical-provision.yml",
+  "runId": 36509211004,
+  "jobId": 109217402488,
+  "deploymentConclusion": "success",
+  "cloudflareVersionId": "1b0df573-8a27-40b0-bf04-f1d2e86c692c",
+  "configuration": {
+    "d1Binding": false,
+    "serviceBinding": false,
+    "publicRoute": false,
+    "workersDev": false
+  },
+  "logAssertions": [
+    "Uploaded luckread-w04",
+    "No targets deployed for luckread-w04",
+    "Current Version ID: 1b0df573-8a27-40b0-bf04-f1d2e86c692c"
+  ],
+  "scope": "Physical Worker resource creation only. No D1 mutation, public API, queue consumer, or projection/deindex business logic."
+}
