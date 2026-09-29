@@ -395,11 +395,11 @@
         "contracts/alignment/mapping-batches/AUTH-013-reconciliation.v1.md",
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/evidence/mapping-0-evidence-registry.v1.json",
         "docs/04-WORKER-MASTER-v1.0.md",
-        "docs/change-control/CC-MAPPING-0-AUTH-013-EVIDENCE-REGISTRY-RECONCILIATION-2026-09-29.md",
-        "docs/change-control/CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-SUCCESS-2026-09-29.md",
         "docs/MAPPING-0-CLOSURE-LEDGER.md",
-        "contracts/evidence/mapping-0-evidence-registry.v1.json"
+        "docs/change-control/CC-MAPPING-0-AUTH-013-EVIDENCE-REGISTRY-RECONCILIATION-2026-09-29.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-SUCCESS-2026-09-29.md"
       ],
       "blockers": [
         "Feature-wide lifecycle transition coverage remains incomplete beyond the proven ACTIVE → RESTRICTED public path; FROZEN/SUSPENDED/BANNED plus escalation/reinstatement/restore paths require bounded evidence.",
