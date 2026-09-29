@@ -18,6 +18,7 @@
   "scope": "Create the W04 physical Worker resource with a minimal /health bootstrap shell. Do not add D1, Service Binding, route, queue consumer, projection store, or public API behavior in this provisioning slice.",
   "deploymentMethod": "Controlled GitHub Actions deployment using pinned Wrangler 4.116.0 and Cloudflare account secrets.",
   "trigger": "Push of this authorization marker to main after protected PR merge.",
-  "authorizationRevision": 2,
-  "previousProvisionAttemptHead": "e691cb89bef9e612a27906cd4635ec65274a99c3"
+  "authorizationRevision": 3,
+  "previousProvisionAttemptHead": "e31ecf2e2a35f6f94aa469bece858e895071d5bf",
+  "provisioningRetryReason": "Typecheck gate corrected; no Cloudflare deploy step was reached in prior attempt."
 }
