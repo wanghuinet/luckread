@@ -27,6 +27,8 @@
 .lr-asset span { color:#6b7280; font-size:12px; margin-top:2px; }
 .lr-asset button { border:0; background:transparent; color:#b91c1c; cursor:pointer; }
 .lr-success, .lr-error { margin-top:14px; padding:11px 13px; border-radius:12px; font-size:14px; }
+.lr-content-status { display:flex; align-items:center; gap:10px; margin-top:14px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; color:#64748b; font-size:13px; }
+.lr-content-status strong { color:#0f172a; }
 .lr-success { background:#ecfdf5; color:#047857; }
 .lr-error { background:#fef2f2; color:#b91c1c; }
 .lr-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
