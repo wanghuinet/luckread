@@ -4016,3 +4016,15 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Global Evidence Registry and Mapping 0 remain `NOT_GREEN`; no global promotion is inferred from this scoped reconciliation.
 - No runtime code, Contract/OpenAPI semantics, D1 schema, Payload version, Worker topology, Service Binding topology, authorization rules, or production deployment changed.
 - Backup: `backup/pre-auth013-evidence-registry-reconciliation-20260929`.
+
+
+## 2026-09-29 — AUTH-013 persistence contract execution-state reconciliation
+
+- Existing controlled remote migration evidence Run `35937873769` already proves the AUTH-013 `0002_auth_013_account_state.sql` migration was applied successfully to D1-01 `luckread`.
+- Artifact `10784305258` proves `users.account_state` and `users.account_state_version` exist with the contracted NOT NULL/default semantics and post-migration `users_count = 0`.
+- The persistence contract had stale execution fields (`NOT_EXECUTED` / `TARGET_DEFINED_AWAITING_MIGRATION`) despite the admitted evidence.
+- Governance-only reconciliation updates those factual fields to the verified current zero-row target state and records exact evidence provenance.
+- The contract remains `CONTRACTED_NOT_VERIFIED` overall because future non-zero pre-existing-user backfill still requires its own authoritative classification policy and broader AUTH-013 lifecycle/security/evidence gates remain open.
+- No migration was re-executed and no remote D1 mutation was performed by this reconciliation.
+- Change Control: `CC-MAPPING-0-AUTH-013-PERSISTENCE-EXECUTION-RECONCILIATION-2026-09-29.md`.
+- Backup: `backup/pre-auth013-persistence-contract-execution-reconciliation-20260929`.
