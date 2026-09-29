@@ -371,6 +371,64 @@ export async function getContent(
   return toContent(row)
 }
 
+export function validateListFilters(statusValue: string | null, typeValue: string | null): {
+  status?: ContentState
+  contentType?: ContentType
+} {
+  const status = statusValue?.trim() || undefined
+  const contentType = typeValue?.trim() || undefined
+  if (status && !isState(status)) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  if (contentType && !['article', 'post', 'video'].includes(contentType)) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+  return {
+    status: status as ContentState | undefined,
+    contentType: contentType as ContentType | undefined,
+  }
+}
+
+export async function listCreatorContents(
+  db: ContentD1,
+  ownerUserId: string,
+  cursor: string | null,
+  limit: number,
+  filters: { status?: ContentState; contentType?: ContentType } = {},
+): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
+  assertResourceId(ownerUserId)
+  const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
+  const decoded = cursor ? decodeCursor(cursor) : null
+  const conditions = ['owner_user_id = ?']
+  const bindings: unknown[] = [ownerUserId]
+  if (filters.status) {
+    conditions.push('state = ?')
+    bindings.push(filters.status)
+  }
+  if (filters.contentType) {
+    conditions.push('content_type = ?')
+    bindings.push(filters.contentType)
+  }
+  if (decoded) {
+    conditions.push('(updated_at < ? OR (updated_at = ? AND id < ?))')
+    bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
+  }
+  const rows = await db.prepare(
+    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
+            title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
+       FROM contents
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY updated_at DESC, id DESC
+      LIMIT ?`,
+  ).bind(...bindings, pageSize + 1).all<ContentRow>()
+  const hasMore = rows.results.length > pageSize
+  const page = rows.results.slice(0, pageSize).map(toContent)
+  const last = page.at(-1)
+  return {
+    items: page,
+    hasMore,
+    nextCursor: hasMore && last ? encodeCursor(last.updatedAt, last.id) : null,
+  }
+}
+
 export async function listContents(
   db: ContentD1,
   cursor: string | null,
