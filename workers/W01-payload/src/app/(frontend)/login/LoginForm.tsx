@@ -35,7 +35,7 @@ export default function LoginForm() {
           deviceId: getDeviceId(),
         }),
       })
-      const data = await response.json().catch(() => null)
+      const data = await response.json().catch((): null => null)
 
       if (!response.ok || !data?.accessToken || !data?.refreshToken) {
         setError(data?.error?.message || '登录失败，请检查账号和密码。')

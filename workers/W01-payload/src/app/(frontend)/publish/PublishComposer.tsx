@@ -39,7 +39,7 @@ async function refreshAccessToken() {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ refreshToken, deviceId: getDeviceId() }),
   })
-  const data = await response.json().catch(() => null)
+  const data = await response.json().catch((): null => null)
   if (!response.ok || !data?.accessToken) return null
   sessionStorage.setItem(ACCESS_KEY, data.accessToken)
   if (data.refreshToken) sessionStorage.setItem(REFRESH_KEY, data.refreshToken)
@@ -81,7 +81,7 @@ export default function PublishComposer() {
     form.append('alt', file.name)
     form.append('file', file)
     const response = await authorizedFetch('/api/media', { method: 'POST', body: form })
-    const data = await response.json().catch(() => null)
+    const data = await response.json().catch((): null => null)
     const doc = data?.doc ?? data
     if (!response.ok || !doc?.id || !doc?.url) {
       throw new Error('MEDIA_UPLOAD_FAILED')
@@ -138,7 +138,7 @@ export default function PublishComposer() {
       },
       body: JSON.stringify(payload),
     })
-    const data = await response.json().catch(() => null)
+    const data = await response.json().catch((): null => null)
     if (!response.ok) throw new Error(data?.error?.message || 'CONTENT_CREATE_FAILED')
     return data as ContentResponse
   }
@@ -178,7 +178,7 @@ export default function PublishComposer() {
         },
         body: JSON.stringify({ to: 'PENDING_REVIEW' }),
       })
-      const data = await response.json().catch(() => null)
+      const data = await response.json().catch((): null => null)
       if (!response.ok) throw new Error(data?.error?.message || 'SUBMIT_FAILED')
       setMessage('已提交发布审核。审核通过后将进入正式发布状态。')
     } catch (caught) {
