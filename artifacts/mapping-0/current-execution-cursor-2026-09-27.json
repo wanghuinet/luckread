@@ -1,31 +1,25 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "0913eb83e02bcee24efab93d3295891c4b2e3966",
-  "backupBranch": "backup/pre-w02-physical-deploy-cursor-reconcile-20260929",
+  "sourceHead": "091a2879598402d7e360bf48b57fcaa6c80660ea",
+  "backupBranch": "backup/pre-mapping0-current-cursor-auth013-w04-20260929",
   "currentCursor": {
-    "id": "AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001",
-    "state": "BLOCKED_EXTERNAL_DEPLOYMENT",
-    "objective": "Close the current W02 physical deployment gate, then deploy the current W01/W02 binding source and execute AUTH-004 remote lifecycle evidence.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-E6-W02-DEPLOYMENT-TRANSPORT-DECISION-2026-09-22.md",
-    "nextGate": "1) Dispatch `.github/workflows/w02-deploy.yml` with source_sha=5c9d5cd22f478890089b9e01769a99550d114a80 and confirm=DEPLOY. 2) Dispatch `.github/workflows/w01-w02-binding-deploy.yml` with source_sha=0913eb83e02bcee24efab93d3295891c4b2e3966 and confirm=DEPLOY_BINDING. 3) Execute AUTH-004 Remote E2E against the admitted deployment. AUTH-002 Remote Runtime Evidence run 36451907916 is PASS and must not be rerun unchanged.",
-    "logicalOwnership": "W01 -> AUTH-004 Payload-native authority CLOSED",
-    "physicalBinding": "W01 luckread-w01-payload / W02_AUTH -> luckread-w02. W01 admitted application source remains 26a5a761c88a6bdb96ea353a30b609d3db300f31 (run 36446769904). W02 physical deployment at current W02 source 5c9d5cd22f478890089b9e01769a99550d114a80 remains unadmitted. After W02 admission, the binding deployment must use current main 0913eb83e02bcee24efab93d3295891c4b2e3966 so the W01 PBKDF2 compatibility correction is actually deployed before AUTH-004 E2E.",
-    "physicalRuntimeTarget": "W01 luckread-w01-payload / D1-01 luckread",
+    "id": "AUTH-013-W04-PROJECTION-DEINDEX-ADMISSION-001",
+    "state": "BLOCKED_EXTERNAL",
+    "objective": "Resolve concrete current W04 resource/entrypoint/binding admission, then implement the minimum projection/deindex consumer using the existing identity.account_state_changed boundary and collect controlled convergence evidence.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-W04-PROJECTION-DEINDEX-GAP-2026-09-29.md",
+    "nextGate": "1) Dispatch the read-only Cloudflare Resource Inventory workflow and record the actual current W04 Worker resource identity if present. 2) If W04 is absent, stop at the external provisioning/change-control gate; do not invent a resource name, Service Binding, route or Wrangler binding. 3) Once resource/entrypoint authority exists, proceed with the minimum W04 projection/deindex admission slice.",
+    "logicalOwnership": "W04 -> Feed / Recommendation / Search derived/projection boundary",
+    "physicalBinding": "NOT_ADMITTED. Current main contains no authoritative W04 resourceId, no current W04 deployment workflow, no Service Binding, and no admitted T08/T09/T10 runtime entrypoint. Historical workers/W04-social is non-authoritative and cannot be promoted by path inference.",
+    "physicalRuntimeTarget": "T08/T09/T10 -> W04; derived/projection only; no new authoritative D1",
     "supersededBlockers": [
-      "Payload 3.87.1 version-alignment gap is superseded by the merged 3.90.2 dependency baseline and successful W01 deployment run 36418911699.",
-      "AUTH-004 local native lifecycle evidence is already VERIFIED at run 36411953998 and must not be rerun unchanged.",
-      "AUTH-004 canonical API/DTO/field mapping is already reconciled and must not be reopened.",
-      "The remaining feature-level runtime gap is controlled remote HTTP/E2E evidence, including remote session invalidation and protected-account enumeration resistance.",
-      "Global Evidence Registry and Mapping 0 remain NOT_GREEN; no promotion is inferred from build/deploy success.",
-      "Remote E2E run 36426287424 reached the real Worker and failed before AUTH-004 lifecycle assertions because Payload native PBKDF2 requests 600000 iterations and Cloudflare Workers rejects counts above 100000.",
-      "Upstream Payload issue #18274 remains OPEN / needs-triage; no stable Payload 3.x release after 3.90.2 is available with an admitted fix at this checkpoint.",
-      "Remote E2E run 36444965855 reached /auth/login successfully but /api/users/me rejected the W01-issued access token because the adapter-generated JWT omitted Payload 3.90.2 protected-header authVersion=1; corrected by switching the adapter to Payload's exported native jwtSign().",
-      "AUTH-002 remote run 36447031793 and AUTH-004 remote run 36447031539 both independently reached the same W01 source 26a5a761c88a6bdb96ea353a30b609d3db300f31 and failed at GET /api/users/me with HTTP 401 before lifecycle assertions. Native Payload login itself returned HTTP 200. This moves the active gate from W01 JWT-format debugging to W02 physical deployment/version admission.",
-      "Repository source history shows W02 authoritative session establishment transport was added in 2d9fa36..., while the authoritative session validation transport was added later in 867129c... and token-version validation in 19b99d.... The repository's explicit W02 deployment evidence currently recorded in the closure packet is older (source 0c0c250f...), so current W02 physical version must be deployment-admitted before further W01 changes.",
-      "AUTH-002 remote evidence run 36451907916 completed SUCCESS at tested W01 source 26a5a761c88a6bdb96ea353a30b609d3db300f31 after the 3.90.2 validator/idempotent-concurrent-logout evidence corrections. Do not rerun it unchanged."
+      "AUTH-013 public HTTP E2E/security/D1 evidence is PASS_VERIFIED by run 36503534440 and must not be rerun unchanged.",
+      "W06 AuditEvent transport/persistence is already PASS_VERIFIED and must not be reopened.",
+      "The remaining AUTH-013 feature-wide blocker is downstream projection/deindex/cache convergence.",
+      "No executable canonical W04 runtime or current physical Cloudflare W04 resource is currently evidenced on main.",
+      "No new Worker, D1, authoritative projection store, Payload Core modification or public API redesign is authorized by the W04 GAP record."
     ],
-    "sourceHead": "0913eb83e02bcee24efab93d3295891c4b2e3966"
+    "sourceHead": "091a2879598402d7e360bf48b57fcaa6c80660ea"
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -52,14 +46,20 @@
     "auth002MigrationExecutionEvidence": "35552919573",
     "auth004PayloadVersionAlignment": "3.90.2",
     "auth004LocalLifecycle": "36411953998",
-    "auth004W01BindingDeploy": "36418911699"
+    "auth004W01BindingDeploy": "36418911699",
+    "auth013PublicHttpE2E": "36503534440",
+    "auth013PublicSecurityE2E": "36503534440",
+    "auth013PublicD1Authority": "36503534440",
+    "auth013W06AuditBoundary": "36090709083",
+    "auth004LifecycleAuthority": "WAIT_AUTHORITY_DECISION"
   },
   "historicalOnlyCursors": [
     "M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001 / WAIT_AUTHORITY_DECISION",
     "AUTH-003 WIRE_SCHEMA_CLOSED / RUNTIME_PERSISTENCE_BLOCKED",
     "AUTH-004 NEXT wording in pre-2026-09-27 queue header/body",
     "W01-MIGRATION-BASELINE-AUTHORITY-001 / BLOCKED_EXTERNAL in historical ledger sections",
-    "AUTH-002-SESSION-MIGRATION-EVIDENCE-CLOSURE / FINAL_MAPPING0_ENTITY_ADMISSION_BLOCKED in the pre-AUTH-004 current cursor snapshot"
+    "AUTH-002-SESSION-MIGRATION-EVIDENCE-CLOSURE / FINAL_MAPPING0_ENTITY_ADMISSION_BLOCKED in the pre-AUTH-004 current cursor snapshot",
+    "AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001 / BLOCKED_EXTERNAL_DEPLOYMENT (superseded 2026-09-29)"
   ],
   "historicalRefs": [
     "docs/change-control/CC-MAPPING-0-AUTH-002-R4-ENTITY-EVIDENCE-DEPENDENCY-2026-09-26.md",
@@ -190,32 +190,28 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Main advanced by governance-only reconciliation after a fresh Payload/Cloudflare upstream recheck. No application runtime source changed; AUTH-004 remains externally blocked by the observed PBKDF2 compatibility issue.",
-    "currentMainSha": "0913eb83e02bcee24efab93d3295891c4b2e3966",
+    "reason": "Main advanced through AUTH-013 response/evidence corrections and AUTH-002 mapping evidence binding. AUTH-013 public HTTP E2E is now PASS_VERIFIED; the next admissible slice is the W04 projection/deindex gap. No W04 resource or runtime is inferred.",
+    "currentMainSha": "091a2879598402d7e360bf48b57fcaa6c80660ea",
+    "actualGitMainHead": "091a2879598402d7e360bf48b57fcaa6c80660ea",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
-    "payloadWireCompatibilityStatus": "AUTH004_REMOTE_RUNTIME_BLOCKED_PBKDF2_COMPATIBILITY",
-    "phoneSourceStatus": "CLOSED_BY_NATIVE_EMAIL_ENTRY_DECISION",
-    "idempotencySourceStatus": "CLOSED",
-    "atomicityStatus": "W01_USER_CONSENT_ENVELOPE_ONE_D1_BATCH_RUNTIME_VERIFIED_LOCAL",
-    "auth003RuntimeRerun": "FORBIDDEN_UNCHANGED_PASS_VERIFIED",
-    "consentRetentionPolicyStatus": "DEV_TEST_POLICY_ADMITTED_PRODUCTION_BLOCKED",
-    "actualGitMainHead": "0913eb83e02bcee24efab93d3295891c4b2e3966",
-    "governanceHeadDisposition": "AUTH-002 runtime evidence gate is PASS on run 36451907916; current main 0913 contains only evidence-governance corrections after W02 source 5c9d, while W02 physical deployment remains unadmitted and current W01 runtime changes require a fresh binding deployment before AUTH-004 E2E.",
-    "reviewedAt": "2026-09-28",
-    "implementationEvidenceSourceHead": "6d574bb56222e0eaf44df663e04eb59535e84be6",
-    "latestGovernanceCommit": "0bd1fde03b2f2966092585b98f2d3e46cbd6d846"
+    "auth013PublicHttpE2eRun": "36503534440",
+    "auth013PublicHttpE2eStatus": "PASS_VERIFIED",
+    "w04ProjectionStatus": "GAP_IDENTIFIED / IMPLEMENTATION_NOT_AUTHORIZED",
+    "w04ResourceStatus": "NOT_VERIFIED_EXTERNAL",
+    "reviewedAt": "2026-09-29",
+    "previousCursorSuperseded": "AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001"
   },
-  "nextGate": "AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001 / BLOCKED_EXTERNAL_DEPLOYMENT",
+  "nextGate": "AUTH-013-W04-PROJECTION-DEINDEX-ADMISSION-001 / BLOCKED_EXTERNAL",
   "latestControlGate": {
-    "workflow": ".github/workflows/auth-002-remote-runtime-evidence.yml",
-    "runId": 36451907916,
-    "headSha": "0913eb83e02bcee24efab93d3295891c4b2e3966",
-    "testedApplicationSourceSha": "26a5a761c88a6bdb96ea353a30b609d3db300f31",
+    "workflow": ".github/workflows/auth-013-public-http-e2e.yml",
+    "runId": 36503534440,
+    "headSha": "b91b49d6262ced5631d4d246d1573fa03583752c",
+    "testedApplicationSourceSha": "f4c329b74f7110af76c7ba7339bfd9d3cb81f910",
     "conclusion": "PASS_VERIFIED_RUNTIME_EVIDENCE",
     "failedStep": null,
-    "meaning": "The remote evidence package validator passed after current 3.90.2 evidence-governance corrections. This closes the evidence-validation gate only; it does not prove current-main Worker deployment.",
+    "meaning": "AUTH-013 public transport, security, concurrency, stale-session and authoritative D1 assertions passed on the exact deployed W01/W02 source. This closes that evidence sub-gate only; it does not prove W04 projection/deindex convergence.",
     "productionAuthorization": "NO_NEW_PRODUCTION_DEPLOYMENT",
-    "evidenceBoundary": "Do not rerun AUTH-002 unchanged. Proceed to W02 physical deployment admission, then current-source binding deployment and AUTH-004 E2E."
+    "evidenceBoundary": "Do not rerun AUTH-013 public E2E unchanged. Proceed to W04 physical resource/entrypoint verification."
   },
   "runtimeEvidenceAdmission": {
     "status": "PASS_VERIFIED",
@@ -434,5 +430,25 @@
     "migrationUnitScope": "MIGRATION_FILE_AND_EXECUTION_ARTIFACT",
     "migrationFileUnchanged": true,
     "registryEvidenceId": "EVD-AUTH002-B27-MIGRATION-EXECUTION-HISTORICAL-001"
+  },
+  "supersededCurrentCursor": {
+    "id": "AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001",
+    "state": "BLOCKED_EXTERNAL_DEPLOYMENT",
+    "sourceHead": "0913eb83e02bcee24efab93d3295891c4b2e3966",
+    "supersededAt": "2026-09-29",
+    "reason": "Superseded by verified AUTH-013 public HTTP E2E and the explicit W04 projection/deindex GAP. The prior cursor would cause work to return to an already-surpassed AUTH-004/W02 physical-deployment gate."
+  },
+  "sourceOfTruthForNextGate": {
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-W04-PROJECTION-DEINDEX-GAP-2026-09-29.md",
+    "workerMaster": "docs/04-WORKER-MASTER-v1.0.md",
+    "mappingFreeze": "docs/05-MAPPING-FREEZE-v1.0.md",
+    "cloudflareInventoryWorkflow": ".github/workflows/cloudflare-resource-inventory.yml",
+    "topology": "12 Workers / 4 D1",
+    "canonicalTasks": [
+      "T08",
+      "T09",
+      "T10"
+    ],
+    "eventBoundary": "contracts/events/identity-account-state-changed.v1.json"
   }
 }
