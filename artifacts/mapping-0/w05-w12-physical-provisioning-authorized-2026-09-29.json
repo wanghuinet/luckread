@@ -68,6 +68,7 @@
   ],
   "deploymentMethod": "Controlled GitHub Actions deployment using pinned Wrangler 4.116.0 and Cloudflare account secrets.",
   "noBusinessImplementation": true,
-  "workflowRevision": 2,
-  "retryReason": "First run had no initialized job; simplify workflow to match validated project provisioning pattern and retain idempotent missing-only creation."
+  "workflowRevision": 3,
+  "retryReason": "Retrigger after workflow hardening merge; no business or topology change.",
+  "triggerRevision": 1
 }
