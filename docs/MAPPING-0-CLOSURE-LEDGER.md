@@ -4028,3 +4028,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No migration was re-executed and no remote D1 mutation was performed by this reconciliation.
 - Change Control: `CC-MAPPING-0-AUTH-013-PERSISTENCE-EXECUTION-RECONCILIATION-2026-09-29.md`.
 - Backup: `backup/pre-auth013-persistence-contract-execution-reconciliation-20260929`.
+
+
+## 2026-09-29 — AUTH-013 side-effect decision input reconciliation
+
+- The legacy side-effect decision input's premise that W06 AuditEvent/event execution was not established is superseded by existing PASS_VERIFIED runtime evidence.
+- Real W02 → AUTH-013 Queue → W06 consumer → D1-03 AuditEvent transport/persistence is already evidenced; no new Worker/D1 or alternate topology is required.
+- Public W01 → W02 transport/security is also evidenced by Run `36503534440`.
+- The remaining AUTH-013 side-effect scope is limited to cache invalidation/version propagation and feature-wide feed/search/content projection/deindex convergence across the declared lifecycle states.
+- Change Control: `CC-MAPPING-0-AUTH-013-SIDE-EFFECT-DECISION-RECONCILIATION-2026-09-29.md`.
+- Backup: `backup/pre-auth013-side-effect-decision-reconciliation-20260929`.

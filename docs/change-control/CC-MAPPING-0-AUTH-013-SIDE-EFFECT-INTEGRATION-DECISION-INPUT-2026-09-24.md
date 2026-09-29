@@ -1,7 +1,7 @@
 # AUTH-013 Side-Effect Integration Decision Input — 2026-09-24
 
 - Feature: AUTH-013
-- Status: DECISION_INPUT / IMPLEMENTATION_BLOCKED
+- Status: RECONCILED / IMPLEMENTATION-BLOCKED-FOR-REMAINING-SIDE-EFFECTS
 - Scope: account-state transition Audit/Event/Cache/Session side effects
 - Repository authority: GitHub main
 
@@ -18,31 +18,28 @@
    - account-state cache version advancement;
    - token/session enforcement by resulting state;
    - deindex/projection convergence for the declared states.
-6. Current repository search does not establish an executable W06 AuditEvent writer or an executable `identity.account_state_changed` producer.
-7. Existing physical worker layout evidence records `workers/W06-media` as a historical/physical-layout mismatch against the canonical W06 responsibility. The current Worker Master forbids inferring Worker authority from directory names.
+6. Controlled runtime evidence now establishes the canonical W02 → Queue → W06 → D1-03 AuditEvent path. Positive Runtime Transport Run `36090709083` completed successfully and retained the immutable D1-03 AuditEvent produced by the real consumer path.
+7. Controlled W06 deployment and Queue consumer evidence establish W06 as the executable AuditEvent writer/runtime boundary. Historical directory names remain non-authoritative; no binding is inferred from `workers/W06-media`.
+8. Controlled AUTH-013 Public HTTP E2E Run `36503534440` separately establishes the public W01 → W02 security/concurrency boundary and D1 authoritative state/session checks.
 
 ## What is already closed
 
 - D1-01 AUTH-013 migration: PASS_VERIFIED.
 - W02 account-state transition kernel: PASS_VERIFIED.
 - W02 source test suite: 13/13 PASS.
+- W06 physical binding/deployment and Queue consumer: PASS_VERIFIED at their admitted scopes.
+- Real W02 → Queue → W06 → D1-03 AuditEvent transport/persistence: PASS_VERIFIED.
+- AUTH-013 public HTTP E2E: PASS_VERIFIED for tested ACTIVE → RESTRICTED / session-security scope.
 - Mapping 0 structural/contract validator: SUCCESS after validator correction.
 
-## Decision questions
+## Decision reconciliation
 
-A downstream implementation needs a canonical execution boundary for:
+The earlier A/B question is now resolved by existing admitted runtime evidence:
 
-- immutable AuditEvent persistence;
-- `identity.account_state_changed` event publication;
-- cache invalidation/version propagation;
-- token/session invalidation or re-authentication side effects;
-- deindex/projection convergence.
+- **A is established for the audit/event boundary:** the existing canonical W06 runtime and D1-03 boundary are physically deployed and have produced immutable AuditEvent evidence through the real Queue consumer path.
+- **B is not required for the audit/event boundary:** no new Worker, D1, direct W02 → D1-03 writer, or alternate topology is justified.
 
-Before implementation, the project must establish whether:
-
-A. the existing W06 canonical worker/runtime is already implemented elsewhere and can be evidence-bound; or
-
-B. the canonical W06 physical/runtime binding is still an open implementation task and must receive its own approved Worker/D1 binding + implementation admission.
+The remaining implementation question is narrower and unchanged in principle: how the existing canonical cache/feed/search/projection contracts are executed and evidenced for the AUTH-013 lifecycle states. That work must use the already frozen Worker/D1 topology and existing ownership rules.
 
 ## Forbidden actions
 
@@ -55,4 +52,4 @@ B. the canonical W06 physical/runtime binding is still an open implementation ta
 
 ## Current disposition
 
-AUTH-013 remains **BLOCKED_NOT_GREEN** only for the downstream side-effect/integration/evidence chain. The W02 state-transition kernel and D1 persistence sub-gates remain verified and must not be repeated.
+AUTH-013 remains **BLOCKED_NOT_GREEN** only for the remaining cache/deindex/projection convergence and feature-wide lifecycle evidence. The W02 state-transition, D1 persistence, W06 AuditEvent transport/persistence, and public HTTP E2E sub-gates are verified and must not be repeated.
