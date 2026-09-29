@@ -51,6 +51,8 @@ async function refreshAccessToken() {
   return data.accessToken as string
 }
 
+const CONTENT_MUTATED_EVENT = 'luckread:content-mutated'
+
 async function authorizedFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   let token = sessionStorage.getItem(ACCESS_KEY)
   const headers = new Headers(init.headers)
@@ -288,6 +290,7 @@ export default function PublishComposer({
         return
       }
       await persistDraft()
+      window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
       setMessage('草稿已保存。')
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : ''
@@ -335,6 +338,7 @@ export default function PublishComposer({
       const nextUrl = new URL(window.location.href)
       nextUrl.searchParams.delete('draft')
       window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
+      window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
       setMessage('草稿已放弃。')
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : ''
@@ -376,6 +380,7 @@ export default function PublishComposer({
           ? { ...current, state: transition.to, version: transition.version, etag: transition.etag }
           : current,
       )
+      window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
       setMessage('已提交发布审核。审核通过后将进入正式发布状态。')
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : ''
