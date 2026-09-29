@@ -4154,3 +4154,14 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
  - This is validation/governance reconciliation only. No W04 runtime, D1, Queue, Worker, Payload, API, or production deployment change was made.
  - The authoritative W04 blocker remains the absence of a concrete admitted derived projection destination and cache/deindex runtime binding.
  - Backup: `backup/pre-auth013-w04-final-head-reconciliation-20260929`.
+
+
+## 2026-09-29 — AUTH-013 W04 current-control pointer reconciliation
+
+- Current `main` remains the authoritative work source; no runtime or infrastructure state changed.
+- The dedicated current execution cursor still selects `AUTH-013-W04-PROJECTION-CONSUMER-001 / BLOCKED_EXTERNAL`.
+- The cursor's `authoritativeControl` had lagged behind the already-established blocker and still pointed to the earlier Event Transport control.
+- Reconciled the cursor to `docs/change-control/CC-MAPPING-0-AUTH-013-W04-PROJECTION-DESTINATION-AUTHORITY-EXHAUSTED-2026-09-29.md`, which is the current factual blocker: no concrete admitted W04 projection destination or cache/deindex runtime is available.
+- Reconciled the cursor's stale current-head reason text to the same destination-authority blocker. The deliberate `currentMainSha = 86e6c0b7b75722177ae2d5adc48b15b9abf97156` source checkpoint is not advanced merely by this governance-only merge.
+- No W04 consumer implementation, Worker/D1/Queue/Service Binding change, cache key, search instance, production deployment, or Evidence Registry promotion was performed.
+- Backup: `backup/pre-auth013-w04-destination-control-reconcile-20260929`.
