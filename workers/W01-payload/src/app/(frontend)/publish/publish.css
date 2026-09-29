@@ -38,6 +38,14 @@
 .lr-actions .danger:hover { background:#ffe4e6; }
 .lr-actions .ghost { background:transparent; color:#475569; border:1px solid #dbe2ea; }
 .lr-actions .ghost:hover { background:#f8fafc; }
+.lr-preview { margin-top:20px; padding:18px; border:1px solid #e2e8f0; border-radius:18px; background:#f8fafc; }
+.lr-preview-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+.lr-preview-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:22px; }
+.lr-preview-type { display:inline-block; font-size:12px; font-weight:800; color:#64748b; margin-bottom:8px; }
+.lr-preview-card h2 { margin:0 0 14px; font-size:26px; line-height:1.25; letter-spacing:-.03em; }
+.lr-preview-body { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.8; color:#334155; }
+.lr-preview-media { margin-top:18px; padding-top:14px; border-top:1px solid #e2e8f0; color:#64748b; font-size:13px; }
+
 .lr-note { margin:14px 0 0; font-size:12px; line-height:1.5; color:#6b7280; }
 @media (max-width:640px) {
   .lr-publish-shell { padding:16px; }
