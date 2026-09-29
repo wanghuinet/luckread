@@ -201,15 +201,27 @@
         "ENT-USER"
       ],
       "payloadCollections": [],
-      "workerRefs": ["W02"],
-      "codeEvidenceRefs": [],
+      "workerRefs": [
+        "W02"
+      ],
+      "codeEvidenceRefs": [
+        "workers/W02-content/src/account/account-state-transition.ts",
+        "workers/W02-content/src/account/account-state-transition.test.ts",
+        "workers/W01-payload/src/app/users/[userId]/account-state/route.ts",
+        "workers/W01-payload/src/app/v1/users/[userId]/account-state/route.ts"
+      ],
       "evidence": [
         "docs/04-WORKER-MASTER-v1.0.md",
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
+        "contracts/alignment/mapping-batches/AUTH-013-real-evidence-reconciliation.v1.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-013-EVIDENCE-REGISTRY-RECONCILIATION-2026-09-29.md",
+        "docs/MAPPING-0-CLOSURE-LEDGER.md",
+        "contracts/evidence/mapping-0-evidence-registry.v1.json"
       ],
       "blockers": [
-        "account-state authority, DTO/entity/field/persistence, Worker/runtime and evidence mapping remain incomplete"
+        "Feature-wide lifecycle transition coverage remains incomplete beyond the proven ACTIVE → RESTRICTED public path; FROZEN/SUSPENDED/BANNED plus escalation/reinstatement/restore paths require bounded evidence.",
+        "Approval-required BANNED behavior and complete cache/deindex/feed/search convergence across contracted lifecycle states remain unproven at feature-wide scope.",
+        "AUTH-013 remains PARTIAL until the remaining lifecycle/side-effect/evidence graph gates are reconciled."
       ]
     },
     {
