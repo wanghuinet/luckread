@@ -26,7 +26,7 @@ export async function resolveGlobalLayer(
   accountState: string,
   now = new Date().toISOString(),
 ): Promise<LayerResolution> {
-  if (!subjectId || accountState !== 'ACTIVE') return { decision: 'DENY' }
+  if (!subjectId || (accountState !== 'PENDING_VERIFICATION' && accountState !== 'ACTIVE')) return { decision: 'DENY' }
 
   const sql = [
     'SELECT id, subject_id AS subjectId, role_id AS roleId,',
