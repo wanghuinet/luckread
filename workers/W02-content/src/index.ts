@@ -12,6 +12,7 @@ import {
   refreshSessionFromAuthoritativeD1,
   revokeSessionExtension,
   validateAuthoritativeSession,
+  resolveAuthenticatedPrincipal,
 } from './session/session-runtime.js'
 import {
   listCurrentUserSessions,
@@ -214,6 +215,33 @@ export default {
             message: status === 401 ? 'authentication denied' : status === 400 ? 'invalid session request' : 'authentication service unavailable',
           },
         }, status)
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/session/principal') {
+      const body = await readJsonBody<{ sessionId?: unknown; userId?: unknown; tokenVersion?: unknown }>(request)
+      if (
+        !body ||
+        typeof body.sessionId !== 'string' ||
+        body.sessionId.length === 0 ||
+        typeof body.userId !== 'string' ||
+        body.userId.length === 0 ||
+        typeof body.tokenVersion !== 'number' ||
+        !Number.isSafeInteger(body.tokenVersion) ||
+        body.tokenVersion < 0
+      ) {
+        return json({ active: false }, 400)
+      }
+
+      try {
+        const result = await resolveAuthenticatedPrincipal(env.D1_01, {
+          sessionId: body.sessionId,
+          userId: body.userId,
+          tokenVersion: body.tokenVersion,
+        })
+        return json(result, result.active ? 200 : 401)
+      } catch {
+        return json({ active: false }, 503)
       }
     }
 

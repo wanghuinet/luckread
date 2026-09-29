@@ -128,6 +128,13 @@ export const validateSession = async (body: {
   return result.active
 }
 
+export const resolveAuthenticatedPrincipal = async (body: {
+  sessionId: string
+  userId: string
+  tokenVersion: number
+}) =>
+  callW02<{ active: boolean; layer?: string }>('/internal/auth/session/principal', body)
+
 export type AccountStateTransitionResult = {
   from: string
   to: string
