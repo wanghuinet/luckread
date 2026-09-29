@@ -429,7 +429,7 @@ export default function PublishComposer({
               hidden
               multiple
               disabled={busy || reviewLocked}
-            onChange={handleFiles}
+              onChange={handleFiles}
               type="file"
             />
           </label>
