@@ -115,7 +115,7 @@ export default function PublishComposer({
         const recovered = data as ContentResponse
         let recoveredBody = ''
         if (recovered.bodyRef) {
-          const bodyResponse = await authorizedFetch(recovered.bodyRef, { method: 'GET' })
+          const bodyResponse = await fetch(recovered.bodyRef, { method: 'GET', credentials: 'same-origin' })
           if (bodyResponse.ok) recoveredBody = await bodyResponse.text()
         }
         if (cancelled) return
