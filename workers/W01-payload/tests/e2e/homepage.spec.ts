@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test('renders the LuckRead public homepage experience', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('http://127.0.0.1:3000/')
 
   await expect(page).toHaveTitle(/LuckRead/)
   await expect(page.getByRole('heading', { name: /让好内容被看见/ })).toBeVisible()
