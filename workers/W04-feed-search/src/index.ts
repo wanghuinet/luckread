@@ -2,6 +2,7 @@
 // Runtime evidence gate follows the admitted destination and queue binding.
 // Final controlled runtime trigger.
 // Consumer/DLQ live verification uses the dedicated Queue API.
+// Final runtime evidence execution.
 import { applyAccountStateProjection, parseAccountStateChanged } from './auth-013-projection.js'
 
 interface ProjectionKV {
