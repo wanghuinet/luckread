@@ -218,7 +218,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
 
           <div className="registerFooter">
             <span>已有 LuckRead 账号？</span>
-            <Link href="/admin/login">登录</Link>
+            <Link href="/login">登录</Link>
           </div>
         </div>
 
