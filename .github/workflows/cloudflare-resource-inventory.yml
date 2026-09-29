@@ -138,6 +138,59 @@ jobs:
           collect "queues" "${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/queues?page=1&per_page=100" artifacts/cloudflare-queue-inventory.json
           cat artifacts/cloudflare-kv-inventory.json artifacts/cloudflare-r2-inventory.json artifacts/cloudflare-queue-inventory.json
 
+      - name: Collect read-only W04 live binding inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p artifacts
+          url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/settings"
+          body_file="artifacts/cloudflare-w04-settings.body"
+          http_code="$(curl -sS --retry 3 --retry-all-errors -o "$body_file" -w '%{http_code}' "$url" "${auth_header[@]}" "${json_header[@]}")" || true
+          if [[ "$http_code" == 2* ]]; then
+            jq '
+              {
+                worker: "luckread-w04",
+                status: "AVAILABLE",
+                bindings: (
+                  (.result.bindings // [])
+                  | map(select((.type // "") | test("secret"; "i") | not))
+                  | map(with_entries(select(
+                      .key
+                      | IN(
+                          "name",
+                          "type",
+                          "namespace_id",
+                          "bucket_name",
+                          "queue_name",
+                          "service",
+                          "script_name",
+                          "instance_name",
+                          "workflow_name",
+                          "class_name",
+                          "id"
+                        )
+                    )))
+                )
+              }
+            ' "$body_file" > artifacts/cloudflare-w04-bindings-inventory.json
+          else
+            jq -n --arg httpStatus "$http_code" '{
+              worker: "luckread-w04",
+              status: "UNAVAILABLE",
+              httpStatus: $httpStatus
+            }' > artifacts/cloudflare-w04-bindings-inventory.json
+          fi
+          rm -f "$body_file"
+          jq . artifacts/cloudflare-w04-bindings-inventory.json
+
+      - name: Publish W04 binding inventory artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-w04-binding-inventory
+          path: artifacts/cloudflare-w04-bindings-inventory.json
+          if-no-files-found: error
+
       - name: Publish extended inventory artifact
         uses: actions/upload-artifact@v4
         with:
