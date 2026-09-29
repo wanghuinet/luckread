@@ -28,21 +28,15 @@ jobs:
         with:
           node-version: 24
 
-      - name: Setup pnpm 11
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.0.0
-          run_install: false
-
       - name: Install locked dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Run W03 content unit tests
-        run: pnpm exec vitest run workers/W03-feed/src/content-runtime.test.ts
+        run: npx --yes vitest@3.2.4 run workers/W03-feed/src/content-runtime.test.ts
 
       - name: Typecheck W03 content runtime
         run: >
-          pnpm exec tsc --noEmit --strict --skipLibCheck
+          npx --yes typescript@5.9.3 tsc --noEmit --strict --skipLibCheck
           --target ES2022 --module ESNext --moduleResolution Bundler
           --lib ES2022,DOM --types @cloudflare/workers-types
           workers/W03-feed/src/content-runtime.ts
