@@ -1,25 +1,26 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "091a2879598402d7e360bf48b57fcaa6c80660ea",
-  "backupBranch": "backup/pre-mapping0-current-cursor-auth013-w04-20260929",
+  "sourceHead": "e73cced0eca9e3a630f06ac793dd8648298725f1",
+  "backupBranch": "backup/pre-w04-event-transport-authority-20260929",
   "currentCursor": {
-    "id": "AUTH-013-W04-PROJECTION-DEINDEX-ADMISSION-001",
-    "state": "BLOCKED_EXTERNAL",
-    "objective": "Resolve concrete current W04 resource/entrypoint/binding admission, then implement the minimum projection/deindex consumer using the existing identity.account_state_changed boundary and collect controlled convergence evidence.",
-    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-W04-PROJECTION-DEINDEX-GAP-2026-09-29.md",
-    "nextGate": "1) Dispatch the read-only Cloudflare Resource Inventory workflow and record the actual current W04 Worker resource identity if present. 2) If W04 is absent, stop at the external provisioning/change-control gate; do not invent a resource name, Service Binding, route or Wrangler binding. 3) Once resource/entrypoint authority exists, proceed with the minimum W04 projection/deindex admission slice.",
+    "id": "AUTH-013-W04-PROJECTION-EVENT-TRANSPORT-AUTHORITY-001",
+    "state": "WAIT_AUTHORITY_DECISION",
+    "objective": "Resolve the existing event-consumer authority conflict before any W04 projection/deindex runtime implementation. W04 may implement only after an explicit contract defines how identity.account_state_changed reaches W04 without weakening W06 audit authority or introducing an implicit shared-queue broadcast.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-W04-PROJECTION-EVENT-TRANSPORT-AUTHORITY-2026-09-29.md",
+    "nextGate": "1) Admit an explicit event transport/fan-out contract. 2) Define the W04 consumer queue/path and ownership without changing event meaning or authoritative D1 ownership. 3) Only then admit the minimum T08/T09/T10 projection/deindex runtime and convergence evidence.",
     "logicalOwnership": "W04 -> Feed / Recommendation / Search derived/projection boundary",
-    "physicalBinding": "NOT_ADMITTED. Current main contains no authoritative W04 resourceId, no current W04 deployment workflow, no Service Binding, and no admitted T08/T09/T10 runtime entrypoint. Historical workers/W04-social is non-authoritative and cannot be promoted by path inference.",
+    "physicalBinding": "VERIFIED. W04 physical Worker luckread-w04 exists and was successfully provisioned by controlled GitHub Actions Run 36509211004. W05-W12 physical provisioning Run 36509821604 confirms the target Worker inventory and idempotent verification.",
     "physicalRuntimeTarget": "T08/T09/T10 -> W04; derived/projection only; no new authoritative D1",
     "supersededBlockers": [
-      "AUTH-013 public HTTP E2E/security/D1 evidence is PASS_VERIFIED by run 36503534440 and must not be rerun unchanged.",
-      "W06 AuditEvent transport/persistence is already PASS_VERIFIED and must not be reopened.",
-      "The remaining AUTH-013 feature-wide blocker is downstream projection/deindex/cache convergence.",
-      "No executable canonical W04 runtime or current physical Cloudflare W04 resource is currently evidenced on main.",
-      "No new Worker, D1, authoritative projection store, Payload Core modification or public API redesign is authorized by the W04 GAP record."
+      "W04 physical resource existence is no longer an external blocker: luckread-w04 is verified.",
+      "W05-W12 physical resources are provisioned/verified; no additional physical Worker creation is needed for this slice.",
+      "Current canonical identity.account_state_changed event contract names W02 as producer, W06 as consumer authority, and queue luckread-auth013-account-state.",
+      "W04 T08/T09/T10 require a derived/projection reaction path, but the repository does not yet define a compliant fan-out/transport contract for W04.",
+      "Do not attach W04 to the existing audit queue by inference; queue consumers do not establish a broadcast contract.",
+      "Do not invent a new eventType, queue, Service Binding, public API, D1 writer, or projection authority until the transport contract is admitted."
     ],
-    "sourceHead": "091a2879598402d7e360bf48b57fcaa6c80660ea"
+    "sourceHead": "e73cced0eca9e3a630f06ac793dd8648298725f1"
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -190,16 +191,26 @@
     "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
   },
   "currentHeadReconciliation": {
-    "reason": "Main advanced through AUTH-013 response/evidence corrections and AUTH-002 mapping evidence binding. AUTH-013 public HTTP E2E is now PASS_VERIFIED; the next admissible slice is the W04 projection/deindex gap. No W04 resource or runtime is inferred.",
-    "currentMainSha": "091a2879598402d7e360bf48b57fcaa6c80660ea",
-    "actualGitMainHead": "091a2879598402d7e360bf48b57fcaa6c80660ea",
-    "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
-    "auth013PublicHttpE2eRun": "36503534440",
-    "auth013PublicHttpE2eStatus": "PASS_VERIFIED",
-    "w04ProjectionStatus": "GAP_IDENTIFIED / IMPLEMENTATION_NOT_AUTHORIZED",
-    "w04ResourceStatus": "NOT_VERIFIED_EXTERNAL",
-    "reviewedAt": "2026-09-29",
-    "previousCursorSuperseded": "AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001"
+    "reason": "W04 physical resource and W05-W12 physical topology are now evidenced on current main; the remaining blocker is event transport authority, not resource creation.",
+    "currentMainSha": "e73cced0eca9e3a630f06ac793dd8648298725f1",
+    "w04PhysicalProvisionRun": "36509211004",
+    "w04PhysicalWorker": "luckread-w04",
+    "w05w12ProvisionRun": "36509821604",
+    "w05w12Provisioned": [
+      "luckread-w05",
+      "luckread-w07",
+      "luckread-w08",
+      "luckread-w09",
+      "luckread-w10",
+      "luckread-w11",
+      "luckread-w12"
+    ],
+    "w05w12Preexisting": [
+      "luckread-w06"
+    ],
+    "w04ProjectionStatus": "BLOCKED_BY_EVENT_TRANSPORT_AUTHORITY",
+    "w04ResourceStatus": "PASS_VERIFIED",
+    "reviewedAt": "2026-09-29"
   },
   "nextGate": "AUTH-013-W04-PROJECTION-DEINDEX-ADMISSION-001 / BLOCKED_EXTERNAL",
   "latestControlGate": {

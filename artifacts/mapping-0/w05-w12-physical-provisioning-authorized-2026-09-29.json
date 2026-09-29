@@ -7,7 +7,7 @@
   "workers": [
     {
       "id": "W05",
-      "responsibility": "Transaction / Monetization",
+      "responsibility": "Social / Community / Messaging / Notification",
       "physicalName": "luckread-w05",
       "sourcePath": "workers/W05-transaction"
     },
@@ -19,37 +19,37 @@
     },
     {
       "id": "W07",
-      "responsibility": "Async / Event",
+      "responsibility": "Subscription / Commerce / Payment / Advertising",
       "physicalName": "luckread-w07",
       "sourcePath": "workers/W07-async"
     },
     {
       "id": "W08",
-      "responsibility": "Search",
+      "responsibility": "Creator / Organization",
       "physicalName": "luckread-w08",
       "sourcePath": "workers/W08-search"
     },
     {
       "id": "W09",
-      "responsibility": "Index / Recommendation",
+      "responsibility": "Platform / Storage / Reliability",
       "physicalName": "luckread-w09",
       "sourcePath": "workers/W09-index-recommendation"
     },
     {
       "id": "W10",
-      "responsibility": "Market / IP",
+      "responsibility": "Async / Queue / Job Execution",
       "physicalName": "luckread-w10",
       "sourcePath": "workers/W10-market-ip"
     },
     {
       "id": "W11",
-      "responsibility": "Analytics / Ads",
+      "responsibility": "Growth / Campaign / Analytics / Operations",
       "physicalName": "luckread-w11",
       "sourcePath": "workers/W11-analytics-ads"
     },
     {
       "id": "W12",
-      "responsibility": "Open / Extension",
+      "responsibility": "External Developer / Integration Execution",
       "physicalName": "luckread-w12",
       "sourcePath": "workers/W12-open-extension"
     }
@@ -70,5 +70,11 @@
   "noBusinessImplementation": true,
   "workflowRevision": 3,
   "retryReason": "Retrigger after workflow hardening merge; no business or topology change.",
-  "triggerRevision": 1
+  "triggerRevision": 1,
+  "authorityReconciliation": {
+    "status": "CORRECTED_TO_ACTIVE_WORKER_MASTER",
+    "source": "docs/04-WORKER-MASTER-v1.0.md",
+    "sourceHead": "e73cced0eca9e3a630f06ac793dd8648298725f1",
+    "note": "Directory names remain unchanged historical/physical layout identifiers; Worker responsibility authority comes only from the active Worker Master."
+  }
 }
