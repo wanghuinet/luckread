@@ -159,7 +159,7 @@ export default function CreatorContentList() {
         },
         body: JSON.stringify({ to: action.to }),
       })
-      const data = await response.json().catch((): { error?: { message?: string } }>(() => ({}))
+      const data = await response.json().catch((): { error?: { message?: string } } => ({}))
       if (!response.ok) throw new Error(data?.error?.message || 'CONTENT_STATE_FAILED')
       setNotice(`“${item.title}”已${action.label}。`)
       await load(null, false)
