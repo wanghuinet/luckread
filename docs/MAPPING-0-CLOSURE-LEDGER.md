@@ -3967,3 +3967,16 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - PR `#175` was independently merged into main and its valid evidence-tooling changes are retained by rebasing from current main.
 - No Contract/OpenAPI, D1, Payload, Worker topology, Service Binding, authorization-rule, or Evidence Registry promotion change.
 - Authoritative cursor remains `AUTH-013-PUBLIC-HTTP-E2E-001 / BLOCKED_EXTERNAL_DEPLOYMENT` until fresh exact-source deployment and successful controlled E2E evidence.
+
+
+## 2026-09-29 — AUTH-013 public HTTP E2E actor/target isolation
+
+- Run `36502416941` passed deployment provenance, exact deployed-source checkout, Payload 3.90.2 admission, randomized fixture preflight/seed, generated ID resolution, all preceding authentication/authorization assertions, the authorized 200 response-shape assertion, and fixture cleanup.
+- The run failed only at the stale `If-Match` assertion: expected HTTP `412 PRECONDITION_FAILED`, observed HTTP `401 UNAUTHENTICATED`.
+- Root cause: the successful transition targeted the same synthetic account used as the operator principal, changing that principal to `RESTRICTED` before the stale-version request. The request therefore failed at the authentication boundary rather than reaching W02 optimistic-concurrency handling.
+- Evidence-tooling-only correction: introduce a third synthetic target user with no session/role, while keeping separate basic and operator principals. The operator performs `ACTIVE -> RESTRICTED` on the target, then the same still-active operator principal submits the stale `If-Match` request.
+- The basic principal remains a separate `ACTIVE` account for the client-authority denial and later revoked-session proof; final D1 assertions now distinguish operator, basic, and target state/journal/session outcomes.
+- Backup before correction: `backup/pre-auth013-e2e-target-isolation-20260929`.
+- Change Control: `CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-ACTOR-TARGET-ISOLATION-2026-09-29.md`.
+- No runtime, Contract/OpenAPI, D1 schema, Payload version, Worker topology, Service Binding, authorization-rule, or Evidence Registry promotion change.
+- AUTH-013 and Mapping 0 remain `NOT_GREEN` until a fresh controlled E2E run completes successfully with exact-source provenance and an admitted evidence artifact.
