@@ -166,7 +166,7 @@ const assertResourceId = (value: string): void => {
   }
 }
 
-const validateInput = (input: unknown): ContentInput => {
+export const validateInput = (input: unknown): ContentInput => {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
@@ -176,6 +176,7 @@ const validateInput = (input: unknown): ContentInput => {
   if (
     !['article', 'post', 'video'].includes(String(contentType)) ||
     !Array.isArray(mediaRefs) || mediaRefs.length > 20 ||
+    (contentType === 'video' && mediaRefs.length === 0) ||
     mediaRefs.some(ref => typeof ref !== 'string' || ref.trim().length === 0 || ref.length > 2048) ||
     (candidate.coverRef !== undefined && candidate.coverRef !== null && (typeof candidate.coverRef !== 'string' || candidate.coverRef.length > 2048)) ||
     typeof candidate.title !== 'string' ||
