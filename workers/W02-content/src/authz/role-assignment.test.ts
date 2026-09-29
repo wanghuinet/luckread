@@ -117,7 +117,13 @@ describe('RoleAssignment global layer resolution', () => {
       .resolves.toEqual({ decision: 'DENY' })
   })
 
-  it('fails before querying when account state is not ACTIVE', async () => {
+  it('resolves the canonical L1 user role for an unverified account', async () => {
+    const { db } = fakeD1([assignment()])
+    await expect(resolveGlobalLayer(db, 'user-1', 'PENDING_VERIFICATION', NOW))
+      .resolves.toEqual({ decision: 'ALLOW', layer: 'L1' })
+  })
+
+  it('fails before querying for blocked account states', async () => {
     const { db, getQueryCount } = fakeD1([assignment({ roleId: 'admin' })])
     await expect(resolveGlobalLayer(db, 'user-1', 'BANNED', NOW))
       .resolves.toEqual({ decision: 'DENY' })
