@@ -1,0 +1,134 @@
+name: W05-W12 Physical Worker Provision
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "artifacts/mapping-0/w05-w12-physical-provisioning-authorized-2026-09-29.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify provisioning authority
+        run: |
+          set -euo pipefail
+          test -f artifacts/mapping-0/w05-w12-physical-provisioning-authorized-2026-09-29.json
+          node - <<'NODE'
+          const fs = require('fs')
+          const p = 'artifacts/mapping-0/w05-w12-physical-provisioning-authorized-2026-09-29.json'
+          const a = JSON.parse(fs.readFileSync(p, 'utf8'))
+          if (a.status !== 'AUTHORIZED_FOR_CONTROLLED_PROVISIONING') throw new Error('Invalid provisioning status')
+          if (a.topology !== '12 Workers / 4 D1') throw new Error('Topology mismatch')
+          const expected = ['W05','W06','W07','W08','W09','W10','W11','W12']
+          const actual = (a.workers || []).map(x => x.id)
+          if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error('Worker authority list mismatch')
+          for (const w of a.workers) {
+            if (w.physicalName !== 'luckread-' + w.id.toLowerCase()) {
+              throw new Error('Physical Worker name mismatch for ' + w.id)
+            }
+          }
+          console.log(JSON.stringify({status:a.status, topology:a.topology, workers:expected}, null, 2))
+          NODE
+
+      - name: Provision only missing physical Workers
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          mkdir -p artifacts/mapping-0
+          umask 077
+          auth_header=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")
+          json_header=(-H "Content-Type: application/json")
+          list_workers() {
+            curl -fsS --retry 3 --retry-all-errors               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts?page=1&per_page=100"               "${auth_header[@]}" "${json_header[@]}"
+          }
+          initial="$(list_workers)"
+          printf '%s' "$initial" > /tmp/cloudflare-workers-initial.json
+          echo "Initial physical Worker inventory:"
+          jq -r '.result[] | (.id // .name)' /tmp/cloudflare-workers-initial.json | sort || true
+
+          provisioned=()
+          skipped=()
+          for worker in luckread-w05 luckread-w06 luckread-w07 luckread-w08 luckread-w09 luckread-w10 luckread-w11 luckread-w12; do
+            present="$(jq -r --arg name "$worker" '[.result[] | (.id // .name)] | any(. == $name)' /tmp/cloudflare-workers-initial.json)"
+            if [ "$present" = "true" ]; then
+              echo "VERIFY_PRESENT $worker"
+              skipped+=("$worker")
+              continue
+            fi
+
+            tmp="$(mktemp -d)"
+            trap 'rm -rf "$tmp"' EXIT
+            mkdir -p "$tmp/src"
+            cat > "$tmp/src/index.ts" <<'EOF'
+          export default {
+            async fetch(): Promise<Response> {
+              return new Response("ok", {
+                status: 200,
+                headers: { "content-type": "text/plain; charset=utf-8" },
+              })
+            },
+          }
+          EOF
+            cat > "$tmp/wrangler.jsonc" <<EOF
+          {
+            "name": "$worker",
+            "main": "src/index.ts",
+            "compatibility_date": "2025-08-15",
+            "workers_dev": false
+          }
+          EOF
+            echo "CREATE $worker"
+            (cd "$tmp" && npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc)
+            provisioned+=("$worker")
+            rm -rf "$tmp"
+            trap - EXIT
+          done
+
+          final="$(list_workers)"
+          printf '%s' "$final" > /tmp/cloudflare-workers-final.json
+
+          for worker in luckread-w05 luckread-w06 luckread-w07 luckread-w08 luckread-w09 luckread-w10 luckread-w11 luckread-w12; do
+            jq -e --arg name "$worker" '[.result[] | (.id // .name)] | any(. == $name)' /tmp/cloudflare-workers-final.json >/dev/null
+          done
+
+          jq -n             --argjson provisioned "$(printf '%s
+' "${provisioned[@]}" | jq -R . | jq -s .)"             --argjson preexisting "$(printf '%s
+' "${skipped[@]}" | jq -R . | jq -s .)"             '{
+              schemaVersion: 1,
+              scope: "W05-W12 physical worker provisioning",
+              bootstrapBehavior: "GET /health-compatible bootstrap only; no D1, service binding, route, queue consumer, projection store, or public API behavior",
+              provisioned: $provisioned,
+              preexisting: $preexisting,
+              verified: true
+            }' > artifacts/mapping-0/w05-w12-physical-provisioning-result.json
+
+          jq . artifacts/mapping-0/w05-w12-physical-provisioning-result.json
+          jq '{workers: [.result[] | {id:(.id // .name),created_on,modified_on,compatibility_date}]}' /tmp/cloudflare-workers-final.json             > artifacts/mapping-0/w05-w12-physical-worker-inventory.json
+
+      - name: Upload physical provisioning evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: w05-w12-physical-provisioning-evidence
+          path: |
+            artifacts/mapping-0/w05-w12-physical-provisioning-result.json
+            artifacts/mapping-0/w05-w12-physical-worker-inventory.json
