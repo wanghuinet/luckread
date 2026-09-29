@@ -7,6 +7,7 @@ const need = (name) => {
 const base = need('W01_BASE_URL').replace(/\/$/, '')
 const basicId = need('AUTH013_BASIC_USER_ID')
 const operatorId = need('AUTH013_OPERATOR_USER_ID')
+const targetId = need('AUTH013_TARGET_USER_ID')
 const basicRefresh = need('AUTH013_BASIC_REFRESH_TOKEN')
 const operatorRefresh = need('AUTH013_OPERATOR_REFRESH_TOKEN')
 const basicDevice = need('AUTH013_BASIC_DEVICE_ID')
@@ -59,7 +60,7 @@ const basicToken = await refresh(basicRefresh, basicDevice, 'basic')
 const operatorToken = await refresh(operatorRefresh, operatorDevice, 'operator')
 
 assertError(
-  await post('/v1/users/' + operatorId + '/account-state', {
+  await post('/v1/users/' + targetId + '/account-state', {
     to: 'RESTRICTED',
     reason: 'AUTH-013 unauthenticated denial',
     actor: { id: 'client', type: 'admin' },
@@ -73,7 +74,7 @@ assertError(
 checks.push('unauthenticated_denial')
 
 assertError(
-  await post('/v1/users/' + operatorId + '/account-state', {
+  await post('/v1/users/' + targetId + '/account-state', {
     to: 'RESTRICTED',
     reason: 'AUTH-013 missing If-Match',
   }, operatorToken),
@@ -97,7 +98,7 @@ assertError(
 )
 checks.push('client_authority_injection_denial')
 
-const success = await post('/v1/users/' + operatorId + '/account-state', {
+const success = await post('/v1/users/' + targetId + '/account-state', {
   to: 'RESTRICTED',
   reason: 'AUTH-013 public operator transition',
   actor: { id: 'client', type: 'admin' },
@@ -115,7 +116,7 @@ if (
 checks.push('public_operator_transition')
 
 assertError(
-  await post('/v1/users/' + operatorId + '/account-state', {
+  await post('/v1/users/' + targetId + '/account-state', {
     to: 'ACTIVE',
     reason: 'AUTH-013 stale If-Match',
   }, operatorToken, { 'If-Match': '1' }),
