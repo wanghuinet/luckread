@@ -162,11 +162,16 @@ export default {
         const content = await getContent(env.D1_02, path.id, principalUserId)
         return json({
           id: content.id,
+          contentType: content.contentType,
           state: content.state,
           version: content.version,
+          revision: content.revision,
           etag: content.etag,
           title: content.title,
           bodyRef: content.bodyRef,
+          mediaRefs: content.mediaRefs,
+          coverRef: content.coverRef,
+          updatedAt: content.updatedAt,
         })
       }
 
