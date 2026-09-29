@@ -4,6 +4,7 @@ import { Gutter } from '@payloadcms/ui'
 import Link from 'next/link'
 import React from 'react'
 
+import CreatorContentList from './CreatorContentList'
 import PublishComposer from '../../(frontend)/publish/PublishComposer'
 import '../../(frontend)/publish/publish.css'
 import styles from './creator-center.module.css'
@@ -101,6 +102,17 @@ export function CreatorCenter({
               <span className={styles.publishHint}>原生 Admin 会话 · W03 内容权威</span>
             </div>
             <PublishComposer contentBasePath="/api/creator/contents" />
+          </section>
+
+          <section className={styles.publishSection}>
+            <div className={styles.publishHeading}>
+              <div>
+                <span className={styles.eyebrow}>CONTENT MANAGEMENT</span>
+                <h2>我的内容</h2>
+              </div>
+              <span className={styles.publishHint}>仅显示当前账号 · W03 内容权威</span>
+            </div>
+            <CreatorContentList />
           </section>
 
           <section className={styles.contentGrid}>
