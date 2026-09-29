@@ -1,8 +1,8 @@
 {
   "version": "1.5.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "18780de74b232b90f40cee1bda6492fa01b1e168",
-  "backupBranch": "backup/pre-current-main-execution-cursor-reconciliation-20260929",
+  "sourceHead": "f49cdd879d4583b31447b93e051b4adca8be58eb",
+  "backupBranch": "backup/pre-current-main-cursor-postmerge-reconcile-20260929",
   "currentCursor": {
     "id": "AUTH-013-LIFECYCLE-SIDE-EFFECT-COVERAGE-001",
     "state": "TODO_VERIFY",
@@ -24,9 +24,9 @@
       "w04WorkerVersion": "83e69e13-104c-482f-bc4c-2176bc9ef824",
       "evidenceId": "EVD-AUTH013-W04-PROJECTION-RUNTIME-001"
     },
-    "currentMainSha": "18780de74b232b90f40cee1bda6492fa01b1e168",
-    "sourceHead": "18780de74b232b90f40cee1bda6492fa01b1e168",
-    "reconciliationNote": "Current execution source is main at 18780de74b232b90f40cee1bda6492fa01b1e168. The W04 runtime evidence source/version remains pinned to the previously deployed exact source; later main changes are retained as current repository state and are not retroactively claimed as deployed."
+    "currentMainSha": "f49cdd879d4583b31447b93e051b4adca8be58eb",
+    "sourceHead": "f49cdd879d4583b31447b93e051b4adca8be58eb",
+    "reconciliationNote": "Current execution source is main at f49cdd879d4583b31447b93e051b4adca8be58eb. The W04 runtime evidence source/version remains pinned to the previously deployed exact source; later main changes are retained as current repository state and are not retroactively claimed as deployed."
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -496,11 +496,11 @@
   },
   "currentMainReconciliation": {
     "reviewedAt": "2026-09-29",
-    "currentMainSha": "18780de74b232b90f40cee1bda6492fa01b1e168",
+    "currentMainSha": "f49cdd879d4583b31447b93e051b4adca8be58eb",
     "latestMergedCommits": [
+      "f49cdd879d4583b31447b93e051b4adca8be58eb",
       "18780de74b232b90f40cee1bda6492fa01b1e168",
-      "820cb6bbcbf8725fd4a5d89ee7443cfe3e10ecfa",
-      "191403af04b44e8f71022855b4b63eb89980d265"
+      "820cb6bbcbf8725fd4a5d89ee7443cfe3e10ecfa"
     ],
     "executionDisposition": "CURRENT_MAIN_RECONCILED_EXTERNAL_EVIDENCE_PENDING",
     "auth013NextGate": {
