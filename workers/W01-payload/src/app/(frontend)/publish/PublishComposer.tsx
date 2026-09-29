@@ -204,7 +204,11 @@ export default function PublishComposer({
       const code = caught instanceof Error ? caught.message : ''
       setError(code === 'AUTH_REQUIRED' ? '登录已失效，请重新登录。' : '提交失败，请稍后重试。')
       if (code === 'AUTH_REQUIRED') {
-        router.replace(window.location.pathname.startsWith('/admin/') ? '/admin/login' : '/login')
+        router.replace(
+          window.location.pathname.startsWith('/admin/')
+            ? `/login?returnTo=${encodeURIComponent(window.location.pathname)}`
+            : '/login',
+        )
       }
     } finally {
       setBusy(false)
