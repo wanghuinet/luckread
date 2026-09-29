@@ -24,6 +24,16 @@
       "remote": true
     }
   ],
+  "routes": [
+    {
+      "pattern": "luckread.cn",
+      "custom_domain": true
+    },
+    {
+      "pattern": "api.luckread.cn",
+      "custom_domain": true
+    }
+  ],
   "r2_buckets": [
     {
       "binding": "R2",
