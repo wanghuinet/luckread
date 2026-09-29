@@ -271,7 +271,7 @@ async function checkEvents() {
   if (auth013.doc.properties?.resourceType?.const !== 'User') fail('events/identity-account-state-changed.v1.json: resourceType must be User')
   if (auth013.doc['x-luckread']?.['consumer-authority'] !== 'W06') fail('events/identity-account-state-changed.v1.json: consumer authority must be W06')
   if (auth013.doc['x-luckread']?.delivery !== 'AT_LEAST_ONCE') fail('events/identity-account-state-changed.v1.json: delivery must be AT_LEAST_ONCE')
-  if (auth013.doc['x-luckread']?.['dead-letter-queue'] !== 'luckread-auth013-account-state-dlq') fail('events/identity-account-state-changed.v1.json: DLQ binding is not canonical')
+  if (auth013.doc['x-luckread']?.destinations?.audit?.['dead-letter-queue'] !== 'luckread-auth013-account-state-dlq') fail('events/identity-account-state-changed.v1.json: audit DLQ binding is not canonical')
 }
 
 /* ----------------------------------------------------------------- openapi */

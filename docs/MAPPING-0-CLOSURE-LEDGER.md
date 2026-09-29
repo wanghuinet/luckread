@@ -4133,3 +4133,14 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Current cursor `AUTH-013-W04-PROJECTION-CONSUMER-001` therefore remains `BLOCKED_EXTERNAL`, but its current-head reconciliation now points to the actual main head and its blocker is narrowed to **concrete W04 projection destination + cache/deindex semantics**.
 - No new Worker, D1, projection store, Service Binding, public API, or cache key is inferred or created by this reconciliation.
 - Backup: `backup/pre-auth013-w04-cursor-reconciliation-20260929`.
+
+
+## 2026-09-29 — AUTH-013 W04 projection destination authority exhausted
+
+- Current `main` at review start: `554ff8084aab3e9237a09b3534f04733fa00c0ce`.
+- Repository authority search across the canonical Search/Feed contracts, L5/L6 instance registries, cache contract, and executable W04 bindings found no concrete W04 projection destination or cache runtime binding.
+- Meilisearch is a selected technology, not a deployed/identified instance in current repository evidence.
+- The correct disposition is `GAP_CONFIRMED / IMPLEMENTATION_NOT_AUTHORIZED`; do not create infrastructure solely to make AUTH-013 GREEN.
+- Existing W04 Worker, W04 projection queue/DLQ, and W02 fan-out evidence remain inherited and are not rerun.
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTH-013-W04-PROJECTION-DESTINATION-AUTHORITY-EXHAUSTED-2026-09-29.md`.
+- Backup: `backup/pre-auth013-w04-destination-authority-exhausted-20260929`.
