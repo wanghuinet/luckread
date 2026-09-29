@@ -4113,3 +4113,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Therefore no W04 queue consumer, new event type, Service Binding, D1 binding, public API, or projection authority is invented in this cursor step.
 - Next authoritative item: `AUTH-013-W04-PROJECTION-EVENT-TRANSPORT-AUTHORITY-001` = `WAIT_AUTHORITY_DECISION`.
 - Completed AUTH-013 public HTTP/security/D1 evidence and W06 AuditEvent evidence are inherited; no rerun is required.
+
+
+## 2026-09-29 — AUTH-013 W04 queue and W02 fan-out implementation gates closed
+
+- Dedicated W04 projection queue `luckread-auth013-account-state-projection` and DLQ `luckread-auth013-account-state-projection-dlq` are physically present; controlled provisioning Run `36510919222` is `PASS_VERIFIED`.
+- W02 dual-destination publication implementation is merged at `31aac14e281e481e9294233344d40af5ac83b146`; focused CI Run `36511115240` passed unit tests and W02 binding validation.
+- The publisher sends the same canonical `identity.account_state_changed` payload independently to the W06 audit queue and W04 projection queue. If either destination fails, the durable journal remains `PENDING` and retries; duplicate delivery is therefore expected and must be absorbed by consumer idempotency.
+- No production W02 deployment or runtime promotion is inferred from focused CI alone.
+- The next blocker is not infrastructure. It is the concrete W04 projection/deindex destination and cache semantics. Existing Feed/Search contracts require derived state, serving-time authorization/visibility checks, replay idempotency and rebuildability, but current repository evidence does not identify an executable concrete W04 destination.
+- Therefore W04 consumer implementation must not invent a store or endpoint. Next cursor: `AUTH-013-W04-PROJECTION-CONSUMER-001` = `BLOCKED_EXTERNAL`.
