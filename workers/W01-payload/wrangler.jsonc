@@ -32,6 +32,18 @@
     {
       "pattern": "api.luckread.cn",
       "custom_domain": true
+    },
+    {
+      "pattern": "www.luckread.cn",
+      "custom_domain": true
+    },
+    {
+      "pattern": "sso.luckread.cn",
+      "custom_domain": true
+    },
+    {
+      "pattern": "mp.luckread.cn",
+      "custom_domain": true
     }
   ],
   "r2_buckets": [
