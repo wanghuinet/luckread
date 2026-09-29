@@ -4003,3 +4003,16 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Evidence artifact `11006620069` is non-expired and has digest `sha256:5a2ef6ead447dc908fa374aa2c9632d76ef3050080afb8dc81fd03f6901311f3`.
 - Change Control: `CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-SUCCESS-2026-09-29.md`.
 - This closes the **public HTTP execution evidence** sub-gate for the tested deployment scope. It does not promote the canonical Evidence Registry or Mapping 0 GREEN; those remain subject to their own freshness and full-graph admission rules.
+
+
+## 2026-09-29 — AUTH-013 public E2E Evidence Registry reconciliation
+
+- Following successful Run `36503534440`, the public HTTP execution evidence sub-gate is closed for the tested deployment scope.
+- Canonical Evidence Registry now contains three new VERIFIED executable records: `EVD-AUTH013-PUBLIC-HTTP-E2E-REMOTE-001`, `EVD-AUTH013-PUBLIC-HTTP-SECURITY-REMOTE-001`, and `EVD-AUTH013-PUBLIC-D1-AUTHORITY-REMOTE-001`.
+- All three records point to Run `36503534440`, artifact `11006620069`, and preserve exact deployed-source provenance `f4c329b74f7110af76c7ba7339bfd9d3cb81f910` using `INHERITED_UNCHANGED_SCOPE`.
+- AUTH-013 canonical Mapping remains `PARTIAL`; obsolete blocker wording about wholly incomplete D1/DTO/runtime/public evidence is replaced with the remaining feature-wide lifecycle and side-effect gaps.
+- Runtime/code bindings are now explicitly recorded for the W01 public route and W02 transition kernel in the AUTH-013 Mapping records.
+- Remaining AUTH-013 gaps: feature-wide FROZEN/SUSPENDED/BANNED and restoration/escalation coverage, approval-required BANNED behavior, and full cache/deindex/feed/search convergence.
+- Global Evidence Registry and Mapping 0 remain `NOT_GREEN`; no global promotion is inferred from this scoped reconciliation.
+- No runtime code, Contract/OpenAPI semantics, D1 schema, Payload version, Worker topology, Service Binding topology, authorization rules, or production deployment changed.
+- Backup: `backup/pre-auth013-evidence-registry-reconciliation-20260929`.
