@@ -13,6 +13,7 @@ import { r2Storage } from '@payloadcms/storage-r2'
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
 import { authSessionStateSchemaHook } from './db/auth-session-state-schema'
+import { clampWorkerPbkdf2Iterations } from './runtime/pbkdf2-worker-compat'
 
 export const AUTH001_USER_CAPTURE_CONTEXT = '__luckreadAuth001UserCapture'
 
@@ -40,11 +41,10 @@ const isWorkerRuntime =
 // native Payload auth/session/recovery pipeline intact, but clamp only the Worker
 // runtime crypto primitive to the platform ceiling. This is a compatibility seam,
 // not a second authentication implementation.
-const WORKER_PBKDF2_MAX_ITERATIONS = 100_000
 if (isWorkerRuntime) {
   const nativePbkdf2 = nodeCrypto.pbkdf2.bind(nodeCrypto)
   nodeCrypto.pbkdf2 = ((...args: Parameters<typeof nodeCrypto.pbkdf2>) => {
-    args[2] = Math.min(args[2], WORKER_PBKDF2_MAX_ITERATIONS)
+    args[2] = clampWorkerPbkdf2Iterations(args[2])
     return nativePbkdf2(...args)
   }) as typeof nodeCrypto.pbkdf2
 }
