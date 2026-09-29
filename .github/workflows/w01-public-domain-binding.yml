@@ -1,0 +1,85 @@
+name: W01 Public Domain Binding
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - workers/W01-payload/wrangler.jsonc
+
+permissions:
+  contents: read
+
+jobs:
+  bind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Attach W01 custom domains
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WORKER_NAME: luckread-w01-payload
+        run: |
+          set -euo pipefail
+
+          test -n "${CLOUDFLARE_ACCOUNT_ID}"
+          test -n "${CLOUDFLARE_API_TOKEN}"
+
+          attach() {
+            local hostname="$1"
+            local response existing_service attach_response
+
+            response="$(curl --fail-with-body --silent --show-error \
+              --get "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
+              --data-urlencode "hostname=${hostname}" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json")"
+
+            existing_service="$(printf '%s' "${response}" | jq -r '.result[0].service // empty')"
+
+            if [ -n "${existing_service}" ] && [ "${existing_service}" != "${WORKER_NAME}" ]; then
+              echo "Refusing to reassign ${hostname}: currently attached to ${existing_service}"
+              exit 1
+            fi
+
+            if [ "${existing_service}" = "${WORKER_NAME}" ]; then
+              echo "ALREADY_BOUND ${hostname} -> ${WORKER_NAME}"
+              return 0
+            fi
+
+            attach_response="$(curl --fail-with-body --silent --show-error \
+              "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
+              -X PUT \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data "$(jq -cn --arg hostname "${hostname}" --arg service "${WORKER_NAME}" \
+                '{hostname:$hostname,service:$service,zone_name:"luckread.cn"}')")"
+
+            printf '%s' "${attach_response}" | jq -e '.success == true and .result.hostname == $hostname and .result.service == $service' \
+              --arg hostname "${hostname}" --arg service "${WORKER_NAME}" >/dev/null
+
+            echo "BOUND ${hostname} -> ${WORKER_NAME}"
+          }
+
+          attach "luckread.cn"
+          attach "api.luckread.cn"
+
+      - name: Verify W01 public domains
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          response="$(curl --fail-with-body --silent --show-error \
+            --get "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json")"
+
+          printf '%s' "${response}" | jq -e '
+            .success == true
+            and ([.result[] | select(.hostname == "luckread.cn" and .service == "luckread-w01-payload")] | length) == 1
+            and ([.result[] | select(.hostname == "api.luckread.cn" and .service == "luckread-w01-payload")] | length) == 1
+          ' >/dev/null
+
+          printf '%s' "${response}" | jq '[.result[] | select((.hostname == "luckread.cn" or .hostname == "api.luckread.cn")) | {hostname,service,zone_name,id,cert_id}]'
