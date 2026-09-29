@@ -1,6 +1,6 @@
 'use client'
 
-import { ChangeEvent, useState } from 'react'
+import { ChangeEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type ContentType = 'article' | 'post' | 'video'
@@ -17,7 +17,11 @@ type ContentResponse = {
   state: string
   version: number
   etag: string
+  contentType?: ContentType
+  title?: string
   bodyRef?: string
+  mediaRefs?: string[]
+  coverRef?: string | null
 }
 
 const ACCESS_KEY = 'luckread.accessToken'
@@ -91,6 +95,57 @@ export default function PublishComposer({
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    const draftId = new URL(window.location.href).searchParams.get('draft')?.trim()
+    if (!draftId) return
+
+    async function restoreDraft() {
+      setBusy(true)
+      setError('')
+      setMessage('正在恢复草稿…')
+      try {
+        const response = await authorizedFetch(
+          `${contentBasePath}/${encodeURIComponent(draftId)}`,
+          { method: 'GET' },
+        )
+        const data = await response.json().catch((): null => null)
+        if (!response.ok || !data?.id || !data?.etag) throw new Error(data?.error?.message || 'DRAFT_RECOVERY_FAILED')
+        const recovered = data as ContentResponse
+        let recoveredBody = ''
+        if (recovered.bodyRef) {
+          const bodyResponse = await authorizedFetch(recovered.bodyRef, { method: 'GET' })
+          if (bodyResponse.ok) recoveredBody = await bodyResponse.text()
+        }
+        if (cancelled) return
+        setDraft(recovered)
+        setType(recovered.contentType ?? 'article')
+        setTitle(recovered.title ?? '')
+        setBody(recoveredBody)
+        setSavedBody(recoveredBody)
+        setCoverRef(recovered.coverRef ?? '')
+        setAssets((recovered.mediaRefs ?? []).map((url: string) => ({
+          id: url,
+          url,
+          filename: '已关联媒体',
+          mimeType: 'application/octet-stream',
+        })))
+        setMessage(recovered.state === 'PENDING_REVIEW' ? '草稿已恢复，当前正在审核。' : '草稿已恢复。')
+      } catch (caught) {
+        if (cancelled) return
+        const code = caught instanceof Error ? caught.message : ''
+        setError(code === 'AUTH_REQUIRED' ? '登录已失效，请重新登录。' : '草稿恢复失败，请检查链接或稍后重试。')
+        setMessage('')
+        if (code === 'AUTH_REQUIRED') router.replace(window.location.pathname.startsWith('/admin/') ? '/admin/login' : '/login')
+      } finally {
+        if (!cancelled) setBusy(false)
+      }
+    }
+
+    void restoreDraft()
+    return () => { cancelled = true }
+  }, [contentBasePath, router])
 
   async function uploadFile(file: File): Promise<UploadedAsset> {
     const form = new FormData()
@@ -171,6 +226,9 @@ export default function PublishComposer({
     const saved = data as ContentResponse
     setDraft(saved)
     setSavedBody(body)
+    const nextUrl = new URL(window.location.href)
+    nextUrl.searchParams.set('draft', saved.id)
+    window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
     return saved
   }
 
@@ -226,6 +284,9 @@ export default function PublishComposer({
       setBody('')
       setAssets([])
       setCoverRef('')
+      const nextUrl = new URL(window.location.href)
+      nextUrl.searchParams.delete('draft')
+      window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
       setMessage('草稿已放弃。')
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : ''
