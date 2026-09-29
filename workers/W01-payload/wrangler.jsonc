@@ -15,6 +15,10 @@
     {
       "binding": "W02_AUTH",
       "service": "luckread-w02"
+    },
+    {
+      "binding": "W03_CONTENT",
+      "service": "luckread-w03"
     }
   ],  "d1_databases": [
     {
