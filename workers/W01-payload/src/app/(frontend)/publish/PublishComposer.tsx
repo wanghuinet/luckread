@@ -96,6 +96,7 @@ export default function PublishComposer({
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [preview, setPreview] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -438,7 +439,25 @@ export default function PublishComposer({
       {message ? <div className="lr-success" role="status">{message}</div> : null}
       {error ? <div className="lr-error" role="alert">{error}</div> : null}
 
+      {preview ? (
+        <section className="lr-preview" aria-label="发布预览">
+          <div className="lr-preview-heading">
+            <strong>发布预览</strong>
+            <button className="ghost" onClick={() => setPreview(false)} type="button">返回编辑</button>
+          </div>
+          <article className="lr-preview-card">
+            <span className="lr-preview-type">{type === 'article' ? '文章' : type === 'post' ? '动态' : '视频'}</span>
+            <h2>{title.trim() || '未填写标题'}</h2>
+            <p className="lr-preview-body">{body.trim() || '暂无正文'}</p>
+            {assets.length ? <div className="lr-preview-media">已添加 {assets.length} 个媒体文件</div> : null}
+          </article>
+        </section>
+      ) : null}
+
       <div className="lr-actions">
+        <button className="ghost" disabled={busy} onClick={() => setPreview((current) => !current)} type="button">
+          {preview ? '关闭预览' : '预览'}
+        </button>
         {draft?.id && draft.state === 'DRAFT' ? (
           <button className="ghost" disabled={busy} onClick={copyDraftLink} type="button">
             {copied ? '已复制' : '复制恢复链接'}
