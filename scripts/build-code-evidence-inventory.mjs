@@ -10,9 +10,10 @@ const entityEvidencePath = 'contracts/entity/entity-implementation-evidence.v1.j
 const fieldContractPath = 'contracts/entity/entity-field-contract.v1.json';
 const payloadPath = 'contracts/alignment/payload-inventory.v1.json';
 const apiPath = 'contracts/alignment/api-inventory.v1.json';
+const mappingPath = 'contracts/alignment/cross-system-mapping.v1.json';
 const outPath = 'contracts/alignment/code-evidence-inventory.v1.json';
 
-for (const p of [entityCatalogPath, entityEvidencePath, fieldContractPath, payloadPath, apiPath]) {
+for (const p of [entityCatalogPath, entityEvidencePath, fieldContractPath, payloadPath, apiPath, mappingPath]) {
   if (!fs.existsSync(`${root}/${p}`)) fail(`missing ${p}`);
 }
 
@@ -21,11 +22,20 @@ const evidence = read(entityEvidencePath);
 const fields = read(fieldContractPath);
 const payload = read(payloadPath);
 const api = read(apiPath);
+const mapping = read(mappingPath);
 
 const entityRecords = entities.records ?? [];
 const fieldRecords = fields.records ?? [];
 const evidenceByEntity = new Map((evidence.records ?? []).map((r) => [r.entityId, r]));
 const records = [];
+const codeRefsByOperation = new Map();
+for (const record of mapping.records ?? []) {
+  for (const operationId of record.apiOperationIds ?? []) {
+    const refs = codeRefsByOperation.get(operationId) ?? [];
+    refs.push(...(record.codeEvidenceRefs ?? []));
+    codeRefsByOperation.set(operationId, refs);
+  }
+}
 
 for (const entity of entityRecords) {
   const ev = evidenceByEntity.get(entity.entityId);
@@ -109,16 +119,21 @@ for (const collection of payload.records ?? []) {
 }
 
 for (const operation of api.records ?? []) {
+  const codeRefs = [...new Set(codeRefsByOperation.get(operation.operationId) ?? [])]
+    .filter((ref) => typeof ref === 'string' && ref.startsWith('workers/'));
+  const testRefs = codeRefs.filter((ref) => /\\.(test|spec)\\./.test(ref));
+  const implementationRefs = codeRefs.filter((ref) => !testRefs.includes(ref));
+  const implemented = implementationRefs.length > 0;
   records.push({
     evidenceId: `API_OPERATION:${operation.operationId}`,
     subjectType: 'API_OPERATION',
     subjectId: operation.operationId,
-    implementationStatus: 'UNRESOLVED',
-    implementationRefs: [],
-    testRefs: [],
+    implementationStatus: implemented ? 'IMPLEMENTED' : 'UNRESOLVED',
+    implementationRefs,
+    testRefs,
     schemaEvidenceRefs: operation.schemaRef ? [operation.schemaRef] : [],
-    sourceRefs: operation.sourceRefs ?? [apiPath],
-    blockers: ['Runtime API implementation evidence is not yet mechanically discovered'],
+    sourceRefs: [...new Set([...(operation.sourceRefs ?? [apiPath]), mappingPath])],
+    blockers: implemented ? [] : ['Runtime API implementation evidence is not yet mechanically discovered'],
   });
 }
 
@@ -126,7 +141,7 @@ records.sort((a, b) => a.evidenceId.localeCompare(b.evidenceId));
 write(outPath, {
   version: '1.0.0',
   status: 'DISCOVERED',
-  sourceOfTruth: `${entityCatalogPath} + ${entityEvidencePath} + ${fieldContractPath} + ${payloadPath} + ${apiPath}`,
+  sourceOfTruth: `${entityCatalogPath} + ${entityEvidencePath} + ${fieldContractPath} + ${payloadPath} + ${apiPath} + ${mappingPath}`,
   generatedBy: 'scripts/build-code-evidence-inventory.mjs',
   records,
 });
