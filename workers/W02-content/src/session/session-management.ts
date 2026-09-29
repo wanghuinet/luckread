@@ -161,7 +161,7 @@ export async function listCurrentUserSessions(
         SELECT 1
         FROM users AS u
         WHERE CAST(u.id AS TEXT) = ?
-          AND u.account_state = 'ACTIVE'
+          AND u.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')
           AND EXISTS (
             SELECT 1
             FROM role_assignments AS ra
@@ -258,7 +258,7 @@ export async function revokeCurrentUserSession(
         SELECT 1
         FROM users AS u
         WHERE CAST(u.id AS TEXT) = ?
-          AND u.account_state = 'ACTIVE'
+          AND u.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')
           AND EXISTS (
             SELECT 1
             FROM role_assignments AS ra
