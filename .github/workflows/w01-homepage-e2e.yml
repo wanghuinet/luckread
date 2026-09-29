@@ -41,4 +41,5 @@ jobs:
         working-directory: workers/W01-payload
         env:
           NODE_OPTIONS: --no-deprecation
+          PAYLOAD_SECRET: luckread-homepage-e2e-secret
         run: pnpm exec playwright test tests/e2e/homepage.spec.ts --config=playwright.config.ts
