@@ -289,7 +289,7 @@ export async function revokeCurrentUserSession(
           WHERE CAST(target_extension.session_id AS TEXT) = ?
             AND target_extension.user_id = ?
         )
-        OR EXISTS (
+        AND EXISTS (
           SELECT 1
           FROM users_sessions AS target_native
           WHERE CAST(target_native.id AS TEXT) = ?
