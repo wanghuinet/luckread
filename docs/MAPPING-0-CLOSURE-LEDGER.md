@@ -4070,3 +4070,14 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - AUTH-004 therefore remains `WAIT_AUTHORITY_DECISION`; the candidate event name is recorded as reference only and must not be promoted or emitted by inference.
 - Existing AUTH-004 runtime/E2E evidence remains valid and is not rerun.
 - Backup: `backup/pre-auth004-event-envelope-authority-gap-20260929`.
+
+
+## 2026-09-29 — Code Evidence API implementation discovery fix
+
+- The Code Evidence Inventory generator previously marked every API operation `UNRESOLVED` and therefore could not mechanically reflect already-admitted Mapping code evidence.
+- The generator now uses explicit `workers/...` codeEvidenceRefs from the canonical cross-system Mapping as the only implementation-promotion input.
+- Exact generated delta: `authRegister` and `transitionAccountState` move to `IMPLEMENTED`; all other API operation statuses remain unchanged.
+- No runtime, Contract/API semantics, D1, Worker topology, resource creation, Evidence Registry promotion or Mapping 0 GREEN promotion occurred.
+- CI regeneration/diff validation remains the acceptance gate.
+- Change Control: `CC-MAPPING-0-CODE-EVIDENCE-API-DISCOVERY-2026-09-29.md`.
+- Backup: `backup/pre-code-evidence-api-discovery-fix-20260929`.
