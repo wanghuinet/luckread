@@ -50,6 +50,9 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('navigator.clipboard.writeText')
     expect(publisher).toContain("'复制恢复链接'")
     expect(publisher).toContain('const stateLabel = draft?.state')
+    expect(publisher).toContain("const reviewLocked = draft?.state === 'PENDING_REVIEW'")
+    expect(publisher).toContain('disabled={busy || reviewLocked}')
+
     expect(publisher).toContain('当前状态')
     expect(publisher).toContain('版本 {draft.version}')
 
