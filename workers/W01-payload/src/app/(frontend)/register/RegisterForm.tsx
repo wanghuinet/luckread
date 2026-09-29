@@ -82,7 +82,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
         | null
 
       if (!response.ok) {
-        const apiMessage =
+        const apiMessage: string | undefined =
           payload && 'error' in payload ? payload.error?.message : undefined
         throw new Error(apiMessage || '注册暂时无法完成，请稍后重试。')
       }
