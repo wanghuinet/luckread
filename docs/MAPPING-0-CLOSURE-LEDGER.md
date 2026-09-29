@@ -4191,3 +4191,18 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No Worker/D1/KV/R2/Search resource was created, no Queue binding changed, no W04 runtime code changed, and no previously admitted runtime evidence was rerun.
 - Backup: `backup/pre-auth013-w04-live-binding-confirmed-20260929`.
 
+
+
+## 2026-09-29 AUTH-013/W04 runtime evidence closure
+
+- Current main source: `53e3bcbb855be8e1240171390c69dd034bf04f8b`.
+- Backup before governance change: `backup/pre-auth013-w04-evidence-admission-20260929`.
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTH-013-W04-RUNTIME-EVIDENCE-ADMISSION-2026-09-29.md`.
+- W04 Runtime Gate Run `36522900537` / Job `109259476025`: SUCCESS.
+- Exact runtime assertions passed: queue consumer identity, exactly one consumer, DLQ identity, globe KV destination, FROZEN→PURGED, RESTORED→ACTIVE, older-version rejection, duplicate idempotency, non-resurrection, synthetic cleanup.
+- Evidence Registry admission: `EVD-AUTH013-W04-PROJECTION-RUNTIME-001` = VERIFIED/PASS.
+- AUTH-013 overall remains `PARTIAL / BLOCKED_NOT_GREEN`; this evidence does not prove the remaining feature-wide lifecycle/side-effect matrix.
+
+NEXT_ITEM_ID: `AUTH-013-LIFECYCLE-SIDE-EFFECT-COVERAGE-001`
+NEXT_ITEM_STATE: `TODO_VERIFY`
+Objective: complete the minimum controlled evidence for FROZEN/SUSPENDED/BANNED, approval-required BAN, escalation/reinstatement/restore, and contracted cache/deindex convergence using existing W01/W02/W04/W06 resources only.
