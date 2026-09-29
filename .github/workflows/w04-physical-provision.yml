@@ -69,9 +69,15 @@ jobs:
           set -euo pipefail
           AUTH=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
           queues="$(curl -fsS --retry 3 --retry-all-errors "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues?per_page=100" "${AUTH[@]}")"
-          jq -e --arg q "luckread-auth013-account-state-projection" '.result[]? | select(.queue_name==$q) | .consumers[]? | select(.script_name=="luckread-w04" and .type=="worker" and .dead_letter_queue=="luckread-auth013-account-state-projection-dlq")' <<<"$queues"
-          jq -e --arg q "luckread-auth013-account-state-projection" '.result[]? | select(.queue_name==$q) | .consumers_total_count == 1' <<<"$queues"
-          echo "W04 AUTH-013 queue consumer verified"
+          queue_id="$(jq -r --arg q "luckread-auth013-account-state-projection" '.result[]? | select(.queue_name==$q) | .queue_id' <<<"$queues")"
+          test -n "$queue_id"
+          consumers="$(curl -fsS --retry 3 --retry-all-errors "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$queue_id/consumers" "${AUTH[@]}")"
+          consumer="$(jq -c '.result[]? | select(.script_name=="luckread-w04" and .type=="worker")' <<<"$consumers")"
+          test -n "$consumer"
+          echo "$consumer" | jq -e --arg dlq "luckread-auth013-account-state-projection-dlq" '.dead_letter_queue==$dlq' >/dev/null
+          count="$(jq -r '.result | length' <<<"$consumers")"
+          test "$count" = "1"
+          echo "W04 AUTH-013 queue consumer + DLQ verified"
 
       - name: Run controlled AUTH-013 W04 projection runtime evidence
         env:
