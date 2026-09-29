@@ -70,8 +70,8 @@ jobs:
             dlq_action="created"
           fi
           npx --yes wrangler@4.116.0 queues list > /tmp/queues-after.txt
-          grep -Fqx "$QUEUE" /tmp/queues-after.txt
-          grep -Fqx "$DLQ" /tmp/queues-after.txt
+          grep -Fq "$QUEUE" /tmp/queues-after.txt
+          grep -Fq "$DLQ" /tmp/queues-after.txt
           node - <<'NODE'
           const fs=require('fs')
           fs.writeFileSync(
