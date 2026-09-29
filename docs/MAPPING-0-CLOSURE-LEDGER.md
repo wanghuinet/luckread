@@ -4179,3 +4179,15 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No Worker/D1/KV/R2/search resource was created, no Queue binding changed, no W04 runtime code changed, and no prior GREEN/PASS evidence was rerun.
 - Backup: `backup/pre-auth013-w04-cloudflare-inventory-confirmed-20260929`.
 
+## 2026-09-29 — AUTH-013 W04 live binding evidence reconciliation
+
+- The live Cloudflare binding inventory completed successfully on current `main`.
+- Run: `36519177221`; tested main SHA: `b09c6cd7630019c4f663c7cf77f9498fdbab4f9b`.
+- Artifact: `cloudflare-w04-binding-inventory`; ID `11011833636`; digest `sha256:031baca1f955e9bea27a60e1d1f7ff300ee37feda5b8855b265351991d197f73`.
+- Observed `luckread-w04 / script-settings / bindings: []`.
+- This closes the uncertainty about whether W04 currently has an existing live resource binding: the live settings response shows none.
+- The finding does not admit a new destination, select an external search/cache product, or authorize a Queue consumer implementation.
+- Current cursor remains `AUTH-013-W04-PROJECTION-CONSUMER-001 / BLOCKED_EXTERNAL`.
+- No Worker/D1/KV/R2/Search resource was created, no Queue binding changed, no W04 runtime code changed, and no previously admitted runtime evidence was rerun.
+- Backup: `backup/pre-auth013-w04-live-binding-confirmed-20260929`.
+
