@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 import PublishComposer from './PublishComposer'
 import './publish.css'
 
@@ -5,8 +7,8 @@ export default function PublishPage() {
   return (
     <main className="lr-publish-shell">
       <div className="lr-publish-topbar">
-        <a href="/" className="lr-wordmark">LuckRead</a>
-        <a href="/login" className="lr-quiet-link">切换账号</a>
+        <Link href="/" className="lr-wordmark">LuckRead</Link>
+        <Link href="/login" className="lr-quiet-link">切换账号</Link>
       </div>
       <section className="lr-publish-layout">
         <div>
