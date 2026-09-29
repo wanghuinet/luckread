@@ -339,15 +339,19 @@ describe('AUTH-011 refresh runtime', () => {
 describe('AUTH-002 native session binding boundaries', () => {
   it('binds extension state to the native sid and preserves the native expiry', async () => {
     const db = {
-      prepare: () => ({
+      prepare: (sql: string) => ({
         bind: (..._args: unknown[]) => ({
-          first: async <T>() => ({
-            sessionId: 'native-sid-7',
-            userId: '42',
-            createdAt: '2026-09-22T12:00:00.000Z',
-            expiresAt: '2026-09-22T14:00:00.000Z',
-            accountState: 'ACTIVE',
-          } as T),
+          first: async <T>() => {
+            if (sql.includes('FROM role_assignments')) return null as T
+            return {
+              sessionId: 'native-sid-7',
+              userId: '42',
+              createdAt: '2026-09-22T12:00:00.000Z',
+              expiresAt: '2026-09-22T14:00:00.000Z',
+              accountState: 'ACTIVE',
+            } as T
+          },
+          run: async () => ({ meta: { changes: 1 } }),
         }),
       }),
     } as unknown as D1Database
@@ -375,6 +379,48 @@ describe('AUTH-002 native session binding boundaries', () => {
       layer: 'L2',
       nativeExpiresAt: '2026-09-22T14:00:00.000Z',
     })
+  })
+
+
+  it('materializes the canonical user role and allows an unverified account to establish an L1 session', async () => {
+    const queries: string[] = []
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (..._args: unknown[]) => {
+          queries.push(sql)
+          return {
+            first: async <T>() => {
+              if (sql.includes('FROM role_assignments')) return null as T
+              return {
+                sessionId: 'native-sid-pending',
+                userId: '42',
+                createdAt: '2026-09-22T12:00:00.000Z',
+                expiresAt: '2026-09-22T14:00:00.000Z',
+                accountState: 'PENDING_VERIFICATION',
+              } as T
+            },
+            run: async () => ({ meta: { changes: 1 } }),
+          }
+        },
+      }),
+    } as unknown as D1Database
+
+    const result = await establishSessionFromAuthoritativeD1(db, {
+      sessionId: 'native-sid-pending',
+      userId: '42',
+      deviceId: 'device-a',
+      now: NOW,
+      resolveLayer: async (_db, userId, accountState) => {
+        expect(userId).toBe('42')
+        expect(accountState).toBe('PENDING_VERIFICATION')
+        return { decision: 'ALLOW', layer: 'L1' }
+      },
+      randomToken: () => 'refresh-pending',
+      execute: async () => ({ meta: { changes: 1 } }),
+    })
+
+    expect(result.layer).toBe('L1')
+    expect(queries.some((sql) => sql.includes('INSERT OR IGNORE INTO role_assignments'))).toBe(true)
   })
 
   it('fails closed on an expired native session before extension persistence', async () => {
