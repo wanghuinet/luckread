@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/persistence/CONTENT-ARTICLE-d1-02-persistence.v1.json",
+  "title": "1.0 Content / Article D1-02 Logical Persistence Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PARTIAL",
+  "featureIds": [
+    "CONTENT-001",
+    "CONTENT-007",
+    "CONTENT-009",
+    "CONTENT-010",
+    "ARTICLE-001",
+    "ARTICLE-002",
+    "ARTICLE-011"
+  ],
+  "entityId": "ENT-CONTENT",
+  "projectionEntityId": "ENT-ARTICLE",
+  "authoritativeDomain": "D1-02",
+  "primaryWorker": "W03",
+  "physicalResource": {
+    "binding": "D1_02",
+    "worker": "W03",
+    "databaseUuid": "NOT_YET_ASSIGNED",
+    "databaseName": "NOT_YET_ASSIGNED",
+    "assignmentRule": "Must be explicitly reconciled from authoritative Cloudflare inventory; never infer from an existing unmapped D1."
+  },
+  "tables": {
+    "contents": {
+      "purpose": "Authoritative current Content resource state for 1.0 article runtime.",
+      "primaryKey": "id",
+      "columns": {
+        "id": {
+          "type": "TEXT",
+          "required": true,
+          "unique": true,
+          "immutable": true
+        },
+        "content_type": {
+          "type": "TEXT",
+          "required": true,
+          "allowed": [
+            "article"
+          ],
+          "immutable": true
+        },
+        "owner_user_id": {
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "apiExposure": "NONE"
+        },
+        "creator_id": {
+          "type": "TEXT",
+          "required": false,
+          "indexed": true
+        },
+        "ip_id": {
+          "type": "TEXT",
+          "required": false,
+          "indexed": true
+        },
+        "state": {
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "enumRef": "contracts/enums/content-state.json"
+        },
+        "version": {
+          "type": "INTEGER",
+          "required": true,
+          "minimum": 1,
+          "indexed": true,
+          "monotonic": true
+        },
+        "revision": {
+          "type": "INTEGER",
+          "required": true,
+          "minimum": 1,
+          "indexed": true,
+          "monotonic": true
+        },
+        "title": {
+          "type": "TEXT",
+          "required": true,
+          "maxLength": 512
+        },
+        "body_ref": {
+          "type": "TEXT",
+          "required": true,
+          "unique": true
+        },
+        "etag": {
+          "type": "TEXT",
+          "required": true,
+          "maxLength": 256
+        },
+        "created_at": {
+          "type": "TEXT",
+          "required": true,
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "TEXT",
+          "required": true,
+          "format": "date-time"
+        }
+      },
+      "constraints": [
+        "id is the opaque ResourceId; no foreign key is inferred across D1 domains.",
+        "owner_user_id is server-authoritative and never accepted from public request payload.",
+        "state is limited to the canonical content-state vocabulary.",
+        "new rows start in DRAFT with version=1 and revision=1.",
+        "If-Match must match the authoritative etag for PATCH, DELETE and state transition.",
+        "PATCH increments version and revision atomically.",
+        "State transition increments version atomically; revision changes only when content body metadata changes.",
+        "etag changes on every successful version increment and is derived deterministically from the new version.",
+        "created_at is immutable; updated_at changes on every successful mutation."
+      ]
+    },
+    "content_mutation_idempotency": {
+      "purpose": "Per-domain replay protection for repeatable content mutations; not a generic platform.",
+      "primaryKey": "id",
+      "uniqueKey": [
+        "owner_user_id",
+        "operation_id",
+        "idempotency_key"
+      ],
+      "columns": {
+        "id": {
+          "type": "TEXT",
+          "required": true
+        },
+        "owner_user_id": {
+          "type": "TEXT",
+          "required": true
+        },
+        "operation_id": {
+          "type": "TEXT",
+          "required": true
+        },
+        "idempotency_key": {
+          "type": "TEXT",
+          "required": true,
+          "maxLength": 256
+        },
+        "request_hash": {
+          "type": "TEXT",
+          "required": true
+        },
+        "status": {
+          "type": "TEXT",
+          "required": true,
+          "allowed": [
+            "IN_PROGRESS",
+            "COMPLETED"
+          ]
+        },
+        "response_status": {
+          "type": "INTEGER",
+          "required": false
+        },
+        "response_json": {
+          "type": "TEXT",
+          "required": false
+        },
+        "created_at": {
+          "type": "TEXT",
+          "required": true,
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "TEXT",
+          "required": true,
+          "format": "date-time"
+        }
+      },
+      "rules": [
+        "Same owner + operation + key + same request_hash replays the first completed response.",
+        "Same owner + operation + key + different request_hash is rejected.",
+        "IN_PROGRESS is fail-closed and does not execute a second mutation.",
+        "Expired reservations may be reclaimed by the owning operation only."
+      ]
+    },
+    "content_outbox_events": {
+      "purpose": "Authoritative mutation-to-async bridge for projection/search/notification side effects.",
+      "primaryKey": "event_id",
+      "columns": {
+        "event_id": {
+          "type": "TEXT",
+          "required": true,
+          "unique": true
+        },
+        "operation_id": {
+          "type": "TEXT",
+          "required": true
+        },
+        "event_type": {
+          "type": "TEXT",
+          "required": true
+        },
+        "content_id": {
+          "type": "TEXT",
+          "required": true,
+          "indexed": true
+        },
+        "aggregate_version": {
+          "type": "INTEGER",
+          "required": true
+        },
+        "payload_json": {
+          "type": "TEXT",
+          "required": true
+        },
+        "created_at": {
+          "type": "TEXT",
+          "required": true,
+          "format": "date-time"
+        },
+        "published_at": {
+          "type": "TEXT",
+          "required": false,
+          "format": "date-time"
+        }
+      },
+      "rules": [
+        "Each authoritative content mutation emits at most one content-domain outbox event in the same D1 transaction.",
+        "Outbox events are asynchronous delivery material and never replace contents as source of truth.",
+        "No distributed transaction is used with W04/W10 or another D1."
+      ]
+    }
+  },
+  "mutationBudgets": {
+    "d1ReadMax": 1,
+    "d1WriteTransactionMax": 1,
+    "asyncEventsMax": 1,
+    "distributedTransactions": false
+  },
+  "runtimeGates": {
+    "physicalD1Binding": "PENDING",
+    "migrationExecution": "PENDING",
+    "optimisticConcurrency": "REQUIRED",
+    "idempotency": "REQUIRED",
+    "securityE2E": "REQUIRED",
+    "remoteRuntimeEvidence": "REQUIRED"
+  },
+  "nonGoals": [
+    "No second content database.",
+    "No Payload collection becomes the public API.",
+    "No physical D1 UUID is assigned by inference.",
+    "No runtime GREEN is claimed by this contract."
+  ]
+}
