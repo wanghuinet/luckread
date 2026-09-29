@@ -49,11 +49,29 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export CLOUDFLARE_API_TOKEN="$CLOUDFLARE_API_TOKEN"
           QUEUE="luckread-auth013-account-state-projection"
           DLQ="luckread-auth013-account-state-projection-dlq"
-          npx --yes wrangler@4.116.0 queues list > /tmp/queues-before.txt
-          if grep -Fqx "$QUEUE" /tmp/queues-before.txt; then
+          AUTH=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+
+          list_queues() {
+            local page=1
+            local pages=1
+            : > /tmp/cloudflare-queues.jsonl
+            while [ "$page" -le "$pages" ]; do
+              body="$(curl -fsS --retry 3 --retry-all-errors \
+                "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues?page=$page&per_page=100" \
+                "${AUTH[@]}")"
+              printf '%s\n' "$body" >> /tmp/cloudflare-queues.jsonl
+              pages="$(jq -r '.result_info.total_pages // 1' <<<"$body")"
+              page=$((page + 1))
+            done
+          }
+
+          list_queues
+          queue_exists="$(jq -s -r --arg name "$QUEUE" '[.[].result[]? | .queue_name] | any(. == $name)' /tmp/cloudflare-queues.jsonl)"
+          dlq_exists="$(jq -s -r --arg name "$DLQ" '[.[].result[]? | .queue_name] | any(. == $name)' /tmp/cloudflare-queues.jsonl)"
+
+          if [ "$queue_exists" = "true" ]; then
             echo "VERIFY_PRESENT $QUEUE"
             queue_action="preexisting"
           else
@@ -61,7 +79,8 @@ jobs:
             npx --yes wrangler@4.116.0 queues create "$QUEUE"
             queue_action="created"
           fi
-          if grep -Fqx "$DLQ" /tmp/queues-before.txt; then
+
+          if [ "$dlq_exists" = "true" ]; then
             echo "VERIFY_PRESENT $DLQ"
             dlq_action="preexisting"
           else
@@ -69,10 +88,18 @@ jobs:
             npx --yes wrangler@4.116.0 queues create "$DLQ"
             dlq_action="created"
           fi
-          npx --yes wrangler@4.116.0 queues list > /tmp/queues-after.txt
-          grep -Fq "$QUEUE" /tmp/queues-after.txt
-          grep -Fq "$DLQ" /tmp/queues-after.txt
-          node - <<'NODE'
+
+          list_queues
+          jq -s --arg queue "$QUEUE" --arg dlq "$DLQ" '
+            {
+              queues: [.[].result[]? | select(.queue_name == $queue or .queue_name == $dlq) |
+                {queue_name, queue_id, created_on, consumers_total_count, consumers}]
+            }' /tmp/cloudflare-queues.jsonl > w04-projection-queue-cloudflare-result.json
+
+          jq -e --arg name "$QUEUE" '[.queues[] | .queue_name] | any(. == $name)' w04-projection-queue-cloudflare-result.json >/dev/null
+          jq -e --arg name "$DLQ" '[.queues[] | .queue_name] | any(. == $name)' w04-projection-queue-cloudflare-result.json >/dev/null
+
+          QUEUE_ACTION="$queue_action" DLQ_ACTION="$dlq_action" node - <<'NODE'
           const fs=require('fs')
           fs.writeFileSync(
             'w04-projection-queue-provisioning-result.json',
@@ -81,15 +108,15 @@ jobs:
               queue:'luckread-auth013-account-state-projection',
               dlq:'luckread-auth013-account-state-projection-dlq',
               consumerWorker:'luckread-w04',
-              queueAction:process.env.queue_action,
-              dlqAction:process.env.dlq_action,
+              queueAction:process.env.QUEUE_ACTION,
+              dlqAction:process.env.DLQ_ACTION,
               verified:true
             },null,2)+'\n'
           )
           NODE
-        env:
-          queue_action: created
-          dlq_action: created
+
+          jq . w04-projection-queue-provisioning-result.json
+          jq . w04-projection-queue-cloudflare-result.json
 
       - name: Upload queue provisioning evidence
         uses: actions/upload-artifact@v4
