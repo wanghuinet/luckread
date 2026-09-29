@@ -15,11 +15,11 @@ export type ContentState =
 export type ContentType = 'article' | 'post' | 'video'
 
 export interface ContentInput {
-  contentType?: ContentType
+  contentType: ContentType
   title: string
   bodyRef: string
-  mediaRefs?: string[]
-  coverRef?: string | null
+  mediaRefs: string[]
+  coverRef: string | null
 }
 
 export interface ContentRecord {
