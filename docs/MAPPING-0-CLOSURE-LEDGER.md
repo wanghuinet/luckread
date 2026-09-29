@@ -4239,3 +4239,19 @@ Objective: complete the minimum controlled evidence for FROZEN/SUSPENDED/BANNED,
 NEXT_ITEM_ID: `AUTH-013-LIFECYCLE-SIDE-EFFECT-COVERAGE-001`
 NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
 Objective: run the controlled W04 side-effect matrix workflow above against the already-admitted live W04 consumer; only after a PASS should the resulting artifact be reconciled into the Evidence Registry.
+
+
+## 2026-09-29 — AUTH-010 current-head readiness reconciliation
+
+- Current main source checkpoint reviewed: 60ab660f2b9791dea50438aba3ce5bf8191488ff.
+- AUTH-010 GET /auth/sessions and DELETE /auth/sessions/{sessionId} are already present in canonical OpenAPI with exact operation IDs authSessionList and authSessionRevoke.
+- AUTH-010 DTO bindings are already CONTRACT_BOUND to those OpenAPI paths and ENT-SESSION.
+- user.session.read and user.session.revoke are already present in the canonical permission catalog with own/self scope; the revoke permission is audit-required.
+- Therefore the older AUTH-010 documents that still describe the OpenAPI/permission prerequisites as absent are stale relative to current main; they remain historical inputs and are not rewritten.
+- No runtime implementation, D1 migration, Worker topology, Queue, Service Binding, cache resource, or Evidence Registry PASS is inferred or promoted.
+- Existing AUTH-013 side-effect workflow remains BLOCKED_EXTERNAL only for manual-dispatch evidence; that blocked external execution is intentionally deferred and is not modified here.
+- New reconciled control: docs/change-control/CC-MAPPING-0-AUTH-010-CURRENT-HEAD-READINESS-RECONCILIATION-2026-09-29.md.
+- Backup: backup/pre-auth010-current-head-reconciliation-20260929.
+- NEXT_ITEM_ID: AUTH-010-HANDLER-BOUNDARY-001
+- NEXT_ITEM_STATE: TODO_FIX
+- Objective: freeze the smallest W01 public authentication → W02 session-management handler boundary from already-admitted contracts, then implement focused list/revoke runtime only after the handler boundary is explicit; do not infer new topology or persistence.
