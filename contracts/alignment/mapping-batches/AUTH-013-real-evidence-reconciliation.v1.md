@@ -403,3 +403,22 @@ The public HTTP execution evidence sub-gate is therefore closed for this tested 
 - `EVD-AUTH013-PUBLIC-D1-AUTHORITY-REMOTE-001`.
 
 AUTH-013 remains `BLOCKED_NOT_GREEN` / Mapping status `PARTIAL`. The remaining gaps are feature-wide lifecycle transition coverage (FROZEN/SUSPENDED/BANNED and restoration/escalation paths), approval-required BANNED behavior, and complete cache/deindex/feed/search convergence. No runtime, Contract/OpenAPI, D1 schema, Payload version, Worker topology, Service Binding, or authorization-rule change is introduced by this reconciliation.
+
+
+## 2026-09-29 W04 projection runtime evidence reconciliation
+
+Controlled AUTH-013/W04 runtime evidence Run `36522900537` completed successfully at exact current main source `53e3bcbb855be8e1240171390c69dd034bf04f8b`.
+
+Verified scope:
+- W04 physical Worker `luckread-w04` deployed successfully.
+- Existing projection queue `luckread-auth013-account-state-projection` has exactly one consumer: W04.
+- Dedicated DLQ is `luckread-auth013-account-state-projection-dlq` with bounded retry settings.
+- Existing derived KV destination `globe` / namespace `32f7e407128a43d59720d5d46736e084` is live and explicitly non-authoritative.
+- FROZEN projection converged to PURGED.
+- RESTORED projection converged to ACTIVE.
+- Older versions were rejected; duplicate delivery was idempotent; purged state was not resurrected.
+- Synthetic projection test state was cleaned after evidence capture.
+
+Evidence Registry record admitted: `EVD-AUTH013-W04-PROJECTION-RUNTIME-001`.
+
+This closes the W04 projection runtime sub-gate only. AUTH-013 remains `PARTIAL / BLOCKED_NOT_GREEN` because feature-wide lifecycle transition coverage, approval-required BANNED behavior, and complete cache/deindex/feed/search convergence remain unproven.
