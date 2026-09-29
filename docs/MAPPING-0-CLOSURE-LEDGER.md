@@ -4038,3 +4038,15 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - The remaining AUTH-013 side-effect scope is limited to cache invalidation/version propagation and feature-wide feed/search/content projection/deindex convergence across the declared lifecycle states.
 - Change Control: `CC-MAPPING-0-AUTH-013-SIDE-EFFECT-DECISION-RECONCILIATION-2026-09-29.md`.
 - Backup: `backup/pre-auth013-side-effect-decision-reconciliation-20260929`.
+
+
+## 2026-09-29 — AUTH-013 W04 projection/deindex GAP identified
+
+- Existing AUTH-013 state, persistence, W06 AuditEvent transport, public HTTP security/concurrency and authoritative D1 sub-gates remain verified; none are rerun.
+- Current repository search does not establish an executable canonical W04 Feed/Recommendation/Search projection/deindex runtime.
+- Historical `workers/W04-social` is explicitly non-authoritative and cannot be used as a binding by directory inference.
+- Current repository search also does not establish a separate executable canonical authorization-cache invalidation runtime boundary.
+- The next admissible slice is therefore a W04/T08-T10 projection/deindex runtime admission, using the existing frozen 12-Worker / 4-D1 topology and existing `identity.account_state_changed` event boundary.
+- No new Worker, D1, projection authority, or public workaround is authorized by this GAP record.
+- Change Control: `CC-MAPPING-0-AUTH-013-W04-PROJECTION-DEINDEX-GAP-2026-09-29.md`.
+- Backup: `backup/pre-auth013-w04-projection-gap-20260929`.
