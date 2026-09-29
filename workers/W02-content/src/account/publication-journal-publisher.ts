@@ -7,6 +7,7 @@ type PublicationJournalRow = {
 type PublicationQueueEnv = {
   D1_01: D1Database
   AUTH013_QUEUE: Queue
+  AUTH013_PROJECTION_QUEUE: Queue
 }
 
 const MAX_BATCH = 10
@@ -45,9 +46,13 @@ export async function publishPendingAccountStateEvents(
       continue
     }
 
-    try {
-      await env.AUTH013_QUEUE.send(payload)
+    const deliveries = await Promise.allSettled([
+      env.AUTH013_QUEUE.send(payload),
+      env.AUTH013_PROJECTION_QUEUE.send(payload),
+    ])
 
+    const failedDelivery = deliveries.some((result) => result.status === 'rejected')
+    if (!failedDelivery) {
       const result = await env.D1_01
         .prepare(
           'UPDATE auth_013_publication_journal SET status = ?, published_at = ?, next_attempt_at = NULL, last_error_code = NULL WHERE journal_id = ? AND status = ?',
@@ -58,19 +63,20 @@ export async function publishPendingAccountStateEvents(
       if (result.meta?.changes === 1) {
         published += 1
       }
-    } catch {
-      const delay = retryDelaySeconds(row.attempt)
-      const nextAttemptAt = new Date(Date.parse(now) + delay * 1000).toISOString()
-
-      await env.D1_01
-        .prepare(
-          'UPDATE auth_013_publication_journal SET status = ?, attempt = attempt + 1, next_attempt_at = ?, last_error_code = ? WHERE journal_id = ? AND status = ?',
-        )
-        .bind('PENDING', nextAttemptAt, 'QUEUE_SEND_FAILED', row.journalId, 'PENDING')
-        .run()
-
-      failed += 1
+      continue
     }
+
+    const delay = retryDelaySeconds(row.attempt)
+    const nextAttemptAt = new Date(Date.parse(now) + delay * 1000).toISOString()
+
+    await env.D1_01
+      .prepare(
+        'UPDATE auth_013_publication_journal SET status = ?, attempt = attempt + 1, next_attempt_at = ?, last_error_code = ? WHERE journal_id = ? AND status = ?',
+      )
+      .bind('PENDING', nextAttemptAt, 'QUEUE_DESTINATION_FAILED', row.journalId, 'PENDING')
+      .run()
+
+    failed += 1
   }
 
   return {
