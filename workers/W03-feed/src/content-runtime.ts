@@ -415,7 +415,7 @@ export async function createContent(
   const replay = inspectIdempotency(existing, ownerUserId, hash, now)
   if (replay.replayed) {
     const parsed = replay.body as { id?: unknown; state?: unknown; version?: unknown; etag?: unknown; title?: unknown; bodyRef?: unknown } | null
-    if (!parsed || typeof parsed.id !== 'string' || typeof parsed.state !== 'string' || typeof parsed.version !== 'number' || typeof parsed.etag !== 'string' || typeof parsed.title !== 'string' || typeof parsed.bodyRef !== 'string') {
+    if (!parsed || typeof parsed.id !== 'string' || !isState(parsed.state) || typeof parsed.version !== 'number' || typeof parsed.etag !== 'string' || typeof parsed.title !== 'string' || typeof parsed.bodyRef !== 'string') {
       throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
     }
     return {
