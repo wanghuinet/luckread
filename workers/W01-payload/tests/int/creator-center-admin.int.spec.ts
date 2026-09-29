@@ -53,7 +53,7 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("const reviewLocked = draft?.state === 'PENDING_REVIEW'")
     expect(publisher).toContain('function startNewContent()')
     expect(publisher).toContain("setDraft(null)")
-    expect(publisher).toContain("'新建内容'")
+    expect(publisher).toContain('新建内容')
 
     expect(publisher).toContain('disabled={busy || reviewLocked}')
 
