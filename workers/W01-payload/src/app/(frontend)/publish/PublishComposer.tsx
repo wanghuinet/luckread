@@ -189,6 +189,8 @@ export default function PublishComposer({
     setAssets((current) => current.filter((asset) => asset.id !== id))
   }
 
+  const reviewLocked = draft?.state === 'PENDING_REVIEW'
+
   const stateLabel = draft?.state === 'DRAFT'
     ? '草稿已保存'
     : draft?.state === 'PENDING_REVIEW'
@@ -382,6 +384,7 @@ export default function PublishComposer({
             aria-selected={type === value}
             className={type === value ? 'active' : ''}
             key={value}
+            disabled={busy || reviewLocked}
             onClick={() => setType(value)}
             role="tab"
             type="button"
@@ -395,6 +398,7 @@ export default function PublishComposer({
         <span>标题</span>
         <input
           maxLength={512}
+          disabled={busy || reviewLocked}
           onChange={(event) => setTitle(event.target.value)}
           placeholder={type === 'post' ? '这一刻想分享什么？' : '输入一个清晰、有吸引力的标题'}
           value={title}
@@ -404,6 +408,7 @@ export default function PublishComposer({
       <label className="lr-field">
         <span>{type === 'post' ? '正文' : type === 'video' ? '视频简介' : '正文'}</span>
         <textarea
+          disabled={busy || reviewLocked}
           onChange={(event) => setBody(event.target.value)}
           placeholder="写下你的内容…"
           rows={14}
@@ -423,7 +428,8 @@ export default function PublishComposer({
               accept="image/*,video/*"
               hidden
               multiple
-              onChange={handleFiles}
+              disabled={busy || reviewLocked}
+            onChange={handleFiles}
               type="file"
             />
           </label>
@@ -436,7 +442,7 @@ export default function PublishComposer({
                   <strong>{asset.filename ?? asset.id}</strong>
                   <span>{asset.mimeType}</span>
                 </div>
-                <button onClick={() => removeAsset(asset.id)} type="button">移除</button>
+                <button disabled={busy || reviewLocked} onClick={() => removeAsset(asset.id)} type="button">移除</button>
               </div>
             ))}
           </div>
@@ -448,6 +454,7 @@ export default function PublishComposer({
       <label className="lr-field">
         <span>封面引用（可选）</span>
         <input
+          disabled={busy || reviewLocked}
           onChange={(event) => setCoverRef(event.target.value)}
           placeholder="默认使用第一个媒体文件"
           value={coverRef}
