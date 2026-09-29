@@ -2,7 +2,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
-import { readVerifiedPayloadTokenVersion } from '../../../../../auth/payload-access-token.js'
+import { readVerifiedPayloadTokenVersion } from '../../../../auth/payload-access-token.js'
 
 type W02Service = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
