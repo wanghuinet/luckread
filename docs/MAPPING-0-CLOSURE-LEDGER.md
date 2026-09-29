@@ -4144,3 +4144,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Existing W04 Worker, W04 projection queue/DLQ, and W02 fan-out evidence remain inherited and are not rerun.
 - Change Control: `docs/change-control/CC-MAPPING-0-AUTH-013-W04-PROJECTION-DESTINATION-AUTHORITY-EXHAUSTED-2026-09-29.md`.
 - Backup: `backup/pre-auth013-w04-destination-authority-exhausted-20260929`.
+
+
+## 2026-09-29 — AUTH-013 W04 Contract Admission validator reconciliation
+
+ - Current `main` after PR #208 merge: `86e6c0b7b75722177ae2d5adc48b15b9abf97156`.
+ - PR #208 corrected Contract CI to validate the current canonical AUTH-013 `destinations.audit.dead-letter-queue` structure rather than the superseded top-level DLQ field.
+ - Contract Admission Run `36512611012` completed successfully after the correction; Mapping 0 Structural Run `36512611096` also completed successfully.
+ - This is validation/governance reconciliation only. No W04 runtime, D1, Queue, Worker, Payload, API, or production deployment change was made.
+ - The authoritative W04 blocker remains the absence of a concrete admitted derived projection destination and cache/deindex runtime binding.
+ - Backup: `backup/pre-auth013-w04-final-head-reconciliation-20260929`.
