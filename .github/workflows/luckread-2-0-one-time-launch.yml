@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R5.md
+      - docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R6.md
 
 permissions:
   contents: read
@@ -27,8 +27,8 @@ jobs:
 
       - name: Verify launch marker
         run: |
-          test -f docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R5.md
-          grep -q "LAUNCH_2_0_R5=AUTHORIZED_BY_MAIN_MERGE" docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R5.md
+          test -f docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R6.md
+          grep -q "LAUNCH_2_0_R6=AUTHORIZED_BY_MAIN_MERGE" docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R6.md
 
       - name: Verify W03 binding
         working-directory: workers/W03-feed
