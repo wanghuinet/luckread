@@ -9,6 +9,7 @@
 // Final jq evidence trigger.
 // Final runtime gate trigger.
 // Runtime log evidence checkpoint.
+// Node runtime evidence script.
 import { applyAccountStateProjection, parseAccountStateChanged } from './auth-013-projection.js'
 
 interface ProjectionKV {
