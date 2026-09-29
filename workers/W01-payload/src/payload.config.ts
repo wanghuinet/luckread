@@ -79,6 +79,19 @@ export default buildConfig({
     importMap: {
       baseDir: path.resolve(dirname),
     },
+    components: {
+      actions: ['/app/(payload)/admin/CreatorCenterAction#CreatorCenterAction'],
+      views: {
+        creatorCenter: {
+          Component: '/app/(payload)/admin/CreatorCenter#CreatorCenter',
+          path: '/creator-center',
+          exact: true,
+          meta: {
+            title: 'Creator Center · LuckRead',
+          },
+        },
+      },
+    },
   },
   collections: [Users, Media],
   editor: lexicalEditor(),
