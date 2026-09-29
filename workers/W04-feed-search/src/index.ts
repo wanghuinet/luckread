@@ -10,6 +10,7 @@
 // Final runtime gate trigger.
 // Runtime log evidence checkpoint.
 // Node runtime evidence script.
+// KV propagation-aware final gate.
 import { applyAccountStateProjection, parseAccountStateChanged } from './auth-013-projection.js'
 
 interface ProjectionKV {
