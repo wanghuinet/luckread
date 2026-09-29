@@ -4123,3 +4123,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No production W02 deployment or runtime promotion is inferred from focused CI alone.
 - The next blocker is not infrastructure. It is the concrete W04 projection/deindex destination and cache semantics. Existing Feed/Search contracts require derived state, serving-time authorization/visibility checks, replay idempotency and rebuildability, but current repository evidence does not identify an executable concrete W04 destination.
 - Therefore W04 consumer implementation must not invent a store or endpoint. Next cursor: `AUTH-013-W04-PROJECTION-CONSUMER-001` = `BLOCKED_EXTERNAL`.
+
+
+## 2026-09-29 — AUTH-013 W04 current-head cursor reconciliation
+
+- Current `main` is `fa984e9af5d3ae8e6c178f1109120b0c4452e082`.
+- This is a governance/current-head reconciliation only. The prior W04 queue, W04/W05-W12 physical provisioning, and W02 fan-out evidence remain inherited; no previously-passed runtime evidence is rerun.
+- The dedicated W04 projection queue/DLQ and W02 dual-destination fan-out gates are already closed by the preceding ledger entry and exact referenced runs.
+- Current cursor `AUTH-013-W04-PROJECTION-CONSUMER-001` therefore remains `BLOCKED_EXTERNAL`, but its current-head reconciliation now points to the actual main head and its blocker is narrowed to **concrete W04 projection destination + cache/deindex semantics**.
+- No new Worker, D1, projection store, Service Binding, public API, or cache key is inferred or created by this reconciliation.
+- Backup: `backup/pre-auth013-w04-cursor-reconciliation-20260929`.
