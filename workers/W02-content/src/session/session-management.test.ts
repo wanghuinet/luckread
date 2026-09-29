@@ -102,6 +102,9 @@ describe('AUTH-010 session revoke', () => {
       },
     } as unknown as D1Database
 
+
+    // The authorization query must preserve idempotent ownership for a revoked
+    // extension row even after Payload has removed the native session row.
     await expect(revokeCurrentUserSession(db, {
       userId: '42',
       currentSessionId: 'sid-current',
