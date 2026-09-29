@@ -378,3 +378,28 @@ Safety boundary:
 The workflow checks the transition result, journal publication, matching D1-03 AuditEvent, canonical actor role, and before/after state/version.
 
 This opens the controlled evidence path for the still-unverified positive publication/persistence boundary; AUTH-013 remains **BLOCKED_NOT_GREEN** until the evidence passes and the downstream lifecycle/security gates are also verified.
+
+
+## 2026-09-29 Public HTTP E2E and evidence registry reconciliation
+
+Controlled AUTH-013 Public Transport HTTP E2E Run `36503534440` completed successfully against deployed source `f4c329b74f7110af76c7ba7339bfd9d3cb81f910` from deployment Run `36502171590`.
+
+Verified in the controlled run:
+- public unauthenticated `401`;
+- mandatory `If-Match` `428`;
+- client-authority injection denial `403`;
+- authorized public transition `200` with the admitted response shape;
+- stale `If-Match` `412`;
+- revoked-session `401`;
+- authoritative D1 state/version/journal/session assertions;
+- synthetic fixture cleanup and zero-row verification.
+
+Evidence artifact `11006620069` is retained by GitHub Actions with digest `sha256:5a2ef6ead447dc908fa374aa2c9632d76ef3050080afb8dc81fd03f6901311f3`.
+
+The public HTTP execution evidence sub-gate is therefore closed for this tested deployment scope. Three executable PASS records are now admitted to the canonical Evidence Registry as VERIFIED using `INHERITED_UNCHANGED_SCOPE`:
+
+- `EVD-AUTH013-PUBLIC-HTTP-E2E-REMOTE-001`;
+- `EVD-AUTH013-PUBLIC-HTTP-SECURITY-REMOTE-001`;
+- `EVD-AUTH013-PUBLIC-D1-AUTHORITY-REMOTE-001`.
+
+AUTH-013 remains `BLOCKED_NOT_GREEN` / Mapping status `PARTIAL`. The remaining gaps are feature-wide lifecycle transition coverage (FROZEN/SUSPENDED/BANNED and restoration/escalation paths), approval-required BANNED behavior, and complete cache/deindex/feed/search convergence. No runtime, Contract/OpenAPI, D1 schema, Payload version, Worker topology, Service Binding, or authorization-rule change is introduced by this reconciliation.
