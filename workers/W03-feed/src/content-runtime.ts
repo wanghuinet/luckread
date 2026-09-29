@@ -35,7 +35,7 @@ export interface ContentRecord {
 
 export interface ContentD1 {
   prepare(query: string): D1PreparedStatement
-  batch<T = D1Result<unknown>>(statements: D1PreparedStatement[]): Promise<T[]>
+  batch(statements: D1PreparedStatement[]): Promise<D1Result<unknown>[]>
 }
 
 interface ContentRow {
@@ -415,14 +415,9 @@ export async function createContent(
   const replay = inspectIdempotency(existing, ownerUserId, hash, now)
   if (replay.replayed) {
     const parsed = replay.body as { id?: unknown; state?: unknown; version?: unknown; etag?: unknown; title?: unknown; bodyRef?: unknown } | null
-    if (
-      typeof parsed.id !== 'string' ||
-      !isState(parsed.state) ||
-      typeof parsed.version !== 'number' ||
-      typeof parsed.etag !== 'string' ||
-      typeof parsed.title !== 'string' ||
-      typeof parsed.bodyRef !== 'string'
-    ) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+    if (!parsed || typeof parsed.id !== 'string' || typeof parsed.state !== 'string' || typeof parsed.version !== 'number' || typeof parsed.etag !== 'string' || typeof parsed.title !== 'string' || typeof parsed.bodyRef !== 'string') {
+      throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+    }
     return {
       id: parsed.id,
       contentType: 'article',
@@ -633,7 +628,7 @@ export async function transitionContentState(
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
 
   assertEtag(content.etag, ifMatch)
-  if (!transitionAllowed(content.state, to, kind, content.ownerUserId === principalUserId, reason)) {
+  if (!canTransitionContentState(content.state, to, kind, content.ownerUserId === principalUserId, reason)) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   }
 
