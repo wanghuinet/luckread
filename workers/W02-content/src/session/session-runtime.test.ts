@@ -3,6 +3,7 @@ import {
   createSessionExtension,
   establishAuthenticatedSession,
   revokeSessionExtension,
+  establishSessionFromAuthoritativeD1,
   validateAuthoritativeSession,
   refreshSessionFromAuthoritativeD1,
   type NativeSessionAuthority,
