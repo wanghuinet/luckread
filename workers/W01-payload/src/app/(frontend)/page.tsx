@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import React from 'react'
 
+import HomeContentFeed from './HomeContentFeed'
 import './styles.css'
 
 const highlights = [
@@ -42,7 +43,7 @@ export default function HomePage() {
             </p>
             <div className="hero-actions">
               <Link className="button button-primary" href="/publish">立即创作<span aria-hidden="true">↗</span></Link>
-              <a className="button button-quiet" href="#explore">探索内容</a>
+              <a className="button button-quiet" href="#content-feed">探索内容</a>
             </div>
           </div>
 
@@ -77,6 +78,8 @@ export default function HomePage() {
             让真正有价值的观点、经验与作品，在更合适的场景里被发现。
           </p>
         </section>
+
+        <HomeContentFeed />
 
         <section className="highlight-grid" aria-label="平台价值">
           {highlights.map((item) => (
