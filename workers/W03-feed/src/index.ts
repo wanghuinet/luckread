@@ -69,6 +69,9 @@ const parseBody = async (request: Request): Promise<Record<string, unknown>> => 
 
 const getPath = (pathname: string): {id?: string; state?: boolean} | null => {
   const parts = pathname.split('/').filter(Boolean)
+  if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
+    return {}
+  }
   if (parts.length === 4 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
     return { id: parts[3] }
   }
