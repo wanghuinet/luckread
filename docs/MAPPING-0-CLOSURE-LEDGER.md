@@ -4100,3 +4100,16 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No API, DTO, D1, Worker topology, or Evidence Registry promotion occurred.
 - Change Control: `CC-MAPPING-0-AUTH-002-CODE-EVIDENCE-BINDING-2026-09-29.md`.
 - Backup: `backup/pre-auth002-code-evidence-bind-20260929`.
+
+
+## 2026-09-29 — W04 physical resource closed; event transport authority is the only next blocker
+
+- Current main: `e73cced0eca9e3a630f06ac793dd8648298725f1`.
+- W04 physical provisioning is PASS_VERIFIED: controlled Run `36509211004` created and verified `luckread-w04` with the minimal bootstrap scope.
+- W05-W12 physical provisioning is PASS_VERIFIED: controlled Run `36509821604` provisioned `luckread-w05`, `luckread-w07`, `luckread-w08`, `luckread-w09`, `luckread-w10`, `luckread-w11`, and `luckread-w12`; `luckread-w06` was pre-existing and verified.
+- The W05-W12 authorization marker is reconciled to the active Worker Master responsibility assignments. Physical directory names remain unchanged and are not ownership authority.
+- The remaining W04 blocker is contract-level event transport authority. The canonical `identity.account_state_changed` event currently declares W02 as producer, W06 as consumer authority, and `luckread-auth013-account-state` as its queue.
+- W04/T08-T10 require an executable projection/deindex reaction, but no admitted fan-out/derived-event transport contract currently grants W04 a compliant consumer path.
+- Therefore no W04 queue consumer, new event type, Service Binding, D1 binding, public API, or projection authority is invented in this cursor step.
+- Next authoritative item: `AUTH-013-W04-PROJECTION-EVENT-TRANSPORT-AUTHORITY-001` = `WAIT_AUTHORITY_DECISION`.
+- Completed AUTH-013 public HTTP/security/D1 evidence and W06 AuditEvent evidence are inherited; no rerun is required.
