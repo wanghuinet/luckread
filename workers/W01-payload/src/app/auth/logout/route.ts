@@ -29,10 +29,15 @@ const errorResponse = (status: number, code: string, message: string) =>
 export async function POST(request: Request): Promise<Response> {
   const payload = await getPayload({ config })
 
-  const authResult = await payload.auth({
-    headers: request.headers,
-    canSetHeaders: false,
-  })
+  let authResult: Awaited<ReturnType<typeof payload.auth>>
+  try {
+    authResult = await payload.auth({
+      headers: request.headers,
+      canSetHeaders: false,
+    })
+  } catch {
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
+  }
 
   const user = authResult.user as { id?: string | number; _sid?: string } | null
   // authLogout is contractually idempotent: an already-revoked/expired current
