@@ -3946,3 +3946,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Backup before correction: `backup/pre-auth013-e2e-client-authority-ifmatch-isolation-20260929`.
 - No AUTH-013 runtime, Contract, D1 schema, Payload version, Worker topology, W02 authority, or Evidence Registry status changed.
 - Authoritative cursor remains `AUTH-013-PUBLIC-HTTP-E2E-001 / BLOCKED_EXTERNAL_DEPLOYMENT` until a fresh exact-source deployment and successful controlled public HTTP E2E artifact.
+
+
+## 2026-09-29 — AUTH-013 public HTTP E2E success/stale If-Match assertion isolation
+
+- Run `36501207751` reached the success-transition assertion after the prior 401/428/403 request-isolation corrections; it failed because the success request omitted `If-Match`.
+- The stale-version assertion also omitted `If-Match`, so it could not test the intended 412 path.
+- Evidence-tooling-only correction: add `If-Match: 1` to the successful operator transition and to the subsequent stale-version request, preserving the mandatory-If-Match 428 check separately.
+- Backup before correction: `backup/pre-auth013-success-stale-ifmatch-isolation-20260929`.
+- No AUTH-013 runtime, Contract, D1 schema, Payload version, Worker topology, W02 authority, or Evidence Registry status changed.
+- Authoritative cursor remains `AUTH-013-PUBLIC-HTTP-E2E-001 / BLOCKED_EXTERNAL_DEPLOYMENT` until a fresh exact-source deployment and successful controlled E2E artifact.
