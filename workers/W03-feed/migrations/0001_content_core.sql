@@ -65,3 +65,67 @@ CREATE INDEX content_outbox_events_content_idx
 
 CREATE INDEX content_outbox_events_unpublished_idx
   ON content_outbox_events(published_at, created_at);
+
+-- Single-row fail-closed guard used inside D1 batch() mutations.
+-- A CHECK failure rolls back the whole batch when the preceding DML
+-- changes zero rows, preventing an idempotency/outbox record from
+-- committing after a stale If-Match or missing resource.
+CREATE TABLE content_txn_guard (
+  id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+  successful INTEGER NOT NULL CHECK (successful = 1)
+);
+
+CREATE TRIGGER contents_after_insert_outbox
+AFTER INSERT ON contents
+BEGIN
+  INSERT INTO content_outbox_events (
+    event_id, operation_id, event_type, content_id, aggregate_version,
+    payload_json, created_at, published_at
+  ) VALUES (
+    lower(hex(randomblob(16))),
+    'createContent',
+    'content.created',
+    NEW.id,
+    NEW.version,
+    json_object(
+      'id', NEW.id,
+      'state', NEW.state,
+      'version', NEW.version,
+      'etag', NEW.etag
+    ),
+    NEW.created_at,
+    NULL
+  );
+END;
+
+CREATE TRIGGER contents_after_update_outbox
+AFTER UPDATE ON contents
+BEGIN
+  INSERT INTO content_outbox_events (
+    event_id, operation_id, event_type, content_id, aggregate_version,
+    payload_json, created_at, published_at
+  ) VALUES (
+    lower(hex(randomblob(16))),
+    CASE
+      WHEN NEW.state = 'DELETED' THEN 'deleteContent'
+      WHEN OLD.state <> NEW.state THEN 'transitionContentState'
+      ELSE 'updateContent'
+    END,
+    CASE
+      WHEN NEW.state = 'DELETED' THEN 'content.deleted'
+      WHEN OLD.state <> NEW.state THEN 'content.state_changed'
+      ELSE 'content.updated'
+    END,
+    NEW.id,
+    NEW.version,
+    json_object(
+      'id', NEW.id,
+      'fromState', OLD.state,
+      'toState', NEW.state,
+      'version', NEW.version,
+      'etag', NEW.etag
+    ),
+    NEW.updated_at,
+    NULL
+  );
+END;
