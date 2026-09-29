@@ -82,7 +82,10 @@
     "principal": {
       "header": "X-LuckRead-Principal-User-Id",
       "requiredFor": "principalRequired=true",
-      "source": "W01 authoritative authentication result; never copied from public request body"
+      "source": "W01 authoritative authentication result; never copied from public request body",
+      "layerHeader": "X-LuckRead-Principal-Layer",
+      "layerRequiredFor": "state transition authorization",
+      "layerSource": "W02 canonical L0-L8 resolution performed at W01 boundary; W03 uses it only for contracted creator/moderator transition gates"
     },
     "correlation": {
       "header": "X-LuckRead-Correlation-Id",
@@ -111,7 +114,8 @@
     "principalAuthority": "W01 authenticates the caller using existing AUTH contracts and sends only the resolved user id.",
     "payloadOwnership": "ownerUserId is never accepted from public or internal caller payloads.",
     "cache": "W01 preserves the public cache rules; internal responses are no-store.",
-    "secrets": "No end-user token or Payload secret is forwarded across the binding."
+    "secrets": "No end-user token or Payload secret is forwarded across the binding.",
+    "principalLayerAuthority": "W01 sends the layer returned by the existing W02 authz resolution; W03 never infers layer from cache or from the public request"
   },
   "evidenceRequired": [
     "exact W01 source commit",
@@ -120,7 +124,8 @@
     "positive create/list/detail/state-transition evidence",
     "negative ownership and stale If-Match evidence",
     "idempotency replay evidence",
-    "no-secret-forwarding evidence"
+    "no-secret-forwarding evidence",
+    "principal layer resolution/correlation evidence"
   ],
   "nonGoals": [
     "No RPC surface.",
