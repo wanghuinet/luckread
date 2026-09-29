@@ -21,8 +21,8 @@
     ],
     "sourceHead": "e73cced0eca9e3a630f06ac793dd8648298725f1",
     "currentHeadReconciliation": {
-      "reason": "Current main contains a successful read-only Cloudflare account inventory. The inventory confirms the dedicated AUTH-013 W04 projection queue exists but has zero consumers and identifies no already-admitted W04 derived projection/cache destination. Implementation remains blocked until concrete destination authority is explicitly admitted.",
-      "currentMainSha": "b39a5a104f351c2bb9b10abe4b7a4fb4a2edebb0",
+      "reason": "Current main has a successful read-only Cloudflare account inventory and a successful live W04 Worker settings inventory. The account inventory finds no admitted W04 derived destination; the live W04 settings response explicitly reports bindings: []. The dedicated AUTH-013 W04 projection queue exists with zero consumers. Implementation remains blocked until a concrete destination authority is explicitly admitted.",
+      "currentMainSha": "b09c6cd7630019c4f663c7cf77f9498fdbab4f9b",
       "w04PhysicalProvisionRun": "36509211004",
       "w04PhysicalWorker": "luckread-w04",
       "w05w12ProvisionRun": "36509821604",
@@ -52,7 +52,7 @@
       "w02FanoutCiRun": "36511115240",
       "w02FanoutCiStatus": "PASS_VERIFIED_UNIT_AND_CONFIG",
       "w04ProjectionRuntimeStatus": "IMPLEMENTATION_PENDING_DESTINATION_AUTHORITY",
-      "destinationAuthorityAudit": "CLOUDFLARE_INVENTORY_VERIFIED_NO_CONCRETE_W04_DESTINATION",
+      "destinationAuthorityAudit": "CLOUDFLARE_ACCOUNT_AND_W04_LIVE_BINDING_INVENTORY_VERIFIED_NO_W04_DESTINATION",
       "destinationAuthoritySourcesChecked": [
         "docs/53-SEARCH-DISCOVERY-SYSTEM-CONTRACT-v1.0.md",
         "docs/55-FEED-RECOMMENDATION-PERSONALIZATION-TRENDING-SYSTEM-CONTRACT-v1.0.md",
@@ -63,9 +63,9 @@
         "workers/W04-feed-search/wrangler.jsonc",
         "workers/W04-feed-search/src/index.ts"
       ],
-      "cloudflareInventoryRunId": "36518463292",
-      "cloudflareInventoryArtifactId": "11011922070",
-      "cloudflareInventoryArtifactDigest": "sha256:e98c5c3ab24b5319cbd74cfa5752d72cf6f773020415a602dd15d7e30304de09",
+      "cloudflareInventoryRunId": "36519177221",
+      "cloudflareInventoryArtifactId": "11011833636",
+      "cloudflareInventoryArtifactDigest": "sha256:031baca1f955e9bea27a60e1d1f7ff300ee37feda5b8855b265351991d197f73",
       "cloudflareObservedKv": [
         "globe"
       ],
@@ -79,7 +79,13 @@
         "projection": "luckread-auth013-account-state-projection",
         "projectionConsumers": 0,
         "projectionDlq": "luckread-auth013-account-state-projection-dlq"
-      }
+      },
+      "cloudflareW04LiveBindingStatus": "PASS_VERIFIED",
+      "cloudflareW04LiveBindingSource": "script-settings",
+      "cloudflareW04LiveBindings": [],
+      "cloudflareW04LiveBindingRunId": "36519177221",
+      "cloudflareW04LiveBindingArtifactId": "11011833636",
+      "cloudflareW04LiveBindingArtifactDigest": "sha256:031baca1f955e9bea27a60e1d1f7ff300ee37feda5b8855b265351991d197f73"
     }
   },
   "alreadyClosed": {
@@ -530,5 +536,15 @@
     "artifactDigest": "sha256:e98c5c3ab24b5319cbd74cfa5752d72cf6f773020415a602dd15d7e30304de09",
     "finding": "No concrete already-admitted W04 derived projection/cache destination identified. AUTH-013 projection queue exists with zero consumers.",
     "disposition": "BLOCKED_EXTERNAL"
+  },
+  "cloudflareLiveW04BindingEvidence": {
+    "status": "PASS_VERIFIED",
+    "runId": "36519177221",
+    "testedMainSha": "b09c6cd7630019c4f663c7cf77f9498fdbab4f9b",
+    "artifactId": "11011833636",
+    "artifactDigest": "sha256:031baca1f955e9bea27a60e1d1f7ff300ee37feda5b8855b265351991d197f73",
+    "worker": "luckread-w04",
+    "source": "script-settings",
+    "bindings": []
   }
 }
