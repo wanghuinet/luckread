@@ -46,6 +46,10 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("searchParams.get('draft')")
     expect(publisher).toContain("method: 'GET'")
     expect(publisher).toContain('window.history.replaceState')
+    expect(publisher).toContain('async function copyDraftLink()')
+    expect(publisher).toContain('navigator.clipboard.writeText')
+    expect(publisher).toContain("'复制恢复链接'")
+
     expect(updateRoute).toContain('export async function GET')
     expect(updateRoute).toContain("method: 'GET'")
     expect(publisher).toContain("credentials: 'include'")
