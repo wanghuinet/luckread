@@ -1,7 +1,7 @@
 {
   "version": "1.4.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "31aac14e281e481e9294233344d40af5ac83b146",
+  "sourceHead": "554ff8084aab3e9237a09b3534f04733fa00c0ce",
   "backupBranch": "backup/pre-w04-event-transport-authority-20260929",
   "currentCursor": {
     "id": "AUTH-013-W04-PROJECTION-CONSUMER-001",
