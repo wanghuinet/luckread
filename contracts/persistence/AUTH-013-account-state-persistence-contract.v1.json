@@ -39,8 +39,8 @@
       "dbType": "TEXT",
       "finalNullable": false,
       "finalRequired": true,
-      "observedCurrently": false,
-      "mappingStatus": "TARGET_DEFINED_AWAITING_MIGRATION"
+      "observedCurrently": true,
+      "mappingStatus": "VERIFIED_CURRENT_ZERO_ROW_TARGET"
     },
     {
       "fieldId": "ENT-USER-F-ACCOUNT-STATE-VERSION",
@@ -50,8 +50,8 @@
       "dbType": "INTEGER",
       "finalNullable": false,
       "finalRequired": true,
-      "observedCurrently": false,
-      "mappingStatus": "TARGET_DEFINED_AWAITING_MIGRATION"
+      "observedCurrently": true,
+      "mappingStatus": "VERIFIED_CURRENT_ZERO_ROW_TARGET"
     }
   ],
   "migration": {
@@ -61,9 +61,24 @@
     "transitionalNullableColumnsAllowed": true,
     "backfillRequiredForExistingRows": true,
     "backfillDecisionStatus": "CURRENT_TARGET_ZERO_ROWS_VERIFIED / FUTURE_NON_ZERO_TARGET_BLOCKED",
-    "executionStatus": "NOT_EXECUTED",
+    "executionStatus": "REMOTE_DDL_APPLIED_POSTMIGRATION_READONLY_EVIDENCE_VERIFIED",
     "executionWorkflow": ".github/workflows/auth-013-account-state-migration.yml",
-    "authorizedScope": "CONTROLLED_REMOTE_D1_ZERO_ROW_TARGET_ONLY"
+    "authorizedScope": "CONTROLLED_REMOTE_D1_ZERO_ROW_TARGET_ONLY",
+    "executionEvidence": {
+      "workflowRun": 35937873769,
+      "sourceCommitSha": "b40ae46fe5862c77f935a54adf4bd7e91c69159a",
+      "evidenceArtifact": "10784305258",
+      "evidenceDigest": "sha256:72c7b323a3a4713a74776a4560980178f8db4eb1691de722729039506d37cf1c",
+      "environment": "CONTROLLED_REMOTE_D1",
+      "databaseName": "luckread",
+      "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+      "usersCount": 0,
+      "accountStateColumnsPresent": true,
+      "accountState": "TEXT NOT NULL DEFAULT 'PENDING_VERIFICATION'",
+      "accountStateVersion": "INTEGER NOT NULL DEFAULT 1",
+      "migrationApplied": "0002_auth_013_account_state.sql",
+      "cleanupVerified": true
+    }
   },
   "rules": {
     "existingUsersMustNotBeSilentlyAssignedState": true,
@@ -83,9 +98,10 @@
     "final schema is verified on the controlled D1-01 target"
   ],
   "remainingGaps": [
-    "non-zero pre-existing-user targets require separate authoritative classification policy before migration",
-    "migration execution and post-schema evidence are absent",
-    "runtime, concurrency, audit, event, cache and security evidence are absent"
+    "non-zero pre-existing-user targets require separate authoritative classification policy before any future migration/backfill",
+    "feature-wide lifecycle transition coverage and security/E2E evidence remain incomplete beyond the verified tested scopes",
+    "cache/deindex/feed/search convergence and full lifecycle side-effect evidence remain incomplete",
+    "final Mapping 0 and Evidence Registry global GREEN admission remain pending"
   ],
   "observedCurrentTargetRowCoverageEvidence": {
     "workflowRun": 35852723250,
