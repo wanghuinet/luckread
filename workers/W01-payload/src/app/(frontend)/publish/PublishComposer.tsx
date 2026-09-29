@@ -189,6 +189,16 @@ export default function PublishComposer({
     setAssets((current) => current.filter((asset) => asset.id !== id))
   }
 
+  const stateLabel = draft?.state === 'DRAFT'
+    ? '草稿已保存'
+    : draft?.state === 'PENDING_REVIEW'
+      ? '审核中'
+      : draft?.state === 'REJECTED'
+        ? '审核退回'
+        : draft?.state === 'PUBLISHED'
+          ? '已发布'
+          : draft?.state
+
   async function persistDraft(): Promise<ContentResponse> {
     let bodyRef = draft?.bodyRef
     if (!bodyRef || savedBody !== body) {
@@ -444,6 +454,13 @@ export default function PublishComposer({
         />
       </label>
 
+      {draft ? (
+        <div className="lr-content-status" role="status">
+          <span>当前状态</span>
+          <strong>{stateLabel}</strong>
+          <span>版本 {draft.version}</span>
+        </div>
+      ) : null}
       {message ? <div className="lr-success" role="status">{message}</div> : null}
       {error ? <div className="lr-error" role="alert">{error}</div> : null}
 

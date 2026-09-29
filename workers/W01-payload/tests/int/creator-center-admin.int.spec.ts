@@ -49,6 +49,10 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('async function copyDraftLink()')
     expect(publisher).toContain('navigator.clipboard.writeText')
     expect(publisher).toContain("'复制恢复链接'")
+    expect(publisher).toContain('const stateLabel = draft?.state')
+    expect(publisher).toContain('当前状态')
+    expect(publisher).toContain('版本 {draft.version}')
+
     expect(publisher).toContain('const [preview, setPreview]')
     expect(publisher).toContain('aria-label="发布预览"')
     expect(publisher).toContain("type === 'video' && assets.length === 0")
