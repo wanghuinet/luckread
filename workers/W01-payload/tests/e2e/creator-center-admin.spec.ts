@@ -3,20 +3,26 @@ import { expect, test } from '@playwright/test'
 test('renders Creator Center inside the native Payload Admin session', async ({ page }) => {
   const suffix = crypto.randomUUID().replaceAll('-', '').slice(0, 12)
   const email = `creator-center-${suffix}@example.com`
+  const username = `creator_${suffix}`
   const password = `LuckRead-${suffix}-P@ss`
 
-  const createUser = await page.request.post('http://localhost:3000/api/users', {
+  const register = await page.request.post('http://localhost:3000/auth/register', {
+    headers: {
+      'Idempotency-Key': `creator-center-e2e-${suffix}`,
+    },
     data: {
-      email,
-      password,
-      username: `creator_${suffix}`,
-      displayName: 'Creator Center E2E',
-      locale: 'zh-CN',
-      timezone: 'UTC',
+      identityType: 'email',
+      identity: email,
+      credential: password,
+      username,
+      consent: {
+        purpose: 'ACCOUNT_REGISTRATION',
+        policyVersion: 'DEV-2026-09-28.1',
+      },
     },
   })
 
-  expect(createUser.ok()).toBeTruthy()
+  expect(register.ok()).toBeTruthy()
 
   await page.goto('http://localhost:3000/admin/login')
   await page.locator('input[type="email"], input[name="email"]').first().fill(email)
