@@ -134,6 +134,32 @@ export type AccountStateTransitionResult = {
   auditEventId: string
 }
 
+export type SessionListResult = {
+  items: Array<{
+    sessionId: string
+    deviceId: string | null
+    createdAt: string
+    expiresAt: string
+    lastSeenAt: string | null
+  }>
+  nextCursor: string | null
+}
+
+export type SessionPrincipal = {
+  userId: string
+  currentSessionId: string
+  tokenVersion: number
+}
+
+export const listSessions = (body: SessionPrincipal & {
+  cursor?: string
+  limit?: number
+}) => callW02<SessionListResult>('/internal/auth/session/list', body)
+
+export const revokeOwnedSession = (body: SessionPrincipal & {
+  targetSessionId: string
+}) => callW02<{ revoked: boolean }>('/internal/auth/session/revoke-owned', body)
+
 export const transitionAccountState = (body: {
   subjectId: string
   targetUserId: string
