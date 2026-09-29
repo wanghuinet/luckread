@@ -36,6 +36,8 @@
 .lr-actions .primary { background:#111827; color:white; }
 .lr-actions .danger { background:#fff1f2; color:#be123c; }
 .lr-actions .danger:hover { background:#ffe4e6; }
+.lr-actions .ghost { background:transparent; color:#475569; border:1px solid #dbe2ea; }
+.lr-actions .ghost:hover { background:#f8fafc; }
 .lr-note { margin:14px 0 0; font-size:12px; line-height:1.5; color:#6b7280; }
 @media (max-width:640px) {
   .lr-publish-shell { padding:16px; }
