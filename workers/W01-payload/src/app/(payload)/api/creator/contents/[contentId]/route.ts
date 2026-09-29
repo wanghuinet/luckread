@@ -10,6 +10,29 @@ const errorResponse = (status: number, code: string, message: string) =>
     { status, headers: { 'cache-control': 'no-store' } },
   )
 
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ contentId: string }> },
+): Promise<Response> {
+  try {
+    const { contentId } = await context.params
+    const principal = await resolveCookieContentPrincipal(request)
+    if (principal instanceof Response) return principal
+
+    return await callW03Content({
+      request,
+      pathname: `/internal/content/contents/${encodeURIComponent(contentId)}`,
+      method: 'DELETE',
+      principal,
+    })
+  } catch (error) {
+    if (error instanceof W03ContentClientError) {
+      return errorResponse(error.status, error.code, 'Content service unavailable')
+    }
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
+  }
+}
+
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ contentId: string }> },
