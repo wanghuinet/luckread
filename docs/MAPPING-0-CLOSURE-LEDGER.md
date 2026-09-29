@@ -4218,3 +4218,24 @@ Objective: complete the minimum controlled evidence for FROZEN/SUSPENDED/BANNED,
 - Evidence Registry admission: `EVD-AUTH013-LIFECYCLE-MATRIX-REMOTE-001` = `VERIFIED/PASS`.
 - This closes the feature-wide lifecycle transition matrix sub-gate. It does not by itself prove every remaining feed/search/cache/deindex runtime edge or global Mapping 0 GREEN.
 - Backup: `backup/pre-auth013-lifecycle-evidence-admission-20260929`.
+
+
+## 2026-09-29 AUTH-013 side-effect matrix evidence gate prepared
+
+- Authoritative main before this evidence-only governance change: `5c245cabcc36c361437455f9c3af911a7c4fd31c`.
+- The already-admitted W04 runtime code, queue, DLQ and `globe` derived KV destination are unchanged; no W04 redeploy is performed by the new evidence workflow.
+- Added controlled workflow: `.github/workflows/auth-013-w04-side-effect-matrix-evidence.yml`.
+- The workflow is manual-dispatch only and tests the existing live W04 consumer against the declared lifecycle projection semantics:
+  - deindex: `FROZEN`, `SUSPENDED`, `BANNED`, `DELETION_PENDING`, `DELETED`;
+  - reactivation: `RESTORED`, `REACTIVATED`;
+  - visible/non-deindex: `RESTRICTED`, `ACTIVE`;
+  - duplicate same-version delivery, older-version rejection and non-resurrection;
+  - `sourceVersion` / `projectionVersion` monotonicity and bounded stale metadata;
+  - negative safety checks that W04 projection state does not become an authorization decision and W04 has no public authorization route.
+- The workflow sends only synthetic messages to the already-admitted projection Queue and creates only a synthetic KV projection key; cleanup is mandatory.
+- This does **not** establish global Mapping 0 GREEN, nor does it create a separate authorization-cache runtime. The cache contract remains authoritative and the current W04 boundary remains derived projection only.
+- No new Worker, D1, Queue, KV namespace, Service Binding, Payload Core change, public API, Contract semantic or topology expansion is introduced.
+
+NEXT_ITEM_ID: `AUTH-013-LIFECYCLE-SIDE-EFFECT-COVERAGE-001`
+NEXT_ITEM_STATE: `BLOCKED_EXTERNAL`
+Objective: run the controlled W04 side-effect matrix workflow above against the already-admitted live W04 consumer; only after a PASS should the resulting artifact be reconciled into the Evidence Registry.
