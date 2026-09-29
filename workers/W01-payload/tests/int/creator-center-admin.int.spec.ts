@@ -41,6 +41,17 @@ describe('Creator Center admin extension', () => {
     expect(stateRoute).toContain('/internal/content/contents/')
   })
 
+  it('keeps frontend and Admin on the same Payload cookie session lifecycle', () => {
+    const login = read('src/app/auth/login/route.ts')
+    const logout = read('src/app/auth/logout/route.ts')
+
+    expect(login).toContain("'set-cookie': [")
+    expect(login).toContain('payload-token=')
+    expect(login).toContain('HttpOnly')
+    expect(login).toContain('SameSite=Lax')
+    expect(logout).toContain("set-cookie': 'payload-token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'")
+  })
+
   it('keeps the existing native admin import map entries', () => {
     const importMap = read('src/app/(payload)/admin/importMap.js')
 
