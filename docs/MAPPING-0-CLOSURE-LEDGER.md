@@ -4081,3 +4081,12 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - CI regeneration/diff validation remains the acceptance gate.
 - Change Control: `CC-MAPPING-0-CODE-EVIDENCE-API-DISCOVERY-2026-09-29.md`.
 - Backup: `backup/pre-code-evidence-api-discovery-fix-20260929`.
+
+
+## 2026-09-29 — Entity Code Evidence derived snapshot reconciliation
+
+- Reconciled stale Code Evidence Inventory Entity records with the current canonical Entity Implementation Evidence.
+- Corrected exactly five derived Entity records: `ENT-CREDENTIAL`, `ENT-IDENTITY`, `ENT-ROLE-ASSIGNMENT`, `ENT-SESSION`, `ENT-USER`.
+- No Entity Catalog promotion or global GREEN status was performed.
+- Change Control: `CC-MAPPING-0-CODE-EVIDENCE-ENTITY-DRIFT-2026-09-29.md`.
+- Backup: `backup/pre-code-evidence-entity-drift-fix-20260929`.
