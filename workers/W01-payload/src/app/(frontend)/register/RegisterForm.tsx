@@ -1,5 +1,6 @@
 'use client'
 
+import './register.css'
 import Link from 'next/link'
 import { FormEvent, useState } from 'react'
 
