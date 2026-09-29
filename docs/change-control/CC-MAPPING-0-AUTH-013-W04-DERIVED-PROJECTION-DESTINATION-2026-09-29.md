@@ -6,11 +6,12 @@
 
 ## Decision
 
-Admit exactly one concrete, non-authoritative Derived Projection Destination for AUTH-013/W04:
+Adopt exactly one existing, concrete, non-authoritative Derived Projection Destination for AUTH-013/W04:
 
 - Destination type: Cloudflare KV namespace
 - Logical destination: `AUTH013_W04_DERIVED_PROJECTION`
-- Intended physical resource name: `luckread-w04-auth013-projection`
+- Physical resource: `globe`
+- Namespace ID: `32f7e407128a43d59720d5d46736e084`
 - Owner: W04
 - Source authority: D1-01 AUTH-013 account-state authority via canonical `identity.account_state_changed`
 - Purpose: derived Feed/Recommendation/Search projection state and deindex tombstone/version markers only
@@ -20,15 +21,15 @@ Admit exactly one concrete, non-authoritative Derived Projection Destination for
 - Queue transport: existing `luckread-auth013-account-state-projection` → `luckread-w04`
 - DLQ: existing `luckread-auth013-account-state-projection-dlq`
 
-This is a Change Control admission of one derived destination. It is not permission to create another storage authority, Worker, D1, public API, or search service.
+The namespace `globe` was observed by the read-only Cloudflare inventory and is not referenced by the repository's W04 binding/configuration. This Change Control explicitly registers it for this single derived projection purpose; no new KV resource is created.
 
-## Why KV is the bounded destination
+## Why this adoption is bounded
 
-KV is used only as a rebuildable derived projection/cache destination. The record MUST carry source authority, source version, policy version, creation/freshness metadata, and lifecycle/deindex semantics. W04 MUST NOT use KV as authoritative account/content/rights state.
+KV is used only as rebuildable derived projection/cache state. It is not account, content, rights, finance, or other business authority. W04 MUST reject stale/out-of-order versions and MUST NOT resurrect deleted or restricted resources.
 
 ## Required record semantics
 
-Each projection record is keyed by canonical resource identity and MUST include at least:
+Each projection record MUST carry at least:
 
 `resourceType`, `resourceId`, `sourceAuthority`, `sourceVersion`, `eventId`, `projectionVersion`, `createdAt`, `staleAfter`, `policyVersion`, and `state`.
 
@@ -38,11 +39,10 @@ Allowed states for AUTH-013 projection reaction are `ACTIVE`, `STALE`, and `PURG
 
 Only these changes are admitted:
 
-1. Provision or adopt the single KV destination.
-2. Register its concrete namespace identifier in repository evidence after Cloudflare verification.
-3. Bind W04 to the existing AUTH-013 projection queue and this KV namespace.
-4. Implement bounded, idempotent consumer handling with per-resource version rejection and purge/deindex behavior.
-5. Produce CI and runtime evidence.
+1. Verify and register the existing `globe` namespace as the single W04 derived destination.
+2. Bind W04 to the existing AUTH-013 projection queue and this KV namespace.
+3. Implement bounded, idempotent consumer handling with per-resource version rejection and purge/deindex behavior.
+4. Produce CI and runtime evidence.
 
 No Payload Core change, no D1 migration, no Worker topology change, no public API redesign, and no second projection destination.
 
@@ -50,13 +50,13 @@ No Payload Core change, no D1 migration, no Worker topology change, no public AP
 
 - Change Control is merged before implementation promotion.
 - Contract/Mapping CI passes against the admitted destination record.
-- Cloudflare provisioning evidence identifies exactly one KV namespace.
-- W04 live binding evidence shows the existing projection queue consumer and exactly the admitted KV binding.
+- Cloudflare evidence verifies the exact KV namespace title and ID.
+- W04 live binding evidence shows the existing projection queue consumer and exactly this KV binding.
 - Runtime evidence proves one logical event is applied once, duplicate delivery is idempotent, older versions cannot regress state, and PURGED state is not resurrected.
 - GREEN is forbidden until all gates above are evidenced and reconciled.
 
-## Rollback / safety
+## Safety
 
-The backup branch is `backup/pre-auth013-w04-derived-destination-20260929`.
+Backup: `backup/pre-auth013-w04-adopt-globe-kv-20260929`.
 
-If the destination or binding cannot satisfy the gates, leave AUTH-013/W04 BLOCKED; do not invent a replacement destination or expand topology.
+If the existing namespace cannot satisfy the above semantics, leave AUTH-013/W04 BLOCKED; do not create a second destination.
