@@ -1,18 +1,12 @@
-import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
 import { readVerifiedPayloadTokenVersion } from '../../../../auth/payload-access-token.js'
-
-type W02Service = {
-  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
-}
-
-type W02Error = {
-  error?: {
-    code?: string
-  }
-}
+import {
+  listSessions,
+  revokeOwnedSession,
+  W02AuthClientError,
+} from '../../../../auth/w02-session-client.js'
 
 type AuthenticatedSubject = {
   userId: string
@@ -42,47 +36,6 @@ const errorResponse = (status: number, code: string, message: string) =>
     status,
   )
 
-async function getW02Service(): Promise<W02Service> {
-  const context = await getCloudflareContext({ async: true })
-  const service = (context.env as unknown as { W02_AUTH?: W02Service }).W02_AUTH
-  if (!service) throw new Error('W02_AUTH_UNAVAILABLE')
-  return service
-}
-
-async function callW02<T>(path: string, body: unknown): Promise<T> {
-  const service = await getW02Service()
-  const response = await service.fetch(
-    new Request(`https://luckread-w02.internal${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    }),
-  )
-
-  let payload: T | W02Error | null = null
-  try {
-    payload = (await response.json()) as T | W02Error
-  } catch {
-    payload = null
-  }
-
-  if (!response.ok) {
-    const code =
-      payload &&
-      typeof payload === 'object' &&
-      payload !== null &&
-      'error' in payload &&
-      typeof (payload as W02Error).error?.code === 'string'
-        ? (payload as W02Error).error!.code!
-        : 'SERVICE_UNAVAILABLE'
-
-    throw new Error(code)
-  }
-
-  if (!payload || typeof payload !== 'object') throw new Error('SERVICE_UNAVAILABLE')
-  return payload as T
-}
-
 async function authenticate(request: Request): Promise<AuthenticatedSubject> {
   const payload = await getPayload({ config })
 
@@ -95,16 +48,18 @@ async function authenticate(request: Request): Promise<AuthenticatedSubject> {
       canSetHeaders: false,
     })
   } catch {
-    throw new Error('UNAUTHENTICATED')
+    throw new W02AuthClientError(401, 'authentication failed')
   }
 
   const user = authResult.user as { id?: string | number; _sid?: string } | null
   if (!user?.id || typeof user._sid !== 'string' || user._sid.length === 0) {
-    throw new Error('UNAUTHENTICATED')
+    throw new W02AuthClientError(401, 'authentication required')
   }
 
   const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (tokenVersion === null) throw new Error('UNAUTHENTICATED')
+  if (tokenVersion === null) {
+    throw new W02AuthClientError(401, 'authentication required')
+  }
 
   return {
     userId: String(user.id),
@@ -114,19 +69,12 @@ async function authenticate(request: Request): Promise<AuthenticatedSubject> {
 }
 
 function mapW02Error(error: unknown): Response {
-  const code = error instanceof Error ? error.message : 'SERVICE_UNAVAILABLE'
-  switch (code) {
-    case 'UNAUTHENTICATED':
-      return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-    case 'PERMISSION_DENIED':
-      return errorResponse(403, 'PERMISSION_DENIED', 'Permission denied')
-    case 'INVALID_CURSOR':
-      return errorResponse(400, 'INVALID_CURSOR', 'Invalid cursor')
-    case 'INVALID_INPUT':
-      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid session request')
-    default:
-      return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Session service unavailable')
+  if (error instanceof W02AuthClientError) {
+    if (error.status === 401) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
+    if (error.status === 403) return errorResponse(403, 'PERMISSION_DENIED', 'Permission denied')
+    if (error.status === 400) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid session request')
   }
+  return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Session service unavailable')
 }
 
 export async function GET(
@@ -139,8 +87,8 @@ export async function GET(
   let subject: AuthenticatedSubject
   try {
     subject = await authenticate(request)
-  } catch {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
+  } catch (error) {
+    return mapW02Error(error)
   }
 
   const url = new URL(request.url)
@@ -149,15 +97,13 @@ export async function GET(
   const limit = rawLimit === null ? undefined : Number(rawLimit)
 
   try {
-    return json(
-      await callW02('/internal/auth/session/list', {
-        userId: subject.userId,
-        currentSessionId: subject.sessionId,
-        tokenVersion: subject.tokenVersion,
-        cursor,
-        limit,
-      }),
-    )
+    return json(await listSessions({
+      userId: subject.userId,
+      currentSessionId: subject.sessionId,
+      tokenVersion: subject.tokenVersion,
+      cursor,
+      limit,
+    }))
   } catch (error) {
     return mapW02Error(error)
   }
@@ -169,7 +115,6 @@ export async function DELETE(
 ): Promise<Response> {
   const { segments = [] } = await context.params
   if (segments.length !== 1 || !segments[0]) return new Response(null, { status: 404 })
-  const targetSessionId = segments[0]
 
   const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   if (!idempotencyKey || idempotencyKey.length > 256) {
@@ -179,16 +124,16 @@ export async function DELETE(
   let subject: AuthenticatedSubject
   try {
     subject = await authenticate(request)
-  } catch {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
+  } catch (error) {
+    return mapW02Error(error)
   }
 
   try {
-    await callW02('/internal/auth/session/revoke-owned', {
+    await revokeOwnedSession({
       userId: subject.userId,
       currentSessionId: subject.sessionId,
       tokenVersion: subject.tokenVersion,
-      targetSessionId,
+      targetSessionId: segments[0],
     })
     return new Response(null, {
       status: 204,
