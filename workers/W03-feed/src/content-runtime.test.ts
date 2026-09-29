@@ -25,4 +25,12 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('PUBLISHED', 'PENDING_REVIEW', 'CREATOR', true, 'material_edit_requires_review')).toBe(true)
     expect(canTransitionContentState('PUBLISHED', 'PENDING_REVIEW', 'CREATOR', true, 'other')).toBe(false)
   })
+
+
+  it('rejects invalid cursors and forbidden direct publication transitions', () => {
+    expect(() => decodeCursor('not-a-valid-cursor')).toThrow()
+    expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true)).toBe(false)
+    expect(canTransitionContentState('DELETED', 'PUBLISHED', 'CREATOR', true)).toBe(false)
+    expect(canTransitionContentState('ARCHIVED', 'PUBLISHED', 'CREATOR', true)).toBe(false)
+  })
 })
