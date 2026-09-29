@@ -36,7 +36,7 @@ jobs:
 
       - name: Typecheck W03 content runtime
         run: >
-          npx --yes typescript@5.9.3 tsc --noEmit --strict --skipLibCheck
+          npx --no-install tsc --noEmit --strict --skipLibCheck
           --target ES2022 --module ESNext --moduleResolution Bundler
           --lib ES2022,DOM --types @cloudflare/workers-types
           workers/W03-feed/src/content-runtime.ts
