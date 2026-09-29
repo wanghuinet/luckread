@@ -1,5 +1,3 @@
-import type { KVNamespace } from '@cloudflare/workers-types'
-
 export type AccountState =
   | 'UNREGISTERED' | 'PENDING_VERIFICATION' | 'ACTIVE' | 'RESTRICTED' | 'FROZEN'
   | 'SUSPENDED' | 'BANNED' | 'DELETION_REQUESTED' | 'DELETION_PENDING' | 'DELETED'
@@ -75,7 +73,7 @@ export function parseAccountStateChanged(value: unknown): AccountStateChangedEve
 }
 
 export async function applyAccountStateProjection(
-  kv: Pick<KVNamespace, 'get' | 'put'>,
+  kv: { get(key: string, type: 'json'): Promise<unknown>; put(key: string, value: string): Promise<void> },
   event: AccountStateChangedEvent,
   now = new Date(),
 ): Promise<'applied' | 'ignored'> {
