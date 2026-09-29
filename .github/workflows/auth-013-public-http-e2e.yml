@@ -177,6 +177,7 @@ jobs:
           W01_BASE_URL: ${{ inputs.w01_base_url }}
         run: |
           node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs'
           const base = process.env.W01_BASE_URL.replace(/\/$/, '')
           const response = await fetch(base + '/v1/users/' + process.env.AUTH013_BASIC_USER_ID + '/account-state', {
             method: 'POST',
@@ -192,13 +193,11 @@ jobs:
           if (response.status !== 401 || body?.error?.code !== 'UNAUTHENTICATED') {
             throw new Error('stale-session denial failed')
           }
-          console.log('AUTH-013 stale-session denial PASS')
-          node --input-type=module <<'NODE'
-          import { writeFileSync } from 'node:fs'
           writeFileSync(
             'artifacts/mapping-0/auth-013-public-http-e2e/stale-session-result.json',
             JSON.stringify({ status: 'PASS', check: 'stale_session_denial', secretMaterialIncluded: false }, null, 2) + '\n',
           )
+          console.log('AUTH-013 stale-session denial PASS')
           NODE
 
       - name: Verify D1 authoritative result
