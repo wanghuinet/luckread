@@ -3,8 +3,8 @@ import { getPayload } from 'payload'
 
 import config from '@payload-config'
 
-import { readVerifiedPayloadTokenVersion } from '../../../../../auth/payload-access-token.js'
-import { validateSession } from '../../../../../auth/w02-session-client.js'
+import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
+import { validateSession } from '@/auth/w02-session-client'
 
 const unauthorized = () =>
   new Response(
