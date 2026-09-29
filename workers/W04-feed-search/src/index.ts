@@ -3,6 +3,7 @@
 // Final controlled runtime trigger.
 // Consumer/DLQ live verification uses the dedicated Queue API.
 // Final runtime evidence execution.
+// Response-shape-safe consumer verification.
 import { applyAccountStateProjection, parseAccountStateChanged } from './auth-013-projection.js'
 
 interface ProjectionKV {
