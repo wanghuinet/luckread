@@ -1,17 +1,19 @@
 {
   "schemaVersion": 1,
-  "status": "AUTHORIZED_FOR_CONTROLLED_PROVISIONING",
+  "status": "AUTHORIZED_FOR_CONTROLLED_ADOPTION",
   "auth": "AUTH-013",
   "worker": "W04",
   "topology": "12 Workers / 4 D1",
   "destination": {
     "type": "cloudflare_kv",
     "logicalBinding": "AUTH013_W04_DERIVED_PROJECTION",
-    "requestedName": "luckread-w04-auth013-projection",
+    "title": "globe",
+    "namespaceId": "32f7e407128a43d59720d5d46736e084",
     "authority": "NONE",
     "owner": "W04",
     "sourceAuthority": "D1-01",
-    "eventType": "identity.account_state_changed"
+    "eventType": "identity.account_state_changed",
+    "adoption": "EXISTING_RESOURCE"
   },
   "transport": {
     "queue": "luckread-auth013-account-state-projection",
@@ -21,8 +23,13 @@
   "constraints": {
     "newD1": false,
     "newWorker": false,
+    "newKv": false,
     "newPublicApi": false,
     "additionalProjectionDestination": false
   },
-  "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-W04-DERIVED-PROJECTION-DESTINATION-2026-09-29.md"
+  "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-W04-DERIVED-PROJECTION-DESTINATION-2026-09-29.md",
+  "sourceEvidence": {
+    "inventoryRunId": "36519177221",
+    "inventoryArtifactId": "11011833636"
+  }
 }
