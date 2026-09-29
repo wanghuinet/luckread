@@ -2,7 +2,7 @@ import {
   callW03Content,
   resolveContentPrincipal,
   W03ContentClientError,
-} from '../../../../../content/w03-content-client.js'
+} from '../../../../content/w03-content-client.js'
 
 const unavailable = (error: W03ContentClientError) =>
   Response.json(
