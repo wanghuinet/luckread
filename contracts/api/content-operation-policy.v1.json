@@ -6,7 +6,7 @@
   "domain": "content",
   "purpose": "Inventory the complete public content lifecycle without assuming that Payload CRUD is the public API.",
   "contentModel": ["article", "post", "video_metadata", "gallery", "live_metadata", "series"],
-  "lifecycle": ["DRAFT", "REVIEW_PENDING", "REVIEW_REJECTED", "SCHEDULED", "PUBLISHED", "UNPUBLISHED", "ARCHIVED", "DELETED"],
+  "lifecycle": ["DRAFT", "PENDING_REVIEW", "REJECTED", "APPROVED", "SCHEDULED", "PUBLISHED", "UNPUBLISHED", "ARCHIVED", "DELETED", "RESTORED"],
   "operations": [
     {
       "operationId": "listContents",
@@ -115,7 +115,7 @@
       "antiAbuse": {"required": true, "scopes": ["account", "endpoint", "resource", "global"], "actions": ["ALLOW", "CHALLENGE", "BLOCK", "REVIEW"]},
       "idempotency": {"required": true},
       "security": ["explicit_transition_matrix", "no_direct_state_field_mutation", "approval_required_for_moderation_transitions", "audit_required"],
-      "stateMachine": {"required": true, "states": ["DRAFT", "REVIEW_PENDING", "REVIEW_REJECTED", "SCHEDULED", "PUBLISHED", "UNPUBLISHED", "ARCHIVED", "DELETED"]},
+      "stateMachine": {"required": true, "states": ["DRAFT", "PENDING_REVIEW", "REJECTED", "APPROVED", "SCHEDULED", "PUBLISHED", "UNPUBLISHED", "ARCHIVED", "DELETED", "RESTORED"]},
       "evidence": {"openapi": "PASS", "permission": "MISSING", "state": "MISSING", "resource": "MISSING", "cache": "MISSING", "integration": "MISSING", "securityE2E": "MISSING"}
     },
     {
