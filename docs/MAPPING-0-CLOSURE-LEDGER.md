@@ -4269,3 +4269,17 @@ Objective: run the controlled W04 side-effect matrix workflow above against the 
 - Backup: backup/pre-auth010-handler-boundary-20260929.
 - **NEXT_ITEM_ID:** AUTH-010-RUNTIME-LIST-REVOKE-001
 - **NEXT_ITEM_STATE:** TODO_FIX
+
+
+## 2026-09-29 — AUTH-010 runtime list/revoke implementation ready for verification
+
+- Implementation branch: work/auth010-runtime-list-revoke-20260929.
+- Scope implemented: one W01 optional-catch-all session handler exposing only the frozen /auth/sessions and /auth/sessions/{sessionId} surfaces; W02 authoritative session list/revoke functions; focused session-management unit tests.
+- W01 authenticates through existing Payload-native auth and verified tokenVersion, derives the current subject from the authenticated principal, and invokes W02 through the existing W02_AUTH Service Binding.
+- W02 enforces the canonical session permissions from contracts/authz/permissions.json plus active global role eligibility, current-session validity, and target-session ownership. Session list is bounded to 50 returned rows and excludes revoked/expired native sessions. Revoke is owner-scoped, idempotent, and uses one authorization read followed by one D1 batch mutation.
+- No new Worker, D1 database, Queue, Service Binding, public API path, cache system, session entity, or Payload Core change was introduced.
+- Focused tests were added for bounded/private projection, cursor validation, ownership enforcement, atomic revoke, and fail-closed cross-account denial.
+- Runtime execution evidence has not been produced yet; therefore AUTH-010 remains `TODO_VERIFY`, not GREEN.
+- Backup: backup/pre-auth010-runtime-list-revoke-20260929.
+- **NEXT_ITEM_ID:** AUTH-010-RUNTIME-LIST-REVOKE-001
+- **NEXT_ITEM_STATE:** TODO_VERIFY

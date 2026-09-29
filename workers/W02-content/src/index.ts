@@ -13,6 +13,11 @@ import {
   revokeSessionExtension,
   validateAuthoritativeSession,
 } from './session/session-runtime.js'
+import {
+  listCurrentUserSessions,
+  revokeCurrentUserSession,
+  SessionManagementError,
+} from './session/session-management.js'
 
 interface Env {
   D1_01: D1Database
@@ -254,6 +259,114 @@ export default {
             message: 'authentication service unavailable',
           },
         }, 503)
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/session/list') {
+      const body = await readJsonBody<{
+        userId?: unknown
+        currentSessionId?: unknown
+        tokenVersion?: unknown
+        cursor?: unknown
+        limit?: unknown
+      }>(request)
+
+      if (
+        !body ||
+        typeof body.userId !== 'string' ||
+        typeof body.currentSessionId !== 'string' ||
+        typeof body.tokenVersion !== 'number' ||
+        (body.cursor !== undefined && typeof body.cursor !== 'string') ||
+        (body.limit !== undefined && typeof body.limit !== 'number')
+      ) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid session list request' } }, 400)
+      }
+
+      try {
+        const result = await listCurrentUserSessions(env.D1_01, {
+          userId: body.userId,
+          currentSessionId: body.currentSessionId,
+          tokenVersion: body.tokenVersion,
+          cursor: body.cursor,
+          limit: body.limit,
+        })
+        return json(result)
+      } catch (error) {
+        if (error instanceof SessionManagementError) {
+          const status =
+            error.code === 'UNAUTHENTICATED' ? 401 :
+            error.code === 'PERMISSION_DENIED' ? 403 :
+            error.code === 'INVALID_CURSOR' ? 400 :
+            error.code === 'INVALID_INPUT' ? 400 :
+            503
+          return json({
+            error: {
+              code:
+                status === 401 ? 'UNAUTHENTICATED' :
+                status === 403 ? 'PERMISSION_DENIED' :
+                status === 400 ? (error.code === 'INVALID_CURSOR' ? 'INVALID_CURSOR' : 'VALIDATION_FAILED') :
+                'SERVICE_UNAVAILABLE',
+              message:
+                status === 401 ? 'authentication denied' :
+                status === 403 ? 'permission denied' :
+                status === 400 ? 'invalid session list request' :
+                'session service unavailable',
+            },
+          }, status)
+        }
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'session service unavailable' } }, 503)
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/session/revoke-owned') {
+      const body = await readJsonBody<{
+        userId?: unknown
+        currentSessionId?: unknown
+        tokenVersion?: unknown
+        targetSessionId?: unknown
+      }>(request)
+
+      if (
+        !body ||
+        typeof body.userId !== 'string' ||
+        typeof body.currentSessionId !== 'string' ||
+        typeof body.tokenVersion !== 'number' ||
+        typeof body.targetSessionId !== 'string'
+      ) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid session revoke request' } }, 400)
+      }
+
+      try {
+        const result = await revokeCurrentUserSession(env.D1_01, {
+          userId: body.userId,
+          currentSessionId: body.currentSessionId,
+          tokenVersion: body.tokenVersion,
+          targetSessionId: body.targetSessionId,
+        })
+        return json(result)
+      } catch (error) {
+        if (error instanceof SessionManagementError) {
+          const status =
+            error.code === 'UNAUTHENTICATED' ? 401 :
+            error.code === 'PERMISSION_DENIED' ? 403 :
+            error.code === 'INVALID_INPUT' ? 400 :
+            503
+          return json({
+            error: {
+              code:
+                status === 401 ? 'UNAUTHENTICATED' :
+                status === 403 ? 'PERMISSION_DENIED' :
+                status === 400 ? 'VALIDATION_FAILED' :
+                'SERVICE_UNAVAILABLE',
+              message:
+                status === 401 ? 'authentication denied' :
+                status === 403 ? 'permission denied' :
+                status === 400 ? 'invalid session revoke request' :
+                'session service unavailable',
+            },
+          }, status)
+        }
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'session service unavailable' } }, 503)
       }
     }
 
