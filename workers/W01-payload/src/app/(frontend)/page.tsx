@@ -33,8 +33,7 @@ export default async function HomePage() {
           <h1>Welcome back, {user.email}</h1>
         )}
         <div className="links">
-          <a
-            className="admin"
+          <a className="admin" href="/publish">\n            创作者中心\n          </a>\n          <a\n            className="admin"
             href={payloadConfig.routes.admin}
             rel="noopener noreferrer"
             target="_blank"
