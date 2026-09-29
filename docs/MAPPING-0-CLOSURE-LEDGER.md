@@ -4283,3 +4283,17 @@ Objective: run the controlled W04 side-effect matrix workflow above against the 
 - Backup: backup/pre-auth010-runtime-list-revoke-20260929.
 - **NEXT_ITEM_ID:** AUTH-010-RUNTIME-LIST-REVOKE-001
 - **NEXT_ITEM_STATE:** TODO_VERIFY
+
+
+## 2026-09-29 — AUTH-010 remote evidence channel ready
+
+- Current source baseline after runtime follow-up: 8a42fbcb0bb1da4a84d687fd603a14c5fb75a605.
+- Controlled remote evidence channel established: .github/workflows/auth-010-remote-e2e.yml.
+- Probe: scripts/auth-010-session-runtime-e2e.mjs.
+- The channel is bound to the existing W01 W02 Auth Binding Deploy provenance and uses the exact deployed source SHA; it does not create new deployment or topology paths.
+- Required runtime assertions cover anonymous denial, bounded/privacy-safe list, invalid cursor, owner-scoped revoke, idempotent repeat revoke, cross-account denial, stale tokenVersion denial, no-store responses, and synthetic-data cleanup.
+- Status remains NOT_EXECUTED until a successful controlled remote deployment triggers the evidence workflow; no Evidence Registry PASS or Mapping 0 GREEN is claimed.
+- Change Control: docs/change-control/CC-MAPPING-0-AUTH-010-REMOTE-RUNTIME-EVIDENCE-CHANNEL-2026-09-29.md.
+- Backup: backup/pre-auth010-remote-evidence-channel-20260929.
+- **NEXT_ITEM_ID:** AUTH-010-REMOTE-RUNTIME-EVIDENCE-001
+- **NEXT_ITEM_STATE:** TODO_VERIFY
