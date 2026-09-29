@@ -80,10 +80,10 @@ jobs:
           export default {
             async fetch(request, env) {
               if (request.method !== 'POST' || new URL(request.url).pathname !== '/__auth013_lifecycle_probe') return new Response(null,{status:404})
-              const db=env.D1_01, uid=900013900+(Date.now()%100000), sid='auth013-session-'+uid, email='auth013-lifecycle-'+uid+'@invalid.local', now='2026-09-29T05:30:00.000Z'
+              const db=env.D1_01, uid=900013900+(Date.now()%100000), sid='auth013-session-'+uid, email='auth013-lifecycle-'+uid+'@invalid.local', username='auth013-lifecycle-'+uid, now='2026-09-29T05:30:00.000Z'
               let iu=false, is=false
               try {
-                await db.prepare('INSERT INTO users (id,email,account_state,account_state_version) VALUES (?,?,?,?)').bind(uid,email,'ACTIVE',1).run(); iu=true
+                await db.prepare('INSERT INTO users (id,email,username,account_state,account_state_version) VALUES (?,?,?,?,?)').bind(uid,email,username,'ACTIVE',1).run(); iu=true
                 await db.prepare('INSERT INTO auth_session_state (session_id,user_id,device_id,token_version,refresh_credential_hash,revoked_at,last_seen_at) VALUES (?,?,?,?,?,NULL,?)').bind(sid,String(uid),'auth013-device-'+uid,1,'synthetic-refresh-'+uid,now).run(); is=true
                 const base={userId:String(uid),reason:'AUTH-013 lifecycle matrix evidence',now,correlationId:'auth013-lifecycle-'+uid,causationId:'auth013-lifecycle-'+uid}
                 const s={}
