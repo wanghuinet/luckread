@@ -1,0 +1,5 @@
+# LuckRead 2.0 creator publishing launch marker R9
+
+LAUNCH_2_0_R9=AUTHORIZED_BY_MAIN_MERGE
+
+Unique launch marker for the current Creator Center/publishing production redeployment after the W01 auth-me import resolution.
