@@ -29,13 +29,19 @@ export function CreatorCenter({
     )
   }
 
+  const viewUser = user as unknown as {
+    displayName?: unknown
+    username?: unknown
+    email?: unknown
+  }
+
   const displayName =
-    typeof user?.displayName === 'string' && user.displayName.trim()
-      ? user.displayName
-      : typeof user?.username === 'string' && user.username.trim()
-        ? user.username
-        : typeof user?.email === 'string' && user.email.trim()
-          ? user.email
+    typeof viewUser.displayName === 'string' && viewUser.displayName.trim()
+      ? viewUser.displayName
+      : typeof viewUser.username === 'string' && viewUser.username.trim()
+        ? viewUser.username
+        : typeof viewUser.email === 'string' && viewUser.email.trim()
+          ? viewUser.email
           : '创作者'
 
   return (
