@@ -1,10 +1,12 @@
 name: Cloudflare Resource Inventory
-run-name: Read-only Cloudflare inventory @ ${{ github.sha }}
+run-name: Automated read-only Cloudflare inventory @ ${{ github.sha }}
 
 on:
   push:
+    branches: ["main"]
     paths:
       - ".github/workflows/cloudflare-resource-inventory.yml"
+      - "docs/change-control/CC-CLOUDFLARE-RESOURCE-INVENTORY-2026-09-29.md"
   pull_request:
     paths:
       - ".github/workflows/cloudflare-resource-inventory.yml"
