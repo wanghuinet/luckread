@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { canTransitionContentState, decodeCursor, encodeCursor, isState, validateInput } from './content-runtime.js'
+import { canTransitionContentState, decodeCursor, encodeCursor, isState, validateInput, validateListFilters } from './content-runtime.js'
 
 describe('W03 content contract core', () => {
   it('accepts the canonical lifecycle vocabulary and cursor round-trip', () => {
@@ -43,6 +43,13 @@ describe('W03 content contract core', () => {
       bodyRef: 'https://cdn.example.com/body.txt',
       mediaRefs: ['https://cdn.example.com/video.mp4'],
     }).contentType).toBe('video')
+  })
+
+  it('validates creator content list filters', () => {
+    expect(validateListFilters('DRAFT', 'video')).toEqual({ status: 'DRAFT', contentType: 'video' })
+    expect(validateListFilters(null, null)).toEqual({})
+    expect(() => validateListFilters('UNKNOWN', null)).toThrow()
+    expect(() => validateListFilters(null, 'audio')).toThrow()
   })
 
   it('rejects invalid cursors and forbidden direct publication transitions', () => {
