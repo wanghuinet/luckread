@@ -246,6 +246,22 @@ export default function PublishComposer({
     return saved
   }
 
+  function startNewContent() {
+    setDraft(null)
+    setSavedBody('')
+    setTitle('')
+    setBody('')
+    setAssets([])
+    setCoverRef('')
+    setPreview(false)
+    setCopied(false)
+    const nextUrl = new URL(window.location.href)
+    nextUrl.searchParams.delete('draft')
+    window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
+    setMessage('已准备新的内容草稿。')
+    setError('')
+  }
+
   async function copyDraftLink() {
     if (!draft?.id) return
     const url = new URL(window.location.href)
@@ -487,6 +503,11 @@ export default function PublishComposer({
       ) : null}
 
       <div className="lr-actions">
+        {draft?.state === 'PENDING_REVIEW' ? (
+          <button className="secondary" disabled={busy} onClick={startNewContent} type="button">
+            新建内容
+          </button>
+        ) : null}
         <button className="ghost" disabled={busy} onClick={() => setPreview((current) => !current)} type="button">
           {preview ? '关闭预览' : '预览'}
         </button>
