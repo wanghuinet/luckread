@@ -1,10 +1,10 @@
 # CC-1.0-CONTENT-CORE-WIRE-STATE-AUTHORITY-2026-09-29
 
-- Status: **BLOCKED — DECISION MATERIAL**
+- Status: **DECISION RECORDED / IMPLEMENTATION PENDING**
 - Scope: LuckRead 1.0 minimum content core (create / publish / list / detail)
 - Source head inspected: `854eebccbeddc9e9c4a82264bd5d8148b6f5f03d`
-- Purpose: reconcile conflicting existing content API and lifecycle authorities before runtime implementation.
-- This record does not delete or rewrite any existing Blueprint or Contract.
+- Purpose: establish the 1.0 wire and lifecycle authority without rewriting existing Blueprint/Contract documents.
+- This record is the Change Control decision for the 1.0 content-core slice; it does not itself declare runtime GREEN.
 
 ## 1. 1.0 target slice
 
@@ -26,68 +26,53 @@ The intended user path is:
 authenticated creator
   → create draft
   → edit
+  → submit/review
   → publish through an explicit state transition
   → public list
   → public detail
 ```
 
-## 2. Conflicting public API authorities
+## 2. Wire authority decision
 
-Two valid repository sources currently define overlapping content API boundaries.
+### Decision
 
-### A. P0 Content and IP Graph Contract
+For the 1.0 content-core public API, the canonical wire family is the **current machine-readable plural content surface**:
 
-Source:
-`docs/10-P0-CONTENT-AND-IP-GRAPH-CONTRACT-v1.0.md`
+```
+GET   /v1/contents
+POST  /v1/contents
+GET   /v1/contents/{contentId}
+PATCH /v1/contents/{contentId}
+DELETE /v1/contents/{contentId}
+POST  /v1/contents/{contentId}/state
+```
 
-It defines:
+Primary authority inputs:
 
-- `POST /v1/content`
-- `GET /v1/content/:id`
-- `PATCH /v1/content/:id`
-- `POST /v1/content/:id/publish`
-- `POST /v1/content/:id/archive`
-
-It also states that public API DTOs must not expose Payload document internals.
-
-### B. Current machine-readable Content API Operation Policy / OpenAPI
-
-Sources:
-- `contracts/api/content-operation-policy.v1.json`
 - `contracts/openapi/v1/openapi.yaml`
-- `contracts/api/api-inventory.v1.json`
+- `contracts/api/content-operation-policy.v1.json`
 
-The operation policy defines `/contents` operations including:
+The singular `/v1/content` family found in older P0 content documentation remains a valid historical/secondary contract input. It is **not** selected as the 1.0 public wire namespace by this Change Control.
 
-- `GET /contents`
-- `POST /contents`
-- `GET /contents/{contentId}`
-- `PATCH /contents/{contentId}`
-- `DELETE /contents/{contentId}`
-- `POST /contents/{contentId}/state`
+### Rationale
 
-The API inventory also contains both singular and plural content paths, including legacy/duplicate-looking surfaces.
+1. The plural operations are represented in the current machine-readable Content API policy.
+2. The current OpenAPI contains explicit operation IDs for the plural lifecycle surface.
+3. The plural surface provides one explicit state-transition operation instead of relying on a special-case publish route.
+4. Runtime implementation must be generated from machine-readable API contracts, not from an older prose route description.
 
-### Conflict
+This decision does not delete or rewrite the singular APIs. They remain outside the minimum 1.0 public wire surface until a separate reconciliation explicitly promotes them.
 
-The repository therefore does not currently provide one unambiguous canonical public wire namespace for the 1.0 content slice.
+## 3. Lifecycle authority decision
 
-No implementation should choose one path by intuition.
+### Decision
 
-## 3. Conflicting lifecycle authorities
+The 1.0 lifecycle authority is:
 
-`docs/10-P0-CONTENT-AND-IP-GRAPH-CONTRACT-v1.0.md` defines a lifecycle centered on:
+- `contracts/state-machines/content.json`
+- `contracts/enums/content-state.json`
 
-```
-DRAFT → REVIEW → SCHEDULED → PUBLISHED → ARCHIVED
-                      ↓
-                    FAILED
-
-PUBLISHED → HIDDEN → RESTORED
-DRAFT/ARCHIVED → DELETED
-```
-
-`contracts/enums/content-state.json` defines:
+Canonical states:
 
 ```
 DRAFT
@@ -102,35 +87,48 @@ DELETED
 RESTORED
 ```
 
-`contracts/api/content-operation-policy.v1.json` defines:
+Canonical transition rules are taken from `contracts/state-machines/content.json`.
+
+In particular:
 
 ```
 DRAFT
-REVIEW_PENDING
-REVIEW_REJECTED
-SCHEDULED
-PUBLISHED
-UNPUBLISHED
-ARCHIVED
-DELETED
+  → PENDING_REVIEW
+  → APPROVED
+  → PUBLISHED
 ```
 
-The names and transition vocabulary are not identical. In particular, review, approval/rejection, hidden/unpublished and restored semantics differ.
+is the normal publish path.
 
-No runtime state machine should be generated from a best-effort union of these values.
+Direct `DRAFT → PUBLISHED` is not the default 1.0 path. The state-machine exception for an explicit auto-publish entitlement remains a separate policy decision and is not assumed by runtime code.
 
-## 4. Worker ownership baseline
+### Rationale
 
-The active canonical Worker Master assigns:
+The repository already contains an executable, machine-readable transition matrix with actor, permission and event requirements. Combining state names from multiple documents would create an invalid state union, so the runtime must use one state-machine authority.
 
-- W03 = Content / Article / Media / Translation
-- W03 primary D1 = D1-02
-- W01 = Public API / Gateway boundary
-- W01 does not own business-state persistence
+## 4. Dependent contract reconciliation
 
-Therefore the 1.0 content runtime should preserve:
+The current `contracts/api/content-operation-policy.v1.json` state list is narrower than the canonical state machine because it predates the full `APPROVED/RESTORED` vocabulary.
 
-```
+Therefore:
+
+- the state machine is the authoritative transition source;
+- the operation policy remains the API resource/behavior budget source;
+- a dependent contract-alignment change is still required before content runtime admission so the operation policy, OpenAPI schemas and state machine describe the same 1.0 transition vocabulary.
+
+No runtime is admitted merely because this decision has been recorded.
+
+## 5. Worker and data authority
+
+The active Worker Master assigns:
+
+- W01 — Public API / Gateway boundary
+- W03 — Content / Article / Media / Translation
+- D1-02 — Content / Community Data
+
+Therefore the target runtime boundary is:
+
+```text
 Client
   ↓
 W01 public API boundary
@@ -140,31 +138,24 @@ W03 content authority
 D1-02 authoritative content state
 ```
 
-This is a routing/ownership baseline only. It does not authorize implementation while the API/state conflict remains unresolved.
+W01 does not become a content-data owner, and no new Worker or D1 is introduced.
 
-## 5. Required authority decision
+## 6. Publication and security rules
 
-Before the first content runtime implementation is admitted, one Change Control decision must establish:
+The 1.0 implementation must enforce:
 
-1. The canonical 1.0 public content path namespace.
-2. The canonical operation IDs for create/list/detail/update/delete/publish.
-3. The canonical lifecycle state vocabulary.
-4. The canonical transition matrix.
-5. Whether review approval is mandatory for 1.0 publication or whether a specific transition is omitted from the minimum release.
-6. The canonical entity ID and field contract for CONTENT/ARTICLE.
-7. The canonical W01 → W03 transport operation and evidence boundary.
+- server-authoritative ownerUserId;
+- resource ownership and creator scope;
+- explicit state transitions;
+- optimistic concurrency;
+- idempotency on repeatable mutations;
+- private drafts excluded from public list/detail responses;
+- deleted/unpublished content excluded from public cache/projection;
+- moderation/approval cannot be bypassed by setting a state field directly;
+- Payload CRUD is not the public API;
+- cache never becomes the authorization boundary.
 
-The decision must preserve the existing Functional Blueprint Feature IDs and the fixed 12 Worker / 4 D1 / 25 Task topology.
-
-## 6. Recommended decision direction
-
-For consistency with the current machine-readable public API governance, the decision packet should evaluate the **current OpenAPI + content-operation-policy pair as the primary wire authority**, while treating older singular `/v1/content` references as historical/secondary inputs unless explicitly promoted.
-
-For lifecycle semantics, the decision should select exactly one state contract and then reconcile all dependent contracts to it. A union of state names is explicitly prohibited.
-
-This section is decision guidance only; it does not itself promote either source to canonical authority.
-
-## 7. Implementation gate
+## 7. Runtime gate
 
 Current result:
 
@@ -174,42 +165,42 @@ ARTICLE-001 / ARTICLE-002 / ARTICLE-003 / ARTICLE-011
 = BLOCKED_NOT_GREEN
 ```
 
-Reason:
+Remaining pre-runtime work:
 
-- public wire authority conflict;
-- lifecycle/state authority conflict;
-- canonical content entity/field mapping not yet evidence-bound;
-- executable runtime/E2E evidence does not exist for this slice.
+1. Reconcile the plural OpenAPI operations with the canonical state-machine vocabulary.
+2. Establish the canonical CONTENT/ARTICLE entity and fields.
+3. Bind D1-02 persistence and optimistic-concurrency rules.
+4. Define the minimal W01 → W03 transport contract.
+5. Then implement one code slice and generate executable evidence.
 
-No Payload collection is added by this document.
+## 8. Next implementation slice
 
-## 8. Next admitted implementation slice
+After the dependent contract alignment passes, implement only:
 
-After the authority decision is merged and its dependent reconciliation passes:
-
-**one content slice only:**
-
-```
-Article draft/create
-  → explicit publish transition
+```text
+create DRAFT article
+  → submit for review
+  → approve/publish transition
   → public list
   → public detail
 ```
 
-The implementation should stay within approximately 1–3 files where practical, use W03/D1-02 ownership, preserve server-authoritative owner IDs, bounded D1 access, idempotency on mutations, and no new Worker/D1.
+The first code slice should stay small, reuse existing infrastructure, and remain within the fixed Worker/D1 topology.
 
 ## 9. Non-goals
 
-This decision material does not implement:
+This decision does not implement:
 
 - collaboration;
 - autosave;
-- scheduled publication;
+- scheduled publishing;
 - comments;
 - recommendation;
 - search;
 - subscription/paywall;
 - video processing;
-- new Payload Core behavior.
+- new Payload Core behavior;
+- a second content database;
+- a parallel custom CMS.
 
-Those remain subsequent 1.0 stages.
+Those remain subsequent 1.0 stages or later feature batches.
