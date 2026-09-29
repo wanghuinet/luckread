@@ -17,6 +17,7 @@ type ContentResponse = {
   state: string
   version: number
   etag: string
+  bodyRef?: string
 }
 
 const ACCESS_KEY = 'luckread.accessToken'
@@ -85,6 +86,8 @@ export default function PublishComposer({
   const [body, setBody] = useState('')
   const [assets, setAssets] = useState<UploadedAsset[]>([])
   const [coverRef, setCoverRef] = useState('')
+  const [draft, setDraft] = useState<ContentResponse | null>(null)
+  const [savedBody, setSavedBody] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -129,31 +132,46 @@ export default function PublishComposer({
     setAssets((current) => current.filter((asset) => asset.id !== id))
   }
 
-  async function createDraft(): Promise<ContentResponse> {
-    const bodyFile = new File(
-      [body],
-      `luckread-content-${crypto.randomUUID()}.txt`,
-      { type: 'text/plain;charset=utf-8' },
-    )
-    const bodyAsset = await uploadFile(bodyFile)
+  async function persistDraft(): Promise<ContentResponse> {
+    let bodyRef = draft?.bodyRef
+    if (!bodyRef || savedBody !== body) {
+      const bodyFile = new File(
+        [body],
+        `luckread-content-${crypto.randomUUID()}.txt`,
+        { type: 'text/plain;charset=utf-8' },
+      )
+      bodyRef = (await uploadFile(bodyFile)).url
+    }
+
     const payload = {
       contentType: type,
       title: title.trim(),
-      bodyRef: bodyAsset.url,
+      bodyRef,
       mediaRefs: assets.map((asset) => asset.url),
       coverRef: coverRef.trim() || assets[0]?.url || null,
     }
-    const response = await authorizedFetch(contentBasePath, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'Idempotency-Key': crypto.randomUUID(),
+
+    const isUpdate = Boolean(draft?.id && draft.etag)
+    const response = await authorizedFetch(
+      isUpdate
+        ? `${contentBasePath}/${encodeURIComponent(draft!.id)}`
+        : contentBasePath,
+      {
+        method: isUpdate ? 'PATCH' : 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(isUpdate ? { 'If-Match': draft!.etag } : {}),
+          'Idempotency-Key': crypto.randomUUID(),
+        },
+        body: JSON.stringify(payload),
       },
-      body: JSON.stringify(payload),
-    })
+    )
     const data = await response.json().catch((): null => null)
-    if (!response.ok) throw new Error(data?.error?.message || 'CONTENT_CREATE_FAILED')
-    return data as ContentResponse
+    if (!response.ok) throw new Error(data?.error?.message || 'CONTENT_SAVE_FAILED')
+    const saved = data as ContentResponse
+    setDraft(saved)
+    setSavedBody(body)
+    return saved
   }
 
   async function saveDraft() {
@@ -163,7 +181,7 @@ export default function PublishComposer({
         setError('请先填写标题和正文。')
         return
       }
-      await createDraft()
+      await persistDraft()
       setMessage('草稿已保存。')
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : ''
@@ -187,18 +205,24 @@ export default function PublishComposer({
         setError('请先填写标题和正文。')
         return
       }
-      const draft = await createDraft()
-      const response = await authorizedFetch(`${contentBasePath}/${encodeURIComponent(draft.id)}/state`, {
+      const savedDraft = await persistDraft()
+      const response = await authorizedFetch(`${contentBasePath}/${encodeURIComponent(savedDraft.id)}/state`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'If-Match': draft.etag,
+          'If-Match': savedDraft.etag,
           'Idempotency-Key': crypto.randomUUID(),
         },
         body: JSON.stringify({ to: 'PENDING_REVIEW' }),
       })
       const data = await response.json().catch((): null => null)
       if (!response.ok) throw new Error(data?.error?.message || 'SUBMIT_FAILED')
+      const transition = data as { to?: string; version?: number; etag?: string }
+      setDraft((current) =>
+        current && transition.to && typeof transition.version === 'number' && transition.etag
+          ? { ...current, state: transition.to, version: transition.version, etag: transition.etag }
+          : current,
+      )
       setMessage('已提交发布审核。审核通过后将进入正式发布状态。')
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : ''
