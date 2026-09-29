@@ -5,6 +5,7 @@
 // Final runtime evidence execution.
 // Response-shape-safe consumer verification.
 // Final live W04 gate trigger.
+// Runtime artifact emission simplified.
 import { applyAccountStateProjection, parseAccountStateChanged } from './auth-013-projection.js'
 
 interface ProjectionKV {
