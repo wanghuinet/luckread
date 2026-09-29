@@ -8,6 +8,7 @@
 // Runtime artifact emission simplified.
 // Final jq evidence trigger.
 // Final runtime gate trigger.
+// Runtime log evidence checkpoint.
 import { applyAccountStateProjection, parseAccountStateChanged } from './auth-013-projection.js'
 
 interface ProjectionKV {
