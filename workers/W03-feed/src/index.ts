@@ -6,6 +6,7 @@ import {
   deleteContent,
   getContent,
   listContents,
+  listOwnedContents,
   toErrorResponse,
   transitionContentState,
   updateContent,
