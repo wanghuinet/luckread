@@ -435,6 +435,72 @@ async function loadAuthoritativeRefreshContext(
   }
 }
 
+export async function resolveAuthenticatedPrincipal(
+  db: D1Database,
+  input: {
+    userId: string
+    sessionId: string
+    tokenVersion: number
+    now?: string
+  },
+): Promise<{ active: boolean; layer?: string }> {
+  if (!input.userId || !input.sessionId) {
+    throw new SessionRuntimeError('INVALID_INPUT', 'authoritative user and session ids are required')
+  }
+
+  const now = input.now ?? new Date().toISOString()
+  try {
+    const row = await db
+      .prepare(`
+        SELECT
+          CAST(s.id AS TEXT) AS sessionId,
+          CAST(s._parent_id AS TEXT) AS userId,
+          s.expires_at AS expiresAt,
+          a.user_id AS extensionUserId,
+          a.token_version AS tokenVersion,
+          a.revoked_at AS revokedAt,
+          u.account_state AS accountState
+        FROM users_sessions AS s
+        INNER JOIN auth_session_state AS a
+          ON CAST(a.session_id AS TEXT) = CAST(s.id AS TEXT)
+        INNER JOIN users AS u
+          ON CAST(u.id AS TEXT) = CAST(s._parent_id AS TEXT)
+        WHERE CAST(s.id AS TEXT) = ?
+          AND CAST(s._parent_id AS TEXT) = ?
+        LIMIT 1
+        `)
+      .bind(String(input.sessionId), String(input.userId))
+      .first<{
+        sessionId: string
+        userId: string
+        expiresAt: string
+        extensionUserId: string
+        tokenVersion: number
+        revokedAt: string | null
+        accountState: string
+      }>()
+
+    if (!row) return { active: false }
+    if (String(row.sessionId) !== String(input.sessionId)) return { active: false }
+    if (String(row.userId) !== String(input.userId)) return { active: false }
+    if (String(row.extensionUserId) !== String(input.userId)) return { active: false }
+    if (row.tokenVersion !== input.tokenVersion) return { active: false }
+    if (row.accountState !== 'ACTIVE' || row.revokedAt) return { active: false }
+    if (Number.isNaN(Date.parse(row.expiresAt)) || Date.parse(row.expiresAt) <= Date.parse(now)) {
+      return { active: false }
+    }
+
+    const layerResolution = await resolveGlobalLayer(db, input.userId, row.accountState, now)
+    if (layerResolution.decision !== 'ALLOW' || !layerResolution.layer) {
+      return { active: false }
+    }
+
+    return { active: true, layer: layerResolution.layer }
+  } catch {
+    return { active: false }
+  }
+}
+
 export async function validateAuthoritativeSession(
   db: D1Database,
   input: {
