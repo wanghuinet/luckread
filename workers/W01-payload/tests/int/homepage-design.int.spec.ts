@@ -1,12 +1,11 @@
 import { readFile } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 describe('LuckRead homepage', () => {
   it('declares the public platform hero and creator entry points', async () => {
     const [page, styles] = await Promise.all([
-      readFile(fileURLToPath(new URL('../../src/app/(frontend)/page.tsx', import.meta.url)), 'utf8'),
-      readFile(fileURLToPath(new URL('../../src/app/(frontend)/styles.css', import.meta.url)), 'utf8'),
+      readFile('src/app/(frontend)/page.tsx', 'utf8'),
+      readFile('src/app/(frontend)/styles.css', 'utf8'),
     ])
 
     expect(page).toContain('让好内容被看见')
