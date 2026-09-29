@@ -121,7 +121,7 @@ for (const collection of payload.records ?? []) {
 for (const operation of api.records ?? []) {
   const codeRefs = [...new Set(codeRefsByOperation.get(operation.operationId) ?? [])]
     .filter((ref) => typeof ref === 'string' && ref.startsWith('workers/'));
-  const testRefs = codeRefs.filter((ref) => /\\.(test|spec)\\./.test(ref));
+  const testRefs = codeRefs.filter((ref) => /\.(test|spec)\./.test(ref));
   const implementationRefs = codeRefs.filter((ref) => !testRefs.includes(ref));
   const implemented = implementationRefs.length > 0;
   records.push({
