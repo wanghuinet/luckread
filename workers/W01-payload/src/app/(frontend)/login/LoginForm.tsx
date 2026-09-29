@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useRouter } from 'next/navigation'
 
 const deviceKey = 'luckread.deviceId'
@@ -15,6 +16,7 @@ function getDeviceId() {
 
 export default function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -46,7 +48,14 @@ export default function LoginForm() {
       sessionStorage.setItem('luckread.refreshToken', data.refreshToken)
       sessionStorage.setItem('luckread.expiresIn', String(data.expiresIn ?? ''))
       sessionStorage.setItem('luckread.layer', String(data.layer ?? ''))
-      router.push('/publish')
+      const requestedReturnTo = searchParams.get('returnTo')
+      const returnTo =
+        requestedReturnTo &&
+        requestedReturnTo.startsWith('/') &&
+        !requestedReturnTo.startsWith('//')
+          ? requestedReturnTo
+          : '/publish'
+      router.push(returnTo)
     } catch {
       setError('网络异常，请稍后重试。')
     } finally {
