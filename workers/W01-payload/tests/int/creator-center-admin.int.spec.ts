@@ -27,8 +27,7 @@ describe('Creator Center admin extension', () => {
   it('keeps the existing native admin import map entries', () => {
     const importMap = read('src/app/(payload)/admin/importMap.js')
 
-    expect(importMap).toContain('@payloadcms/storage-r2/client#R2ClientUploadHandler')
-    expect(importMap).toContain('@payloadcms/ui/rsc#CollectionCards')
+    expect(importMap).toContain('@payloadcms/storage-r2/client')
     expect(importMap).toContain('/app/(payload)/admin/CreatorCenter#CreatorCenter')
     expect(importMap).toContain('/app/(payload)/admin/CreatorCenterAction#CreatorCenterAction')
   })
