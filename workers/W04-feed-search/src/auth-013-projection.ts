@@ -1,3 +1,5 @@
+import type { KVNamespace } from '@cloudflare/workers-types'
+
 export type AccountState =
   | 'UNREGISTERED' | 'PENDING_VERIFICATION' | 'ACTIVE' | 'RESTRICTED' | 'FROZEN'
   | 'SUSPENDED' | 'BANNED' | 'DELETION_REQUESTED' | 'DELETION_PENDING' | 'DELETED'
