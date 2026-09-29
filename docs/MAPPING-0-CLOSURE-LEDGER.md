@@ -4050,3 +4050,13 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - No new Worker, D1, projection authority, or public workaround is authorized by this GAP record.
 - Change Control: `CC-MAPPING-0-AUTH-013-W04-PROJECTION-DEINDEX-GAP-2026-09-29.md`.
 - Backup: `backup/pre-auth013-w04-projection-gap-20260929`.
+
+
+## 2026-09-29 — AUTH-001 canonical mapping evidence reconciliation
+
+- Canonical AUTH-001 mapping previously reported DTO/entity/worker/evidence gaps even though the current Evidence Registry already contains verified registration runtime, security, concurrency, migration and W02 materializer evidence.
+- The mapping now explicitly records the admitted W01 transactional registration boundary and W02 eventual identity/credential materialization boundary.
+- Code references now bind the W01 registration route and the W02 credential/materialization implementation without creating a second registration architecture.
+- AUTH-001 remains `PARTIAL`: no page mapping is inferred; global Worker/D1 promotion remains governed by Mapping 0 / Five-Way gates; remote production/public registration E2E and complete security/anti-abuse evidence remain open.
+- No runtime code, migration, Worker topology, D1 topology or Evidence Registry promotion was performed.
+- Backup: `backup/pre-auth001-mapping-reconciliation-20260929`.

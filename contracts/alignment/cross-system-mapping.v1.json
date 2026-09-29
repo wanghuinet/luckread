@@ -27,7 +27,13 @@
       "payloadCollections": [
         "users"
       ],
-      "codeEvidenceRefs": [],
+      "codeEvidenceRefs": [
+        "workers/W01-payload/src/app/auth/register/route.ts",
+        "workers/W01-payload/src/collections/Users.ts",
+        "workers/W01-payload/src/payload.config.ts",
+        "workers/W02-content/src/credentials/credential-add.ts",
+        "workers/W02-content/src/credentials/credential-add.test.ts"
+      ],
       "evidence": [
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
         "contracts/alignment/mapping-batches/B19-AUTH-001-real-evidence-reconciliation.v1.md",
@@ -36,14 +42,25 @@
         "contracts/dto/auth-dto-contract.v1.json",
         "docs/change-control/CC-MAPPING-0-AUTH-001-EVENTUAL-MATERIALIZATION-ADMISSION-2026-09-28.md",
         "workers/W01-payload/src/collections/Users.ts",
-        "workers/W01-payload/src/payload.config.ts"
+        "workers/W01-payload/src/payload.config.ts",
+        "contracts/entity/entity-implementation-evidence.v1.json",
+        "contracts/persistence/AUTH-001-registration-envelope-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-WRITER-BOUNDARY-2026-09-27.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-27.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-EVIDENCE-ADMISSION-2026-09-28.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-MIGRATION-EXECUTION-2026-09-28.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-W02-CREDENTIAL-HASH-SECRET-AUTHORITY-GAP-2026-09-28.md",
+        "docs/MAPPING-0-CLOSURE-LEDGER.md",
+        "contracts/evidence/mapping-0-evidence-registry.v1.json"
       ],
       "blockers": [
-        "DTO mapping missing",
-        "Entity/Field mapping missing",
-        "Page mapping missing",
-        "Worker/D1 canonical mapping missing",
-        "security and integration evidence incomplete"
+        "Canonical page/reference mapping for AUTH-001 remains absent; no page is inferred from an API-only registration surface.",
+        "Final canonical Worker/D1 promotion remains governed by the current Worker/D1 binding and global Mapping 0 / Five-Way gates; this reconciliation records the already-admitted W01 transactional + W02 eventual materialization boundary without promoting it to global GREEN.",
+        "Remote production/public registration E2E and complete security/anti-abuse evidence beyond the verified controlled scopes remain incomplete."
+      ],
+      "workerRefs": [
+        "W01",
+        "W02"
       ]
     },
     {
