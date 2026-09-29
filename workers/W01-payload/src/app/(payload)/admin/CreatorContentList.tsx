@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 type ContentState =
   | 'DRAFT' | 'PENDING_REVIEW' | 'REJECTED' | 'APPROVED' | 'SCHEDULED'
@@ -109,6 +110,7 @@ export default function CreatorContentList() {
   const [workingId, setWorkingId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const router = useRouter()
 
   const load = useCallback(async (cursor: string | null, append: boolean) => {
     setLoading(true)
@@ -130,10 +132,13 @@ export default function CreatorContentList() {
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : ''
       setError(code === 'AUTH_REQUIRED' ? '登录状态需要更新，请重新登录。' : '内容列表加载失败，请稍后重试。')
+      if (code === 'AUTH_REQUIRED' && window.location.pathname.startsWith('/admin/')) {
+        router.replace(`/login?returnTo=${encodeURIComponent(window.location.pathname)}`)
+      }
     } finally {
       setLoading(false)
     }
-  }, [status])
+  }, [router, status])
 
   useEffect(() => { void load(null, false) }, [load])
 
