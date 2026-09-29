@@ -3980,3 +3980,14 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 - Change Control: `CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-ACTOR-TARGET-ISOLATION-2026-09-29.md`.
 - No runtime, Contract/OpenAPI, D1 schema, Payload version, Worker topology, Service Binding, authorization-rule, or Evidence Registry promotion change.
 - AUTH-013 and Mapping 0 remain `NOT_GREEN` until a fresh controlled E2E run completes successfully with exact-source provenance and an admitted evidence artifact.
+
+
+## 2026-09-29 — AUTH-013 public HTTP E2E stale-session workflow syntax correction
+
+- Run `36503289078` completed the full public transport E2E step successfully, including 200 authorized transition and stale `If-Match` validation.
+- The following stale-session verification step failed before executing its HTTP assertion because a nested Node heredoc marker was embedded inside an existing heredoc, producing a JavaScript `SyntaxError: Unexpected identifier 'input'`.
+- Evidence-tooling-only correction: collapse the stale-session assertion and non-secret artifact write into a single Node heredoc.
+- Backup before correction: `backup/pre-auth013-e2e-stale-session-heredoc-20260929`.
+- Change Control: `CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-STALE-SESSION-HEREDOC-2026-09-29.md`.
+- No runtime, Contract/OpenAPI, D1 schema, Payload version, Worker topology, Service Binding, authorization-rule, or Evidence Registry promotion change.
+- AUTH-013 and Mapping 0 remain `NOT_GREEN` until a fresh controlled E2E run executes the stale-session proof and all final D1 assertions successfully.
