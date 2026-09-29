@@ -1134,6 +1134,24 @@
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36522900537",
       "freshnessMode": "EXACT_SHA",
       "note": "Controlled current-main evidence verified W04 queue/DLQ identity, exactly one consumer, admitted globe KV derived destination, FROZEN→PURGED convergence, RESTORED→ACTIVE convergence, older-version rejection, duplicate delivery idempotency, non-resurrection, and synthetic KV cleanup. This closes the W04 projection runtime sub-gate only; AUTH-013 remains non-GREEN pending feature-wide lifecycle and side-effect convergence."
+    },
+    {
+      "evidenceId": "EVD-AUTH013-LIFECYCLE-MATRIX-REMOTE-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-013::LIFECYCLE_TRANSITION_MATRIX",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-013",
+      "source": "GitHub Actions AUTH-013 Lifecycle Matrix Runtime Evidence",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36527170976",
+      "commitSha": "56908b2f49845428db7c36520d0d989e70256e33",
+      "timestamp": "2026-09-29T05:39:41Z",
+      "producer": "AUTH-013 Lifecycle Matrix Runtime Evidence / run 36527170976 / job 109272654888",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "109272654888",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36527170976",
+      "freshnessMode": "EXACT_SHA",
+      "note": "Controlled remote D1 lifecycle matrix passed ACTIVE→RESTRICTED→FROZEN→SUSPENDED→BANNED→RESTORED→ACTIVE; L7 approval was required for BAN; rejected BAN caused no mutation; direct BANNED→ACTIVE was rejected; suspension and ban retained session revocation; final account state/version were ACTIVE/7; journal source versions 2–7 were canonical identity.account_state_changed events; synthetic user/session/journal cleanup completed."
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
