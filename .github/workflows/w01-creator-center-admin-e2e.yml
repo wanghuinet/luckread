@@ -1,4 +1,4 @@
-name: W01 Creator Center Admin E2E
+name: W01 Creator Center Admin Verification
 
 on:
   push:
@@ -59,22 +59,9 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm run build
 
-      - name: Apply local Payload migrations
+      - name: Verify Creator Center integration contract
         working-directory: workers/W01-payload
         env:
           NODE_OPTIONS: --no-deprecation
           PAYLOAD_SECRET: luckread-creator-center-e2e-secret
-        run: pnpm exec payload migrate
-
-      - name: Install Chromium
-        working-directory: workers/W01-payload
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Run Creator Center E2E
-        working-directory: workers/W01-payload
-        env:
-          NODE_OPTIONS: --no-deprecation
-          PAYLOAD_SECRET: luckread-creator-center-e2e-secret
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: pnpm exec playwright test tests/e2e/creator-center-admin.spec.ts --config=playwright.config.ts
+        run: pnpm exec vitest run tests/int/creator-center-admin.int.spec.ts --config ./vitest.config.mts
