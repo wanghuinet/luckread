@@ -113,7 +113,11 @@ export async function POST(
       expectedVersion,
     })
 
-    return json(result, 200)
+    return json({
+      from: result.from,
+      to: result.to,
+      auditEventId: result.auditEventId,
+    }, 200)
   } catch (error) {
     if (error instanceof W02AuthClientError) {
       if (error.status === 401) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
