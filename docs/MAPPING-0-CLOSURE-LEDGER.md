@@ -4206,3 +4206,15 @@ Current main: `3395da99d8bb596faa706c33d1a4ef6467557780`.
 NEXT_ITEM_ID: `AUTH-013-LIFECYCLE-SIDE-EFFECT-COVERAGE-001`
 NEXT_ITEM_STATE: `TODO_VERIFY`
 Objective: complete the minimum controlled evidence for FROZEN/SUSPENDED/BANNED, approval-required BAN, escalation/reinstatement/restore, and contracted cache/deindex convergence using existing W01/W02/W04/W06 resources only.
+
+
+## 2026-09-29 AUTH-013 lifecycle matrix evidence admission
+
+- Controlled remote lifecycle matrix Run `36527170976` / Job `109272654888`: SUCCESS.
+- Exact admitted application source: `56908b2f49845428db7c36520d0d989e70256e33`; D1-01: `2f80471e-3756-49f9-8db1-7707a433ad64`; database: `luckread`.
+- PASS assertions: ACTIVE→RESTRICTED→FROZEN→SUSPENDED; suspension session revocation; BAN without L7 rejected without mutation; SUSPENDED→BANNED with L7; BANNED retains revocation; direct BANNED→ACTIVE forbidden; BANNED→RESTORED with L7; RESTORED→ACTIVE; final ACTIVE/version 7; journal versions 2–7 all use canonical `identity.account_state_changed`.
+- Synthetic user/session/journal cleanup completed successfully.
+- Evidence artifact: `auth-013-lifecycle-matrix-evidence-36527170976`, ID `11015405950`, SHA-256 `9821f76981af097334526e896d62db01061cfd49247286ba5f772c11243d638c`.
+- Evidence Registry admission: `EVD-AUTH013-LIFECYCLE-MATRIX-REMOTE-001` = `VERIFIED/PASS`.
+- This closes the feature-wide lifecycle transition matrix sub-gate. It does not by itself prove every remaining feed/search/cache/deindex runtime edge or global Mapping 0 GREEN.
+- Backup: `backup/pre-auth013-lifecycle-evidence-admission-20260929`.
