@@ -46,7 +46,14 @@ export default function LoginForm() {
       sessionStorage.setItem('luckread.refreshToken', data.refreshToken)
       sessionStorage.setItem('luckread.expiresIn', String(data.expiresIn ?? ''))
       sessionStorage.setItem('luckread.layer', String(data.layer ?? ''))
-      router.push('/publish')
+      const requestedReturnTo = new URLSearchParams(window.location.search).get('returnTo')
+      const returnTo =
+        requestedReturnTo &&
+        requestedReturnTo.startsWith('/') &&
+        !requestedReturnTo.startsWith('//')
+          ? requestedReturnTo
+          : '/publish'
+      router.push(returnTo)
     } catch {
       setError('网络异常，请稍后重试。')
     } finally {

@@ -4,6 +4,8 @@ import { Gutter } from '@payloadcms/ui'
 import Link from 'next/link'
 import React from 'react'
 
+import PublishComposer from '../../(frontend)/publish/PublishComposer'
+import '../../(frontend)/publish/publish.css'
 import styles from './creator-center.module.css'
 
 export function CreatorCenter({
@@ -88,6 +90,17 @@ export function CreatorCenter({
               <strong>查看 LuckRead</strong>
               <span>返回公开首页与内容体验</span>
             </Link>
+          </section>
+
+          <section className={styles.publishSection}>
+            <div className={styles.publishHeading}>
+              <div>
+                <span className={styles.eyebrow}>CONTENT STUDIO</span>
+                <h2>发布内容</h2>
+              </div>
+              <span className={styles.publishHint}>原生 Admin 会话 · W03 内容权威</span>
+            </div>
+            <PublishComposer contentBasePath="/api/creator/contents" />
           </section>
 
           <section className={styles.contentGrid}>

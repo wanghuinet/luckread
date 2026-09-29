@@ -35,6 +35,21 @@ async function getW03Service(): Promise<W03ContentService> {
   return service
 }
 
+const getPayloadCookieToken = (request: Request): string | null => {
+  const cookieHeader = request.headers.get('cookie') ?? ''
+  const cookieName = 'payload-token'
+  for (const part of cookieHeader.split(';')) {
+    const [rawName, ...rawValue] = part.trim().split('=')
+    if (rawName !== cookieName || rawValue.length === 0) continue
+    try {
+      return decodeURIComponent(rawValue.join('='))
+    } catch {
+      return rawValue.join('=')
+    }
+  }
+  return null
+}
+
 export async function resolveContentPrincipal(request: Request): Promise<ContentPrincipal | Response> {
   const authorization = request.headers.get('Authorization') ?? ''
   if (!authorization.startsWith('Bearer ')) {
@@ -77,6 +92,25 @@ export async function resolveContentPrincipal(request: Request): Promise<Content
     }
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
+}
+
+export async function resolveCookieContentPrincipal(request: Request): Promise<ContentPrincipal | Response> {
+  const authorization = request.headers.get('Authorization') ?? ''
+  if (authorization.startsWith('Bearer ')) {
+    return resolveContentPrincipal(request)
+  }
+
+  const token = getPayloadCookieToken(request)
+  if (!token) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
+
+  const headers = new Headers(request.headers)
+  headers.set('Authorization', `Bearer ${token}`)
+  return resolveContentPrincipal(
+    new Request(request.url, {
+      method: 'GET',
+      headers,
+    }),
+  )
 }
 
 export async function resolveOptionalContentPrincipal(

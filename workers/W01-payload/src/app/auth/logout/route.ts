@@ -47,6 +47,7 @@ export async function POST(request: Request): Promise<Response> {
       status: 204,
       headers: {
         'cache-control': 'no-store',
+        'set-cookie': 'payload-token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0',
       },
     })
   }
@@ -66,6 +67,7 @@ export async function POST(request: Request): Promise<Response> {
     status: 204,
     headers: {
       'cache-control': 'no-store',
+      'set-cookie': 'payload-token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0',
     },
   })
 }
