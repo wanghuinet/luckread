@@ -1,7 +1,7 @@
 {
   "version": "1.4.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "554ff8084aab3e9237a09b3534f04733fa00c0ce",
+  "sourceHead": "86e6c0b7b75722177ae2d5adc48b15b9abf97156",
   "backupBranch": "backup/pre-w04-event-transport-authority-20260929",
   "currentCursor": {
     "id": "AUTH-013-W04-PROJECTION-CONSUMER-001",
@@ -22,7 +22,7 @@
     "sourceHead": "e73cced0eca9e3a630f06ac793dd8648298725f1",
     "currentHeadReconciliation": {
       "reason": "Current main records completion of W04/W05-W12 physical provisioning, W04 projection queue/DLQ provisioning, and W02 dual-destination fan-out CI. Repository authority search is exhausted without a concrete W04 projection destination or cache runtime binding; implementation remains blocked until such authority is explicitly admitted.",
-      "currentMainSha": "554ff8084aab3e9237a09b3534f04733fa00c0ce",
+      "currentMainSha": "86e6c0b7b75722177ae2d5adc48b15b9abf97156",
       "w04PhysicalProvisionRun": "36509211004",
       "w04PhysicalWorker": "luckread-w04",
       "w05w12ProvisionRun": "36509821604",
