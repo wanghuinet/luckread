@@ -149,13 +149,13 @@ jobs:
           version_list_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/versions?per_page=1"
           version_list_body="artifacts/cloudflare-w04-version-list.body"
           version_body="artifacts/cloudflare-w04-version.body"
-          http_code="$(curl -sS --retry 3 --retry-all-errors -o "$settings_body" -w '%{http_code}' "$settings_url" "${auth_header[@]}" "${json_header[@]}")" || true
 
           extract_bindings() {
-            jq '.
+            local source="$1"
+            jq --arg source "$source" '{
               worker: "luckread-w04",
               status: "AVAILABLE",
-              source: .source,
+              source: $source,
               bindings: (
                 (.bindings // [])
                 | map(select((.type // "") | test("secret"; "i") | not))
@@ -177,15 +177,12 @@ jobs:
                       )
                   )))
               )
-            '
+            }'
           }
 
+          http_code="$(curl -sS --retry 3 --retry-all-errors -o "$settings_body" -w '%{http_code}' "$settings_url" "${auth_header[@]}" "${json_header[@]}")" || true
           if [[ "$http_code" == 2* ]]; then
-            jq --arg source "script-settings" '
-              ($body.bindings // []) as $bindings
-              | {bindings:$bindings, source:$source}
-            ' --slurpfile body "$settings_body" /dev/null >/tmp/w04-binding-input.json
-            extract_bindings </tmp/w04-binding-input.json > artifacts/cloudflare-w04-bindings-inventory.json
+            jq '{bindings:(.result.bindings // [])}' "$settings_body" | extract_bindings "script-settings" > artifacts/cloudflare-w04-bindings-inventory.json
           else
             version_http_code="$(curl -sS --retry 3 --retry-all-errors -o "$version_list_body" -w '%{http_code}' "$version_list_url" "${auth_header[@]}" "${json_header[@]}")" || true
             if [[ "$version_http_code" == 2* ]]; then
@@ -198,24 +195,28 @@ jobs:
               version_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/versions/${version_id}"
               version_http_code="$(curl -sS --retry 3 --retry-all-errors -o "$version_body" -w '%{http_code}' "$version_url" "${auth_header[@]}" "${json_header[@]}")" || true
               if [[ "$version_http_code" == 2* ]]; then
-                jq --arg source "latest-version" '
-                  ($body[0].result.resources.bindings // []) as $bindings
-                  | {bindings:$bindings, source:$source}
-                ' --slurpfile body "$version_body" /dev/null >/tmp/w04-binding-input.json
-                extract_bindings </tmp/w04-binding-input.json > artifacts/cloudflare-w04-bindings-inventory.json
+                jq '{bindings:(.result.resources.bindings // [])}' "$version_body" | extract_bindings "latest-version" > artifacts/cloudflare-w04-bindings-inventory.json
               else
-                jq -n --arg settingsStatus "$http_code" --arg versionStatus "$version_http_code" '
-                  {worker:"luckread-w04",status:"UNAVAILABLE",reason:"settings_and_latest_version_read_failed",settingsHttpStatus:$settingsStatus,latestVersionHttpStatus:$versionStatus}
-                ' > artifacts/cloudflare-w04-bindings-inventory.json
+                jq -n --arg settingsStatus "$http_code" --arg versionStatus "$version_http_code" '{
+                  worker:"luckread-w04",
+                  status:"UNAVAILABLE",
+                  reason:"settings_and_latest_version_read_failed",
+                  settingsHttpStatus:$settingsStatus,
+                  latestVersionHttpStatus:$versionStatus
+                }' > artifacts/cloudflare-w04-bindings-inventory.json
               fi
             else
-              jq -n --arg settingsStatus "$http_code" --arg versionStatus "$version_http_code" '
-                {worker:"luckread-w04",status:"UNAVAILABLE",reason:"settings_and_version_list_read_failed",settingsHttpStatus:$settingsStatus,versionListHttpStatus:$versionStatus}
-              ' > artifacts/cloudflare-w04-bindings-inventory.json
+              jq -n --arg settingsStatus "$http_code" --arg versionStatus "$version_http_code" '{
+                worker:"luckread-w04",
+                status:"UNAVAILABLE",
+                reason:"settings_and_version_list_read_failed",
+                settingsHttpStatus:$settingsStatus,
+                versionListHttpStatus:$versionStatus
+              }' > artifacts/cloudflare-w04-bindings-inventory.json
             fi
           fi
 
-          rm -f "$settings_body" "$version_list_body" "$version_body" /tmp/w04-binding-input.json
+          rm -f "$settings_body" "$version_list_body" "$version_body"
           jq . artifacts/cloudflare-w04-bindings-inventory.json
       - name: Publish W04 binding inventory artifact
         uses: actions/upload-artifact@v4
