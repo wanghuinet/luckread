@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R8.md
+      - docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R9.md
 
 permissions:
   contents: read
@@ -27,8 +27,8 @@ jobs:
 
       - name: Verify launch marker
         run: |
-          test -f docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R8.md
-          grep -q "LAUNCH_2_0_R8=AUTHORIZED_BY_MAIN_MERGE" docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R8.md
+          test -f docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R9.md
+          grep -q "LAUNCH_2_0_R9=AUTHORIZED_BY_MAIN_MERGE" docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R9.md
 
       - name: Verify W03 binding
         working-directory: workers/W03-feed
@@ -106,13 +106,14 @@ jobs:
             https://mp.luckread.cn/register
             https://mp.luckread.cn/login
             https://mp.luckread.cn/publish
+            https://mp.luckread.cn/admin/creator-center
             https://api.luckread.cn/api/v1/contents
           )
           for url in "${urls[@]}"; do
             code="$(curl -L -sS -o /tmp/luckread-smoke -w '%{http_code}' "$url")"
             echo "$url -> $code"
             case "$url" in
-              */register|*/login|*/publish) test "$code" -ge 200 && test "$code" -lt 500 ;;
+              */register|*/login|*/publish|*/admin/creator-center) test "$code" -ge 200 && test "$code" -lt 500 ;;
               */contents) test "$code" = 200 ;;
             esac
           done
