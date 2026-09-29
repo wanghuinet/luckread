@@ -152,7 +152,7 @@ export default function CreatorContentList() {
                   </time>
                 </div>
                 <div className={styles.contentListActions}>
-                  {['DRAFT', 'REJECTED', 'UNPUBLISHED', 'ARCHIVED'].includes(item.state) ? (
+                  {['DRAFT', 'REJECTED'].includes(item.state) ? (
                     <Link className={styles.secondaryButton} href={`/publish?draft=${encodeURIComponent(item.id)}`}>
                       继续编辑
                     </Link>
