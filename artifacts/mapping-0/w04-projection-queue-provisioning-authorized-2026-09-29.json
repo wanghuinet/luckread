@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "status": "AUTHORIZED_FOR_CONTROLLED_PROVISIONING",
+  "date": "2026-09-29",
+  "sourceOfAuthority": "Explicit project-owner authorization for Cloudflare infrastructure required by the admitted W04 projection event transport contract",
+  "topology": "12 Workers / 4 D1",
+  "queue": "luckread-auth013-account-state-projection",
+  "dlq": "luckread-auth013-account-state-projection-dlq",
+  "consumerWorker": "luckread-w04",
+  "eventType": "identity.account_state_changed",
+  "producer": "W02",
+  "scope": "Create only the dedicated W04 projection queue and DLQ if missing; do not modify the existing W06 audit queue or any D1/Worker/public route resource.",
+  "retry": "bounded consumer retries with dedicated DLQ configured when W04 consumer deployment is admitted",
+  "noBusinessImplementation": true
+}
