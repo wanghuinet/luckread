@@ -160,6 +160,11 @@ export default function CreatorContentList() {
                       继续编辑
                     </Link>
                   ) : null}
+                  {item.state === 'PUBLISHED' ? (
+                    <Link className={styles.secondaryButton} href={`/content/${encodeURIComponent(item.id)}`}>
+                      查看内容
+                    </Link>
+                  ) : null}
                 </div>
               </article>
             ))}
