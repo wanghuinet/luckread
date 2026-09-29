@@ -814,8 +814,9 @@
       "status": "VERIFIED",
       "checkId": "108790999719",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36379124829",
-      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
-      "note": "Controlled remote D1-01/`luckread` execution at exact current-main SHA b6eab1eae17a825103c0a3b3a6c80daf570e8ff3. Target migration 20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1 was applied exactly once. Post-migration evidence proved exact auth_registration_envelopes and consents column sets, all required indexes, unchanged Users row count and unchanged Users schema. No application fixtures were created and no production Worker was deployed. Artifact 10952236480, sha256:f896e02b45a70861918d76c993aa6ae034341c195aca3786d6df7b0323f87daa."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Controlled remote D1-01/`luckread` execution at exact current-main SHA b6eab1eae17a825103c0a3b3a6c80daf570e8ff3. Target migration 20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1 was applied exactly once. Post-migration evidence proved exact auth_registration_envelopes and consents column sets, all required indexes, unchanged Users row count and unchanged Users schema. No application fixtures were created and no production Worker was deployed. Artifact 10952236480, sha256:f896e02b45a70861918d76c993aa6ae034341c195aca3786d6df7b0323f87daa.",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "evidenceId": "EVD-AUTH001-W02-MATERIALIZER-RUNTIME-REMOTE-001",
@@ -832,8 +833,9 @@
       "status": "VERIFIED",
       "checkId": "108799593871",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36377880967",
-      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
-      "note": "Controlled remote D1-01 materializer evidence at exact implementation source SHA bd2791a4ca799126fac16afbc0506070e9074a77. Successful rerun after AUTH-001 registration/consent migration became physically present remotely. FAIL_CLOSED missing-key path was verified with no mutation; first valid pass created exactly one identity and two initial credentials; identity converged; credentials were active and hashed; second run created nothing; no raw secret appeared in the result; production Worker was not deployed. No relevant W02 materializer, credential-add, credential-hash-key or W02 index source changed between this tested SHA and current main 37b0473f7214dd4eaca0326d147973e44fe52e7e. Artifact 10953241430, sha256:9b65754f98d44453d7df598d1bdda40374f3aa5eb033239d6001e1d227f59062."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Controlled remote D1-01 materializer evidence at exact implementation source SHA bd2791a4ca799126fac16afbc0506070e9074a77. Successful rerun after AUTH-001 registration/consent migration became physically present remotely. FAIL_CLOSED missing-key path was verified with no mutation; first valid pass created exactly one identity and two initial credentials; identity converged; credentials were active and hashed; second run created nothing; no raw secret appeared in the result; production Worker was not deployed. No relevant W02 materializer, credential-add, credential-hash-key or W02 index source changed between this tested SHA and current main 37b0473f7214dd4eaca0326d147973e44fe52e7e. Artifact 10953241430, sha256:9b65754f98d44453d7df598d1bdda40374f3aa5eb033239d6001e1d227f59062.",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "evidenceId": "EVD-AUTH001-REGISTRATION-RUNTIME-LOCAL-ENV-POLICY-SPLIT-001",
@@ -890,8 +892,9 @@
       "status": "VERIFIED",
       "checkId": "108894001186",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36411953998",
-      "freshnessMode": "EXACT_SHA",
-      "note": "Local W01 Payload-native Local API lifecycle evidence at exact current-main SHA 1c7010b33ac8941293ab919413b1348df0593ee0. PASS assertions: old password rejected after change; changed password accepted; two previously-valid native sessions were both invalidated after password change (revokedExistingSessionCount=2); the changed-password session was invalidated after native reset; reset token replay rejected; expired reset token rejected; secretsRecorded=false. This is controlled local D1 integration evidence only and does not establish remote W01 HTTP E2E, protected-account enumeration resistance, lifecycle event evidence, or Mapping 0 GREEN."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Local W01 Payload-native Local API lifecycle evidence at exact current-main SHA 1c7010b33ac8941293ab919413b1348df0593ee0. PASS assertions: old password rejected after change; changed password accepted; two previously-valid native sessions were both invalidated after password change (revokedExistingSessionCount=2); the changed-password session was invalidated after native reset; reset token replay rejected; expired reset token rejected; secretsRecorded=false. This is controlled local D1 integration evidence only and does not establish remote W01 HTTP E2E, protected-account enumeration resistance, lifecycle event evidence, or Mapping 0 GREEN.",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "evidenceId": "EVD-AUTH004-B10-W01-ADAPTER-IMPLEMENTATION-001",
@@ -906,8 +909,9 @@
       "producer": "GitHub merged implementation PR #167",
       "result": "PASS",
       "status": "VERIFIED",
-      "freshnessMode": "EXACT_SHA",
-      "note": "The admitted W01 implementation exposes authPasswordChange, authPasswordResetRequest and authPasswordResetConfirm as thin adapters over Payload-native password update, forgotPassword and resetPassword operations. This verifies implementation presence and exact source provenance only; it does not establish remote HTTP E2E, protected-account enumeration resistance, session invalidation, lifecycle events, or Mapping 0 GREEN."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "The admitted W01 implementation exposes authPasswordChange, authPasswordResetRequest and authPasswordResetConfirm as thin adapters over Payload-native password update, forgotPassword and resetPassword operations. This verifies implementation presence and exact source provenance only; it does not establish remote HTTP E2E, protected-account enumeration resistance, session invalidation, lifecycle events, or Mapping 0 GREEN.",
+      "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md"
     },
     {
       "evidenceId": "EVD-AUTH001-REGISTRATION-RUNTIME-LOCAL-002",
@@ -1112,7 +1116,25 @@
       "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
       "inheritanceRef": "docs/MAPPING-0-CLOSURE-LEDGER.md",
       "note": "Authoritative D1 validation confirmed the independent target at RESTRICTED/version 2 with exactly one identity.account_state_changed journal row at version 2; operator and basic accounts remained unchanged; the basic session had revoked_at populated and token_version incremented. Cleanup verification returned zero remaining synthetic users/sessions/extensions/roles/journals. Artifact 11006620069."
+    },
+    {
+      "evidenceId": "EVD-AUTH013-W04-PROJECTION-RUNTIME-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-013::W04_PROJECTION_RUNTIME",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-013",
+      "source": "GitHub Actions W04 Physical Worker Provision controlled AUTH-013/W04 projection runtime evidence",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36522900537",
+      "commitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b",
+      "timestamp": "2026-09-29T04:46:08Z",
+      "producer": "W04 physical provision + controlled Node runtime evidence / run 36522900537 / job 109259476025",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "109259476025",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36522900537",
+      "freshnessMode": "EXACT_SHA",
+      "note": "Controlled current-main evidence verified W04 queue/DLQ identity, exactly one consumer, admitted globe KV derived destination, FROZEN→PURGED convergence, RESTORED→ACTIVE convergence, older-version rejection, duplicate delivery idempotency, non-resurrection, and synthetic KV cleanup. This closes the W04 projection runtime sub-gate only; AUTH-013 remains non-GREEN pending feature-wide lifecycle and side-effect convergence."
     }
   ],
-  "testedCommitSha": "10885288b7115e3f967e6b01772e2063f0d55d6d"
+  "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
 }
