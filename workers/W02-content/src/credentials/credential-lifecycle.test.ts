@@ -279,6 +279,77 @@ describe('AUTH-003 credential lifecycle', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' })
   })
 
+  it('fails closed when credential ownership lookup is unavailable', async () => {
+    const db = {
+      prepare() {
+        return {
+          bind() {
+            return {
+              async first() {
+                throw new Error('D1 network detail must not escape')
+              },
+            }
+          },
+        }
+      },
+    } as unknown as D1Database
+
+    await expect(
+      replaceCredential(db, {
+        actorUserId: 'user-a',
+        credentialId: 'auth3-a',
+        value: 'new@example.invalid',
+        idempotencyKey: 'replace-unavailable',
+        secret: SECRET,
+        now: NOW,
+      }),
+    ).rejects.toMatchObject({ code: 'UNAVAILABLE' })
+    await expect(
+      replaceCredential(db, {
+        actorUserId: 'user-a',
+        credentialId: 'auth3-a',
+        value: 'new@example.invalid',
+        idempotencyKey: 'replace-unavailable-2',
+        secret: SECRET,
+        now: NOW,
+      }),
+    ).rejects.toThrow('credential service unavailable')
+  })
+
+  it('fails closed when credential removal lookup is unavailable', async () => {
+    const db = {
+      prepare() {
+        return {
+          bind() {
+            return {
+              async first() {
+                throw new Error('protected D1 failure')
+              },
+            }
+          },
+        }
+      },
+    } as unknown as D1Database
+
+    await expect(
+      removeCredential(db, {
+        actorUserId: 'user-a',
+        credentialId: 'auth3-a',
+        idempotencyKey: 'remove-unavailable',
+        now: NOW,
+      }),
+    ).rejects.toMatchObject({ code: 'UNAVAILABLE' })
+    await expect(
+      removeCredential(db, {
+        actorUserId: 'user-a',
+        credentialId: 'auth3-a',
+        idempotencyKey: 'remove-unavailable-2',
+        now: NOW,
+      }),
+    ).rejects.toThrow('credential service unavailable')
+  })
+
+
   it('maps malformed input to the lifecycle contract', async () => {
     const db = fakeD1([])
     await expect(
