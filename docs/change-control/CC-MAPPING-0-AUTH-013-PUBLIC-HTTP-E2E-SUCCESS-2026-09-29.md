@@ -11,7 +11,7 @@ main commit `b91b49d6262ced5631d4d246d1573fa03583752c`.
 
 The workflow verified the deployed source provenance against:
 
-- tested/deployed source: `f4c329b74f7110af76c7ba7339bfd9d9d`
+- tested/deployed source: `f4c329b74f7110af76c7ba7339bfd9d3cb81f910`
 - deployment run: `36502171590`
 - W01 public path: `/v1/users/{userId}/account-state`
 - D1: `luckread`
