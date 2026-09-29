@@ -95,6 +95,7 @@ export default function PublishComposer({
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -230,6 +231,20 @@ export default function PublishComposer({
     nextUrl.searchParams.set('draft', saved.id)
     window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
     return saved
+  }
+
+  async function copyDraftLink() {
+    if (!draft?.id) return
+    const url = new URL(window.location.href)
+    url.searchParams.set('draft', draft.id)
+    try {
+      await navigator.clipboard.writeText(url.toString())
+      setCopied(true)
+      setMessage('草稿恢复链接已复制。登录后可在其他设备继续编辑。')
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setError('无法复制链接，请从地址栏复制当前页面地址。')
+    }
   }
 
   async function saveDraft() {
@@ -424,6 +439,11 @@ export default function PublishComposer({
       {error ? <div className="lr-error" role="alert">{error}</div> : null}
 
       <div className="lr-actions">
+        {draft?.id && draft.state === 'DRAFT' ? (
+          <button className="ghost" disabled={busy} onClick={copyDraftLink} type="button">
+            {copied ? '已复制' : '复制恢复链接'}
+          </button>
+        ) : null}
         {draft?.state === 'DRAFT' ? (
           <button className="danger" disabled={busy} onClick={discardDraft} type="button">
             放弃草稿
