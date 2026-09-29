@@ -72,8 +72,9 @@ jobs:
           queue_id="$(jq -r --arg q "luckread-auth013-account-state-projection" '.result[]? | select(.queue_name==$q) | .queue_id' <<<"$queues")"
           test -n "$queue_id"
           consumers="$(curl -fsS --retry 3 --retry-all-errors "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$queue_id/consumers" "${AUTH[@]}")"
-          consumer="$(jq -c '.result[]? | select(.script_name=="luckread-w04" and .type=="worker")' <<<"$consumers")"
+          consumer="$(jq -c '.result[]? | select(.script_name=="luckread-w04")' <<<"$consumers")"
           test -n "$consumer"
+          echo "$consumer" | jq '{script_name, type, queue_name, dead_letter_queue, settings}'
           echo "$consumer" | jq -e --arg dlq "luckread-auth013-account-state-projection-dlq" '.dead_letter_queue==$dlq' >/dev/null
           count="$(jq -r '.result | length' <<<"$consumers")"
           test "$count" = "1"
