@@ -2,46 +2,53 @@
 
 ## Status
 
-`WAIT_AUTHORITY_DECISION`
+`ADMITTED_FOR_IMPLEMENTATION`
 
-## Scope
+## Decision
 
-Resolve the transport authority required to move the already-admitted `identity.account_state_changed` event from the canonical W02 → W06 audit path to the W04 derived/projection boundary for T08/T09/T10.
+Use direct multi-destination publication from the canonical W02 event producer. The same canonical `identity.account_state_changed` event is delivered independently to the existing W06 audit queue and a dedicated W04 projection queue. W06 remains the audit consumer authority; W04 consumes only for derived Feed/Recommendation/Search projection and deindex reaction.
 
-## Facts
+## Why this is the minimum compliant path
 
-1. `identity.account_state_changed` is a canonical v1 event.
-2. Its current contract names W02 as producer, W06 as consumer authority, and `luckread-auth013-account-state` as its queue.
-3. W04 is now a real physical Worker: `luckread-w04`, verified by controlled provisioning Run `36509211004`.
-4. The W04 GAP requires feed/recommendation/search projection/deindex convergence from account-state lifecycle changes.
-5. The repository does not currently define a compliant W04 fan-out/derived-event transport contract.
+- W02 remains the sole producer and owner of event meaning.
+- W06's existing audit queue and consumer authority remain unchanged.
+- W04 is not attached to the audit queue, avoiding an invalid broadcast assumption.
+- No additional Worker is introduced; W10 remains the async execution boundary rather than becoming an artificial event authority for this feature.
+- At-least-once delivery and eventId idempotency already match the platform Event Contract.
+- A partial destination failure keeps the durable publication pending; retry may duplicate a successful destination, which is expected and must be absorbed by consumer deduplication.
 
-## Non-negotiable constraint
+## New physical delivery resources
 
-Do not attach W04 to `luckread-auth013-account-state` by inference. The existing queue is the admitted W06 audit-consumer boundary; the current contract establishes no broadcast semantics.
+- W04 projection queue: `luckread-auth013-account-state-projection`
+- W04 projection DLQ: `luckread-auth013-account-state-projection-dlq`
+- Consumer: `luckread-w04`
 
-Do not invent a new event type, queue, Service Binding, D1 writer, or public API in implementation code before the transport authority is admitted.
+These queue resources are required infrastructure for the admitted contract. They do not become business authority or a fifth D1.
 
-## Required decision inputs
+## Runtime implementation boundary
 
-The next Change Control must explicitly choose and contract exactly one transport pattern: (a) direct multi-destination publication from W02 with independent W06 audit and W04 projection queues; or (b) an explicit intermediate fan-out/derived-event boundary owned by the canonical Async/Queue Worker and its contract.
+The next implementation slice may change only:
+1. W02 publication to address both admitted queues;
+2. W04 queue consumer validation/idempotency/deindex projection behavior;
+3. controlled queue provisioning and corresponding evidence.
 
-Whichever pattern is admitted must define producer/consumer ownership, queue identity, idempotency, ordering, retry/DLQ, security scope, backpressure, observability, and replay semantics. It must preserve W06 audit authority and W04 as derived/projection only.
+It must not change the account-state state machine, W02 D1-01 authority, W06 D1-03 audit authority, Payload Core, public API semantics, or frozen Worker/D1 counts.
 
-## Acceptance boundary
+## Acceptance requirements
 
-Until that decision is admitted:
-
-- W04 physical resource = PASS_VERIFIED;
-- W04 projection/deindex implementation = NOT_AUTHORIZED;
-- AUTH-013 remains NOT_GREEN;
-- no Mapping 0 GREEN promotion occurs.
+- both destination queues exist and each has exactly one consumer;
+- one state transition produces one logical eventId;
+- duplicate delivery produces no duplicate projection side effect;
+- out-of-order delivery cannot regress per-resource version;
+- W06 audit remains independently durable;
+- W04 projection/deindex is derived and non-authoritative;
+- failed projection delivery reaches the dedicated DLQ after bounded retries;
+- replay is safe and does not resurrect deleted/purged content.
 
 ## Provenance
 
-- Current main: `e73cced0eca9e3a630f06ac793dd8648298725f1`
-- W04 provisioning: Run `36509211004`
-- W05-W12 provisioning: Run `36509821604`
+- Current base: `fbc0d8ccd799ac4c975e46497de9dab30928f897`
 - Worker Master: `docs/04-WORKER-MASTER-v1.0.md`
-- Event contract: `contracts/events/identity-account-state-changed.v1.json`
+- Event Contract: `contracts/events/identity-account-state-changed.v1.json`
 - W04 GAP: `docs/change-control/CC-MAPPING-0-AUTH-013-W04-PROJECTION-DEINDEX-GAP-2026-09-29.md`
+- Cloudflare queue semantics checked against official documentation dated 2026-04-21/2026-08-25: a queue has one consumer Worker, while a Worker may produce to multiple queues. citeturn511064search4turn511064search1
