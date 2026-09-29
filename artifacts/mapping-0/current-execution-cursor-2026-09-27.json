@@ -1,16 +1,16 @@
 {
   "version": "1.1.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "091a2879598402d7e360bf48b57fcaa6c80660ea",
-  "backupBranch": "backup/pre-mapping0-current-cursor-auth013-w04-20260929",
+  "sourceHead": "d36d49a65e01bc2faa30326abb352492fd6ce857",
+  "backupBranch": "backup/pre-auth013-w04-inventory-evidence-20260929",
   "currentCursor": {
     "id": "AUTH-013-W04-PROJECTION-DEINDEX-ADMISSION-001",
     "state": "BLOCKED_EXTERNAL",
     "objective": "Resolve concrete current W04 resource/entrypoint/binding admission, then implement the minimum projection/deindex consumer using the existing identity.account_state_changed boundary and collect controlled convergence evidence.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-W04-PROJECTION-DEINDEX-GAP-2026-09-29.md",
-    "nextGate": "1) Dispatch the read-only Cloudflare Resource Inventory workflow and record the actual current W04 Worker resource identity if present. 2) If W04 is absent, stop at the external provisioning/change-control gate; do not invent a resource name, Service Binding, route or Wrangler binding. 3) Once resource/entrypoint authority exists, proceed with the minimum W04 projection/deindex admission slice.",
+    "nextGate": "Cloudflare inventory Run 36508055575 is recorded and shows W04 absent. Remain fail-closed at the external provisioning/change-control gate; do not invent a Worker name, resourceId, Service Binding, route or Wrangler binding. A concrete W04 resource/entrypoint authority must exist before the minimum W04 projection/deindex admission slice can begin.",
     "logicalOwnership": "W04 -> Feed / Recommendation / Search derived/projection boundary",
-    "physicalBinding": "NOT_ADMITTED. Current main contains no authoritative W04 resourceId, no current W04 deployment workflow, no Service Binding, and no admitted T08/T09/T10 runtime entrypoint. Historical workers/W04-social is non-authoritative and cannot be promoted by path inference.",
+    "physicalBinding": "NOT_ADMITTED / EXTERNALLY_VERIFIED_ABSENT. Read-only Cloudflare inventory Run 36508055575 observed 3 Workers (luckread-w01-payload, luckread-w02, luckread-w06) and no W04 resource. No W04 resourceId, deployment workflow, Service Binding or T08/T09/T10 runtime entrypoint is admitted. Historical workers/W04-social remains non-authoritative and cannot be promoted by path inference.",
     "physicalRuntimeTarget": "T08/T09/T10 -> W04; derived/projection only; no new authoritative D1",
     "supersededBlockers": [
       "AUTH-013 public HTTP E2E/security/D1 evidence is PASS_VERIFIED by run 36503534440 and must not be rerun unchanged.",
@@ -19,7 +19,7 @@
       "No executable canonical W04 runtime or current physical Cloudflare W04 resource is currently evidenced on main.",
       "No new Worker, D1, authoritative projection store, Payload Core modification or public API redesign is authorized by the W04 GAP record."
     ],
-    "sourceHead": "091a2879598402d7e360bf48b57fcaa6c80660ea"
+    "sourceHead": "d36d49a65e01bc2faa30326abb352492fd6ce857"
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -191,13 +191,13 @@
   },
   "currentHeadReconciliation": {
     "reason": "Main advanced through AUTH-013 response/evidence corrections and AUTH-002 mapping evidence binding. AUTH-013 public HTTP E2E is now PASS_VERIFIED; the next admissible slice is the W04 projection/deindex gap. No W04 resource or runtime is inferred.",
-    "currentMainSha": "091a2879598402d7e360bf48b57fcaa6c80660ea",
-    "actualGitMainHead": "091a2879598402d7e360bf48b57fcaa6c80660ea",
+    "currentMainSha": "d36d49a65e01bc2faa30326abb352492fd6ce857",
+    "actualGitMainHead": "d36d49a65e01bc2faa30326abb352492fd6ce857",
     "nativeAuthStatus": "PAYLOAD_NATIVE_AUTH004_SCOPE",
     "auth013PublicHttpE2eRun": "36503534440",
     "auth013PublicHttpE2eStatus": "PASS_VERIFIED",
     "w04ProjectionStatus": "GAP_IDENTIFIED / IMPLEMENTATION_NOT_AUTHORIZED",
-    "w04ResourceStatus": "NOT_VERIFIED_EXTERNAL",
+    "w04ResourceStatus": "VERIFIED_ABSENT_IN_EXTERNAL_INVENTORY_RUN_36508055575",
     "reviewedAt": "2026-09-29",
     "previousCursorSuperseded": "AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001"
   },
@@ -450,5 +450,28 @@
       "T10"
     ],
     "eventBoundary": "contracts/events/identity-account-state-changed.v1.json"
+  },
+  "externalVerification": {
+    "reviewedAt": "2026-09-29",
+    "status": "PASS_VERIFIED_READ_ONLY_INVENTORY",
+    "workflow": ".github/workflows/cloudflare-resource-inventory.yml",
+    "runId": 36508055575,
+    "runConclusion": "success",
+    "testedHeadSha": "d36d49a65e01bc2faa30326abb352492fd6ce857",
+    "artifactId": 11007359320,
+    "artifactSha256": "ba410aaee1661405abe60d45089ae4548a69d3db17dfd6a6165c7227396204d1",
+    "observedCounts": {
+      "d1": 4,
+      "workers": 3
+    },
+    "observedWorkers": [
+      "luckread-w01-payload",
+      "luckread-w02",
+      "luckread-w06"
+    ],
+    "w04Resource": "ABSENT",
+    "finding": "The current Cloudflare account inventory does not contain a W04 Worker resource. This does not authorize provisioning; the canonical physical identity and admission inputs are still missing.",
+    "decision": "BLOCKED_EXTERNAL_PROVISIONING_CHANGE_CONTROL",
+    "evidenceBoundary": "Read-only observation only; no resource creation, deployment, binding, D1 mutation, or Evidence Registry promotion."
   }
 }
