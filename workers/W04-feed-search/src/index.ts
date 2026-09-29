@@ -1,11 +1,16 @@
 // AUTH-013 W04 binding CI trigger: runtime implementation unchanged.
 // Runtime evidence gate follows the admitted destination and queue binding.
 // Final controlled runtime trigger.
-import type { MessageBatch, KVNamespace } from '@cloudflare/workers-types'
 import { applyAccountStateProjection, parseAccountStateChanged } from './auth-013-projection.js'
 
+interface ProjectionKV {
+  get(key: string, type: 'json'): Promise<unknown>
+  put(key: string, value: string): Promise<void>
+}
+interface QueueMessage { body: unknown; ack(): void; retry(): void }
+interface MessageBatchLike { messages: QueueMessage[] }
 interface Env {
-  AUTH013_W04_DERIVED_PROJECTION: KVNamespace
+  AUTH013_W04_DERIVED_PROJECTION: ProjectionKV
 }
 
 const json = (body: unknown, status = 200) =>
@@ -23,7 +28,7 @@ export default {
     return new Response(null, { status: 404 })
   },
 
-  async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
+  async queue(batch: MessageBatchLike, env: Env): Promise<void> {
     for (const message of batch.messages) {
       try {
         const event = parseAccountStateChanged(message.body)
