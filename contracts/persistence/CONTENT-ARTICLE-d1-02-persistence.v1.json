@@ -20,9 +20,16 @@
   "physicalResource": {
     "binding": "D1_02",
     "worker": "W03",
-    "databaseUuid": "NOT_YET_ASSIGNED",
-    "databaseName": "NOT_YET_ASSIGNED",
-    "assignmentRule": "Must be explicitly reconciled from authoritative Cloudflare inventory; never infer from an existing unmapped D1."
+    "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+    "databaseName": "luckreadpro",
+    "databaseNameAuthority": "display label only; UUID is authoritative",
+    "allocationStatus": "ADMITTED",
+    "allocationBasis": {
+      "inventoryRun": 36577107292,
+      "inventoryHead": "2bab91c72e15305387fa7f4dd9db1114d2c4ff62",
+      "source": "Cloudflare API read-only inventory",
+      "priorDecision": "CC-MAPPING-0-E6-W02-PHYSICAL-BINDING-AND-ROLEASSIGNMENT-DECISION-PACKET-2026-09-22"
+    }
   },
   "tables": {
     "contents": {
