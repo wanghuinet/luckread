@@ -4,6 +4,7 @@ import { Gutter } from '@payloadcms/ui'
 import Link from 'next/link'
 import React from 'react'
 
+import CreatorContentList from './CreatorContentList'
 import PublishComposer from '../../(frontend)/publish/PublishComposer'
 import '../../(frontend)/publish/publish.css'
 import styles from './creator-center.module.css'
@@ -102,6 +103,8 @@ export function CreatorCenter({
             </div>
             <PublishComposer contentBasePath="/api/creator/contents" />
           </section>
+
+          <CreatorContentList />
 
           <section className={styles.contentGrid}>
             <article className={styles.panel}>
