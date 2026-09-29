@@ -27,8 +27,8 @@ jobs:
 
       - name: Verify audit marker
         run: |
-          test -f docs/release/ADMIN-READONLY-AUDIT-2026-09-30.md
-          grep -q "ADMIN_READONLY_AUDIT_R2=AUTHORIZED_BY_MAIN_MERGE" docs/release/ADMIN-READONLY-AUDIT-2026-09-30.md
+          test -f docs/release/ADMIN-READONLY-AUDIT-2026-09-30-R3.md
+          grep -q "ADMIN_READONLY_AUDIT_R3=AUTHORIZED_BY_MAIN_MERGE" docs/release/ADMIN-READONLY-AUDIT-2026-09-30-R3.md
 
       - name: Read production admin roles
         env:
