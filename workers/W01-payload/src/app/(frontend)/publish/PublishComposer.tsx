@@ -198,6 +198,46 @@ export default function PublishComposer({
     }
   }
 
+  async function discardDraft() {
+    if (!draft?.id || draft.state !== 'DRAFT') return
+    if (!window.confirm('确定放弃这份草稿吗？此操作不可撤销。')) return
+
+    setBusy(true)
+    setError('')
+    setMessage('')
+    try {
+      const response = await authorizedFetch(
+        contentBasePath + '/' + encodeURIComponent(draft.id),
+        {
+          method: 'DELETE',
+          headers: {
+            'If-Match': draft.etag,
+            'Idempotency-Key': crypto.randomUUID(),
+          },
+        },
+      )
+      if (!response.ok) {
+        const data = await response.json().catch((): null => null)
+        throw new Error(data?.error?.message || 'CONTENT_DELETE_FAILED')
+      }
+      setDraft(null)
+      setSavedBody('')
+      setTitle('')
+      setBody('')
+      setAssets([])
+      setCoverRef('')
+      setMessage('草稿已放弃。')
+    } catch (caught) {
+      const code = caught instanceof Error ? caught.message : ''
+      setError(code === 'AUTH_REQUIRED' ? '登录已失效，请重新登录。' : '放弃草稿失败，请稍后重试。')
+      if (code === 'AUTH_REQUIRED') {
+        router.replace(window.location.pathname.startsWith('/admin/') ? '/admin/login' : '/login')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function submitForReview() {
     setBusy(true); setError(''); setMessage('')
     try {
@@ -323,11 +363,16 @@ export default function PublishComposer({
       {error ? <div className="lr-error" role="alert">{error}</div> : null}
 
       <div className="lr-actions">
+        {draft?.state === 'DRAFT' ? (
+          <button className="danger" disabled={busy} onClick={discardDraft} type="button">
+            放弃草稿
+          </button>
+        ) : null}
         <button className="secondary" disabled={busy} onClick={saveDraft} type="button">
           {busy ? '处理中…' : '保存草稿'}
         </button>
-        <button className="primary" disabled={busy} onClick={submitForReview} type="button">
-          {busy ? '处理中…' : '提交发布'}
+        <button className="primary" disabled={busy || draft?.state === 'PENDING_REVIEW'} onClick={submitForReview} type="button">
+          {busy ? '处理中…' : draft?.state === 'PENDING_REVIEW' ? '审核中…' : '提交发布'}
         </button>
       </div>
 
