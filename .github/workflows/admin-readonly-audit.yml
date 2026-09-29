@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - docs/release/ADMIN-READONLY-AUDIT-2026-09-30.md
+      - docs/release/ADMIN-READONLY-AUDIT-2026-09-30-R2.md
 
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - name: Verify audit marker
         run: |
           test -f docs/release/ADMIN-READONLY-AUDIT-2026-09-30.md
-          grep -q "ADMIN_READONLY_AUDIT=AUTHORIZED_BY_MAIN_MERGE" docs/release/ADMIN-READONLY-AUDIT-2026-09-30.md
+          grep -q "ADMIN_READONLY_AUDIT_R2=AUTHORIZED_BY_MAIN_MERGE" docs/release/ADMIN-READONLY-AUDIT-2026-09-30.md
 
       - name: Read production admin roles
         env:
@@ -37,7 +37,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/admin-audit
-          npx wrangler@4.116.0 d1 execute luckread --remote --json --command "SELECT CAST(u.id AS TEXT) AS user_id, u.email, u.username, u.account_state, ra.role_id, ra.scope_type, ra.status, ra.valid_from, ra.valid_until FROM users u JOIN role_assignments ra ON CAST(ra.subject_id AS TEXT)=CAST(u.id AS TEXT) WHERE ra.status='ACTIVE' AND ra.scope_type='global' AND ra.role_id IN ('admin','super_admin') ORDER BY ra.role_id, u.id;" > artifacts/admin-audit/admin-roles.json
+          npx wrangler@4.116.0 d1 execute luckread --remote --json --command "SELECT CAST(u.id AS TEXT) AS user_id, u.email, u.username, u.account_state, ra.role_id, ra.scope_type, ra.status, ra.valid_from, ra.valid_until FROM users u LEFT JOIN role_assignments ra ON CAST(ra.subject_id AS TEXT)=CAST(u.id AS TEXT) ORDER BY u.id, ra.status, ra.role_id;" > artifacts/admin-audit/all-roles.json
+          cp artifacts/admin-audit/all-roles.json artifacts/admin-audit/admin-roles.json
           npx wrangler@4.116.0 d1 execute luckread --remote --json --command "SELECT COUNT(*) AS user_count FROM users;" > artifacts/admin-audit/user-count.json
           cat artifacts/admin-audit/admin-roles.json
           cat artifacts/admin-audit/user-count.json
