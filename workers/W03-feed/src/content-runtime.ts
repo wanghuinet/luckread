@@ -199,23 +199,24 @@ const parseResponseJson = (value: string | null): unknown => {
 const isActiveIdempotency = (row: IdempotencyRow | null, now: Date): boolean =>
   !!row?.idem_id && !!row.idem_expires_at && Date.parse(row.idem_expires_at) > now.getTime()
 
-const replayIdempotency = (
+const inspectIdempotency = (
   row: IdempotencyRow | null,
   ownerUserId: string,
   requestHashValue: string,
   now: Date,
-): unknown | null => {
-  if (!isActiveIdempotency(row, now)) return null
-  if (row?.idem_owner_user_id !== ownerUserId) {
-    throw new ContentRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
-  }
-  if (row.idem_request_hash !== requestHashValue) {
+): { replayed: boolean; body: unknown | null; status: number | null } => {
+  if (!isActiveIdempotency(row, now)) return { replayed: false, body: null, status: null }
+  if (row?.idem_owner_user_id !== ownerUserId || row.idem_request_hash !== requestHashValue) {
     throw new ContentRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
   }
   if (row.idem_status === 'IN_PROGRESS') {
     throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
   }
-  return parseResponseJson(row.idem_response_json)
+  return {
+    replayed: true,
+    body: parseResponseJson(row.idem_response_json),
+    status: row.idem_response_status,
+  }
 }
 
 const emptyIdempotency = (): IdempotencyRow => ({
@@ -233,6 +234,7 @@ const loadMutationRow = async (
   contentId: string,
   operationId: string,
   idempotencyKey: string,
+  ownerUserId: string,
 ): Promise<{ content: ContentRecord | null; idempotency: IdempotencyRow }> => {
   const row = await db.prepare(
     `SELECT
@@ -249,12 +251,12 @@ const loadMutationRow = async (
        LEFT JOIN (
          SELECT id, owner_user_id, request_hash, status, response_status, response_json, expires_at
          FROM content_mutation_idempotency
-         WHERE operation_id = ? AND idempotency_key = ?
+         WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ?
          ORDER BY created_at DESC
          LIMIT 1
        ) i ON 1 = 1
       WHERE c.id = ?`,
-  ).bind(operationId, idempotencyKey, contentId).first<ContentWithIdempotencyRow>()
+  ).bind(ownerUserId, operationId, idempotencyKey, contentId).first<ContentWithIdempotencyRow>()
 
   if (!row) return { content: null, idempotency: emptyIdempotency() }
 
@@ -406,13 +408,13 @@ export async function createContent(
             status AS idem_status, response_status AS idem_response_status, response_json AS idem_response_json,
             expires_at AS idem_expires_at
        FROM content_mutation_idempotency
-      WHERE operation_id = ? AND idempotency_key = ?
+      WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ?
       ORDER BY created_at DESC LIMIT 1`,
-  ).bind(operationId, idempotencyKey).first<IdempotencyRow>()
+  ).bind(ownerUserId, operationId, idempotencyKey).first<IdempotencyRow>()
 
-  const replay = replayIdempotency(existing, ownerUserId, hash, now)
-  if (replay) {
-    const parsed = replay as { id?: unknown; state?: unknown; version?: unknown; etag?: unknown; title?: unknown; bodyRef?: unknown }
+  const replay = inspectIdempotency(existing, ownerUserId, hash, now)
+  if (replay.replayed) {
+    const parsed = replay.body as { id?: unknown; state?: unknown; version?: unknown; etag?: unknown; title?: unknown; bodyRef?: unknown } | null
     if (
       typeof parsed.id !== 'string' ||
       !isState(parsed.state) ||
@@ -494,9 +496,12 @@ export async function updateContent(
   const normalized = validateInput(input)
   const operationId = 'updateContent'
   const hash = await requestHash(operationId, { contentId, input: normalized, ifMatch: normalizeEtag(ifMatch) })
-  const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey)
-  const replay = replayIdempotency(idempotency, principalUserId, hash, now)
-  if (replay) return replay as ContentRecord
+  const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
+  const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
+  if (replay.replayed) {
+    if (!replay.body) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+    return replay.body as ContentRecord
+  }
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
   if (content.ownerUserId !== principalUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   assertEtag(content.etag, ifMatch)
@@ -545,9 +550,9 @@ export async function deleteContent(
 
   const operationId = 'deleteContent'
   const hash = await requestHash(operationId, { contentId, ifMatch: normalizeEtag(ifMatch) })
-  const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey)
-  const replay = replayIdempotency(idempotency, principalUserId, hash, now)
-  if (replay) return
+  const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
+  const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
+  if (replay.replayed) return
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
   if (content.ownerUserId !== principalUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   assertEtag(content.etag, ifMatch)
@@ -619,9 +624,12 @@ export async function transitionContentState(
 
   const operationId = 'transitionContentState'
   const hash = await requestHash(operationId, { contentId, to, reason: reason ?? null, ifMatch: normalizeEtag(ifMatch) })
-  const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey)
-  const replay = replayIdempotency(idempotency, principalUserId, hash, now)
-  if (replay) return replay as { from: ContentState; to: ContentState; version: number; etag: string }
+  const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
+  const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
+  if (replay.replayed) {
+    if (!replay.body) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+    return replay.body as { from: ContentState; to: ContentState; version: number; etag: string }
+  }
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
 
   assertEtag(content.etag, ifMatch)
