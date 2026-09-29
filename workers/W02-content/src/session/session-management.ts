@@ -142,7 +142,7 @@ export async function listCurrentUserSessions(
     ? ' AND (s.created_at < ? OR (s.created_at = ? AND CAST(s.id AS TEXT) < ?))'
     : ''
 
-  const sql = \`
+  const sql = `
     SELECT
       CAST(s.id AS TEXT) AS sessionId,
       a.device_id AS deviceId,
@@ -170,7 +170,7 @@ export async function listCurrentUserSessions(
               AND ra.scope_type = 'global'
               AND ra.valid_from <= ?
               AND (ra.valid_until IS NULL OR ? < ra.valid_until)
-              AND ra.role_id IN (\${rolePlaceholders(SESSION_READ_ROLES)})
+              AND ra.role_id IN (${rolePlaceholders(SESSION_READ_ROLES)})
           )
       )
       AND EXISTS (
@@ -185,10 +185,10 @@ export async function listCurrentUserSessions(
           AND current_state.revoked_at IS NULL
           AND current_session.expires_at > ?
       )
-      \${cursorSql}
+      ${cursorSql}
     ORDER BY s.created_at DESC, CAST(s.id AS TEXT) DESC
     LIMIT ?
-  \`
+  `
 
   const bindings: unknown[] = [
     input.userId,
@@ -252,7 +252,7 @@ export async function revokeCurrentUserSession(
     throw new SessionManagementError('SERVICE_UNAVAILABLE', 'session permission authority is unavailable')
   }
 
-  const authorizationSql = \`
+  const authorizationSql = `
     SELECT
       EXISTS (
         SELECT 1
@@ -267,7 +267,7 @@ export async function revokeCurrentUserSession(
               AND ra.scope_type = 'global'
               AND ra.valid_from <= ?
               AND (ra.valid_until IS NULL OR ? < ra.valid_until)
-              AND ra.role_id IN (\${rolePlaceholders(SESSION_REVOKE_ROLES)})
+              AND ra.role_id IN (${rolePlaceholders(SESSION_REVOKE_ROLES)})
           )
       ) AS permissionAllowed,
       EXISTS (
@@ -282,21 +282,22 @@ export async function revokeCurrentUserSession(
           AND current_state.revoked_at IS NULL
           AND current_session.expires_at > ?
       ) AS currentSessionValid,
-      (
-        EXISTS (
-          SELECT 1
-          FROM auth_session_state AS target_extension
-          WHERE CAST(target_extension.session_id AS TEXT) = ?
-            AND target_extension.user_id = ?
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM users_sessions AS target_native
-          WHERE CAST(target_native.id AS TEXT) = ?
-            AND CAST(target_native._parent_id AS TEXT) = ?
-        )
+      EXISTS (
+        SELECT 1
+        FROM auth_session_state AS target_extension
+        WHERE CAST(target_extension.session_id AS TEXT) = ?
+          AND target_extension.user_id = ?
+          AND (
+            target_extension.revoked_at IS NOT NULL
+            OR EXISTS (
+              SELECT 1
+              FROM users_sessions AS target_native
+              WHERE CAST(target_native.id AS TEXT) = ?
+                AND CAST(target_native._parent_id AS TEXT) = ?
+            )
+          )
       ) AS targetOwned
-  \`
+  `
 
   try {
     const authorization = await db.prepare(authorizationSql).bind(
@@ -329,7 +330,7 @@ export async function revokeCurrentUserSession(
     }
 
     const results = await db.batch([
-      db.prepare(\`
+      db.prepare(`
         UPDATE auth_session_state
            SET revoked_at = ?,
                last_seen_at = ?,
@@ -337,12 +338,12 @@ export async function revokeCurrentUserSession(
          WHERE CAST(session_id AS TEXT) = ?
            AND user_id = ?
            AND revoked_at IS NULL
-      \`).bind(now, now, input.targetSessionId, input.userId),
-      db.prepare(\`
+      `).bind(now, now, input.targetSessionId, input.userId),
+      db.prepare(`
         DELETE FROM users_sessions
          WHERE CAST(id AS TEXT) = ?
            AND CAST(_parent_id AS TEXT) = ?
-      \`).bind(input.targetSessionId, input.userId),
+      `).bind(input.targetSessionId, input.userId),
     ])
 
     if (results.length !== 2) {
