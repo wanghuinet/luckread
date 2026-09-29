@@ -540,7 +540,7 @@ export async function resolveAuthenticatedPrincipal(
     if (String(row.userId) !== String(input.userId)) return { active: false }
     if (String(row.extensionUserId) !== String(input.userId)) return { active: false }
     if (row.tokenVersion !== input.tokenVersion) return { active: false }
-    if (row.accountState !== 'ACTIVE' || row.revokedAt) return { active: false }
+    if ((row.accountState !== 'PENDING_VERIFICATION' && row.accountState !== 'ACTIVE') || row.revokedAt) return { active: false }
     if (Number.isNaN(Date.parse(row.expiresAt)) || Date.parse(row.expiresAt) <= Date.parse(now)) {
       return { active: false }
     }
@@ -608,7 +608,7 @@ export async function validateAuthoritativeSession(
     if (String(row.userId) !== String(input.userId)) return { active: false }
     if (String(row.extensionUserId) !== String(input.userId)) return { active: false }
     if (row.tokenVersion !== input.tokenVersion) return { active: false }
-    if (row.accountState !== 'ACTIVE' || row.revokedAt) return { active: false }
+    if ((row.accountState !== 'PENDING_VERIFICATION' && row.accountState !== 'ACTIVE') || row.revokedAt) return { active: false }
     if (Number.isNaN(Date.parse(row.expiresAt)) || Date.parse(row.expiresAt) <= Date.parse(now)) {
       return { active: false }
     }
