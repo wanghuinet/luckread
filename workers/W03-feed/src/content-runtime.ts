@@ -380,7 +380,7 @@ export async function listContents(
   const rows = decoded
     ? await db.prepare(
         `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
-                title, body_ref, etag, created_at, updated_at
+                title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
            FROM contents
           WHERE state = 'PUBLISHED'
             AND (updated_at < ? OR (updated_at = ? AND id < ?))
@@ -476,7 +476,7 @@ export async function createContent(
     insertCompletedIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(responseBody), createdAt, expiresAt),
     db.prepare(
       `INSERT INTO contents
-        (id, content_type, owner_user_id, creator_id, ip_id, state, version, revision, title, body_ref, etag, created_at, updated_at)
+        (id, content_type, owner_user_id, creator_id, ip_id, state, version, revision, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
        VALUES (?, ?, ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?, ?, ?) `,
     ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, responseBody.etag, createdAt, createdAt),
     atomicGuard(db),
