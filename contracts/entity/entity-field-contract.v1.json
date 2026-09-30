@@ -1,5 +1,5 @@
 {
-  "version": "1.2",
+  "version": "1.3",
   "status": "NOT_GREEN",
   "sourceOfTruth": "contracts/entity/entity-catalog.v1.json",
   "featureInventoryRef": "contracts/alignment/feature-inventory.v1.json",
@@ -841,6 +841,105 @@
         "docs/160-DATA-LIFECYCLE-RETENTION-ERASURE-CONTRACT-v1.0.md",
         "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md",
         "docs/21-D21-ADVERTISING-PLATFORM-CONTRACT-v1.0.md"
+      ]
+    },
+    {
+      "entityId": "ENT-SOCIAL-FOLLOW",
+      "status": "PROPOSED",
+      "fieldContractRef": "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+      "fields": [
+        {
+          "fieldId": "ENT-SOCIAL-FOLLOW-F-RELATIONSHIP-ID",
+          "name": "relationshipId",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": true,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "INTERNAL_IDENTIFIER",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+          "apiExposure": "SCOPED_IDENTIFIER",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED_IDENTIFIER",
+          "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json"
+          ]
+        },
+        {
+          "fieldId": "ENT-SOCIAL-FOLLOW-F-FOLLOWER-USER-ID",
+          "name": "followerUserId",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "INTERNAL_RELATION",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+          "apiExposure": "NONE",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED_IDENTIFIER",
+          "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json"
+          ]
+        },
+        {
+          "fieldId": "ENT-SOCIAL-FOLLOW-F-TARGET-USER-ID",
+          "name": "targetUserId",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "INTERNAL_RELATION",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+          "apiExposure": "NONE",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED_IDENTIFIER",
+          "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json"
+          ]
+        },
+        {
+          "fieldId": "ENT-SOCIAL-FOLLOW-F-CREATED-AT",
+          "name": "createdAt",
+          "type": "datetime",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "AUDIT_METADATA",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+          "apiExposure": "SCOPED",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED",
+          "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json"
+          ]
+        }
+      ],
+      "evidenceRefs": [
+        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
       ]
     }
   ],
