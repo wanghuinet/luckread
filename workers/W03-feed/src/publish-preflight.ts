@@ -196,8 +196,13 @@ const detectPhoneNumbers = (value: string): {
 
   for (const match of value.matchAll(PHONE_CANDIDATE_RE)) {
     const raw = match[0]
-    if (isDateLike(raw) || /^\s*(?:\+|00)/.test(raw)) continue
+    if (isDateLike(raw)) continue
     const index = match.index ?? 0
+    const hasExplicitInternationalPrefix = /^\s*(?:\+|00)/.test(raw)
+    if (hasExplicitInternationalPrefix) {
+      addPhoneDetection(dedupe, raw, parsePhoneNumberFromString(raw))
+      continue
+    }
     const context = value.slice(Math.max(0, index - 48), Math.min(value.length, index + raw.length + 48))
     if (!PHONE_CONTEXT_RE.test(context) && !/[().\s-]/.test(raw)) continue
     const hint = nearbyCountryHint(value, index)
@@ -276,24 +281,24 @@ const decodeCommonHtmlEntities = (value: string): string =>
 const MESSENGER_RULES: MessengerRule[] = [
   { platform: 'WhatsApp', patterns: [
     /(?:https?:\/\/)?(?:wa\.me|api\.whatsapp\.com\/send\?phone=)[^\s<>"')]+/gi,
-    /\bWhatsApp\s*(?:ID|账号|号码|number)?\s*[:：=]?\s*(\+?\d[\d\s().-]{7,}\d)\b/gi,
+    /\bWhatsApp\s*(?:ID|账号|号码|number)?\s*[:：=]?\s*(?!https?:\/\/|www\.)(\+?\d[\d\s().-]{7,}\d)\b/gi,
   ]},
   { platform: 'Telegram', patterns: [
     /(?:https?:\/\/)?(?:t\.me|telegram\.me)\/[A-Za-z0-9_]{3,64}\b/gi,
-    /\bTelegram\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z][A-Za-z0-9_]{3,31}\b/gi,
+    /\bTelegram\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*(?!https?:\/\/|www\.)@?[A-Za-z][A-Za-z0-9_]{3,31}\b/gi,
   ]},
   { platform: 'Facebook Messenger', patterns: [
     /(?:https?:\/\/)?m\.me\/[A-Za-z0-9._-]{2,64}\b/gi,
     /(?:https?:\/\/)?(?:messenger\.com\/t|facebook\.com\/messages\/t)\/[A-Za-z0-9._-]{2,64}\b/gi,
-    /\bMessenger\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z0-9._-]{3,64}\b/gi,
+    /\bMessenger\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*(?!https?:\/\/|www\.)@?[A-Za-z0-9._-]{3,64}\b/gi,
   ]},
   { platform: 'WeChat', patterns: [
     /(?:https?:\/\/)?(?:weixin\.qq\.com|wechat\.com)\/[^\s<>"')]+/gi,
-    /(?:微信号|WeChat\s*(?:ID|username)?|weixin)\s*[:：=]?\s*[A-Za-z][A-Za-z0-9_-]{5,19}\b/gi,
+    /(?:微信号|WeChat\s*(?:ID|username)?|weixin)\s*[:：=]?\s*(?!https?:\/\/|www\.)[A-Za-z][A-Za-z0-9_-]{5,19}\b/gi,
   ]},
   { platform: 'LINE', patterns: [
     /(?:https?:\/\/)?line\.me\/(?:R\/ti\/p\/|ti\/p\/~?)[^\s<>"')]+/gi,
-    /\bLINE\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z0-9._-]{3,32}\b/gi,
+    /\bLINE\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*(?!https?:\/\/|www\.)@?[A-Za-z0-9._-]{3,32}\b/gi,
   ]},
   { platform: 'QQ', patterns: [
     /(?:QQ(?:号|账号|ID)?|扣扣)\s*[:：=]?\s*\d{5,12}\b/gi,
@@ -301,23 +306,23 @@ const MESSENGER_RULES: MessengerRule[] = [
   ]},
   { platform: 'Signal', patterns: [
     /(?:https?:\/\/)?signal\.me\/[^\s<>"')]+/gi,
-    /\bSignal\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z0-9._-]{3,64}\b/gi,
+    /\bSignal\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*(?!https?:\/\/|www\.)@?[A-Za-z0-9._-]{3,64}\b/gi,
   ]},
   { platform: 'Viber', patterns: [
     /(?:https?:\/\/)?(?:vb\.me|viber\.com)\/[^\s<>"')]+/gi,
-    /\bViber\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z0-9._-]{3,64}\b/gi,
+    /\bViber\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*(?!https?:\/\/|www\.)@?[A-Za-z0-9._-]{3,64}\b/gi,
   ]},
   { platform: 'KakaoTalk', patterns: [
     /(?:https?:\/\/)?open\.kakao\.com\/[^\s<>"')]+/gi,
-    /\bKakao(?:Talk)?\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z0-9._-]{3,64}\b/gi,
+    /\bKakao(?:Talk)?\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*(?!https?:\/\/|www\.)@?[A-Za-z0-9._-]{3,64}\b/gi,
   ]},
   { platform: 'Discord', patterns: [
     /(?:https?:\/\/)?(?:discord\.gg|discord\.com\/users|discordapp\.com\/users)\/[^\s<>"')]+/gi,
-    /\bDiscord\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z0-9._-]{3,64}(?:#\d{4})?\b/gi,
+    /\bDiscord\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*(?!https?:\/\/|www\.)@?[A-Za-z0-9._-]{3,64}(?:#\d{4})?\b/gi,
   ]},
   { platform: 'Skype', patterns: [
     /(?:https?:\/\/)?join\.skype\.com\/[^\s<>"')]+/gi,
-    /\bSkype\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*[A-Za-z0-9._-]{3,64}\b/gi,
+    /\bSkype\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*(?!https?:\/\/|www\.)[A-Za-z0-9._-]{3,64}\b/gi,
   ]},
   { platform: 'Zalo', patterns: [
     /(?:https?:\/\/)?zalo\.me\/[^\s<>"')]+/gi,
