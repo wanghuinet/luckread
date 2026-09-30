@@ -67,4 +67,78 @@ describe('W03 publish preflight', () => {
     })
     expect(result.findings.some(item => item.id === 'MEDIA-QR')).toBe(true)
   })
+
+
+  it('detects phone candidates across Americas, Europe, East Asia and Southeast Asia without claiming current carrier ownership', () => {
+    const result = preflightContent({
+      ...base,
+      body: [
+        'China +86 138 1234 5678',
+        'United States +1 202-555-0123',
+        'United Kingdom +44 7700 900123',
+        'France +33 6 12 34 56 78',
+        'Germany +49 151 23456789',
+        'Italy +39 312 345 6789',
+        'Spain +34 612 345 678',
+        'Japan +81 90 1234 5678',
+        'South Korea +82 10 1234 5678',
+        'India +91 98765 43210',
+        'Australia +61 412 345 678',
+        'Singapore +65 9123 4567',
+        'Malaysia +60 12 345 6789',
+        'Indonesia +62 812 3456 7890',
+        'Thailand +66 81 234 5678',
+        'Philippines +63 917 123 4567',
+        'Vietnam +84 912 345 678',
+      ].join('\n'),
+    })
+    expect(result.analyzed.phoneCount).toBeGreaterThanOrEqual(17)
+    expect(result.analyzed.mobileNumberCount).toBeGreaterThanOrEqual(16)
+    expect(result.analyzed.detectedMobileRegions).toEqual(expect.arrayContaining([
+      'China (+86)',
+      'United States/Canada (NANP)',
+      'United Kingdom (+44)',
+      'France (+33)',
+      'Japan (+81)',
+      'South Korea (+82)',
+      'Singapore (+65)',
+      'Malaysia (+60)',
+      'Indonesia (+62)',
+      'Thailand (+66)',
+      'Philippines (+63)',
+      'Vietnam (+84)',
+    ]))
+  })
+
+  it('detects representative top-tier messaging IDs and invite links', () => {
+    const result = preflightContent({
+      ...base,
+      body: [
+        'WhatsApp: https://wa.me/14155550123',
+        'Telegram: @luckread_news',
+        'Messenger: https://m.me/luckread.page',
+        'WeChat ID: luckread_news',
+        'LINE ID: luckread_line',
+        'QQ号: 123456789',
+        'Signal: https://signal.me/#p/+14155550123',
+        'Viber: https://vb.me/luckread',
+        'KakaoTalk: https://open.kakao.com/o/luckread',
+        'Discord: https://discord.gg/luckread',
+      ].join('\n'),
+    })
+    expect(result.analyzed.messengerIdCount).toBe(10)
+    expect(result.analyzed.detectedMessengers).toEqual(expect.arrayContaining([
+      'WhatsApp',
+      'Telegram',
+      'Facebook Messenger',
+      'WeChat',
+      'LINE',
+      'QQ',
+      'Signal',
+      'Viber',
+      'KakaoTalk',
+      'Discord',
+    ]))
+    expect(result.findings.some(item => item.id === 'CONTACT-MESSENGER-ID')).toBe(true)
+  })
 })
