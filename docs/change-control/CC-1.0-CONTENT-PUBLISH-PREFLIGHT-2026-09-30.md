@@ -45,3 +45,9 @@ The preflight request is bounded and contains the current editor snapshot. The r
 ## Evidence rule
 
 This decision document does not declare GREEN. Implementation becomes admitted only after the normal repository gates and CI evidence succeed.
+
+## v1 extension — global contact detection
+
+The first-layer preflight registry now screens for phone-number candidates across major target markets in the Americas, Europe, East Asia and Southeast Asia, using country-code and national mobile-number patterns derived from public numbering-plan material. It also detects representative mainstream messaging identifiers or invite links for ten platforms: WhatsApp, Telegram, Facebook Messenger, WeChat, LINE, QQ, Signal, Viber, KakaoTalk and Discord.
+
+This is intentionally a local screening layer. It does not claim live carrier ownership, HLR status, SIM status, or account ownership. Number portability means a prefix cannot establish the subscriber's current operator; those checks belong to a later external verification layer.
