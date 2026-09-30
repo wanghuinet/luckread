@@ -141,6 +141,8 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
   const title = input.title
   const body = input.body
   const bodyLower = body.toLowerCase()
+  const aiMode = normalizedMode(input.aiMode)
+  const humanContribution = normalizedHumanContribution(input.humanContribution)
   const titleLower = title.toLowerCase()
   const externalUrls = firstMatches(body, /(?:https?:\/\/|www\.)[^\s<>"')]+/gi, 10)
   const phones = firstMatches(body, /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g, 10)
