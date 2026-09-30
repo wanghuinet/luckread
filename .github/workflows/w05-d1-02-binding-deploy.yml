@@ -25,19 +25,19 @@ env:
 
 jobs:
   deploy:
-    if: ${ inputs.confirm == 'DEPLOY_W05_D1_02' }
+    if: ${{ inputs.confirm == 'DEPLOY_W05_D1_02' }}
     runs-on: ubuntu-latest
     steps:
       - name: Validate source SHA
         run: |
           set -euo pipefail
-          test -n "${ inputs.source_sha }"
-          printf '%s' "${ inputs.source_sha }" | grep -Eq '^[0-9a-f]{40}$'
+          test -n "${{ inputs.source_sha }}"
+          printf '%s' "${{ inputs.source_sha }}" | grep -Eq '^[0-9a-f]{40}$'
 
       - name: Checkout exact source
         uses: actions/checkout@v4
         with:
-          ref: ${ inputs.source_sha }
+          ref: ${{ inputs.source_sha }}
           fetch-depth: 1
 
       - name: Setup Node
@@ -54,8 +54,8 @@ jobs:
 
       - name: Deploy W05 with D1-02 binding
         env:
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         working-directory: workers/W05-transaction
         run: |
           set -euo pipefail
@@ -63,8 +63,8 @@ jobs:
 
       - name: Verify live worker binding
         env:
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
           curl -fsS             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$EXPECTED_WORKER/settings"             > /tmp/w05-settings.json
@@ -78,10 +78,10 @@ jobs:
           {
             "workflow": "W05 D1-02 Physical Binding Deploy",
             "runId": "$GITHUB_RUN_ID",
-            "sourceSha": "${ inputs.source_sha }",
+            "sourceSha": "${{ inputs.source_sha }}",
             "worker": "$EXPECTED_WORKER",
             "d1DatabaseUuid": "$EXPECTED_DB_UUID",
-            "confirmation": "${ inputs.confirm }",
+            "confirmation": "${{ inputs.confirm }",
             "bindingVerified": true
           }
           EOF
@@ -89,7 +89,7 @@ jobs:
       - name: Upload binding provenance
         uses: actions/upload-artifact@v4
         with:
-          name: w05-d1-02-binding-${ inputs.source_sha }
+          name: w05-d1-02-binding-${{ inputs.source_sha }}
           path: artifacts/mapping-0/w05-d1-02-binding-deployment-provenance.json
           if-no-files-found: error
           retention-days: 14
