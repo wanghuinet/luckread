@@ -80,6 +80,16 @@
       "principalRequired": true,
       "precondition": "If-Match",
       "idempotency": "Idempotency-Key"
+    },
+    {
+      "operationId": "preflightContent",
+      "method": "POST",
+      "publicPath": "/api/creator/contents/{contentId}/preflight",
+      "internalPath": "/internal/content/contents/{contentId}/preflight",
+      "principalRequired": true,
+      "idempotency": false,
+      "d1ReadMax": 0,
+      "d1WriteMax": 0
     }
   ],
   "headers": {
@@ -136,7 +146,8 @@
     "principal layer resolution/correlation evidence",
     "creator-owned list evidence",
     "cross-user exclusion evidence",
-    "creator list filter/cursor evidence"
+    "creator list filter/cursor evidence",
+    "publish preflight verdict/recheck evidence"
   ],
   "nonGoals": [
     "No RPC surface.",
