@@ -14,7 +14,7 @@ on:
       w01_base_url:
         description: Controlled W01 URL
         required: true
-        default: https://luckread-w01-payload.wanghui-79b.workers.dev
+        default: https://api.luckread.cn
         type: string
       database_name:
         description: Controlled D1 database name
@@ -32,7 +32,7 @@ permissions:
 
 env:
   WRANGLER_VERSION: 4.116.0
-  W01_BASE_URL: ${{ github.event_name == 'workflow_run' && 'https://luckread-w01-payload.wanghui-79b.workers.dev' || inputs.w01_base_url }}
+  W01_BASE_URL: ${{ github.event_name == 'workflow_run' && 'https://api.luckread.cn' || inputs.w01_base_url }}
   DATABASE_NAME: ${{ github.event_name == 'workflow_run' && 'luckread' || inputs.database_name }}
   DEPLOYMENT_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.deployment_run_id }}
   # On workflow_run, resolve the exact deployed source from the deployment artifact name.
