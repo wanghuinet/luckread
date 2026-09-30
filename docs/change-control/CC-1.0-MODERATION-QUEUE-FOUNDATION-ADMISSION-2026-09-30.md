@@ -121,3 +121,7 @@ The current blocker is specifically the missing authoritative moderation decisio
 **BLOCKED pending contract admission and reconciliation.**
 
 No runtime moderation implementation is authorized by this record.
+
+## 8. Canonical Blueprint feature identity
+
+This moderation foundation maps to Blueprint features `GOV-003` (moderation queue) and `GOV-004` (enforcement case). The transport filename remains a historical contract artifact name; it MUST NOT be interpreted as a new Blueprint Feature ID.
