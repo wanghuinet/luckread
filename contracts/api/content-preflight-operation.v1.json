@@ -23,9 +23,15 @@
     "topic-to-body relevance",
     "long paragraph and structure quality",
     "repeated/boilerplate content",
-    "global mobile/phone candidates across major Americas, Europe, East Asia and Southeast Asia numbering formats",
+    "global phone candidates across major Americas, Europe, East Asia and Southeast Asia numbering formats",
+    "phone normalization and validation using libphonenumber-js with conservative national-format fallback",
     "phone/contact/social-account/lead-generation signals",
-    "representative mainstream messenger ID/account/invite-link detection: WhatsApp, Telegram, Facebook Messenger, WeChat, LINE, QQ, Signal, Viber, KakaoTalk, Discord",
+    "platform registry detection for messenger, social, enterprise and community channels",
+    "mainstream messenger detection: WhatsApp, Telegram, Facebook Messenger, WeChat, LINE, QQ, Signal, Viber, KakaoTalk, Discord",
+    "expanded channel detection: Instagram, Snapchat, TikTok, X, Reddit, Zalo, imo, BiP, Kik, Microsoft Teams, Slack, Google Chat, WeCom, DingTalk, Feishu/Lark, Threema, Matrix/Element, XMPP, Session, SimpleX",
+    "email address contact detection",
+    "Unicode NFKC, zero-width, bidi-control and targeted homoglyph normalization before contact detection",
+    "external URL extraction and registrable-domain parsing using tldts",
     "external URL and promotion combinations",
     "QR-code/scan text hints and media-reference heuristics",
     "HTML/script/hidden-style injection hints"
@@ -42,11 +48,22 @@
     "Proving that a detected phone number or messenger ID is active/owned by a person",
     "Guaranteeing Google indexing or ranking",
     "Replacing content moderation or human review",
-    "Adding a new Worker or D1 database"
+    "Adding a new Worker or D1 database",
+    "Live telecom subscriber/operator ownership, HLR, SIM or portability verification",
+    "Proving that a detected social/messenger identifier is currently active or owned by a person"
   ],
   "recheck": {
     "requiredBeforeReviewSubmission": true,
     "serverSide": true,
     "finalAuthority": "W03"
+  },
+  "implementation": {
+    "openSourceRuntime": {
+      "phone": "libphonenumber-js/mobile",
+      "domainParser": "tldts",
+      "normalization": "Built-in NFKC + targeted UTS39-style homoglyph/zero-width handling"
+    },
+    "performance": "Fast path is deterministic and stateless; external AI/OCR/intelligence remains optional and out of the synchronous v1 path.",
+    "privacy": "UI exposes counts/platforms only; full phone/identifier values are masked in server findings."
   }
 }
