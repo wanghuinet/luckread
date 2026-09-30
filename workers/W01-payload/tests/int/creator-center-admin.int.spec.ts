@@ -88,7 +88,7 @@ describe('Creator Center admin extension', () => {
     expect(preflightRoute).toContain('resolveCookieContentPrincipal')
     expect(preflightRoute).toContain('/internal/content/contents/')
     expect(preflightRoute).toContain('/preflight')
-    expect(stateRoute).toContain('preflight')
+    expect(preflightRoute).toContain('/preflight')
   })
 
   it('exposes the creator-owned content management read slice', () => {
