@@ -38,6 +38,28 @@ The current repository still contains a physical `workers/W04-social` directory.
 
 Therefore the feature-specific runtime binding remains unresolved even though the logical Worker × D1 boundary itself is already frozen.
 
+## Confirmed Canonical Task / Worker / D1 Binding
+
+The frozen Final Mapping explicitly assigns the Social Graph domain to:
+
+```text
+Social graph → T11 → W05 → D1-02
+```
+
+This binding is therefore evidence-backed at the Task / Worker / D1 boundary and does not need to be inferred from the physical directory name.
+
+For `SOCIAL-001` and `SOCIAL-002`, this means the remaining mapping gap is downstream of the already-frozen ownership boundary:
+
+```text
+Feature → T11 → W05 → D1-02
+                     ↓
+               Entity / Field / API DTO
+                     ↓
+               Code / Security / Event
+                     ↓
+               Test / Evidence
+```
+
 ## Remaining Blocking Edges
 
 The repository does not yet provide evidence sufficient to bind:
