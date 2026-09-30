@@ -102,6 +102,18 @@ For `main` head `87cfc42ae2f20bbccd3a8b002401555b1b4945ef`, the current structur
 
 The separately observed failures in legacy/diagnostic workflow paths such as `.github/workflows/contract-ci.yml`, `.github/workflows/contract-admission-ci.yml`, and the W04 side-effect matrix are not used to override the active gate results. They are not evidence that Social Follow has become implementable.
 
+## Current Gate Checkpoint — main = `93e0a2f2b8c5dec254a84f859b5ab0b6cae932f4`
+
+The post-sweep active Contract Admission and Mapping Structural runs both completed successfully:
+
+- Contract Admission CI run `36710932793` = `success`.
+- Mapping 0 Structural Gate run `36710932862` = `success`.
+- Contract Admission sub-gates (common, state-machines, enums, Payload reconciliation, OpenAPI, events, authz, full) all completed `success`.
+- Capability Contract Graph Gate completed `success`.
+- Five-Way Alignment and Strict Downstream R4/Evidence/R5 jobs were `skipped` because their global prerequisites remain unresolved; no GREEN is inferred from skipped jobs.
+
+Therefore the current control-plane contracts are structurally/admission-valid, while the Social feature-specific technical mapping remains `NOT_GREEN`.
+
 ## Remaining Blocking Edges
 
 The repository does not yet provide evidence sufficient to bind:
