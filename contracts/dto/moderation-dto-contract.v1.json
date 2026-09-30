@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/dto/moderation-dto-contract.v1.json",
+  "contractId": "MODERATION-DTO-CONTRACT-v1.0",
+  "status": "CONTRACT_DRAFT_OPENAPI_PENDING",
+  "sourceOfTruth": "contracts/api/moderation-operation-policy.v1.json",
+  "implementationAuthorization": false,
+  "purpose": "Reserve stable moderation DTO identities and visibility rules without claiming canonical OpenAPI, runtime or persistence evidence.",
+  "records": [
+    {
+      "operationId": "listModerationQueue",
+      "requestDtoId": null,
+      "responseDtoId": "DTO-MODERATION-QUEUE-RESPONSE",
+      "openApiStatus": "MISSING",
+      "bindingStatus": "RESERVED_NOT_CANONICAL"
+    },
+    {
+      "operationId": "getModerationCase",
+      "requestDtoId": "DTO-MODERATION-CASE-PATH",
+      "responseDtoId": "DTO-MODERATION-CASE-RESPONSE",
+      "openApiStatus": "MISSING",
+      "bindingStatus": "RESERVED_NOT_CANONICAL"
+    },
+    {
+      "operationId": "decideModerationCase",
+      "requestDtoId": "DTO-MODERATION-DECISION-REQUEST",
+      "responseDtoId": "DTO-MODERATION-DECISION-RESPONSE",
+      "openApiStatus": "MISSING",
+      "bindingStatus": "RESERVED_NOT_CANONICAL"
+    }
+  ],
+  "schemas": {
+    "DTO-MODERATION-QUEUE-RESPONSE": {
+      "status": "DRAFT",
+      "shape": {
+        "items": "bounded array of reviewer-visible queue entries",
+        "nextCursor": "opaque cursor or null",
+        "hasMore": "boolean",
+        "requestId": "request identifier"
+      },
+      "sensitiveData": "must exclude raw evidence, protected reporter identity and internal risk thresholds"
+    },
+    "DTO-MODERATION-CASE-PATH": {
+      "status": "DRAFT",
+      "shape": {
+        "caseId": "opaque moderation case identifier"
+      }
+    },
+    "DTO-MODERATION-CASE-RESPONSE": {
+      "status": "DRAFT",
+      "shape": {
+        "caseId": "opaque case identifier",
+        "target": "scoped target reference",
+        "contentReference": "reference to authoritative content resource",
+        "policyVersion": "policy version reference",
+        "currentDecision": "decision summary or null",
+        "evidenceRefs": "scoped evidence references",
+        "status": "case lifecycle status",
+        "version": "optimistic concurrency version",
+        "createdAt": "date-time",
+        "updatedAt": "date-time"
+      },
+      "sensitiveData": "internal risk signals and raw evidence are excluded unless explicit reviewer scope allows a separately contracted projection"
+    },
+    "DTO-MODERATION-DECISION-REQUEST": {
+      "status": "DRAFT",
+      "shape": {
+        "expectedVersion": "integer",
+        "decision": "approve or reject decision value",
+        "policyVersion": "policy version reference",
+        "reasonCode": "controlled reason code",
+        "severity": "controlled severity",
+        "scope": "decision scope",
+        "effectiveAt": "date-time",
+        "expiresAt": "date-time or null",
+        "idempotencyKey": "transport header; not duplicated as business identity"
+      },
+      "serverOwned": [
+        "reviewer identity",
+        "actor layer",
+        "case ownership/scope",
+        "audit timestamps where server-generated"
+      ]
+    },
+    "DTO-MODERATION-DECISION-RESPONSE": {
+      "status": "DRAFT",
+      "shape": {
+        "caseId": "opaque case identifier",
+        "decisionId": "opaque decision identifier",
+        "outcome": "APPROVED or REJECTED",
+        "version": "new case version",
+        "effectiveAt": "date-time",
+        "requestId": "request identifier"
+      },
+      "sensitiveData": "no raw evidence or internal risk thresholds"
+    }
+  },
+  "bindingRules": {
+    "operationIdsMustExistInOpenApiBeforeCanonicalBinding": true,
+    "dtoIdsMustBeStable": true,
+    "inlineOpenApiSchemasAreAuthoritativeUntilPromotedToReusableComponents": true,
+    "no_runtime_claim": true,
+    "no_persistence_claim": true,
+    "no_security_evidence_claim": true,
+    "reservedBindingsMustNotBeTreatedAsCanonicalUntilOpenApiPathExists": true
+  },
+  "requiredNextContracts": [
+    "canonical OpenAPI paths",
+    "moderation entity contracts",
+    "D1-03 persistence contract",
+    "trusted reviewer transport binding",
+    "audit event binding",
+    "runtime/evidence admission"
+  ]
+}
