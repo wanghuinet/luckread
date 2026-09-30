@@ -35,7 +35,10 @@
     "next": "16.2.6",
     "payload": "3.87.1",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "@moderation-api/unicode-spoofing": "0.4.0",
+    "libphonenumber-js": "1.13.13",
+    "tldts": "7.4.16"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260914.1",
