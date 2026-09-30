@@ -83,3 +83,12 @@ The canonical DTO edge for the promoted Social Follow mutation operations is now
 - both operations retain their existing no-body success semantics: 200 for follow and 204 for unfollow.
 
 This reconciliation adds no runtime, persistence, Payload, security-E2E, concurrency, event, cache, or Evidence Registry claim. `SOCIAL-002` followers/following discovery operations remain unpromoted and are not assigned DTOs.
+
+
+## Persistence Contract Reconciliation
+
+The four contract-defined Follow fields are now bound to the D1-02 logical persistence contract:
+
+`contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json`
+
+The contract defines the authoritative `social_follow_relationships` table, its primary key, active-relation uniqueness boundary, and follower/created and target/created query indexes. It deliberately does not claim migration execution or runtime evidence.

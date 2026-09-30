@@ -867,7 +867,8 @@
           "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
           "postgresqlPortability": "PORTABLE",
           "evidenceRefs": [
-            "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json"
+            "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+            "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json"
           ]
         },
         {
@@ -889,7 +890,8 @@
           "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
           "postgresqlPortability": "PORTABLE",
           "evidenceRefs": [
-            "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json"
+            "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+            "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json"
           ]
         },
         {
@@ -911,7 +913,8 @@
           "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
           "postgresqlPortability": "PORTABLE",
           "evidenceRefs": [
-            "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json"
+            "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+            "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json"
           ]
         },
         {
@@ -933,13 +936,15 @@
           "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
           "postgresqlPortability": "PORTABLE",
           "evidenceRefs": [
-            "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json"
+            "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+            "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json"
           ]
         }
       ],
       "evidenceRefs": [
         "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
+        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json"
       ]
     }
   ],

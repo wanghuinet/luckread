@@ -1,8 +1,0 @@
-{
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "$id":"https://luckread.com/contracts/v1/authz/feature-action-permission-registry.v1.json",
-  "version":"1.0",
-  "status":"NOT_GREEN",
-  "sourceOfTruth":"docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-  "records":[]
-}

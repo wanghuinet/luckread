@@ -60,3 +60,12 @@ Mapping 0 promotion
 ## Verification boundary
 
 This Change-Control establishes Contract/DTO binding only. A passing Contract/OpenAPI CI run validates structural/admission integrity for this contract surface; it does not prove runtime implementation, persistence, security execution, concurrency behavior, or GREEN status.
+
+
+## Downstream Persistence Link
+
+The admitted Follow mutation DTOs are now linked to the dedicated persistence contract:
+
+`contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json`
+
+This link is contractual only; migration and runtime remain unverified.

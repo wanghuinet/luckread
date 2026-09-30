@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
+  "title": "SOCIAL-001 Follow Relationship D1-02 Logical Persistence Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureIds": [
+    "SOCIAL-001",
+    "SOCIAL-002"
+  ],
+  "entityId": "ENT-SOCIAL-FOLLOW",
+  "entityFieldContract": "contracts/entity/entity-field-contract.v1.json#ENT-SOCIAL-FOLLOW",
+  "sourceOfTruth": "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+  "authoritativeDomain": "D1-02",
+  "primaryTask": "T11",
+  "primaryWorker": "W05",
+  "physicalResource": {
+    "binding": "D1_02",
+    "worker": "W05",
+    "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+    "databaseName": "luckreadpro",
+    "databaseNameAuthority": "display label only; UUID is authoritative",
+    "allocationStatus": "ADMITTED",
+    "allocationSource": "contracts/persistence/CONTENT-ARTICLE-d1-02-persistence.v1.json#physicalResource"
+  },
+  "tables": {
+    "social_follow_relationships": {
+      "purpose": "Authoritative active user-to-user Follow relationship state for SOCIAL-001.",
+      "primaryKey": "relationship_id",
+      "columns": {
+        "relationship_id": {
+          "fieldId": "ENT-SOCIAL-FOLLOW-F-RELATIONSHIP-ID",
+          "type": "TEXT",
+          "required": true,
+          "unique": true,
+          "immutable": true,
+          "apiExposure": "SCOPED_IDENTIFIER"
+        },
+        "follower_user_id": {
+          "fieldId": "ENT-SOCIAL-FOLLOW-F-FOLLOWER-USER-ID",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true,
+          "apiExposure": "NONE"
+        },
+        "target_user_id": {
+          "fieldId": "ENT-SOCIAL-FOLLOW-F-TARGET-USER-ID",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true,
+          "apiExposure": "NONE"
+        },
+        "created_at": {
+          "fieldId": "ENT-SOCIAL-FOLLOW-F-CREATED-AT",
+          "type": "TEXT",
+          "required": true,
+          "format": "date-time",
+          "indexed": true,
+          "immutable": true
+        }
+      },
+      "constraints": [
+        "relationship_id is the opaque internal identifier and is never reused.",
+        "An active relation is uniquely identified by (follower_user_id, target_user_id).",
+        "follower_user_id is resolved from the authenticated server principal; the client cannot authoritatively provide it.",
+        "target_user_id resolves to ENT-USER and is validated against account state, followability, privacy/scope and block policy before mutation.",
+        "Unfollow removes the active relation atomically; deleting a missing relation is idempotent success.",
+        "No deleted/inactive row state is stored in this table; historical follow/unfollow analytics are derived elsewhere.",
+        "No foreign key is inferred across D1 domains; user identifiers remain logical relations only."
+      ],
+      "indexes": [
+        "uq_social_follow_follower_target UNIQUE (follower_user_id, target_user_id)",
+        "ix_social_follow_follower_created (follower_user_id, created_at)",
+        "ix_social_follow_target_created (target_user_id, created_at)"
+      ]
+    }
+  },
+  "mutationBudgets": {
+    "d1ReadMax": 1,
+    "d1WriteTransactionMax": 1,
+    "distributedTransactions": false
+  },
+  "runtimeGates": {
+    "physicalD1Binding": "PENDING",
+    "migrationExecution": "PENDING",
+    "uniqueConstraintEvidence": "PENDING",
+    "indexEvidence": "PENDING",
+    "runtimePositive": "REQUIRED",
+    "runtimeNegative": "REQUIRED",
+    "concurrency": "REQUIRED",
+    "securityE2E": "REQUIRED",
+    "remoteRuntimeEvidence": "REQUIRED"
+  },
+  "nonGoals": [
+    "No D1 migration is executed or claimed by this contract.",
+    "No Payload Collection is introduced.",
+    "No separate idempotency table is introduced for Follow.",
+    "No outbox/event table is defined by this slice; event delivery remains a downstream contract and implementation gate.",
+    "No follower/following projection table is introduced as authoritative state.",
+    "No runtime GREEN is claimed."
+  ]
+}
