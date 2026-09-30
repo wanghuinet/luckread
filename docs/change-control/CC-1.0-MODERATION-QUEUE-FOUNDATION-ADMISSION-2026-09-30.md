@@ -3,7 +3,7 @@
 **Status: GAP / DECISION MATERIAL / IMPLEMENTATION BLOCKED**
 
 Repository: `wanghuinet/luckread`  
-Base head reviewed: `c6bc180c321a8ff000b863202343e94cd0e72c41`
+Base head reviewed: `c4b4cb46c6c352eb362ec5e600d12322e5f3ac9b`
 
 ## 1. Purpose
 
@@ -36,27 +36,28 @@ This record does not authorize implementation. It prevents the code layer from i
 
 The current W06 runtime source implements AUTH-013 audit persistence and queue consumption, but does not expose a moderation Queue / Case / Decision runtime.
 
-The repository search currently finds the moderation API paths in the contracts only; there is no admitted runtime implementation for:
+The repository search still finds no admitted runtime implementation for:
 
 - queue read / assignment;
 - moderation case read;
 - moderation decision mutation;
 - reviewer evidence read boundary;
-- content-decision transport binding;
-- moderation decision audit binding.
+- W06→W03 content-decision transport;
+- runtime execution/evidence for the existing decision→AuditEvent binding.
 
-No executable persistence contract has been admitted for the moderation queue/case/decision objects.
+Entity, persistence, OpenAPI/DTO and audit contracts are now explicit; execution remains blocked.
 
 ## 4. Contract-first reservation
 
-The following machine-readable drafts now exist on `main` and remain non-canonical:
+The following machine-readable contracts now exist on `main` and remain non-runtime:
 
-- `contracts/api/moderation-operation-policy.v1.json` — queue/case/decision operation budgets, permissions and security invariants.
-- `contracts/dto/moderation-dto-contract.v1.json` — stable reserved DTO identities and sensitive-field rules.
+- `contracts/api/moderation-operation-policy.v1.json` — queue/case/decision operation budgets, permissions and security invariants; status `CONTRACTED_OPENAPI_BOUND`.
+- `contracts/dto/moderation-dto-contract.v1.json` — stable DTO identities and visibility rules; status `CONTRACTED_OPENAPI_BOUND`.
+- `contracts/entity/MODERATION-CASE-CONTRACT.v1.json` and `contracts/entity/MODERATION-DECISION-CONTRACT.v1.json` — entity vocabulary; status `CONTRACTED_NOT_VERIFIED`.
+- `contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json` — D1-03 logical persistence binding; status `CONTRACTED_NOT_VERIFIED`.
+- `contracts/events/GOV-004-moderation-decision-audit-binding.v1.json` — decision→AuditEvent binding; status `CONTRACTED_NOT_VERIFIED`.
 
-Both are explicitly `CONTRACT_DRAFT_OPENAPI_PENDING` and carry `implementationAuthorization: false`.
-
-No OpenAPI promotion, persistence execution or W06 runtime implementation is implied by these files.
+These bindings do not authorize W06 runtime, D1 migration execution, or remote evidence claims.
 
 ## 4.1 Entity / persistence contract slice admitted for further reconciliation
 
@@ -69,7 +70,7 @@ The following contract-only bindings are now explicit and remain non-canonical:
 - `contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json` defines the minimum reviewer principal/layer/permission/provenance and conditional-request inputs; it remains `BLOCKED_NOT_ADMITTED`.
 - The entity catalog, field registry and database-entity persistence inventory now carry the same proposed/non-verified records.
 
-This slice does not create a Worker, D1, migration execution, OpenAPI promotion or runtime implementation. The moderation path remains BLOCKED pending canonical OpenAPI, trusted reviewer transport, audit binding and executable evidence.
+This slice does not create a Worker, D1, migration execution, or runtime implementation. OpenAPI and DTO are already canonically bound; the moderation path remains BLOCKED pending trusted reviewer authority, W06→W03 content transport, and executable evidence.
 
 ## 4. Non-negotiable authority constraints
 
@@ -89,18 +90,14 @@ The decision path now requires both `If-Match` (transport precondition) and `exp
 
 ## 5. Required contract-first closure before implementation
 
-The next admitted slice must establish, at minimum:
+The remaining contract/authority closure must establish:
 
-- moderation queue DTO and read semantics;
-- moderation case DTO and sensitive-field visibility rules;
-- moderation decision DTO including policyVersion/reasonCode/severity/scope/effectiveAt/reviewer identity;
-- authoritative persistence binding and migration plan;
-- trusted reviewer transport binding (`contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json`);
-- content-decision transport binding from W06 to W03;
-- permission checks for queue/case/decision;
-- idempotency + If-Match/expectedVersion rules for decisions;
-- audit-event mapping;
-- evidence requirements and remote/runtime verification plan.
+- trusted reviewer authority binding (`contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json`);
+- W06→W03 content-decision transport binding;
+- permission/transport negative evidence;
+- idempotency + If-Match/expectedVersion runtime evidence;
+- decision→AuditEvent one-to-one runtime evidence;
+- migration and remote D1 evidence before any runtime promotion.
 
 Only after the above reconciles to GREEN should W06 moderation runtime code be added.
 
@@ -129,3 +126,8 @@ This moderation foundation maps to Blueprint features `GOV-003` (moderation queu
 ## 9. Audit binding
 
 `contracts/events/GOV-004-moderation-decision-audit-binding.v1.json` now binds the authoritative decision mutation to the existing W06/D1-03 `AuditEvent` schema. It remains `CONTRACTED_NOT_VERIFIED`; no runtime or remote evidence is claimed.
+
+
+## 10. Current Authority Gate
+
+The only new architectural decision still required for the moderation execution path is the trusted internal transport boundary. The decision packet `docs/change-control/CC-1.0-MODERATION-TRUSTED-TRANSPORT-AUTHORITY-2026-10-01.md` records the candidate topology and explicit non-goals. Until that gate is authorized and evidence-bound, W06 runtime remains BLOCKED.
