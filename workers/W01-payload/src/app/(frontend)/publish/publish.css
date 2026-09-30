@@ -94,3 +94,19 @@
 .lr-preflight-red { border-color:#fecaca; background:#fff7f7; }
 .lr-preflight-yellow { border-color:#fde68a; background:#fffbeb; }
 .lr-preflight-pass { border-color:#bbf7d0; background:#f0fdf4; }
+
+/* Floating creator self-check assistant */
+.lr-check-assistant{position:fixed;right:max(20px,env(safe-area-inset-right));bottom:max(22px,env(safe-area-inset-bottom));z-index:80;display:flex;flex-direction:column;align-items:flex-end;gap:12px}
+.lr-check-assistant-fab{display:inline-flex;align-items:center;gap:9px;border:0;border-radius:999px;padding:13px 18px;background:#173f35;color:#fff;font:600 14px/1.2 inherit;box-shadow:0 8px 28px rgba(15,45,37,.25);cursor:pointer}
+.lr-check-assistant-fab>span:first-child{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#d6f5e5;color:#173f35;font-weight:800}
+.lr-check-assistant-panel{width:min(340px,calc(100vw - 32px));padding:18px;border:1px solid #dce9e2;border-radius:18px;background:#fff;color:#20332c;box-shadow:0 16px 48px rgba(20,40,32,.2)}
+.lr-check-assistant-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.lr-check-assistant-head>div{display:flex;flex-direction:column;gap:3px}
+.lr-check-assistant-head strong{font-size:16px}
+.lr-check-assistant-head span,.lr-check-assistant-panel p{font-size:12px;color:#687a72}
+.lr-check-assistant-head button{border:0;background:transparent;color:#687a72;font-size:24px;cursor:pointer}
+.lr-check-assistant-panel p{line-height:1.65;margin:12px 0}
+.lr-check-assistant-status{padding:9px 10px;margin-bottom:10px;border-radius:9px;background:#f0f7f3;font-size:12px}
+.lr-check-assistant-run{width:100%;border:0;border-radius:10px;padding:11px 14px;background:#173f35;color:#fff;font-weight:600;cursor:pointer}
+.lr-check-assistant-run:disabled,.lr-check-assistant-fab:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:600px){.lr-check-assistant{right:14px;bottom:max(16px,env(safe-area-inset-bottom))}.lr-check-assistant-fab{padding:12px 15px}.lr-check-assistant-panel{width:min(320px,calc(100vw - 28px))}}
