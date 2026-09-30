@@ -7,19 +7,20 @@
   "status": "CONTRACTED_OPENAPI_BOUND",
   "implementationAuthorization": false,
   "sourceRefs": [
-    "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
-    "docs/150-MODERATION-GOVERNANCE-CENTER-EXPERIENCE-CONTRACT-v1.0.md",
-    "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
     "contracts/authz/permissions.json",
-    "contracts/state-machines/content.json",
-    "docs/change-control/CC-1.0-MODERATION-QUEUE-FOUNDATION-ADMISSION-2026-09-30.md",
     "contracts/entity/MODERATION-CASE-CONTRACT.v1.json",
     "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
-    "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
-    "contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json",
-    "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
     "contracts/events/GOV-004-moderation-decision-audit-binding.v1.json",
-    "contracts/transport/W01-W06-moderation-http-binding.v1.json"
+    "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
+    "contracts/state-machines/content.json",
+    "contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json",
+    "contracts/transport/W01-W06-moderation-http-binding.v1.json",
+    "contracts/transport/W06-W03-content-moderation-http-binding.v1.json",
+    "docs/150-MODERATION-GOVERNANCE-CENTER-EXPERIENCE-CONTRACT-v1.0.md",
+    "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
+    "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
+    "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
+    "docs/change-control/CC-1.0-MODERATION-QUEUE-FOUNDATION-ADMISSION-2026-09-30.md"
   ],
   "authorityBoundary": {
     "worker": "W06",
@@ -209,7 +210,9 @@
         "integration": "MISSING",
         "securityE2E": "MISSING",
         "audit": "CONTRACTED_NOT_VERIFIED"
-      }
+      },
+      "contentTransitionTransport": "CONTRACTED_PENDING_AUTHORITY",
+      "contentTransitionTransportRef": "contracts/transport/W06-W03-content-moderation-http-binding.v1.json"
     }
   ],
   "nonGoals": [
@@ -227,6 +230,7 @@
     "openApi": "BOUND_CANONICAL",
     "implementationAuthorization": false,
     "auditBinding": "CONTRACTED_NOT_VERIFIED",
-    "transport": "CONTRACTED_NOT_VERIFIED"
+    "transport": "CONTRACTED_NOT_VERIFIED",
+    "contentTransitionTransport": "CONTRACTED_PENDING_AUTHORITY"
   }
 }
