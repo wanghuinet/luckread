@@ -40,7 +40,7 @@ export interface PublishPreflightResult {
     externalUrlCount: number
     phoneCount: number
     mobileNumberCount: number
-    detectedMobileRegions: string[]
+    detectedPhoneRegions: string[]
     messengerIdCount: number
     detectedMessengers: string[]
   }
@@ -551,7 +551,7 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
       externalUrlCount: externalUrls.length,
       phoneCount: phoneDetections.phoneCount,
       mobileNumberCount: phoneDetections.mobileCount,
-      detectedMobileRegions: phoneDetections.regions,
+      detectedPhoneRegions: phoneDetections.regions,
       messengerIdCount: messengerIds.length,
       detectedMessengers: Array.from(new Set(messengerIds.map(item => item.platform))),
     },
