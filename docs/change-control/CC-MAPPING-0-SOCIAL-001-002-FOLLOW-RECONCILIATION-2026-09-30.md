@@ -76,7 +76,7 @@ Relevant existing semantic claims include:
 - relation mutations require permission, rate-limit and privacy guards;
 - event enqueue/delivery/replay semantics are bounded and idempotent.
 
-This strengthens the semantic-contract evidence for `SOCIAL-001/002`, but it still does not provide a canonical Entity ID, Field ID, migration/schema, executable W05 handler, runtime evidence, or Evidence Registry provenance.
+This strengthens the semantic-contract evidence for `SOCIAL-001/002`. The missing Entity/Field contract has now been established through Contract-First Change Control as `ENT-SOCIAL-FOLLOW` / `SocialFollowRelationship` with four contract-defined fields. These are contract-level identifiers only; they are not persistence/runtime-verified.
 
 ## Evidence Sweep — Current `main` Head
 
@@ -126,14 +126,35 @@ This closes only the `Feature → API operation` edge for `SOCIAL-001`. It does 
 
 For `SOCIAL-002`, `getUsersUserIdFollowers` and `getUsersUserIdFollowing` exist in OpenAPI and API inventory, but both are explicitly marked `DISCOVERY_DRAFT` with detailed response contracts still open. They therefore remain non-promoted discovery evidence and are not used as a GREEN API binding.
 
+## Entity / Field Contract Reconciliation
+
+The missing Follow relationship entity has now been established through:
+
+- `docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md`;
+- `contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json`;
+- Entity Catalog record `ENT-SOCIAL-FOLLOW` with status `PROPOSED`;
+- Entity Field Contract registry entry for `ENT-SOCIAL-FOLLOW` with status `PROPOSED`.
+
+Contract-defined fields are:
+
+```text
+ENT-SOCIAL-FOLLOW-F-RELATIONSHIP-ID
+ENT-SOCIAL-FOLLOW-F-FOLLOWER-USER-ID
+ENT-SOCIAL-FOLLOW-F-TARGET-USER-ID
+ENT-SOCIAL-FOLLOW-F-CREATED-AT
+```
+
+The contract also defines the active uniqueness boundary as `(followerUserId, targetUserId)`, while follower/following counts remain derived projections. No D1 table, migration, Payload collection, W05 handler or runtime verification is claimed.
+
+This closes the Contract-First Entity / Field definition gap but does not promote `SOCIAL-001/002` to GREEN.
+
 ## Remaining Blocking Edges
 
 The repository does not yet provide evidence sufficient to bind:
 
 ```text
-canonical Entity ID
-canonical Field ID / persistence schema
 canonical DTO ID
+Field-to-physical persistence schema
 canonical OpenAPI operation registry admission
 W05 executable handler
 W05 → D1 binding evidence for this feature
@@ -162,7 +183,8 @@ The next executable gate remains:
 
 ```text
 Global Mapping Consolidation GREEN
-→ canonical Social API/DTO/Entity/Field mapping
+→ canonical Social DTO mapping
+→ Field-to-physical persistence schema
 → W05/D1 binding evidence
 → runtime implementation admission
 → tests + Evidence Registry
