@@ -27,6 +27,7 @@ describe('Creator Center admin extension', () => {
   it('embeds the existing publisher with a scoped W03 content bridge', () => {
     const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    const page = read('src/app/(frontend)/publish/page.tsx')
     const contentClient = read('src/content/w03-content-client.ts')
     const createRoute = read('src/app/(payload)/api/creator/contents/route.ts')
     const updateRoute = read('src/app/(payload)/api/creator/contents/[contentId]/route.ts')
