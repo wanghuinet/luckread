@@ -100,5 +100,7 @@
     "No outbox/event table is defined by this slice; event delivery remains a downstream contract and implementation gate.",
     "No follower/following projection table is introduced as authoritative state.",
     "No runtime GREEN is claimed."
-  ]
+  ],
+  "migrationContractRef": "contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json",
+  "migrationStatus": "CONTRACTED_NOT_VERIFIED"
 }
