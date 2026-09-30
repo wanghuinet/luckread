@@ -3,6 +3,7 @@ name: W01 Creator Center Admin Verification
 on:
   push:
     branches:
+      - main
       - 'feat/creator-center-*'
     paths:
       - 'workers/W01-payload/**'
