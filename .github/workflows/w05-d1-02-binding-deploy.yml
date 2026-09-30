@@ -81,7 +81,7 @@ jobs:
             "sourceSha": "${{ inputs.source_sha }}",
             "worker": "$EXPECTED_WORKER",
             "d1DatabaseUuid": "$EXPECTED_DB_UUID",
-            "confirmation": "${{ inputs.confirm }",
+            "confirmation": "${{ inputs.confirm }}",
             "bindingVerified": true
           }
           EOF
