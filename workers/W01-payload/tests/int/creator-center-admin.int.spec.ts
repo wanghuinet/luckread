@@ -120,6 +120,35 @@ describe('Creator Center admin extension', () => {
     expect(client).toContain('X-LuckRead-Principal-User-Id')
   })
 
+  it('organizes the creator center around creator-first workflows', () => {
+    const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const styles = read('src/app/(payload)/admin/creator-center.module.css')
+
+    expect(view).toContain('文章管理')
+    expect(view).toContain('发布中心')
+    expect(view).toContain('发布检测')
+    expect(view).toContain('素材库')
+    expect(view).toContain('数据中心')
+    expect(view).toContain('粉丝与订阅')
+    expect(view).toContain('收益与权益')
+    expect(view).toContain('快速创作')
+    expect(view).toContain('写文章')
+    expect(view).toContain('发动态')
+    expect(view).toContain('发视频')
+    expect(view).toContain('id="overview"')
+    expect(view).toContain('id="content"')
+    expect(view).toContain('id="publisher"')
+    expect(view).toContain('id="quality"')
+    expect(view).toContain('id="assets"')
+    expect(view).toContain('className={styles.floatingAssistant}')
+
+    expect(styles).toContain('.creatorLayout')
+    expect(styles).toContain('.sidebar')
+    expect(styles).toContain('.quickCreate')
+    expect(styles).toContain('.toolGrid')
+    expect(styles).toContain('.futureGrid')
+  })
+
   it('keeps frontend and Admin on the same Payload cookie session lifecycle', () => {
     const login = read('src/app/auth/login/route.ts')
     const logout = read('src/app/auth/logout/route.ts')
