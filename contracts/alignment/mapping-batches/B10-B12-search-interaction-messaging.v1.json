@@ -162,10 +162,11 @@
         "contracts/openapi/v1/openapi.yaml#/social/follows",
         "contracts/api/interaction-operation-policy.v1.json",
         "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
+        "contracts/dto/auth-dto-contract.v1.json"
       ],
       "blockers": [
-        "DTO/Field/Persistence/Payload/Security/Lifecycle/Code/Test/Evidence mapping not yet evidence-bound"
+        "Canonical Field/Persistence/Payload/Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; API operation IDs, DTO bindings, and Entity ID are contract-bound."
       ],
       "apiOperationIds": [
         "follow",
@@ -184,7 +185,7 @@
         "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
       ],
       "blockers": [
-        "Follower/following API/DTO, Field/Persistence/Payload/Security/Lifecycle/Code/Test/Evidence mapping not yet evidence-bound"
+        "Canonical followers/following API/DTO/Field/Persistence/Payload/Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; shared Follow Entity is contract-bound, but followers/following operations remain DISCOVERY_DRAFT."
       ],
       "entityIds": [
         "ENT-SOCIAL-FOLLOW"

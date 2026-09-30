@@ -72,3 +72,14 @@ Entity contract
 ```
 
 This Change Control establishes the missing Entity/Field contract identifiers without claiming technical verification.
+
+
+## DTO Contract Reconciliation
+
+The canonical DTO edge for the promoted Social Follow mutation operations is now established in `contracts/dto/auth-dto-contract.v1.json`:
+
+- `follow` → `DTO-SOCIAL-FOLLOW-REQUEST` → `#/paths/~1social~1follows/post/requestBody/content/application~1json/schema`;
+- `unfollow` → `DTO-SOCIAL-UNFOLLOW-REQUEST` → `#/paths/~1social~1follows/delete/requestBody/content/application~1json/schema`;
+- both operations retain their existing no-body success semantics: 200 for follow and 204 for unfollow.
+
+This reconciliation adds no runtime, persistence, Payload, security-E2E, concurrency, event, cache, or Evidence Registry claim. `SOCIAL-002` followers/following discovery operations remain unpromoted and are not assigned DTOs.

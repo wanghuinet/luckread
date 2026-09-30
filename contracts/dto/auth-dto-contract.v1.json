@@ -185,6 +185,34 @@
         "ENT-SESSION"
       ],
       "status": "NO_BODY_DTO"
+    },
+    {
+      "featureId": "SOCIAL-001",
+      "operationId": "follow",
+      "requestDtoId": "DTO-SOCIAL-FOLLOW-REQUEST",
+      "responseDtoId": null,
+      "requestSchemaRef": "#/paths/~1social~1follows/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": null,
+      "responseStatus": 200,
+      "entityIds": [
+        "ENT-SOCIAL-FOLLOW",
+        "ENT-USER"
+      ],
+      "status": "NO_BODY_DTO"
+    },
+    {
+      "featureId": "SOCIAL-001",
+      "operationId": "unfollow",
+      "requestDtoId": "DTO-SOCIAL-UNFOLLOW-REQUEST",
+      "responseDtoId": null,
+      "requestSchemaRef": "#/paths/~1social~1follows/delete/requestBody/content/application~1json/schema",
+      "responseSchemaRef": null,
+      "responseStatus": 204,
+      "entityIds": [
+        "ENT-SOCIAL-FOLLOW",
+        "ENT-USER"
+      ],
+      "status": "NO_BODY_DTO"
     }
   ],
   "bindingRules": {
