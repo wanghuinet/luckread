@@ -84,13 +84,50 @@
         "no_cross_domain_table_reads"
       ],
       "evidence": {
-        "openapi": "BOUND_CANONICAL",
-        "permission": "CONTRACTED",
-        "dto": "CONTRACTED_NOT_VERIFIED",
-        "persistence": "CONTRACTED_NOT_VERIFIED",
-        "transport": "CONTRACTED_NOT_VERIFIED",
+        "openapi": "PASS",
+        "permission": "CONTRACTED_NOT_VERIFIED",
+        "state": "MISSING",
+        "resource": "CONTRACTED_NOT_VERIFIED",
+        "cache": "CONTRACTED_NOT_VERIFIED",
+        "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0,
+        "depthBounded": true
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "ip",
+          "device",
+          "endpoint",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "state": {
+        "required": [
+          "authenticated_reviewer",
+          "reviewer_scope"
+        ],
+        "terminal": "NOT_APPLICABLE"
       }
     },
     {
@@ -128,13 +165,51 @@
         "content_facts_reference_authority_not_copy"
       ],
       "evidence": {
-        "openapi": "BOUND_CANONICAL",
-        "permission": "CONTRACTED",
-        "dto": "CONTRACTED_NOT_VERIFIED",
-        "persistence": "CONTRACTED_NOT_VERIFIED",
-        "transport": "CONTRACTED_NOT_VERIFIED",
+        "openapi": "PASS",
+        "permission": "CONTRACTED_NOT_VERIFIED",
+        "state": "MISSING",
+        "resource": "CONTRACTED_NOT_VERIFIED",
+        "cache": "CONTRACTED_NOT_VERIFIED",
+        "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0,
+        "depthBounded": true
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "ip",
+          "device",
+          "endpoint",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "state": {
+        "required": [
+          "authenticated_reviewer",
+          "reviewer_scope",
+          "case_exists"
+        ],
+        "terminal": "NOT_APPLICABLE"
       }
     },
     {
@@ -202,17 +277,53 @@
         "sensitive_evidence_never_returned"
       ],
       "evidence": {
-        "openapi": "BOUND_CANONICAL",
-        "permission": "CONTRACTED",
-        "dto": "CONTRACTED_NOT_VERIFIED",
-        "persistence": "CONTRACTED_NOT_VERIFIED",
-        "transport": "CONTRACTED_NOT_VERIFIED",
+        "openapi": "PASS",
+        "permission": "CONTRACTED_NOT_VERIFIED",
+        "state": "MISSING",
+        "resource": "CONTRACTED_NOT_VERIFIED",
+        "cache": "N/A",
+        "antiAbuse": "MISSING",
         "integration": "MISSING",
-        "securityE2E": "MISSING",
-        "audit": "CONTRACTED_NOT_VERIFIED"
+        "securityE2E": "MISSING"
       },
       "contentTransitionTransport": "CONTRACTED_PENDING_AUTHORITY",
-      "contentTransitionTransportRef": "contracts/transport/W06-W03-content-moderation-http-binding.v1.json"
+      "contentTransitionTransportRef": "contracts/transport/W06-W03-content-moderation-http-binding.v1.json",
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0,
+        "depthBounded": true
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "ip",
+          "device",
+          "endpoint",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK",
+          "REVIEW"
+        ]
+      },
+      "state": {
+        "required": [
+          "authenticated_reviewer",
+          "reviewer_scope",
+          "case=PENDING_REVIEW",
+          "expectedVersion"
+        ],
+        "terminal": "APPROVED_OR_REJECTED"
+      }
     }
   ],
   "nonGoals": [
