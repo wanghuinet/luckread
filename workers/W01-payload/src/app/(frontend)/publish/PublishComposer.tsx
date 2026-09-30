@@ -126,7 +126,12 @@ export default function PublishComposer({
 
   useEffect(() => {
     let cancelled = false
-    const draftId = new URL(window.location.href).searchParams.get('draft')?.trim()
+    const url = new URL(window.location.href)
+    const draftId = url.searchParams.get('draft')?.trim()
+    const requestedType = url.searchParams.get('type')?.trim()
+    if (!draftId && (requestedType === 'article' || requestedType === 'post' || requestedType === 'video')) {
+      setType(requestedType)
+    }
     if (!draftId) return
 
     async function restoreDraft() {
