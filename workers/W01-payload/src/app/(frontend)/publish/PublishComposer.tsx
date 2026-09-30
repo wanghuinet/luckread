@@ -123,6 +123,7 @@ export default function PublishComposer({
   const [aiMode, setAiMode] = useState<AiMode>('none')
   const [humanConfirmed, setHumanConfirmed] = useState(false)
   const [preflightReport, setPreflightReport] = useState<PublishPreflightResult | null>(null)
+  const [assistantOpen, setAssistantOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -449,6 +450,27 @@ export default function PublishComposer({
 
   return (
     <div className="lr-composer-card">
+      <div className="lr-check-assistant">
+        {assistantOpen ? (
+          <section className="lr-check-assistant-panel" aria-label="检测小助手">
+            <div className="lr-check-assistant-head">
+              <div><strong>检测小助手</strong><span>发布前内容自检</span></div>
+              <button type="button" aria-label="关闭检测小助手" onClick={() => setAssistantOpen(false)}>×</button>
+            </div>
+            <p>检查标题、正文质量、SEO、导流信息及 AI 创作规范。自检不会自动发布内容。</p>
+            {preflightReport ? <div className="lr-check-assistant-status">最近结果：{preflightReport.verdict === "PASS" ? "检查通过" : preflightReport.verdict === "YELLOW" ? "有待完善项" : "存在阻断项"} · 得分 {preflightReport.score}</div> : null}
+            <button className="lr-check-assistant-run" type="button" disabled={busy || reviewLocked} onClick={async () => {
+              setBusy(true); setError(""); setMessage("")
+              try { await runPreflight(); setMessage("自检完成，请查看页面中的检测报告。") }
+              catch (caught) { setError(caught instanceof Error ? caught.message : "自检失败，请稍后重试。") }
+              finally { setBusy(false) }
+            }}>{busy ? "正在检测…" : "立即检测当前内容"}</button>
+          </section>
+        ) : null}
+        <button className="lr-check-assistant-fab" type="button" aria-expanded={assistantOpen} onClick={() => setAssistantOpen((open) => !open)}>
+          <span aria-hidden="true">✓</span><span>检测小助手</span>
+        </button>
+      </div>
       <div className="lr-type-tabs" role="tablist" aria-label="内容类型">
         {([
           ['article', '文章'],
