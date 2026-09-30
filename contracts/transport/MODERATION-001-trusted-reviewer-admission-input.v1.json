@@ -145,8 +145,9 @@
     "No direct W02→W06 business Service Binding is inferred.",
     "No Payload moderation authority.",
     "No D1-03 migration execution.",
-    "No canonical OpenAPI promotion.",
-    "No Mapping 0 GREEN claim."
+    "No Mapping 0 GREEN claim.",
+    "Canonical moderation OpenAPI is already bound separately; this contract does not promote or redefine its paths.",
+    "No W06 runtime implementation is authorized until reviewer identity/layer authority is evidence-bound."
   ],
   "relatedFeatureIds": [
     "GOV-004"
