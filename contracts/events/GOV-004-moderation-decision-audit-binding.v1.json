@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/events/GOV-004-moderation-decision-audit-binding.v1.json",
+  "title": "GOV-004 Moderation Decision Audit Binding",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureId": "GOV-004",
+  "operationId": "decideModerationCase",
+  "sourceRefs": [
+    "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
+    "contracts/entity/MODERATION-CASE-CONTRACT.v1.json",
+    "contracts/api/moderation-operation-policy.v1.json",
+    "contracts/authz/permissions.json",
+    "contracts/schemas/common/audit-event.json",
+    "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md"
+  ],
+  "authority": {
+    "worker": "W06",
+    "database": "D1-03",
+    "writer": "W06",
+    "auditEntity": "AuditEvent"
+  },
+  "binding": {
+    "schema": "contracts/schemas/common/audit-event.json",
+    "action": "moderation.decide",
+    "targetType": "ModerationCase",
+    "targetId": "caseId",
+    "actor": "server-derived reviewer actor from admitted authenticated principal",
+    "occurredAt": "server-generated decision timestamp",
+    "requestId": "decision request requestId",
+    "traceId": "transport correlation/trace identifier when present"
+  },
+  "before": {
+    "allowedFields": [
+      "caseId",
+      "version",
+      "state",
+      "currentDecisionId"
+    ],
+    "rawEvidenceForbidden": true,
+    "secretsForbidden": true
+  },
+  "after": {
+    "allowedFields": [
+      "caseId",
+      "version",
+      "state",
+      "currentDecisionId",
+      "decisionId",
+      "outcome",
+      "policyVersion",
+      "reasonCode",
+      "severity",
+      "scope",
+      "effectiveAt",
+      "expiresAt"
+    ],
+    "rawEvidenceForbidden": true,
+    "internalRiskThresholdsForbidden": true,
+    "reviewerCredentialMaterialForbidden": true
+  },
+  "invariants": [
+    "Every authoritative moderation decision mutation emits exactly one immutable AuditEvent after the decision authority has accepted the mutation.",
+    "AuditEvent actor is server-derived and MUST NOT be taken from client reviewer fields.",
+    "The audit target is the authoritative ModerationCase identifier; content identifiers remain logical references.",
+    "Audit persistence uses the existing W06/D1-03 AuditEvent authority; no second audit table is created.",
+    "Audit failure MUST NOT create a successful moderation decision result; the admitted transaction path must define atomic/compensating behavior before runtime authorization.",
+    "Audit records are not user-erasure-deleted under the canonical AuditEvent contract."
+  ],
+  "nonGoals": [
+    "No new Worker or D1.",
+    "No new AuditEvent persistence schema.",
+    "No raw evidence or internal risk thresholds in audit payload.",
+    "No runtime or remote evidence claim."
+  ],
+  "verificationRequirements": [
+    "W06 AuditEvent schema/persistence authority evidence",
+    "decision-to-audit one-to-one evidence",
+    "actor provenance evidence",
+    "negative evidence for client reviewer spoofing",
+    "audit failure behavior evidence",
+    "Evidence Registry record"
+  ]
+}
