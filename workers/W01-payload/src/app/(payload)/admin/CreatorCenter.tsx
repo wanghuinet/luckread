@@ -13,6 +13,7 @@ type CreatorNavItem = {
   label: string
   href: string
   hint?: string
+  section?: string
   icon: string
 }
 
@@ -196,29 +197,29 @@ export function CreatorCenter({
                   </div>
                   <span>选择一个入口，直接进入现有发布器</span>
                 </div>
-                <div className={styles.quickGrid + ' row'}>
-                  <Link className={styles.createCard + ' card col'} href="/publish?type=article">
+                <div className={styles.quickGrid}>
+                  <Link className={styles.createCard + ' card'} href="/publish?type=article">
                     <span className={styles.createIcon}><i className="fa-solid fa-file-pen" aria-hidden="true" /></span>
                     <span className={styles.createCopy}>
                       <strong>写文章</strong>
                       <small>长文、图文、专题内容</small>
                     </span>
                   </Link>
-                  <Link className={styles.createCard + ' card col'} href="/publish?type=post">
+                  <Link className={styles.createCard + ' card'} href="/publish?type=post">
                     <span className={styles.createIcon}><i className="fa-solid fa-comment-dots" aria-hidden="true" /></span>
                     <span className={styles.createCopy}>
                       <strong>发动态</strong>
                       <small>短内容、观点与即时分享</small>
                     </span>
                   </Link>
-                  <Link className={styles.createCard + ' card col'} href="/publish?type=video">
+                  <Link className={styles.createCard + ' card'} href="/publish?type=video">
                     <span className={styles.createIcon}><i className="fa-solid fa-video" aria-hidden="true" /></span>
                     <span className={styles.createCopy}>
                       <strong>发视频</strong>
                       <small>上传视频与封面素材</small>
                     </span>
                   </Link>
-                  <Link className={styles.createCard + ' card col'} href="/admin/collections/media">
+                  <Link className={styles.createCard + ' card'} href="/admin/collections/media">
                     <span className={styles.createIcon}><i className="fa-solid fa-photo-film" aria-hidden="true" /></span>
                     <span className={styles.createCopy}>
                       <strong>素材库</strong>
