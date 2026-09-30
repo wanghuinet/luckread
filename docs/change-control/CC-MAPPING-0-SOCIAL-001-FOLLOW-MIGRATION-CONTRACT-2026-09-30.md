@@ -1,7 +1,7 @@
 # Change Control: SOCIAL-001 Follow Migration Contract — 2026-09-30
 
 - Change Control ID: `CC-MAPPING-0-SOCIAL-001-FOLLOW-MIGRATION-CONTRACT-2026-09-30`
-- Status: `CONTRACT-FIRST / ADMITTED / EXECUTION-PENDING`
+- Status: `MIGRATION-VERIFIED / RUNTIME-PENDING`
 - Base main: `2cbb486a174abc926393dbb2019f33483cbfc37e`
 - Backup: `backup/main-follow-migration-contract-before-20260930`
 - Feature: `SOCIAL-001`
@@ -40,7 +40,10 @@ schema evidence
 - D1 UUID: `6c342634-97f6-4248-9f4a-85772af4f22c`
 - Physical binding contract: `docs/change-control/CC-MAPPING-0-SOCIAL-001-W05-D1-02-PHYSICAL-BINDING-2026-09-30.md`
 - Migration contract: `contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json`
-- Expected migration artifact: `workers/W05-transaction/migrations/20260930_001_social_001_follow_v1.sql`\n- Migration artifact blob SHA: `effa0a6ca934d9b995611d7612baa1255379c0a7`
+- Expected migration artifact: `workers/W05-transaction/migrations/20260930_001_social_001_follow_v1.sql`
+- Migration artifact blob SHA: `effa0a6ca934d9b995611d7612baa1255379c0a7`
+- Migration execution workflow: `.github/workflows/social-001-follow-d1-02-migration.yml`
+- Fixed verifier commit: `e9057337aac25cb5a18659802863ad13da5572aa`
 
 ## Required execution order
 
@@ -67,26 +70,32 @@ schema evidence
 
 ## Evidence boundary
 
-Static contract validation may establish structural consistency only. It cannot be treated as proof that the migration ran or that the live D1 schema matches.
+Static contract validation may establish structural consistency only. The verified remote execution evidence for run `36718167892` proves the migration was applied to D1-02 and the post-migration schema matches the contracted shape.
 
-Promotion remains blocked until executable evidence exists for:
+The workflow's final conclusion was `failure` only because its post-migration result collector duplicated nested `results` rows and therefore counted one migration-history row as more than one. The verifier has since been corrected and made safe for already-applied migrations.
 
-- exact deployment SHA;
-- live W05-to-D1-02 binding;
-- migration execution run;
-- applied migration version;
-- table/column/nullability/primary-key schema;
-- unique constraint;
-- indexes;
-- absence of unauthorized schema expansion.
+Verified evidence:
+
+- exact migration source SHA: `d1b2a0096066c6486cd174e77293b144b9978e93`;
+- binding evidence: run `36717067309`;
+- remote migration run: `36718167892`;
+- applied migration: `20260930_001_social_001_follow_v1.sql`;
+- applied exactly once at `2026-09-30 12:57:30`;
+- exact four-column schema;
+- contracted unique relation index and both pagination indexes;
+- zero physical foreign keys;
+- no unexpected schema expansion;
+- durable evidence record: `artifacts/mapping-0/social-001-follow-d1-02-migration-evidence-20260930.json`.
+
+Promotion remains blocked on W05 runtime implementation and runtime/security/concurrency/event/projection evidence.
 
 ## Gate state
 
 ```
 Migration contract: ADMITTED
-Migration artifact: NOT CREATED
-Migration execution: NOT EXECUTED
-Schema evidence: NOT PRESENT
+Migration artifact: CREATED
+Migration execution: VERIFIED_BY_REMOTE_EVIDENCE
+Schema evidence: VERIFIED_BY_REMOTE_EVIDENCE
 W05 runtime: NOT ADMITTED
 SOCIAL-001: NOT_GREEN
 ```
