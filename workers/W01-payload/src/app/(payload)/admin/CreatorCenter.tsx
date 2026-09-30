@@ -68,7 +68,7 @@ export function CreatorCenter({
 
             <div className={styles.navLinks}>
               <a href="#dashboard" className={styles.navLink}>总览</a>
-              <a href="#content-management" className={styles.navLink}>内容管理</a>
+              <a href="#content-management" className={styles.navLink}>文章管理</a>
               <a href="#publisher" className={styles.navLink}>发布</a>
               <a href="#creator-tools" className={styles.navLink}>创作工具</a>
             </div>
@@ -99,8 +99,8 @@ export function CreatorCenter({
             <Link className={styles.featureCard} href="#content-management">
               <span className={styles.featureIcon}>01</span>
               <div>
-                <strong>文章 / 动态 / 视频</strong>
-                <span>统一管理草稿、审核、已发布和已下线内容。</span>
+                <strong>文章管理 · 动态 · 视频</strong>
+                <span>统一管理文章、动态、视频，以及草稿、审核、已发布和已下线内容。</span>
               </div>
               <span className={styles.featureArrow}>→</span>
             </Link>
@@ -137,7 +137,7 @@ export function CreatorCenter({
             <div className={styles.sectionHeading}>
               <div>
                 <span className={styles.eyebrow}>CONTENT MANAGEMENT</span>
-                <h2>内容管理</h2>
+                <h2>文章与内容管理</h2>
                 <p>这是创作者的内容主工作区：先管理内容，再进入具体编辑和发布流程。</p>
               </div>
               <div className={styles.headingActions}>
