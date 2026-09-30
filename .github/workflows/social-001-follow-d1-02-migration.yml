@@ -1,0 +1,310 @@
+name: SOCIAL-001 Follow D1-02 Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source SHA containing the admitted Follow migration artifact
+        required: true
+        type: string
+      database_name:
+        description: D1-02 display name bound in W05 wrangler.jsonc
+        required: true
+        type: string
+      binding_run_id:
+        description: Successful W05 D1-02 binding workflow run containing live binding evidence
+        required: true
+        type: string
+      binding_source_sha:
+        description: Exact source SHA recorded by the W05 binding provenance artifact
+        required: true
+        type: string
+      confirm:
+        description: Type APPLY_SOCIAL_001_MIGRATION to permit remote D1 mutation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  EXPECTED_DB_NAME: luckreadpro
+  EXPECTED_WORKER: luckread-w05
+  EXPECTED_BINDING: DB
+  EXPECTED_BINDING_RUN: "36717067309"
+  EXPECTED_BINDING_SOURCE_SHA: 72751a271946ba994e5f45e0d4cd1076cecc71a8
+
+jobs:
+  migrate:
+    if: ${{{ inputs.confirm == 'APPLY_SOCIAL_001_MIGRATION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Validate dispatch inputs
+        env:
+          SOURCE_SHA: ${{{ inputs.source_sha }}
+          DATABASE_NAME: ${{{ inputs.database_name }}
+          BINDING_RUN_ID: ${{{ inputs.binding_run_id }}
+          BINDING_SOURCE_SHA: ${{{ inputs.binding_source_sha }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+          test "$DATABASE_NAME" = "$EXPECTED_DB_NAME"
+          test "$BINDING_RUN_ID" = "$EXPECTED_BINDING_RUN"
+          test "$BINDING_SOURCE_SHA" = "$EXPECTED_BINDING_SOURCE_SHA"
+
+      - name: Checkout exact migration source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Validate exact source SHA
+        env:
+          SOURCE_SHA: ${{{ inputs.source_sha }}
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify binding provenance
+        env:
+          GH_TOKEN: ${{{ github.token }}
+          BINDING_RUN_ID: ${{{ inputs.binding_run_id }}
+          BINDING_SOURCE_SHA: ${{{ inputs.binding_source_sha }}
+        run: |
+          set -euo pipefail
+          conclusion="$(gh run view "$BINDING_RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
+          test "$conclusion" = "success"
+          rm -rf /tmp/social-001-binding-evidence
+          mkdir -p /tmp/social-001-binding-evidence
+          gh run download "$BINDING_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            -n "w05-d1-02-binding-$BINDING_SOURCE_SHA" \
+            -D /tmp/social-001-binding-evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('/tmp/social-001-binding-evidence/w05-d1-02-binding-deployment-provenance.json')
+          data = json.loads(p.read_text())
+          expected = {
+              'runId': '36717067309',
+              'sourceSha': '72751a271946ba994e5f45e0d4cd1076cecc71a8',
+              'worker': 'luckread-w05',
+              'd1DatabaseUuid': '6c342634-97f6-4248-9f4a-85772af4f22c',
+              'confirmation': 'DEPLOY_W05_D1_02',
+              'bindingVerified': True,
+          }
+          for key, value in expected.items():
+              if data.get(key) != value:
+                  raise SystemExit(f'binding provenance mismatch: {key}={data.get(key)!r}')
+          print('SOCIAL_001_BINDING_EVIDENCE=PASS')
+          PY
+
+      - name: Verify W05 D1-02 binding and migration source
+        working-directory: workers/W05-transaction
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          c = json.loads(Path('wrangler.jsonc').read_text())
+          if c.get('name') != 'luckread-w05':
+              raise SystemExit('W05 worker name mismatch')
+          ds = c.get('d1_databases', [])
+          if len(ds) != 1:
+              raise SystemExit(f'expected exactly one D1 binding, got {len(ds)}')
+          d = ds[0]
+          if d.get('binding') != 'DB':
+              raise SystemExit('unexpected D1 binding name')
+          if d.get('database_id') != '6c342634-97f6-4248-9f4a-85772af4f22c':
+              raise SystemExit('unexpected D1 database UUID')
+          if d.get('database_name') != 'luckreadpro':
+              raise SystemExit('unexpected D1 display name')
+          print(json.dumps(d, indent=2))
+          PY
+          test -f migrations/20260930_001_social_001_follow_v1.sql
+          test -z "$(git status --short)"
+
+      - name: Static migration invariant check
+        working-directory: workers/W05-transaction
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import sqlite3
+          from pathlib import Path
+          sql = Path('migrations/20260930_001_social_001_follow_v1.sql').read_text()
+          digest = hashlib.sha256(sql.encode()).hexdigest()
+          db = sqlite3.connect(':memory:')
+          db.executescript(sql)
+          table = db.execute('PRAGMA table_info("social_follow_relationships")').fetchall()
+          indexes = db.execute('PRAGMA index_list("social_follow_relationships")').fetchall()
+          foreign_keys = db.execute('PRAGMA foreign_key_list("social_follow_relationships")').fetchall()
+          names = {row[1] for row in table}
+          expected = {'relationship_id','follower_user_id','target_user_id','created_at'}
+          if names != expected:
+              raise SystemExit(f'unexpected columns: {sorted(names)}')
+          if not any(row[1] == 'uq_social_follow_follower_target' and row[2] == 1 for row in indexes):
+              raise SystemExit('unique follow relation index missing')
+          for expected_name in ('ix_social_follow_follower_created','ix_social_follow_target_created'):
+              if not any(row[1] == expected_name for row in indexes):
+                  raise SystemExit(f'missing index: {expected_name}')
+          if foreign_keys:
+              raise SystemExit('cross-D1/physical foreign key is forbidden')
+          print(f'SOCIAL_001_MIGRATION_STATIC=PASS sha256={digest}')
+          Path('/tmp/social-001-migration-sha256.txt').write_text(digest + '\n')
+          PY
+
+      - name: Capture controlled remote preflight
+        working-directory: workers/W05-transaction
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{{ inputs.database_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/artifacts/mapping-0/social-001-migration"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'social_follow_relationships';" \
+            > "$GITHUB_WORKSPACE/artifacts/mapping-0/social-001-migration/preflight-table.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command "SELECT id,name,applied_at FROM d1_migrations ORDER BY id;" \
+            > "$GITHUB_WORKSPACE/artifacts/mapping-0/social-001-migration/preflight-migrations.json"
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const dir = process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/social-001-migration'
+          const table = JSON.parse(fs.readFileSync(dir + '/preflight-table.json', 'utf8'))
+          const migrations = JSON.parse(fs.readFileSync(dir + '/preflight-migrations.json', 'utf8'))
+          const rows = (x) => Array.isArray(x) ? x.flatMap(rows) : (x && Array.isArray(x.results) ? x.results : [])
+          const tableRows = rows(table)
+          const migrationRows = rows(migrations)
+          if (tableRows.length) throw new Error('Fail-closed: social_follow_relationships already exists')
+          if (migrationRows.some((r) => r.name === '20260930_001_social_001_follow_v1')) {
+            throw new Error('Fail-closed: target migration is already recorded in d1_migrations')
+          }
+          console.log(JSON.stringify({ targetTablePresent:false, targetMigrationRecorded:false }))
+          NODE
+
+      - name: Apply SOCIAL-001 Follow migration remotely
+        working-directory: workers/W05-transaction
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{{ inputs.database_name }}
+        run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$DATABASE_NAME" --remote --config wrangler.jsonc
+
+      - name: Capture and validate post-migration evidence
+        working-directory: workers/W05-transaction
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{{ inputs.database_name }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'PRAGMA table_info("social_follow_relationships");' \
+            > "$GITHUB_WORKSPACE/artifacts/mapping-0/social-001-migration/post-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'PRAGMA index_list("social_follow_relationships");' \
+            > "$GITHUB_WORKSPACE/artifacts/mapping-0/social-001-migration/post-indexes.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'PRAGMA foreign_key_list("social_follow_relationships");' \
+            > "$GITHUB_WORKSPACE/artifacts/mapping-0/social-001-migration/post-foreign-keys.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
+            --command 'SELECT id,name,applied_at FROM d1_migrations ORDER BY id;' \
+            > "$GITHUB_WORKSPACE/artifacts/mapping-0/social-001-migration/post-migrations.json"
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const dir = process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/social-001-migration'
+          const read = (name) => JSON.parse(fs.readFileSync(dir + '/' + name, 'utf8'))
+          const collect = (x, out=[]) => {
+            if (Array.isArray(x)) { x.forEach(v => collect(v,out)); return out }
+            if (!x || typeof x !== 'object') return out
+            if (Array.isArray(x.results)) x.results.forEach(v => out.push(v))
+            Object.values(x).forEach(v => collect(v,out))
+            return out
+          }
+          const rows = name => collect(read(name))
+          const schema = rows('post-schema.json')
+          const indexes = rows('post-indexes.json')
+          const foreignKeys = rows('post-foreign-keys.json')
+          const migrations = rows('post-migrations.json')
+          const expectedColumns = [
+            ['relationship_id','TEXT',1,1],
+            ['follower_user_id','TEXT',1,0],
+            ['target_user_id','TEXT',1,0],
+            ['created_at','TEXT',1,0],
+          ]
+          for (const [name,type,notnull,pk] of expectedColumns) {
+            const r = schema.find(x => x.name === name)
+            if (!r || r.type !== type || Number(r.notnull) !== notnull || Number(r.pk) !== pk) {
+              throw new Error('Schema mismatch: ' + name)
+            }
+          }
+          if (schema.length !== expectedColumns.length) throw new Error('Unexpected schema expansion')
+          const indexNames = new Set(indexes.map(x => String(x.name)))
+          for (const name of [
+            'uq_social_follow_follower_target',
+            'ix_social_follow_follower_created',
+            'ix_social_follow_target_created',
+          ]) if (!indexNames.has(name)) throw new Error('Missing required index: ' + name)
+          if (foreignKeys.length) throw new Error('Physical foreign key exists unexpectedly')
+          const applied = migrations.filter(x => x.name === '20260930_001_social_001_follow_v1')
+          if (applied.length !== 1) throw new Error('Migration history does not show exactly one application')
+          const summary = {
+            migration: '20260930_001_social_001_follow_v1',
+            appliedExactlyOnce: true,
+            schemaExact: true,
+            indexesExact: true,
+            physicalForeignKeys: 0,
+            databaseUuid: '6c342634-97f6-4248-9f4a-85772af4f22c',
+            worker: 'luckread-w05',
+            result: 'PASS',
+          }
+          fs.writeFileSync(dir + '/post-migration-summary.json', JSON.stringify(summary,null,2) + '\n')
+          console.log(JSON.stringify(summary,null,2))
+          NODE
+
+      - name: Record execution provenance
+        if: always()
+        env:
+          SOURCE_SHA: ${{{ inputs.source_sha }}
+          DATABASE_NAME: ${{{ inputs.database_name }}
+          BINDING_RUN_ID: ${{{ inputs.binding_run_id }}
+          BINDING_SOURCE_SHA: ${{{ inputs.binding_source_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/social-001-migration
+          cat > artifacts/mapping-0/social-001-migration/provenance.json <<EOF
+          {
+            "repository": "$GITHUB_REPOSITORY",
+            "workflow": "$GITHUB_WORKFLOW",
+            "runId": "$GITHUB_RUN_ID",
+            "runAttempt": "$GITHUB_RUN_ATTEMPT",
+            "sourceSha": "$SOURCE_SHA",
+            "worker": "$EXPECTED_WORKER",
+            "databaseName": "$DATABASE_NAME",
+            "databaseUuid": "$EXPECTED_DB_ID",
+            "bindingRunId": "$BINDING_RUN_ID",
+            "bindingSourceSha": "$BINDING_SOURCE_SHA",
+            "migration": "20260930_001_social_001_follow_v1",
+            "remoteMutation": true,
+            "mappingGreen": false
+          }
+          EOF
+
+      - name: Upload controlled migration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: social-001-follow-d1-02-migration-${{{ github.run_id }}
+          path: artifacts/mapping-0/social-001-migration/
+          if-no-files-found: error
+          retention-days: 30
