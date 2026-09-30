@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { detectContactSignals, type ContactSignal } from './contact-detector.js'
+
 export type PreflightVerdict = 'PASS' | 'YELLOW' | 'RED'
 export type PreflightSeverity = 'INFO' | 'WARN' | 'BLOCK'
 export type AiMode = 'none' | 'outline' | 'assist' | 'full'
@@ -59,223 +61,6 @@ const count = (value: string, pattern: RegExp): number => value.match(pattern)?.
 const firstMatches = (value: string, pattern: RegExp, max = 6): string[] =>
   Array.from(value.matchAll(pattern)).slice(0, max).map(match => match[0])
 
-
-type MobileNumberRule = {
-  region: string
-  countryCode: string
-  international: RegExp
-  national?: RegExp
-  mobileSpecific: boolean
-}
-
-type DetectedMobileNumber = {
-  raw: string
-  region: string
-  mobileSpecific: boolean
-}
-
-type MessengerRule = {
-  platform: string
-  patterns: RegExp[]
-}
-
-const PHONE_CANDIDATE_RE = /(?<![\d+])(?:\+?\d[\d\s().-]{6,}\d)(?!\d)/g
-const PHONE_CONTEXT_RE = /(?:phone|telephone|mobile|cell|call|tel|contact|whatsapp|联系电话|电话|手机|手机号|移动电话|联系号码|联系方式)/i
-
-// This is a screening registry, not a live carrier database.
-// Mobile-number portability means a prefix cannot prove the subscriber's current carrier.
-const MOBILE_NUMBER_RULES: MobileNumberRule[] = [
-  { region: 'China (+86)', countryCode: '86', international: /^1[3-9]\d{9}$/, national: /^1[3-9]\d{9}$/, mobileSpecific: true },
-  { region: 'Hong Kong (+852)', countryCode: '852', international: /^[569]\d{7}$/, national: /^[569]\d{7}$/, mobileSpecific: true },
-  { region: 'Macao (+853)', countryCode: '853', international: /^6\d{7}$/, national: /^6\d{7}$/, mobileSpecific: true },
-  { region: 'Taiwan (+886)', countryCode: '886', international: /^9\d{8}$/, national: /^09\d{8}$/, mobileSpecific: true },
-  { region: 'Japan (+81)', countryCode: '81', international: /^(70|80|90)\d{8}$/, national: /^0(70|80|90)\d{8}$/, mobileSpecific: true },
-  { region: 'South Korea (+82)', countryCode: '82', international: /^10\d{8}$/, national: /^010\d{8}$/, mobileSpecific: true },
-  { region: 'United Kingdom (+44)', countryCode: '44', international: /^7(?:1|2|3|4|5|7|8|9)\d{8}$/, national: /^07(?:1|2|3|4|5|7|8|9)\d{8}$/, mobileSpecific: true },
-  { region: 'France (+33)', countryCode: '33', international: /^[67]\d{8}$/, national: /^0[67]\d{8}$/, mobileSpecific: true },
-  { region: 'Germany (+49)', countryCode: '49', international: /^1[5-7]\d{8,9}$/, national: /^01[5-7]\d{8,9}$/, mobileSpecific: true },
-  { region: 'Italy (+39)', countryCode: '39', international: /^3\d{9}$/, national: /^3\d{9}$/, mobileSpecific: true },
-  { region: 'Spain (+34)', countryCode: '34', international: /^[67]\d{8}$/, national: /^[67]\d{8}$/, mobileSpecific: true },
-  { region: 'Portugal (+351)', countryCode: '351', international: /^9\d{8}$/, national: /^9\d{8}$/, mobileSpecific: true },
-  { region: 'Netherlands (+31)', countryCode: '31', international: /^6\d{8}$/, national: /^06\d{8}$/, mobileSpecific: true },
-  { region: 'Belgium (+32)', countryCode: '32', international: /^4\d{8}$/, national: /^04\d{8}$/, mobileSpecific: true },
-  { region: 'Switzerland (+41)', countryCode: '41', international: /^7[5-9]\d{7}$/, national: /^07[5-9]\d{7}$/, mobileSpecific: true },
-  { region: 'Ireland (+353)', countryCode: '353', international: /^8[3-9]\d{7}$/, national: /^08[3-9]\d{7}$/, mobileSpecific: true },
-  { region: 'Poland (+48)', countryCode: '48', international: /^[5-8]\d{8}$/, national: /^[5-8]\d{8}$/, mobileSpecific: true },
-  { region: 'Czechia (+420)', countryCode: '420', international: /^[67]\d{8}$/, national: /^[67]\d{8}$/, mobileSpecific: true },
-  { region: 'Hungary (+36)', countryCode: '36', international: /^(20|30|31|50|70)\d{7}$/, national: /^(20|30|31|50|70)\d{7}$/, mobileSpecific: true },
-  { region: 'Romania (+40)', countryCode: '40', international: /^7\d{8}$/, national: /^07\d{8}$/, mobileSpecific: true },
-  { region: 'Greece (+30)', countryCode: '30', international: /^69\d{8}$/, national: /^069\d{8}$/, mobileSpecific: true },
-  { region: 'Türkiye (+90)', countryCode: '90', international: /^5\d{9}$/, national: /^05\d{9}$/, mobileSpecific: true },
-  { region: 'Russia/Kazakhstan (+7)', countryCode: '7', international: /^9\d{9}$/, national: /^8(?:9\d{9})$/, mobileSpecific: true },
-  { region: 'Ukraine (+380)', countryCode: '380', international: /^(50|63|66|67|68|73|91|93|95|96|97|98|99)\d{7}$/, national: /^0(?:50|63|66|67|68|73|91|93|95|96|97|98|99)\d{7}$/, mobileSpecific: true },
-  { region: 'Israel (+972)', countryCode: '972', international: /^5\d{8}$/, national: /^05\d{8}$/, mobileSpecific: true },
-  { region: 'United Arab Emirates (+971)', countryCode: '971', international: /^5\d{8}$/, national: /^05\d{8}$/, mobileSpecific: true },
-  { region: 'Saudi Arabia (+966)', countryCode: '966', international: /^5\d{8}$/, national: /^05\d{8}$/, mobileSpecific: true },
-  { region: 'South Africa (+27)', countryCode: '27', international: /^[6-8]\d{8}$/, national: /^0[6-8]\d{8}$/, mobileSpecific: true },
-  { region: 'United States/Canada (NANP)', countryCode: '1', international: /^[2-9]\d{9}$/, national: /^[2-9]\d{9}$/, mobileSpecific: false },
-  { region: 'Mexico (+52)', countryCode: '52', international: /^[2-9]\d{9}$/, mobileSpecific: false },
-  { region: 'Brazil (+55)', countryCode: '55', international: /^\d{2}9\d{8}$/, national: /^\d{2}9\d{8}$/, mobileSpecific: true },
-  { region: 'Australia (+61)', countryCode: '61', international: /^4\d{8}$/, national: /^04\d{8}$/, mobileSpecific: true },
-  { region: 'New Zealand (+64)', countryCode: '64', international: /^2\d{7,9}$/, national: /^02\d{7,9}$/, mobileSpecific: true },
-  { region: 'India (+91)', countryCode: '91', international: /^[6-9]\d{9}$/, national: /^[6-9]\d{9}$/, mobileSpecific: true },
-  { region: 'Pakistan (+92)', countryCode: '92', international: /^3\d{9}$/, national: /^03\d{9}$/, mobileSpecific: true },
-  { region: 'Bangladesh (+880)', countryCode: '880', international: /^1[3-9]\d{8}$/, national: /^01[3-9]\d{8}$/, mobileSpecific: true },
-  { region: 'Indonesia (+62)', countryCode: '62', international: /^8\d{8,11}$/, national: /^08\d{8,11}$/, mobileSpecific: true },
-  { region: 'Malaysia (+60)', countryCode: '60', international: /^1\d{8,9}$/, national: /^01\d{8,9}$/, mobileSpecific: true },
-  { region: 'Singapore (+65)', countryCode: '65', international: /^[89]\d{7}$/, national: /^[89]\d{7}$/, mobileSpecific: true },
-  { region: 'Thailand (+66)', countryCode: '66', international: /^[689]\d{8}$/, national: /^0[689]\d{8}$/, mobileSpecific: true },
-  { region: 'Philippines (+63)', countryCode: '63', international: /^9\d{9}$/, national: /^09\d{9}$/, mobileSpecific: true },
-  { region: 'Vietnam (+84)', countryCode: '84', international: /^[35789]\d{8}$/, national: /^0[35789]\d{8}$/, mobileSpecific: true },
-  { region: 'Cambodia (+855)', countryCode: '855', international: /^[1-9]\d{7,8}$/, national: /^0[1-9]\d{7,8}$/, mobileSpecific: true },
-  { region: 'Laos (+856)', countryCode: '856', international: /^20\d{8}$/, national: /^020\d{8}$/, mobileSpecific: true },
-  { region: 'Myanmar (+95)', countryCode: '95', international: /^9\d{7,9}$/, national: /^09\d{7,9}$/, mobileSpecific: true },
-  { region: 'Brunei (+673)', countryCode: '673', international: /^[78]\d{6}$/, national: /^[78]\d{6}$/, mobileSpecific: true },
-]
-
-const MESSENGER_RULES: MessengerRule[] = [
-  {
-    platform: 'WhatsApp',
-    patterns: [
-      /(?:https?:\/\/)?(?:wa\.me|api\.whatsapp\.com\/send\?phone=)[^\s<>"')]+/gi,
-      /\bWhatsApp\s*(?:ID|账号|号码|number)?\s*[:：=]?\s*(\+?\d[\d\s().-]{7,}\d)\b/gi,
-    ],
-  },
-  {
-    platform: 'Telegram',
-    patterns: [
-      /(?:https?:\/\/)?(?:t\.me|telegram\.me)\/[A-Za-z0-9_]{3,64}\b/gi,
-      /\bTelegram\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z][A-Za-z0-9_]{3,31}\b/gi,
-    ],
-  },
-  {
-    platform: 'Facebook Messenger',
-    patterns: [
-      /(?:https?:\/\/)?m\.me\/[A-Za-z0-9._-]{2,64}\b/gi,
-      /(?:https?:\/\/)?(?:messenger\.com\/t|facebook\.com\/messages\/t)\/[A-Za-z0-9._-]{2,64}\b/gi,
-      /\bMessenger\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z0-9._-]{3,64}\b/gi,
-    ],
-  },
-  {
-    platform: 'WeChat',
-    patterns: [
-      /(?:https?:\/\/)?(?:weixin\.qq\.com|wechat\.com)\/[^\s<>"')]+/gi,
-      /(?:微信号|WeChat\s*(?:ID|username)?|weixin)\s*[:：=]?\s*[A-Za-z][A-Za-z0-9_-]{5,19}\b/gi,
-    ],
-  },
-  {
-    platform: 'LINE',
-    patterns: [
-      /(?:https?:\/\/)?line\.me\/(?:R\/ti\/p\/|ti\/p\/~?)[^\s<>"')]+/gi,
-      /\bLINE\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z0-9._-]{3,32}\b/gi,
-    ],
-  },
-  {
-    platform: 'QQ',
-    patterns: [
-      /(?:QQ(?:号|账号|ID)?|扣扣)\s*[:：=]?\s*\d{5,12}\b/gi,
-      /(?:https?:\/\/)?qq\.com\/[^\s<>"')]+/gi,
-    ],
-  },
-  {
-    platform: 'Signal',
-    patterns: [
-      /(?:https?:\/\/)?signal\.me\/[^\s<>"')]+/gi,
-      /\bSignal\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z0-9._-]{3,64}\b/gi,
-    ],
-  },
-  {
-    platform: 'Viber',
-    patterns: [
-      /(?:https?:\/\/)?(?:vb\.me|viber\.com)\/[^\s<>"')]+/gi,
-      /\bViber\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z0-9._-]{3,64}\b/gi,
-    ],
-  },
-  {
-    platform: 'KakaoTalk',
-    patterns: [
-      /(?:https?:\/\/)?open\.kakao\.com\/[^\s<>"')]+/gi,
-      /\bKakao(?:Talk)?\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z0-9._-]{3,64}\b/gi,
-    ],
-  },
-  {
-    platform: 'Discord',
-    patterns: [
-      /(?:https?:\/\/)?(?:discord\.gg|discord\.com\/users|discordapp\.com\/users)\/[^\s<>"')]+/gi,
-      /\bDiscord\s*(?:ID|username|用户名|账号)?\s*[:：=]?\s*@?[A-Za-z0-9._-]{3,64}(?:#\d{4})?\b/gi,
-    ],
-  },
-]
-
-const isDateLike = (raw: string): boolean =>
-  /^\+?\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(raw.trim())
-
-const normalizePhoneDigits = (raw: string): string => raw.replace(/\D/g, '')
-
-const detectPhoneNumbers = (value: string): {
-  matches: DetectedMobileNumber[]
-  mobileCount: number
-  phoneCount: number
-  regions: string[]
-} => {
-  const dedupe = new Map<string, DetectedMobileNumber>()
-  for (const match of value.matchAll(PHONE_CANDIDATE_RE)) {
-    const raw = match[0]
-    if (isDateLike(raw)) continue
-
-    const digits = normalizePhoneDigits(raw)
-    if (digits.length < 8 || digits.length > 15) continue
-    const start = Math.max(0, (match.index ?? 0) - 36)
-    const end = Math.min(value.length, (match.index ?? 0) + raw.length + 36)
-    const context = value.slice(start, end)
-    const hasContext = PHONE_CONTEXT_RE.test(context)
-    const hasFormatting = /[+\s().-]/.test(raw)
-    const hasExplicitInternationalPrefix = /^\s*(?:\+|00)/.test(raw)
-
-    for (const rule of MOBILE_NUMBER_RULES) {
-      const internationalMatch = digits.startsWith(rule.countryCode) &&
-        rule.international.test(digits.slice(rule.countryCode.length))
-      const nationalMatch = rule.national?.test(digits) ?? false
-      if (!internationalMatch && !nationalMatch) continue
-
-      // A national-format number is only a candidate when formatting or nearby
-      // phone context exists. An explicit +/00 prefix is sufficient for an
-      // international-format candidate. This prevents bare IDs/order numbers
-      // from being misclassified as mobile numbers.
-      if (!hasExplicitInternationalPrefix && !hasContext && !hasFormatting) continue
-
-      const key = rule.region + '|' + digits
-      if (!dedupe.has(key)) {
-        dedupe.set(key, { raw, region: rule.region, mobileSpecific: rule.mobileSpecific })
-      }
-      break
-    }
-  }
-
-  const matches = Array.from(dedupe.values())
-  return {
-    matches,
-    mobileCount: matches.filter(item => item.mobileSpecific).length,
-    phoneCount: matches.length,
-    regions: Array.from(new Set(matches.map(item => item.region))),
-  }
-}
-
-const detectMessengerIds = (value: string): { platform: string; match: string }[] => {
-  const hits: { platform: string; match: string }[] = []
-  const seen = new Set<string>()
-  for (const rule of MESSENGER_RULES) {
-    for (const pattern of rule.patterns) {
-      for (const match of firstMatches(value, pattern, 6)) {
-        const key = rule.platform + '|' + match.toLowerCase()
-        if (seen.has(key)) continue
-        seen.add(key)
-        hits.push({ platform: rule.platform, match })
-      }
-    }
-  }
-  return hits
-}
 
 const titleSignals = (title: string): string[] =>
   Array.from(new Set(
@@ -366,10 +151,10 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
   const aiMode = normalizedMode(input.aiMode)
   const humanContribution = normalizedHumanContribution(input.humanContribution)
   const titleLower = title.toLowerCase()
+  const contactDetection = detectContactSignals(body)
   const externalUrls = firstMatches(body, /(?:https?:\/\/|www\.)[^\s<>"')]+/gi, 10)
-  const phoneDetections = detectPhoneNumbers(body)
-  const phones = phoneDetections.matches
-  const messengerIds = detectMessengerIds(body)
+  const phoneCount = contactDetection.phoneCount
+  const messengerIdCount = contactDetection.messengerIdCount
   const paragraphs = body.split(/\n\s*\n+/).map(value => value.trim()).filter(Boolean)
   const headingCount = count(body, /^(?:#{1,6}\s+|(?:第[一二三四五六七八九十百]+[章节条]\s*)|(?:[一二三四五六七八九十百]+[、.．]\s*).{2,60})$/gim)
   const repeatedSentences = uniqueRepeatedSentences(body)
@@ -436,35 +221,73 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
     )
   }
 
-  if (phones.length) {
-    const hasPromotion = salesSignals.length > 0 || contactSignals.length > 0 || messengerIds.length > 0 || externalUrls.length > 0
-    const mobileRegions = phoneDetections.regions.filter(region => !region.includes('NANP') && !region.includes('Mexico'))
-    const regionHint = mobileRegions.length ? '（覆盖：' + mobileRegions.slice(0, 4).join('、') + (mobileRegions.length > 4 ? '等' : '') + '）' : ''
+  if (phoneCount > 0) {
+    const hasPromotion = contactDetection.leadGenerationSignals.length > 0 || messengerIdCount > 0 || externalUrls.length > 0
+    const regions = contactDetection.detectedMobileRegions.slice(0, 5)
     addFinding(
       findings,
       'CONTACT-PHONE',
       hasPromotion ? 'BLOCK' : 'WARN',
       'CONTACT',
-      phoneDetections.mobileCount > 0 ? '发现手机号/移动号码' : '发现电话号候选',
-      hasPromotion ? '检测到电话/手机号，并与社交账号、网址或推广导流信号组合出现。' : '正文存在电话或手机号候选' + regionHint + '；请确认它是报道事实所必需，而不是引导联系。',
+      contactDetection.mobileNumberCount > 0 ? '发现手机号/移动号码' : '发现电话号候选',
+      hasPromotion
+        ? '检测到电话/手机号，并与即时通讯账号、网址或推广导流信号组合出现。'
+        : '正文存在手机号候选' + (regions.length ? '（覆盖：' + regions.join('、') + (contactDetection.detectedMobileRegions.length > 5 ? '等' : '') + '）' : '') + '；第一层依据号码计划与格式做候选识别，不等同于实时运营商或号码存活核验。',
       '删除个人联系方式和导流号码；确有必要时仅保留公开机构联系方式，并注明来源。',
     )
   }
 
-  if (messengerIds.length) {
-    const hasIntent = salesSignals.length > 0 || externalUrls.length > 0 || qrSignals.length > 0
+  if (messengerIdCount > 0) {
+    const hasIntent = contactDetection.leadGenerationSignals.length > 0 || externalUrls.length > 0 || qrSignals.length > 0
     addFinding(
       findings,
       'CONTACT-MESSENGER-ID',
       hasIntent ? 'BLOCK' : 'WARN',
       'CONTACT',
-      '发现即时通讯账号/邀请链接',
-      hasIntent ? '检测到主流即时通讯账号、邀请链接或联系方式，并伴随导流/营销信号。' : '检测到主流即时通讯账号或邀请链接；请确认这是报道事实所必需，而不是引导私聊、加群或站外成交。',
-      '删除私聊、加群、邀请链接和营销账号；确有必要时只保留公开机构联系信息并说明来源。',
+      '发现即时通讯/社交账号或邀请链接',
+      hasIntent
+        ? '检测到即时通讯、社交账号或邀请链接，并伴随导流/营销信号。'
+        : '检测到明确的即时通讯、社交账号或邀请链接格式；单独提及平台名称不会触发本项。',
+      hasIntent ? '删除私聊、加群、邀请链接和营销账号；确有必要时只保留公开机构联系信息并说明来源。' : '确认该账号信息是报道事实所必需；否则删除或改为公开机构信息。',
     )
-  } else if (contactSignals.length) {
-    const hasIntent = salesSignals.length > 0 || externalUrls.length > 0 || qrSignals.length > 0
-    addFinding(findings, 'CONTACT-PLATFORM-ID', hasIntent ? 'BLOCK' : 'WARN', 'CONTACT', '发现社交账号/联系方式信号', hasIntent ? '社交账号或联系方式与导流/营销信号组合出现。' : '正文存在微信、LINE、QQ、Telegram 等联系方式相关词汇。', '仅保留报道对象所必需的公开联系方式，不要引导用户私聊或加群。')
+  }
+
+  if (contactDetection.socialProfileCount > 0) {
+    const hasIntent = contactDetection.leadGenerationSignals.length > 0 || externalUrls.length > 0 || qrSignals.length > 0
+    addFinding(
+      findings,
+      'CONTACT-SOCIAL-PROFILE',
+      hasIntent ? 'BLOCK' : 'WARN',
+      'CONTACT',
+      '发现社交平台个人主页链接',
+      hasIntent ? '检测到 Instagram、TikTok、X、Snapchat 或 Reddit 等社交主页，并伴随导流信号。' : '检测到社交平台个人主页链接；确认它是否是报道事实所必需。',
+      '删除站外导流主页；如属于信息来源，使用公开机构/原始来源并说明用途。',
+    )
+  }
+
+  if (contactDetection.emailCount > 0) {
+    const hasIntent = contactDetection.leadGenerationSignals.length > 0 || externalUrls.length > 0
+    addFinding(
+      findings,
+      'CONTACT-EMAIL',
+      hasIntent ? 'BLOCK' : 'WARN',
+      'CONTACT',
+      '发现电子邮箱地址',
+      hasIntent ? '邮箱地址与网址或推广/导流语句组合出现。' : '正文存在电子邮箱，请确认公开邮箱属于报道事实所必需信息。',
+      '删除个人邮箱和营销邮箱；确有必要时只保留公开机构邮箱并注明来源。',
+    )
+  }
+
+  if (contactDetection.obfuscationDetected && (phoneCount > 0 || messengerIdCount > 0 || contactDetection.emailCount > 0)) {
+    addFinding(
+      findings,
+      'SEC-CONTACT-OBFUSCATION',
+      'WARN',
+      'SECURITY',
+      '发现可能的联系方式混淆写法',
+      '文本包含零宽字符、同形 Unicode 或其他可能降低规则命中率的写法；系统已在内部做规范化后再次检测。',
+      '恢复为正常、可读的文本；不要使用隐藏字符或故意拆分联系方式。',
+    )
   }
 
   if (qrSignals.length || mediaRiskRefs.length) {
@@ -511,8 +334,9 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
   if (headingCount > 0) positiveSignals.push('存在可识别的小节结构')
   if (input.contentType !== 'post' && body.length >= 800) positiveSignals.push('正文达到较完整的信息承载量')
   if (externalUrls.length === 0) positiveSignals.push('未发现外部网址')
-  if (phones.length === 0) positiveSignals.push('未发现电话/手机号候选')
-  if (messengerIds.length === 0) positiveSignals.push('未发现主流即时通讯账号/邀请链接')
+  if (phoneCount === 0) positiveSignals.push('未发现疑似手机号/电话候选')
+  if (messengerIdCount === 0 && contactDetection.socialProfileCount === 0) positiveSignals.push('未发现明确的即时通讯/社交账号链接')
+  if (contactDetection.obfuscationDetected) positiveSignals.push('已执行 Unicode/隐藏字符规范化检测')
 
   if (aiMode === 'full') {
     addFinding(findings, 'AI-FULL-AUTO', 'BLOCK', 'AI', '禁止整篇 AI 自动成稿直接发布', 'LuckRead 要求 AI 用于提纲、结构、整理或辅助润色，不能把整篇 AI 成稿不经创作者实质补充直接提交。', '回到草稿，加入你自己的事实、经历、数据、案例、判断和核验；再重新提交。')
@@ -531,8 +355,11 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
   const score = clampScore(100 - blocks * 35 - warns * 8 + Math.min(firstHandSignals.length * 2, 10) + Math.min(headingCount * 2, 6))
   const verdict: PreflightVerdict = blocks > 0 ? 'RED' : warns > 0 ? 'YELLOW' : 'PASS'
 
+  const contactSignals: ContactSignal[] = contactDetection.signals.slice(0, 24)
+
   return {
     policyVersion: 'luckread.publish-preflight.v1',
+    contactSignals,
     verdict,
     score,
     seoReadiness: verdict === 'RED' ? 'BLOCKED' : verdict === 'YELLOW' ? 'IMPROVE' : 'READY',
