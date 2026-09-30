@@ -92,7 +92,11 @@ export default function CreatorContentList() {
   }, [load])
 
   async function transition(item: Item, to: 'PUBLISHED' | 'UNPUBLISHED') {
-    const verb = to === 'UNPUBLISHED' ? '下线' : '重新发布'
+    const verb = to === 'UNPUBLISHED'
+      ? '下线'
+      : item.state === 'APPROVED'
+        ? '发布'
+        : '重新发布'
     if (!window.confirm(`确定要${verb}“${item.title}”吗？`)) return
 
     setActionId(item.id)
@@ -200,6 +204,16 @@ export default function CreatorContentList() {
                     <Link className={styles.secondaryButton} href={`/publish?draft=${encodeURIComponent(item.id)}`}>
                       继续编辑
                     </Link>
+                  ) : null}
+                  {item.state === 'APPROVED' ? (
+                    <button
+                      className={styles.primaryButton}
+                      disabled={actionId !== null}
+                      onClick={() => void transition(item, 'PUBLISHED')}
+                      type="button"
+                    >
+                      {actionId === item.id ? '处理中…' : '立即发布'}
+                    </button>
                   ) : null}
                   {item.state === 'PUBLISHED' ? (
                     <>
