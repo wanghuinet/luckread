@@ -1,0 +1,95 @@
+name: W05 D1-02 Physical Binding Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: 'Exact 40-character source SHA to deploy'
+        required: true
+        type: string
+      confirm:
+        description: 'Explicit binding deployment confirmation'
+        required: true
+        type: choice
+        options:
+          - DEPLOY_W05_D1_02
+          - CANCEL
+        default: CANCEL
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_DB_UUID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  EXPECTED_WORKER: luckread-w05
+
+jobs:
+  deploy:
+    if: ${ inputs.confirm == 'DEPLOY_W05_D1_02' }
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate source SHA
+        run: |
+          set -euo pipefail
+          test -n "${ inputs.source_sha }"
+          printf '%s' "${ inputs.source_sha }" | grep -Eq '^[0-9a-f]{40}$'
+
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${ inputs.source_sha }
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify binding contract before deployment
+        run: |
+          set -euo pipefail
+          test -f workers/W05-transaction/wrangler.jsonc
+          jq -e --arg worker "$EXPECTED_WORKER" '.name == $worker' workers/W05-transaction/wrangler.jsonc >/dev/null
+          jq -e --arg db "$EXPECTED_DB_UUID"             '.d1_databases | length == 1 and .[0].binding == "DB" and .[0].database_id == $db'             workers/W05-transaction/wrangler.jsonc >/dev/null
+
+      - name: Deploy W05 with D1-02 binding
+        env:
+          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }
+          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }
+        working-directory: workers/W05-transaction
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+
+      - name: Verify live worker binding
+        env:
+          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }
+          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }
+        run: |
+          set -euo pipefail
+          curl -fsS             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$EXPECTED_WORKER/settings"             > /tmp/w05-settings.json
+          jq -e --arg db "$EXPECTED_DB_UUID"             '.. | objects | select(.id? == $db)' /tmp/w05-settings.json >/dev/null
+
+      - name: Write exact-SHA provenance
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0
+          cat > artifacts/mapping-0/w05-d1-02-binding-deployment-provenance.json <<EOF
+          {
+            "workflow": "W05 D1-02 Physical Binding Deploy",
+            "runId": "$GITHUB_RUN_ID",
+            "sourceSha": "${ inputs.source_sha }",
+            "worker": "$EXPECTED_WORKER",
+            "d1DatabaseUuid": "$EXPECTED_DB_UUID",
+            "confirmation": "${ inputs.confirm }",
+            "bindingVerified": true
+          }
+          EOF
+
+      - name: Upload binding provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: w05-d1-02-binding-${ inputs.source_sha }
+          path: artifacts/mapping-0/w05-d1-02-binding-deployment-provenance.json
+          if-no-files-found: error
+          retention-days: 14
