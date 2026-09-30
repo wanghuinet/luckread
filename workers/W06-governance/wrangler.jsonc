@@ -4,6 +4,12 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-08-15",
   "workers_dev": false,
+  "services": [
+    {
+      "binding": "W03_CONTENT_MODERATION",
+      "service": "luckread-w03"
+    }
+  ],
   "queues": {
     "consumers": [
       {
