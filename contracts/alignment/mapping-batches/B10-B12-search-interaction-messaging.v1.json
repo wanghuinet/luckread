@@ -160,24 +160,34 @@
       "evidenceRefs": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/openapi/v1/openapi.yaml#/social/follows",
-        "contracts/api/interaction-operation-policy.v1.json"
+        "contracts/api/interaction-operation-policy.v1.json",
+        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
       ],
       "blockers": [
-        "DTO/Entity/Field/Payload/Security/Lifecycle/Code/Test/Evidence mapping not yet evidence-bound"
+        "DTO/Field/Persistence/Payload/Security/Lifecycle/Code/Test/Evidence mapping not yet evidence-bound"
       ],
       "apiOperationIds": [
         "follow",
         "unfollow"
+      ],
+      "entityIds": [
+        "ENT-SOCIAL-FOLLOW"
       ]
     },
     {
       "featureId": "SOCIAL-002",
       "status": "UNRESOLVED",
       "evidenceRefs": [
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
       ],
       "blockers": [
-        "API/DTO/Entity/Field/Payload/Security/Lifecycle/Code mapping not yet evidence-bound"
+        "Follower/following API/DTO, Field/Persistence/Payload/Security/Lifecycle/Code/Test/Evidence mapping not yet evidence-bound"
+      ],
+      "entityIds": [
+        "ENT-SOCIAL-FOLLOW"
       ]
     },
     {
