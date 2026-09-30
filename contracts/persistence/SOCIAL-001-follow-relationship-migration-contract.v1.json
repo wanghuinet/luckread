@@ -20,7 +20,7 @@
     "migrationId": "MIG-SOCIAL-001-FOLLOW-V1",
     "migrationVersion": "20260930_001_SOCIAL_001_FOLLOW_V1",
     "artifactPath": "workers/W05-transaction/migrations/20260930_001_social_001_follow_v1.sql",
-    "executionStatus": "NOT_EXECUTED",
+    "executionStatus": "EXECUTED",
     "executionAuthority": "W05 bound to admitted D1-02 UUID only",
     "forwardOnly": true,
     "idempotent": true,
@@ -86,7 +86,12 @@
       "Create a second authoritative Follow table in another D1 domain.",
       "Execute against a database UUID other than the admitted D1-02 UUID.",
       "Claim migration success from planned, static, or local-only validation."
-    ]
+    ],
+    "executionRunId": "36718167892",
+    "executionSourceSha": "d1b2a0096066c6486cd174e77293b144b9978e93",
+    "executionResult": "REMOTE_EXECUTION_SUCCESS",
+    "appliedAt": "2026-09-30 12:57:30",
+    "evidenceRef": "artifacts/mapping-0/social-001-follow-d1-02-migration-evidence-20260930.json"
   },
   "evidenceRequirements": [
     "exact source SHA used for deployment",
@@ -108,5 +113,6 @@
     "This contract does not add W05 runtime handlers.",
     "This contract does not promote SOCIAL-001 to GREEN.",
     "This contract does not promote SOCIAL-002 followers/following queries."
-  ]
+  ],
+  "runtimeVerificationStatus": "NOT_VERIFIED"
 }
