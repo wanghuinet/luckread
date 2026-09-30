@@ -40,7 +40,7 @@ schema evidence
 - D1 UUID: `6c342634-97f6-4248-9f4a-85772af4f22c`
 - Physical binding contract: `docs/change-control/CC-MAPPING-0-SOCIAL-001-W05-D1-02-PHYSICAL-BINDING-2026-09-30.md`
 - Migration contract: `contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json`
-- Expected migration artifact: `workers/W05-transaction/migrations/20260930_001_social_001_follow_v1.sql`
+- Expected migration artifact: `workers/W05-transaction/migrations/20260930_001_social_001_follow_v1.sql`\n- Migration artifact blob SHA: `effa0a6ca934d9b995611d7612baa1255379c0a7`
 
 ## Required execution order
 
