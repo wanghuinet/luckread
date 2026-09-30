@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/content-preflight-operation.json",
+  "title": "LuckRead Publish Preflight Operation",
+  "version": "1.0.0",
+  "domain": "content",
+  "operationId": "preflightContent",
+  "purpose": "Run stateless publish-readiness checks before a creator submits content for review.",
+  "publicPath": "/api/creator/contents/{contentId}/preflight",
+  "internalPath": "/internal/content/contents/{contentId}/preflight",
+  "method": "POST",
+  "visibility": "public_authenticated",
+  "authority": "W03",
+  "database": {
+    "reads": 0,
+    "writes": 0,
+    "reason": "Pure analysis; authoritative content persistence remains in D1-02."
+  },
+  "checks": [
+    "AI creation policy and required substantial creator contribution for articles",
+    "people-first/original-value signals aligned to Google Search guidance",
+    "title clarity and keyword-stuffing risk",
+    "topic-to-body relevance",
+    "long paragraph and structure quality",
+    "repeated/boilerplate content",
+    "phone/contact/social-account/lead-generation signals",
+    "external URL and promotion combinations",
+    "QR-code/scan text hints and media-reference heuristics",
+    "HTML/script/hidden-style injection hints"
+  ],
+  "verdicts": {
+    "PASS": "No blocking issue detected.",
+    "YELLOW": "Advisory issues exist; creator may continue, subject to normal moderation.",
+    "RED": "A blocking policy/quality issue exists; creator must fix it before review submission."
+  },
+  "nonGoals": [
+    "AI authorship forensic detection",
+    "Pixel-level image OCR or QR decoding",
+    "Guaranteeing Google indexing or ranking",
+    "Replacing content moderation or human review",
+    "Adding a new Worker or D1 database"
+  ],
+  "recheck": {
+    "requiredBeforeReviewSubmission": true,
+    "serverSide": true,
+    "finalAuthority": "W03"
+  }
+}
