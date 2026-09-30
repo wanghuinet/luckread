@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/moderation-operation-policy.v1.json",
+  "title": "LuckRead Moderation API Operation Policy — Admission Draft",
+  "version": "1.0.0",
+  "domain": "moderation",
+  "status": "CONTRACT_DRAFT_OPENAPI_PENDING",
+  "implementationAuthorization": false,
+  "sourceRefs": [
+    "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
+    "docs/150-MODERATION-GOVERNANCE-CENTER-EXPERIENCE-CONTRACT-v1.0.md",
+    "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
+    "contracts/authz/permissions.json",
+    "contracts/state-machines/content.json",
+    "docs/change-control/CC-1.0-MODERATION-QUEUE-FOUNDATION-ADMISSION-2026-09-30.md"
+  ],
+  "authorityBoundary": {
+    "worker": "W06",
+    "database": "D1-03",
+    "contentStateAuthority": "W03",
+    "payloadAuthority": false,
+    "newWorkerAllowed": false,
+    "newDatabaseAllowed": false
+  },
+  "invariants": [
+    "Moderation owns reviewer queue, case, decision and enforcement intent; Content remains authoritative for content lifecycle state.",
+    "A moderation decision MUST NOT directly mutate W03 content storage.",
+    "Reviewer identity and permission MUST be derived server-side from the authenticated administrative principal.",
+    "Sensitive evidence and internal risk signals MUST never be exposed through creator/public DTOs.",
+    "Every decision MUST record target, policyVersion, reasonCode, severity, scope and reviewer or automation source as required by the parent moderation contract.",
+    "Decision mutations MUST be idempotent and protected by expectedVersion/optimistic concurrency where the case can race.",
+    "Queue reads MUST be bounded and reviewer-scope filtered.",
+    "No synchronous fan-out to content, creator, feed or notification projections is allowed in the request path.",
+    "Content transition to APPROVED or REJECTED MUST remain attributable to a moderation decision.",
+    "Moderation implementation remains blocked until canonical OpenAPI, DTO, persistence, transport and evidence bindings reconcile."
+  ],
+  "operations": [
+    {
+      "operationId": "listModerationQueue",
+      "method": "GET",
+      "path": "/admin/moderation/queue",
+      "visibility": "admin_authenticated",
+      "capability": "moderation_queue_read",
+      "status": "RESERVED_OPENAPI_PENDING",
+      "authorization": {
+        "required": true,
+        "permission": "moderation.queue.read",
+        "scope": "reviewer_scope"
+      },
+      "resource": {
+        "class": "BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 50,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0
+      },
+      "pagination": {
+        "style": "OPAQUE_CURSOR",
+        "pageSizeMax": 50,
+        "offsetForbidden": true
+      },
+      "cache": {
+        "mode": "PRIVATE_NO_SHARED_CACHE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "security": [
+        "reviewer_scope_server_derived",
+        "sensitive_evidence_excluded",
+        "queue_order_policy_versioned",
+        "no_cross_domain_table_reads"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "permission": "CONTRACTED",
+        "dto": "MISSING",
+        "persistence": "MISSING",
+        "transport": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "getModerationCase",
+      "method": "GET",
+      "path": "/admin/moderation/cases/{caseId}",
+      "visibility": "admin_authenticated",
+      "capability": "moderation_case_read",
+      "status": "RESERVED_OPENAPI_PENDING",
+      "authorization": {
+        "required": true,
+        "permission": "moderation.case.read",
+        "scope": "reviewer_scope"
+      },
+      "resource": {
+        "class": "BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 50,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0
+      },
+      "cache": {
+        "mode": "PRIVATE_NO_SHARED_CACHE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "security": [
+        "case_scope_server_derived",
+        "evidence_minimization",
+        "internal_risk_fields_hidden",
+        "content_facts_reference_authority_not_copy"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "permission": "CONTRACTED",
+        "dto": "MISSING",
+        "persistence": "MISSING",
+        "transport": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "decideModerationCase",
+      "method": "POST",
+      "path": "/admin/moderation/cases/{caseId}/decision",
+      "visibility": "admin_authenticated",
+      "capability": "moderation_decide",
+      "status": "RESERVED_OPENAPI_PENDING",
+      "authorization": {
+        "required": true,
+        "permission": "moderation.decide",
+        "scope": "reviewer_scope"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 1,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 8,
+        "rpcMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true,
+        "requiresOptimisticConcurrency": true
+      },
+      "idempotency": {
+        "required": true,
+        "key": "Idempotency-Key"
+      },
+      "concurrency": {
+        "strategy": "EXPECTED_VERSION",
+        "conflictStatus": 412,
+        "duplicateDecision": "IDEMPOTENT_REPLAY"
+      },
+      "decision": {
+        "requiredFields": [
+          "target",
+          "policyVersion",
+          "reasonCode",
+          "severity",
+          "scope",
+          "effectiveAt",
+          "reviewerOrAutomationSource"
+        ],
+        "allowedContentTransitions": [
+          "PENDING_REVIEW→APPROVED",
+          "PENDING_REVIEW→REJECTED"
+        ]
+      },
+      "security": [
+        "reviewer_identity_server_derived",
+        "decision_scope_server_derived",
+        "no_direct_content_state_field_mutation",
+        "audit_required",
+        "sensitive_evidence_never_returned"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "permission": "CONTRACTED",
+        "dto": "MISSING",
+        "persistence": "MISSING",
+        "transport": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
+    }
+  ],
+  "nonGoals": [
+    "No W06 runtime implementation.",
+    "No D1-03 migration execution.",
+    "No new Worker or D1.",
+    "No direct W06→W03 database access.",
+    "No public moderation API exposure.",
+    "No promotion to canonical OpenAPI until explicitly reconciled.",
+    "No implementation GREEN claim."
+  ]
+}
