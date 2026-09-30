@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import styles from './creator-center.module.css'
+
 type Props = {
   qualityTarget?: string
 }
@@ -32,7 +34,7 @@ export default function CreatorCenterAssistant({ qualityTarget = 'quality' }: Pr
     window.requestAnimationFrame(() => {
       document.getElementById(qualityTarget)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       const target = document.querySelector<HTMLElement>(
-        '.lr-preflight-report, .lr-preflight-policy, button'
+        '#quality .lr-preflight-policy, #quality .lr-preflight-report, #quality button',
       )
       target?.focus?.({ preventScroll: true })
     })
@@ -42,7 +44,7 @@ export default function CreatorCenterAssistant({ qualityTarget = 'quality' }: Pr
     setOpen(false)
     window.requestAnimationFrame(() => {
       document.getElementById(qualityTarget)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      const button = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
+      const button = Array.from(document.querySelectorAll<HTMLButtonElement>('#publisher button')).find(
         (item) => item.textContent?.trim() === '发布前自检',
       )
       button?.click()
@@ -52,7 +54,11 @@ export default function CreatorCenterAssistant({ qualityTarget = 'quality' }: Pr
   return (
     <div className={styles.assistantDock} ref={panelRef}>
       {open ? (
-        <section className={styles.assistantPanel} aria-label="发布前检测助手">
+        <section
+          id="creator-check-assistant"
+          className={styles.assistantPanel}
+          aria-label="发布前检测助手"
+        >
           <div className={styles.assistantPanelHead}>
             <div>
               <span className={styles.assistantKicker}>CREATOR CHECK</span>
@@ -109,5 +115,3 @@ export default function CreatorCenterAssistant({ qualityTarget = 'quality' }: Pr
     </div>
   )
 }
-
-import styles from './creator-center.module.css'
