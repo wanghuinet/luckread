@@ -276,6 +276,20 @@ const maskValue = (value: string): string => {
 }
 
 const regionLabel = (country?: string, callingCode?: string): string => {
+  const callingCodeLabels: Record<string, string> = {
+    '1': 'United States/Canada (NANP)', '33': 'France (+33)', '34': 'Spain (+34)', '39': 'Italy (+39)',
+    '44': 'United Kingdom (+44)', '49': 'Germany (+49)', '52': 'Mexico (+52)', '55': 'Brazil (+55)',
+    '60': 'Malaysia (+60)', '61': 'Australia (+61)', '62': 'Indonesia (+62)', '63': 'Philippines (+63)',
+    '64': 'New Zealand (+64)', '65': 'Singapore (+65)', '66': 'Thailand (+66)', '81': 'Japan (+81)',
+    '82': 'South Korea (+82)', '84': 'Vietnam (+84)', '86': 'China (+86)', '90': 'Türkiye (+90)',
+    '91': 'India (+91)', '92': 'Pakistan (+92)', '95': 'Myanmar (+95)', '351': 'Portugal (+351)',
+    '353': 'Ireland (+353)', '380': 'Ukraine (+380)', '420': 'Czechia (+420)', '40': 'Romania (+40)',
+    '41': 'Switzerland (+41)', '43': 'Austria (+43)', '45': 'Denmark (+45)', '46': 'Sweden (+46)',
+    '47': 'Norway (+47)', '48': 'Poland (+48)', '852': 'Hong Kong (+852)', '853': 'Macao (+853)',
+    '855': 'Cambodia (+855)', '856': 'Laos (+856)', '880': 'Bangladesh (+880)', '886': 'Taiwan (+886)',
+    '966': 'Saudi Arabia (+966)', '971': 'United Arab Emirates (+971)', '972': 'Israel (+972)',
+  }
+  if (callingCode && callingCodeLabels[callingCode]) return callingCodeLabels[callingCode]
   if (!country) return callingCode ? '国际号码 (+' + callingCode + ')' : '未知地区'
   const labels: Record<string, string> = {
     CN: 'China (+86)', HK: 'Hong Kong (+852)', MO: 'Macao (+853)', TW: 'Taiwan (+886)',
@@ -485,11 +499,14 @@ const detectObfuscation = (value: string): boolean => normalizeContactText(value
 export const detectContactSignals = (rawValue: string): ContactDetectionResult => {
   const raw = String(rawValue ?? '')
   const { normalized, hadObfuscation } = normalizeContactText(raw)
+  const compacted = compactContactLabels(normalized)
+  const compactChanged = compacted !== normalized
   const signals = dedupeSignals([
     ...detectPhones(raw),
     ...detectPhones(normalized),
     ...detectMessengers(raw),
     ...detectMessengers(normalized),
+    ...detectMessengers(compacted),
     ...detectSocialProfileUrls(raw),
     ...detectEmails(raw),
   ])
@@ -526,6 +543,6 @@ export const detectContactSignals = (rawValue: string): ContactDetectionResult =
     urlCount: domains.urls.length,
     detectedDomains: domains.domains,
     leadGenerationSignals,
-    obfuscationDetected: hadObfuscation || detectObfuscation(normalized),
+    obfuscationDetected: hadObfuscation || (compactChanged && signals.some(item => item.kind === 'MESSENGER' || item.kind === 'SOCIAL')),
   }
 }
