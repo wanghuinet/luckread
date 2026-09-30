@@ -125,3 +125,7 @@ No runtime moderation implementation is authorized by this record.
 ## 8. Canonical Blueprint feature identity
 
 This moderation foundation maps to Blueprint features `GOV-003` (moderation queue) and `GOV-004` (enforcement case). The transport filename remains a historical contract artifact name; it MUST NOT be interpreted as a new Blueprint Feature ID.
+
+## 9. Audit binding
+
+`contracts/events/GOV-004-moderation-decision-audit-binding.v1.json` now binds the authoritative decision mutation to the existing W06/D1-03 `AuditEvent` schema. It remains `CONTRACTED_NOT_VERIFIED`; no runtime or remote evidence is claimed.
