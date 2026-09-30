@@ -243,6 +243,8 @@ const LEAD_GENERATION_RE = /(?:加我|加v|加vx|加微信|加好友|扫码|私�
 const firstMatches = (value: string, pattern: RegExp, max = 6): string[] =>
   Array.from(value.matchAll(pattern)).slice(0, max).map(match => match[0])
 
+const compactContactLabels = (value: string): string => value.replace(/[\s\u00A0·•]+/g, '')
+
 const normalizeContactText = (value: string): { normalized: string; hadObfuscation: boolean } => {
   const nfkc = value.normalize('NFKC')
   const stripped = nfkc.replace(ZERO_WIDTH_RE, '').replace(BIDI_CONTROL_RE, '')
@@ -408,19 +410,22 @@ const detectPhones = (value: string): ContactSignal[] => {
 
 const detectMessengers = (value: string): ContactSignal[] => {
   const signals: ContactSignal[] = []
+  const variants = Array.from(new Set([value, normalizeContactText(value).normalized, compactContactLabels(normalizeContactText(value).normalized)]))
   for (const rule of MESSENGER_RULES) {
     for (const pattern of rule.patterns) {
-      for (const match of value.matchAll(pattern)) {
-        const raw = match[0]
-        const isUrl = /(?:^|\b)(?:https?:\/\/)?(?:wa\.me|t\.me|telegram\.me|m\.me|messenger\.com|facebook\.com|weixin\.qq\.com|wechat\.com|line\.me|signal\.me|vb\.me|viber\.com|open\.kakao\.com|discord\.gg|discord\.com|instagram\.com|snapchat\.com|tiktok\.com|x\.com|twitter\.com|reddit\.com|zalo\.me|imo\.im|kik\.me|teams\.microsoft\.com|join\.slack\.com|chat\.google\.com|work\.weixin\.qq\.com|feishu\.cn|larksuite\.com|matrix\.to|app\.element\.io|simplex\.chat)/i.test(raw)
-        signals.push({
-          kind: rule.profileKind === 'social' ? 'SOCIAL' : 'MESSENGER',
-          platform: rule.platform,
-          confidence: isUrl ? 'HIGH' : 'MEDIUM',
-          reasonCode: isUrl ? 'MESSENGER_INVITE_URL' : 'MESSENGER_LABELED_ID',
-          maskedValue: maskValue(raw),
-        })
-        if (signals.length >= 60) return dedupeSignals(signals)
+      for (const variant of variants) {
+        for (const match of variant.matchAll(pattern)) {
+          const raw = match[0]
+          const isUrl = /(?:^|\b)(?:https?:\/\/)?(?:wa\.me|t\.me|telegram\.me|m\.me|messenger\.com|facebook\.com|weixin\.qq\.com|wechat\.com|line\.me|signal\.me|vb\.me|viber\.com|open\.kakao\.com|discord\.gg|discord\.com|instagram\.com|snapchat\.com|tiktok\.com|x\.com|twitter\.com|reddit\.com|zalo\.me|imo\.im|kik\.me|teams\.microsoft\.com|join\.slack\.com|chat\.google\.com|work\.weixin\.qq\.com|feishu\.cn|larksuite\.com|matrix\.to|app\.element\.io|simplex\.chat)/i.test(raw)
+          signals.push({
+            kind: rule.profileKind === 'social' ? 'SOCIAL' : 'MESSENGER',
+            platform: rule.platform,
+            confidence: isUrl ? 'HIGH' : 'MEDIUM',
+            reasonCode: isUrl ? 'MESSENGER_INVITE_URL' : 'MESSENGER_LABELED_ID',
+            maskedValue: maskValue(raw),
+          })
+          if (signals.length >= 80) return dedupeSignals(signals)
+        }
       }
     }
   }
@@ -469,8 +474,11 @@ const detectDomains = (value: string): { urls: string[]; domains: string[] } => 
   return { urls, domains }
 }
 
-const detectLeadGeneration = (value: string): string[] =>
-  Array.from(new Set(firstMatches(value, LEAD_GENERATION_RE, 20).map(item => item.trim().toLowerCase())))
+const detectLeadGeneration = (value: string): string[] => {
+  const normalized = normalizeContactText(value).normalized
+  const variants = Array.from(new Set([normalized, compactContactLabels(normalized)]))
+  return Array.from(new Set(variants.flatMap(item => firstMatches(item, LEAD_GENERATION_RE, 20)).map(item => item.trim().toLowerCase())))
+}
 
 const detectObfuscation = (value: string): boolean => normalizeContactText(value).hadObfuscation
 
