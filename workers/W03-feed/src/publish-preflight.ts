@@ -179,11 +179,6 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
     /(?:优惠|折扣|促销|下单|购买|付款|代理|加盟|招商|返利|赚钱|课程|咨询|推广|引流|私域|加V|加vx|加微信|扫码|私聊|联系我|添加好友)/gi,
     15,
   )
-  const contactSignals = firstMatches(
-    body,
-    /(?:微信|weixin|wx|威信|V信|vx|LINE|WhatsApp|Telegram|QQ|公众号|群聊|加群|邮箱|email)/gi,
-    15,
-  )
   const qrSignals = firstMatches(body, /(?:二维码|扫码|扫一扫|识别下方二维码)/gi, 8)
   const htmlSignals = firstMatches(body, /<\/?(?:script|style|iframe|object|embed|img|a\b)[^>]*>/gi, 8)
   const hiddenTextSignals = firstMatches(body, /(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|opacity\s*:\s*0)/gi, 8)
