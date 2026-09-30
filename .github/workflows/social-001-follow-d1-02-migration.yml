@@ -6,18 +6,22 @@ on:
       source_sha:
         description: Exact source SHA containing the admitted Follow migration artifact
         required: true
+        default: 43253b7ed201e849909611a5ea43ee4157fc3e2b
         type: string
       database_name:
         description: D1-02 display name bound in W05 wrangler.jsonc
         required: true
+        default: luckreadpro
         type: string
       binding_run_id:
         description: Successful W05 D1-02 binding workflow run containing live binding evidence
         required: true
+        default: "36717067309"
         type: string
       binding_source_sha:
         description: Exact source SHA recorded by the W05 binding provenance artifact
         required: true
+        default: 72751a271946ba994e5f45e0d4cd1076cecc71a8
         type: string
       confirm:
         description: Type APPLY_SOCIAL_001_MIGRATION to permit remote D1 mutation
@@ -198,7 +202,6 @@ jobs:
             throw new Error('Fail-closed: migration history exists but target table is missing')
           }
           const skipMigration = tableRows.length === 1 && targetMigrationRecorded === 1
-          const fs = require('node:fs')
           fs.appendFileSync(process.env.GITHUB_ENV, 'SKIP_MIGRATION=' + (skipMigration ? 'true' : 'false') + '\n')
           console.log(JSON.stringify({ targetTablePresent:tableRows.length === 1, targetMigrationRecorded:targetMigrationRecorded === 1, skipMigration }))
           NODE
