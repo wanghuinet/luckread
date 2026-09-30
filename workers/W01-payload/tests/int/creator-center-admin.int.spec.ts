@@ -45,6 +45,8 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("'If-Match': draft.etag")
     expect(publisher).toContain('useEffect')
     expect(publisher).toContain("searchParams.get('draft')")
+    expect(publisher).toContain("searchParams.get('type')")
+    expect(publisher).toContain("requestedType === 'article' || requestedType === 'post' || requestedType === 'video'")
     expect(publisher).toContain("method: 'GET'")
     expect(publisher).toContain('window.history.replaceState')
     expect(publisher).toContain('async function copyDraftLink()')
