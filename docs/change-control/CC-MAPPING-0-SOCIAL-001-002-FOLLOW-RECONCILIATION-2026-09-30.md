@@ -1,0 +1,76 @@
+# CC-MAPPING-0-SOCIAL-001-002-FOLLOW-RECONCILIATION-2026-09-30
+
+**Status:** RECONCILIATION-DELTA / NOT_GREEN
+**Implementation authorization:** false
+
+## Purpose
+
+在不越过 Global Mapping Consolidation Gate 的前提下，收敛 `SOCIAL-001` follow/unfollow 与 `SOCIAL-002` followers/following 的已存在合同证据。
+
+## Confirmed Repository Evidence
+
+`contracts/api/interaction-operation-policy.v1.json` already defines canonical interaction operation IDs:
+
+```text
+follow   POST   /interactions via /social/follows
+unfollow DELETE /interactions via /social/follows
+```
+
+Existing rules already define:
+
+- permission: `interaction.follow`;
+- scope: actor + target;
+- idempotency: `actorId:targetId:follow`;
+- concurrent duplicate control: atomic unique constraint or upsert;
+- follow mutation: single authoritative write;
+- event fan-out: asynchronous and bounded;
+- counters: projections, not authorization truth;
+- block policy: server-side enforcement before relationship visibility;
+- anti-abuse scopes: IP, device, account, endpoint, resource, global.
+
+Social contracts also establish that Follow is an authoritative relationship and follower/following counts are derived state.
+
+## Remaining Blocking Edges
+
+The repository does not yet provide evidence sufficient to bind:
+
+```text
+canonical Entity ID
+canonical Field ID / persistence schema
+canonical DTO ID
+canonical OpenAPI operation registry admission
+W05 executable handler
+W05 → D1 binding evidence for this feature
+follow.created / follow.deleted producer binding
+cache invalidation/version evidence
+runtime positive/negative/concurrency/security evidence
+Evidence Registry provenance for SOCIAL-001/002
+`````text
+
+These gaps keep both features `NOT_GREEN`.
+
+## Authority Decision
+
+```text
+User             → Identity authority
+Social           → Follow relationship authority
+Follower count   → derived projection
+Membership       → Subscription / Entitlement authority
+Data Center      → projection/query surface
+Payload Core     → unchanged upstream dependency
+```
+
+## Required Next Gate
+
+The next executable gate remains:
+
+```text
+Global Mapping Consolidation GREEN
+→ canonical Social API/DTO/Entity/Field mapping
+→ W05/D1 binding evidence
+→ runtime implementation admission
+→ tests + Evidence Registry
+→ only then Follow/Follower runtime
+```
+
+No code or infrastructure is authorized by this document.
