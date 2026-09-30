@@ -18,7 +18,13 @@ const duplicates = (xs) => xs.filter((x, i) => xs.indexOf(x) !== i);
 for (const id of duplicates(catalogIds)) errors.push(`duplicate catalog entity: ${id}`);
 for (const id of duplicates(evidenceIds)) errors.push(`duplicate evidence entity: ${id}`);
 for (const id of evidenceIds) if (!catalogIds.includes(id)) errors.push(`unknown evidence entity: ${id}`);
-for (const id of catalogIds) if (!evidenceIds.includes(id)) errors.push(`missing implementation evidence: ${id}`);
+for (const entity of catalog.records) {
+  // Contract-First entities may legitimately have no implementation evidence yet.
+  // Implementation evidence becomes mandatory once an entity leaves PROPOSED.
+  if (entity.status !== 'PROPOSED' && !evidenceIds.includes(entity.entityId)) {
+    errors.push(`missing implementation evidence: ${entity.entityId}`);
+  }
+};
 
 const byId = new Map(evidence.records.map((r) => [r.entityId, r]));
 for (const entity of catalog.records) {
