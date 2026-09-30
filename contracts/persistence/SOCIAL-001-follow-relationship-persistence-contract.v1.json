@@ -83,10 +83,10 @@
     "distributedTransactions": false
   },
   "runtimeGates": {
-    "physicalD1Binding": "PENDING",
-    "migrationExecution": "PENDING",
-    "uniqueConstraintEvidence": "PENDING",
-    "indexEvidence": "PENDING",
+    "physicalD1Binding": "VERIFIED_BY_REMOTE_EVIDENCE",
+    "migrationExecution": "VERIFIED_BY_REMOTE_EVIDENCE",
+    "uniqueConstraintEvidence": "VERIFIED_BY_REMOTE_EVIDENCE",
+    "indexEvidence": "VERIFIED_BY_REMOTE_EVIDENCE",
     "runtimePositive": "REQUIRED",
     "runtimeNegative": "REQUIRED",
     "concurrency": "REQUIRED",
@@ -102,5 +102,6 @@
     "No runtime GREEN is claimed."
   ],
   "migrationContractRef": "contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json",
-  "migrationStatus": "CONTRACTED_NOT_VERIFIED"
+  "migrationStatus": "EXECUTED",
+  "executionEvidenceRef": "artifacts/mapping-0/social-001-follow-d1-02-migration-evidence-20260930.json"
 }
