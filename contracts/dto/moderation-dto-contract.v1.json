@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/dto/moderation-dto-contract.v1.json",
   "contractId": "MODERATION-DTO-CONTRACT-v1.0",
-  "status": "CONTRACT_DRAFT_OPENAPI_PENDING",
+  "status": "CONTRACTED_OPENAPI_BOUND",
   "sourceOfTruth": "contracts/api/moderation-operation-policy.v1.json",
   "implementationAuthorization": false,
   "purpose": "Reserve stable moderation DTO identities and visibility rules without claiming canonical OpenAPI, runtime or persistence evidence.",
@@ -11,22 +11,25 @@
       "operationId": "listModerationQueue",
       "requestDtoId": null,
       "responseDtoId": "DTO-MODERATION-QUEUE-RESPONSE",
-      "openApiStatus": "MISSING",
-      "bindingStatus": "RESERVED_NOT_CANONICAL"
+      "openApiStatus": "BOUND_CANONICAL",
+      "bindingStatus": "CONTRACTED_NOT_VERIFIED",
+      "openApiSchemaRef": "#/components/schemas/ModerationQueueResponse"
     },
     {
       "operationId": "getModerationCase",
       "requestDtoId": "DTO-MODERATION-CASE-PATH",
       "responseDtoId": "DTO-MODERATION-CASE-RESPONSE",
-      "openApiStatus": "MISSING",
-      "bindingStatus": "RESERVED_NOT_CANONICAL"
+      "openApiStatus": "BOUND_CANONICAL",
+      "bindingStatus": "CONTRACTED_NOT_VERIFIED",
+      "openApiSchemaRef": "#/components/schemas/ModerationCaseResponse"
     },
     {
       "operationId": "decideModerationCase",
       "requestDtoId": "DTO-MODERATION-DECISION-REQUEST",
       "responseDtoId": "DTO-MODERATION-DECISION-RESPONSE",
-      "openApiStatus": "MISSING",
-      "bindingStatus": "RESERVED_NOT_CANONICAL"
+      "openApiStatus": "BOUND_CANONICAL",
+      "bindingStatus": "CONTRACTED_NOT_VERIFIED",
+      "openApiSchemaRef": "#/components/schemas/ModerationDecisionRequest"
     }
   ],
   "schemas": {
@@ -107,8 +110,7 @@
     "reservedBindingsMustNotBeTreatedAsCanonicalUntilOpenApiPathExists": true
   },
   "requiredNextContracts": [
-    "canonical OpenAPI paths",
-    "contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json",
+    "trusted reviewer transport authority binding",
     "audit event binding",
     "runtime/evidence admission"
   ]
