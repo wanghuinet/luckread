@@ -14,6 +14,7 @@ import {
   type ContentState,
   type ContentD1,
 } from './content-runtime.js'
+import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
 
 interface Env {
   D1_02: D1Database
@@ -69,7 +70,7 @@ const parseBody = async (request: Request): Promise<Record<string, unknown>> => 
   }
 }
 
-const getPath = (pathname: string): {id?: string; state?: boolean} | null => {
+const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean} | null => {
   const parts = pathname.split('/').filter(Boolean)
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
     return {}
@@ -79,6 +80,9 @@ const getPath = (pathname: string): {id?: string; state?: boolean} | null => {
   }
   if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'state') {
     return { id: parts[3], state: true }
+  }
+  if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'preflight') {
+    return { id: parts[3], preflight: true }
   }
   return null
 }
@@ -148,11 +152,33 @@ export default {
 
       if (!path) return new Response(null, { status: 404 })
 
+      if (request.method === 'POST' && path.id && path.preflight) {
+        requiredPrincipal(request)
+        const body = await parseBody(request)
+        try {
+          return json(preflightContent(normalizePreflightInput(body)))
+        } catch {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+      }
+
       if (request.method === 'POST' && path.id && path.state) {
         const principal = requiredPrincipal(request)
         const body = await parseBody(request)
         const to = body.to
         if (typeof to !== 'string') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        if (to === 'PENDING_REVIEW') {
+          if (!body.preflight || typeof body.preflight !== 'object' || Array.isArray(body.preflight)) {
+            throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+          }
+          let report
+          try {
+            report = preflightContent(body.preflight)
+          } catch {
+            throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+          }
+          if (report.verdict === 'RED') throw new ContentRuntimeError('PREFLIGHT_BLOCKED', 422)
+        }
         const reason = typeof body.reason === 'string' ? body.reason : undefined
         const result = await transitionContentState(
           env.D1_02,
