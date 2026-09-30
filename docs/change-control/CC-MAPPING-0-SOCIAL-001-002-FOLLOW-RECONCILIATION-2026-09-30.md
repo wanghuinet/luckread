@@ -60,6 +60,24 @@ Feature → T11 → W05 → D1-02
                Test / Evidence
 ```
 
+## Additional L5/L6 Semantic Evidence
+
+`docs/188-L5-L6-SOCIAL-COMMUNITY-INTERACTION-INSTANCE-REGISTRY-v1.0.md` closes the L4/L5/L6 semantic scope for the follow lifecycle without authorizing implementation.
+
+Relevant existing semantic claims include:
+
+- relationship ID must be unique and non-reused;
+- follow user requires target eligibility and scope/privacy enforcement;
+- duplicate follow is idempotent;
+- unfollow removes only the authorized relation and projections converge;
+- follow creator requires a valid creator target and unique relation;
+- social relation queries enforce viewer/target scope and reproducibility;
+- social projections are rebuildable from authoritative relations/events;
+- relation mutations require permission, rate-limit and privacy guards;
+- event enqueue/delivery/replay semantics are bounded and idempotent.
+
+This strengthens the semantic-contract evidence for `SOCIAL-001/002`, but it still does not provide a canonical Entity ID, Field ID, migration/schema, executable W05 handler, runtime evidence, or Evidence Registry provenance.
+
 ## Remaining Blocking Edges
 
 The repository does not yet provide evidence sufficient to bind:
