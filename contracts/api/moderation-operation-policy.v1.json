@@ -4,7 +4,7 @@
   "title": "LuckRead Moderation API Operation Policy — Admission Draft",
   "version": "1.0.0",
   "domain": "moderation",
-  "status": "CONTRACT_DRAFT_OPENAPI_PENDING",
+  "status": "CONTRACTED_OPENAPI_BOUND",
   "implementationAuthorization": false,
   "sourceRefs": [
     "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
@@ -47,7 +47,7 @@
       "path": "/admin/moderation/queue",
       "visibility": "admin_authenticated",
       "capability": "moderation_queue_read",
-      "status": "RESERVED_OPENAPI_PENDING",
+      "status": "CONTRACTED_OPENAPI_BOUND",
       "authorization": {
         "required": true,
         "permission": "moderation.queue.read",
@@ -81,11 +81,11 @@
         "no_cross_domain_table_reads"
       ],
       "evidence": {
-        "openapi": "MISSING",
+        "openapi": "BOUND_CANONICAL",
         "permission": "CONTRACTED",
-        "dto": "MISSING",
+        "dto": "CONTRACTED_NOT_VERIFIED",
         "persistence": "CONTRACTED_NOT_VERIFIED",
-        "transport": "MISSING",
+        "transport": "MISSING_AUTHORITY_BINDING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
       }
@@ -96,7 +96,7 @@
       "path": "/admin/moderation/cases/{caseId}",
       "visibility": "admin_authenticated",
       "capability": "moderation_case_read",
-      "status": "RESERVED_OPENAPI_PENDING",
+      "status": "CONTRACTED_OPENAPI_BOUND",
       "authorization": {
         "required": true,
         "permission": "moderation.case.read",
@@ -125,11 +125,11 @@
         "content_facts_reference_authority_not_copy"
       ],
       "evidence": {
-        "openapi": "MISSING",
+        "openapi": "BOUND_CANONICAL",
         "permission": "CONTRACTED",
-        "dto": "MISSING",
+        "dto": "CONTRACTED_NOT_VERIFIED",
         "persistence": "CONTRACTED_NOT_VERIFIED",
-        "transport": "MISSING",
+        "transport": "MISSING_AUTHORITY_BINDING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
       }
@@ -140,7 +140,7 @@
       "path": "/admin/moderation/cases/{caseId}/decision",
       "visibility": "admin_authenticated",
       "capability": "moderation_decide",
-      "status": "RESERVED_OPENAPI_PENDING",
+      "status": "CONTRACTED_OPENAPI_BOUND",
       "authorization": {
         "required": true,
         "permission": "moderation.decide",
@@ -199,9 +199,9 @@
         "sensitive_evidence_never_returned"
       ],
       "evidence": {
-        "openapi": "MISSING",
+        "openapi": "BOUND_CANONICAL",
         "permission": "CONTRACTED",
-        "dto": "MISSING",
+        "dto": "CONTRACTED_NOT_VERIFIED",
         "persistence": "CONTRACTED_NOT_VERIFIED",
         "transport": "CONTRACTED_NOT_VERIFIED",
         "integration": "MISSING",
@@ -221,6 +221,7 @@
   "contractClosure": {
     "entityContracts": "CONTRACTED_NOT_VERIFIED",
     "persistenceContract": "CONTRACTED_NOT_VERIFIED",
+    "openApi": "BOUND_CANONICAL",
     "implementationAuthorization": false
   }
 }
