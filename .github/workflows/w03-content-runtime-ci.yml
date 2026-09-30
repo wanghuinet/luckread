@@ -32,7 +32,7 @@ jobs:
         run: npm ci
 
       - name: Run W03 content unit tests
-        run: npx --yes vitest@3.2.4 run workers/W03-feed/src/content-runtime.test.ts
+        run: npx --yes vitest@3.2.4 run workers/W03-feed/src/content-runtime.test.ts workers/W03-feed/src/publish-preflight.test.ts
 
       - name: Typecheck W03 content runtime
         run: >
@@ -40,4 +40,5 @@ jobs:
           --target ES2022 --module ESNext --moduleResolution Bundler
           --lib ES2022,DOM --types @cloudflare/workers-types
           workers/W03-feed/src/content-runtime.ts
+          workers/W03-feed/src/publish-preflight.ts
           workers/W03-feed/src/index.ts
