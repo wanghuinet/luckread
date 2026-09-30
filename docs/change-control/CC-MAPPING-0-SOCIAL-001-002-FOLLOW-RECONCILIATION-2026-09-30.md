@@ -30,6 +30,14 @@ Existing rules already define:
 
 Social contracts also establish that Follow is an authoritative relationship and follower/following counts are derived state.
 
+## Worker / D1 Boundary Evidence
+
+`docs/04-WORKER-MASTER-v1.0.md` and `docs/03-WORKER-BINDING-MAPPING-v1.0.md` establish the canonical logical owner for Social as W05, with scoped D1-02 read/write authority and no unrestricted cross-D1 access.
+
+The current repository still contains a physical `workers/W04-social` directory. Existing Mapping-0 records explicitly treat that directory as legacy/non-canonical. Its path must not be promoted to current W05 authority by inference.
+
+Therefore the feature-specific runtime binding remains unresolved even though the logical Worker × D1 boundary itself is already frozen.
+
 ## Remaining Blocking Edges
 
 The repository does not yet provide evidence sufficient to bind:
