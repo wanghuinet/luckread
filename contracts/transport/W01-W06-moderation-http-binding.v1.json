@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W01-W06-moderation-http-binding.v1.json",
+  "title": "W01 to W06 Moderation Internal HTTP Binding",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PENDING_RUNTIME_EVIDENCE",
+  "caller": {
+    "logicalWorker": "W01",
+    "role": "Public API / Gateway",
+    "authority": "Public wire boundary"
+  },
+  "callee": {
+    "logicalWorker": "W06",
+    "role": "Rights / Trust & Safety / Governance",
+    "authority": "Moderation D1-03"
+  },
+  "transport": {
+    "kind": "Cloudflare Worker Service Binding HTTP",
+    "binding": "W06_MODERATION",
+    "targetWorker": "luckread-w06",
+    "publicExposure": false,
+    "newWorker": false,
+    "newDatabase": false
+  },
+  "authorityChain": {
+    "authentication": {
+      "source": "W01 native Payload authentication",
+      "sessionValidation": "Existing W01→W02 W02_AUTH authenticated-principal path",
+      "clientWritable": false
+    },
+    "principal": {
+      "userIdHeader": "X-LuckRead-Principal-User-Id",
+      "layerHeader": "X-LuckRead-Principal-Layer",
+      "layerSource": "W02 canonical L0-L8 resolution consumed by W01",
+      "clientWritable": false
+    },
+    "permission": {
+      "source": "Canonical moderation operation policy + permissions contract",
+      "resolution": "W06 maps operationId to required permission; client never supplies an authoritative permission",
+      "requiredPermissions": {
+        "listModerationQueue": "moderation.queue.read",
+        "getModerationCase": "moderation.case.read",
+        "decideModerationCase": "moderation.decide"
+      }
+    },
+    "reviewerScope": {
+      "source": "W06 authoritative case/reviewer scope state",
+      "clientWritable": false,
+      "rule": "A valid principal and L6 layer do not by themselves grant access outside the reviewer scope."
+    }
+  },
+  "operations": [
+    {
+      "operationId": "listModerationQueue",
+      "method": "GET",
+      "publicPath": "/api/v1/admin/moderation/queue",
+      "internalPath": "/admin/moderation/queue",
+      "principalRequired": true,
+      "d1ReadMax": 1,
+      "d1WriteMax": 0,
+      "cache": "PRIVATE_NO_SHARED_CACHE",
+      "auditRequired": true
+    },
+    {
+      "operationId": "getModerationCase",
+      "method": "GET",
+      "publicPath": "/api/v1/admin/moderation/cases/{caseId}",
+      "internalPath": "/admin/moderation/cases/{caseId}",
+      "principalRequired": true,
+      "d1ReadMax": 1,
+      "d1WriteMax": 0,
+      "cache": "PRIVATE_NO_SHARED_CACHE",
+      "auditRequired": true
+    },
+    {
+      "operationId": "decideModerationCase",
+      "method": "POST",
+      "publicPath": "/api/v1/admin/moderation/cases/{caseId}/decision",
+      "internalPath": "/admin/moderation/cases/{caseId}/decision",
+      "principalRequired": true,
+      "precondition": "If-Match",
+      "idempotency": "Idempotency-Key",
+      "d1ReadMax": 1,
+      "d1WriteTransactionMax": 1,
+      "cache": "NO_STORE",
+      "auditRequired": true
+    }
+  ],
+  "headers": {
+    "requiredOnEveryCall": {
+      "X-LuckRead-Caller": "W01",
+      "X-LuckRead-Transport-Version": "1.0",
+      "X-LuckRead-Correlation-Id": "required"
+    },
+    "principal": {
+      "X-LuckRead-Principal-User-Id": "required",
+      "X-LuckRead-Principal-Layer": "required",
+      "source": "W01 verified principal; never public request body"
+    },
+    "forwarded": [
+      "If-Match on decideModerationCase",
+      "Idempotency-Key on decideModerationCase"
+    ],
+    "forbidden": [
+      "Authorization bearer credential",
+      "client-supplied reviewer identity as authority",
+      "client-supplied layer as authority",
+      "client-supplied permission as authority",
+      "raw evidence",
+      "internal risk thresholds"
+    ]
+  },
+  "failurePolicy": {
+    "timeoutMs": 2000,
+    "automaticRetries": 0,
+    "failClosed": [
+      "missing W06_MODERATION binding",
+      "missing caller marker",
+      "unsupported transport version",
+      "missing principal user id",
+      "missing principal layer",
+      "layer below L6 for moderation operations",
+      "missing required permission by operation",
+      "missing reviewer-scope authority",
+      "invalid W06 response envelope"
+    ],
+    "statusMapping": {
+      "unauthenticated": 401,
+      "permissionDenied": 403,
+      "notFound": 404,
+      "missingPrecondition": 428,
+      "preconditionFailed": 412,
+      "invalidState": 409
+    }
+  },
+  "security": {
+    "trustBoundary": "W06 is private and reachable only through the admitted W01 Service Binding.",
+    "noEndUserTokenForwarding": true,
+    "principalProvenanceRequired": true,
+    "reviewerLayerServerDerived": true,
+    "operationPermissionServerDerived": true,
+    "reviewerScopeServerDerived": true,
+    "sensitiveEvidenceExcludedFromNormalDTO": true,
+    "noCrossDomainTableAccess": true
+  },
+  "topologyConstraints": {
+    "workerCountDelta": 0,
+    "databaseCountDelta": 0,
+    "newPayloadCollections": 0,
+    "crossD1Transactions": 0,
+    "directW02ToW06BusinessBinding": false,
+    "directW06ToW03TableAccess": false
+  },
+  "sourceRefs": [
+    "contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json",
+    "contracts/api/moderation-operation-policy.v1.json",
+    "contracts/dto/moderation-dto-contract.v1.json",
+    "contracts/authz/permissions.json",
+    "contracts/authz/layers.json",
+    "contracts/transport/W01-W03-content-http-binding.v1.json",
+    "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+  ],
+  "implementationStatus": {
+    "serviceBindingConfig": "NOT_IMPLEMENTED",
+    "w01Runtime": "NOT_IMPLEMENTED",
+    "w06Runtime": "NOT_IMPLEMENTED",
+    "deploymentEvidence": "MISSING",
+    "securityE2E": "MISSING",
+    "implementationAuthorization": false
+  },
+  "nonGoals": [
+    "No new Worker or D1.",
+    "No direct W02→W06 business Service Binding.",
+    "No public W06 route.",
+    "No D1 migration execution.",
+    "No moderation runtime implementation.",
+    "No Mapping 0 GREEN claim."
+  ],
+  "verificationRequirements": [
+    "W01 source/unit proof for principal and layer forwarding",
+    "W06 source proof for server-derived permission and reviewer-scope checks",
+    "W01→W06 Service Binding deployment evidence",
+    "positive queue/case/decision transport evidence",
+    "401/403/428/412 negative evidence",
+    "client reviewer/layer/permission spoofing rejection",
+    "Idempotency replay and key-reuse-conflict evidence",
+    "no Authorization header forwarding evidence",
+    "correlation/requestId preservation evidence"
+  ]
+}
