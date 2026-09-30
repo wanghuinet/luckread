@@ -1,6 +1,6 @@
 # CC-1.1 Moderation W01→W06 Trusted Transport Binding — 2026-10-01
 
-**Status: CONTRACT / RUNTIME IMPLEMENTATION BLOCKED**
+**Status: CONTRACT-BOUND / RUNTIME IMPLEMENTATION BLOCKED**
 
 Repository: `wanghuinet/luckread`  
 Base head: `c4b4cb46c6c352eb362ec5e600d12322e5f3ac9b`
@@ -60,7 +60,16 @@ The binding forwards only the verified principal identity/layer and required con
 - No new Worker/D1.
 - No production GREEN or Evidence Registry promotion.
 
-## 6. Next admission gate
+## 6. Reconciliation result
+
+The trusted transport authority is now contract-bound:
+
+- `contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json` is `CONTRACTED_NOT_VERIFIED`.
+- `contracts/api/moderation-operation-policy.v1.json` records the transport as `CONTRACTED_NOT_VERIFIED`.
+- The W01→W06 binding remains unimplemented and has no deployment/runtime evidence.
+- No production implementation authorization is granted.
+
+## 7. Next admission gate
 
 Before runtime implementation, CI and Change Control must reconcile:
 
