@@ -331,6 +331,11 @@ const detectInternationalPhonesWithLibrary = (value: string): DetectedMobileNumb
         raw,
         region: regionLabel(number.country, number.countryCallingCode),
         mobileSpecific: type === 'MOBILE' || type === 'FIXED_LINE_OR_MOBILE',
+        phoneKind: type === 'MOBILE' || type === 'FIXED_LINE_OR_MOBILE'
+          ? 'MOBILE'
+          : type === 'FIXED_LINE'
+            ? 'LANDLINE'
+            : 'UNKNOWN',
         confidence: valid ? 'HIGH' : 'MEDIUM',
         source: 'library',
       })
@@ -346,6 +351,7 @@ type DetectedMobileNumber = {
   raw: string
   region: string
   mobileSpecific: boolean
+  phoneKind: 'MOBILE' | 'LANDLINE' | 'UNKNOWN'
   confidence: ContactSignalConfidence
   source: 'library' | 'national'
 }
@@ -379,6 +385,7 @@ const detectNationalPhones = (value: string): DetectedMobileNumber[] => {
           raw,
           region: rule.region,
           mobileSpecific: rule.mobileSpecific,
+          phoneKind: rule.mobileSpecific ? 'MOBILE' : 'UNKNOWN',
           confidence: hasContext && rule.mobileSpecific ? 'HIGH' : 'MEDIUM',
           source: 'national',
         })
