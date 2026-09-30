@@ -182,17 +182,29 @@ jobs:
           const dir = process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/social-001-migration'
           const table = JSON.parse(fs.readFileSync(dir + '/preflight-table.json', 'utf8'))
           const migrations = JSON.parse(fs.readFileSync(dir + '/preflight-migrations.json', 'utf8'))
-          const rows = (x) => Array.isArray(x) ? x.flatMap(rows) : (x && Array.isArray(x.results) ? x.results : [])
+          const rows = (x) => {
+            if (Array.isArray(x)) return x.flatMap((item) => Array.isArray(item?.results) ? item.results : [])
+            if (x && Array.isArray(x.results)) return x.results
+            return []
+          }
           const tableRows = rows(table)
           const migrationRows = rows(migrations)
-          if (tableRows.length) throw new Error('Fail-closed: social_follow_relationships already exists')
-          if (migrationRows.some((r) => r.name === '20260930_001_social_001_follow_v1')) {
-            throw new Error('Fail-closed: target migration is already recorded in d1_migrations')
+          const targetMigrationRecorded = migrationRows.filter((r) => r.name === '20260930_001_social_001_follow_v1').length
+          if (targetMigrationRecorded > 1) throw new Error('Fail-closed: target migration is recorded more than once')
+          if (tableRows.length && targetMigrationRecorded === 0) {
+            throw new Error('Fail-closed: target table exists without matching migration history')
           }
-          console.log(JSON.stringify({ targetTablePresent:false, targetMigrationRecorded:false }))
+          if (!tableRows.length && targetMigrationRecorded === 1) {
+            throw new Error('Fail-closed: migration history exists but target table is missing')
+          }
+          const skipMigration = tableRows.length === 1 && targetMigrationRecorded === 1
+          const fs = require('node:fs')
+          fs.appendFileSync(process.env.GITHUB_ENV, 'SKIP_MIGRATION=' + (skipMigration ? 'true' : 'false') + '\n')
+          console.log(JSON.stringify({ targetTablePresent:tableRows.length === 1, targetMigrationRecorded:targetMigrationRecorded === 1, skipMigration }))
           NODE
 
       - name: Apply SOCIAL-001 Follow migration remotely
+        if: ${{ env.SKIP_MIGRATION != 'true' }}
         working-directory: workers/W05-transaction
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -224,14 +236,12 @@ jobs:
           const fs = require('node:fs')
           const dir = process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/social-001-migration'
           const read = (name) => JSON.parse(fs.readFileSync(dir + '/' + name, 'utf8'))
-          const collect = (x, out=[]) => {
-            if (Array.isArray(x)) { x.forEach(v => collect(v,out)); return out }
-            if (!x || typeof x !== 'object') return out
-            if (Array.isArray(x.results)) x.results.forEach(v => out.push(v))
-            Object.values(x).forEach(v => collect(v,out))
-            return out
+          const rows = name => {
+            const x = read(name)
+            if (Array.isArray(x)) return x.flatMap((item) => Array.isArray(item?.results) ? item.results : [])
+            if (x && Array.isArray(x.results)) return x.results
+            return []
           }
-          const rows = name => collect(read(name))
           const schema = rows('post-schema.json')
           const indexes = rows('post-indexes.json')
           const foreignKeys = rows('post-foreign-keys.json')
