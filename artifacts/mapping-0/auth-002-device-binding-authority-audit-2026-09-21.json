@@ -1,0 +1,50 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-09-21",
+  "sourceHead": "ac1b0169191913e32261f35375ea2d25a3e079a5",
+  "status": "INPUT_AUTHORITY_MISSING_CONFIRMED",
+  "scope": "AUTH-002 ENT-SESSION-F-DEVICE-ID source and transport authority",
+  "sources": {
+    "contracts/openapi/v1/openapi.yaml": {
+      "sha": "2103d366d27771c011ba846e8536a5c882a07051",
+      "deviceId": false,
+      "deviceTransport": false,
+      "deviceBindingText": false
+    },
+    "contracts/dto/auth-dto-contract.v1.json": {
+      "sha": "bcf43f36fa4aad8cf50951fabf3d050dab25bc9a",
+      "deviceId": false,
+      "deviceTransport": false,
+      "deviceBindingText": false
+    },
+    "contracts/api/auth-operation-policy.v1.json": {
+      "sha": "08639408f63df71224a51d471134dbb3680f3ba8",
+      "deviceId": false,
+      "deviceTransport": false,
+      "deviceBindingText": false
+    },
+    "contracts/entity/AUTH-002-session-field-contract.v1.json": {
+      "sha": "685ff6e004c19d24b8a0d517d6b117d37b0eb3b6",
+      "deviceId": true,
+      "role": "required canonical Session field"
+    },
+    "contracts/persistence/AUTH-002-minimum-session-integration-contract.v1.json": {
+      "sha": "5387d1fd568e6143a812552055fec5a2e49ab47e",
+      "deviceId": true,
+      "role": "required integration dimension; source/transport not defined"
+    }
+  },
+  "conclusion": "The repository defines deviceId as a required canonical Session field but does not currently define its AUTH-002 wire transport or authoritative source. No client header, request property, server-issued device identifier, or derivation rule is canonically established in the checked API/DTO/Policy sources.",
+  "prohibitedInference": [
+    "Do not invent X-Device-Id or another transport header.",
+    "Do not add a login request deviceId property by inference.",
+    "Do not derive device identity from IP, User-Agent, fingerprinting, cookie, or other uncontracted attributes.",
+    "Do not create ENT-DEVICE-RECORD solely to fill this gap."
+  ],
+  "impact": {
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md",
+    "gapId": "E6-WIRE-002",
+    "status": "OPEN",
+    "implementationAuthorized": false
+  }
+}

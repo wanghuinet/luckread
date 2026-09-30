@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "auditId": "M0-STRUCTURAL-GATE-EVIDENCE-2026-09-20",
+  "testedCommit": "2b475f7991f82c25a715e091f46049edd7d4852c",
+  "workflowRun": {
+    "runId": 35492578135,
+    "name": "Mapping 0 Structural Gate",
+    "event": "push",
+    "conclusion": "success",
+    "jobId": 106029931574,
+    "jobName": "Mapping 0 structural/contract verification"
+  },
+  "verification": {
+    "gate": "MAPPING-0-STRUCTURAL",
+    "status": "GREEN",
+    "canonicalFeatureCount": 449,
+    "mappingRecordCount": 449,
+    "missingRecordCount": 0,
+    "orphanRecordCount": 0,
+    "unresolvedDownstreamGapCount": 449,
+    "canonicalGraphStatus": "NOT_GREEN"
+  },
+  "relatedSteps": {
+    "mappingClosureMetrics": "executed_successfully",
+    "evidenceFreshnessMetrics": "executed_successfully",
+    "batchGOrphanDuplicateSweep": "executed_successfully"
+  },
+  "importantBoundary": "Structural GREEN proves repository shape/inventory integrity for the tested commit only. It does not prove feature-level downstream closure, runtime evidence, or canonical graph GREEN.",
+  "freshness": "Fresh current-main structural evidence for this exact tested commit. Reuse only for later documentation-only descendants unless structural inputs change; do not interpret as feature-level GREEN.",
+  "mappingStatusSnapshot": {
+    "PARTIAL": 17,
+    "MISSING": 1,
+    "UNRESOLVED": 431
+  },
+  "disposition": "ACCEPTED_AS_STRUCTURAL_EVIDENCE_NOT_FEATURE_GREEN",
+  "implementationAuthorization": false,
+  "verificationDownstream": {
+    "canonicalMappingRecordCount": 449,
+    "canonicalMappingStatus": "NOT_GREEN",
+    "unresolvedDownstreamGapCount": 449
+  }
+}

@@ -1,0 +1,144 @@
+name: LuckRead 2.0 One-Time Production Launch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R9.md
+
+permissions:
+  contents: read
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Verify launch marker
+        run: |
+          test -f docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R9.md
+          grep -q "LAUNCH_2_0_R9=AUTHORIZED_BY_MAIN_MERGE" docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R9.md
+
+      - name: Verify W03 binding
+        working-directory: workers/W03-feed
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const c = JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
+          if (c.name !== 'luckread-w03') throw new Error('W03 worker name mismatch');
+          if (c.main !== 'src/index.ts') throw new Error('W03 entrypoint mismatch');
+          const d1 = (c.d1_databases || []).find(x => x.binding === 'D1_02');
+          if (!d1 || d1.database_id !== '6c342634-97f6-4248-9f4a-85772af4f22c') throw new Error('D1_02 binding mismatch');
+          console.log(JSON.stringify({worker:c.name,d1:d1.database_id}));
+          NODE
+
+      - name: W03 typecheck and tests
+        run: |
+          npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W03-feed/src/content-runtime.ts workers/W03-feed/src/index.ts
+          npx --yes vitest@3.2.4 run workers/W03-feed/src/content-runtime.test.ts
+
+      - name: W02 typecheck and tests
+        run: |
+          npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W02-content/src/index.ts
+          npx --yes vitest@3.2.4 run workers/W02-content/src/authz/role-assignment.test.ts workers/W02-content/src/session/session-runtime.test.ts workers/W02-content/src/session/session-management.test.ts
+
+      - name: Deploy W02
+        working-directory: workers/W02-content
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+
+      - name: Apply pending D1-02 migrations
+        working-directory: workers/W03-feed
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          npx --yes wrangler@4.116.0 d1 migrations apply D1_02 --remote --config wrangler.jsonc
+
+      - name: Deploy W03
+        working-directory: workers/W03-feed
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+          run_install: false
+
+      - name: Install locked W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
+      - name: Build W01
+        working-directory: workers/W01-payload
+        run: pnpm exec opennextjs-cloudflare build
+
+      - name: Deploy W01
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+
+      - name: Production smoke test
+        run: |
+          set -euo pipefail
+          urls=(
+            https://mp.luckread.cn/register
+            https://mp.luckread.cn/login
+            https://mp.luckread.cn/publish
+            https://mp.luckread.cn/admin/creator-center
+            https://api.luckread.cn/api/v1/contents
+          )
+          for url in "${urls[@]}"; do
+            code="$(curl -L -sS -o /tmp/luckread-smoke -w '%{http_code}' "$url")"
+            echo "$url -> $code"
+            case "$url" in
+              */register|*/login|*/publish|*/admin/creator-center) test "$code" -ge 200 && test "$code" -lt 500 ;;
+              */contents) test "$code" = 200 ;;
+            esac
+          done
+
+      - name: Write launch provenance
+        run: |
+          mkdir -p artifacts/release
+          cat > artifacts/release/luckread-2-0-launch.txt <<EOF
+          release=2.0
+          commit=${GITHUB_SHA}
+          w03_worker=luckread-w03
+          w03_d1=D1_02
+          w03_migration=remote_pending_applied
+          w03_deploy=true
+          w01_deploy=true
+          smoke_test=true
+          binary_media=object_storage
+          new_workers=0
+          new_d1_domains=0
+          new_tasks=0
+          EOF
+          cat artifacts/release/luckread-2-0-launch.txt
+
+      - name: Upload launch evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: luckread-2-0-launch-${{ github.sha }}
+          path: artifacts/release/luckread-2-0-launch.txt

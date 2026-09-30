@@ -1,0 +1,134 @@
+{
+  "version":"1.0.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "featureId":"AUTH-002",
+  "entityId":"ENT-SESSION",
+  "purpose":"Define the minimum explicit integration required because Payload 3.87.1 native sessions do not satisfy the canonical Session contract by themselves.",
+  "authority":"D1-01",
+  "nativeAuthority":"Payload auth-enabled Users collection remains the native authentication/session authority for native fields and sid lifecycle until the integration boundary is executed and verified.",
+  "canonicalAuthority":"The canonical ENT-SESSION contract remains the application-level semantic authority. No duplicate full session table is authorized by this contract.",
+  "unsupportedNativeDimensions":[
+    "deviceId",
+    "tokenVersion",
+    "refreshCredentialHash",
+    "revokedAt",
+    "lastSeenAt"
+  ],
+  "integrationModel":{
+    "mode":"MINIMUM_EXTENSION_AROUND_NATIVE_SESSION",
+    "principle":"Extend or derive only the unsupported canonical dimensions; reuse Payload native session identity, createdAt and expiresAt where concrete runtime/schema evidence proves equivalence.",
+    "singleAuthority":"A request must never be authorized by conflicting native-session and custom-session states.",
+    "noParallelSessionTable":true,
+    "noRawCredentialPersistence":true
+  },
+  "canonicalMapping":{
+    "id":"Payload native session id (sid), subject to schema/runtime proof",
+    "userId":"Payload auth user id",
+    "createdAt":"Payload native session createdAt, subject to schema/runtime proof",
+    "expiresAt":"Payload native session expiresAt, subject to schema/runtime proof",
+    "deviceId":"EXPLICIT_INTEGRATION_FIELD_REQUIRED",
+    "tokenVersion":"EXPLICIT_INTEGRATION_STATE_REQUIRED",
+    "refreshCredentialHash":"EXPLICIT_SECRET_DERIVED_STATE_REQUIRED",
+    "revokedAt":"EXPLICIT_DURABLE_REVOCATION_STATE_REQUIRED",
+    "lastSeenAt":"EXPLICIT_RUNTIME_ACTIVITY_STATE_REQUIRED"
+  },
+  "requiredIntegrationBehavior":{
+    "login":[
+      "authenticate through Payload native auth",
+      "obtain native sid",
+      "resolve authoritative device binding",
+      "derive server-controlled tokenVersion",
+      "derive and persist only a one-way refresh credential verifier/hash for the canonical integration state if refresh credential state is required",
+      "record canonical session linkage without creating a second session identity"
+    ],
+    "validation":[
+      "validate Payload native sid/user association",
+      "validate canonical device binding",
+      "validate tokenVersion invalidation state",
+      "reject revoked canonical sessions",
+      "reject expired native sessions",
+      "fail closed on disagreement between native and canonical state"
+    ],
+    "logout":[
+      "invoke native logout/session removal",
+      "record durable canonical revocation state where required by the field contract",
+      "remain idempotent"
+    ],
+    "refresh":[
+      "validate native session sid and canonical integration state",
+      "prevent reuse of a previously accepted refresh credential",
+      "atomically advance refresh state where the canonical contract requires rotation",
+      "ensure concurrent refresh has at most one successful successor"
+    ],
+    "activity":[
+      "update lastSeenAt only according to an explicit bounded runtime policy",
+      "never use lastSeenAt as the sole authorization decision"
+    ]
+  },
+  "stateOwnership":{
+    "nativePayloadSession":["sid","createdAt","expiresAt"],
+    "canonicalIntegrationState":["deviceId","tokenVersion","refreshCredentialHash","revokedAt","lastSeenAt"],
+    "derivedJWTClaims":["id","collection","sid","exp","iat"],
+    "forbiddenOwnership":["rawAccessToken","rawRefreshToken","password"]
+  },
+  "transactionRules":[
+    "Native session creation and canonical integration state creation must have a deterministic ordering and compensating failure path.",
+    "Logout must not report success while required durable revocation state failed to persist.",
+    "Refresh rotation must use a compare-and-update or transactional equivalent so one predecessor cannot produce two valid successors.",
+    "Authorization checks must fail closed if native session state and canonical integration state cannot be reconciled.",
+    "Canonical integration state must reference the native sid rather than minting an independent session identifier."
+  ],
+  "migrationRules":{
+    "required":true,
+    "minimumSchemaOnly":true,
+    "forbidden":"Do not create a complete second sessions table mirroring Payload sessions.",
+    "requiredEvidence":[
+      "actual generated Payload auth schema",
+      "exact extension columns/storage selected for unsupported dimensions",
+      "versioned migration artifact",
+      "successful migration execution",
+      "migration status evidence",
+      "rollback/compensation analysis"
+    ]
+  },
+  "securityRules":[
+    "Refresh credential material must be one-way derived only and must never be returned, logged or placed in public DTOs/events.",
+    "Device identifiers must be privacy-safe and server-bound.",
+    "tokenVersion must be server-controlled and cannot be supplied by clients.",
+    "Revocation state must override stale caches and stale JWTs.",
+    "Canonical integration state cannot weaken Payload native session validation."
+  ],
+  "verificationMatrix":{
+    "nativeSid":"REQUIRED",
+    "nativeUserBinding":"REQUIRED",
+    "nativeCreatedAt":"REQUIRED",
+    "nativeExpiresAt":"REQUIRED",
+    "deviceBinding":"REQUIRED",
+    "tokenVersionInvalidation":"REQUIRED",
+    "refreshRotationReplay":"REQUIRED",
+    "logoutRevocation":"REQUIRED",
+    "expiry":"REQUIRED",
+    "lastSeenUpdate":"REQUIRED",
+    "concurrentRefresh":"REQUIRED",
+    "noSecretPersistence":"REQUIRED",
+    "singleAuthority":"REQUIRED"
+  },
+  "stopConditions":[
+    "A second independent session identifier is introduced.",
+    "A full parallel sessions table is introduced without a revised contract.",
+    "Native sid can authorize after canonical revocation.",
+    "Refresh predecessor can be reused successfully after rotation.",
+    "Concurrent refresh can produce two valid successors.",
+    "Raw credential material is persisted or exposed.",
+    "Device binding is client-controlled or absent where required.",
+    "Any unsupported dimension is implemented without an explicit field mapping and migration evidence."
+  ],
+  "readiness":{
+    "contract":"CLOSED_FOR_IMPLEMENTATION_INPUT",
+    "implementation":"NOT_STARTED",
+    "migration":"NOT_STARTED",
+    "tests":"NOT_STARTED",
+    "evidence":"NOT_BOUND",
+    "entityPromotion":"BLOCKED"
+  }
+}

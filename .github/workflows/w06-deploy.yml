@@ -1,0 +1,152 @@
+name: W06 Governance Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source commit to deploy
+        required: true
+        type: string
+      confirm:
+        description: Type DEPLOY to permit this controlled W06 deployment
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirm == 'DEPLOY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact implementation commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify required admission gates for the source SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          PREVIOUS_ADMITTED_SOURCE_SHA: "fc560a42f7ab61b6e51a5b288d239430292d7e17"
+          PREVIOUS_PERSISTENCE_EVIDENCE_SOURCE_SHA: "eb9f33dda3e9892f1814d34bbe4c8327a1ba2dde"
+          CONTRACT_BASE_SHA: "367534dc07806a9b9f9a1b85ae8ecf42a7ae4afc"
+          CONTRACT_BASE_RUN: "35957666015"
+        run: |
+          set -euo pipefail
+
+          carry_forward_workflow() {
+            local workflow="$1"
+            local previous="$2"
+            local conclusion
+            conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --commit "$previous" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
+            test "$conclusion" = "success" || {
+              echo "Carry-forward baseline $workflow is not SUCCESS for $previous (observed: ${conclusion:-none})"
+              exit 1
+            }
+            echo "INHERITED_SUCCESS: $workflow from $previous"
+          }
+
+          for workflow in mapping-0-structural-ci.yml ensure-feature-inventory.yml; do
+            conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --commit "$SOURCE_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
+            test "$conclusion" = "success" || {
+              echo "Required workflow $workflow is not SUCCESS for $SOURCE_SHA (observed: ${conclusion:-none})"
+              exit 1
+            }
+          done
+
+          # The previous production-admitted W06 source is fc560... .
+          # This deployment admits the next W06 runtime slice only. Contract,
+          # Blueprint, Entity, and non-W06 authority-sensitive changes remain
+          # rejected by the explicit allowlist below.
+          changed_from_admitted="$(gh api "repos/$GITHUB_REPOSITORY/compare/$PREVIOUS_ADMITTED_SOURCE_SHA...$SOURCE_SHA" --jq '.files[]?.filename // empty')"
+          test -n "$changed_from_admitted" || {
+            echo "No diff found between admitted W06 source and requested source"
+            exit 1
+          }
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              workers/W06-governance/*|.github/workflows/w06-*|docs/change-control/CC-MAPPING-0-AUTH-013-W06-*|docs/MAPPING-0-CLOSURE-LEDGER.md|artifacts/mapping-0/w06-*)
+                ;;
+              *)
+                echo "W06 runtime admission rejected unexpected delta: $file"
+                exit 1
+                ;;
+            esac
+          done <<< "$changed_from_admitted"
+
+          carry_forward_workflow auth-013-persistence-schema-evidence.yml "$PREVIOUS_PERSISTENCE_EVIDENCE_SOURCE_SHA"
+
+          required_jobs=(
+            "Blueprint Feature Inventory Gate"
+            "Contract Admission Gate (state-machines)"
+            "Contract Admission Gate (openapi)"
+            "Mapping 0 Structural/Contract Gate"
+            "Contract Admission Gate (authz)"
+            "Contract Admission Gate (common)"
+            "Semantic Cross-Contract Gate"
+            "Payload Contract Reconciliation Gate"
+            "Contract Admission Gate (enums)"
+            "Capability Contract Graph Gate"
+          )
+
+          jobs_json="$(gh run view "$CONTRACT_BASE_RUN" --repo "$GITHUB_REPOSITORY" --json jobs)"
+          for job in "${required_jobs[@]}"; do
+            conclusion="$(jq -r --arg name "$job" '.jobs[] | select(.name == $name) | .conclusion // empty' <<< "$jobs_json")"
+            test "$conclusion" = "success" || {
+              echo "Contract admission baseline job failed or is missing: $job (observed: ${conclusion:-none})"
+              exit 1
+            }
+          done
+
+          changed_files="$(gh api "repos/$GITHUB_REPOSITORY/compare/$CONTRACT_BASE_SHA...$SOURCE_SHA" --jq '.files[]?.filename // empty')"
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              workers/W06-governance/*|.github/workflows/w06-*|docs/change-control/CC-MAPPING-0-AUTH-013-W06-*|docs/MAPPING-0-CLOSURE-LEDGER.md)
+                ;;
+              *)
+                echo "Source SHA changes an authority-sensitive path outside the admitted W06 delta: $file"
+                exit 1
+                ;;
+            esac
+          done <<< "$changed_files"
+
+      - name: Verify W06 physical binding configuration
+        working-directory: workers/W06-governance
+        run: |
+          test -f wrangler.jsonc
+          node - <<'NODE'
+          const fs = require('fs')
+          const text = fs.readFileSync('wrangler.jsonc', 'utf8')
+          const required = [
+            '"name": "luckread-w06"',
+            '"binding": "D1_03"',
+            '"database_id": "bda1d247-a371-4244-91ae-aef96034db7f"'
+          ]
+          for (const value of required) {
+            if (!text.includes(value)) throw new Error(`Missing required binding assertion: ${value}`)
+          }
+          NODE
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: TypeScript verification
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/index.ts
+
+      - name: Deploy W06 with pinned Wrangler
+        working-directory: workers/W06-governance
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc

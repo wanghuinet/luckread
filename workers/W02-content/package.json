@@ -1,0 +1,7 @@
+{
+  "name": "@luckread/w02-identity-auth",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": { "node": ">=24" }
+}

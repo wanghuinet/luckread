@@ -1,0 +1,18 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "contractVersion":"1.0",
+  "sourceOfTruth":"docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "batch":"T",
+  "domain":"T. Copyright and rights",
+  "status":"NOT_GREEN",
+  "records":[
+    {"featureId":"RIGHTS-001","name":"ownership","hierarchy":{"l1":"T","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"RIGHTS-002","name":"original/reprint/license metadata","hierarchy":{"l1":"T","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"RIGHTS-003","name":"copyright fingerprint","hierarchy":{"l1":"T","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"RIGHTS-004","name":"duplicate detection","hierarchy":{"l1":"T","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"RIGHTS-005","name":"copyright claim","hierarchy":{"l1":"T","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"RIGHTS-006","name":"takedown","hierarchy":{"l1":"T","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"RIGHTS-007","name":"counter-notice/appeal","hierarchy":{"l1":"T","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"RIGHTS-008","name":"rights revenue","hierarchy":{"l1":"T","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+  ]
+}

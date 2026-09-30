@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/evidence/rc-02-report-appeal-green-gate.json",
+  "title": "RC-02 Report/Appeal Production Green Gate",
+  "version": "1.0.0",
+  "status": "BLOCKED_ON_IMPLEMENTATION_BASELINE",
+  "contract": "contracts/api/report-appeal.v1.json",
+  "requiredEvidence": [
+    { "id": "API-01", "requirement": "Canonical OpenAPI exposes report and appeal operations with exact paths, auth, schemas and errors.", "status": "PENDING" },
+    { "id": "AUTH-01", "requirement": "Actor identity and target scope are derived and checked server-side.", "status": "PENDING" },
+    { "id": "STATE-01", "requirement": "Appeal eligibility and moderation state transitions are enforced server-side.", "status": "PENDING" },
+    { "id": "DEDUP-01", "requirement": "Duplicate reports/active appeals converge safely under retries and concurrency.", "status": "PENDING" },
+    { "id": "AUDIT-01", "requirement": "Immutable audit evidence is emitted for report and appeal mutations.", "status": "PENDING" },
+    { "id": "E2E-01", "requirement": "Security and integration tests prove privacy isolation, idempotency and authorization boundaries.", "status": "PENDING" }
+  ],
+  "greenRule": "RC-02 is GREEN only when every requiredEvidence item is PASS and CI records immutable evidence references.",
+  "implementationBlocker": "The current GitHub main branch still lacks the synchronized application implementation baseline required for executable domain tests."
+}

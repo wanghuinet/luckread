@@ -1,0 +1,160 @@
+{
+  "version": "1.0.0",
+  "evidenceType": "MAPPING_0_AUTH_004_WIRE_SCHEMA_INPUT_AUDIT",
+  "generatedAt": "2026-09-26",
+  "repository": "wanghuinet/luckread",
+  "sourceHead": "36756e0be1e81dd4d9abb5613cc82dc70c13752b",
+  "featureId": "AUTH-004",
+  "status": "WIRE_SCHEMA_NOT_CLOSED",
+  "authorityChain": {
+    "routeOperation": "CC-MAPPING-0-AUTH-004-OPENAPI-DISCOVERY-SHELL-CONFLICT-2026-09-26",
+    "dtoVocabulary": "CC-MAPPING-0-AUTH-004-005-DTO-VOCABULARY-AUTHORITY-2026-09-26",
+    "canonicalFeatureContract": "contracts/api/AUTH-004-password-recovery-contract.v1.json",
+    "canonicalWireGate": "contracts/alignment/mapping-batches/AUTH-004-wire-projection-decision-gate.v1.md"
+  },
+  "inheritedInputs": [
+    {
+      "item": "canonicalOperations",
+      "value": [
+        "authPasswordChange POST /auth/password/change",
+        "authPasswordResetRequest POST /auth/password/reset/request",
+        "authPasswordResetConfirm POST /auth/password/reset/confirm"
+      ],
+      "source": "contracts/api/AUTH-004-password-recovery-contract.v1.json",
+      "authority": "RESOLVED"
+    },
+    {
+      "item": "dtoVocabulary",
+      "value": [
+        "DTO-AUTH-004-PASSWORD-CHANGE-REQUEST",
+        "DTO-AUTH-004-PASSWORD-CHANGE-RESPONSE",
+        "DTO-AUTH-004-PASSWORD-RESET-REQUEST",
+        "DTO-AUTH-004-PASSWORD-RESET-CONFIRM",
+        "DTO-AUTH-004-PASSWORD-RESET-RESPONSE"
+      ],
+      "source": "CC-MAPPING-0-AUTH-004-005-DTO-VOCABULARY-AUTHORITY-2026-09-26",
+      "authority": "RESOLVED"
+    },
+    {
+      "item": "authorizationBoundaries",
+      "value": {
+        "authPasswordChange": "authenticated self; user.credential.manage",
+        "authPasswordResetRequest": "anonymous",
+        "authPasswordResetConfirm": "anonymous; recovery_token; token-bound"
+      },
+      "source": "contracts/api/AUTH-004-password-recovery-contract.v1.json",
+      "authority": "RESOLVED"
+    },
+    {
+      "item": "securityLifecycle",
+      "value": [
+        "single-use token",
+        "time-bounded token",
+        "purpose-bound token",
+        "raw token never persisted",
+        "raw token never logged",
+        "successful change/reset revokes affected sessions",
+        "password never returned/logged",
+        "no account enumeration",
+        "cross-account change denied",
+        "replay denied"
+      ],
+      "source": "contracts/api/AUTH-004-password-recovery-contract.v1.json",
+      "authority": "RESOLVED"
+    },
+    {
+      "item": "platformErrorEnvelope",
+      "value": [
+        "requestId",
+        "code",
+        "category",
+        "severity",
+        "message",
+        "userSafeReason",
+        "retryable",
+        "retryAfter",
+        "operationId",
+        "detailsRef"
+      ],
+      "source": "docs/166-UNIFIED-ERROR-AND-STATE-TAXONOMY-CONTRACT-v1.0.md",
+      "authority": "CROSS_CUTTING_CONTRACT"
+    },
+    {
+      "item": "sensitiveMutationIdempotencyRule",
+      "value": "Sensitive state-changing APIs require idempotency interaction; exact AUTH-004 application remains to be frozen by feature wire decision.",
+      "source": "docs/72-USER-CENTER-PROFILE-SETTINGS-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
+      "authority": "CROSS_CUTTING_CONTRACT_WITH_FEATURE_GAP"
+    }
+  ],
+  "unresolvedWireInputs": [
+    {
+      "operationId": "authPasswordChange",
+      "items": [
+        "exact request field names",
+        "current-password representation",
+        "new-password representation",
+        "password-policy reference",
+        "requiredness/nullability",
+        "success status",
+        "success body vs no-body",
+        "exact error/status mapping",
+        "feature-specific idempotency requirement"
+      ]
+    },
+    {
+      "operationId": "authPasswordResetRequest",
+      "items": [
+        "exact account/recovery identifier request field",
+        "accepted identifier format",
+        "requiredness/nullability",
+        "success status",
+        "success body vs no-body",
+        "recovery delivery metadata public/private",
+        "exact error/status mapping",
+        "rate-limit contract reference"
+      ]
+    },
+    {
+      "operationId": "authPasswordResetConfirm",
+      "items": [
+        "exact recovery-token field name",
+        "recovery-token representation/format",
+        "new-password field name and policy reference",
+        "requiredness/nullability",
+        "success status",
+        "success body vs no-body",
+        "expired/replayed/wrong-purpose error mapping",
+        "public representation of session invalidation, if any",
+        "idempotency/replay semantics at wire boundary"
+      ]
+    }
+  ],
+  "historicalNonAuthorityInputs": [
+    {
+      "source": "docs/batches/01-FOUNDATION-IDENTITY-IMPLEMENTATION-PLAN-v1.0.md",
+      "finding": "Older foundation plan names POST /v1/auth/password/forgot and POST /v1/auth/password/reset.",
+      "disposition": "HISTORICAL/DESIGN INPUT ONLY",
+      "reason": "Does not match the current AUTH-004 three-operation feature contract and provides no exact DTO field schema."
+    },
+    {
+      "source": "contracts/openapi/v1/openapi.yaml",
+      "finding": "postAccountPasswordChange and postAccountRecovery are DISCOVERY_DRAFT shells.",
+      "disposition": "HISTORICAL/DISCOVERY ONLY",
+      "reason": "Current route authority decision explicitly excludes these from canonical AUTH-004 operations and they contain no admitted wire schema."
+    }
+  ],
+  "prohibitedInferences": [
+    "currentPassword from generic password-change naming alone",
+    "newPassword from generic password-change naming alone",
+    "identifier field from account/recovery legacy route naming",
+    "recoveryToken field name from persistence tokenHash",
+    "success status from neighboring AUTH operations",
+    "session invalidation response body from persistence side effects"
+  ],
+  "nextGate": "Explicit AUTH-004 wire-schema authority decision",
+  "openApiPromotion": false,
+  "dtoRegistryPromotion": false,
+  "runtimeAdmission": false,
+  "evidenceAdmission": false,
+  "mapping0Green": false
+}

@@ -1,0 +1,90 @@
+name: W04 Physical Worker Provision
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "artifacts/mapping-0/w04-physical-provisioning-authorized-2026-09-29.json"
+      - "workers/W04-feed-search/**"
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify W04 provisioning authority
+        working-directory: workers/W04-feed-search
+        run: |
+          set -euo pipefail
+          test -f wrangler.jsonc
+          test -f src/index.ts
+          test -f ../../artifacts/mapping-0/w04-physical-provisioning-authorized-2026-09-29.json
+          node - <<'NODE'
+          const fs = require('fs')
+          const cfg = fs.readFileSync('wrangler.jsonc', 'utf8')
+          for (const value of [
+            '"name": "luckread-w04"',
+            '"main": "src/index.ts"',
+            '"workers_dev": false'
+          ]) {
+            if (!cfg.includes(value)) throw new Error("Missing W04 provisioning assertion: " + value)
+          }
+          NODE
+
+      - name: TypeScript verification
+        run: |
+          set -euo pipefail
+          npx --yes -p typescript@5.9.3 tsc \
+            --noEmit --target ES2022 --module ESNext --moduleResolution Bundler \
+            --strict --skipLibCheck \
+            workers/W04-feed-search/src/index.ts
+
+      - name: Deploy W04 with pinned Wrangler
+        working-directory: workers/W04-feed-search
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+
+      - name: Verify live AUTH-013 queue consumer
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          AUTH=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+          queues="$(curl -fsS --retry 3 --retry-all-errors "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues?per_page=100" "${AUTH[@]}")"
+          queue_id="$(jq -r --arg q "luckread-auth013-account-state-projection" '.result[]? | select(.queue_name==$q) | .queue_id' <<<"$queues")"
+          test -n "$queue_id"
+          consumers="$(curl -fsS --retry 3 --retry-all-errors "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$queue_id/consumers" "${AUTH[@]}")"
+          echo "$consumers" | jq '.result'
+          consumer="$(jq -c 'if (.result|type)=="array" then .result[] else .result end | select(.script=="luckread-w04")' <<<"$consumers")"
+          test -n "$consumer"
+          echo "$consumer" | jq '{script_name, type, queue_name, dead_letter_queue, settings}'
+          echo "$consumer" | jq -e --arg dlq "luckread-auth013-account-state-projection-dlq" '.dead_letter_queue==$dlq' >/dev/null
+          count="$(jq -r 'if (.result|type)=="array" then (.result|length) else 1 end' <<<"$consumers")"
+          test "$count" = "1"
+          echo "W04 AUTH-013 queue consumer + DLQ verified"
+
+      - name: Run controlled AUTH-013 W04 projection runtime evidence
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node scripts/auth013-w04-runtime-evidence.mjs
+

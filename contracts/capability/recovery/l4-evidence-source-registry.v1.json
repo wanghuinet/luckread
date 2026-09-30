@@ -1,0 +1,27 @@
+{
+  "version":"1.0",
+  "status":"SOURCE_REGISTRY_READY_RECONCILIATION_PENDING",
+  "authority":"recovery-input-only",
+  "purpose":"Register existing domain-level L1-L4 traceability contracts as evidence sources without promoting them to a second capability authority.",
+  "selectionRule":"Only repository documents with explicit L1-L4 traceability/admission semantics are registered. No hierarchy is inferred from filenames, API routes, Payload collections, or feature-name similarity.",
+  "sources":[
+    {"path":"docs/39-L1-L4-TRACEABILITY-AND-CONTRACT-ADMISSION-MATRIX-v1.0.md","role":"global-traceability-baseline","status":"FOUND"},
+    {"path":"docs/45-MCN-CENTER-L1-L4-TRACEABILITY-AND-CONTRACT-ADMISSION-v1.0.md","role":"domain-traceability","status":"FOUND"},
+    {"path":"docs/70-OPEN-PLATFORM-L1-L4-TRACEABILITY-AND-CONTRACT-ADMISSION-v1.0.md","role":"domain-traceability","status":"FOUND"},
+    {"path":"docs/77-CREATOR-SYSTEM-L1-L4-TRACEABILITY-AND-CONTRACT-ADMISSION-v1.0.md","role":"domain-traceability","status":"FOUND"},
+    {"path":"docs/101-TAXONOMY-TOPIC-L1-L4-TRACEABILITY-AND-CONTRACT-ADMISSION-v1.0.md","role":"domain-traceability","status":"FOUND"},
+    {"path":"docs/125-COMMERCE-ORDER-FULFILLMENT-L1-L4-TRACEABILITY-AND-CONTRACT-ADMISSION-v1.0.md","role":"domain-traceability","status":"FOUND"},
+    {"path":"docs/132-ADVERTISING-L1-L4-TRACEABILITY-AND-CONTRACT-ADMISSION-v1.0.md","role":"domain-traceability","status":"FOUND"},
+    {"path":"docs/178-L3-L4-TRACEABILITY-CLOSURE-MATRIX-v1.0.md","role":"closure-input","status":"FOUND"},
+    {"path":"docs/archive/1.0-reuse/RECOVERED-35-THIRD-LEVEL-CAPABILITY-MASTER-MATRIX-v1.0.md","role":"historical-l3-input","status":"RECOVERED"},
+    {"path":"docs/archive/1.0-reuse/RECOVERED-36-FOURTH-LEVEL-CAPABILITY-MASTER-MATRIX-v1.0.md","role":"historical-l1-l2-input","status":"RECOVERED"}
+  ],
+  "rules":[
+    "A source document is evidence, not authority, until reconciled with Blueprint 2.0.",
+    "Overlapping domain documents must not create duplicate authorities.",
+    "Each admitted L4 must resolve to exactly one L3, L2, and L1 parent chain.",
+    "Missing owner, authority, lifecycle, authorization, or acceptance evidence remains blocking.",
+    "No 449 Feature ID is admitted by this registry alone."
+  ],
+  "crosswalk":{"status":"NOT_STARTED","matchedFeatures":0,"reviewRequired":449,"conflicts":0,"unresolved":449}
+}

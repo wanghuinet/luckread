@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.0",
+  "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "batch": "P",
+  "domain": "P. Translation and internationalization",
+  "status": "NOT_GREEN",
+  "records": [
+    {"featureId":"I18N-001","name":"UI locale","hierarchy":{"l1":"P. Translation and internationalization","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"I18N-002","name":"content language","hierarchy":{"l1":"P. Translation and internationalization","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"I18N-003","name":"manual content translation","hierarchy":{"l1":"P. Translation and internationalization","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"I18N-004","name":"comment translation","hierarchy":{"l1":"P. Translation and internationalization","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"I18N-005","name":"translation versions/review","hierarchy":{"l1":"P. Translation and internationalization","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"I18N-006","name":"region/country/timezone","hierarchy":{"l1":"P. Translation and internationalization","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"I18N-007","name":"regional content policy","hierarchy":{"l1":"P. Translation and internationalization","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"I18N-008","name":"regional recommendation","hierarchy":{"l1":"P. Translation and internationalization","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"I18N-009","name":"currency/number/date formats","hierarchy":{"l1":"P. Translation and internationalization","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+  ]
+}

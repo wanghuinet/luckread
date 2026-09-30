@@ -1,0 +1,228 @@
+name: AUTH-013 W04 Side-Effect Matrix Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Select RUN to execute controlled projection/deindex evidence"
+        required: true
+        type: choice
+        options:
+          - RUN
+
+permissions:
+  contents: read
+
+jobs:
+  side-effect-matrix:
+    if: ${{ inputs.confirm == 'RUN' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_W04_SOURCE_SHA: "53e3bcbb855be8e1240171390c69dd034bf04f8b"
+      EXPECTED_W04_VERSION_ID: "83e69e13-104c-482f-bc4c-2176bc9ef824"
+      W04_NAME: "luckread-w04"
+      QUEUE_NAME: "luckread-auth013-account-state-projection"
+      DLQ_NAME: "luckread-auth013-account-state-projection-dlq"
+      KV_NAMESPACE_ID: "32f7e407128a43d59720d5d46736e084"
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+    steps:
+      - name: Checkout admitted W04 source
+        uses: actions/checkout@v4
+        with:
+          ref: "53e3bcbb855be8e1240171390c69dd034bf04f8b"
+          fetch-depth: 0
+
+      - name: Validate exact deployment provenance and source safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$EXPECTED_W04_SOURCE_SHA" "$GITHUB_SHA"
+          test -f workers/W04-feed-search/src/index.ts
+          test -f workers/W04-feed-search/src/auth-013-projection.ts
+          test -f workers/W04-feed-search/wrangler.jsonc
+          node - <<'NODE'
+          const fs=require('node:fs')
+          const p=fs.readFileSync('workers/W04-feed-search/src/auth-013-projection.ts','utf8')
+          const i=fs.readFileSync('workers/W04-feed-search/src/index.ts','utf8')
+          const w=fs.readFileSync('workers/W04-feed-search/wrangler.jsonc','utf8')
+          const a=fs.readFileSync('contracts/authz/authz-cache-invariant.json','utf8')
+          const checks={
+            monotonicVersionGate:p.includes('current.sourceVersion >= event.sourceVersion'),
+            sourceAuthorityD101:p.includes("sourceAuthority: 'D1-01'"),
+            projectionVersionTracksStateVersion:p.includes('projectionVersion: event.after.accountStateVersion'),
+            declaredDeindexStates:p.includes("'FROZEN', 'SUSPENDED', 'BANNED', 'DELETION_PENDING', 'DELETED'"),
+            noW04D1:!w.includes('d1_databases'),
+            noAuthorizationDecision:!p.includes('authorizationDecision')&&!p.includes('allow:'),
+            noPublicAuthorizationPath:i.includes('status: 404'),
+            cacheInvariant001Present:a.includes('"AUTHZ-CACHE-INVARIANT-001"')
+          }
+          for(const [k,v] of Object.entries(checks)) if(!v) throw new Error('Safety assertion failed: '+k)
+          console.log(JSON.stringify({AUTH_013_W04_SAFETY:'PASS',checks},null,2))
+          NODE
+
+      - name: Validate Cloudflare credentials
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+
+      - name: Inspect live W04 consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          queues="$(curl -fsS --retry 3 --retry-all-errors             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues?per_page=100")"
+          consumer="$(jq -c --arg q "$QUEUE_NAME" '.result[]? | select(.queue_name==$q) | .consumers[]? | select(.script_name=="luckread-w04" and .type=="worker" and .dead_letter_queue=="luckread-auth013-account-state-projection-dlq")' <<<"$queues")"
+          count="$(jq -r --arg q "$QUEUE_NAME" '.result[]? | select(.queue_name==$q) | .consumers_total_count' <<<"$queues")"
+          queue_id="$(jq -r --arg q "$QUEUE_NAME" '.result[]? | select(.queue_name==$q) | .queue_id' <<<"$queues")"
+          test -n "$consumer"
+          test "$count" = "1"
+          test -n "$queue_id"
+          printf '%s
+' "$queue_id" > /tmp/auth013-queue-id
+          printf '%s
+' "$consumer" > /tmp/auth013-consumer
+          printf '%s
+' "$count" > /tmp/auth013-consumer-count
+          echo "AUTH013_W04_LIVE_CONSUMER=PASS"
+
+      - name: Execute controlled lifecycle projection/deindex matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/auth-013-w04-side-effect
+          QUEUE_ID="$(cat /tmp/auth013-queue-id)"
+          RESOURCE="usr_auth013_w04_side_effect_$GITHUB_RUN_ID"
+          KEY="auth013:projection:User:$RESOURCE"
+          ENCODED_KEY="$(jq -rn --arg k "$KEY" '$k|@uri')"
+
+          cleanup() {
+            curl -sS --retry 2 --retry-all-errors -X DELETE               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               -H "Content-Type: application/json"               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/$KV_NAMESPACE_ID/values/$ENCODED_KEY" >/dev/null || true
+          }
+          trap cleanup EXIT
+
+          push() {
+            local version="$1" before="$2" after="$3" event_id="$4"
+            body="$(jq -n --arg r "$RESOURCE" --arg eid "$event_id" --arg b "$before" --arg a "$after" --argjson v "$version"               '{eventId:$eid,eventType:"identity.account_state_changed",schemaVersion:"1.0",producer:"W02",resourceType:"User",resourceId:$r,occurredAt:"2026-09-29T06:00:00.000Z",publishedAt:"2026-09-29T06:00:01.000Z",correlationId:"auth013-side-effect-matrix",causationId:$eid,idempotencyKey:$eid,attempt:1,sourceVersion:$v,actor:{actorId:"auth013-side-effect-evidence",actorType:"operator"},before:{accountState:$b,accountStateVersion:(if $v > 1 then ($v-1) else 1 end)},after:{accountState:$a,accountStateVersion:$v},reason:"controlled AUTH-013 side-effect matrix evidence"}')"
+            message="$(jq -n --argjson b "$body" '{body:$b,content_type:"json"}')"
+            curl -fsS --retry 3 --retry-all-errors -X POST               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               -H "Content-Type: application/json"               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$QUEUE_ID/messages"               --data "$message" >/dev/null
+          }
+
+          get_record() {
+            curl -sS --retry 3 --retry-all-errors               -o /tmp/auth013-record.json -w '%{http_code}'               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               -H "Content-Type: application/json"               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/$KV_NAMESPACE_ID/values/$ENCODED_KEY"
+          }
+
+          expect() {
+            local version="$1" state="$2" deindex="$3" label="$4"
+            for _ in $(seq 1 18); do
+              status="$(get_record)"
+              if [ "$status" = "200" ] && jq -e --argjson v "$version" --arg s "$state" --argjson d "$deindex"                 '.sourceVersion==$v and .projectionVersion==$v and .accountState==$s and .deindex==$d and .state==(if $d then "PURGED" else "ACTIVE" end) and .sourceAuthority=="D1-01" and .policyVersion=="AUTH-013-v1"'                 /tmp/auth013-record.json >/dev/null; then
+                echo "PASS $label"
+                return 0
+              fi
+              sleep 2
+            done
+            cat /tmp/auth013-record.json 2>/dev/null || true
+            echo "FAIL $label"
+            return 1
+          }
+
+          push 2 ACTIVE FROZEN "evt-$GITHUB_RUN_ID-2"
+          expect 2 FROZEN true "ACTIVE->FROZEN"
+          push 3 FROZEN SUSPENDED "evt-$GITHUB_RUN_ID-3"
+          expect 3 SUSPENDED true "FROZEN->SUSPENDED"
+          push 4 SUSPENDED BANNED "evt-$GITHUB_RUN_ID-4"
+          expect 4 BANNED true "SUSPENDED->BANNED"
+          push 5 DELETION_REQUESTED DELETION_PENDING "evt-$GITHUB_RUN_ID-5"
+          expect 5 DELETION_PENDING true "DELETION_REQUESTED->DELETION_PENDING"
+          push 6 DELETION_PENDING DELETED "evt-$GITHUB_RUN_ID-6"
+          expect 6 DELETED true "DELETION_PENDING->DELETED"
+          push 7 BANNED RESTORED "evt-$GITHUB_RUN_ID-7"
+          expect 7 RESTORED false "BANNED->RESTORED"
+          push 8 DELETED REACTIVATED "evt-$GITHUB_RUN_ID-8"
+          expect 8 REACTIVATED false "DELETED->REACTIVATED"
+          push 9 ACTIVE RESTRICTED "evt-$GITHUB_RUN_ID-9"
+          expect 9 RESTRICTED false "ACTIVE->RESTRICTED"
+          push 10 RESTRICTED ACTIVE "evt-$GITHUB_RUN_ID-10"
+          expect 10 ACTIVE false "RESTRICTED->ACTIVE"
+
+          push 10 RESTRICTED ACTIVE "evt-$GITHUB_RUN_ID-10"
+          sleep 3
+          test "$(get_record)" = "200"
+          jq -e --arg eid "evt-$GITHUB_RUN_ID-10" '.sourceVersion==10 and .projectionVersion==10 and .state=="ACTIVE" and .eventId==$eid' /tmp/auth013-record.json >/dev/null
+
+          push 6 DELETION_PENDING DELETED "evt-$GITHUB_RUN_ID-6-old"
+          sleep 3
+          test "$(get_record)" = "200"
+          jq -e --arg eid "evt-$GITHUB_RUN_ID-10" '.sourceVersion==10 and .projectionVersion==10 and .state=="ACTIVE" and .deindex==false and .eventId==$eid' /tmp/auth013-record.json >/dev/null
+
+          node - /tmp/auth013-record.json <<'NODE'
+          const fs=require('node:fs')
+          const r=JSON.parse(fs.readFileSync(process.argv[2],'utf8'))
+          const created=Date.parse(r.createdAt)
+          const stale=Date.parse(r.staleAfter)
+          if(!Number.isFinite(created)||!Number.isFinite(stale)||stale<created||stale-created>300000) throw new Error('invalid/broad stale window')
+          for(const k of ['authorizationDecision','allow','deny','sessionValid','tokenValid']) if(Object.prototype.hasOwnProperty.call(r,k)) throw new Error('auth material in projection: '+k)
+          console.log('AUTH_013_W04_SIDE_EFFECT_RUNTIME=PASS')
+          NODE
+
+          node - <<'NODE'
+          const fs=require('node:fs')
+          const out={
+            schemaVersion:1,
+            auth:"AUTH-013",
+            worker:"luckread-w04",
+            deployedSourceSha:process.env.EXPECTED_W04_SOURCE_SHA,
+            deployedVersionId:process.env.EXPECTED_W04_VERSION_ID,
+            githubRunId:process.env.GITHUB_RUN_ID,
+            githubSourceHead:process.env.GITHUB_SHA,
+            queue:"luckread-auth013-account-state-projection",
+            queueId:fs.readFileSync('/tmp/auth013-queue-id','utf8').trim(),
+            dlq:"luckread-auth013-account-state-projection-dlq",
+            consumer:JSON.parse(fs.readFileSync('/tmp/auth013-consumer','utf8')),
+            consumerCount:Number(fs.readFileSync('/tmp/auth013-consumer-count','utf8')),
+            derivedDestination:{type:"cloudflare_kv",physicalResource:"globe",namespaceId:"32f7e407128a43d59720d5d46736e084",authority:"NONE"},
+            matrix:{deindex:["FROZEN","SUSPENDED","BANNED","DELETION_PENDING","DELETED"],reactivation:["RESTORED","REACTIVATED"],visible:["RESTRICTED","ACTIVE"],duplicateIdempotent:true,olderVersionRejected:true,nonResurrection:true,sourceAuthorityD101:true,projectionVersionTracksAccountStateVersion:true,boundedStaleWindow:true,syntheticCleanup:true}
+          }
+          fs.writeFileSync('artifacts/mapping-0/auth-013-w04-side-effect/runtime-evidence.json',JSON.stringify(out,null,2)+'
+')
+          NODE
+
+      - name: Verify synthetic KV cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEY="auth013:projection:User:usr_auth013_w04_side_effect_$GITHUB_RUN_ID"
+          ENCODED_KEY="$(jq -rn --arg k "$KEY" '$k|@uri')"
+          status="$(curl -sS --retry 3 --retry-all-errors             -o /tmp/auth013-cleanup.json -w '%{http_code}'             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/$KV_NAMESPACE_ID/values/$ENCODED_KEY")"
+          test "$status" = "404"
+          echo "AUTH013_W04_SIDE_EFFECT_CLEANUP=PASS"
+
+      - name: Capture provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > artifacts/mapping-0/auth-013-w04-side-effect/provenance.txt <<EOF
+          workflow=AUTH-013 W04 Side-Effect Matrix Evidence
+          github_run_id=$GITHUB_RUN_ID
+          github_source_head=$GITHUB_SHA
+          w04_deployed_source_sha=$EXPECTED_W04_SOURCE_SHA
+          w04_deployed_version_id=$EXPECTED_W04_VERSION_ID
+          w04_worker=$W04_NAME
+          queue=$QUEUE_NAME
+          dlq=$DLQ_NAME
+          derived_destination=cloudflare_kv:globe:$KV_NAMESPACE_ID
+          authority=D1-01
+          synthetic_cleanup=true
+          no_w04_redeploy=true
+          EOF
+
+      - name: Upload side-effect evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-013-w04-side-effect-evidence
+          path: artifacts/mapping-0/auth-013-w04-side-effect/
+          if-no-files-found: error
+          retention-days: 30

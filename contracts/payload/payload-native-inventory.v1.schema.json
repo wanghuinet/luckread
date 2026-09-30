@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/payload/payload-native-inventory.v1.schema.json",
+  "title": "Luckread Payload Native Inventory v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "status", "source", "generatedBy", "collections"],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "status": { "enum": ["DISCOVERED", "BLOCKED", "NOT_GREEN"] },
+    "source": { "type": "string", "minLength": 1 },
+    "generatedBy": { "type": "string", "minLength": 1 },
+    "collections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["slug", "sourceRef", "auth", "fields"],
+        "properties": {
+          "slug": { "type": "string", "minLength": 1 },
+          "sourceRef": { "type": "string", "minLength": 1 },
+          "auth": { "type": "boolean" },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "type", "sourceRef", "classification"],
+              "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "type": { "type": "string", "minLength": 1 },
+                "sourceRef": { "type": "string", "minLength": 1 },
+                "classification": { "const": "PAYLOAD_CONFIG_DISCOVERED" },
+                "required": { "type": "boolean" },
+                "unique": { "type": "boolean" },
+                "defaultValue": {},
+                "hasAccess": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

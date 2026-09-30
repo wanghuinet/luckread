@@ -1,0 +1,26 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/evidence/rc-openapi-mapping.json",
+  "title":"RC API to Canonical OpenAPI Mapping Gate",
+  "version":"1.0.0",
+  "contract":[
+    "contracts/api/block-mute.v1.json",
+    "contracts/api/report-appeal.v1.json",
+    "contracts/api/revision.v1.json",
+    "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+    "contracts/api/organization-members.v1.json",
+    "contracts/api/ip-content.v1.json",
+    "contracts/api/feed-delivery.v1.json",
+    "contracts/api/search-feed-consistency.v1.json"
+  ],
+  "canonicalOpenAPI":"contracts/openapi/v1/openapi.yaml",
+  "mappingRule":"Every public RC operation MUST have an exact method+path+operationId entry in Canonical OpenAPI. Server base /api/v1 is transport metadata and MUST NOT be duplicated in RC paths.",
+  "requiredEvidence":[
+    {"id":"exact-operationId","requirement":"Every RC operation has an exact operationId match in Canonical OpenAPI.","status":"PENDING"},
+    {"id":"exact-method-path","requirement":"Every RC operation has an exact HTTP method and path match in Canonical OpenAPI.","status":"PENDING"},
+    {"id":"auth-alignment","requirement":"Authentication requirements and public/private semantics are aligned with Canonical OpenAPI.","status":"PENDING"},
+    {"id":"response-alignment","requirement":"Success status and required concurrency/idempotency parameters are represented in Canonical OpenAPI.","status":"PENDING"},
+    {"id":"no-orphan-public-api","requirement":"No RC public operation exists outside Canonical OpenAPI without an explicit internal/private designation.","status":"PENDING"}
+  ],
+  "status":"BLOCKED_ON_IMPLEMENTATION_BASELINE"
+}

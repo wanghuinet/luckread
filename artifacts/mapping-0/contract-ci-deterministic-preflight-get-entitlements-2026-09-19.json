@@ -1,0 +1,74 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-09-19",
+  "purpose": "Deterministic CI-preflight record for the already-detected getEntitlements operationId collision.",
+  "sourceRefs": {
+    "semanticCi": "scripts/contract-semantic-ci.mjs",
+    "operationPolicy": "contracts/openapi/v1/operation-policy.json",
+    "apiInventory": "contracts/alignment/api-inventory.v1.json",
+    "openapi": "contracts/openapi/v1/openapi.yaml"
+  },
+  "noInference": true,
+  "findings": {
+    "semanticCiContainsDuplicateCheck": true,
+    "duplicateOperationId": "getEntitlements",
+    "openapiLineLocations": [
+      922,
+      1612
+    ],
+    "apiInventoryRows": [
+      {
+        "operationId": "getEntitlements",
+        "method": "GET",
+        "path": "/v1/entitlements",
+        "openapiPath": "/entitlements",
+        "domain": "subscription_entitlement_payment",
+        "status": "DISCOVERED",
+        "featureIds": [],
+        "schemaRef": "",
+        "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/entitlements",
+        "sourceRefs": [
+          "contracts/openapi/v1/openapi.yaml",
+          "contracts/api/api-inventory.v1.json"
+        ]
+      },
+      {
+        "operationId": "getEntitlements",
+        "method": "GET",
+        "path": "/v1/entitlements/{subjectId}",
+        "openapiPath": "/entitlements/{subjectId}",
+        "domain": "subscription_entitlement_payment",
+        "status": "DISCOVERED",
+        "featureIds": [],
+        "schemaRef": "",
+        "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/entitlements/{subjectId}",
+        "sourceRefs": [
+          "contracts/openapi/v1/openapi.yaml",
+          "contracts/api/api-inventory.v1.json"
+        ]
+      }
+    ],
+    "policyRows": [
+      {
+        "operationId": "getEntitlements",
+        "auth": {
+          "mode": "permission"
+        },
+        "permissions": [
+          "entitlement.read"
+        ],
+        "auditRequired": false,
+        "optimisticLockRequired": false,
+        "idempotencyRequired": false,
+        "stateMachine": "none"
+      }
+    ],
+    "deterministicConsequence": "If the current OpenAPI is passed to the semantic CI path that executes the duplicate operationId check, this duplicate condition is a direct failure condition independent of other possible CI failures."
+  },
+  "governance": {
+    "changeControl": "docs/change-control/CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19.md",
+    "noAutoRepair": true,
+    "requiredDecision": "Select canonical treatment of /entitlements and /entitlements/{subjectId}; then reconcile API Inventory, OpenAPI, policy, DTO and affected mappings."
+  },
+  "status": "BLOCKED"
+}

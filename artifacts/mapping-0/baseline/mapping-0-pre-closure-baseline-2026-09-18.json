@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "purpose": "Mapping 0 pre-closure baseline snapshot",
+  "capturedAt": "2026-09-18T04:24:00+08:00",
+  "repository": "wanghuinet/luckread",
+  "branch": "main",
+  "head": "fbbc0f02db3ee64272dbda4603386a80c4275da6",
+  "workingTree": "unknown-from-GitHub-api",
+  "canonicalMappingStatus": "NOT_GREEN",
+  "featureInventoryStatus": "DISCOVERED",
+  "featureEntityPersistenceRegistry": {
+    "records": 0,
+    "status": "NOT_GREEN"
+  },
+  "apiSurface": {
+    "openapiOperations": 151,
+    "inventoryOperations": 151,
+    "operationPolicyOperations": 151,
+    "surfaceStatus": "SYNCHRONIZED_DRAFT"
+  },
+  "mapping0EvidenceRegistry": {
+    "knownFromCurrentValidation": "final gate requires every canonical feature to have current executable PASS evidence",
+    "status": "NOT_GREEN"
+  },
+  "baselineSource": "GitHub canonical files at main",
+  "note": "This snapshot records the pre-closure state. It is not implementation evidence and does not assert local working-tree cleanliness."
+}

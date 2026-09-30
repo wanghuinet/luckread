@@ -1,0 +1,18 @@
+{
+  "validationType": "LOCAL_DESIGN_VALIDATION_ONLY",
+  "migrationId": "MIG-AUTH-003-CREDENTIAL-V1",
+  "testedAt": "2026-09-27",
+  "result": "PASS",
+  "checks": [
+    "migration SQL executes against synthetic SQLite schema containing existing users table and data",
+    "auth_identities primary key and unique normalized fields enforce uniqueness",
+    "auth_credentials kind check rejects unsupported values",
+    "auth_credentials value_hash uniqueness enforced",
+    "auth_credentials kind + normalized_value uniqueness enforced",
+    "auth_credentials identity foreign key and cascade delete work",
+    "existing users table definition remains unchanged"
+  ],
+  "remoteEvidence": false,
+  "mapping0Green": false,
+  "entityPromotion": false
+}

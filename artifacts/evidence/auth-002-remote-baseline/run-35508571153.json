@@ -1,0 +1,75 @@
+{
+  "evidenceType": "AUTH_002_REMOTE_BASELINE_EXECUTION_EVIDENCE",
+  "version": "1.0.0",
+  "repository": "wanghuinet/luckread",
+  "workflowRunId": 35508571153,
+  "workflowJobId": 106072401909,
+  "workflow": "W01 Baseline Migration Execution",
+  "workflowHeadSha": "47896fc1671833b2c2afa5b3e0d8a3eae4a7d8a1",
+  "requestedSourceSha": "56926bab09951a8a0e15c820f1fb58dd8ba7090f",
+  "databaseName": "luckread",
+  "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+  "migration": {
+    "name": "20250929_111647",
+    "result": "PASS",
+    "recordedInPayloadMigrations": true,
+    "batch": 1,
+    "remoteConnectionEstablished": true
+  },
+  "preMigration": {
+    "applicationTableCount": 0,
+    "cloudflareInternalTablesObserved": ["_cf_KV"]
+  },
+  "postMigration": {
+    "numTablesFromD1Info": 8,
+    "databaseSizeBytes": 159744,
+    "applicationTables": [
+      "media",
+      "payload_locked_documents",
+      "payload_locked_documents_rels",
+      "payload_migrations",
+      "payload_preferences",
+      "payload_preferences_rels",
+      "users",
+      "users_sessions"
+    ],
+    "evidenceQueryWrites": 0,
+    "servedByPrimary": true,
+    "servedByRegion": "APAC",
+    "servedByColo": "NRT"
+  },
+  "usersSchema": {
+    "columns": [
+      "id",
+      "updated_at",
+      "created_at",
+      "email",
+      "reset_password_token",
+      "reset_password_expiration",
+      "salt",
+      "hash",
+      "login_attempts",
+      "lock_until"
+    ],
+    "canonicalProfileFieldsPresent": [],
+    "note": "The baseline schema does not yet contain the newer canonical Users profile fields; this evidence does not authorize a hand-written migration."
+  },
+  "artifacts": {
+    "githubArtifactId": 10604388551,
+    "githubArtifactName": "w01-baseline-migration-evidence-35508571153",
+    "githubArtifactSha256": "357576fa0a0fac948acbd78c2e45d0749e1c13c3ebbac8a5c5d970ae91e99a31",
+    "files": {
+      "catalog.json": "a9bcf62004fccde9bff20bb5baee5ac93460511ab4849cfd12a689fea9df497b",
+      "d1-info.json": "1582de1ac5bde14c34825dab1355a19335eee6e3624d3363a22b66f3d41a7f97",
+      "migration-status.json": "66dd920d3507ac3e68a9df2f6ce51acde51292f866278f6b205c13982214edc6",
+      "provenance.json": "f0cf35c53864ab1f8dd9dccaea22bcf0b942b141e248e612e5c23db961cf99d8",
+      "users-schema.json": "f3a50428d0f9d368ee6bb2cb537423e8a467fcef26ff92213af788929619f94d"
+    }
+  },
+  "classification": {
+    "remoteD1BaselineMigration": "VERIFIED",
+    "remoteD1SchemaCapture": "VERIFIED",
+    "auth002Overall": "NOT_GREEN",
+    "reason": "Session runtime, adapter regression, deviceId, tokenVersion, refresh/replay, revocation and Evidence Registry promotion gates remain open."
+  }
+}

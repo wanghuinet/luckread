@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/common/etag.json",
+  "title": "ETag",
+  "description": "Strong entity tag for optimistic concurrency and conditional requests. Format: \"v{version}-r{revision}-{representation_hash}\". Weak prefix W/ MUST NOT be accepted for write preconditions.",
+  "type": "string",
+  "pattern": "^\"v[0-9]+-r[0-9]+-[A-Za-z0-9_-]{1,64}\"$",
+  "x-luckread": {
+    "canonical-source": "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
+    "weak-prefix-allowed-for-writes": false
+  }
+}

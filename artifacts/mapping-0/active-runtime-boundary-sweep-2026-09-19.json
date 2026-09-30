@@ -1,0 +1,28 @@
+{
+  "auditId": "M0-ACTIVE-RUNTIME-BOUNDARY-SWEEP-2026-09-19",
+  "testedCommit": "7fe476a8d02bd0163ad21ae4c28d8921876891c8",
+  "noInference": true,
+  "scopes": {
+    "d1Fabric": {
+      "searchTerm": "D1-Fabric",
+      "activeCodeOrWorkflowRefsFound": 0,
+      "matchesObserved": "documentation/governance references only",
+      "disposition": "No active D1-Fabric import, workflow, or runtime reference identified by the repository search."
+    },
+    "legacyPayloadRoot": {
+      "activeRuntimeAuthority": "workers/W01-payload/",
+      "currentW01RuntimeReferencesFound": true,
+      "activeWorkflowReferencesUseW01": true,
+      "legacyRootAsCurrentRuntimeEvidence": false,
+      "disposition": "Legacy root references remain historical/governance references; they are not treated as active W01 implementation."
+    },
+    "usersSource": {
+      "currentPath": "workers/W01-payload/src/collections/Users.ts",
+      "currentFields": [],
+      "legacyPath": "src/collections/Users.ts",
+      "currentRepositoryPathResolvable": false,
+      "disposition": "Do not treat legacy field references as current implementation evidence."
+    }
+  },
+  "conclusion": "Boundary sweep found no active D1-Fabric or legacy-root runtime drift. Existing W01 field/entity authority conflicts remain unchanged and continue to block Payload reconciliation."
+}

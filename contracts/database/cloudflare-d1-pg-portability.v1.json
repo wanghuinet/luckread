@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/cloudflare-d1-pg-portability.v1.json",
+  "title": "Luckread Cloudflare D1 to PostgreSQL Portability Contract",
+  "version": "1.0.0",
+  "status": "FROZEN_CONTRACT",
+  "purpose": "Keep the Luckread application data model Cloudflare D1-native today while preserving a low-cost, deterministic migration path to PostgreSQL providers such as GCP Cloud SQL for PostgreSQL or other PostgreSQL-compatible services later.",
+  "authority": {
+    "sourceOfTruth": "This contract is subordinate to the official Payload adapter contracts and is authoritative for Luckread-owned application data design.",
+    "officialPayloadCompatibility": [
+      "@payloadcms/db-d1-sqlite",
+      "@payloadcms/db-postgres"
+    ],
+    "principle": "Portability is achieved through a portable logical domain model, not by pretending D1 and PostgreSQL have identical physical capabilities."
+  },
+  "architecture": {
+    "canonicalLayer": "Luckread logical application data contract",
+    "currentPhysicalTarget": "Cloudflare D1",
+    "futurePhysicalTargets": [
+      "PostgreSQL on Google Cloud",
+      "PostgreSQL-compatible managed services",
+      "Other standards-compliant PostgreSQL providers"
+    ],
+    "adapterBoundary": "Database-specific SQL, types, connection handling, indexes, migrations, and extensions must remain below the application data contract boundary."
+  },
+  "nonNegotiableInvariants": [
+    "Application APIs and domain state machines must not expose D1-specific physical types or table implementation details.",
+    "Application-owned identifiers must remain opaque and portable across D1 and PostgreSQL.",
+    "Application-owned timestamps must have an explicit logical UTC contract independent of physical timestamp type.",
+    "Business enums and state machines must be represented by stable application values, not vendor enum types.",
+    "Business JSON must have a logical JSON contract; D1 may serialize it as TEXT while PostgreSQL may use JSONB only as an implementation optimization after portability review.",
+    "Application logic must not depend on SQLite rowid, PostgreSQL serial sequences, or any other vendor-generated identity mechanism.",
+    "Application logic must not depend on PostgreSQL-only functions, extensions, stored procedures, or triggers unless a portable fallback contract exists.",
+    "Application-owned tables must be migratable without depending on Payload internal table names or undocumented adapter internals.",
+    "R2/object storage references must remain storage-provider-neutral at the domain level even when Cloudflare R2 is the initial implementation.",
+    "Cache, KV, queue, and object-storage bindings must never become part of the authoritative relational domain contract."
+  ],
+  "portableLogicalTypes": {
+    "id": "Opaque TEXT logical identifier; may map to PostgreSQL text/uuid only through an explicit migration mapping without changing API identity semantics.",
+    "integer": "Signed integer logical value; physical range must remain within both D1/SQLite and target PostgreSQL contract limits.",
+    "boolean": "Logical boolean; D1 implementation INTEGER 0/1, PostgreSQL implementation may use boolean.",
+    "decimal": "Use only where required and define precision/scale in the logical contract; do not assume SQLite REAL is sufficient for financial values.",
+    "timestamp": "UTC instant with millisecond logical precision; D1 implementation INTEGER epoch milliseconds; PostgreSQL implementation may use timestamptz with an explicit conversion boundary.",
+    "json": "Logical JSON document with bounded size and canonical serialization rules; physical representation is adapter-specific.",
+    "text": "UTF-8 application text with explicit length/semantic constraints at the application contract level.",
+    "binary": "Opaque binary data should normally be object storage, not relational storage; BLOB/bytea is reserved for genuinely small binary values."
+  },
+  "schemaRules": {
+    "portablePrimaryKey": "Use stable application IDs rather than database-generated row identity as the domain key.",
+    "foreignKeys": "Foreign-key relationships must be expressible in both SQLite/D1 and PostgreSQL; application integrity must not rely solely on vendor-specific constraint behavior.",
+    "indexes": "Define logical access patterns first. Physical index definitions may differ between D1 and PostgreSQL and must be adapter-specific.",
+    "uniqueConstraints": "Business uniqueness rules must be explicitly documented and portable; collation-sensitive uniqueness must declare its normalization strategy.",
+    "checks": "CHECK constraints may be used where supported by both targets, but state-machine validation remains an application contract as well.",
+    "nullable": "Nullability is part of the logical schema and must not be inferred from adapter defaults.",
+    "naming": "Application table and column names must use stable domain terminology and must not encode database vendor semantics."
+  },
+  "d1SpecificImplementation": {
+    "allowed": [
+      "INTEGER epoch-millisecond timestamps",
+      "INTEGER booleans",
+      "TEXT JSON serialization",
+      "D1 binding access",
+      "D1 read replica routing",
+      "Cloudflare-specific migration execution"
+    ],
+    "mustNotLeakIntoDomain": [
+      "D1 binding names",
+      "SQLite rowid assumptions",
+      "SQLite-only SQL functions",
+      "SQLite-specific pragma behavior",
+      "Cloudflare-specific object URLs",
+      "Cloudflare-specific KV keys as relational identifiers"
+    ]
+  },
+  "postgresMigrationRules": {
+    "targetAdapter": "@payloadcms/db-postgres",
+    "targetDatabase": "PostgreSQL",
+    "allowedPhysicalOptimizations": [
+      "JSONB for bounded application JSON where query patterns justify it",
+      "native boolean columns",
+      "timestamptz for timestamp storage",
+      "PostgreSQL-specific index types after workload validation",
+      "provider-native connection pooling"
+    ],
+    "forbiddenMigrationShortcuts": [
+      "Changing public IDs solely to match PostgreSQL native types",
+      "Changing API field names because PostgreSQL uses different physical names",
+      "Rewriting application state machines around PostgreSQL enums",
+      "Moving authoritative application state into PostgreSQL-specific extensions without a contract",
+      "Making PostgreSQL JSONB semantics part of the public API",
+      "Making stored procedures the only implementation of critical business rules"
+    ],
+    "migrationRequirement": "A D1-to-PostgreSQL migration must be a physical storage migration behind the same logical application contract, not an API/domain rewrite."
+  },
+  "r2AndStoragePortability": {
+    "logicalObjectReference": [
+      "storageProvider",
+      "objectKey",
+      "contentHash",
+      "contentType",
+      "objectSize",
+      "version"
+    ],
+    "rule": "The logical object reference must not require Cloudflare R2 semantics. A future GCP deployment may map the same contract to Google Cloud Storage without changing the domain API.",
+    "migration": "Object data may be copied independently from relational migration; D1/PostgreSQL records remain metadata and integrity references."
+  },
+  "migrationPhases": [
+    "Freeze logical schema and API contracts",
+    "Inventory Payload-owned versus Luckread-owned data",
+    "Export D1 application-owned records in canonical logical format",
+    "Create PostgreSQL physical schema from the logical contract",
+    "Load and validate application-owned records",
+    "Reconcile counts, hashes, uniqueness, foreign-key relationships, and state-machine validity",
+    "Migrate object storage references and validate object integrity",
+    "Run dual-read or shadow validation where required",
+    "Cut over authoritative writes only after reconciliation passes",
+    "Keep rollback path until post-cutover verification completes"
+  ],
+  "verificationRequirements": [
+    "D1 schema execution test",
+    "PostgreSQL schema generation test",
+    "Canonical export/import round-trip test",
+    "ID preservation test",
+    "Timestamp preservation test",
+    "Enum/state preservation test",
+    "JSON semantic equivalence test",
+    "Uniqueness and relationship reconciliation test",
+    "R2/object-reference integrity test",
+    "API contract compatibility test before and after physical database substitution"
+  ],
+  "failClosedConditions": [
+    "A domain field cannot be represented without a D1-to-PostgreSQL conversion rule",
+    "A public API field depends on a vendor-specific physical type",
+    "A migration requires changing stable application identifiers without an explicit versioned contract",
+    "A business rule exists only as a PostgreSQL-specific implementation with no application-level contract",
+    "A D1-only implementation leaks binding names or SQLite semantics into domain APIs",
+    "A PostgreSQL migration requires rewriting Payload/Luckread API contracts merely to preserve database compatibility"
+  ],
+  "designDirective": "Design for D1 now, but treat PostgreSQL as a first-class future physical target. Cloudflare optimization must reduce cost and improve runtime fit without creating irreversible domain-model or API coupling."
+}

@@ -1,0 +1,64 @@
+{
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "promotion": "NOT_GREEN",
+  "purpose": "Physical D1-01 migration contract for the AUTH-013 durable publication journal. The journal is a durable publication boundary and never a second Account State authority.",
+  "migrationId": "MIG-AUTH-013-PUBLICATION-JOURNAL-V1",
+  "featureId": "AUTH-013",
+  "authority": {
+    "worker": "W02",
+    "domain": "D1-01",
+    "businessAuthority": "W02",
+    "auditAuthority": "W06",
+    "eventContract": "contracts/events/identity-account-state-changed.v1.json"
+  },
+  "target": {
+    "physicalTable": "auth_013_publication_journal",
+    "sourceMigration": "workers/W02-content/migrations/0003_auth_013_publication_journal.sql",
+    "databaseBinding": "workers/W02-content/wrangler.jsonc:D1_01"
+  },
+  "columns": [
+    {"column":"journal_id","dbType":"TEXT","nullable":false,"primaryKey":true},
+    {"column":"event_id","dbType":"TEXT","nullable":false,"unique":true},
+    {"column":"event_type","dbType":"TEXT","nullable":false,"constant":"identity.account_state_changed"},
+    {"column":"schema_version","dbType":"TEXT","nullable":false,"constant":"1.0"},
+    {"column":"resource_id","dbType":"TEXT","nullable":false},
+    {"column":"source_version","dbType":"INTEGER","nullable":false,"minimum":1},
+    {"column":"payload","dbType":"TEXT","nullable":false,"immutable":true},
+    {"column":"status","dbType":"TEXT","nullable":false,"enum":["PENDING","PUBLISHED","FAILED"]},
+    {"column":"attempt","dbType":"INTEGER","nullable":false,"minimum":1,"default":1},
+    {"column":"next_attempt_at","dbType":"TEXT","nullable":true},
+    {"column":"created_at","dbType":"TEXT","nullable":false},
+    {"column":"published_at","dbType":"TEXT","nullable":true},
+    {"column":"last_error_code","dbType":"TEXT","nullable":true,"maxLength":128}
+  ],
+  "constraints": {
+    "resourceVersionUniqueness":["resource_id","event_type","source_version"],
+    "statusValues":["PENDING","PUBLISHED","FAILED"],
+    "eventType":"identity.account_state_changed",
+    "schemaVersion":"1.0"
+  },
+  "indexes":["auth_013_publication_journal_status_next_attempt_idx"],
+  "rules": {
+    "journalIsNotAccountStateAuthority":true,
+    "w02IsAuthoritativeWriter":true,
+    "w02MustNotWriteD1_03":true,
+    "sameD1AtomicityRequiredForTransitionAndJournalInsert":true,
+    "publisherRetriesMustReuseTheSameEventId":true,
+    "consumerIdempotencyRemainsW06Responsibility":true
+  },
+  "remoteExecution": {
+    "workflow":".github/workflows/auth-013-publication-journal-migration.yml",
+    "mode":"CONTROLLED_REMOTE_D1",
+    "mutation":"NOT_EXECUTED"
+  },
+  "evidenceRequirements":[
+    "static migration audit",
+    "exact source SHA",
+    "D1_01 binding and UUID verification",
+    "preflight absence of target journal table",
+    "post-migration table schema",
+    "post-migration index evidence",
+    "D1 migration ledger evidence"
+  ]
+}

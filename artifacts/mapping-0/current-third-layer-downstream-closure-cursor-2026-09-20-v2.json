@@ -1,0 +1,62 @@
+{
+  "version": "2.0.0",
+  "evidenceType": "MAPPING_0_THIRD_LAYER_DOWNSTREAM_CLOSURE_CURSOR",
+  "generatedAt": "2026-09-20",
+  "repository": "wanghuinet/luckread",
+  "sourceHead": "d3153de2f466ceeb6257e203b1f9abbab7906a74",
+  "previousCursor": "9b581b3210ac3af05e7a21727fc9160641898599",
+  "completedBatch": {
+    "id": "M0-AUTH-002-REMOTE-BASELINE-001",
+    "result": "BASELINE_CAPTURED_VALIDATION_REJECTED_FOR_POST_MIGRATION_CLAIM",
+    "workflowRunId": 35498648527,
+    "captureCommit": "4db61fa914d66731fa0fdfc7241c8d6d1bf8ec06",
+    "evidenceArtifact": "artifacts/mapping-0/auth-002-remote-baseline-evidence-2026-09-20.json",
+    "mappingEvidenceBoundFeature": "AUTH-002"
+  },
+  "currentState": {
+    "canonicalMapping": {
+      "total": 449,
+      "status": "NOT_GREEN",
+      "partial": 17,
+      "unresolved": 431,
+      "missing": 1,
+      "missingFeature": "AUTH-007"
+    },
+    "fiveWay": "PENDING_CURRENT_HEAD_VERIFICATION",
+    "r4": {
+      "total": 449,
+      "ready": 0,
+      "blocked": 449
+    },
+    "evidenceRegistry": "NOT_GREEN"
+  },
+  "auth002": {
+    "remoteTarget": "luckread/2f80471e-3756-49f9-8db1-7707a433ad64",
+    "environment": "CONTROLLED_REMOTE_D1",
+    "remoteTables": [
+      "_cf_KV"
+    ],
+    "payloadMigrations": "ABSENT",
+    "users": "ABSENT",
+    "authSessionState": "ABSENT",
+    "remoteWritesDuringCapture": 0,
+    "postMigrationEvidence": false,
+    "migrationExecutionAdmission": "GREEN — EXECUTION ADMITTED",
+    "executionState": "BLOCKED_EXTERNAL",
+    "nextRequiredAction": "Run existing W01 Baseline Migration Execution workflow with explicit EXECUTE_W01_BASELINE confirmation, then review post-migration migration history and schema evidence."
+  },
+  "closureProgress": {
+    "deterministicMappingStatusPromotions": 0,
+    "newEvidenceBindings": 1,
+    "newCanonicalFeatureEdges": 0,
+    "contractChanges": 0,
+    "blueprintChanges": 0,
+    "architectureChanges": 0,
+    "d1WritesByEvidenceWorkflow": 0
+  },
+  "antiLoop": {
+    "inheritedStructuralGate": true,
+    "inheritedClosedAuthorityControls": true,
+    "remoteBaselineEvidenceReusableUntilInputsChange": true
+  }
+}

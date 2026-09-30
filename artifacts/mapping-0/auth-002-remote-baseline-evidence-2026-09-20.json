@@ -1,0 +1,68 @@
+{
+  "version": "1.0.0",
+  "evidenceType": "AUTH_002_REMOTE_D1_PRE_MIGRATION_BASELINE",
+  "generatedAt": "2026-09-20T08:07:08.846Z",
+  "repository": "wanghuinet/luckread",
+  "testedCommitSha": "4db61fa914d66731fa0fdfc7241c8d6d1bf8ec06",
+  "workflow": {
+    "name": "AUTH-002 Session Schema Evidence",
+    "runId": 35498648527,
+    "event": "push",
+    "conclusion": "failure_at_validation_only",
+    "reason": "Remote catalog contains no physical users table"
+  },
+  "target": {
+    "databaseName": "luckread",
+    "uuid": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "environmentClass": "CONTROLLED_REMOTE_D1"
+  },
+  "remoteObserved": {
+    "numTables": 0,
+    "databaseSizeBytes": 12288,
+    "readQueries24h": 16,
+    "writeQueries24h": 0,
+    "rowsRead24h": 6,
+    "rowsWritten24h": 0,
+    "catalogTables": [
+      "_cf_KV"
+    ],
+    "payloadMigrationsTable": "ABSENT",
+    "usersTable": "ABSENT",
+    "usersSchemaRows": 0,
+    "usersIndexesRows": 0,
+    "usersForeignKeysRows": 0,
+    "authSessionStateTable": "ABSENT",
+    "writesPerformedByEvidenceWorkflow": 0
+  },
+  "interpretation": {
+    "status": "BASELINE_CONFIRMED_UNINITIALIZED",
+    "proves": "Controlled remote D1 target is reachable and currently has no application tables beyond Cloudflare internal _cf_KV; no Payload migration history is present.",
+    "doesNotProve": "Approved baseline migration has not yet been executed; no post-migration schema equivalence is established.",
+    "noMigrationExecutedByEvidenceWorkflow": true
+  },
+  "validation": {
+    "gateStatus": "REJECTED",
+    "rejectionReason": "catalog does not prove a physical users table",
+    "evidencePackageUploaded": true,
+    "artifactId": 10601628499,
+    "artifactZipSha256": "2487b70d0db517641b65b9c4172eaed96190ed01ee9625433c2f23fa0f0427e0"
+  },
+  "approvedNextStep": {
+    "changeControl": "docs/change-control/CC-W01-MIGRATION-BASELINE-DIFF-2026-09-20.md",
+    "admission": "GREEN — EXECUTION ADMITTED",
+    "migration": "workers/W01-payload/src/migrations/20250929_111647.ts",
+    "migrationIndex": "workers/W01-payload/src/migrations/index.ts",
+    "remoteExecutionRequired": true,
+    "currentState": "BLOCKED_EXTERNAL",
+    "reason": "Existing W01 Baseline Migration Execution workflow is workflow_dispatch-only and requires explicit EXECUTE_W01_BASELINE confirmation."
+  },
+  "safety": {
+    "noContractChange": true,
+    "noBlueprintChange": true,
+    "noMappingStatusPromotion": true,
+    "noGeneratedMigrationPromotion": true,
+    "noHandAuthoredDDL": true,
+    "noD1WritePerformedByEvidenceWorkflow": true,
+    "noInference": true
+  }
+}

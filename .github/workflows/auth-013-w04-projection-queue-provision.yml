@@ -1,0 +1,125 @@
+name: AUTH-013 W04 Projection Queue Provision
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "artifacts/mapping-0/w04-projection-queue-provisioning-authorized-2026-09-29.json"
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Checkout exact main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate provisioning authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -f artifacts/mapping-0/w04-projection-queue-provisioning-authorized-2026-09-29.json
+          node - <<'NODE'
+          const fs = require('fs')
+          const a = JSON.parse(fs.readFileSync('artifacts/mapping-0/w04-projection-queue-provisioning-authorized-2026-09-29.json','utf8'))
+          if (a.status !== 'AUTHORIZED_FOR_CONTROLLED_PROVISIONING') throw new Error('Invalid status')
+          if (a.queue !== 'luckread-auth013-account-state-projection') throw new Error('Queue mismatch')
+          if (a.dlq !== 'luckread-auth013-account-state-projection-dlq') throw new Error('DLQ mismatch')
+          if (a.consumerWorker !== 'luckread-w04') throw new Error('Consumer mismatch')
+          console.log(JSON.stringify(a,null,2))
+          NODE
+
+      - name: Inspect and provision queue resources idempotently
+        shell: bash
+        run: |
+          set -euo pipefail
+          QUEUE="luckread-auth013-account-state-projection"
+          DLQ="luckread-auth013-account-state-projection-dlq"
+          AUTH=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+
+          list_queues() {
+            local page=1
+            local pages=1
+            : > /tmp/cloudflare-queues.jsonl
+            while [ "$page" -le "$pages" ]; do
+              body="$(curl -fsS --retry 3 --retry-all-errors \
+                "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues?page=$page&per_page=100" \
+                "${AUTH[@]}")"
+              printf '%s\n' "$body" >> /tmp/cloudflare-queues.jsonl
+              pages="$(jq -r '.result_info.total_pages // 1' <<<"$body")"
+              page=$((page + 1))
+            done
+          }
+
+          list_queues
+          queue_exists="$(jq -s -r --arg name "$QUEUE" '[.[].result[]? | .queue_name] | any(. == $name)' /tmp/cloudflare-queues.jsonl)"
+          dlq_exists="$(jq -s -r --arg name "$DLQ" '[.[].result[]? | .queue_name] | any(. == $name)' /tmp/cloudflare-queues.jsonl)"
+
+          if [ "$queue_exists" = "true" ]; then
+            echo "VERIFY_PRESENT $QUEUE"
+            queue_action="preexisting"
+          else
+            echo "CREATE $QUEUE"
+            npx --yes wrangler@4.116.0 queues create "$QUEUE"
+            queue_action="created"
+          fi
+
+          if [ "$dlq_exists" = "true" ]; then
+            echo "VERIFY_PRESENT $DLQ"
+            dlq_action="preexisting"
+          else
+            echo "CREATE $DLQ"
+            npx --yes wrangler@4.116.0 queues create "$DLQ"
+            dlq_action="created"
+          fi
+
+          list_queues
+          jq -s --arg queue "$QUEUE" --arg dlq "$DLQ" '
+            {
+              queues: [.[].result[]? | select(.queue_name == $queue or .queue_name == $dlq) |
+                {queue_name, queue_id, created_on, consumers_total_count, consumers}]
+            }' /tmp/cloudflare-queues.jsonl > w04-projection-queue-cloudflare-result.json
+
+          jq -e --arg name "$QUEUE" '[.queues[] | .queue_name] | any(. == $name)' w04-projection-queue-cloudflare-result.json >/dev/null
+          jq -e --arg name "$DLQ" '[.queues[] | .queue_name] | any(. == $name)' w04-projection-queue-cloudflare-result.json >/dev/null
+
+          QUEUE_ACTION="$queue_action" DLQ_ACTION="$dlq_action" node - <<'NODE'
+          const fs=require('fs')
+          fs.writeFileSync(
+            'w04-projection-queue-provisioning-result.json',
+            JSON.stringify({
+              schemaVersion:1,
+              queue:'luckread-auth013-account-state-projection',
+              dlq:'luckread-auth013-account-state-projection-dlq',
+              consumerWorker:'luckread-w04',
+              queueAction:process.env.QUEUE_ACTION,
+              dlqAction:process.env.DLQ_ACTION,
+              verified:true
+            },null,2)+'\n'
+          )
+          NODE
+
+          jq . w04-projection-queue-provisioning-result.json
+          jq . w04-projection-queue-cloudflare-result.json
+
+      - name: Upload queue provisioning evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-013-w04-projection-queue-provisioning-evidence
+          path: w04-projection-queue-provisioning-result.json

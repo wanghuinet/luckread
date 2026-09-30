@@ -1,0 +1,7 @@
+{
+  "$schema":"https://luckread.com/contracts/v1/api/feature-api-operation-registry.v1.schema.json",
+  "version":"1.0",
+  "status":"NOT_GREEN",
+  "sourceOfTruth":"docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "records":[]
+}

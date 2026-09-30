@@ -1,0 +1,160 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-09-19",
+  "sourceCommit": "6cbc40f349e1a8a7f587e633456602049b52133f",
+  "noInference": true,
+  "purpose": "Record authoritative authorization assets that exist today and distinguish them from feature-bound canonical mappings.",
+  "authorityAssets": [
+    "docs/04-P0-PERMISSION-RBAC-CONTRACT-v1.0.md",
+    "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
+    "docs/14-P0-AUTHORIZATION-CONTRACT-RECONCILIATION-v1.0.md",
+    "contracts/authz/permissions.json",
+    "contracts/authz/layers.json",
+    "contracts/alignment/mapping-batches/B15-security-authorization-lifecycle-reconciliation.v1.md",
+    "contracts/entity/entity-catalog.v1.json",
+    "contracts/entity/entity-field-contract.v1.json"
+  ],
+  "featureFamilies": {
+    "AUTHZ": {
+      "AUTHZ-001": {
+        "authorityAssets": [
+          "contracts/authz/layers.json",
+          "contracts/authz/permissions.json"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Role/permission catalogs exist; Feature→API→Entity→enforcement binding is not evidence-bound."
+      },
+      "AUTHZ-002": {
+        "authorityAssets": [
+          "contracts/authz/permissions.json",
+          "docs/14-P0-AUTHORIZATION-CONTRACT-RECONCILIATION-v1.0.md"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Permission catalog and authorization rules exist; Feature-specific API enforcement binding is not established."
+      },
+      "AUTHZ-003": {
+        "authorityAssets": [
+          "contracts/authz/permissions.json",
+          "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Entitlement-related permissions/layer resolution exist; canonical entitlement persistence/entity binding is not established."
+      },
+      "AUTHZ-004": {
+        "authorityAssets": [
+          "contracts/authz/permissions.json",
+          "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Subscription/entitlement authority concepts exist; Feature-specific derived-access mapping is not established."
+      },
+      "AUTHZ-005": {
+        "authorityAssets": [
+          "docs/14-P0-AUTHORIZATION-CONTRACT-RECONCILIATION-v1.0.md",
+          "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Resource ownership is a canonical authorization dimension; no Feature-bound entity/API/ownership enforcement evidence is established."
+      },
+      "AUTHZ-006": {
+        "authorityAssets": [
+          "contracts/authz/permissions.json",
+          "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Organization-scoped permissions exist; Feature-specific organization/team entity and API mapping remains open."
+      },
+      "AUTHZ-007": {
+        "authorityAssets": [
+          "docs/14-P0-AUTHORIZATION-CONTRACT-RECONCILIATION-v1.0.md"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "OAuth/API scope is named as a capability, but no canonical operation/DTO/security binding is established."
+      },
+      "AUTHZ-008": {
+        "authorityAssets": [
+          "contracts/authz/layers.json",
+          "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Temporary/delegated ordering is defined conceptually; no feature-bound lifecycle/persistence mapping is established."
+      },
+      "AUTHZ-009": {
+        "authorityAssets": [
+          "docs/14-P0-AUTHORIZATION-CONTRACT-RECONCILIATION-v1.0.md"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Service-account/API-key capability is inventoried; canonical entity/persistence/security mapping is not established."
+      },
+      "AUTHZ-010": {
+        "authorityAssets": [
+          "contracts/authz/permissions.json",
+          "docs/14-P0-AUTHORIZATION-CONTRACT-RECONCILIATION-v1.0.md"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Audit permission and auditability rules exist; Feature-bound audit event/storage mapping is not established."
+      }
+    },
+    "ORG": {
+      "ORG-001": {
+        "authorityAssets": [
+          "contracts/authz/permissions.json",
+          "contracts/entity/entity-catalog.v1.json"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "org.create and organization membership permission concepts exist, but organization entity/API binding is not established."
+      },
+      "ORG-002": {
+        "authorityAssets": [
+          "contracts/entity/entity-catalog.v1.json"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "MCN is inventoried but no canonical MCN entity/field/creator-binding contract is established."
+      },
+      "ORG-003": {
+        "authorityAssets": [
+          "contracts/authz/permissions.json",
+          "contracts/entity/entity-catalog.v1.json"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Organization member/role permissions exist, but team/member entity and lifecycle mapping is not established."
+      },
+      "ORG-004": {
+        "authorityAssets": [
+          "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
+          "contracts/entity/entity-catalog.v1.json"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Identity/organization separation is authoritative, but creator-binding entity/lifecycle mapping is not established."
+      },
+      "ORG-005": {
+        "authorityAssets": [
+          "contracts/authz/permissions.json"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Authorization catalog exists, but creator contract/revenue-split data authority and financial mapping are not established."
+      },
+      "ORG-006": {
+        "authorityAssets": [
+          "contracts/entity/entity-catalog.v1.json"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Organization analytics/settlement entity and source-of-truth mapping is not established."
+      },
+      "ORG-007": {
+        "authorityAssets": [
+          "contracts/authz/permissions.json",
+          "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
+        ],
+        "featureBinding": "NOT_ESTABLISHED",
+        "reason": "Organization management permissions/lifecycle principles exist, but approval/audit/transfer mapping is not established."
+      }
+    }
+  },
+  "disposition": {
+    "canonicalMappingChanges": 0,
+    "statusPromotions": 0,
+    "implementationChanges": 0,
+    "d1Changes": 0
+  }
+}

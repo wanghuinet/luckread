@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/report-appeal.json",
+  "title": "LuckRead Report and Appeal API Contract",
+  "version": "1.0.0",
+  "domain": "moderation",
+  "purpose": "Production contract for user reports and appeal submission. This contract is subordinate to the canonical OpenAPI document and moderation-operation policy.",
+  "invariants": [
+    "actorId MUST be derived from the authenticated server-side principal and MUST NOT be accepted from the request body.",
+    "report target, reason and evidence MUST be validated against the target resource and caller authorization scope before creation.",
+    "A report MUST NOT expose reporter identity to unauthorized users or the reported party.",
+    "Repeated equivalent reports from the same actor against the same target within the configured deduplication window MUST converge to one authoritative report or an explicit duplicate result.",
+    "Report creation MUST NOT directly mutate moderation decisions; moderation state is authoritative only through the moderation workflow.",
+    "An appeal MUST reference an eligible moderation decision and MUST be rejected when the decision is not appealable or the actor lacks ownership/scope.",
+    "Appeal submission MUST be idempotent and MUST NOT create duplicate active appeals for the same decision and appellant.",
+    "Report and appeal mutations MUST emit bounded asynchronous domain events after the authoritative write.",
+    "Sensitive report and appeal records MUST use private authorization and MUST NOT be placed in shared caches.",
+    "All report and appeal mutations MUST create immutable audit evidence with actor, target, policy/version and correlation identifiers."
+  ],
+  "operations": [
+    {
+      "operationId": "createReport",
+      "method": "POST",
+      "path": "/reports",
+      "auth": { "required": true, "permission": "report.create", "scope": "self" },
+      "request": {
+        "required": ["targetType", "targetId", "reasonCode"],
+        "properties": {
+          "targetType": { "enum": ["content", "comment", "creator", "media", "profile"] },
+          "targetId": { "$ref": "#/definitions/ResourceId" },
+          "reasonCode": { "type": "string", "maxLength": 128 },
+          "description": { "type": "string", "maxLength": 4000 },
+          "evidenceRefs": { "type": "array", "maxItems": 20, "items": { "type": "string", "maxLength": 512 } }
+        }
+      },
+      "success": { "status": 201, "idempotent": true },
+      "errors": ["AUTH_REQUIRED", "PERMISSION_DENIED", "RESOURCE_NOT_FOUND", "VALIDATION_FAILED", "RATE_LIMITED", "CONFLICT"],
+      "concurrency": { "strategy": "UNIQUE_DEDUP_WINDOW_OR_TRANSACTIONAL_UPSERT", "duplicateResult": "IDEMPOTENT_SUCCESS" },
+      "cache": { "mode": "NONE", "shared": false },
+      "events": { "asyncMax": 2, "fanoutMax": 0, "event": "moderation.report.created" },
+      "audit": { "required": true, "record": "actor, target, reason, policyVersion, correlationId" }
+    },
+    {
+      "operationId": "createAppeal",
+      "method": "POST",
+      "path": "/appeals",
+      "auth": { "required": true, "permission": "appeal.create", "scope": "self" },
+      "request": {
+        "required": ["moderationCaseId", "reason"],
+        "properties": {
+          "moderationCaseId": { "$ref": "#/definitions/ResourceId" },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 4000 },
+          "evidenceRefs": { "type": "array", "maxItems": 20, "items": { "type": "string", "maxLength": 512 } }
+        }
+      },
+      "success": { "status": 201, "idempotent": true },
+      "errors": ["AUTH_REQUIRED", "PERMISSION_DENIED", "RESOURCE_NOT_FOUND", "INVALID_STATE", "VALIDATION_FAILED", "RATE_LIMITED", "CONFLICT"],
+      "stateRequirements": ["case_exists", "case_appealable", "actor_is_subject_or_authorized_representative"],
+      "concurrency": { "strategy": "UNIQUE_ACTIVE_APPEAL_OR_TRANSACTIONAL_UPSERT", "duplicateResult": "IDEMPOTENT_SUCCESS" },
+      "cache": { "mode": "NONE", "shared": false },
+      "events": { "asyncMax": 2, "fanoutMax": 0, "event": "moderation.appeal.created" },
+      "audit": { "required": true, "record": "actor, moderationCase, policyVersion, correlationId" }
+    }
+  ],
+  "definitions": {
+    "ResourceId": { "type": "string", "minLength": 1, "maxLength": 128 }
+  },
+  "greenEvidence": {
+    "openapi": "required",
+    "permission": "required",
+    "state": "required",
+    "deduplication": "required",
+    "audit": "required",
+    "securityE2E": "required"
+  }
+}

@@ -1,0 +1,223 @@
+name: Cloudflare Resource Inventory
+run-name: Automated read-only Cloudflare inventory @ ${{ github.sha }}
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/cloudflare-resource-inventory.yml"
+      - "docs/change-control/CC-CLOUDFLARE-RESOURCE-INVENTORY-2026-09-29.md"
+  pull_request:
+    paths:
+      - ".github/workflows/cloudflare-resource-inventory.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    name: Read-only Cloudflare D1 and Worker inventory
+    runs-on: ubuntu-latest
+    env:
+      CF_API_BASE: https://api.cloudflare.com/client/v4
+      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCOUNT_ID"
+          test -n "$CF_API_TOKEN"
+
+      - name: Collect read-only Cloudflare inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          auth_header=(-H "Authorization: Bearer $CF_API_TOKEN")
+          json_header=(-H "Content-Type: application/json")
+
+          mkdir -p artifacts
+
+          page=1
+          per_page=100
+          d1_pages=()
+          while :; do
+            body="$(curl -fsS --retry 3 --retry-all-errors               "${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/d1/database?page=${page}&per_page=${per_page}"               "${auth_header[@]}" "${json_header[@]}")"
+            d1_pages+=("$body")
+            total="$(jq -r '.result_info.total_count // (.result | length)' <<<"$body")"
+            (( page * per_page >= total )) && break
+            ((page++))
+          done
+
+          page=1
+          worker_pages=()
+          while :; do
+            body="$(curl -fsS --retry 3 --retry-all-errors               "${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts?page=${page}&per_page=${per_page}"               "${auth_header[@]}" "${json_header[@]}")"
+            worker_pages+=("$body")
+            total="$(jq -r '.result_info.total_count // (.result | length)' <<<"$body")"
+            (( page * per_page >= total )) && break
+            ((page++))
+          done
+
+          {
+            jq -s '{
+              inventoryType: "cloudflare-account-read-only",
+              d1: (
+                map(.result // []) | add |
+                map({
+                  name,
+                  uuid: (.uuid // .id // null),
+                  created_at: (.created_at // null),
+                  jurisdiction: (.jurisdiction // null)
+                })
+              )
+            }' <<<"${d1_pages[@]}" > /tmp/d1.json
+
+            jq -s '{
+              workers: (
+                map(.result // []) | add |
+                map({
+                  id: (.id // .name // null),
+                  created_on: (.created_on // null),
+                  modified_on: (.modified_on // null),
+                  compatibility_date: (.compatibility_date // null)
+                })
+              )
+            }' <<<"${worker_pages[@]}" > /tmp/workers.json
+
+            jq -n               --arg accountId "$CF_ACCOUNT_ID"               --slurpfile d1 /tmp/d1.json               --slurpfile workers /tmp/workers.json               '{
+                schemaVersion: 1,
+                source: "Cloudflare API read-only inventory",
+                accountId: $accountId,
+                d1: $d1[0].d1,
+                workers: $workers[0].workers,
+                counts: {
+                  d1: ($d1[0].d1 | length),
+                  workers: ($workers[0].workers | length)
+                },
+                observation: {
+                  workerResourceNames: ($workers[0].workers | map(.id)),
+                  readOnly: true
+                }
+              }'
+          } > artifacts/cloudflare-resource-inventory.json
+
+          # Emit only sanitized inventory metadata; never echo the API token.
+          jq '{schemaVersion,source,counts,d1:[.d1[]|{name,uuid,created_at,jurisdiction}],workers:[.workers[]|{id,created_on,modified_on,compatibility_date}]}'             artifacts/cloudflare-resource-inventory.json             > artifacts/cloudflare-resource-inventory-sanitized.json
+
+          jq . artifacts/cloudflare-resource-inventory-sanitized.json
+
+
+      - name: Collect read-only KV R2 and Queue inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p artifacts
+          auth_header=(-H "Authorization: Bearer $CF_API_TOKEN")
+          json_header=(-H "Content-Type: application/json")
+
+          collect() {
+            local kind="$1"
+            local url="$2"
+            local out="$3"
+            local body_file="${out}.body"
+            local http_code
+            http_code="$(curl -sS --retry 3 --retry-all-errors -o "$body_file" -w '%{http_code}' "$url" "${auth_header[@]}" "${json_header[@]}")" || true
+            if [[ "$http_code" == 2* ]]; then
+              jq -n --arg kind "$kind" --slurpfile body "$body_file" '{kind:$kind,status:"AVAILABLE",result:($body[0].result // []),result_info:($body[0].result_info // null)}' > "$out"
+            else
+              jq -n --arg kind "$kind" --arg httpStatus "$http_code" '{kind:$kind,status:"UNAVAILABLE",httpStatus:$httpStatus}' > "$out"
+            fi
+            rm -f "$body_file"
+          }
+          collect "kv" "${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces?page=1&per_page=100" artifacts/cloudflare-kv-inventory.json
+          collect "r2" "${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/r2/buckets?direction=asc" artifacts/cloudflare-r2-inventory.json
+          collect "queues" "${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/queues?page=1&per_page=100" artifacts/cloudflare-queue-inventory.json
+          cat artifacts/cloudflare-kv-inventory.json artifacts/cloudflare-r2-inventory.json artifacts/cloudflare-queue-inventory.json
+
+      - name: Collect read-only W04 live binding inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p artifacts
+          auth_header=(-H "Authorization: Bearer $CF_API_TOKEN")
+          json_header=(-H "Content-Type: application/json")
+
+          extract_bindings() {
+            local source="$1"
+            jq --arg source "$source" '{
+              worker: "luckread-w04",
+              status: "AVAILABLE",
+              source: $source,
+              bindings: (
+                (.bindings // [])
+                | map(select((.type // "") | test("secret"; "i") | not))
+                | map(with_entries(select(
+                    .key
+                    | IN("name","type","namespace_id","bucket_name","queue_name","service","script_name","instance_name","namespace","workflow_name","class_name","id")
+                  )))
+              )
+            }'
+          }
+
+          settings_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/settings"
+          settings_body="artifacts/cloudflare-w04-settings.body"
+          settings_status="$(curl -sS --retry 3 --retry-all-errors -o "$settings_body" -w '%{http_code}' "$settings_url" "${auth_header[@]}" "${json_header[@]}")" || true
+          if [[ "$settings_status" == 2* ]]; then
+            jq '{bindings:(.result.bindings // [])}' "$settings_body" | extract_bindings "script-settings" > artifacts/cloudflare-w04-bindings-inventory.json
+          else
+            deployment_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/deployments?per_page=1"
+            deployment_body="artifacts/cloudflare-w04-deployment.body"
+            deployment_status="$(curl -sS --retry 3 --retry-all-errors -o "$deployment_body" -w '%{http_code}' "$deployment_url" "${auth_header[@]}" "${json_header[@]}")" || true
+            if [[ "$deployment_status" == 2* ]]; then
+              version_id="$(jq -r '.result[0].versions[0].version_id // empty' "$deployment_body")"
+            else
+              version_id=""
+            fi
+            if [[ -n "$version_id" ]]; then
+              version_url="${CF_API_BASE}/accounts/${CF_ACCOUNT_ID}/workers/scripts/luckread-w04/versions/${version_id}"
+              version_body="artifacts/cloudflare-w04-version.body"
+              version_status="$(curl -sS --retry 3 --retry-all-errors -o "$version_body" -w '%{http_code}' "$version_url" "${auth_header[@]}" "${json_header[@]}")" || true
+              if [[ "$version_status" == 2* ]]; then
+                jq '{bindings:(.result.resources.bindings // [])}' "$version_body" | extract_bindings "active-deployment-version" > artifacts/cloudflare-w04-bindings-inventory.json
+              else
+                jq -n --arg settings "$settings_status" --arg deployment "$deployment_status" --arg version "$version_status" '{worker:"luckread-w04",status:"UNAVAILABLE",reason:"w04_binding_read_failed",settingsHttpStatus:$settings,deploymentHttpStatus:$deployment,versionHttpStatus:$version}' > artifacts/cloudflare-w04-bindings-inventory.json
+              fi
+            elif [[ "$deployment_status" == 2* ]]; then
+              jq -n --arg settings "$settings_status" --arg deployment "$deployment_status" '{worker:"luckread-w04",status:"AVAILABLE",source:"deployment-inventory",bindings:[],note:"no_active_deployment_version_identified",settingsHttpStatus:$settings,deploymentHttpStatus:$deployment}' > artifacts/cloudflare-w04-bindings-inventory.json
+            else
+              jq -n --arg settings "$settings_status" --arg deployment "$deployment_status" '{worker:"luckread-w04",status:"UNAVAILABLE",reason:"w04_live_binding_inventory_unavailable",settingsHttpStatus:$settings,deploymentHttpStatus:$deployment}' > artifacts/cloudflare-w04-bindings-inventory.json
+            fi
+          fi
+
+          rm -f "$settings_body" "${deployment_body:-}" "${version_body:-}"
+          jq . artifacts/cloudflare-w04-bindings-inventory.json
+      - name: Publish W04 binding inventory artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-w04-binding-inventory
+          path: artifacts/cloudflare-w04-bindings-inventory.json
+          if-no-files-found: error
+
+      - name: Publish extended inventory artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-resource-inventory-extended
+          path: |
+            artifacts/cloudflare-kv-inventory.json
+            artifacts/cloudflare-r2-inventory.json
+            artifacts/cloudflare-queue-inventory.json
+          if-no-files-found: error
+
+      - name: Publish inventory artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-resource-inventory
+          path: artifacts/cloudflare-resource-inventory-sanitized.json
+          if-no-files-found: error

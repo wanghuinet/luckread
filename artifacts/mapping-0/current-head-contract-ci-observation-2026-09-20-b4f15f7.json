@@ -1,0 +1,69 @@
+{
+  "evidenceType": "MAPPING_0_CURRENT_HEAD_CI_OBSERVATION",
+  "observedAt": "2026-09-20",
+  "repository": "wanghuinet/luckread",
+  "testedHead": "b4f15f7db8c6926553bae5b2ef6eeb9c4457c5a9",
+  "source": "GitHub Actions",
+  "runs": {
+    "mapping0Structural": {
+      "runId": 35456317596,
+      "conclusion": "success"
+    },
+    "featureInventory": {
+      "runId": 35456317672,
+      "conclusion": "success"
+    },
+    "contractCI": {
+      "runId": 35456317578,
+      "conclusion": "failure"
+    }
+  },
+  "contractCIJobs": {
+    "Mapping 0 Structural/Contract Gate": "success",
+    "Semantic Cross-Contract Gate": "failure",
+    "Blueprint Feature Inventory Gate": "success",
+    "Contract Admission Gate (common)": "success",
+    "Contract Admission Gate (openapi)": "success",
+    "Contract Admission Gate (state-machines)": "success",
+    "Contract Admission Gate (authz)": "success",
+    "Payload Contract Reconciliation Gate": "failure",
+    "Contract Admission Gate (enums)": "success",
+    "Capability Contract Graph Gate": "skipped",
+    "Five-Way Alignment Admission Gate": "skipped",
+    "Contract Admission Gate (full)": "skipped",
+    "Strict Downstream R4/Evidence/R5 Gate": "skipped",
+    "OpenAPI Lint": "skipped"
+  },
+  "failures": {
+    "semantic": [
+      "openapi.yaml: duplicate operationId detected",
+      "operation-policy.json: operationId 'getEntitlementsOp' is not present in openapi.yaml",
+      "openapi.yaml: operation 'getEntitlementsOp' could not be located for policy binding"
+    ],
+    "payload": [
+      "MISSING Payload field: ENT-USER.username",
+      "MISSING Payload field: ENT-USER.displayName",
+      "MISSING Payload field: ENT-USER.bio",
+      "MISSING Payload field: ENT-USER.avatar",
+      "MISSING Payload field: ENT-USER.locale",
+      "MISSING Payload field: ENT-USER.timezone",
+      "unmapped Payload collection: workers/W01-payload/src/collections/Media.ts:Media"
+    ]
+  },
+  "governance": {
+    "noContractStatusPromotion": true,
+    "noOperationIdRename": true,
+    "noEntityCreation": true,
+    "noBusinessImplementation": true,
+    "authorityControlsAffected": [
+      "CC-MAPPING-0-OPENAPI-DUPLICATE-GET-ENTITLEMENTS-2026-09-19",
+      "CC-MAPPING-0-W01-ENT-USER-SOURCE-CONFLICT-2026-09-18",
+      "CC-MAPPING-0-W01-MEDIA-COLLECTION-ENTITY-AUTHORITY-GAP-2026-09-19"
+    ]
+  },
+  "inheritance": {
+    "historicalCurrentHeadObservations": "superseded_by_this_fresh_run",
+    "rerunScope": "current-head-only",
+    "duplicateWorkCreated": false
+  }
+}

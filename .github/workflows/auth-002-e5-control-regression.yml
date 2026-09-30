@@ -1,0 +1,28 @@
+name: AUTH-002 E5 Admission Control Regression
+
+on:
+  push:
+    paths:
+      - "scripts/auth-002-e5-remote-migration-admission.mjs"
+      - "scripts/auth-002-e5-admission-regression.mjs"
+      - ".github/workflows/auth-002-e5-remote-migration-execution.yml"
+      - "docs/change-control/CC-MAPPING-0-AUTH-002-E5-REMOTE-EXECUTION-2026-09-21.md"
+      - "artifacts/mapping-0/AUTH-002-E5-EXECUTE-REQUEST.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run E5 admission regression
+        run: node scripts/auth-002-e5-admission-regression.mjs

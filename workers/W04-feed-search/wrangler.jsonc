@@ -1,0 +1,24 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "luckread-w04",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-08-15",
+  "workers_dev": false,
+  "kv_namespaces": [
+    {
+      "binding": "AUTH013_W04_DERIVED_PROJECTION",
+      "id": "32f7e407128a43d59720d5d46736e084"
+    }
+  ],
+  "queues": {
+    "consumers": [
+      {
+        "queue": "luckread-auth013-account-state-projection",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "luckread-auth013-account-state-projection-dlq"
+      }
+    ]
+  }
+}

@@ -1,0 +1,381 @@
+{
+  "repository": "wanghuinet/luckread",
+  "sourceHead": "a02697aef7ef13ade3c708e27ad22cc17c3f26bc",
+  "checkpointDate": "2026-09-21",
+  "scope": "W01 AUTH-002 migration source registration and controlled execution boundary",
+  "checks": {
+    "E5 migration generation proof": {
+      "runId": 35547971500,
+      "jobId": 106177246380,
+      "testedCommitSha": "26dd3bc2ab9c2764c11a9a1baaf88d3427fcfa83",
+      "conclusion": "success",
+      "artifactId": 10617646103,
+      "result": "PASS"
+    },
+    "E5 migration source registration": {
+      "migrationPath": "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
+      "migrationIndexPath": "workers/W01-payload/src/migrations/index.ts",
+      "registrationCommits": [
+        "ed8c64193cba8c554de1c678468158d0d8b90646",
+        "e34e18c5a0e13759503b8ac9636e419e491291d8"
+      ],
+      "status": "REGISTERED"
+    },
+    "Current-head migration static CI": {
+      "status": "PASS_INHERITED",
+      "verifiedRunId": 35548553203,
+      "verifiedTestedCommitSha": "e34e18c5a0e13759503b8ac9636e419e491291d8",
+      "reason": "Only documentation/checkpoint/control files changed after the verified W01 migration source audit; migration source, payload config, Users, db schema source and migration files are unchanged."
+    }
+  },
+  "approvedBaselineExecution": {
+    "status": "PASS_VERIFIED",
+    "evidenceWorkflow": "W01 Baseline Migration Execution",
+    "evidenceRunId": 35508571153,
+    "evidenceJobId": 106072401909,
+    "evidenceArtifactId": 10604388551,
+    "evidenceSourceSha": "56926bab09951a8a0e15c820f1fb58dd8ba7090f",
+    "databaseName": "luckread",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "migration": "20250929_111647",
+    "migrationResult": "PASS",
+    "recordedInPayloadMigrations": true,
+    "batch": 1,
+    "postMigrationApplicationTables": [
+      "media",
+      "payload_locked_documents",
+      "payload_locked_documents_rels",
+      "payload_migrations",
+      "payload_preferences",
+      "payload_preferences_rels",
+      "users",
+      "users_sessions"
+    ],
+    "canonicalProfileFieldsPresent": [],
+    "remoteEvidenceWrites": 0,
+    "currentPreflightReconfirmationRunId": 35551188747,
+    "currentPreflightApplicationTables": [
+      "media",
+      "payload_locked_documents",
+      "payload_locked_documents_rels",
+      "payload_migrations",
+      "payload_preferences",
+      "payload_preferences_rels",
+      "users",
+      "users_sessions"
+    ],
+    "currentPreflightConclusion": "BLOCKED_AS_ALREADY_APPLIED",
+    "currentPreflightRunId": 35551188747
+  },
+  "remoteEvidence": {
+    "baselineExecution": "PASS_VERIFIED",
+    "baselineEvidenceRunId": 35508571153,
+    "latestReadOnlyEvidenceRunId": 35553227463,
+    "latestReadOnlyEvidenceConclusion": "PASS_VERIFIED_POST_E5",
+    "currentBaselinePresenceReconfirmationRunId": 35551188747,
+    "currentBaselinePresenceReconfirmationConclusion": "BLOCKED_AS_ALREADY_APPLIED",
+    "currentRemoteState": [
+      "auth_session_state",
+      "media",
+      "payload_locked_documents",
+      "payload_locked_documents_rels",
+      "payload_migrations",
+      "payload_preferences",
+      "payload_preferences_rels",
+      "users",
+      "users_sessions"
+    ],
+    "remoteWritesDuringLatestReadOnlyCapture": 0
+  },
+  "AUTH-002": {
+    "E5": "GENERATED_AND_REGISTERED",
+    "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
+    "E4.5": "PASS_VERIFIED_HISTORICAL_UNTIL_REBOUND_TO_FINAL_SHA",
+    "overall": "NOT_GREEN",
+    "E4_5": "PASS_VERIFIED",
+    "authorityReconciliationStatus": "PASS_VERIFIED",
+    "remoteExecutionRunId": 35552919573,
+    "remoteExecutionTechnicalResult": "PASS",
+    "retroactiveAuthorization": false,
+    "nextGate": "E6_RUNTIME_IMPLEMENTATION_ADMISSION"
+  },
+  "mapping0": {
+    "status": "NOT_GREEN",
+    "nextItemId": "GAP-E6-RUNTIME-001",
+    "nextItemState": "TODO_FIX",
+    "noMappingRowsReexecuted": true,
+    "metrics": {
+      "canonicalRecords": 449,
+      "statusDistribution": {
+        "PARTIAL": 17,
+        "MISSING": 1,
+        "UNRESOLVED": 431
+      },
+      "apiEdges": 11,
+      "entityEdges": 9,
+      "payloadEdges": 1,
+      "codeEvidenceEdges": 0,
+      "evidenceReferenceCoverage": 449
+    },
+    "previousItemId": "M0-AUTHZ-LAYER-MAPPING-CONFLICT-001",
+    "previousItemState": "CLOSED — REPRESENTATION RECONCILED"
+  },
+  "nextRequiredExternalAction": "Obtain/record the normal Contract-First authority decision that binds each admitted canonical logical Worker to its concrete current physical Worker resource/name. For AUTH-002 this specifically requires canonical W02/T01/T03 binding, then deployed source-commit/configuration evidence and E6 runtime evidence. Do not derive names from repository directories or historical P01-P08 topology, and do not create resources merely to satisfy the gap.",
+  "noMappingRowsReexecuted": true,
+  "e5": {
+    "migrationId": "MIG-AUTH-002-SESSION-V1",
+    "sourcePath": "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
+    "sourceBlobSha": "2b43a7b08fe7c5be98793da7eb07ddd2cf9e6921",
+    "indexBlobSha": "436c37e395145017d9135f938d69a741a936c60b",
+    "generationProofRunId": 35547971500,
+    "generationProofConclusion": "success",
+    "sourceAuditRunId": 35548553203,
+    "sourceAuditConclusion": "success",
+    "schemaSourceChangeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E5-DRIZZLE-SCHEMA-SOURCE-2026-09-21.md",
+    "executionStatus": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
+    "remoteTableBeforeExecution": "CONFIRMED_ABSENT_BY_E5_PREFLIGHT_AT_EXECUTION",
+    "requiredNextGate": "E6_WIRE_INPUTS",
+    "executionChannel": {
+      "admissionGuard": "scripts/auth-002-e5-remote-migration-admission.mjs",
+      "admissionGuardCommit": "d76fc52126907719d29903d6ea6089fe1e48e1bc",
+      "workflow": ".github/workflows/auth-002-e5-remote-migration-execution.yml",
+      "workflowPreparedCommit": "831dba5e9637ebe71d45394644d7ca0b0d72290e",
+      "workflowHardeningCommit": "1c01f40a6752c711b61a169a5488c0ed70b447df",
+      "remoteExecutionStarted": true,
+      "executionRunId": 35552919573,
+      "executionArtifactId": 10618729380,
+      "guardFixed": true,
+      "pushExecutionRemoved": true
+    },
+    "authorityIncidentRemediation": {
+      "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E5-AUTHORITY-INCIDENT-REMEDIATION-2026-09-21.md",
+      "status": "CLOSED — CONTROL REMEDIATION VERIFIED",
+      "retroactiveAuthorization": false,
+      "parentAuthorityDecision": "CLOSED — EXECUTION NOT AUTHORIZED; TECHNICAL RESULT RETAINED",
+      "currentGuardCommit": "e302fb15284bb5b3f00f4c29bc5479c7f2a223da",
+      "currentWorkflowHardeningCommit": "19e6b50aafa204ccabde8b656d705fd7766d0269"
+    },
+    "admissionRegression": {
+      "script": "scripts/auth-002-e5-admission-regression.mjs",
+      "workflow": ".github/workflows/auth-002-e5-control-regression.yml",
+      "status": "STATIC_CONTROL_CHECK_COMMITTED",
+      "d1Mutation": false,
+      "e5Execution": false,
+      "verifies": [
+        "exact authoritative Status-line admission",
+        "explanatory-text non-admission",
+        "OPEN-status non-admission",
+        "manual-dispatch-only E5 workflow",
+        "no obsolete push-marker validation",
+        "reconciled parent authority is not GREEN",
+        "stale execute marker absent"
+      ]
+    },
+    "authorityReconciliation": {
+      "decisionRecord": "docs/change-control/MAPPING-0-AUTHORITY-DECISIONS-2026-09-20.md",
+      "decision": "E5 execution was not authorized at execution time; technical result retained; no retroactive GREEN authorization; no rerun.",
+      "parentChangeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E5-REMOTE-EXECUTION-2026-09-21.md",
+      "parentStatus": "CLOSED — EXECUTION NOT AUTHORIZED; TECHNICAL RESULT RETAINED",
+      "reconciliationStatus": "PASS_VERIFIED"
+    }
+  },
+  "AUTH002": {
+    "E4_5": "PASS_VERIFIED",
+    "baselineMigrationExecution": "PASS_VERIFIED",
+    "E5_generation": "PASS_VERIFIED",
+    "E5_static_audit": "PASS_VERIFIED",
+    "E5_remote_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILIATION_REQUIRED",
+    "overall": "NOT_GREEN",
+    "governanceIncident": {
+      "runId": 35552919573,
+      "testedSourceSha": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
+      "governingChangeControlStatusAtExecution": "OPEN — EXECUTION DECISION REQUIRED",
+      "rootCause": "unanchored admission regex matched explanatory text",
+      "containment": [
+        "exact-line anchored Status check",
+        "implicit push execution removed",
+        "stale trigger marker removed"
+      ],
+      "compensatingD1Mutation": false,
+      "governanceStatusAtExecution": "OPEN — EXECUTION DECISION REQUIRED",
+      "reconciliationStatus": "PASS_VERIFIED",
+      "retroactiveAuthorization": false
+    },
+    "E5_independent_schema_evidence": {
+      "workflowRunId": 35553227463,
+      "status": "PASS_VERIFIED",
+      "promotion": "NOT_YET_PROMOTED",
+      "artifactId": 10619545790,
+      "digest": "sha256:68a812d812da703ace3b14e62360b56815c01c939418eb70a6e7252a573e9f31",
+      "testedCommitSha": "9241545d1a6dff7d87f0c3351e9a36867b6228af",
+      "scope": "read-only post-execution remote D1 schema/catalog recapture"
+    },
+    "E5": "GENERATED_AND_REGISTERED",
+    "E5_execution": "TECHNICAL_PASS_GOVERNANCE_RECONCILED",
+    "nextGate": "E6_WIRE_INPUTS"
+  },
+  "latestReconciliationCommit": "49c082039e74b1cfd1458884a2bd4de49921f297",
+  "note": "Current main records a genuine Contract authority conflict: docs/301 distinguishes user(unverified)->L1 and user(verified)->L2 while contracts/authz/layers.json maps user->L1 and verified_user->L2. This must be reconciled before a deterministic RoleAssignment-to-L0-L8 resolver can be admitted. No runtime code or D1 mutation performed.",
+  "executionTriggerAttempts": {
+    "commits": [
+      "7e2d3c85e77172ea016b74a1c59b58191cf2be79",
+      "525379507d47b1845a6d13e1f1f499fd90000d96",
+      "fe1f2784d21f3f629bbad0baa971f1aa56520914"
+    ],
+    "repositoryEvidenceOfSuccessfulE5Mutation": true,
+    "interpretation": "Run 35552919573 is the authoritative technical execution evidence; governance authorization was invalidly permissive because the guard regex matched explanatory text while the Change Control status remained OPEN.",
+    "changeControlStatusAtExecution": "OPEN — EXECUTION DECISION REQUIRED"
+  },
+  "independentSchemaEvidence": {
+    "workflowRunId": 35553227463,
+    "status": "PASS_VERIFIED",
+    "resultNotPromoted": true,
+    "purpose": "read-only post-execution remote D1 schema/catalog recapture",
+    "artifactId": 10619545790,
+    "digest": "sha256:68a812d812da703ace3b14e62360b56815c01c939418eb70a6e7252a573e9f31",
+    "testedCommitSha": "9241545d1a6dff7d87f0c3351e9a36867b6228af"
+  },
+  "e6RuntimeIntegrationGap": {
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-INTEGRATION-GAP-2026-09-21.md",
+    "gapId": "GAP-E6-RUNTIME-001",
+    "status": "OPEN — CURRENT W02 PHYSICAL BINDING + D1-01 ROLEASSIGNMENT SOURCE/EVIDENCE + AUTH-002 RUNTIME EVIDENCE REQUIRED",
+    "runtimeCorrelationPathVerified": false,
+    "remoteRuntimeExecutionStarted": false,
+    "audit": "artifacts/mapping-0/worker-physical-layout-reconciliation-2026-09-21.md"
+  },
+  "e6RuntimeImplementationAdmission": {
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-21.md",
+    "status": "BLOCKED — RUNTIME BINDING/EVIDENCE REQUIRED",
+    "implementationAuthorized": false,
+    "runtimeCodeChanged": false,
+    "remoteD1Mutation": false,
+    "dependsOnE5AuthorityReconciliation": true,
+    "parentE5AuthorityIncidentReconciled": true,
+    "gaps": [
+      {
+        "id": "E6-LAYER-001",
+        "status": "OPEN",
+        "finding": "RoleAssignment authority is now explicit; W01 still lacks an admitted runtime binding/resolver implementation and controlled authLogin/authRefresh evidence for the resulting L0-L8 layer."
+      }
+    ],
+    "failClosedGuard": {
+      "script": "scripts/auth-002-e6-implementation-admission.mjs",
+      "workflow": ".github/workflows/auth-002-e6-implementation-admission.yml",
+      "status": "PASS_VERIFIED",
+      "protectedRuntimePathsGuarded": true,
+      "latestRunId": 35561587245,
+      "latestJobId": 106215329002
+    },
+    "authorityDependency": "CLOSED — RoleAssignment authority and deterministic layer semantics reconciled"
+  },
+  "e6WireInputGaps": {
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-INPUT-GAPS-2026-09-21.md",
+    "status": "CLOSED — CONTRACT INPUTS RESOLVED",
+    "decisionControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-WIRE-AUTHORITY-DECISION-2026-09-21",
+    "E6_WIRE_001": "PASS_VERIFIED_AUTHORITY",
+    "E6_WIRE_002": "PASS_VERIFIED_AUTHORITY"
+  },
+  "auth011WireAuthorityDrift": {
+    "audit": "artifacts/mapping-0/auth-011-wire-authority-drift-2026-09-21.json",
+    "status": "DRIFT_CONFIRMED",
+    "currentOpenApiRefreshPath": true,
+    "currentOpenApiRefreshOperationId": true,
+    "apiInventoryRefreshRequired": true,
+    "staleCrosscheckMustNotPromote": true,
+    "currentOpenApiRefreshContractStatus": "DISCOVERY_DRAFT",
+    "currentOpenApiRefreshWireSchemaComplete": false,
+    "currentOpenApiRefreshRouteAdmitted": false
+  },
+  "e6WireInputSufficiencyAudit": {
+    "artifact": "artifacts/mapping-0/e6-wire-input-sufficiency-audit-2026-09-21.json",
+    "status": "BLOCKED_INPUTS_CONFIRMED",
+    "antiLoop": true,
+    "finding": "Neither E6 wire/input gap can be closed from an existing exact canonical contract; no implementation work is admitted by inference.",
+    "sourceHead": "9fd9e7c954d982288a39c1946d6af7140e688069"
+  },
+  "e6WireInputRecheck": {
+    "checkedAt": "2026-09-21",
+    "searchedFor": [
+      "AUTH-002 E6 decision",
+      "authRefresh wire decision",
+      "device binding decision",
+      "E6-WIRE"
+    ],
+    "newAuthorityFound": false,
+    "status": "NO_NEW_CANONICAL_AUTHORITY",
+    "conclusion": "E6-WIRE-001 and E6-WIRE-002 remain genuine Contract-First decision inputs; runtime implementation remains fail-closed."
+  },
+  "e6LayerAuthority": {
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-E6-LAYER-AUTHORITY-2026-09-21.md",
+    "audit": "artifacts/mapping-0/auth-002-e6-layer-authority-audit-2026-09-21.md",
+    "status": "CLOSED — AUTHORITY RECONCILED; RUNTIME BINDING OPEN",
+    "authorityDomain": "D1-01 Identity / Account / Access",
+    "authorityInput": "RoleAssignment (authorization input)",
+    "layerDefinitionSource": "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
+    "machineLayerSource": "contracts/authz/layers.json",
+    "payloadUserRoleRule": "User.role is compatibility metadata and is not complete authorization authority",
+    "verifiedGap": "Deterministic RoleAssignment→L0-L8 semantics are contractually established; W01 still lacks an evidence-bound authoritative RoleAssignment source and admitted runtime binding.",
+    "implementationAuthorized": false,
+    "upstreamDependency": "RESOLVED — contracts/entity/AUTHZ-role-assignment-authority.v1.json",
+    "upstreamDependencies": [
+      "RESOLVED — contracts/entity/AUTHZ-role-assignment-authority.v1.json"
+    ],
+    "e6RoleRepresentationConflict": "CLOSED — see docs/change-control/CC-MAPPING-0-AUTHZ-L1-L2-ROLE-REPRESENTATION-2026-09-21.md",
+    "e6RoleAssignmentAuthorityBoundary": "CLOSED — AUTHORITY CONTRACT RECONCILED"
+  },
+  "e6LayerAuthorityDecisionInput": "artifacts/mapping-0/auth-002-e6-layer-authority-decision-input-2026-09-21.md",
+  "e6RoleAssignmentAuthorityChangeControl": "docs/change-control/CC-MAPPING-0-AUTHZ-ROLE-ASSIGNMENT-AUTHORITY-2026-09-21.md",
+  "e6RoleAssignmentAuthorityConflict": "CLOSED — AUTHORITY CONTRACT RECONCILED",
+  "currentPhysicalWorkerBindingControl": "docs/change-control/CC-MAPPING-0-WORKER-PHYSICAL-BINDING-2026-09-21.md",
+  "currentPhysicalWorkerBindingStatus": "WAIT_AUTHORITY_DECISION — PHYSICAL BINDING AUTHORITY REQUIRED",
+  "physicalWorkerBindingAuthoritySearch": {
+    "status": "COMPLETE_NO_NEW_AUTHORITY_FOUND",
+    "testedMainHead": "14a41a4c49c09cbf5c3fefa67635d1ca7e8e56a9",
+    "conclusion": "No current Contract/decision supplies concrete physical Worker resource/name bindings for canonical W02-W12; do not infer, create, rename or deploy."
+  },
+  "physicalWorkerBindingEvidenceDelta": {
+    "status": "PASS_VERIFIED_AUDIT — BINDING STILL NOT ESTABLISHED",
+    "w01RepositoryCandidate": {
+      "path": "workers/W01-payload/wrangler.jsonc",
+      "workerName": "luckread-w01-payload",
+      "d1Binding": "luckread",
+      "d1DatabaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+      "promotion": "NOT_PROMOTED_TO_CANONICAL_WORKER_IDENTITY"
+    },
+    "w02RepositoryBinding": {
+      "path": "workers/W02-content/wrangler.jsonc",
+      "status": "ABSENT_ON_CURRENT_MAIN"
+    },
+    "physicalWorkerDirectoryRule": "DIRECTORY_AND_CONFIG_NAMES_ARE_NON-AUTHORITATIVE_FOR_LOGICAL_WORKER_OWNERSHIP",
+    "latestCloudflareInventory": {
+      "runId": 35480031531,
+      "capturedAt": "2026-09-20T00:55:27Z",
+      "uploadedScriptCount": 0,
+      "physicalToLogicalMapping": "NOT_ESTABLISHED"
+    },
+    "conclusion": "Canonical W02 physical resource/source/deployment binding remains unestablished; E6 runtime admission remains blocked. No resource mutation performed.",
+    "reexecution": "NONE"
+  },
+  "cloudflareInventory": {
+    "status": "PASS_VERIFIED_READ_ONLY",
+    "runId": 35598525409,
+    "artifactId": 10637318432,
+    "artifactDigest": "sha256:8767fe564ab8f11b8ded8b63ab8577487fb609e579ff15243e639cb0dd2a046",
+    "sourceCommit": "75e5a25fba48d95c432476cda6b0b6d6d4c70b06",
+    "d1Count": 2,
+    "workerUploadedScriptCount": 0,
+    "workerResources": [],
+    "evidencePath": "artifacts/cloudflare/current-resource-inventory-2026-09-21.json",
+    "mutationPerformed": false,
+    "conclusion": "Fresh read-only Cloudflare API inventory confirms zero uploaded Worker scripts at capture time. Physical Worker deployment/source binding therefore remains unestablished."
+  },
+  "workerDeploymentAdmissionAudit": {
+    "status": "BLOCKED — PHYSICAL NAMING/RESOURCE BINDING AUTHORITY NOT ESTABLISHED",
+    "audit": "artifacts/mapping-0/worker-deployment-admission-audit-2026-09-21.md",
+    "freshCloudflareInventoryRunId": 35598525409,
+    "uploadedWorkerScripts": 0,
+    "physicalNamingRuleFound": false,
+    "deploymentEvidenceChainDefined": true,
+    "runtimeImplementationAuthorized": false
+  }
+}

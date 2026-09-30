@@ -1,0 +1,139 @@
+name: W02 AUTH-003 Migration Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact main commit containing the admitted AUTH-003 migration source
+        required: true
+        type: string
+      database_name:
+        description: Controlled D1 database name
+        required: true
+        default: luckread
+        type: string
+      confirm:
+        description: Type MIGRATE to authorize the controlled remote migration
+        required: true
+        default: MIGRATE
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      D1_01_ID: 2f80471e-3756-49f9-8db1-7707a433ad64
+      DATABASE_NAME: ${{ inputs.database_name }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      EXPECTED_MIGRATION: 0004_auth_003_credentials.sql
+    steps:
+      - name: Validate operator confirmation
+        run: |
+          set -euo pipefail
+          test "${{ inputs.confirm }}" = "MIGRATE"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify exact source and D1 target
+        working-directory: workers/W02-content
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          node --input-type=module -e "import fs from 'node:fs'; const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8')); const d=c.d1_databases?.find(x=>x.binding==='D1_01'); if(!d) throw new Error('D1_01 binding missing'); if(d.database_name !== process.env.DATABASE_NAME) throw new Error('database_name mismatch'); if(d.database_id !== process.env.D1_01_ID) throw new Error('D1_01 database_id mismatch'); console.log(JSON.stringify({binding:d.binding,database_name:d.database_name,database_id:d.database_id},null,2))"
+
+      - name: Verify migration source
+        working-directory: workers/W02-content
+        run: |
+          set -euo pipefail
+          test -s "migrations/$EXPECTED_MIGRATION"
+          test "$(git log -1 --format=%H)" = "$SOURCE_SHA"
+
+      - name: Preflight remote migration ledger
+        working-directory: workers/W02-content
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/mapping-0/auth-003-migration-evidence
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT id,name,applied_at FROM d1_migrations ORDER BY id;"             > ../../artifacts/mapping-0/auth-003-migration-evidence/pre_migrations.txt
+          grep -F '0001_role_assignments.sql' ../../artifacts/mapping-0/auth-003-migration-evidence/pre_migrations.txt
+          grep -F '0002_auth_013_account_state.sql' ../../artifacts/mapping-0/auth-003-migration-evidence/pre_migrations.txt
+          grep -F '0003_auth_013_publication_journal.sql' ../../artifacts/mapping-0/auth-003-migration-evidence/pre_migrations.txt
+          grep -F '0003_role_authorization_versions.sql' ../../artifacts/mapping-0/auth-003-migration-evidence/pre_migrations.txt
+          if grep -F "$EXPECTED_MIGRATION" ../../artifacts/mapping-0/auth-003-migration-evidence/pre_migrations.txt; then
+            echo "AUTH-003 migration already applied; abort"
+            exit 1
+          fi
+
+      - name: Preflight AUTH-003 tables absent
+        working-directory: workers/W02-content
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT COUNT(*) AS c FROM sqlite_master WHERE type='table' AND name IN ('auth_identities','auth_credentials');"             > ../../artifacts/mapping-0/auth-003-migration-evidence/pre_schema_guard.txt
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT sql FROM sqlite_master WHERE type='table' AND name='users';"             > ../../artifacts/mapping-0/auth-003-migration-evidence/pre_users_schema.txt
+          grep -F '"c": 0' ../../artifacts/mapping-0/auth-003-migration-evidence/pre_schema_guard.txt
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT name,type,tbl_name,sql FROM sqlite_master WHERE name IN ('auth_identities','auth_credentials') ORDER BY name;"             > ../../artifacts/mapping-0/auth-003-migration-evidence/pre_schema_named_objects.txt
+
+      - name: Apply admitted migration
+        working-directory: workers/W02-content
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 migrations apply "$DATABASE_NAME" --remote --config wrangler.jsonc
+
+      - name: Capture post-migration evidence
+        working-directory: workers/W02-content
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT name,type,tbl_name,sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND (name LIKE 'auth_identities%' OR name LIKE 'auth_credentials%') ORDER BY type,name;"             > ../../artifacts/mapping-0/auth-003-migration-evidence/post_schema.txt
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT id,name,applied_at FROM d1_migrations WHERE name='$EXPECTED_MIGRATION';"             > ../../artifacts/mapping-0/auth-003-migration-evidence/post_migration_ledger.txt
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "PRAGMA foreign_key_check;"             > ../../artifacts/mapping-0/auth-003-migration-evidence/foreign_key_check.txt
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "PRAGMA foreign_key_check(auth_credentials);"             > ../../artifacts/mapping-0/auth-003-migration-evidence/auth_credentials_foreign_key_check.txt
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT sql FROM sqlite_master WHERE type='table' AND name='users';"             > ../../artifacts/mapping-0/auth-003-migration-evidence/post_users_schema.txt
+          printf '%s\n' \
+            "AUTH-003 Migration Evidence" \
+            "run_id=${{ github.run_id }}" \
+            "source_sha=$SOURCE_SHA" \
+            "database_name=$DATABASE_NAME" \
+            "database_id=$D1_01_ID" \
+            "migration=$EXPECTED_MIGRATION" \
+            "remote_ddl=true" \
+            "application_data_dml=false" \
+            "d1_migration_ledger_write=true" \
+            "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > ../../artifacts/mapping-0/auth-003-migration-evidence/provenance.txt
+
+      - name: Validate evidence
+        working-directory: workers/W02-content
+        run: |
+          set -euo pipefail
+          test -s ../../artifacts/mapping-0/auth-003-migration-evidence/pre_migrations.txt
+          test -s ../../artifacts/mapping-0/auth-003-migration-evidence/pre_schema_guard.txt
+          test -s ../../artifacts/mapping-0/auth-003-migration-evidence/post_schema.txt
+          test -s ../../artifacts/mapping-0/auth-003-migration-evidence/post_migration_ledger.txt
+          test -s ../../artifacts/mapping-0/auth-003-migration-evidence/foreign_key_check.txt
+          test -s ../../artifacts/mapping-0/auth-003-migration-evidence/auth_credentials_foreign_key_check.txt
+          test -s ../../artifacts/mapping-0/auth-003-migration-evidence/provenance.txt
+          test -s ../../artifacts/mapping-0/auth-003-migration-evidence/pre_users_schema.txt
+          test -s ../../artifacts/mapping-0/auth-003-migration-evidence/post_users_schema.txt
+          cmp -s ../../artifacts/mapping-0/auth-003-migration-evidence/pre_users_schema.txt ../../artifacts/mapping-0/auth-003-migration-evidence/post_users_schema.txt
+          grep -F "$EXPECTED_MIGRATION" ../../artifacts/mapping-0/auth-003-migration-evidence/post_migration_ledger.txt
+          grep -F '"results": []' ../../artifacts/mapping-0/auth-003-migration-evidence/auth_credentials_foreign_key_check.txt
+          grep -F "source_sha=$SOURCE_SHA" ../../artifacts/mapping-0/auth-003-migration-evidence/provenance.txt
+
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-003-migration-evidence-${{ inputs.source_sha }}
+          path: artifacts/mapping-0/auth-003-migration-evidence/
+          if-no-files-found: error
+          retention-days: 30

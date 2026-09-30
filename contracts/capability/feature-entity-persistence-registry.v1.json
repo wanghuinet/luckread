@@ -1,0 +1,91 @@
+{
+  "version": "1.0",
+  "status": "NOT_GREEN",
+  "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "records": [
+    {
+      "featureId": "AUTH-001",
+      "domainId": "D1-01",
+      "entityIds": [
+        "ENT-USER",
+        "ENT-CONSENT",
+        "ENT-IDENTITY",
+        "ENT-CREDENTIAL"
+      ],
+      "persistenceMode": "MIXED",
+      "owner": "D1-01",
+      "status": "BLOCKED",
+      "evidenceRefs": [
+        "contracts/persistence/AUTH-001-registration-envelope-contract.v1.json",
+        "contracts/entity/PRIV-002-consent-field-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-WRITER-BOUNDARY-2026-09-27.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-27.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-ENTITY-PERSISTENCE-REGISTRY-RECONCILIATION-2026-09-28.md",
+        "https://github.com/wanghuinet/luckread/actions/runs/36372326548"
+      ]
+    },
+    {
+      "featureId": "AUTH-002",
+      "domainId": "D1-01",
+      "entityIds": [
+        "ENT-IDENTITY",
+        "ENT-CREDENTIAL",
+        "ENT-SESSION"
+      ],
+      "persistenceMode": "MIXED",
+      "owner": "D1-01",
+      "status": "BLOCKED",
+      "evidenceRefs": [
+        "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
+        "contracts/persistence/AUTH-002-minimum-session-integration-contract.v1.json",
+        "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
+        "contracts/entity/AUTH-002-session-field-contract.v1.json"
+      ]
+    },
+    {
+      "featureId": "AUTH-003",
+      "domainId": "D1-01",
+      "entityIds": [
+        "ENT-IDENTITY",
+        "ENT-CREDENTIAL"
+      ],
+      "persistenceMode": "MIXED",
+      "owner": "D1-01",
+      "status": "BLOCKED",
+      "evidenceRefs": [
+        "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-003-006-dto-schema-closure-gate.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-003-006-openapi-operation-reconciliation.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md",
+        "contracts/entity/AUTH-003-credential-field-contract.v1.json",
+        "contracts/entity/AUTH-003-identity-field-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-MIGRATION-ADMISSION-2026-09-27.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-ENTITY-EVIDENCE-BINDING-2026-09-27.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-FINAL-ENTITY-FIELD-PERSISTENCE-RECONCILIATION-2026-09-28.md",
+        "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
+        "https://github.com/wanghuinet/luckread/actions/runs/36299334577"
+      ]
+    },
+    {
+      "featureId": "AUTH-004",
+      "domainId": "D1-01",
+      "entityIds": [
+        "ENT-CREDENTIAL",
+        "ENT-SESSION",
+        "ENT-VERIFICATION"
+      ],
+      "persistenceMode": "PAYLOAD_NATIVE",
+      "owner": "W01-PAYLOAD",
+      "status": "BLOCKED",
+      "evidenceRefs": [
+        "contracts/api/AUTH-004-password-recovery-contract.v1.json",
+        "contracts/dto/auth-dto-contract.v1.json",
+        "contracts/entity/AUTH-004-password-recovery-field-contract.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-004-real-evidence-reconciliation.v1.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-004-DTO-REGISTRY-RECONCILIATION-2026-09-28.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-004-EVIDENCE-REGISTRY-BINDING-2026-09-28.md",
+        "https://github.com/wanghuinet/luckread/actions/runs/36288319530"
+      ]
+    }
+  ]
+}

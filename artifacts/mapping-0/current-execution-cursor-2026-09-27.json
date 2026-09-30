@@ -1,0 +1,530 @@
+{
+  "version": "1.5.0",
+  "status": "CURRENT_CURSOR_AUTHORITATIVE",
+  "sourceHead": "18780de74b232b90f40cee1bda6492fa01b1e168",
+  "backupBranch": "backup/pre-current-main-execution-cursor-reconciliation-20260929",
+  "currentCursor": {
+    "id": "AUTH-013-LIFECYCLE-SIDE-EFFECT-COVERAGE-001",
+    "state": "TODO_VERIFY",
+    "objective": "Complete the remaining AUTH-013 lifecycle transition and side-effect evidence using the existing W01/W02 authoritative path and already-admitted W04/W06 consumers, without adding Worker/D1 topology.",
+    "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-SIDE-EFFECT-DECISION-RECONCILIATION-2026-09-29.md",
+    "nextGate": "Build the minimum controlled evidence slice for FROZEN, SUSPENDED, BANNED (approval required), escalation/reinstatement/restore paths and contracted cache/deindex convergence; reuse existing deployed resources and do not create a new public route or data store.",
+    "logicalOwnership": "W02 -> D1-01 account authority; W06 -> D1-03 audit; W04 -> derived Feed / Recommendation / Search projection",
+    "physicalBinding": "VERIFIED. W04 luckread-w04, W06 audit consumer, W02 authority path, dedicated W04 projection queue/DLQ, and existing globe KV derived destination are admitted/verified.",
+    "physicalRuntimeTarget": "T01 -> W02/D1-01; audit -> W06/D1-03; T08/T09/T10 -> W04 derived projection",
+    "supersededBlockers": [
+      "W04 destination authority missing — resolved by adopted existing globe KV Change Control.",
+      "W04 projection queue consumer missing — resolved and verified by Run 36522900537.",
+      "W04 projection runtime evidence pending — resolved by Run 36522900537.",
+      "Do not add D1, Worker, Queue, KV, public API, or alternate event authority."
+    ],
+    "sourceEvidence": {
+      "mainSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b",
+      "w04RuntimeRun": "36522900537",
+      "w04WorkerVersion": "83e69e13-104c-482f-bc4c-2176bc9ef824",
+      "evidenceId": "EVD-AUTH013-W04-PROJECTION-RUNTIME-001"
+    },
+    "currentMainSha": "18780de74b232b90f40cee1bda6492fa01b1e168",
+    "sourceHead": "18780de74b232b90f40cee1bda6492fa01b1e168",
+    "reconciliationNote": "Current execution source is main at 18780de74b232b90f40cee1bda6492fa01b1e168. The W04 runtime evidence source/version remains pinned to the previously deployed exact source; later main changes are retained as current repository state and are not retroactively claimed as deployed."
+  },
+  "alreadyClosed": {
+    "auth003Wire": true,
+    "auth003OpenApiDto": true,
+    "auth002E6Runtime": "36219132123",
+    "w01Baseline": "35508571153",
+    "auth002Auth003SharedEntityAuthority": true,
+    "auth003PhysicalMapping": true,
+    "auth001RegisterWireRequiredness": true,
+    "auth001IdempotencySemantics": true,
+    "auth001RegistrationWriterBoundary": true,
+    "auth001NativeEmailEntry": true,
+    "auth001Auth013InitialPersistence": true,
+    "auth003ListRuntime": "36307891924",
+    "auth003ReplaceRemoveLifecycleRuntime": "36308120758",
+    "auth001NativeHashCapture": "36362963595",
+    "auth001FreshDevRuntime": "36386908500",
+    "auth003IdentityMaterialization": "36377880967",
+    "auth002Gate1": "36217784262",
+    "auth002Runtime": "36219132123",
+    "auth002Security": "36219132123",
+    "auth002Concurrency": "36219132123",
+    "auth002ExtensionCorrelation": "36219132123",
+    "auth002MigrationExecutionEvidence": "35552919573",
+    "auth004PayloadVersionAlignment": "3.90.2",
+    "auth004LocalLifecycle": "36411953998",
+    "auth004W01BindingDeploy": "36418911699",
+    "auth013PublicHttpE2E": "36503534440",
+    "auth013PublicSecurityE2E": "36503534440",
+    "auth013PublicD1Authority": "36503534440",
+    "auth013W06AuditBoundary": "36090709083",
+    "auth004LifecycleAuthority": "WAIT_AUTHORITY_DECISION"
+  },
+  "historicalOnlyCursors": [
+    "M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001 / WAIT_AUTHORITY_DECISION",
+    "AUTH-003 WIRE_SCHEMA_CLOSED / RUNTIME_PERSISTENCE_BLOCKED",
+    "AUTH-004 NEXT wording in pre-2026-09-27 queue header/body",
+    "W01-MIGRATION-BASELINE-AUTHORITY-001 / BLOCKED_EXTERNAL in historical ledger sections",
+    "AUTH-002-SESSION-MIGRATION-EVIDENCE-CLOSURE / FINAL_MAPPING0_ENTITY_ADMISSION_BLOCKED in the pre-AUTH-004 current cursor snapshot",
+    "AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001 / BLOCKED_EXTERNAL_DEPLOYMENT (superseded 2026-09-29)"
+  ],
+  "historicalRefs": [
+    "docs/change-control/CC-MAPPING-0-AUTH-002-R4-ENTITY-EVIDENCE-DEPENDENCY-2026-09-26.md",
+    "artifacts/mapping-0/auth-002-r4-entity-evidence-dependency-2026-09-26.json",
+    "docs/MAPPING-0-CLOSURE-LEDGER.md",
+    "contracts/alignment/mapping-batches/AUTH-003-006-next-closure-queue.v1.md"
+  ],
+  "rules": [
+    "Historical cursor text must not be treated as the current execution instruction.",
+    "Do not rerun W01 baseline 35508571153 unchanged.",
+    "Do not reopen AUTH-003 wire/OpenAPI/DTO authority unless an authoritative input changes.",
+    "Do not infer AUTH-003 physical table, column, index or constraint names.",
+    "Do not promote ENT-IDENTITY or ENT-CREDENTIAL.",
+    "Do not promote Mapping 0 GREEN or Evidence Registry status from documentation-only changes.",
+    "Use the AUTH-003 runtime/persistence admission packet as the single input checklist; do not reopen closed wire/API/DTO work.",
+    "Do not assign the existing W01-PAYLOAD-D1-BINDING physical database to W02/D1-01 by inference.",
+    "Treat W02 -> D1-01 as the closed logical owner chain; keep physical Worker/D1 binding as a separate gate.",
+    "Treat luckread-w02 and D1-01 target UUID 2f80471e-... as explicit authority inputs; do not reinterpret or reassign the target. Physical target identity is closed; current-SHA deployment correctness remains a separate gate.",
+    "Do not inherit AUTH-003 runtime correctness from earlier W02 deployment evidence; same-SHA evidence is required.",
+    "Do not rerun remote migration 36296831559 or reapply 0004_auth_003_credentials.sql; remote DDL execution has already occurred.",
+    "Treat 36296831559 as execution checkpoint only; final schema correctness requires a later read-only exact-SHA postcheck.",
+    "Do not promote AUTH-003 persistence status from the migration execution log alone.",
+    "Do not rerun AUTH-002 runtime evidence 36219132123 unchanged.",
+    "Do not reapply the already-executed AUTH-002 E5 migration without a new explicit Change Control and controlled execution admission.",
+    "Do not promote AUTH-002 or ENT-SESSION from runtime evidence alone; migration execution and final Mapping 0 admission remain required."
+  ],
+  "previousSourceHead": "9d8d2a43e758ff72018de1158f1b13fca12167bf",
+  "authorityDiscovery": {
+    "reviewedAt": "2026-09-27",
+    "result": "AUTHORITY_ADMITTED_BY_CHANGE_CONTROL",
+    "searchedSources": [
+      "contracts/api/auth-operation-policy.v1.json",
+      "docs/change-control/CC-MAPPING-0-AUTH-003-WIRE-PROJECTION-AUTHORITY-2026-09-26.md",
+      "docs/21-P0-PUBLIC-API-INVENTORY-AND-COMPLETENESS-CONTRACT-v1.0.md",
+      "docs/23-P0-API-INVENTORY-RECONCILIATION-CONTRACT-v1.0.md",
+      "contracts/api/user-account-operation-policy.v1.json",
+      "contracts/api/feed-operation-policy.v1.json",
+      "contracts/api/interaction-operation-policy.v1.json",
+      "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md",
+      "contracts/resource-budget/edge-first-worker-topology.json",
+      "docs/04-WORKER-TOPOLOGY-CHANGE-CONTROL-v1.0.md"
+    ],
+    "finding": "AUTH-003 operation-policy fields and task edge are now explicitly admitted by CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27. Historical neighbor-domain and superseded topology sources remain non-authoritative.",
+    "decision": "OPERATION_POLICY_AND_TASK_EDGE_CLOSED",
+    "historicalResourceBudgetDisposition": "The edge-first-worker-topology resource defaults are explicitly historical and tied to the superseded W01-W13/P01-P08 topology. They are not current 12-Worker operation-policy authority and cannot be imported into AUTH-003.",
+    "baselineAdmission": {
+      "status": "ADMITTED_GOVERNANCE_BASELINE",
+      "policy": "docs/176-PRIVACY-DATA-RETENTION-POLICY-v0.1.md",
+      "changeControl": "docs/change-control/CC-MAPPING-0-PRIVACY-DATA-RETENTION-POLICY-BASELINE-2026-09-27.md",
+      "mainSha": "e5d1dea7531791892831d7c3f6c00e1cf8474fac",
+      "effect": "Does not change the missing concrete PRIV-004 policy-instance gate."
+    }
+  },
+  "evidenceChannel": {
+    "workflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
+    "mode": "READONLY",
+    "status": "POSTMIGRATION_SCHEMA_EVIDENCE_ADMITTED",
+    "captures": [
+      "sqlite_master",
+      "table_list",
+      "auth_identities_table_info",
+      "auth_credentials_table_info",
+      "auth_identities_index_list",
+      "auth_credentials_index_list",
+      "auth_credentials_foreign_keys",
+      "foreign_key_check",
+      "d1_migrations_presence",
+      "d1_migrations",
+      "provenance"
+    ],
+    "schemaEvidence": "CAPTURED_AND_ADMITTED",
+    "runId": "36298629648",
+    "artifactId": "10924623571",
+    "sourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "migrationDesign": "ADMITTED",
+    "executionRunId": "36296831559",
+    "executionJobId": "108557122475",
+    "executionSourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435",
+    "executionStatus": "REMOTE_DDL_APPLIED_POSTMIGRATION_READONLY_EVIDENCE_VERIFIED",
+    "executionConclusion": "REMOTE_DDL_EXECUTED_TRUE_POST_SCHEMA_EVIDENCE_NOT_ADMITTED",
+    "executionEvidenceRef": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
+    "postcheckWorkflow": ".github/workflows/w02-remote-d1-readonly-evidence.yml",
+    "postcheckRequired": false,
+    "migrationWorkflow": ".github/workflows/w02-auth-003-migration-evidence.yml",
+    "workflowCommit": "7c9f1fbf41791f56cd23e2ee27ded09f883b956a",
+    "postcheckValidation": "PASS_VERIFIED: observed AUTH-003 schema, indexes, FK, migration ledger and provenance; auth_credentials table-scoped foreign_key_check returned empty; no DDL/DML."
+  },
+  "decisionInput": {
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-003-TASK-POLICY-AUTHORITY-ADMISSION-2026-09-27.md",
+    "taskEdge": "AUTH-003 -> T01 -> W02 -> D1-01",
+    "taskEdgeStatus": "PASS_VERIFIED_LOGICAL_MAPPING",
+    "operationPolicyStatus": "CLOSED_AUTHORITY_ADMITTED",
+    "sourceHead": "953e9f40cdbd9eccf454ee2cb6deae2cb543d352",
+    "schemaEvidenceAdmission": "docs/change-control/CC-MAPPING-0-AUTH-003-D1-SCHEMA-EVIDENCE-ADMISSION-2026-09-27.md",
+    "schemaEvidenceStatus": "PASS_VERIFIED_EVIDENCE_CAPTURE",
+    "migrationAdmission": "docs/change-control/CC-MAPPING-0-AUTH-003-MIGRATION-ADMISSION-2026-09-27.md",
+    "migrationDesignStatus": "PASS_VERIFIED_DESIGN_ADMISSION",
+    "remoteMigrationStatus": "POSTCHECK_VERIFIED",
+    "executionReconciliation": "docs/change-control/CC-MAPPING-0-AUTH-003-REMOTE-MIGRATION-EXECUTION-RECONCILIATION-2026-09-27.md",
+    "executionRunId": "36296831559",
+    "executionSourceSha": "52c6868f99ae2ec9aeb8bdceb4a18396cde20435"
+  },
+  "authoritySourcesChecked": [
+    "contracts/api/auth-operation-policy.v1.json",
+    "docs/change-control/CC-MAPPING-0-AUTH-003-WIRE-PROJECTION-AUTHORITY-2026-09-26.md",
+    "docs/21-P0-PUBLIC-API-INVENTORY-AND-COMPLETENESS-CONTRACT-v1.0.md",
+    "docs/23-P0-API-INVENTORY-RECONCILIATION-CONTRACT-v1.0.md",
+    "contracts/api/user-account-operation-policy.v1.json",
+    "contracts/api/feed-operation-policy.v1.json",
+    "contracts/api/interaction-operation-policy.v1.json",
+    "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md",
+    "contracts/resource-budget/edge-first-worker-topology.json",
+    "docs/04-WORKER-TOPOLOGY-CHANGE-CONTROL-v1.0.md"
+  ],
+  "implementationState": {
+    "sourceHead": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+    "slice": "AUTH-003 credential-add persistence/security/runtime vertical slice",
+    "implementationCommit": "419bb7fd887af0c30412bead50f8196ec6446bb7",
+    "implementationStatus": "MERGED_TO_MAIN_RUNTIME_EVIDENCE_ADMITTED_FOR_ADD_SLICE",
+    "runtimeWorkflow": ".github/workflows/w02-auth-003-credential-add-runtime-evidence.yml",
+    "runtimeRequirement": "same-SHA controlled remote D1 runtime evidence; no production Worker deployment",
+    "runtimeEvidenceStatus": "PASS_VERIFIED",
+    "runtimeEvidenceRunId": "36299334577",
+    "runtimeEvidenceArtifactId": "10924573167",
+    "runtimeEvidenceArtifactSha256": "5ee09ed921ec8d1c1805e2db20c73a54a6be6c37a6a0ca4ddb3bf29f7ce353b5",
+    "entityEvidenceBindingStatus": "BOUND_NOT_PROMOTED",
+    "entityEvidenceBindingMainSha": "2458c7ce75aa1bea3f16ec33985e6ec245224500"
+  },
+  "currentHeadReconciliation": {
+    "reason": "W04 physical resource and W05-W12 physical topology are now evidenced on current main; the remaining blocker is event transport authority, not resource creation.",
+    "currentMainSha": "e73cced0eca9e3a630f06ac793dd8648298725f1",
+    "w04PhysicalProvisionRun": "36509211004",
+    "w04PhysicalWorker": "luckread-w04",
+    "w05w12ProvisionRun": "36509821604",
+    "w05w12Provisioned": [
+      "luckread-w05",
+      "luckread-w07",
+      "luckread-w08",
+      "luckread-w09",
+      "luckread-w10",
+      "luckread-w11",
+      "luckread-w12"
+    ],
+    "w05w12Preexisting": [
+      "luckread-w06"
+    ],
+    "w04ProjectionStatus": "BLOCKED_BY_EVENT_TRANSPORT_AUTHORITY",
+    "w04ResourceStatus": "PASS_VERIFIED",
+    "reviewedAt": "2026-09-29"
+  },
+  "nextGate": "AUTH-013-W04-PROJECTION-DEINDEX-ADMISSION-001 / BLOCKED_EXTERNAL",
+  "latestControlGate": {
+    "workflow": ".github/workflows/auth-013-public-http-e2e.yml",
+    "runId": 36503534440,
+    "headSha": "b91b49d6262ced5631d4d246d1573fa03583752c",
+    "testedApplicationSourceSha": "f4c329b74f7110af76c7ba7339bfd9d3cb81f910",
+    "conclusion": "PASS_VERIFIED_RUNTIME_EVIDENCE",
+    "failedStep": null,
+    "meaning": "AUTH-013 public transport, security, concurrency, stale-session and authoritative D1 assertions passed on the exact deployed W01/W02 source. This closes that evidence sub-gate only; it does not prove W04 projection/deindex convergence.",
+    "productionAuthorization": "NO_NEW_PRODUCTION_DEPLOYMENT",
+    "evidenceBoundary": "Do not rerun AUTH-013 public E2E unchanged. Proceed to W04 physical resource/entrypoint verification."
+  },
+  "runtimeEvidenceAdmission": {
+    "status": "PASS_VERIFIED",
+    "workflow": ".github/workflows/auth-001-registration-local-evidence.yml",
+    "runId": "36386908500",
+    "testedSourceSha": "dd803fb465bf91e9bd8e22ecd34798cdaec42359",
+    "artifactId": "10954444469",
+    "artifactSha256": "c7bfc953c93abc83ec66d4bc289f8c2970a1dc536d38282fa3a30b4818d6fe39",
+    "environment": "CONTROLLED_LOCAL_D1_OPENNEXT_WORKER",
+    "assertions": "AUTH-001 registration batch, password material, replay/idempotency, rollback, concurrency and no-W02-mutation all passed after DEV/PROD policy separation.",
+    "productionDeployment": "BLOCKED",
+    "evidenceAdmissionRef": "docs/change-control/CC-MAPPING-0-AUTH-001-FRESH-RUNTIME-EVIDENCE-RECONCILIATION-2026-09-28.md"
+  },
+  "contractDecisionBlocker": {
+    "issueId": "CC-AUTH003-NORMALIZED-UNIQUENESS-SEMANTICS-2026-09-27",
+    "status": "RESOLVED_PASS_VERIFIED",
+    "resolution": "ENT-CREDENTIAL normalizedValue is not independently unique; persistence uniqueness is composite (kind, normalizedValue).",
+    "resolutionRefs": [
+      "docs/change-control/CC-MAPPING-0-AUTH-003-NORMALIZED-UNIQUENESS-SEMANTICS-RESOLUTION-2026-09-27.md",
+      "contracts/entity/AUTH-003-credential-field-contract.v1.json",
+      "contracts/entity/entity-field-contract.v1.json",
+      "contracts/api/AUTH-003-credential-management-contract.v1.json",
+      "workers/W02-content/migrations/0004_auth_003_credentials.sql"
+    ]
+  },
+  "entityPromotionGate": {
+    "status": "BLOCKED",
+    "entities": [
+      "ENT-IDENTITY",
+      "ENT-CREDENTIAL"
+    ],
+    "reason": "ENT-IDENTITY and ENT-CREDENTIAL have admitted implementation/runtime evidence, but canonical entity catalog promotion remains blocked by global Evidence Registry / Mapping 0 / Five-Way NOT_GREEN. AUTH-001 identity-type/native-auth reconciliation and eventual-consistency decision are closed; no implementation or promotion is inferred from them.",
+    "evidenceRegistryStatus": "NOT_GREEN",
+    "fiveWayStatus": "NOT_GREEN"
+  },
+  "supportingControls": [
+    "docs/change-control/CC-MAPPING-0-AUTH-001-PAYLOAD-NATIVE-CAPABILITY-RECONCILIATION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTER-WIRE-RECONCILIATION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-IDEMPOTENCY-CANONICAL-SEAM-RECONCILIATION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-NATIVE-EMAIL-REGISTRATION-DECISION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-WRITER-BOUNDARY-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-USER-001-PAYLOAD-API-FIELD-RECONCILIATION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-AUTH-013-INITIAL-PERSISTENCE-RECONCILIATION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-AUTHORITY-RECONCILIATION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONCRETE-SCHEMA-ADMISSION-GAP-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-SCHEMA-RECONCILIATION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-PRIV-002-CONSENT-CONTRACT-DECISION-PACKET-2026-09-27.md",
+    "contracts/entity/PRIV-002-consent-field-contract.v1.json",
+    "contracts/persistence/PRIV-002-consent-persistence-contract.v1.json",
+    "contracts/events/privacy-consent-withdrawn.v1.json",
+    "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-GAP-2026-09-27.md",
+    "contracts/privacy/PRIV-004-retention-policy-authority.v1.json",
+    "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md",
+    "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
+    "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-27.md",
+    "docs/176-PRIVACY-DATA-RETENTION-POLICY-v0.1.md",
+    "docs/change-control/CC-MAPPING-0-PRIVACY-DATA-RETENTION-POLICY-BASELINE-2026-09-27.md",
+    "docs/change-control/CC-MAPPING-0-PRIV-004-ADMISSION-GUARD-2026-09-27.md",
+    ".github/workflows/priv004-policy-instance-admission.yml"
+  ],
+  "currentSourceReconciliation": {
+    "reviewedAt": "2026-09-28",
+    "mainSha": "76a9a0697a687a72fdfc793060df57d230ae2779",
+    "payloadPackage": "workers/W01-payload/package.json",
+    "payloadVersion": "3.90.2",
+    "capabilityFinding": "Payload native AUTH-004 capability is contractually aligned to 3.90.2, but the native password hashing implementation is incompatible with Cloudflare Workers production because it requests 600000 PBKDF2 iterations.",
+    "implementationDisposition": "AUTH004_W01_SOURCE_DEPLOYED_W02_PHYSICAL_DEPLOYMENT_ADMISSION_PENDING",
+    "staleEvidenceCorrection": "The 3.87.1 cursor is historical and superseded by 3.90.2; the new blocker is external runtime compatibility, not a version-alignment gap.",
+    "currentMainSha": "0913eb83e02bcee24efab93d3295891c4b2e3966",
+    "implementationSourceSha": "26a5a761c88a6bdb96ea353a30b609d3db300f31",
+    "currentSourceHead": "0913eb83e02bcee24efab93d3295891c4b2e3966",
+    "evidenceAdmission": {
+      "runId": "36431940464",
+      "jobId": "108959464320",
+      "testedSourceSha": "0af2fcb66b6bb54ace065b7debe5559a80a285a4",
+      "artifactId": "10973254137",
+      "artifactSha256": "5c154a9322abc0d3aa7afd078d81d5646b978ce55392cc3f2320e8a39b6bb8d9",
+      "status": "PASS_SOURCE_VERIFIED",
+      "productionDeployment": false,
+      "publicHttpE2E": "NOT_EXECUTED"
+    },
+    "w01TransportUnitEvidence": {
+      "runId": "36432420115",
+      "jobId": "108961689387",
+      "testedSourceSha": "faab246f89d287018da24134a5c0e9f0593ae8de",
+      "status": "PASS_SOURCE_UNIT_VERIFIED",
+      "productionDeployment": false
+    },
+    "publicHttpE2eExecution": {
+      "status": "READY_NOT_EXECUTED",
+      "probe": "scripts/auth-013-public-transport-e2e.mjs",
+      "fixture": "scripts/auth-013-public-http-e2e-fixture.mjs",
+      "workflow": ".github/workflows/auth-013-public-http-e2e.yml",
+      "testedSourceMustEqual": "exact W01/W02 binding deployment source",
+      "durableArtifacts": [
+        "public-http-result.json",
+        "stale-session-result.json",
+        "d1-result.json",
+        "provenance.json"
+      ],
+      "productionDeployment": false
+    },
+    "governanceHeadDisposition": "W02 physical deployment admission remains pending. W01 latest admitted deployment is 26a5; current main 0913 must be freshly deployed through the controlled W01/W02 binding workflow before AUTH-004 runtime evidence."
+  },
+  "devTestPolicy": {
+    "policyId": "PRIV-004-ACCOUNT-REGISTRATION-DEV-TEMP",
+    "policyVersion": "DEV-2026-09-28.1",
+    "durationSeconds": 63072000,
+    "productionUse": false,
+    "expires": "2026-12-31T23:59:59Z",
+    "status": "HISTORICAL_DEVELOPMENT_ONLY",
+    "replacedBy": "PRIV-004-ACCOUNT-REGISTRATION-PROD / PROD-2026-09-28.1"
+  },
+  "contractAdmission": {
+    "workflow": ".github/workflows/contract-admission-v2.yml",
+    "runId": 36356876475,
+    "sourceSha": "e5d94ccb1c0fe6eceb39db2027cb23305fb63aa0",
+    "mode": "DEVELOPMENT",
+    "status": "PASS_VERIFIED",
+    "applicableJobsSuccessful": [
+      "contract",
+      "contract-semantic",
+      "feature-inventory",
+      "payload-reconciliation",
+      "capability-graph",
+      "mapping-zero-final",
+      "contract-full"
+    ],
+    "skippedJobs": [
+      "capability-graph-strict-downstream",
+      "alignment",
+      "openapi-lint"
+    ],
+    "boundary": "Contract development admission only; no production runtime or Evidence Registry promotion."
+  },
+  "remoteMigrationEvidence": {
+    "status": "PASS_VERIFIED",
+    "workflow": ".github/workflows/auth-001-registration-migration-execution.yml",
+    "runId": "36379124829",
+    "jobId": "108790999719",
+    "testedSourceSha": "b6eab1eae17a825103c0a3b3a6c80daf570e8ff3",
+    "artifactId": "10952236480",
+    "artifactRef": "https://github.com/wanghuinet/luckread/actions/runs/36379124829/artifacts/10952236480",
+    "artifactSha256": "f896e02b45a70861918d76c993aa6ae034341c195aca3786d6df7b0323f87daa",
+    "environment": "CONTROLLED_REMOTE_D1",
+    "databaseName": "luckread",
+    "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "migration": "20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1",
+    "assertions": [
+      "migration_applied_exactly_once",
+      "auth_registration_envelopes_schema_exact",
+      "consents_schema_exact",
+      "required_indexes_present",
+      "existing_users_count_unchanged",
+      "existing_users_schema_unchanged",
+      "no_application_fixtures_created",
+      "no_production_worker_deployed"
+    ],
+    "productionDeployment": "BLOCKED"
+  },
+  "runtimeMaterializerEvidenceAdmission": {
+    "status": "PASS_VERIFIED",
+    "workflow": "W02 AUTH-001 Registration Materializer Remote Evidence",
+    "runId": "36377880967",
+    "jobId": "108799593871",
+    "testedSourceSha": "bd2791a4ca799126fac16afbc0506070e9074a77",
+    "artifactId": "10953241430",
+    "artifactRef": "https://github.com/wanghuinet/luckread/actions/runs/36377880967/artifacts/10953241430",
+    "artifactSha256": "9b65754f98d44453d7df598d1bdda40374f3aa5eb033239d6001e1d227f59062",
+    "environment": "CONTROLLED_REMOTE_D1_AUTH001_MATERIALIZER",
+    "assertions": [
+      "missing_key_fails_closed_without_mutation",
+      "exactly_one_identity_after_first_materialization",
+      "two_initial_credentials_after_first_materialization",
+      "identity_converges",
+      "credentials_active_and_hashed",
+      "second_run_creates_nothing",
+      "no_raw_secret_in_result",
+      "no_production_worker_deployed"
+    ],
+    "evidenceRegistryId": "EVD-AUTH001-W02-MATERIALIZER-RUNTIME-REMOTE-001",
+    "productionDeployment": "BLOCKED",
+    "currentMainAfterMerge": "0655c79e674bf4c8d63cfb3d463c311aac0cd814"
+  },
+  "productionPolicyAuthority": {
+    "status": "ADMITTED_ENGINEERING_PRODUCTION_AUTHORITY",
+    "policyId": "PRIV-004-ACCOUNT-REGISTRATION-PROD",
+    "policyVersion": "PROD-2026-09-28.1",
+    "rule": {
+      "mode": "DURATION",
+      "durationSeconds": 63072000
+    },
+    "sourceAuthority": "LuckRead Internal Engineering Production Policy Authority",
+    "approvalRef": "ENG-DECISION-2026-09-28-PRIV004-PROD-730D",
+    "legalComplianceStatus": "NOT_A_LEGAL_OR_COMPLIANCE_AUTHORITY",
+    "provenanceCheckpoint": "4399b83c31c2ac709bcc36c648b2bd994fb711dd"
+  },
+  "policyArtifacts": {
+    "development": "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json",
+    "production": "artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json",
+    "selectionBoundary": "W01 resolves by runtime environment; client cannot select policy."
+  },
+  "evidenceAdmissibilityBoundary": {
+    "status": "RESOLVED_TECHNICAL_EVIDENCE_ADMITTED",
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-002-HISTORICAL-MIGRATION-EVIDENCE-ADMISSION-2026-09-28.md",
+    "historicalExecutionRunId": "35552919573",
+    "historicalExecutionSourceSha": "fe1f2784d21f3f629bbad0baa971f1aa56520914",
+    "migrationFileBlobShaHistorical": "2b43a7b08fe7c5be98793da7eb07ddd2cf9e6921",
+    "migrationFileBlobShaCurrent": "2b43a7b08fe7c5be98793da7eb07ddd2cf9e6921",
+    "migrationIndexBlobShaHistorical": "436c37e395145017d9135f938d69a741a936c60b",
+    "migrationIndexBlobShaCurrent": "4a8ee2b68c1b845d06b9f4bb892e59d70a556376",
+    "admissibilityFinding": "HISTORICAL_TECHNICAL_EXECUTION_ACCEPTED_WITHOUT_RETROACTIVE_AUTHORIZATION",
+    "duplicateExecution": "PROHIBITED_FAIL_CLOSED",
+    "contractChange": "NONE",
+    "migrationUnitScope": "MIGRATION_FILE_AND_EXECUTION_ARTIFACT",
+    "migrationFileUnchanged": true,
+    "registryEvidenceId": "EVD-AUTH002-B27-MIGRATION-EXECUTION-HISTORICAL-001"
+  },
+  "supersededCurrentCursor": {
+    "id": "AUTH-004-W02-PHYSICAL-DEPLOYMENT-ADMISSION-001",
+    "state": "BLOCKED_EXTERNAL_DEPLOYMENT",
+    "sourceHead": "0913eb83e02bcee24efab93d3295891c4b2e3966",
+    "supersededAt": "2026-09-29",
+    "reason": "Superseded by verified AUTH-013 public HTTP E2E and the explicit W04 projection/deindex GAP. The prior cursor would cause work to return to an already-surpassed AUTH-004/W02 physical-deployment gate."
+  },
+  "sourceOfTruthForNextGate": {
+    "changeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-W04-PROJECTION-DEINDEX-GAP-2026-09-29.md",
+    "workerMaster": "docs/04-WORKER-MASTER-v1.0.md",
+    "mappingFreeze": "docs/05-MAPPING-FREEZE-v1.0.md",
+    "cloudflareInventoryWorkflow": ".github/workflows/cloudflare-resource-inventory.yml",
+    "topology": "12 Workers / 4 D1",
+    "canonicalTasks": [
+      "T08",
+      "T09",
+      "T10"
+    ],
+    "eventBoundary": "contracts/events/identity-account-state-changed.v1.json"
+  },
+  "cloudflareInventoryReconciliation": {
+    "status": "PASS_VERIFIED_EXTERNAL_INVENTORY",
+    "runId": "36518463292",
+    "testedMainSha": "b39a5a104f351c2bb9b10abe4b7a4fb4a2edebb0",
+    "artifactId": "11011922070",
+    "artifactDigest": "sha256:e98c5c3ab24b5319cbd74cfa5752d72cf6f773020415a602dd15d7e30304de09",
+    "finding": "No concrete already-admitted W04 derived projection/cache destination identified. AUTH-013 projection queue exists with zero consumers.",
+    "disposition": "BLOCKED_EXTERNAL"
+  },
+  "cloudflareLiveW04BindingEvidence": {
+    "status": "PASS_VERIFIED",
+    "runId": "36519177221",
+    "testedMainSha": "b09c6cd7630019c4f663c7cf77f9498fdbab4f9b",
+    "artifactId": "11011833636",
+    "artifactDigest": "sha256:031baca1f955e9bea27a60e1d1f7ff300ee37feda5b8855b265351991d197f73",
+    "worker": "luckread-w04",
+    "source": "script-settings",
+    "bindings": []
+  },
+  "latestRuntimeEvidence": {
+    "auth013W04Projection": "PASS_VERIFIED",
+    "workflow": ".github/workflows/w04-physical-provision.yml",
+    "runId": "36522900537",
+    "jobId": "109259476025",
+    "headSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
+  },
+  "currentMainReconciliation": {
+    "reviewedAt": "2026-09-29",
+    "currentMainSha": "18780de74b232b90f40cee1bda6492fa01b1e168",
+    "latestMergedCommits": [
+      "18780de74b232b90f40cee1bda6492fa01b1e168",
+      "820cb6bbcbf8725fd4a5d89ee7443cfe3e10ecfa",
+      "191403af04b44e8f71022855b4b63eb89980d265"
+    ],
+    "executionDisposition": "CURRENT_MAIN_RECONCILED_EXTERNAL_EVIDENCE_PENDING",
+    "auth013NextGate": {
+      "status": "BLOCKED_EXTERNAL",
+      "workflow": ".github/workflows/auth-013-w04-side-effect-matrix-evidence.yml",
+      "executionMode": "workflow_dispatch",
+      "requiredConfirmation": "RUN",
+      "deployedSourceSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b",
+      "deployedWorkerVersion": "83e69e13-104c-482f-bc4c-2176bc9ef824",
+      "note": "No new code/topology is authorized or needed for this gate; runtime evidence must be executed against the admitted live W04 version."
+    },
+    "otherExternalGates": [
+      {
+        "feature": "AUTH-004",
+        "workflow": ".github/workflows/w01-w02-binding-deploy.yml",
+        "status": "EXTERNAL_DEPLOYMENT_REQUIRED",
+        "note": "Fresh current-source W01/W02 binding deployment is required before remote AUTH-004 E2E evidence."
+      },
+      {
+        "feature": "AUTH-010",
+        "workflow": ".github/workflows/w01-w02-binding-deploy.yml",
+        "status": "EXTERNAL_DEPLOYMENT_REQUIRED",
+        "note": "Fresh current-source W01/W02 binding deployment is required before remote AUTH-010 E2E evidence."
+      }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "version":"1.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "purpose":"Single navigational authority index for AUTH-002..006 feature field contracts. This file does not promote entities or fields to verified runtime status.",
+  "records":[
+    {"featureId":"AUTH-002","entityIds":["ENT-SESSION"],"fieldContractRefs":["contracts/entity/AUTH-002-session-field-contract.v1.json"],"status":"CONTRACTED_NOT_VERIFIED"},
+    {"featureId":"AUTH-003","entityIds":["ENT-IDENTITY","ENT-CREDENTIAL"],"fieldContractRefs":["contracts/entity/AUTH-003-identity-field-contract.v1.json","contracts/entity/AUTH-003-credential-field-contract.v1.json"],"status":"CONTRACTED_NOT_VERIFIED"},
+    {"featureId":"AUTH-004","entityIds":["ENT-CREDENTIAL","ENT-VERIFICATION","ENT-SESSION"],"fieldContractRefs":["contracts/entity/AUTH-003-credential-field-contract.v1.json","contracts/entity/AUTH-004-password-recovery-field-contract.v1.json","contracts/entity/AUTH-002-session-field-contract.v1.json"],"status":"CONTRACTED_NOT_VERIFIED"},
+    {"featureId":"AUTH-005","entityIds":["ENT-VERIFICATION","ENT-CREDENTIAL","ENT-IDENTITY"],"fieldContractRefs":["contracts/entity/AUTH-005-verification-field-contract.v1.json","contracts/entity/AUTH-003-credential-field-contract.v1.json","contracts/entity/AUTH-003-identity-field-contract.v1.json"],"status":"CONTRACTED_NOT_VERIFIED"},
+    {"featureId":"AUTH-006","entityIds":["ENT-CREDENTIAL","ENT-VERIFICATION","ENT-IDENTITY"],"fieldContractRefs":["contracts/entity/AUTH-006-passkey-field-contract.v1.json","contracts/entity/AUTH-005-verification-field-contract.v1.json","contracts/entity/AUTH-003-identity-field-contract.v1.json"],"status":"CONTRACTED_NOT_VERIFIED"}
+  ],
+  "promotionRules":{"fieldContractIsNotImplementationEvidence":true,"entityCatalogStatusMustRemainUnverifiedUntilRuntimeEvidence":true,"D1SchemaMustBeObservedBeforePhysicalMapping":true,"Mapping0MustResolveEveryReference":true}
+}

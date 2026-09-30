@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "auditId": "M0-B01-WORKER-OWNERSHIP-RECONCILIATION-AUDIT-2026-09-20",
+  "sourceHead": "8ccd9f281987a1bb61d98f9630955583ac82ad7b",
+  "conflictId": "B01-CONFLICT-002",
+  "type": "WORKER_OWNERSHIP",
+  "status": "RESOLVED",
+  "noInference": true,
+  "authoritySources": [
+    {
+      "path": "docs/04-WORKER-MASTER-v1.0.md",
+      "finding": "Explicit ACTIVE / CANONICAL WORKER MASTER; freezes exactly 12 Workers / 4 D1 domains / 25 Contract Tasks and defines W01 as Public API/Gateway boundary and W02 as Identity/Account/Authorization."
+    },
+    {
+      "path": "docs/03-WORKER-BINDING-MAPPING-v1.0.md",
+      "finding": "Explicit ACTIVE / CANONICAL Worker × D1 binding; W01 has no direct authoritative D1 authority and W02 is D1-01 authority."
+    },
+    {
+      "path": "docs/02-FINAL-MAPPING-v1.0.md",
+      "finding": "Current mapping resolves identity/account ownership to T01/W02/D1-01 and API platform boundary to T24/W01."
+    }
+  ],
+  "supersessionRule": {
+    "path": "docs/04-WORKER-MASTER-v1.0.md",
+    "finding": "The canonical Worker Master explicitly classifies historical Worker models, including the historical W01-W13 topology, as historical evidence only and prohibits reuse as current ownership."
+  },
+  "conflictingSourceDisposition": [
+    {
+      "path": "contracts/resource-budget/edge-first-worker-topology.json",
+      "finding": "Still carries ARCHITECTURE_LOCKED and a 13-logical-worker model, but its topology is explicitly superseded for current Worker ownership by the active canonical Worker Master."
+    },
+    {
+      "path": "docs/300-ARCHITECTURE-BASELINE-WORKER-D1-R2-CACHE-MAP-v1.0.md",
+      "finding": "Contains an older W00-W08 logical model; treated as historical evidence under the current canonical Worker Master."
+    }
+  ],
+  "resolution": {
+    "decision": "B01-CONFLICT-002 is resolved at reconciliation level using the already-active canonical Worker Master and Worker × D1 Binding Mapping. No new Worker, D1, Task, capability, or ownership edge is created.",
+    "canonicalWorkerMaster": "docs/04-WORKER-MASTER-v1.0.md",
+    "canonicalBinding": "docs/03-WORKER-BINDING-MAPPING-v1.0.md",
+    "featureMappingEffect": "NONE",
+    "implementationAuthorization": false
+  },
+  "prohibitions": [
+    "Do not alter the frozen 12 Worker / 4 D1 / 25 Task topology.",
+    "Do not delete or rewrite historical topology documents solely to make the reconciliation pass.",
+    "Do not create new Feature→Worker edges from directory names or routes.",
+    "Do not promote Mapping-0 feature status."
+  ]
+}

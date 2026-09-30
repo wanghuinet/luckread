@@ -1,0 +1,39 @@
+name: PRIV-004 Policy Instance Admission Guard
+
+on:
+  push:
+    paths:
+      - "scripts/priv004-policy-instance-admission.mjs"
+      - "contracts/privacy/PRIV-004-retention-policy-authority.v1.json"
+      - "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json"
+      - "artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json"
+      - "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md"
+      - "docs/change-control/CC-MAPPING-0-PRIV-004-ADMISSION-GUARD-2026-09-27.md"
+  pull_request:
+    paths:
+      - "scripts/priv004-policy-instance-admission.mjs"
+      - "contracts/privacy/PRIV-004-retention-policy-authority.v1.json"
+      - "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json"
+      - "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json"
+      - "docs/change-control/CC-MAPPING-0-PRIV-004-POLICY-INSTANCE-ADMISSION-2026-09-27.md"
+      - "docs/change-control/CC-MAPPING-0-PRIV-004-ADMISSION-GUARD-2026-09-27.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate PRIV-004 policy instance admission boundary
+        run: node scripts/priv004-policy-instance-admission.mjs

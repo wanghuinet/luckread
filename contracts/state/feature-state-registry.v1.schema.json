@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/state/feature-state-registry.v1.schema.json",
+  "title":"Luckread Feature State Registry",
+  "type":"object","additionalProperties":false,
+  "required":["version","status","sourceOfTruth","records"],
+  "properties":{
+    "version":{"const":"1.0","type":"string"},
+    "status":{"type":"string","enum":["NOT_GREEN","GREEN"]},
+    "sourceOfTruth":{"type":"string"},
+    "records":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["featureId","domainId","stateMachineId","stateField","versionField","status","evidenceRefs"],"properties":{
+      "featureId":{"type":"string","minLength":1},"domainId":{"type":"string","minLength":1},"stateMachineId":{"type":"string","minLength":1},"stateField":{"type":"string","minLength":1},"versionField":{"type":"string","minLength":1},"status":{"type":"string","enum":["UNMAPPED","MAPPED","VERIFIED","BLOCKED"]},"evidenceRefs":{"type":"array","items":{"type":"string"}}
+    }}}
+  }
+}

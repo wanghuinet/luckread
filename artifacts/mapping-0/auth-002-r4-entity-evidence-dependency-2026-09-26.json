@@ -1,0 +1,49 @@
+{
+  "version":"1.0.0",
+  "evidenceType":"MAPPING_0_AUTH_002_R4_ENTITY_EVIDENCE_DEPENDENCY",
+  "generatedAt":"2026-09-26",
+  "repository":"wanghuinet/luckread",
+  "assessmentBaseMain":"ae24f89e18f548c7d393704323abddcd8aeb1961",
+  "taskId":"M0-AUTH-002-R4-ENTITY-DEPENDENCY-EVIDENCE-001",
+  "status":"BLOCKED_EXTERNAL",
+  "blockerClass":"UPSTREAM_AUTHORITY",
+  "entities":{
+    "ENT-IDENTITY":{"catalogStatus":"PROPOSED","persistenceStatus":"NOT_VERIFIED","admissibleRuntimeEvidence":false},
+    "ENT-CREDENTIAL":{"catalogStatus":"PROPOSED","persistenceStatus":"NOT_VERIFIED","admissibleRuntimeEvidence":false}
+  },
+  "evidenceFinding":{
+    "currentRemoteD1MigrationEvidence":false,
+    "currentCredentialRuntimeImplementationEvidence":false,
+    "currentNormalizationUniquenessRuntimeEvidence":false,
+    "currentVerifiedEvidenceRegistryBinding":false,
+    "historicalLocalAuth003Evidence":"EXPIRED_OR_BLOCKED"
+  },
+  "upstreamAuthority":{
+    "featureId":"AUTH-003",
+    "status":"BLOCKED_NOT_GREEN",
+    "nextRequiredAuthority":"explicit public wire projection and exact request/response/status/error semantics",
+    "sourceRefs":[
+      "contracts/alignment/mapping-batches/AUTH-003-006-next-closure-queue.v1.md",
+      "artifacts/mapping-0/auth-003-wire-schema-blocker-audit-2026-09-20.json",
+      "contracts/alignment/mapping-batches/AUTH-003-006-dto-schema-closure-gate.v1.md",
+      "contracts/alignment/mapping-batches/AUTH-003-contractual-mapping-delta.v1.md"
+    ]
+  },
+  "gateResult":{
+    "auth002RegistryStatus":"BLOCKED",
+    "r4":"BLOCKED",
+    "fiveWay":"NOT_GREEN",
+    "mapping0":"NOT_GREEN"
+  },
+  "nextAction":{
+    "id":"M0-AUTH-003-WIRE-PROJECTION-AUTHORITY-001",
+    "state":"WAIT_AUTHORITY_DECISION",
+    "objective":"Resolve the smallest explicit AUTH-003 public wire-schema authority set before any runtime/persistence implementation admission.",
+    "prohibited":[
+      "Do not invent DTO fields or HTTP semantics.",
+      "Do not create or execute an AUTH-003 migration from guessed physical names.",
+      "Do not promote ENT-IDENTITY or ENT-CREDENTIAL.",
+      "Do not rerun AUTH-002 Runtime Evidence Run 36219132123."
+    ]
+  }
+}

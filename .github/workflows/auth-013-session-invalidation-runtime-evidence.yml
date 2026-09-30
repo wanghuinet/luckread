@@ -1,0 +1,360 @@
+name: AUTH-013 Session Invalidation Runtime Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type RUN to execute controlled remote session invalidation evidence"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  session-invalidation:
+    if: ${{ inputs.confirm == 'RUN' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      D1_01_ID: "2f80471e-3756-49f9-8db1-7707a433ad64"
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate credentials
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+
+      - name: Prepare remote security harness
+        run: |
+          set -euo pipefail
+          RUN_ID="${{ github.run_id }}"
+
+          cat > .auth-013-session-invalidation.wrangler.jsonc <<EOF
+          {
+            "\$schema": "./node_modules/wrangler/config-schema.json",
+            "name": "luckread-auth013-session-invalidation-evidence-harness",
+            "main": ".auth-013-session-invalidation-harness.ts",
+            "compatibility_date": "2025-08-15",
+            "d1_databases": [
+              {
+                "binding": "D1_01",
+                "database_name": "luckread",
+                "database_id": "$D1_01_ID",
+                "remote": true
+              }
+            ],
+            "vars": {
+              "RUN_ID": "$RUN_ID"
+            }
+          }
+          EOF
+
+          cat > .auth-013-session-invalidation-harness.ts <<'EOF'
+          // CI-only ephemeral harness. It executes the current main W02 transition
+          // kernel against real D1-01 and proves the token/session security side effect.
+          // It never changes Worker/D1 topology and only uses synthetic records.
+          // @ts-nocheck
+          import { applyAccountStateTransition } from './workers/W02-content/src/account/account-state-transition.ts'
+          import { rotateRefreshCredential } from './workers/W02-content/src/session/session-runtime.ts'
+
+          const json = (body: unknown, status = 200) =>
+            new Response(JSON.stringify(body, null, 2), {
+              status,
+              headers: {
+                'content-type': 'application/json; charset=utf-8',
+                'cache-control': 'no-store',
+              },
+            })
+
+          const hashToken = async (token: string) => {
+            const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
+            return Array.from(new Uint8Array(digest))
+              .map((value) => value.toString(16).padStart(2, '0'))
+              .join('')
+          }
+
+          export default {
+            async fetch(
+              request: Request,
+              env: { D1_01: D1Database; RUN_ID: string },
+            ): Promise<Response> {
+              if (request.method !== 'POST' || new URL(request.url).pathname !== '/probe') {
+                return new Response(null, { status: 404 })
+              }
+
+              const db = env.D1_01
+              const runId = env.RUN_ID
+              const userId = 920000000 + (Number(runId) % 50000000)
+              const email = `auth013-session-invalidation-${runId}@invalid.local`
+              const sessionId = `auth013-session-${runId}`
+              const deviceId = `auth013-device-${runId}`
+              const refreshToken = `auth013-refresh-${runId}-secret`
+              const now = new Date().toISOString()
+              const future = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+              const refreshCredentialHash = await hashToken(refreshToken)
+
+              const existingUser = await db.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first()
+              if (existingUser) {
+                return json({ status: 'FAIL_CLOSED', reason: 'synthetic_user_id_already_exists', userId }, 409)
+              }
+
+              const existingSession = await db.prepare('SELECT session_id FROM auth_session_state WHERE session_id = ?').bind(sessionId).first()
+              if (existingSession) {
+                return json({ status: 'FAIL_CLOSED', reason: 'synthetic_session_id_already_exists', sessionId }, 409)
+              }
+
+              await db
+                .prepare(
+                  'INSERT INTO users (id, email, account_state, account_state_version) VALUES (?, ?, ?, ?)',
+                )
+                .bind(userId, email, 'ACTIVE', 1)
+                .run()
+
+              await db
+                .prepare(
+                  'INSERT INTO users_sessions (_order, _parent_id, id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)',
+                )
+                .bind(0, userId, sessionId, now, future)
+                .run()
+
+              await db
+                .prepare(
+                  'INSERT INTO auth_session_state (session_id, user_id, device_id, token_version, refresh_credential_hash, revoked_at, last_seen_at) VALUES (?, ?, ?, ?, ?, NULL, ?)',
+                )
+                .bind(sessionId, String(userId), deviceId, 1, refreshCredentialHash, now)
+                .run()
+
+              try {
+                const transition = await applyAccountStateTransition(db, {
+                  userId: String(userId),
+                  to: 'SUSPENDED',
+                  reason: `AUTH-013 controlled session invalidation evidence / run ${runId}`,
+                  expectedVersion: 1,
+                  actor: { id: `auth013-security-admin-${runId}`, type: 'admin' },
+                  permission: 'user.suspend',
+                  now,
+                  correlationId: `auth013-security-${runId}`,
+                  causationId: `auth013-security-${runId}`,
+                })
+
+                const state = await db
+                  .prepare(
+                    'SELECT account_state, account_state_version FROM users WHERE id = ? LIMIT 1',
+                  )
+                  .bind(userId)
+                  .first()
+
+                const session = await db
+                  .prepare(
+                    'SELECT session_id, revoked_at, last_seen_at FROM auth_session_state WHERE session_id = ? LIMIT 1',
+                  )
+                  .bind(sessionId)
+                  .first()
+
+                let staleRefreshCode = null
+                let staleRefreshRejected = false
+                try {
+                  await rotateRefreshCredential(db, {
+                    refreshToken,
+                    deviceId,
+                    now: new Date().toISOString(),
+                    hashToken: async () => refreshCredentialHash,
+                    randomToken: () => 'must-not-be-issued',
+                    issueAccessToken: () => {
+                      throw new Error('ACCESS_TOKEN_MUST_NOT_BE_ISSUED')
+                    },
+                  })
+                } catch (error) {
+                  staleRefreshRejected = error?.code === 'UNAUTHENTICATED'
+                  staleRefreshCode = String(error?.code ?? '')
+                }
+
+                return json({
+                  status: 'PASS',
+                  userId,
+                  sessionId,
+                  transition,
+                  state,
+                  session,
+                  checks: {
+                    stateSuspended: state?.account_state === 'SUSPENDED',
+                    stateVersionAdvanced: Number(state?.account_state_version) === 2,
+                    revokedAtPresent: typeof session?.revoked_at === 'string' && session.revoked_at.length > 0,
+                    staleRefreshRejected,
+                    staleRefreshCode: staleRefreshCode === 'UNAUTHENTICATED',
+                  },
+                  journalId: transition.journalId,
+                  eventId: transition.eventId,
+                })
+              } catch (error) {
+                return json(
+                  {
+                    status: 'RUNTIME_EXCEPTION',
+                    userId,
+                    sessionId,
+                    error: {
+                      name: String(error?.name ?? 'Error'),
+                      message: String(error?.message ?? error),
+                      code: String(error?.code ?? ''),
+                    },
+                  },
+                  500,
+                )
+              }
+            },
+          }
+          EOF
+
+      - name: Start remote security harness
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 dev --remote --config .auth-013-session-invalidation.wrangler.jsonc --ip 127.0.0.1 --port 8791 > auth-013-session-invalidation-harness.log 2>&1 &
+          echo $! > auth-013-session-invalidation-harness.pid
+
+          ready=0
+          for _ in $(seq 1 90); do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8791/probe || true)
+            if [ "$code" != "000" ]; then ready=1; break; fi
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            cat auth-013-session-invalidation-harness.log
+            exit 1
+          fi
+
+      - name: Execute real session invalidation transition
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/auth-013-session-invalidation
+          http_code=$(curl -sS -o artifacts/mapping-0/auth-013-session-invalidation/runtime.json -w '%{http_code}' -X POST http://127.0.0.1:8791/probe)
+          echo "AUTH013_SESSION_INVALIDATION_HTTP_STATUS=$http_code"
+          cat artifacts/mapping-0/auth-013-session-invalidation/runtime.json
+          test "$http_code" = "200"
+
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const result = JSON.parse(fs.readFileSync('artifacts/mapping-0/auth-013-session-invalidation/runtime.json', 'utf8'))
+          if (result.status !== 'PASS') throw new Error('Session invalidation runtime evidence did not PASS')
+
+          const checks = result.checks ?? {}
+          for (const [name, ok] of Object.entries(checks)) {
+            if (name === 'staleRefreshCode') continue
+            if (!ok) throw new Error(`AUTH-013 session invalidation assertion failed: ${name}`)
+          }
+          if (checks.staleRefreshCode !== true) {
+            throw new Error('AUTH-013 stale refresh credential was not rejected with UNAUTHENTICATED')
+          }
+
+          fs.writeFileSync(
+            'artifacts/mapping-0/auth-013-session-invalidation/assertions.json',
+            JSON.stringify({
+              runId: result.transition ? process.env.GITHUB_RUN_ID : null,
+              userId: result.userId,
+              sessionId: result.sessionId,
+              transition: result.transition,
+              state: result.state,
+              session: result.session,
+              checks: result.checks,
+            }, null, 2) + '\n'
+          )
+          NODE
+
+      - name: Remove only synthetic session/security records
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          if [ ! -f artifacts/mapping-0/auth-013-session-invalidation/runtime.json ]; then exit 0; fi
+
+          node - <<'NODE'
+          import fs from 'node:fs'
+
+          const result = JSON.parse(
+            fs.readFileSync('artifacts/mapping-0/auth-013-session-invalidation/runtime.json', 'utf8'),
+          )
+          const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
+          const token = process.env.CLOUDFLARE_API_TOKEN
+
+          const sqlLiteral = (value) => JSON.stringify(String(value))
+
+          async function query(sql) {
+            const response = await fetch(
+              `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${process.env.D1_01_ID}/query`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ sql }),
+              },
+            )
+            const body = await response.json()
+            if (!response.ok || body.success !== true) {
+              throw new Error(`D1 cleanup failed: ${response.status} ${JSON.stringify(body)}`)
+            }
+            return body.result?.[0]?.results ?? []
+          }
+
+          await query(`DELETE FROM auth_session_state WHERE session_id = ${sqlLiteral(result.sessionId)}`)
+          await query(`DELETE FROM auth_013_publication_journal WHERE journal_id = ${sqlLiteral(result.transition.journalId)}`)
+          await query(`DELETE FROM users_sessions WHERE id = ${sqlLiteral(result.sessionId)}`)
+          await query(`DELETE FROM users WHERE id = ${Number(result.userId)}`)
+
+          const remaining = await query(`SELECT COUNT(*) AS count FROM users WHERE id = ${Number(result.userId)}`)
+          const sessionRemaining = await query(`SELECT COUNT(*) AS count FROM auth_session_state WHERE session_id = ${sqlLiteral(result.sessionId)}`)
+
+          if (Number(remaining[0]?.count ?? -1) !== 0) throw new Error('Synthetic user cleanup failed')
+          if (Number(sessionRemaining[0]?.count ?? -1) !== 0) throw new Error('Synthetic session cleanup failed')
+
+          console.log(JSON.stringify({
+            SYNTHETIC_USER_CLEANUP: 'PASS',
+            SYNTHETIC_SESSION_CLEANUP: 'PASS',
+            TRANSITION_JOURNAL_CLEANUP: 'PASS',
+            IMMUTABLE_AUDIT_POLICY: 'RETAIN_IF_PUBLISHED',
+          }, null, 2))
+          NODE
+
+      - name: Capture provenance
+        run: |
+          cat > artifacts/mapping-0/auth-013-session-invalidation/provenance.txt <<EOF
+          workflow=AUTH-013 Session Invalidation Runtime Evidence
+          github_run_id=${{ github.run_id }}
+          github_source_head=${{ github.sha }}
+          worker=W02
+          database=luckread / $D1_01_ID
+          transition=ACTIVE -> SUSPENDED
+          security_effect=auth_session_state.revoked_at
+          stale_refresh_assertion=UNAUTHENTICATED
+          evidence_class=CONTROLLED_REMOTE_D1_CODEPATH
+          EOF
+
+      - name: Upload session invalidation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-013-session-invalidation-evidence-${{ github.run_id }}
+          path: artifacts/mapping-0/auth-013-session-invalidation/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Cleanup ephemeral harness
+        if: ${{ always() }}
+        run: |
+          if [ -f auth-013-session-invalidation-harness.pid ]; then
+            kill "$(cat auth-013-session-invalidation-harness.pid)" 2>/dev/null || true
+          fi
+          rm -f .auth-013-session-invalidation-harness.ts .auth-013-session-invalidation.wrangler.jsonc auth-013-session-invalidation-harness.pid

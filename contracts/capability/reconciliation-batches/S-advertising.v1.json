@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.0",
+  "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "batch": "S",
+  "domain": "S. Advertising",
+  "status": "NOT_GREEN",
+  "records": [
+    {"featureId":"ADS-001","name":"advertiser/account","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-002","name":"campaign/ad group","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-003","name":"creative","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-004","name":"placement/inventory","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-005","name":"targeting/audience","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-006","name":"budget/bid","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-007","name":"impression/click/conversion","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-008","name":"attribution","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-009","name":"frequency cap","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-010","name":"brand safety/ad review","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-011","name":"direct advertising","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-012","name":"external network integration","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-013","name":"CJ/affiliate integration","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-014","name":"AdSense compatibility/integration boundary","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"ADS-015","name":"ad analytics/revenue/settlement","hierarchy":{"l1":"S","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/enums/organization-member-state.json",
+  "title": "OrganizationMemberState",
+  "description": "Organization membership lifecycle. Canonical Source: docs/304 section 2.3.",
+  "type": "string",
+  "enum": [
+    "INVITED",
+    "JOINED",
+    "ACTIVE",
+    "SUSPENDED",
+    "LEFT",
+    "REMOVED"
+  ],
+  "x-luckread": {
+    "canonical-source": "docs/304-ORGANIZATION-ENTERPRISE-AND-IP-PRINCIPAL-CONTRACT-v1.0.md",
+    "domain": "D1-01",
+    "cache-version-field": "organization_version",
+    "invariant": "Removal or role change MUST increment organization_version for the affected subject."
+  }
+}

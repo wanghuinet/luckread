@@ -1,0 +1,1 @@
+Temporary cleanup marker: duplicate AUTH-001 DTO closure drafts were created during evidence reconciliation and must not be used as canonical mapping evidence. Canonical mapping remains fail-closed.

@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "auditId": "M0-CURRENT-DOWNSTREAM-GATE-EVIDENCE-2026-09-20",
+  "sourceCommit": "2b475f7991f82c25a715e091f46049edd7d4852c",
+  "contractCiRun": 35492578141,
+  "status": "DOWNSTREAM_NOT_GREEN",
+  "admissionResults": {
+    "contractSemantic": "PASS",
+    "contractCommon": "PASS",
+    "contractStateMachines": "PASS",
+    "contractOpenAPI": "PASS",
+    "contractAuthz": "PASS",
+    "blueprintFeatureInventory": "PASS",
+    "payloadContractReconciliation": "PASS",
+    "capabilityContractGraph": "PASS",
+    "fiveWayAlignment": "FAIL_NOT_GREEN",
+    "strictDownstreamR4EvidenceR5": "FAIL_BLOCKED"
+  },
+  "fiveWay": {
+    "apiOperations": 151,
+    "payloadCollections": 2,
+    "codeEvidenceRecords": 203,
+    "blockerCount": 450,
+    "canonicalMissingCount": 0
+  },
+  "r4": {
+    "canonicalFeatureCount": 449,
+    "readyCount": 0,
+    "blockedCount": 449,
+    "missingEntityBinding": 440,
+    "persistenceNotVerified": 9
+  },
+  "interpretation": "Current Contract CI confirms the same intended fail-closed downstream boundary on the B01 ownership-reconciliation descendant: structural and admission layers pass, while feature-level Entity/Persistence/Evidence closure is not complete.",
+  "independentFixAvailableFromExistingAuthority": false,
+  "prohibitedInference": [
+    "Do not convert downstream gaps to PASS without feature-specific evidence.",
+    "Do not create 440 Entity bindings from route/name similarity.",
+    "Do not convert the 9 persistence-not-verified records into verified state without persistence/runtime evidence.",
+    "Do not relax Five-Way or R4 gates merely to make Contract CI green."
+  ],
+  "nextControlledBlockers": [
+    "AUTH-003 exact public Wire Schema authority",
+    "AUTH-002 controlled external D1 migration/runtime evidence",
+    "449 feature-level Entity/Persistence/Evidence downstream closure; only explicit authority/evidence may reduce this set."
+  ],
+  "mapping0Effect": "NONE",
+  "implementationAuthorization": false,
+  "freshness": "Fresh Contract CI evidence for commit 2b475f7991f82c25a715e091f46049edd7d4852c; reuse until underlying downstream inputs change."
+}

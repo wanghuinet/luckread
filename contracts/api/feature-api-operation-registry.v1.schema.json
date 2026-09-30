@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/feature-api-operation-registry.v1.schema.json",
+  "title": "Luckread Feature API Operation Registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "status", "sourceOfTruth", "records"],
+  "properties": {
+    "version": {"const":"1.0","type":"string"},
+    "status": {"type":"string","enum":["NOT_GREEN","GREEN"]},
+    "sourceOfTruth": {"type":"string"},
+    "records": {"type":"array","items":{"type":"object","additionalProperties":false,"required":["featureId","domainId","operationId","method","path","primaryWorker","status","evidenceRefs"],"properties":{
+      "featureId":{"type":"string","minLength":1},"domainId":{"type":"string","minLength":1},"operationId":{"type":"string","minLength":1},"method":{"type":"string","enum":["GET","POST","PUT","PATCH","DELETE"]},"path":{"type":"string","minLength":1},"primaryWorker":{"type":"string","minLength":1},"status":{"type":"string","enum":["UNMAPPED","MAPPED","VERIFIED","BLOCKED"]},"evidenceRefs":{"type":"array","items":{"type":"string"}}
+    }}}
+  }
+}

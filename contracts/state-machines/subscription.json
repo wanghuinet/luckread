@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/state-machines/subscription.json",
+  "title": "Subscription State Machine",
+  "type": "object",
+  "x-luckread": {
+    "state-field": "status",
+    "requires-optimistic-lock": true,
+    "terminal-states": ["EXPIRED", "CANCELED"]
+  },
+  "x-transitions": [
+    {"from":"PENDING","to":"ACTIVE","actor":"system|payment"},
+    {"from":"ACTIVE","to":"PAST_DUE","actor":"system|payment"},
+    {"from":"PAST_DUE","to":"ACTIVE","actor":"system|payment"},
+    {"from":"ACTIVE","to":"CANCELED","actor":"user|creator|admin|system"},
+    {"from":"PAST_DUE","to":"CANCELED","actor":"admin|system"},
+    {"from":"ACTIVE","to":"EXPIRED","actor":"system"},
+    {"from":"PAST_DUE","to":"EXPIRED","actor":"system"}
+  ],
+  "x-forbidden": [
+    {"from":"CANCELED","to":"ACTIVE"},
+    {"from":"EXPIRED","to":"ACTIVE"},
+    {"from":"EXPIRED","to":"CANCELED"}
+  ]
+}

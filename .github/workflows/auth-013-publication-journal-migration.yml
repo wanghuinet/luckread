@@ -1,0 +1,136 @@
+name: AUTH-013 D1-01 Publication Journal Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source commit containing the admitted journal migration
+        required: true
+        type: string
+      database_name:
+        description: Current Cloudflare display name for the D1-01 UUID bound in W02 wrangler.jsonc
+        required: true
+        type: string
+      confirm:
+        description: Type APPLY to permit remote D1 mutation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact migration source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify W02 D1-01 binding
+        working-directory: workers/W02-content
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const c = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'));
+          const d = c.d1_databases?.find((x) => x.binding === 'D1_01');
+          if (!d) throw new Error('D1_01 binding missing');
+          if (d.database_name !== process.env.EXPECTED_DB_NAME) throw new Error('database_name input does not match W02 D1_01 binding');
+          if (d.database_id !== process.env.EXPECTED_DB_ID) throw new Error('W02 D1-01 binding does not match controlled target UUID');
+          console.log(JSON.stringify(d, null, 2));
+          NODE
+        env:
+          EXPECTED_DB_NAME: ${{ inputs.database_name }}
+          EXPECTED_DB_ID: 2f80471e-3756-49f9-8db1-7707a433ad64
+
+      - name: Verify admitted migration source
+        run: |
+          test -f contracts/migration/AUTH-013-publication-journal.v1.json
+          test -f workers/W02-content/migrations/0003_auth_013_publication_journal.sql
+          test -z "$(git status --short)"
+
+      - name: Preflight controlled target
+        working-directory: workers/W02-content
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/artifacts/mapping-0/auth-013-journal-migration"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("auth_013_publication_journal");' > "$GITHUB_WORKSPACE/artifacts/mapping-0/auth-013-journal-migration/preflight-journal-schema.json"
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const schema = JSON.parse(fs.readFileSync(process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/auth-013-journal-migration/preflight-journal-schema.json', 'utf8'));
+          const rows = schema?.[0]?.results ?? [];
+          if (rows.length) throw new Error('AUTH-013 fail-closed: journal table already exists; stop rather than applying a duplicate migration');
+          console.log(JSON.stringify({ targetJournalPresent: false }));
+          NODE
+
+      - name: Apply AUTH-013 publication journal migration remotely
+        working-directory: workers/W02-content
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 d1 migrations apply "${{ inputs.database_name }}" --remote --config wrangler.jsonc
+
+      - name: Capture post-migration journal schema
+        working-directory: workers/W02-content
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("auth_013_publication_journal");' > "$GITHUB_WORKSPACE/artifacts/mapping-0/auth-013-journal-migration/post-journal-schema.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("auth_013_publication_journal");' > "$GITHUB_WORKSPACE/artifacts/mapping-0/auth-013-journal-migration/post-journal-indexes.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT * FROM d1_migrations ORDER BY id;' > "$GITHUB_WORKSPACE/artifacts/mapping-0/auth-013-journal-migration/d1-migrations.json"
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const root = process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/auth-013-journal-migration';
+          const schema = JSON.parse(fs.readFileSync(root + '/post-journal-schema.json', 'utf8'));
+          const indexes = JSON.parse(fs.readFileSync(root + '/post-journal-indexes.json', 'utf8'));
+          const rows = schema?.[0]?.results ?? [];
+          const indexRows = indexes?.[0]?.results ?? [];
+          const names = new Set(rows.map((r) => r.name));
+          const required = ['journal_id','event_id','event_type','schema_version','resource_id','source_version','payload','status','attempt','next_attempt_at','created_at','published_at','last_error_code'];
+          for (const name of required) if (!names.has(name)) throw new Error('Missing journal column: ' + name);
+          const journal = rows.find((r) => r.name === 'journal_id');
+          const eventId = rows.find((r) => r.name === 'event_id');
+          const sourceVersion = rows.find((r) => r.name === 'source_version');
+          const attempt = rows.find((r) => r.name === 'attempt');
+          if (!journal || journal.notnull !== 1 || journal.pk !== 1) throw new Error('journal_id must be NOT NULL primary key');
+          if (!eventId || eventId.notnull !== 1) throw new Error('event_id must be NOT NULL');
+          if (!sourceVersion || sourceVersion.type !== 'INTEGER' || sourceVersion.notnull !== 1) throw new Error('source_version must be required INTEGER');
+          if (!attempt || attempt.dflt_value !== '1') throw new Error('attempt default must be 1');
+          if (!indexRows.some((r) => r.name === 'auth_013_publication_journal_status_next_attempt_idx')) throw new Error('required status/next-attempt index missing');
+          console.log(JSON.stringify({ AUTH_013_PUBLICATION_JOURNAL_MIGRATION: 'PASS', columns: required, requiredIndex: 'auth_013_publication_journal_status_next_attempt_idx' }, null, 2));
+          NODE
+
+      - name: Capture migration provenance
+        run: |
+          mkdir -p artifacts/mapping-0/auth-013-journal-migration
+          {
+            echo "workflow=AUTH-013 D1-01 Publication Journal Migration"
+            echo "source_sha=${{ inputs.source_sha }}"
+            echo "database_name=${{ inputs.database_name }}"
+            echo "database_id=2f80471e-3756-49f9-8db1-7707a433ad64"
+            echo "migration=0003_auth_013_publication_journal.sql"
+            echo "remote_mutation=true"
+            echo "scope=CONTROLLED_REMOTE_D1"
+          } > artifacts/mapping-0/auth-013-journal-migration/provenance.txt
+
+      - name: Upload controlled migration evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-013-journal-migration-${{ github.run_id }}
+          path: ${{ github.workspace }}/artifacts/mapping-0/auth-013-journal-migration/
+          if-no-files-found: error
+          retention-days: 14

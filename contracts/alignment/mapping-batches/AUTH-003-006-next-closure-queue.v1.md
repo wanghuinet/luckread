@@ -1,0 +1,184 @@
+# AUTH-003–AUTH-006 Next Closure Queue v1
+
+Status: `EXECUTION_QUEUE_FROZEN / AUTH-003 RUNTIME-PERSISTENCE ADMISSION; AUTH-004 AFTER AUTH-003`
+
+## Purpose
+
+Batch the next Mapping-0 closure work for AUTH-003 through AUTH-006 without manufacturing API/DTO semantics. This artifact records the exact closure inputs that must be decided or evidenced before canonical OpenAPI/DTO promotion.
+
+## Authority rule
+
+`DEFINED != MAPPED != IMPLEMENTED != VERIFIED != GREEN`.
+
+Existing feature contracts establish operation identities and security obligations, but unresolved wire schemas must not be inferred from entity fields, persistence mappings, implementation types, generated types, examples, or archived contracts.
+
+## AUTH-003 — Credential Management
+
+### Already established
+
+- Operations: `authCredentialList`, `authCredentialAdd`, `authCredentialReplace`, `authCredentialRemove`.
+- Routes: `/auth/credentials` and `/auth/credentials/{credentialId}`.
+- DTO identifiers are contractually named.
+- Self scope and `user.credential.manage` authorization are established.
+- Mutating operations require `Idempotency-Key`.
+- Credential secret material and normalized values are non-public.
+
+### Closure queue
+
+1. Explicitly approve public projection for `kind`, `active`, `createdAt`, `updatedAt`, and any other allowed metadata.
+2. Freeze exact add/replace request fields, types, formats, requiredness, and validation rules.
+3. Freeze `credentialId` parameter schema.
+4. Freeze list envelope, item projection, ordering, cursor/limit semantics.
+5. Freeze success status/body semantics, including remove body vs `204 No Content`.
+6. Freeze generic conflict/error semantics without credential enumeration.
+7. Only then write OpenAPI schemas and promote DTO registry entries.
+
+## AUTH-004 — Password Change / Recovery
+
+### Already established
+
+- Operations: `authPasswordChange`, `authPasswordResetRequest`, `authPasswordResetConfirm`.
+- Change/reset lifecycle is a distinct contract surface.
+- Recovery-token lifecycle and session invalidation are downstream closure requirements.
+
+### Closure queue
+
+1. Freeze exact request/response schemas for all three operations.
+2. Freeze recovery-token representation and ownership/purpose binding.
+3. Freeze expiry, single-use, replay and invalidation semantics.
+4. Freeze status/error mapping with enumeration resistance.
+5. Bind session invalidation behavior to the approved lifecycle contract.
+6. Only then promote OpenAPI/DTO mappings.
+
+## AUTH-005 — Identity Verification
+
+### Already established
+
+- Operations: `authVerificationRequest`, `authVerificationConfirm`, `authVerificationRevoke`.
+- Verification challenge lifecycle is a distinct contract surface.
+
+### Closure queue
+
+1. Freeze challenge request/response schemas.
+2. Freeze challenge/token representation without exposing secret material.
+3. Freeze purpose, account binding, expiry and single-use semantics.
+4. Freeze revoke semantics and post-revoke behavior.
+5. Freeze wrong-purpose, expired, replay and concurrency error semantics.
+6. Only then promote OpenAPI/DTO mappings.
+
+## AUTH-006 — Passkey / WebAuthn
+
+### Already established
+
+- Current contract terminology is `passkey` + `assertion`; do not regress to the earlier draft `authentication` naming.
+- Operations: registration options/verify, assertion options/verify, remove.
+- RP-ID/origin/challenge and verification are downstream security/persistence concerns.
+
+### Closure queue
+
+1. Freeze exact WebAuthn registration-options schema.
+2. Freeze registration verification request/response schema.
+3. Freeze assertion-options schema.
+4. Freeze assertion-verification request/response schema.
+5. Freeze passkey removal parameter/body/status semantics.
+6. Freeze RP-ID/origin/challenge representation and secret handling rules.
+7. Freeze failure semantics for invalid origin/RP-ID, expired/replayed challenge, and failed assertion.
+8. Only then promote OpenAPI/DTO mappings.
+
+## Batch execution order
+
+`AUTH-003 wire projection → AUTH-003 OpenAPI/DTO → AUTH-004 wire contract → AUTH-004 OpenAPI/DTO → AUTH-005 wire contract → AUTH-005 OpenAPI/DTO → AUTH-006 WebAuthn wire contract → AUTH-006 OpenAPI/DTO → Mapping-0 reconciliation`.
+
+The work may be prepared in parallel, but promotion remains per-feature and fail-closed.
+
+## Prohibited shortcuts
+
+- No DTO schema synthesis from entity fields.
+- No OpenAPI schema synthesis from DTO identifier names.
+- No migration/persistence mapping promotion from physical-name guesses.
+- No Evidence Registry IDs created merely to satisfy mapping rows.
+- No GREEN status until executable evidence is bound to the tested commit SHA.
+
+## Current batch disposition
+
+`AUTH-003: WIRE_SCHEMA_CLOSED / RUNTIME_PERSISTENCE_BLOCKED`
+
+`AUTH-004: BLOCKED_ON_EXPLICIT_WIRE_CONTRACT`
+
+`AUTH-005: BLOCKED_ON_EXPLICIT_WIRE_CONTRACT`
+
+`AUTH-006: BLOCKED_ON_EXPLICIT_WEBAUTHN_WIRE_CONTRACT`
+
+`Mapping-0: BLOCKED_UNTIL_CANONICAL_DTO_AND_OPENAPI_INPUTS_EXIST`
+
+## Next concrete action
+
+AUTH-003 wire closure is already recorded as closed. Do not reopen or repeat its wire-authority work unless an authoritative input changes. The current closure unit is AUTH-003 runtime/persistence/evidence admission under existing contracts. Resolve operation-policy authority and physical persistence mapping before runtime/migration implementation admission. AUTH-004 remains downstream and must not leapfrog the current AUTH-003 admission gate.
+
+## 2026-09-26 AUTH-003 wire closure
+
+The explicit public wire-schema authority has been accepted and encoded in the canonical API contract, OpenAPI, API Inventory source and DTO registry. The remaining AUTH-003 blockers are D1 persistence, runtime implementation, normalization/uniqueness execution evidence, security-E2E evidence, durable Evidence Registry binding and final Mapping-0 reconciliation.
+
+
+## 2026-09-27 — Current continuation override / AUTH-003 runtime-persistence admission
+
+The previously appended `AUTH-003 wire closure` is retained as historical source evidence. The current Mapping 0 continuation cursor now supersedes the older batch wording that named AUTH-004 as the next execution unit.
+
+Current authoritative continuation:
+`AUTH-003 runtime/persistence/evidence closure under existing contracts`
+
+State:
+`BLOCKED — RUNTIME/PERSISTENCE IMPLEMENTATION ADMISSION REQUIRED`
+
+Current blockers:
+- AUTH-003 operation-policy resource/cache/retry/event/queue/anti-abuse authority is incomplete.
+- AUTH-003 physical D1 table/column/index/constraint authority remains `PENDING_SCHEMA_EVIDENCE`.
+- AUTH-003 runtime implementation and migration execution are not admitted.
+- ENT-IDENTITY and ENT-CREDENTIAL remain contract-only/proposed.
+- No Evidence Registry promotion or Mapping 0 GREEN promotion is permitted.
+
+This continuation override does not reopen AUTH-003 wire/OpenAPI/DTO work and does not authorize implementation by inference.
+
+
+## 2026-09-27 — Superseding continuation after wire/API/DTO reconciliation
+
+The prior runtime-persistence continuation is preserved as historical traceability. It is superseded for current execution because the following inputs are now closed:
+
+- operation-policy/task authority = PASS_VERIFIED;
+- AUTH-003 physical D1 mapping = evidenced for the admitted credential-add slice;
+- AUTH-003 OpenAPI/DTO wire schema = encoded and API Contract CI validated;
+- canonical AUTH-003 DTO bindings exist in `contracts/dto/auth-dto-contract.v1.json` and `contracts/dto/auth-dto-records.v1.json`;
+- credential-add runtime/security/concurrency evidence is admitted and VERIFIED.
+
+Current authoritative continuation:
+
+`AUTH-003 runtime lifecycle closure`
+
+State:
+
+`BLOCKED — CREDENTIAL-LIST RUNTIME/EVIDENCE REQUIRED`
+
+Current blockers:
+
+- `authCredentialList`, `authCredentialReplace`, and `authCredentialRemove` runtime/evidence are not yet admitted;
+- ENT-IDENTITY and ENT-CREDENTIAL catalog promotion remains blocked until full lifecycle reconciliation;
+- Mapping 0 / Five-Way remains globally NOT_GREEN.
+
+No wire-schema reopening, migration rerun, D1 mutation, or Mapping 0 GREEN promotion is authorized by this continuation.
+
+
+## 2026-09-28 — current execution cursor supersession
+
+The AUTH-003 continuation entries above are preserved as historical closure-queue traceability.
+
+For present Mapping 0 work selection, the dedicated cursor
+`artifacts/mapping-0/current-execution-cursor-2026-09-27.json`
+is the authoritative current execution source and supersedes the earlier AUTH-003 "Current authoritative continuation" wording.
+
+Current execution state:
+`AUTH-001-REGISTRATION-CLOSURE / BLOCKED_PRIV004_POLICY_INSTANCE`
+
+Current gate:
+admit the first approved `ACCOUNT_REGISTRATION / LEGAL_AUDIT` PRIV-004 policy instance with version, scope, effective period, deterministic rule, approval and provenance evidence.
+
+This supersession does not reopen or invalidate the AUTH-003 wire/runtime evidence already admitted, and it does not authorize any new AUTH-003 runtime rerun or Mapping 0 promotion.

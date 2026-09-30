@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract": "change-impact",
+  "version": "1.0.0",
+  "status": "NOT_GREEN",
+  "records": [],
+  "blockers": [
+    {
+      "id": "CHANGE-IMPACT-BOOTSTRAP-001",
+      "status": "BLOCKED",
+      "reason": "Impact records cannot be considered complete before the five-way reconciliation graph exists.",
+      "requiredNextStep": "Build impact records from the reconciled Feature/Capability/API/DTO/Entity/Database/Payload/Code/Security/Lifecycle graph."
+    }
+  ],
+  "sourceOfTruth": {
+    "step7": "docs/PRE-CONTRACT-STEP-7-RECONCILIATION-CHANGE-IMPACT-v1.0.md",
+    "mapping": "docs/PRE-CONTRACT-STEP-6-FIVE-WAY-MAPPING-REGISTRY-v1.0.md"
+  }
+}

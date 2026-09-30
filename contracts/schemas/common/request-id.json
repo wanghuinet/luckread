@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/common/request-id.json",
+  "title": "Request ID",
+  "description": "Stable request correlation identifier returned by the API.",
+  "type": "string",
+  "minLength": 5,
+  "maxLength": 128,
+  "pattern": "^req_[A-Za-z0-9_-]+$"
+}

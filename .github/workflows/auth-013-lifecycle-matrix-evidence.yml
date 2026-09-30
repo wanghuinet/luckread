@@ -1,0 +1,203 @@
+name: AUTH-013 Lifecycle Matrix Runtime Evidence
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact current main source containing the admitted AUTH-013 transition kernel
+        required: true
+        type: string
+      database_name:
+        description: Current Cloudflare display name for D1-01
+        required: true
+        type: string
+      confirm:
+        description: Type RUN to execute the controlled remote lifecycle evidence
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  lifecycle-matrix:
+    if: ${{ inputs.confirm == 'RUN' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      D1_01_ID: "2f80471e-3756-49f9-8db1-7707a433ad64"
+      DATABASE_NAME: ${{ inputs.database_name }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Checkout exact current source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify exact evidence admission inputs
+        run: |
+          set -euo pipefail
+          test "${{ inputs.source_sha }}" = "56908b2f49845428db7c36520d0d989e70256e33"
+          test "${{ inputs.database_name }}" = "luckread"
+          test -f workers/W02-content/src/account/account-state-transition.ts
+          test -f contracts/state-machines/account.json
+          test -f contracts/events/identity-account-state-changed.v1.json
+          test -z "$(git status --short)"
+      - name: Validate Cloudflare credentials
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+      - name: Prepare ephemeral remote D1 lifecycle harness
+        run: |
+          set -euo pipefail
+          cat > .auth-013-lifecycle.wrangler.jsonc <<EOF
+          {
+            "\$schema": "./node_modules/wrangler/config-schema.json",
+            "name": "luckread-auth013-lifecycle-evidence-harness",
+            "main": ".auth-013-lifecycle-harness.ts",
+            "compatibility_date": "2025-08-15",
+            "d1_databases": [
+              {
+                "binding": "D1_01",
+                "database_name": "$DATABASE_NAME",
+                "database_id": "$D1_01_ID",
+                "remote": true
+              }
+            ]
+          }
+          EOF
+          cat > .auth-013-lifecycle-harness.ts <<'EOF'
+          // CI-only ephemeral harness. Synthetic User/session/journal rows are cleaned.
+          // @ts-nocheck
+          import { applyAccountStateTransition } from './workers/W02-content/src/account/account-state-transition.ts'
+          const json = (body, status=200) => new Response(JSON.stringify(body, null, 2), {status,headers:{'content-type':'application/json'}})
+          const transition = async (db, input) => {
+            try { return {ok:true, result:await applyAccountStateTransition(db,input)} }
+            catch (e) { return {ok:false,error:{code:e?.code??'UNKNOWN',message:String(e?.message??e)}} }
+          }
+          export default {
+            async fetch(request, env) {
+              if (request.method !== 'POST' || new URL(request.url).pathname !== '/__auth013_lifecycle_probe') return new Response(null,{status:404})
+              const db=env.D1_01, uid=900013900+(Date.now()%100000), sid='auth013-session-'+uid, email='auth013-lifecycle-'+uid+'@invalid.local', username='auth013-lifecycle-'+uid, now='2026-09-29T05:30:00.000Z'
+              let iu=false, is=false
+              try {
+                await db.prepare('INSERT INTO users (id,email,username,account_state,account_state_version) VALUES (?,?,?,?,?)').bind(uid,email,username,'ACTIVE',1).run(); iu=true
+                await db.prepare('INSERT INTO auth_session_state (session_id,user_id,device_id,token_version,refresh_credential_hash,revoked_at,last_seen_at) VALUES (?,?,?,?,?,NULL,?)').bind(sid,String(uid),'auth013-device-'+uid,1,'synthetic-refresh-'+uid,now).run(); is=true
+                const base={userId:String(uid),reason:'AUTH-013 lifecycle matrix evidence',now,correlationId:'auth013-lifecycle-'+uid,causationId:'auth013-lifecycle-'+uid}
+                const s={}
+                s.r=await transition(db,{...base,expectedVersion:1,to:'RESTRICTED',actor:{id:'auth013-operator',type:'operator'},permission:'user.restrict.limited'})
+                s.f=await transition(db,{...base,expectedVersion:2,to:'FROZEN',actor:{id:'auth013-operator',type:'operator'},permission:'user.freeze'})
+                const sb=await db.prepare('SELECT revoked_at FROM auth_session_state WHERE session_id=?').bind(sid).first()
+                s.s=await transition(db,{...base,expectedVersion:3,to:'SUSPENDED',actor:{id:'auth013-admin',type:'admin'},permission:'user.suspend'})
+                const sa=await db.prepare('SELECT revoked_at FROM auth_session_state WHERE session_id=?').bind(sid).first()
+                s.b0=await transition(db,{...base,expectedVersion:4,to:'BANNED',actor:{id:'auth013-admin',type:'admin'},permission:'user.ban'})
+                const rb=await db.prepare('SELECT account_state,account_state_version FROM users WHERE id=?').bind(uid).first()
+                s.b=await transition(db,{...base,expectedVersion:4,to:'BANNED',actor:{id:'auth013-admin',type:'admin'},permission:'user.ban',approvalLevel:'L7'})
+                const sbn=await db.prepare('SELECT revoked_at FROM auth_session_state WHERE session_id=?').bind(sid).first()
+                s.ba=await transition(db,{...base,expectedVersion:5,to:'ACTIVE',actor:{id:'auth013-admin',type:'admin'},permission:'user.restore',approvalLevel:'L7'})
+                s.br=await transition(db,{...base,expectedVersion:5,to:'RESTORED',actor:{id:'auth013-admin',type:'admin'},permission:'user.restore',approvalLevel:'L7'})
+                s.ra=await transition(db,{...base,expectedVersion:6,to:'ACTIVE',actor:{id:'auth013-system',type:'system'},permission:'system.job'})
+                const fu=await db.prepare('SELECT account_state,account_state_version FROM users WHERE id=?').bind(uid).first()
+                const jr=await db.prepare('SELECT event_type,source_version FROM auth_013_publication_journal WHERE resource_id=? ORDER BY source_version').bind(String(uid)).all()
+                const checks={
+                  restricted:s.r.ok&&s.r.result.accountStateVersion===2,
+                  frozen:s.f.ok&&s.f.result.accountStateVersion===3,
+                  suspended:s.s.ok&&s.s.result.accountStateVersion===4,
+                  suspensionRevokesSession:sb?.revoked_at==null&&typeof sa?.revoked_at==='string'&&sa.revoked_at.length>0,
+                  banApprovalRequired:!s.b0.ok&&s.b0.error.code==='FORBIDDEN',
+                  rejectedBanNoMutation:rb?.account_state==='SUSPENDED'&&Number(rb?.account_state_version)===4,
+                  banned:s.b.ok&&s.b.result.accountStateVersion===5,
+                  bannedRetainsRevocation:typeof sbn?.revoked_at==='string'&&sbn.revoked_at.length>0,
+                  directBannedToActiveForbidden:!s.ba.ok&&s.ba.error.code==='INVALID_STATE',
+                  restored:s.br.ok&&s.br.result.accountStateVersion===6,
+                  restoredToActive:s.ra.ok&&s.ra.result.accountStateVersion===7,
+                  finalState:fu?.account_state==='ACTIVE'&&Number(fu?.account_state_version)===7,
+                  journalVersions:JSON.stringify((jr.results??[]).map(x=>Number(x.source_version)))===JSON.stringify([2,3,4,5,6,7]),
+                  canonicalEvents:(jr.results??[]).every(x=>x.event_type==='identity.account_state_changed')
+                }
+                for(const [k,v] of Object.entries(checks)) if(!v) throw new Error('AUTH-013 lifecycle assertion failed: '+k)
+                return json({status:'PASS',environment:'CONTROLLED_REMOTE_D1_LIFECYCLE_MATRIX',testUserId:uid,sessionId:sid,steps:s,observed:{sb,sa,sbn,fu,journal:jr.results},checks})
+              } catch(e) { return json({status:'RUNTIME_EXCEPTION',testUserId:uid,error:{message:String(e?.message??e),code:String(e?.code??'')}},500) }
+              finally {
+                if(is) await db.prepare('DELETE FROM auth_session_state WHERE session_id=?').bind(sid).run()
+                if(iu){await db.prepare('DELETE FROM auth_013_publication_journal WHERE resource_id=?').bind(String(uid)).run(); await db.prepare('DELETE FROM users WHERE id=?').bind(uid).run()}
+                const cu=await db.prepare('SELECT COUNT(*) count FROM users WHERE id=?').bind(uid).first(), cs=await db.prepare('SELECT COUNT(*) count FROM auth_session_state WHERE session_id=?').bind(sid).first(), cj=await db.prepare('SELECT COUNT(*) count FROM auth_013_publication_journal WHERE resource_id=?').bind(String(uid)).first()
+                if(Number(cu?.count??-1)!==0||Number(cs?.count??-1)!==0||Number(cj?.count??-1)!==0) throw new Error('AUTH-013 lifecycle evidence cleanup failed')
+              }
+            }
+          }
+          EOF
+      - name: Start and execute ephemeral remote Worker lifecycle harness
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/auth-013-lifecycle
+          npx --yes wrangler@4.116.0 dev --remote --config .auth-013-lifecycle.wrangler.jsonc --ip 127.0.0.1 --port 8788 > auth-013-lifecycle-harness.log 2>&1 &
+          echo $! > auth-013-lifecycle-harness.pid
+          ready=0
+          for _ in $(seq 1 90); do
+            if ! kill -0 "$(cat auth-013-lifecycle-harness.pid)" 2>/dev/null; then
+              cat auth-013-lifecycle-harness.log
+              exit 1
+            fi
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8788/__auth013_lifecycle_probe || true)
+            if [ "$code" != "000" ]; then
+              sleep 2
+              if ! kill -0 "$(cat auth-013-lifecycle-harness.pid)" 2>/dev/null; then
+                cat auth-013-lifecycle-harness.log
+                exit 1
+              fi
+              verify_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8788/__auth013_lifecycle_probe || true)
+              if [ "$verify_code" != "000" ]; then ready=1; break; fi
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat auth-013-lifecycle-harness.log
+            exit 1
+          fi
+
+          set +e
+          http_code=$(curl -sS -o artifacts/mapping-0/auth-013-lifecycle/runtime-result.json -w '%{http_code}' -X POST --max-time 30 http://127.0.0.1:8788/__auth013_lifecycle_probe)
+          curl_exit=$?
+          set -e
+          echo "AUTH_013_LIFECYCLE_HTTP_STATUS=$http_code"
+          echo "AUTH_013_LIFECYCLE_CURL_EXIT=$curl_exit"
+          echo "--- runtime result ---"
+          cat artifacts/mapping-0/auth-013-lifecycle/runtime-result.json || true
+          echo "--- wrangler harness log ---"
+          cat auth-013-lifecycle-harness.log || true
+          test "$curl_exit" = "0"
+          test "$http_code" = "200"
+
+          node - <<'NODE'
+          const fs=require('node:fs')
+          const r=JSON.parse(fs.readFileSync('artifacts/mapping-0/auth-013-lifecycle/runtime-result.json','utf8'))
+          if(r.status!=='PASS') throw new Error('AUTH-013 lifecycle matrix did not PASS')
+          for(const [k,v] of Object.entries(r.checks||{})) if(!v) throw new Error('AUTH-013 lifecycle assertion failed: '+k)
+          console.log('AUTH_013_LIFECYCLE_MATRIX=PASS')
+          NODE
+      - name: Capture provenance
+        run: |
+          cat > artifacts/mapping-0/auth-013-lifecycle/provenance.txt <<EOF
+          workflow=AUTH-013 Lifecycle Matrix Runtime Evidence
+          source_sha=${{ inputs.source_sha }}
+          database_name=$DATABASE_NAME
+          database_id=$D1_01_ID
+          environment=CONTROLLED_REMOTE_D1_LIFECYCLE_MATRIX
+          synthetic_data_cleanup=true
+          EOF
+          cat auth-013-lifecycle-harness.log >> artifacts/mapping-0/auth-013-lifecycle/wrangler-harness.log
+      - name: Upload lifecycle evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-013-lifecycle-matrix-evidence-${{ github.run_id }}
+          path: artifacts/mapping-0/auth-013-lifecycle/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Cleanup ephemeral runtime
+        if: ${{ always() }}
+        run: |
+          if [ -f auth-013-lifecycle-harness.pid ]; then kill "$(cat auth-013-lifecycle-harness.pid)" 2>/dev/null || true; fi
+          rm -f .auth-013-lifecycle-harness.ts .auth-013-lifecycle.wrangler.jsonc

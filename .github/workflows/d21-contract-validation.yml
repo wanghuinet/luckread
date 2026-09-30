@@ -1,0 +1,45 @@
+name: D21 Contract Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/d21-*'
+      - 'scripts/d21-contract-validator.py'
+      - '.github/workflows/d21-contract-validation.yml'
+  pull_request:
+    paths:
+      - 'docs/d21-*'
+      - 'scripts/d21-contract-validator.py'
+      - '.github/workflows/d21-contract-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  d21-contract:
+    name: D21 Cross-Registry Contract Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install YAML parser
+        run: python -m pip install --disable-pip-version-check --no-input PyYAML==6.0.2
+      - name: Validate D21 registries
+        run: python scripts/d21-contract-validator.py
+      - name: Emit evidence summary
+        if: always()
+        run: |
+          {
+            echo '## D21 Contract Evidence'
+            echo ''
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Workflow: $GITHUB_WORKFLOW"
+            echo "- Run: $GITHUB_RUN_ID"
+            echo "- Validator: scripts/d21-contract-validator.py"
+          } >> "$GITHUB_STEP_SUMMARY"

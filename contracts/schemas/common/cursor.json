@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/common/cursor.json",
+  "title": "Opaque Cursor",
+  "description": "Opaque pagination cursor. Clients MUST NOT parse or construct cursor contents.",
+  "type": "string",
+  "minLength": 1,
+  "maxLength": 2048
+}

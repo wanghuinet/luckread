@@ -1,0 +1,44 @@
+name: W03 Content Runtime CI
+
+on:
+  pull_request:
+    paths:
+      - "workers/W03-feed/**"
+      - "contracts/persistence/CONTENT-ARTICLE-d1-02-persistence.v1.json"
+      - "contracts/transport/W01-W03-content-http-binding.v1.json"
+      - "contracts/openapi/v1/openapi.yaml"
+  push:
+    branches: ["main"]
+    paths:
+      - "workers/W03-feed/**"
+
+permissions:
+  contents: read
+
+jobs:
+  content-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run W03 content unit tests
+        run: npx --yes vitest@3.2.4 run workers/W03-feed/src/content-runtime.test.ts workers/W03-feed/src/publish-preflight.test.ts
+
+      - name: Typecheck W03 content runtime
+        run: >
+          npx --no-install tsc --noEmit --strict --skipLibCheck
+          --target ES2022 --module ESNext --moduleResolution Bundler
+          --lib ES2022,DOM --types @cloudflare/workers-types
+          workers/W03-feed/src/content-runtime.ts
+          workers/W03-feed/src/publish-preflight.ts
+          workers/W03-feed/src/index.ts

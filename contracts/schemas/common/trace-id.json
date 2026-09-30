@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/common/trace-id.json",
+  "title": "Trace ID",
+  "description": "Distributed-tracing correlation identifier. Optional at the API boundary, but MUST be propagated whenever tracing is enabled for the request.",
+  "type": "string",
+  "minLength": 1,
+  "maxLength": 128,
+  "pattern": "^[A-Za-z0-9._:-]+$"
+}

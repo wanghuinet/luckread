@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.0",
+  "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "batch": "M",
+  "domain": "M. Community",
+  "status": "NOT_GREEN",
+  "records": [
+    {"featureId":"COMMUNITY-001","name":"community/channel","hierarchy":{"l1":"M. Community","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"COMMUNITY-002","name":"group/thread","hierarchy":{"l1":"M. Community","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"COMMUNITY-003","name":"community rules","hierarchy":{"l1":"M. Community","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"COMMUNITY-004","name":"moderator roles","hierarchy":{"l1":"M. Community","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"COMMUNITY-005","name":"member levels/badges","hierarchy":{"l1":"M. Community","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"COMMUNITY-006","name":"community moderation","hierarchy":{"l1":"M. Community","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"COMMUNITY-007","name":"slow mode/rate controls","hierarchy":{"l1":"M. Community","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null},
+    {"featureId":"COMMUNITY-008","name":"community events","hierarchy":{"l1":"M. Community","l2":null,"l3":null,"l4":null},"reconciliationState":"BLUEPRINT_ONLY","admissionState":null}
+  ]
+}

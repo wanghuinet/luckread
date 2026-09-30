@@ -1,0 +1,168 @@
+{
+  "version": "1.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "entityId": "ENT-SOCIAL-FOLLOW",
+  "featureRefs": [
+    "SOCIAL-001",
+    "SOCIAL-002"
+  ],
+  "sourceRefs": [
+    "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+    "docs/11-P0-SOCIAL-INTERACTION-AND-EVENT-CONTRACT-v1.0.md",
+    "docs/54-SOCIAL-COMMUNITY-SYSTEM-CONTRACT-v1.0.md",
+    "docs/188-L5-L6-SOCIAL-COMMUNITY-INTERACTION-INSTANCE-REGISTRY-v1.0.md",
+    "contracts/api/interaction-operation-policy.v1.json",
+    "docs/02-FINAL-MAPPING-v1.0.md",
+    "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
+  ],
+  "authority": {
+    "domainId": "D1-02",
+    "classification": "AUTHORITATIVE",
+    "primaryTask": "T11",
+    "primaryWorker": "W05",
+    "entityStatus": "PROPOSED_UNTIL_PERSISTENCE_AND_RUNTIME_EVIDENCE"
+  },
+  "fields": [
+    {
+      "fieldId": "ENT-SOCIAL-FOLLOW-F-RELATIONSHIP-ID",
+      "name": "relationshipId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": true,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_IDENTIFIER",
+      "apiExposure": "SCOPED_IDENTIFIER",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED_IDENTIFIER",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "Every Follow relation is an independently addressable, auditable relation instance and its identifier is never reused."
+    },
+    {
+      "fieldId": "ENT-SOCIAL-FOLLOW-F-FOLLOWER-USER-ID",
+      "name": "followerUserId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_RELATION",
+      "apiExposure": "NONE",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED_IDENTIFIER",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "The authoritative actor of a Follow relation must remain bound to exactly one ENT-USER identity for the relation lifetime."
+    },
+    {
+      "fieldId": "ENT-SOCIAL-FOLLOW-F-TARGET-USER-ID",
+      "name": "targetUserId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_RELATION",
+      "apiExposure": "NONE",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED_IDENTIFIER",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "The target of a Follow relation must remain bound to exactly one authoritative ENT-USER identity for the relation lifetime."
+    },
+    {
+      "fieldId": "ENT-SOCIAL-FOLLOW-F-CREATED-AT",
+      "name": "createdAt",
+      "type": "datetime",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "AUDIT_METADATA",
+      "apiExposure": "SCOPED",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
+      "credentialMaterial": false,
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "authorityReason": "Creation time supports stable pagination, audit lineage and deterministic relation ordering."
+    }
+  ],
+  "constraints": {
+    "uniqueActiveRelation": [
+      "followerUserId",
+      "targetUserId"
+    ],
+    "indexes": [
+      [
+        "followerUserId",
+        "createdAt"
+      ],
+      [
+        "targetUserId",
+        "createdAt"
+      ]
+    ]
+  },
+  "lifecycle": {
+    "create": "Canonical follow operation creates exactly one active relation after account, target, privacy, block and scope checks pass.",
+    "duplicateCreate": "Duplicate follow converges to the existing active relation and returns the operation-defined idempotent success.",
+    "remove": "Canonical unfollow operation atomically removes the active relation if present.",
+    "missingRemove": "Removing a missing relation is an idempotent success.",
+    "identifier": "relationshipId is never reused after relation removal.",
+    "derivedState": "Follower/following counts and ranking/analytics state are rebuildable projections and are not stored as authoritative fields here."
+  },
+  "security": {
+    "actorSource": "Authenticated server-side principal only.",
+    "targetSource": "Request target is resolved against authoritative ENT-USER.",
+    "policyChecks": [
+      "account state",
+      "target followability",
+      "block policy",
+      "privacy/audience scope",
+      "tenant/scope isolation",
+      "anti-abuse/rate limit"
+    ],
+    "clientTrust": [
+      "client cannot choose followerUserId authoritatively",
+      "client cannot supply or overwrite relationship state",
+      "client cannot supply follower/following counters"
+    ]
+  },
+  "nonGoals": [
+    "No Payload Collection authority.",
+    "No D1 table or migration claim.",
+    "No idempotency-store field.",
+    "No event-envelope duplication.",
+    "No follower/following counter fields.",
+    "No cache as source of truth.",
+    "No runtime implementation claim.",
+    "No VERIFIED promotion without persistence and executable evidence."
+  ],
+  "verificationRequirements": {
+    "requiredEvidence": [
+      "entity catalog admission",
+      "field registry admission",
+      "canonical DTO binding",
+      "persistence table/column mapping",
+      "unique constraint and index evidence",
+      "W05 physical Worker binding",
+      "W05-to-D1-02 execution evidence",
+      "follow duplicate-idempotency runtime test",
+      "unfollow-missing idempotency runtime test",
+      "concurrency race test",
+      "block/privacy/security negative tests",
+      "event producer evidence",
+      "cache/projection convergence evidence",
+      "Evidence Registry record with validating commit SHA",
+      "persistence contract binds the four entity fields to one D1-02 authoritative relation table"
+    ],
+    "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the full executable persistence/runtime/evidence chain is admitted."
+  },
+  "persistenceContract": "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
+  "persistenceStatus": "CONTRACTED_NOT_VERIFIED"
+}

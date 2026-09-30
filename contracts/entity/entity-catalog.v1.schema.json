@@ -1,0 +1,19 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/entity/entity-catalog.v1.schema.json",
+  "type":"object","additionalProperties":false,
+  "required":["version","status","sourceOfTruth","records"],
+  "properties":{
+    "version":{"const":"1.0"},
+    "status":{"enum":["NOT_GREEN","GREEN"]},
+    "sourceOfTruth":{"type":"string","minLength":1},
+    "records":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["entityId","name","domainId","classification","status","evidenceRefs"],"properties":{
+      "entityId":{"type":"string","pattern":"^ENT-[A-Z0-9-]+$"},
+      "name":{"type":"string","minLength":1},
+      "domainId":{"type":"string","minLength":1},
+      "classification":{"enum":["AUTHORITATIVE","AUTHORIZATION","BILLING","PROJECTION","SYSTEM"]},
+      "status":{"enum":["PROPOSED","VERIFIED","RETIRED","BLOCKED"]},
+      "evidenceRefs":{"type":"array","items":{"type":"string","minLength":1},"minItems":1,"uniqueItems":true}
+    }}}
+  }
+}
