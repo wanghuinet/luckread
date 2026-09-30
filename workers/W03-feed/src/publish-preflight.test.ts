@@ -94,7 +94,7 @@ describe('W03 publish preflight', () => {
     })
     expect(result.analyzed.phoneCount).toBeGreaterThanOrEqual(17)
     expect(result.analyzed.mobileNumberCount).toBeGreaterThanOrEqual(16)
-    expect(result.analyzed.detectedPhoneRegions).toEqual(expect.arrayContaining([
+    expect(result.analyzed.detectedMobileRegions).toEqual(expect.arrayContaining([
       'China (+86)',
       'United States/Canada (NANP)',
       'United Kingdom (+44)',
