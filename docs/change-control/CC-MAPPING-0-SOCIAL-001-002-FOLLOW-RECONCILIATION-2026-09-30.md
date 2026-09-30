@@ -78,6 +78,30 @@ Relevant existing semantic claims include:
 
 This strengthens the semantic-contract evidence for `SOCIAL-001/002`, but it still does not provide a canonical Entity ID, Field ID, migration/schema, executable W05 handler, runtime evidence, or Evidence Registry provenance.
 
+## Evidence Sweep — Current `main` Head
+
+At `main` = `87cfc42ae2f20bbccd3a8b002401555b1b4945ef`, the evidence sweep found:
+
+- `contracts/entity/entity-catalog.v1.json` contains 11 entity records and no Social/Follow entity record.
+- `contracts/entity/entity-field-contract.v1.json` contains 11 entity field groups and no canonical Social/Follow field group.
+- `contracts/entity/entity-implementation-evidence.v1.json` contains 11 entity implementation records and no Social/Follow implementation record.
+- `workers/W05-transaction/` currently contains only its `README.md`; there is no executable Follow handler there.
+- `workers/W04-social/` also contains only its `README.md`; it provides no executable Follow implementation and cannot be promoted to canonical ownership by directory inference.
+- The canonical Mapping and Five-Way records continue to show `SOCIAL-001` and `SOCIAL-002` as `UNRESOLVED` with empty Entity/API/Code bindings.
+
+This sweep closes the “maybe an existing canonical Follow entity/runtime is already present” question with negative repository evidence. It does not justify inventing a new Entity ID, Field ID, migration, or handler inside Mapping 0.
+
+## Current Gate Evidence
+
+For `main` head `87cfc42ae2f20bbccd3a8b002401555b1b4945ef`, the current structural/admission gates are passing:
+
+- Mapping 0 Structural Gate — success;
+- Contract Admission CI — success;
+- Ensure Feature Inventory — success;
+- AUTH-013 Persistence Schema Evidence — success.
+
+The separately observed failures in legacy/diagnostic workflow paths such as `.github/workflows/contract-ci.yml`, `.github/workflows/contract-admission-ci.yml`, and the W04 side-effect matrix are not used to override the active gate results. They are not evidence that Social Follow has become implementable.
+
 ## Remaining Blocking Edges
 
 The repository does not yet provide evidence sufficient to bind:
@@ -93,7 +117,7 @@ follow.created / follow.deleted producer binding
 cache invalidation/version evidence
 runtime positive/negative/concurrency/security evidence
 Evidence Registry provenance for SOCIAL-001/002
-`````text
+```
 
 These gaps keep both features `NOT_GREEN`.
 
