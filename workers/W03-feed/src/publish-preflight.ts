@@ -179,6 +179,11 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
     /(?:优惠|折扣|促销|下单|购买|付款|代理|加盟|招商|返利|赚钱|课程|咨询|推广|引流|私域|加V|加vx|加微信|扫码|私聊|联系我|添加好友)/gi,
     15,
   )
+  const contactKeywordSignals = firstMatches(
+    body,
+    /(?:微信|weixin|wx|威信|V信|vx|LINE|WhatsApp|Telegram|QQ|公众号|群聊|加群|邮箱|email|Instagram|Snapchat|Zalo|Discord|KakaoTalk|Signal|Viber)/gi,
+    20,
+  )
   const qrSignals = firstMatches(body, /(?:二维码|扫码|扫一扫|识别下方二维码)/gi, 8)
   const htmlSignals = firstMatches(body, /<\/?(?:script|style|iframe|object|embed|img|a\b)[^>]*>/gi, 8)
   const hiddenTextSignals = firstMatches(body, /(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|opacity\s*:\s*0)/gi, 8)
@@ -294,7 +299,7 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
     addFinding(
       findings,
       'MEDIA-QR',
-      qrSignals.length && (salesSignals.length || contactSignals.length) ? 'BLOCK' : 'WARN',
+      qrSignals.length && (salesSignals.length || contactKeywordSignals.length) ? 'BLOCK' : 'WARN',
       'MEDIA',
       '发现二维码/疑似推广媒体风险',
       '正文或媒体引用名出现二维码、扫码或疑似推广素材信号；当前版本不宣称已经完成图片像素级 OCR/二维码解码。',
