@@ -128,6 +128,7 @@ describe('Creator Center admin extension', () => {
 
   it('organizes the creator center around creator-first workflows', () => {
     const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const assistant = read('src/app/(payload)/admin/CreatorCenterAssistant.tsx')
     const styles = read('src/app/(payload)/admin/creator-center.module.css')
 
     expect(view).toContain('文章管理')
@@ -146,7 +147,10 @@ describe('Creator Center admin extension', () => {
     expect(view).toContain('id="publisher"')
     expect(view).toContain('id="quality"')
     expect(view).toContain('id="assets"')
-    expect(view).toContain('className={styles.floatingAssistant}')
+    expect(view).toContain('<CreatorCenterAssistant />')
+    expect(assistant).toContain('className={styles.floatingAssistant}')
+    expect(assistant).toContain('aria-controls="creator-check-assistant"')
+    expect(assistant).toContain("textContent?.trim() === '发布前自检'")
 
     expect(styles).toContain('.creatorLayout')
     expect(styles).toContain('.sidebar')
