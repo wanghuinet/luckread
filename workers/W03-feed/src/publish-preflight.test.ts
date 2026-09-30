@@ -12,6 +12,11 @@ describe('W03 publish preflight', () => {
     mediaRefs: [],
   }
 
+  it('does not treat a normal Chinese title as title noise', () => {
+    const result = preflightContent(base)
+    expect(result.findings.some(item => item.id === 'SEO-TITLE-NOISE')).toBe(false)
+  })
+
   it('passes a human-finished, structured article without obvious spam signals', () => {
     const result = preflightContent(base)
     expect(result.verdict).toBe('PASS')
