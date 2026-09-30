@@ -1,0 +1,112 @@
+{
+  "version": "1.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureIds": [
+    "SOCIAL-001",
+    "SOCIAL-002"
+  ],
+  "entityId": "ENT-SOCIAL-FOLLOW",
+  "persistenceContractRef": "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
+  "physicalBindingContractRef": "docs/change-control/CC-MAPPING-0-SOCIAL-001-W05-D1-02-PHYSICAL-BINDING-2026-09-30.md",
+  "dtoContractRef": "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-DTO-CONTRACT-2026-09-30.md",
+  "authority": {
+    "domainId": "D1-02",
+    "primaryTask": "T11",
+    "primaryWorker": "W05",
+    "workerName": "luckread-w05",
+    "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c"
+  },
+  "migration": {
+    "migrationId": "MIG-SOCIAL-001-FOLLOW-V1",
+    "migrationVersion": "20260930_001_SOCIAL_001_FOLLOW_V1",
+    "artifactPath": "workers/W05-transaction/migrations/20260930_001_social_001_follow_v1.sql",
+    "executionStatus": "NOT_EXECUTED",
+    "executionAuthority": "W05 bound to admitted D1-02 UUID only",
+    "forwardOnly": true,
+    "idempotent": true,
+    "transactionBoundary": "single D1 migration execution",
+    "preconditions": [
+      "W05-to-D1-02 physical binding evidence is present for the exact deployment SHA.",
+      "The target database UUID equals 6c342634-97f6-4248-9f4a-85772af4f22c.",
+      "No authoritative social_follow_relationships table exists with conflicting schema.",
+      "The migration artifact hash is recorded before execution."
+    ],
+    "postconditions": [
+      "social_follow_relationships exists with the contracted columns and primary key.",
+      "The active relation uniqueness constraint exists on (follower_user_id, target_user_id).",
+      "The follower pagination index exists on (follower_user_id, created_at).",
+      "The target pagination index exists on (target_user_id, created_at).",
+      "No cross-D1 physical foreign key is introduced.",
+      "Applied migration version is observable in the target database migration ledger."
+    ],
+    "ddl": {
+      "table": "social_follow_relationships",
+      "columns": [
+        {
+          "name": "relationship_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": true,
+          "fieldId": "ENT-SOCIAL-FOLLOW-F-RELATIONSHIP-ID"
+        },
+        {
+          "name": "follower_user_id",
+          "type": "TEXT",
+          "nullable": false,
+          "fieldId": "ENT-SOCIAL-FOLLOW-F-FOLLOWER-USER-ID"
+        },
+        {
+          "name": "target_user_id",
+          "type": "TEXT",
+          "nullable": false,
+          "fieldId": "ENT-SOCIAL-FOLLOW-F-TARGET-USER-ID"
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "nullable": false,
+          "fieldId": "ENT-SOCIAL-FOLLOW-F-CREATED-AT"
+        }
+      ],
+      "constraints": [
+        "UNIQUE (follower_user_id, target_user_id)"
+      ],
+      "indexes": [
+        "uq_social_follow_follower_target UNIQUE (follower_user_id, target_user_id)",
+        "ix_social_follow_follower_created (follower_user_id, created_at)",
+        "ix_social_follow_target_created (target_user_id, created_at)"
+      ]
+    },
+    "forbidden": [
+      "DROP TABLE social_follow_relationships as a routine rollback.",
+      "ALTER or rename contracted columns without a new admitted contract.",
+      "Add follower/following counters as authoritative columns.",
+      "Add a Payload Collection for Follow.",
+      "Add a cross-D1 foreign key to ENT-USER.",
+      "Create a second authoritative Follow table in another D1 domain.",
+      "Execute against a database UUID other than the admitted D1-02 UUID.",
+      "Claim migration success from planned, static, or local-only validation."
+    ]
+  },
+  "evidenceRequirements": [
+    "exact source SHA used for deployment",
+    "W05 deployed worker identity",
+    "live W05-to-D1-02 binding inspection",
+    "migration artifact path and content hash",
+    "migration execution run ID",
+    "applied migration version from the target D1 migration ledger",
+    "schema inspection proving columns, nullability and primary key",
+    "unique constraint inspection",
+    "index inspection",
+    "no cross-D1 foreign-key evidence",
+    "Evidence Registry record bound to the execution SHA"
+  ],
+  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, versioned migration artifact and executed D1 schema evidence all pass their respective gates.",
+  "nonGoals": [
+    "This contract does not execute a migration.",
+    "This contract does not deploy a Worker.",
+    "This contract does not add W05 runtime handlers.",
+    "This contract does not promote SOCIAL-001 to GREEN.",
+    "This contract does not promote SOCIAL-002 followers/following queries."
+  ]
+}
