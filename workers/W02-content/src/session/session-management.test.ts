@@ -7,7 +7,13 @@ import {
 
 const NOW = '2026-09-29T06:00:00.000Z'
 
-function listDb(rows: Array<Record<string, unknown>>) {
+function listDb(
+  rows: Array<Record<string, unknown>>,
+  authorization: { permissionAllowed: number; currentSessionValid: number } = {
+    permissionAllowed: 1,
+    currentSessionValid: 1,
+  },
+) {
   let seenSql = ''
   let seenArgs: unknown[] = []
   const db = {
@@ -18,7 +24,7 @@ function listDb(rows: Array<Record<string, unknown>>) {
           seenArgs = args
           return {
             all: async <T>() => ({ results: rows as T[] }),
-            first: async <T>() => ({ permissionAllowed: 1, currentSessionValid: 1, targetOwned: 1 } as T),
+            first: async <T>() => ({ ...authorization, targetOwned: 1 } as T),
           }
         },
       }
@@ -78,6 +84,17 @@ describe('AUTH-010 session list', () => {
       cursor: 'not-a-valid-cursor',
       now: NOW,
     })).rejects.toMatchObject({ code: 'INVALID_CURSOR' } satisfies Partial<SessionManagementError>)
+  })
+
+  it('fails closed when the current tokenVersion no longer matches the authoritative session', async () => {
+    const db = listDb([], { permissionAllowed: 1, currentSessionValid: 0 })
+
+    await expect(listCurrentUserSessions(db, {
+      userId: '42',
+      currentSessionId: 'sid-2',
+      tokenVersion: 3,
+      now: NOW,
+    })).rejects.toMatchObject({ code: 'UNAUTHENTICATED' } satisfies Partial<SessionManagementError>)
   })
 })
 
