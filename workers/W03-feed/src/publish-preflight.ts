@@ -230,6 +230,7 @@ const detectPhoneNumbers = (value: string): {
     const context = value.slice(start, end)
     const hasContext = PHONE_CONTEXT_RE.test(context)
     const hasFormatting = /[+\s().-]/.test(raw)
+    const hasExplicitInternationalPrefix = /^\s*(?:\+|00)/.test(raw)
 
     for (const rule of MOBILE_NUMBER_RULES) {
       const internationalMatch = digits.startsWith(rule.countryCode) &&
@@ -237,9 +238,11 @@ const detectPhoneNumbers = (value: string): {
       const nationalMatch = rule.national?.test(digits) ?? false
       if (!internationalMatch && !nationalMatch) continue
 
-      // Short local numbers and non-mobile NANP numbers need stronger context
-      // to avoid turning dates, IDs, or ordinary numeric strings into phones.
-      if ((!rule.mobileSpecific || digits.length <= 8) && !hasContext && !hasFormatting) continue
+      // A national-format number is only a candidate when formatting or nearby
+      // phone context exists. An explicit +/00 prefix is sufficient for an
+      // international-format candidate. This prevents bare IDs/order numbers
+      // from being misclassified as mobile numbers.
+      if (!hasExplicitInternationalPrefix && !hasContext && !hasFormatting) continue
 
       const key = rule.region + '|' + digits
       if (!dedupe.has(key)) {
