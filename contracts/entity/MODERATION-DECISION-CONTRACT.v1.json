@@ -9,16 +9,17 @@
     "GOV-004"
   ],
   "sourceRefs": [
-    "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
-    "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
-    "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
     "contracts/api/moderation-operation-policy.v1.json",
-    "contracts/dto/moderation-dto-contract.v1.json",
     "contracts/authz/permissions.json",
+    "contracts/dto/moderation-dto-contract.v1.json",
+    "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
+    "contracts/events/GOV-004-moderation-decision-audit-binding.v1.json",
+    "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
     "contracts/state-machines/content.json",
     "contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json",
+    "contracts/transport/W06-W03-content-moderation-http-binding.v1.json",
     "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
-    "contracts/events/GOV-004-moderation-decision-audit-binding.v1.json"
+    "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md"
   ],
   "authority": {
     "domainId": "D1-03",
@@ -335,7 +336,8 @@
     "audit evidence",
     "security E2E",
     "Evidence Registry record",
-    "decision audit one-to-one evidence"
+    "decision audit one-to-one evidence",
+    "W06→W03 content transition transport evidence"
   ],
   "persistenceContract": "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json"
 }
