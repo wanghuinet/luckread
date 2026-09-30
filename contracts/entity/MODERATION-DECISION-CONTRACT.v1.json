@@ -17,7 +17,8 @@
     "contracts/authz/permissions.json",
     "contracts/state-machines/content.json",
     "contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json",
-    "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+    "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
+    "contracts/events/GOV-004-moderation-decision-audit-binding.v1.json"
   ],
   "authority": {
     "domainId": "D1-03",
@@ -333,7 +334,8 @@
     "content transition transport evidence",
     "audit evidence",
     "security E2E",
-    "Evidence Registry record"
+    "Evidence Registry record",
+    "decision audit one-to-one evidence"
   ],
   "persistenceContract": "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json"
 }
