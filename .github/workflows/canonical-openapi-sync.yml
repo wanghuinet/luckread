@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   sync:
@@ -43,10 +42,5 @@ jobs:
             git push
           fi
 
-      - name: Dispatch Contract CI on canonical ref
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          validated_ref="$(git rev-parse HEAD)"
-          echo "Dispatching Contract CI for ${validated_ref}"
-          gh workflow run contract-ci.yml --ref "${validated_ref}"
+      - name: Rely on active Contract Admission CI
+        run: echo "Canonical sync completed; active Contract Admission CI v2 is triggered by the resulting main push."
