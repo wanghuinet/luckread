@@ -425,6 +425,36 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "getModerationCase",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "moderation.case.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/moderation-operation-policy.v1.json"
+    },
+    {
+      "operationId": "listModerationQueue",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "moderation.queue.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/moderation-operation-policy.v1.json"
+    },
+    {
       "operationId": "getArticlesArticleId",
       "auth": {
         "mode": "permission"
@@ -1406,6 +1436,21 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "decideModerationCase",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "moderation.decide"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/moderation-operation-policy.v1.json"
     },
     {
       "operationId": "postAnalyticsBatch",

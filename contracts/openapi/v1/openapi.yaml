@@ -2423,6 +2423,39 @@ paths:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
 
+  /admin/moderation/cases/{caseId}:
+    get:
+      tags: [Admin]
+      summary: Discovery draft for GET undefined
+      operationId: getModerationCase
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /admin/moderation/cases/{caseId}/decision:
+    post:
+      tags: [Admin]
+      summary: Discovery draft for POST undefined
+      operationId: decideModerationCase
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /admin/moderation/queue:
+    get:
+      tags: [Admin]
+      summary: Discovery draft for GET undefined
+      operationId: listModerationQueue
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
 components:
   securitySchemes:
     bearerAuth:
