@@ -46,8 +46,21 @@ The preflight request is bounded and contains the current editor snapshot. The r
 
 This decision document does not declare GREEN. Implementation becomes admitted only after the normal repository gates and CI evidence succeed.
 
-## v1 extension — global contact detection
+## v1 extension — global contact and bypass detection
 
-The first-layer preflight registry now screens for phone-number candidates across major target markets in the Americas, Europe, East Asia and Southeast Asia, using country-code and national mobile-number patterns derived from public numbering-plan material. It also detects representative mainstream messaging identifiers or invite links for ten platforms: WhatsApp, Telegram, Facebook Messenger, WeChat, LINE, QQ, Signal, Viber, KakaoTalk and Discord.
+The first-layer preflight registry uses three local, runtime-safe primitives:
+- `libphonenumber-js/max` for international and context-assisted national phone parsing.
+- `tldts` for URL/hostname parsing, including IP-host and IDN/Punycode shape checks.
+- `@moderation-api/unicode-spoofing` for UTS #39 confusable detection, mixed-script analysis and invisible-character analysis.
 
-This is intentionally a local screening layer. It does not claim live carrier ownership, HLR status, SIM status, or account ownership. Number portability means a prefix cannot establish the subscriber's current operator; those checks belong to a later external verification layer.
+The runtime keeps a conservative fallback for national-format phone candidates: a country/region hint must be present before parsing. It does not claim live carrier ownership, HLR status, SIM status, or account ownership. Number portability means a prefix cannot establish the subscriber's current operator; those checks belong to a later external verification layer.
+
+Messaging detection is a registry, not a single keyword filter. v1 covers WhatsApp, Telegram, Facebook Messenger, WeChat, LINE, QQ, Signal, Viber, KakaoTalk, Discord, Skype, Zalo, WeCom, DingTalk and Snapchat link/ID patterns.
+
+Unicode normalization is used only for detection; original editor content is not silently rewritten. Normalized text is used to catch HTML-entity, width, invisible-character and homoglyph bypasses. Legitimate multilingual content remains advisory unless it combines with contact/lead-generation evidence.
+
+The previously considered `@ensdomains/unicode-confusables` package is not adopted as a runtime dependency. Repository security evidence records a compromised release under that package name in 2025; the runtime therefore uses the zero-runtime-dependency UTS #39 implementation above instead of introducing that supply-chain risk.
+
+### Risk-fusion rule
+
+A phone, messaging account, QR cue or external URL by itself is not an automatic block. Blocking is driven by a promotional/contact combination, or by multiple concrete contact channels when no clear public/reference context is present. This preserves room for news reporting, public institution contacts, source citations and technical documentation while still catching common off-platform lead-generation patterns.
