@@ -12,6 +12,18 @@ type PublishPreflightResult = {
   seoReadiness: 'READY' | 'IMPROVE' | 'BLOCKED'
   summary: string
   findings: Array<{ severity: 'INFO' | 'WARN' | 'BLOCK'; category: string; title: string; message: string; fix: string }>
+  analyzed: {
+    titleChars: number
+    bodyChars: number
+    paragraphCount: number
+    headingCount: number
+    externalUrlCount: number
+    phoneCount: number
+    mobileNumberCount: number
+    detectedPhoneRegions: string[]
+    messengerIdCount: number
+    detectedMessengers: string[]
+  }
 }
 
 type UploadedAsset = {
