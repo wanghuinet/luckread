@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/v1/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json",
   "title": "GOV-003/GOV-004 Trusted Reviewer Admission Input Contract",
   "version": "1.0.0",
-  "status": "BLOCKED_NOT_ADMITTED",
+  "status": "CONTRACTED_NOT_VERIFIED",
   "featureId": "GOV-003",
   "operationIds": [
     "listModerationQueue",
@@ -31,8 +31,8 @@
       "requiredFor": [
         "decideModerationCase"
       ],
-      "currentTransportEvidence": "NO_CURRENT_EVIDENCE_BOUND",
-      "status": "MISSING_AUTHORITY_BINDING"
+      "currentTransportEvidence": "CONTRACTED_PENDING_RUNTIME_EVIDENCE",
+      "status": "CONTRACTED_NOT_VERIFIED"
     },
     "reviewerLayer": {
       "field": "reviewerLayer",
@@ -43,8 +43,8 @@
         "getModerationCase",
         "decideModerationCase"
       ],
-      "currentTransportEvidence": "NO_CURRENT_EVIDENCE_BOUND",
-      "status": "MISSING_AUTHORITY_BINDING"
+      "currentTransportEvidence": "CONTRACTED_PENDING_RUNTIME_EVIDENCE",
+      "status": "CONTRACTED_NOT_VERIFIED"
     },
     "permissionContext": {
       "field": "permissionContext",
@@ -133,13 +133,13 @@
   "evidenceRequiredBeforeImplementationAdmission": [
     "verified W01 authenticated principal propagation to the moderation boundary",
     "verified reviewer identity/layer/permission scope derivation",
-    "trusted internal transport binding to W06",
+    "W01→W06 Service Binding deployment evidence",
     "exact transport source SHA",
     "fail-closed unauthenticated/insufficient-layer/outsider-scope negative tests",
     "If-Match 428/412 evidence",
     "Idempotency replay and key-reuse-conflict evidence"
   ],
-  "implementationRule": "This contract does not authorize W06 runtime implementation. Runtime remains blocked until each MISSING_AUTHORITY_BINDING is reconciled to an existing authoritative source and admitted evidence is produced.",
+  "implementationRule": "The transport binding is contract-defined but not runtime-verified. W06 runtime remains blocked until deployment, principal/layer/permission scope checks and fail-closed negative evidence are produced.",
   "nonGoals": [
     "No new Service Binding is created by this contract.",
     "No direct W02→W06 business Service Binding is inferred.",
@@ -151,5 +151,9 @@
   ],
   "relatedFeatureIds": [
     "GOV-004"
-  ]
+  ],
+  "sourceRefs": [
+    "contracts/transport/W01-W06-moderation-http-binding.v1.json"
+  ],
+  "bindingContract": "contracts/transport/W01-W06-moderation-http-binding.v1.json"
 }
