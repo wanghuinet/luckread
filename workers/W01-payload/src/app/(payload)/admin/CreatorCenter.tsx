@@ -149,7 +149,7 @@ export function CreatorCenter({
             <div className={styles.contentShell}>
               <section id="overview" className={styles.hero}>
                 <div className={styles.heroCopy}>
-                  <span className={styles.eyebrow}>TODAY'S WORKSPACE</span>
+                  <span className={styles.eyebrow}>TODAY WORKSPACE</span>
                   <h1>创作、管理、发布，一站完成</h1>
                   <p>
                     以成熟创作者平台常见的“总览 + 内容库 + 发布器 + 工具箱”组织工作流。
