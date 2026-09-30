@@ -6721,13 +6721,13 @@
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
         "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-        "contracts/openapi/v1/openapi.yaml#/social/follows",
         "contracts/api/interaction-operation-policy.v1.json",
-        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
         "contracts/dto/auth-dto-contract.v1.json",
-        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json"
+        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+        "contracts/openapi/v1/openapi.yaml#/social/follows",
+        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
       ],
       "blockers": [
         "Canonical Payload/Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; Field and physical persistence contract are now bound."
@@ -6745,10 +6745,10 @@
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
         "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
-        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json"
+        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
       ],
       "blockers": [
         "Canonical followers/following API/DTO/Field/Persistence/Payload/Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; followers/following operations remain DISCOVERY_DRAFT."
