@@ -224,9 +224,12 @@
       "endpoint_groups": [
         "GET /v1/account/data-export",
         "GET /v1/admin/moderation",
+        "GET /v1/admin/moderation/cases/{caseId}",
+        "GET /v1/admin/moderation/queue",
         "GET /v1/audit/events",
         "POST /v1/account/data-export",
         "POST /v1/account/deletion-request",
+        "POST /v1/admin/moderation/cases/{caseId}/decision",
         "POST /v1/appeals",
         "POST /v1/reports"
       ]
