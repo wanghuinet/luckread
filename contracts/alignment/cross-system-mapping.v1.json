@@ -6713,7 +6713,9 @@
         "follow",
         "unfollow"
       ],
-      "entityIds": [],
+      "entityIds": [
+        "ENT-SOCIAL-FOLLOW"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
@@ -6721,26 +6723,32 @@
         "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/openapi/v1/openapi.yaml#/social/follows",
-        "contracts/api/interaction-operation-policy.v1.json"
+        "contracts/api/interaction-operation-policy.v1.json",
+        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
       ],
       "blockers": [
-        "Canonical DTO/Entity/Field/Persistence/Payload/Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; API operation IDs are now evidence-bound as follow/unfollow."
+        "Canonical DTO/Field/Persistence/Payload/Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; API operation IDs and Entity ID are now contract-bound."
       ]
     },
     {
       "featureId": "SOCIAL-002",
       "status": "UNRESOLVED",
       "apiOperationIds": [],
-      "entityIds": [],
+      "entityIds": [
+        "ENT-SOCIAL-FOLLOW"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
         "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Canonical followers/following API/DTO/Field/Persistence/Payload/Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; shared Follow Entity is now contract-bound."
       ]
     },
     {
