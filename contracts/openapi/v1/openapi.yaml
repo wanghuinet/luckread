@@ -2426,35 +2426,88 @@ paths:
   /admin/moderation/cases/{caseId}:
     get:
       tags: [Admin]
-      summary: Discovery draft for GET undefined
+      summary: Read a moderation case within the authenticated reviewer scope.
       operationId: getModerationCase
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Moderation case.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationCaseResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /admin/moderation/cases/{caseId}/decision:
     post:
       tags: [Admin]
-      summary: Discovery draft for POST undefined
+      summary: Record the authoritative moderation decision for a case.
       operationId: decideModerationCase
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+        - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ModerationDecisionRequest' }
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Authoritative moderation decision result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationDecisionResponse' }
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
 
   /admin/moderation/queue:
     get:
       tags: [Admin]
-      summary: Discovery draft for GET undefined
+      summary: Read the bounded moderation queue for the authenticated reviewer scope.
       operationId: listModerationQueue
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Bounded moderation queue page.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationQueueResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '400':
+          $ref: '#/components/responses/InvalidCursor'
 
 components:
   securitySchemes:
@@ -2679,4 +2732,102 @@ components:
       properties:
         id: { $ref: '#/components/schemas/ResourceId' }
         name: { type: string }
+    ModerationQueueItem:
+      type: object
+      additionalProperties: false
+      required: [caseId, targetType, targetId, policyVersion, state, priority, version, createdAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        state: { $ref: '../../enums/moderation-case-state.json' }
+        priority: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    ModerationQueueResponse:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, hasMore, requestId]
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ModerationQueueItem' }
+        nextCursor:
+          type: [string, 'null']
+        hasMore: { type: boolean }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    ModerationCaseResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, target, contentReference, policyVersion, currentDecision, evidenceRefs, status, version, createdAt, updatedAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        target:
+          $ref: '#/components/schemas/ModerationTarget'
+        contentReference:
+          $ref: '#/components/schemas/ModerationContentReference'
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        currentDecision:
+          anyOf:
+            - { $ref: '#/components/schemas/ModerationDecisionSummary' }
+            - { type: 'null' }
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: { type: string }
+        status:
+          $ref: '../../enums/moderation-case-state.json'
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ModerationTarget:
+      type: object
+      additionalProperties: false
+      required: [targetType, targetId]
+      properties:
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationContentReference:
+      type: object
+      additionalProperties: false
+      required: [contentId]
+      properties:
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationDecisionSummary:
+      type: object
+      additionalProperties: false
+      required: [decisionId, outcome, policyVersion, effectiveAt]
+      properties:
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+    ModerationDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, decision, policyVersion, reasonCode, severity, scope, effectiveAt]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        decision: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        reasonCode: { type: string, minLength: 1, maxLength: 128 }
+        severity: { type: string, minLength: 1, maxLength: 64 }
+        scope: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
+    ModerationDecisionResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, decisionId, outcome, version, effectiveAt, requestId]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        version: { type: integer, minimum: 1 }
+        effectiveAt: { type: string, format: date-time }
+        requestId: { $ref: '#/components/schemas/RequestId' }
  }
