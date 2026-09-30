@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W06-W03-content-moderation-http-binding.v1.json",
+  "title": "W06 to W03 Moderation Content-State Internal HTTP Binding",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PENDING_AUTHORITY",
+  "caller": {
+    "logicalWorker": "W06",
+    "role": "Rights / Trust & Safety / Governance",
+    "authority": "Moderation D1-03 decision authority"
+  },
+  "callee": {
+    "logicalWorker": "W03",
+    "role": "Content / Article / Media / Translation",
+    "authority": "Content D1-02 state authority"
+  },
+  "transport": {
+    "kind": "Cloudflare Worker Service Binding HTTP",
+    "binding": "W03_CONTENT_MODERATION",
+    "targetWorker": "luckread-w03",
+    "publicExposure": false,
+    "newWorker": false,
+    "newDatabase": false
+  },
+  "purpose": "Carry an accepted moderation decision to the existing W03 content lifecycle authority without granting W06 direct D1-02 access or duplicating content state.",
+  "operation": {
+    "operationId": "transitionContentState",
+    "method": "POST",
+    "internalPath": "/internal/content/contents/{contentId}/state",
+    "allowedTransitions": [
+      "PENDING_REVIEW→APPROVED",
+      "PENDING_REVIEW→REJECTED"
+    ],
+    "precondition": "If-Match",
+    "idempotency": "Idempotency-Key",
+    "d1ReadMax": 1,
+    "d1WriteTransactionMax": 1
+  },
+  "authorityChain": {
+    "decisionSource": "W06 authoritative ModerationDecision",
+    "decisionIdHeader": "X-LuckRead-Moderation-Decision-Id",
+    "policyVersionHeader": "X-LuckRead-Moderation-Policy-Version",
+    "actorSource": "server-derived reviewer principal carried by the W01→W06 admission boundary",
+    "contentAuthority": "W03 validates the current content state/version and performs the single authoritative D1-02 state mutation",
+    "noDirectD1Access": true
+  },
+  "headers": {
+    "requiredOnEveryCall": {
+      "X-LuckRead-Caller": "W06",
+      "X-LuckRead-Transport-Version": "1.0",
+      "X-LuckRead-Correlation-Id": "required",
+      "X-LuckRead-Principal-User-Id": "required",
+      "X-LuckRead-Principal-Layer": "required"
+    },
+    "moderationProvenance": {
+      "X-LuckRead-Moderation-Decision-Id": "required",
+      "X-LuckRead-Moderation-Policy-Version": "required",
+      "X-LuckRead-Moderation-Outcome": "APPROVED|REJECTED"
+    },
+    "forwarded": {
+      "If-Match": "required and must represent the targeted W03 content version/ETag",
+      "Idempotency-Key": "required"
+    },
+    "forbidden": [
+      "Authorization bearer credential",
+      "client-supplied reviewer authority",
+      "raw evidence",
+      "internal risk thresholds"
+    ]
+  },
+  "requestBody": {
+    "required": [
+      "to",
+      "decisionId",
+      "policyVersion"
+    ],
+    "to": [
+      "APPROVED",
+      "REJECTED"
+    ],
+    "decisionId": "must match X-LuckRead-Moderation-Decision-Id",
+    "policyVersion": "must match X-LuckRead-Moderation-Policy-Version",
+    "targetContentState": "must be PENDING_REVIEW before mutation"
+  },
+  "validation": {
+    "W06": "must have an accepted authoritative decision for the target case and preserve decision provenance",
+    "W03": "must reject missing/invalid transport markers, stale If-Match, unsupported transition, wrong current state or missing moderation decision provenance",
+    "decisionAttribution": "content transition must remain attributable to exactly one moderation decision"
+  },
+  "failurePolicy": {
+    "timeoutMs": 2000,
+    "automaticRetries": 0,
+    "failClosed": [
+      "missing binding",
+      "wrong caller marker",
+      "unsupported transport version",
+      "missing principal",
+      "missing moderation decision id",
+      "policy/outcome mismatch",
+      "invalid response envelope"
+    ],
+    "statusMapping": {
+      "unauthenticated": 401,
+      "permissionDenied": 403,
+      "notFound": 404,
+      "invalidState": 409,
+      "missingPrecondition": 428,
+      "preconditionFailed": 412
+    }
+  },
+  "topologyConstraints": {
+    "workerCountDelta": 0,
+    "databaseCountDelta": 0,
+    "newPayloadCollections": 0,
+    "crossD1Transactions": 0,
+    "directW06ToW03TableAccess": false,
+    "publicExposure": false
+  },
+  "implementationStatus": {
+    "bindingConfig": "NOT_IMPLEMENTED",
+    "W06Caller": "NOT_IMPLEMENTED",
+    "W03Callee": "EXISTING_RUNTIME_REQUIRES_TRANSPORT_ADAPTER",
+    "deploymentEvidence": "MISSING",
+    "securityE2E": "MISSING",
+    "implementationAuthorization": false
+  },
+  "sourceRefs": [
+    "contracts/api/moderation-operation-policy.v1.json",
+    "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
+    "contracts/state-machines/content.json",
+    "contracts/transport/W01-W06-moderation-http-binding.v1.json",
+    "contracts/transport/W01-W03-content-http-binding.v1.json",
+    "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+  ],
+  "verificationRequirements": [
+    "explicit Authority Gate for the W06→W03 internal binding",
+    "exact W06/W03 source commit evidence",
+    "W06 decision provenance evidence",
+    "W03 PENDING_REVIEW positive transition evidence",
+    "APPROVED and REJECTED negative/positive state-machine evidence",
+    "401/403/409/428/412 negative evidence",
+    "stale content version rejection evidence",
+    "idempotency replay evidence",
+    "no direct D1-02 access evidence",
+    "decision-to-content-transition attribution evidence"
+  ],
+  "nonGoals": [
+    "No new Worker or D1.",
+    "No direct W06→W03 D1 access.",
+    "No public W03 route.",
+    "No new public operationId.",
+    "No content-state authority in W06.",
+    "No runtime GREEN claim."
+  ]
+}
