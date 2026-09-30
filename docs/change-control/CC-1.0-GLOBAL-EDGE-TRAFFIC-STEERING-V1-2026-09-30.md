@@ -1,6 +1,6 @@
 # CC-1.0 Global Edge Traffic Steering & High-Volume Ingestion — 2026-09-30
 
-**Status:** CHANGE-CONTROL / READY FOR RECONCILIATION
+**Status:** CHANGE-CONTROL / RECONCILED / IMPLEMENTATION PENDING
 
 ## Purpose
 
@@ -16,10 +16,17 @@
 
 ## Baseline
 
-Current main:
+Baseline before this change:
 
 ```text
 4ec956c12feb82a6912f5397b0b3e7a0aa9eb1dd
+```
+
+Reconciliation commits:
+
+```text
+96fa0fec4b95ae454866dcc4192c1da929efe4cc
+cae4ec408932c0633cacf1242c1e6ddecaba6ebb
 ```
 
 Existing Blueprint already requires:
@@ -165,10 +172,24 @@ Before runtime implementation of regional steering or high-volume ingestion, the
 
 Implementation readiness requires measured workload evidence demonstrating that the existing topology is the bottleneck being addressed.
 
+## Reconciliation Result
+
+The change is consistent with the existing Blueprint and domain contracts because it:
+
+- does not alter the fixed Worker/D1 topology;
+- preserves Social as Follow authority;
+- preserves Membership as Subscription/Entitlement authority;
+- keeps Data Center as a projection/query surface;
+- follows the existing high-volume async and cost-first rules;
+- does not modify Payload Core;
+- does not require a regional authoritative database per geography.
+
+Therefore the architecture rule is reconciled at contract level. Runtime implementation remains separately gated by measured workload evidence and the relevant execution/evidence contracts.
+
 ## Decision
 
 ```text
-Architecture capability: ACCEPTED AS FUTURE EVOLUTION
+Architecture capability: RECONCILED / ACCEPTED AS FUTURE EVOLUTION
 Current implementation: NOT AUTHORIZED BY THIS CC
 Current topology: UNCHANGED
 Evidence status: NOT GREEN
