@@ -20,6 +20,10 @@
     {
       "binding": "W03_CONTENT",
       "service": "luckread-w03"
+    },
+    {
+      "binding": "W06_MODERATION",
+      "service": "luckread-w06"
     }
   ],  "d1_databases": [
     {
