@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 const BASE_URL = String(process.env.W01_BASE_URL || 'https://api.luckread.cn').replace(/\/$/, '')
 const DATABASE_NAME = String(process.env.DATABASE_NAME || 'luckread')
 const WRANGLER_VERSION = process.env.WRANGLER_VERSION || '4.116.0'
-const TEST_ID = \`AUTH010-\${process.env.GITHUB_RUN_ID || Date.now()}-\${randomBytes(5).toString('hex')}\`
+const TEST_ID = `AUTH010-${process.env.GITHUB_RUN_ID || Date.now()}-${randomBytes(5).toString('hex')}`
 const TESTED_COMMIT_SHA = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
 const ARTIFACT_DIR = 'artifacts/evidence/auth-010/remote-e2e'
 
@@ -15,7 +15,7 @@ if (!ACCOUNT_ID || !API_TOKEN) throw new Error('Cloudflare credentials are requi
 
 mkdirSync(ARTIFACT_DIR, { recursive: true })
 
-const sqlString = (value) => \`'\${String(value).replace(/'/g, "''")}'\`
+const sqlString = (value) => `'${String(value).replace(/'/g, "''")}'`
 const flattenRows = (value) => {
   if (Array.isArray(value)) return value.flatMap((item) => {
     if (Array.isArray(item)) return item
@@ -33,7 +33,7 @@ const d1Json = (command) => {
     'npx',
     [
       '--yes',
-      \`wrangler@\${WRANGLER_VERSION}\`,
+      `wrangler@${WRANGLER_VERSION}`,
       'd1',
       'execute',
       DATABASE_NAME,
@@ -55,13 +55,13 @@ async function request(path, { method = 'GET', body, token, headers = {} } = {})
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 20_000)
   try {
-    const response = await fetch(\`\${BASE_URL}\${path}\`, {
+    const response = await fetch(`${BASE_URL}${path}`, {
       method,
       signal: controller.signal,
       headers: {
         accept: 'application/json',
         ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-        ...(token ? { authorization: \`Bearer \${token}\` } : {}),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
         ...headers,
       },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -82,7 +82,7 @@ async function request(path, { method = 'GET', body, token, headers = {} } = {})
 }
 
 const writeJson = (name, value) =>
-  writeFileSync(\`\${ARTIFACT_DIR}/\${name}\`, \`\${JSON.stringify(value, null, 2)}\\n\`)
+  writeFileSync(`${ARTIFACT_DIR}/${name}`, `${JSON.stringify(value, null, 2)}\n`)
 
 const failures = []
 const createdUsers = []
@@ -96,7 +96,7 @@ function check(condition, message) {
 }
 
 function expectStatus(response, expected, label) {
-  check(response.status === expected, \`\${label}: expected HTTP \${expected}, got \${response.status}\`)
+  check(response.status === expected, `${label}: expected HTTP ${expected}, got ${response.status}`)
 }
 
 function noSecretFields(value) {
@@ -108,14 +108,14 @@ function noSecretFields(value) {
 }
 
 async function createUser(label) {
-  const suffix = \`\${TEST_ID}-\${label}-\${randomBytes(4).toString('hex')}\`
-  const email = \`auth010-\${label}-\${suffix}@example.com\`
-  const username = \`auth010_\${label}_\${suffix.replaceAll('-', '').slice(-20)}\`
-  const password = \`Evd-AUTH010-\${randomBytes(24).toString('base64url')}-Z9!\`
+  const suffix = `${TEST_ID}-${label}-${randomBytes(4).toString('hex')}`
+  const email = `auth010-${label}-${suffix}@example.com`
+  const username = `auth010_${label}_${suffix.replaceAll('-', '').slice(-20)}`
+  const password = `Evd-AUTH010-${randomBytes(24).toString('base64url')}-Z9!`
 
   const response = await request('/auth/register', {
     method: 'POST',
-    headers: { 'Idempotency-Key': \`\${TEST_ID}-register-\${label}\` },
+    headers: { 'Idempotency-Key': `${TEST_ID}-register-${label}` },
     body: {
       identityType: 'email',
       identity: email,
@@ -128,56 +128,56 @@ async function createUser(label) {
     },
   })
 
-  expectStatus(response, 201, \`register \${label}\`)
+  expectStatus(response, 201, `register ${label}`)
   const userId = String(response.data?.userId ?? '')
-  check(userId.length > 0, \`register \${label}: userId missing\`)
-  check(response.data?.accountState === 'PENDING_VERIFICATION', \`register \${label}: unexpected account state\`)
+  check(userId.length > 0, `register ${label}: userId missing`)
+  check(response.data?.accountState === 'PENDING_VERIFICATION', `register ${label}: unexpected account state`)
   createdUsers.push({ userId, email })
   return { userId, email, username, password }
 }
 
 function activateAndAuthorize(user, label) {
   const now = new Date().toISOString()
-  const roleId = \`\${TEST_ID}-role-\${label}-\${randomBytes(5).toString('hex')}\`
+  const roleId = `${TEST_ID}-role-${label}-${randomBytes(5).toString('hex')}`
 
   d1Json(
-    \`UPDATE users
+    `UPDATE users
      SET account_state='ACTIVE',
          account_state_version=COALESCE(account_state_version, 0) + 1
-     WHERE CAST(id AS TEXT)=\${sqlString(user.userId)}\`,
+     WHERE CAST(id AS TEXT)=${sqlString(user.userId)}`,
   )
 
   d1Json(
-    \`INSERT INTO role_assignments
+    `INSERT INTO role_assignments
       (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at)
      VALUES (
-       \${sqlString(roleId)},
-       \${sqlString(user.userId)},
+       ${sqlString(roleId)},
+       ${sqlString(user.userId)},
        'user',
        'global',
        NULL,
        'ACTIVE',
-       \${sqlString(now)},
+       ${sqlString(now)},
        NULL,
-       \${sqlString(now)},
-       \${sqlString(now)}
-     )\`,
+       ${sqlString(now)},
+       ${sqlString(now)}
+     )`,
   )
 
   const account = d1Rows(
-    \`SELECT account_state FROM users WHERE CAST(id AS TEXT)=\${sqlString(user.userId)} LIMIT 1\`,
+    `SELECT account_state FROM users WHERE CAST(id AS TEXT)=${sqlString(user.userId)} LIMIT 1`,
   )[0]
   const assignment = d1Rows(
-    \`SELECT id,subject_id,role_id,scope_type,status FROM role_assignments WHERE id=\${sqlString(roleId)} LIMIT 1\`,
+    `SELECT id,subject_id,role_id,scope_type,status FROM role_assignments WHERE id=${sqlString(roleId)} LIMIT 1`,
   )[0]
 
-  check(String(account?.account_state) === 'ACTIVE', \`activate \${label}: account state not ACTIVE\`)
+  check(String(account?.account_state) === 'ACTIVE', `activate ${label}: account state not ACTIVE`)
   check(
     String(assignment?.subject_id) === user.userId &&
     String(assignment?.role_id) === 'user' &&
     String(assignment?.scope_type) === 'global' &&
     String(assignment?.status) === 'ACTIVE',
-    \`authorize \${label}: role assignment not established\`,
+    `authorize ${label}: role assignment not established`,
   )
   roleAssignments.push(roleId)
 }
@@ -191,9 +191,9 @@ async function login(user, deviceId) {
       deviceId,
     },
   })
-  expectStatus(response, 200, \`login \${deviceId}\`)
-  check(typeof response.data?.accessToken === 'string', \`login \${deviceId}: access token missing\`)
-  check(typeof response.data?.refreshToken === 'string', \`login \${deviceId}: refresh token missing\`)
+  expectStatus(response, 200, `login ${deviceId}`)
+  check(typeof response.data?.accessToken === 'string', `login ${deviceId}: access token missing`)
+  check(typeof response.data?.refreshToken === 'string', `login ${deviceId}: refresh token missing`)
   return {
     accessToken: response.data.accessToken,
     refreshToken: response.data.refreshToken,
@@ -202,18 +202,18 @@ async function login(user, deviceId) {
 
 function sessionForDevice(userId, deviceId) {
   const rows = d1Rows(
-    \`SELECT s.id,s._parent_id,s.created_at,s.expires_at,a.device_id,a.token_version,a.revoked_at
+    `SELECT s.id,s._parent_id,s.created_at,s.expires_at,a.device_id,a.token_version,a.revoked_at
      FROM users_sessions AS s
      INNER JOIN auth_session_state AS a
        ON CAST(a.session_id AS TEXT)=CAST(s.id AS TEXT)
       AND a.user_id=CAST(s._parent_id AS TEXT)
-     WHERE CAST(s._parent_id AS TEXT)=\${sqlString(userId)}
-       AND a.device_id=\${sqlString(deviceId)}
+     WHERE CAST(s._parent_id AS TEXT)=${sqlString(userId)}
+       AND a.device_id=${sqlString(deviceId)}
      ORDER BY s.created_at DESC
-     LIMIT 1\`,
+     LIMIT 1`,
   )
   const row = rows[0]
-  check(Boolean(row?.id), \`session lookup missing for \${deviceId}\`)
+  check(Boolean(row?.id), `session lookup missing for ${deviceId}`)
   return {
     sessionId: String(row.id),
     userId: String(row._parent_id),
@@ -227,16 +227,16 @@ function sessionForDevice(userId, deviceId) {
 
 function extensionFor(sessionId) {
   return d1Rows(
-    \`SELECT session_id,user_id,device_id,token_version,revoked_at,last_seen_at
+    `SELECT session_id,user_id,device_id,token_version,revoked_at,last_seen_at
      FROM auth_session_state
-     WHERE session_id=\${sqlString(sessionId)}
-     LIMIT 1\`,
+     WHERE session_id=${sqlString(sessionId)}
+     LIMIT 1`,
   )[0] ?? null
 }
 
 function nativeSessionExists(sessionId) {
   return d1Rows(
-    \`SELECT id FROM users_sessions WHERE id=\${sqlString(sessionId)} LIMIT 1\`,
+    `SELECT id FROM users_sessions WHERE id=${sqlString(sessionId)} LIMIT 1`,
   ).length === 1
 }
 
@@ -258,7 +258,7 @@ try {
     readFileSync('artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json', 'utf8'),
   )
   const policyVersion = String(policy.policyVersion ?? '')
-  check(policyVersion === 'PROD-2026-09-28.1', \`unexpected production policy version: \${policyVersion}\`)
+  check(policyVersion === 'PROD-2026-09-28.1', `unexpected production policy version: ${policyVersion}`)
 
   const anonymous = await request('/auth/sessions')
   expectStatus(anonymous, 401, 'anonymous session list')
@@ -280,7 +280,7 @@ try {
   expectStatus(list, 200, 'session list')
   check(list.cacheControl.toLowerCase().includes('no-store'), 'session list must be non-shared/no-store')
   check(Array.isArray(list.data?.items), 'session list items missing')
-  check(list.data.items.length <= 50, \`session list exceeded 50-item contract: \${list.data.items.length}\`)
+  check(list.data.items.length <= 50, `session list exceeded 50-item contract: ${list.data.items.length}`)
   check(list.data.items.some((item) => String(item?.sessionId) === secondSession.sessionId), 'session list missing secondary session')
   check(list.data.items.some((item) => String(item?.sessionId) === primarySession.sessionId), 'session list missing current session')
   check(
@@ -298,10 +298,10 @@ try {
   const badCursor = await request('/auth/sessions?cursor=not-a-valid-cursor', { token: firstLogin.accessToken })
   expectStatus(badCursor, 400, 'invalid session cursor')
 
-  const revoke = await request(\`/auth/sessions/\${secondSession.sessionId}\`, {
+  const revoke = await request(`/auth/sessions/${secondSession.sessionId}`, {
     method: 'DELETE',
     token: firstLogin.accessToken,
-    headers: { 'Idempotency-Key': \`\${TEST_ID}-revoke-secondary\` },
+    headers: { 'Idempotency-Key': `${TEST_ID}-revoke-secondary` },
   })
   expectStatus(revoke, 204, 'revoke secondary session')
   check(revoke.bodyBytes === 0, 'revoke returned a response body')
@@ -311,10 +311,10 @@ try {
   check(Boolean(revokedExtension?.revoked_at), 'secondary extension revocation was not persisted')
   check(!nativeSessionExists(secondSession.sessionId), 'secondary native session was not removed')
 
-  const repeatedRevoke = await request(\`/auth/sessions/\${secondSession.sessionId}\`, {
+  const repeatedRevoke = await request(`/auth/sessions/${secondSession.sessionId}`, {
     method: 'DELETE',
     token: firstLogin.accessToken,
-    headers: { 'Idempotency-Key': \`\${TEST_ID}-revoke-secondary\` },
+    headers: { 'Idempotency-Key': `${TEST_ID}-revoke-secondary` },
   })
   expectStatus(repeatedRevoke, 204, 'repeated revoke')
   check(repeatedRevoke.bodyBytes === 0, 'repeated revoke returned a response body')
@@ -323,19 +323,19 @@ try {
   expectStatus(afterRevoke, 200, 'session list after revoke')
   check(!afterRevoke.data.items.some((item) => String(item?.sessionId) === secondSession.sessionId), 'revoked session remained visible')
 
-  const crossAccount = await request(\`/auth/sessions/\${primarySession.sessionId}\`, {
+  const crossAccount = await request(`/auth/sessions/${primarySession.sessionId}`, {
     method: 'DELETE',
     token: otherLogin.accessToken,
-    headers: { 'Idempotency-Key': \`\${TEST_ID}-cross-account\` },
+    headers: { 'Idempotency-Key': `${TEST_ID}-cross-account` },
   })
   expectStatus(crossAccount, 403, 'cross-account revoke')
 
   const beforeVersionBump = extensionFor(primarySession.sessionId)
   check(beforeVersionBump?.revoked_at == null, 'current session unexpectedly revoked before version test')
   d1Json(
-    \`UPDATE auth_session_state
+    `UPDATE auth_session_state
      SET token_version=token_version+1
-     WHERE session_id=\${sqlString(primarySession.sessionId)}\`,
+     WHERE session_id=${sqlString(primarySession.sessionId)}`,
   )
 
   const staleTokenVersion = await request('/auth/sessions', { token: firstLogin.accessToken })
@@ -344,9 +344,9 @@ try {
   // Restore the primary session extension only to keep cleanup deterministic;
   // the evidence already captured the fail-closed denial.
   d1Json(
-    \`UPDATE auth_session_state
-     SET token_version=\${beforeVersionBump?.token_version ?? primarySession.tokenVersion}
-     WHERE session_id=\${sqlString(primarySession.sessionId)}\`,
+    `UPDATE auth_session_state
+     SET token_version=${beforeVersionBump?.token_version ?? primarySession.tokenVersion}
+     WHERE session_id=${sqlString(primarySession.sessionId)}`,
   )
 
   const primaryExtension = extensionFor(primarySession.sessionId)
@@ -395,35 +395,35 @@ try {
     console.log('AUTH-010_REMOTE_E2E_RESULT=PASS')
   }
 } catch (error) {
-  console.error(\`AUTH-010_REMOTE_E2E_RESULT=FAIL: \${error instanceof Error ? error.message : String(error)}\`)
+  console.error(`AUTH-010_REMOTE_E2E_RESULT=FAIL: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
   const cleanupErrors = []
 
   for (const roleId of roleAssignments) {
     try {
-      d1Json(\`DELETE FROM role_assignments WHERE id=\${sqlString(roleId)}\`)
+      d1Json(`DELETE FROM role_assignments WHERE id=${sqlString(roleId)}`)
     } catch (error) {
-      cleanupErrors.push(\`role \${roleId}: \${error instanceof Error ? error.message : String(error)}\`)
+      cleanupErrors.push(`role ${roleId}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
   for (const user of createdUsers) {
     try {
-      d1Json(\`DELETE FROM auth_session_state WHERE user_id=\${sqlString(user.userId)}\`)
-      d1Json(\`DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)=\${sqlString(user.userId)}\`)
-      d1Json(\`DELETE FROM users WHERE CAST(id AS TEXT)=\${sqlString(user.userId)}\`)
+      d1Json(`DELETE FROM auth_session_state WHERE user_id=${sqlString(user.userId)}`)
+      d1Json(`DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)=${sqlString(user.userId)}`)
+      d1Json(`DELETE FROM users WHERE CAST(id AS TEXT)=${sqlString(user.userId)}`)
     } catch (error) {
-      cleanupErrors.push(\`user \${user.userId}: \${error instanceof Error ? error.message : String(error)}\`)
+      cleanupErrors.push(`user ${user.userId}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
   const remainingSynthetic = []
   for (const user of createdUsers) {
     try {
-      const rows = d1Rows(\`SELECT id,email FROM users WHERE CAST(id AS TEXT)=\${sqlString(user.userId)} LIMIT 1\`)
+      const rows = d1Rows(`SELECT id,email FROM users WHERE CAST(id AS TEXT)=${sqlString(user.userId)} LIMIT 1`)
       if (rows.length > 0) remainingSynthetic.push(String(user.userId))
     } catch (error) {
-      cleanupErrors.push(\`cleanup verify \${user.userId}: \${error instanceof Error ? error.message : String(error)}\`)
+      cleanupErrors.push(`cleanup verify ${user.userId}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
@@ -431,7 +431,7 @@ try {
     'runtime-session-list.json',
     'runtime-session-revoke.json',
   ].filter((name) => {
-    try { readFileSync(\`\${ARTIFACT_DIR}/\${name}\`); return true } catch { return false }
+    try { readFileSync(`${ARTIFACT_DIR}/${name}`); return true } catch { return false }
   })
 
   const dependency = JSON.parse(readFileSync('workers/W01-payload/package.json', 'utf8'))
@@ -459,7 +459,7 @@ try {
     artifactHashes: Object.fromEntries(
       files.map((name) => [
         name,
-        createHash('sha256').update(readFileSync(\`\${ARTIFACT_DIR}/\${name}\`)).digest('hex'),
+        createHash('sha256').update(readFileSync(`${ARTIFACT_DIR}/${name}`)).digest('hex'),
       ]),
     ),
     secretsExposed: false,
