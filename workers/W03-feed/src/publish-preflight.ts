@@ -199,7 +199,7 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
   if (title.length > 70) {
     addFinding(findings, 'SEO-TITLE-LONG', 'WARN', 'SEO', '标题偏长', '标题较长，搜索结果中的标题链接可能被截断。', '保留真正重要的信息，删除重复修饰词。')
   }
-  if (/^[\s\W_]+$/u.test(title) || /(.)\1{7,}/u.test(title)) {
+  if (/^[\s\p{P}\p{S}_]+$/u.test(title) || /(.)\1{7,}/u.test(title)) {
     addFinding(findings, 'SEO-TITLE-NOISE', 'BLOCK', 'SEO', '标题含明显乱码/重复字符', '标题存在异常符号或重复字符，影响可读性与可信度。', '重写为自然、明确、可理解的标题。')
   }
 
