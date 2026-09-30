@@ -545,6 +545,13 @@ export default function PublishComposer({
             <span>质量 / SEO 准备度 {preflightReport.score}</span>
           </div>
           <p>{preflightReport.summary}</p>
+          <div className="lr-preflight-stats" aria-label="检测统计">
+            <span>正文 {preflightReport.analyzed.bodyChars}</span>
+            <span>段落 {preflightReport.analyzed.paragraphCount}</span>
+            <span>外链 {preflightReport.analyzed.externalUrlCount}</span>
+            <span>电话 {preflightReport.analyzed.phoneCount}</span>
+            <span>即时通讯 {preflightReport.analyzed.messengerIdCount}</span>
+          </div>
           {preflightReport.findings.slice(0, 8).map((item, index) => (
             <div className="lr-preflight-finding" key={item.category + item.title + index}>
               <strong>{item.severity === 'BLOCK' ? '阻断' : item.severity === 'WARN' ? '建议' : '提示'} · {item.title}</strong>
