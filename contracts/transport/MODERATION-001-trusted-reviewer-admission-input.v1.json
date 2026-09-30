@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json",
-  "title": "MODERATION-001 Trusted Reviewer Admission Input Contract",
+  "title": "GOV-003/GOV-004 Trusted Reviewer Admission Input Contract",
   "version": "1.0.0",
   "status": "BLOCKED_NOT_ADMITTED",
-  "featureId": "MODERATION-001",
+  "featureId": "GOV-003",
   "operationIds": [
     "listModerationQueue",
     "getModerationCase",
@@ -16,7 +16,7 @@
     "worker": "W06",
     "d1": "D1-03"
   },
-  "purpose": "Define the minimum trusted server-side reviewer context required before W06 moderation Queue/Case/Decision runtime may execute. This contract does not create a new transport or authority.",
+  "purpose": "Define the minimum trusted server-side reviewer context required before the GOV-003 moderation queue and GOV-004 enforcement-case decision runtime may execute. This contract does not create a new transport or authority.",
   "inputContract": {
     "authenticatedPrincipal": {
       "field": "actorUserId",
@@ -147,5 +147,8 @@
     "No D1-03 migration execution.",
     "No canonical OpenAPI promotion.",
     "No Mapping 0 GREEN claim."
+  ],
+  "relatedFeatureIds": [
+    "GOV-004"
   ]
 }
