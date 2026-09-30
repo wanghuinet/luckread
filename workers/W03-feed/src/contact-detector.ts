@@ -499,12 +499,12 @@ const detectLeadGeneration = (value: string): string[] => {
   return Array.from(new Set(variants.flatMap(item => firstMatches(item, LEAD_GENERATION_RE, 20)).map(item => item.trim().toLowerCase())))
 }
 
-const detectObfuscation = (value: string): boolean => normalizeContactText(value).hadObfuscation
-
 const containsSpacedPlatformLabel = (value: string, platform: string): boolean => {
   const letters = platform.replace(/[^A-Za-z]/g, '')
   if (letters.length < 3) return false
-  const pattern = letters.split('').map(char => char.replace(/[.*+?^{}()|[\]\\]/g, '\\const detectObfuscation = (value: string): boolean => normalizeContactText(value).hadObfuscation
+  const pattern = letters.split('').join('\\s+')
+  return new RegExp(pattern, 'i').test(value)
+}
 
 export const detectContactSignals = (rawValue: string): ContactDetectionResult => {
 ')).join('\\s+')
@@ -515,7 +515,6 @@ export const detectContactSignals = (rawValue: string): ContactDetectionResult =
   const raw = String(rawValue ?? '')
   const { normalized, hadObfuscation } = normalizeContactText(raw)
   const compacted = compactContactLabels(normalized)
-  const compactChanged = compacted !== normalized
   const signals = dedupeSignals([
     ...detectPhones(raw),
     ...detectPhones(normalized),
