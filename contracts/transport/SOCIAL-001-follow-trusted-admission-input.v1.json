@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/SOCIAL-001-follow-trusted-admission-input.v1.json",
+  "title": "SOCIAL-001 Follow Trusted Admission Input Contract",
+  "version": "1.0.0",
+  "status": "BLOCKED_NOT_ADMITTED",
+  "featureId": "SOCIAL-001",
+  "operationIds": [
+    "follow",
+    "unfollow"
+  ],
+  "canonicalOwnership": {
+    "domain": "SOCIAL",
+    "task": "T11",
+    "worker": "W05",
+    "d1": "D1-02"
+  },
+  "purpose": "Define the minimum trusted server-side inputs that must exist before W05 may execute the authoritative Follow/Unfollow mutation. This contract closes the security-input shape without inventing a new authority.",
+  "inputContract": {
+    "actor": {
+      "field": "actorUserId",
+      "source": "W01 authenticated Payload principal established through the existing W01→W02 session-authority path",
+      "clientWritable": false,
+      "required": true
+    },
+    "target": {
+      "field": "targetUserId",
+      "source": "public request target resolved against authoritative ENT-USER",
+      "clientWritable": true,
+      "required": true,
+      "canonicalExposure": "targetUserId only"
+    },
+    "actorAccountState": {
+      "field": "actorAccountState",
+      "source": "D1-01 account-state authority",
+      "clientWritable": false,
+      "requiredFor": [
+        "follow"
+      ],
+      "currentTransportEvidence": "NOT_BOUND_TO_SOCIAL",
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "targetFollowability": {
+      "field": "targetFollowability",
+      "source": "authoritative Social/Creator/User policy decision for the target",
+      "clientWritable": false,
+      "requiredFor": [
+        "follow"
+      ],
+      "currentTransportEvidence": "NO_CURRENT_EVIDENCE_BOUND",
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "blockPolicy": {
+      "field": "blockPolicyAllows",
+      "source": "authoritative Social/Trust & Safety policy decision",
+      "clientWritable": false,
+      "requiredFor": [
+        "follow",
+        "unfollow"
+      ],
+      "currentTransportEvidence": "NO_CURRENT_EVIDENCE_BOUND",
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "privacyScope": {
+      "field": "privacyScopeAllows",
+      "source": "authoritative privacy/audience policy decision",
+      "clientWritable": false,
+      "requiredFor": [
+        "follow"
+      ],
+      "currentTransportEvidence": "NO_CURRENT_EVIDENCE_BOUND",
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "antiAbuse": {
+      "field": "antiAbuseAdmission",
+      "source": "canonical interaction anti-abuse admission layer",
+      "clientWritable": false,
+      "requiredFor": [
+        "follow",
+        "unfollow"
+      ],
+      "allowedValues": [
+        "ALLOW",
+        "THROTTLE",
+        "CHALLENGE",
+        "BLOCK",
+        "REVIEW"
+      ],
+      "currentTransportEvidence": "NO_CURRENT_EVIDENCE_BOUND",
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "callerProvenance": {
+      "fields": [
+        "caller",
+        "transportVersion",
+        "correlationId"
+      ],
+      "source": "trusted internal transport",
+      "clientWritable": false,
+      "required": true
+    }
+  },
+  "admissionDecision": {
+    "field": "decision",
+    "allowedValues": [
+      "ALLOW",
+      "DENY"
+    ],
+    "rule": "W05 MUST fail closed unless every required policy input for the operation is present, fresh for the request, and sourced from an admitted authority.",
+    "clientWritable": false
+  },
+  "operationRequirements": {
+    "follow": {
+      "requiredInputs": [
+        "actorUserId",
+        "targetUserId",
+        "actorAccountState",
+        "targetFollowability",
+        "blockPolicyAllows",
+        "privacyScopeAllows",
+        "antiAbuseAdmission",
+        "callerProvenance"
+      ],
+      "successMutation": "single authoritative D1-02 write protected by unique (actorUserId,targetUserId) relation constraint",
+      "duplicateRule": "duplicate active relation is idempotent success",
+      "selfFollowRule": "deny when canonical operation policy forbids self-follow",
+      "rpcBudget": 0
+    },
+    "unfollow": {
+      "requiredInputs": [
+        "actorUserId",
+        "targetUserId",
+        "blockPolicyAllows",
+        "antiAbuseAdmission",
+        "callerProvenance"
+      ],
+      "successMutation": "single atomic D1-02 delete",
+      "missingRule": "missing active relation is idempotent success",
+      "rpcBudget": 0
+    }
+  },
+  "transportSecurity": {
+    "rules": [
+      "No end-user bearer token is forwarded to W05 as an authority credential.",
+      "actorUserId MUST originate from the authenticated server principal.",
+      "The public request MUST NOT be allowed to set actorUserId, account state, policy decisions, counters or relation state.",
+      "Policy decision fields MUST NOT be accepted from an untrusted public client.",
+      "Missing or ambiguous policy input MUST fail closed.",
+      "The transport MUST be internal-only and MUST carry correlation/provenance metadata."
+    ]
+  },
+  "topologyConstraints": {
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newPayloadCollections": 0,
+    "crossD1Transactions": 0,
+    "newPublicOperationIds": 0
+  },
+  "evidenceRequiredBeforeImplementationAdmission": [
+    "authority source for actor account state",
+    "authority source for target followability",
+    "authority source for block policy",
+    "authority source for privacy/scope",
+    "authority source for anti-abuse admission",
+    "trusted W01→W05 transport binding",
+    "exact source SHA for each boundary",
+    "fail-closed negative tests"
+  ],
+  "implementationRule": "This contract does not authorize W05 runtime implementation. Implementation remains blocked until all MISSING_AUTHORITY_BINDING entries are reconciled to existing authoritative sources or a formally admitted authority contract.",
+  "nonGoals": [
+    "No new policy store",
+    "No D1-02 copy of D1-01 account authority",
+    "No parallel block/privacy authority",
+    "No ad-hoc W05 RPC to another business Worker",
+    "No cache as authorization authority",
+    "No Mapping 0 GREEN claim"
+  ]
+}
