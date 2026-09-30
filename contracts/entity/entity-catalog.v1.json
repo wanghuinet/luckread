@@ -121,6 +121,17 @@
         "docs/160-DATA-LIFECYCLE-RETENTION-ERASURE-CONTRACT-v1.0.md",
         "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"
       ]
+    },
+    {
+      "entityId": "ENT-SOCIAL-FOLLOW",
+      "name": "SocialFollowRelationship",
+      "domainId": "D1-02",
+      "classification": "AUTHORITATIVE",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
+      ]
     }
   ],
   "rules": {
