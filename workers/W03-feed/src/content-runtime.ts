@@ -103,6 +103,7 @@ const publicMessage = (code: string): string => {
     case 'IDEMPOTENCY_IN_PROGRESS': return 'A matching content mutation is already in progress'
     case 'IDEMPOTENCY_KEY_REUSE_CONFLICT': return 'Idempotency-Key cannot be reused with different input'
     case 'SERVICE_UNAVAILABLE': return 'Content service unavailable'
+    case 'PREFLIGHT_BLOCKED': return 'Publish preflight blocked submission'
     default: return 'Content request failed'
   }
 }

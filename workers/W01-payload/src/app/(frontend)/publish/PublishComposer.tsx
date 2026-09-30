@@ -4,6 +4,27 @@ import { ChangeEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type ContentType = 'article' | 'post' | 'video'
+type AiMode = 'none' | 'outline' | 'assist' | 'full'
+
+type PublishPreflightResult = {
+  verdict: 'PASS' | 'YELLOW' | 'RED'
+  score: number
+  seoReadiness: 'READY' | 'IMPROVE' | 'BLOCKED'
+  summary: string
+  findings: Array<{ severity: 'INFO' | 'WARN' | 'BLOCK'; category: string; title: string; message: string; fix: string }>
+  analyzed: {
+    titleChars: number
+    bodyChars: number
+    paragraphCount: number
+    headingCount: number
+    externalUrlCount: number
+    phoneCount: number
+    mobileNumberCount: number
+    detectedPhoneRegions: string[]
+    messengerIdCount: number
+    detectedMessengers: string[]
+  }
+}
 
 type UploadedAsset = {
   id: string
@@ -99,6 +120,9 @@ export default function PublishComposer({
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [preview, setPreview] = useState(false)
+  const [aiMode, setAiMode] = useState<AiMode>('none')
+  const [humanConfirmed, setHumanConfirmed] = useState(false)
+  const [preflightReport, setPreflightReport] = useState<PublishPreflightResult | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -278,6 +302,36 @@ export default function PublishComposer({
     }
   }
 
+  async function runPreflight(): Promise<{ report: PublishPreflightResult; input: Record<string, unknown>; draft: ContentResponse }> {
+    if (!title.trim() || !body.trim()) throw new Error('请先填写标题和正文。')
+    if (type === 'video' && assets.length === 0) throw new Error('视频至少需要添加一个媒体文件。')
+
+    const savedDraft = await persistDraft()
+    const input = {
+      contentType: type,
+      title: title.trim(),
+      body,
+      mediaRefs: assets.map((asset) => asset.url),
+      coverRef: coverRef.trim() || assets[0]?.url || null,
+      aiMode,
+      humanContribution: humanConfirmed ? 'substantial' : 'light',
+    }
+    const response = await authorizedFetch(
+      contentBasePath + '/' + encodeURIComponent(savedDraft.id) + '/preflight',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(input),
+      },
+    )
+    const report = await response.json().catch((): null => null) as PublishPreflightResult | null
+    if (!response.ok || !report?.verdict) throw new Error('发布前检查失败，请稍后重试。')
+    setPreflightReport(report)
+    return { report, input, draft: savedDraft }
+  }
+
+
+
   async function saveDraft() {
     setBusy(true); setError(''); setMessage('')
     try {
@@ -354,24 +408,24 @@ export default function PublishComposer({
   async function submitForReview() {
     setBusy(true); setError(''); setMessage('')
     try {
-      if (!title.trim() || !body.trim()) {
-        setError('请先填写标题和正文。')
-        return
+      const { report, input, draft: savedDraft } = await runPreflight()
+      if (report.verdict === 'RED') return
+      if (report.verdict === 'YELLOW') {
+        const warnings = report.findings.filter((item) => item.severity === 'WARN').slice(0, 4).map((item) => '• ' + item.title).join('\\n')
+        if (!window.confirm(report.summary + '\\n\\n建议先处理：\\n' + warnings + '\\n\\n确认仍然提交审核吗？')) return
       }
-      if (type === 'video' && assets.length === 0) {
-        setError('视频至少需要添加一个媒体文件。')
-        return
-      }
-      const savedDraft = await persistDraft()
-      const response = await authorizedFetch(`${contentBasePath}/${encodeURIComponent(savedDraft.id)}/state`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'If-Match': savedDraft.etag,
-          'Idempotency-Key': crypto.randomUUID(),
+      const response = await authorizedFetch(
+        contentBasePath + '/' + encodeURIComponent(savedDraft.id) + '/state',
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'If-Match': savedDraft.etag,
+            'Idempotency-Key': crypto.randomUUID(),
+          },
+          body: JSON.stringify({ to: 'PENDING_REVIEW', preflight: input }),
         },
-        body: JSON.stringify({ to: 'PENDING_REVIEW' }),
-      })
+      )
       const data = await response.json().catch((): null => null)
       if (!response.ok) throw new Error(data?.error?.message || 'SUBMIT_FAILED')
       const transition = data as { to?: string; version?: number; etag?: string }
@@ -381,10 +435,10 @@ export default function PublishComposer({
           : current,
       )
       window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
-      setMessage('已提交发布审核。审核通过后将进入正式发布状态。')
+      setMessage('发布前检查通过，已提交审核。审核通过后将进入正式发布状态。')
     } catch (caught) {
       const code = caught instanceof Error ? caught.message : ''
-      setError(code === 'AUTH_REQUIRED' ? '登录已失效，请重新登录。' : '提交失败，请稍后重试。')
+      setError(code === 'AUTH_REQUIRED' ? '登录已失效，请重新登录。' : code || '提交失败，请稍后重试。')
       if (code === 'AUTH_REQUIRED') {
         router.replace(window.location.pathname.startsWith('/admin/') ? '/admin/login' : '/login')
       }
@@ -472,6 +526,55 @@ export default function PublishComposer({
         )}
       </div>
 
+
+      <div className="lr-preflight-policy">
+        <div className="lr-preflight-policy-heading">
+          <strong>创作者质量与 AI 规范</strong>
+          <span>发布前自动检查</span>
+        </div>
+        <label className="lr-field">
+          <span>AI 使用方式（请据实选择）</span>
+          <select disabled={busy || reviewLocked} onChange={(event) => { setAiMode(event.target.value as AiMode); setPreflightReport(null) }} value={aiMode}>
+            <option value="none">未使用 AI</option>
+            <option value="outline">AI 只做提纲 / 框架</option>
+            <option value="assist">AI 辅助整理 / 润色</option>
+            <option value="full">整篇 AI 生成（禁止直接发布）</option>
+          </select>
+        </label>
+        {type === 'article' ? (
+          <label className="lr-preflight-check">
+            <input checked={humanConfirmed} disabled={busy || reviewLocked} onChange={(event) => { setHumanConfirmed(event.target.checked); setPreflightReport(null) }} type="checkbox" />
+            <span>我已补充自己的原创事实、经验、案例、数据或判断，并亲自核验关键事实。</span>
+          </label>
+        ) : null}
+        <p>原则：AI 可以帮你搭框架，但不能替代创作者完成文章；最终内容必须真正帮助读者。</p>
+      </div>
+
+      {preflightReport ? (
+        <section className={'lr-preflight-report lr-preflight-' + preflightReport.verdict.toLowerCase()} aria-label="发布前检查结果">
+          <div className="lr-preflight-report-head">
+            <strong>{preflightReport.verdict === 'PASS' ? '检查通过' : preflightReport.verdict === 'YELLOW' ? '建议修改后发布' : '暂不能提交'}</strong>
+            <span>质量 / SEO 准备度 {preflightReport.score}</span>
+          </div>
+          <p>{preflightReport.summary}</p>
+          <div className="lr-preflight-stats" aria-label="检测统计">
+            <span>正文 {preflightReport.analyzed.bodyChars}</span>
+            <span>段落 {preflightReport.analyzed.paragraphCount}</span>
+            <span>外链 {preflightReport.analyzed.externalUrlCount}</span>
+            <span>电话 {preflightReport.analyzed.phoneCount}</span>
+            <span>即时通讯 {preflightReport.analyzed.messengerIdCount}</span>
+          </div>
+          {preflightReport.findings.slice(0, 8).map((item, index) => (
+            <div className="lr-preflight-finding" key={item.category + item.title + index}>
+              <strong>{item.severity === 'BLOCK' ? '阻断' : item.severity === 'WARN' ? '建议' : '提示'} · {item.title}</strong>
+              <span>{item.message}</span>
+              <small>建议：{item.fix}</small>
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+
       <label className="lr-field">
         <span>封面引用（可选）</span>
         <input
@@ -513,6 +616,14 @@ export default function PublishComposer({
             新建内容
           </button>
         ) : null}
+        <button className="ghost" disabled={busy || reviewLocked} onClick={async () => {
+          setBusy(true); setError(''); setMessage('')
+          try { await runPreflight(); setMessage('发布前检查完成，请查看检查结果。') }
+          catch (caught) { setError(caught instanceof Error ? caught.message : '发布前检查失败，请稍后重试。') }
+          finally { setBusy(false) }
+        }} type="button">
+          发布前自检
+        </button>
         <button className="ghost" disabled={busy} onClick={() => setPreview((current) => !current)} type="button">
           {preview ? '关闭预览' : '预览'}
         </button>
@@ -535,7 +646,7 @@ export default function PublishComposer({
       </div>
 
       <p className="lr-note">
-        提交发布不会绕过审核：创建后先进入草稿，再按内容状态机进入审核和正式发布。
+        提交发布不会绕过审核：创建后先进入草稿；发布前由 W03 做质量、SEO、导流与 AI 创作规范检查，再按内容状态机进入审核和正式发布。
       </p>
     </div>
   )
