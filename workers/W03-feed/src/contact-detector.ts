@@ -10,6 +10,7 @@ export type ContactSignal = {
   kind: ContactSignalKind
   platform?: string
   region?: string
+  phoneKind?: 'MOBILE' | 'LANDLINE' | 'UNKNOWN'
   confidence: ContactSignalConfidence
   reasonCode:
     | 'PHONE_VALID'
@@ -409,9 +410,13 @@ const dedupeSignals = (signals: ContactSignal[]): ContactSignal[] => {
 const detectPhones = (value: string): ContactSignal[] => {
   const signals: ContactSignal[] = []
   for (const found of [...detectInternationalPhonesWithLibrary(value), ...detectNationalPhones(value)]) {
+    const phoneKind = found.source === 'library'
+      ? found.mobileSpecific ? 'MOBILE' : 'LANDLINE'
+      : found.mobileSpecific ? 'MOBILE' : 'UNKNOWN'
     signals.push({
       kind: 'PHONE',
       region: found.region,
+      phoneKind,
       confidence: found.confidence,
       reasonCode: found.source === 'library'
         ? found.confidence === 'HIGH' ? 'PHONE_VALID' : 'PHONE_POSSIBLE'
@@ -496,6 +501,16 @@ const detectLeadGeneration = (value: string): string[] => {
 
 const detectObfuscation = (value: string): boolean => normalizeContactText(value).hadObfuscation
 
+const containsSpacedPlatformLabel = (value: string, platform: string): boolean => {
+  const letters = platform.replace(/[^A-Za-z]/g, '')
+  if (letters.length < 3) return false
+  const pattern = letters.split('').map(char => char.replace(/[.*+?^{}()|[\]\\]/g, '\\const detectObfuscation = (value: string): boolean => normalizeContactText(value).hadObfuscation
+
+export const detectContactSignals = (rawValue: string): ContactDetectionResult => {
+')).join('\\s+')
+  return new RegExp(pattern, 'i').test(value)
+}
+
 export const detectContactSignals = (rawValue: string): ContactDetectionResult => {
   const raw = String(rawValue ?? '')
   const { normalized, hadObfuscation } = normalizeContactText(raw)
@@ -534,7 +549,7 @@ export const detectContactSignals = (rawValue: string): ContactDetectionResult =
   return {
     signals: dedupeSignals(signals).slice(0, 80),
     phoneCount: phoneSignals.length,
-    mobileNumberCount: phoneSignals.filter(item => item.reasonCode !== 'PHONE_NATIONAL_CONTEXT' || /mobile|手机号|手机|联系电话/i.test(raw)).length,
+    mobileNumberCount: phoneSignals.filter(item => item.phoneKind === 'MOBILE').length,
     detectedMobileRegions: Array.from(new Set(phoneSignals.map(item => item.region).filter(Boolean))),
     messengerIdCount: messengerSignals.length,
     detectedMessengers: Array.from(new Set(messengerSignals.map(item => item.platform).filter(Boolean))),
@@ -543,6 +558,6 @@ export const detectContactSignals = (rawValue: string): ContactDetectionResult =
     urlCount: domains.urls.length,
     detectedDomains: domains.domains,
     leadGenerationSignals,
-    obfuscationDetected: hadObfuscation || (compactChanged && signals.some(item => item.kind === 'MESSENGER' || item.kind === 'SOCIAL')),
+    obfuscationDetected: hadObfuscation || MESSENGER_RULES.some(rule => containsSpacedPlatformLabel(normalized, rule.platform)),
   }
 }
