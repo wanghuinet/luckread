@@ -110,6 +110,15 @@ describe('W03 publish preflight', () => {
     ]))
   })
 
+  it('does not classify a bare numeric identifier as a phone without context or formatting', () => {
+    const result = preflightContent({
+      ...base,
+      body: '版本号 9876543210，订单流水 123456789012。',
+    })
+    expect(result.analyzed.phoneCount).toBe(0)
+    expect(result.findings.some(item => item.id === 'CONTACT-PHONE')).toBe(false)
+  })
+
   it('detects representative top-tier messaging IDs and invite links', () => {
     const result = preflightContent({
       ...base,
