@@ -6,7 +6,8 @@
   "status": "CONTRACTED_NOT_VERIFIED",
   "entityId": "ENT-MODERATION-CASE",
   "featureRefs": [
-    "MODERATION-001"
+    "GOV-003",
+    "GOV-004"
   ],
   "sourceRefs": [
     "contracts/entity/MODERATION-CASE-CONTRACT.v1.json",
