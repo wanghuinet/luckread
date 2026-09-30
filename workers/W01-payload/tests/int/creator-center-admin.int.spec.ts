@@ -120,6 +120,27 @@ describe('Creator Center admin extension', () => {
     expect(client).toContain('X-LuckRead-Principal-User-Id')
   })
 
+  it('surfaces the implemented creator workflow as a first-class workspace', () => {
+    const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const styles = read('src/app/(payload)/admin/creator-center.module.css')
+
+    expect(view).toContain('id="dashboard"')
+    expect(view).toContain('id="content-management"')
+    expect(view).toContain('id="publisher"')
+    expect(view).toContain('id="creator-tools"')
+    expect(view).toContain('文章 / 动态 / 视频')
+    expect(view).toContain('内容管理')
+    expect(view).toContain('发布中心')
+    expect(view).toContain('发布前检测助手')
+    expect(view).toContain('href="/admin/collections/media"')
+    expect(view).toContain('href="/admin/account"')
+    expect(view).toContain('className={styles.floatingAssistant}')
+    expect(view).toContain('检测助手')
+    expect(styles).toContain('.creatorNav')
+    expect(styles).toContain('.overviewGrid')
+    expect(styles).toContain('.floatingAssistant')
+  })
+
   it('keeps frontend and Admin on the same Payload cookie session lifecycle', () => {
     const login = read('src/app/auth/login/route.ts')
     const logout = read('src/app/auth/logout/route.ts')
