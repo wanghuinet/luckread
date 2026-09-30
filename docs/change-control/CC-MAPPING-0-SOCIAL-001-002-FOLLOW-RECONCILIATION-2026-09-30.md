@@ -114,6 +114,18 @@ The post-sweep active Contract Admission and Mapping Structural runs both comple
 
 Therefore the current control-plane contracts are structurally/admission-valid, while the Social feature-specific technical mapping remains `NOT_GREEN`.
 
+## API Operation Reconciliation — SOCIAL-001
+
+The repository now provides direct canonical API evidence for the Follow mutation pair:
+
+- `follow` — `POST /social/follows` — formal OpenAPI `operationId`, sourced in `contracts/openapi/v1/openapi.yaml#/social/follows`.
+- `unfollow` — `DELETE /social/follows` — formal OpenAPI `operationId`, sourced in the same OpenAPI path.
+- `contracts/api/interaction-operation-policy.v1.json` independently defines the same `follow` / `unfollow` operation IDs and their idempotency/concurrency/security rules.
+
+This closes only the `Feature → API operation` edge for `SOCIAL-001`. It does **not** close DTO, Entity, Field/Persistence, Payload, W05 executable code, runtime, event-producer, cache, or Evidence Registry edges.
+
+For `SOCIAL-002`, `getUsersUserIdFollowers` and `getUsersUserIdFollowing` exist in OpenAPI and API inventory, but both are explicitly marked `DISCOVERY_DRAFT` with detailed response contracts still open. They therefore remain non-promoted discovery evidence and are not used as a GREEN API binding.
+
 ## Remaining Blocking Edges
 
 The repository does not yet provide evidence sufficient to bind:
