@@ -514,11 +514,6 @@ const containsSpacedPlatformLabel = (value: string, platform: string): boolean =
 }
 
 export const detectContactSignals = (rawValue: string): ContactDetectionResult => {
-')).join('\\s+')
-  return new RegExp(pattern, 'i').test(value)
-}
-
-export const detectContactSignals = (rawValue: string): ContactDetectionResult => {
   const raw = String(rawValue ?? '')
   const { normalized, hadObfuscation } = normalizeContactText(raw)
   const compacted = compactContactLabels(normalized)
