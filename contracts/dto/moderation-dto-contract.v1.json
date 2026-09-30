@@ -73,13 +73,15 @@
         "scope": "decision scope",
         "effectiveAt": "date-time",
         "expiresAt": "date-time or null",
-        "idempotencyKey": "transport header; not duplicated as business identity"
+        "idempotencyKey": "transport header; not duplicated as business identity",
+        "ifMatch": "If-Match request header carrying the current case version/ETag"
       },
       "serverOwned": [
         "reviewer identity",
         "actor layer",
         "case ownership/scope",
-        "audit timestamps where server-generated"
+        "audit timestamps where server-generated",
+        "If-Match validation result"
       ]
     },
     "DTO-MODERATION-DECISION-RESPONSE": {
@@ -106,7 +108,7 @@
   },
   "requiredNextContracts": [
     "canonical OpenAPI paths",
-    "trusted reviewer transport binding",
+    "contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json",
     "audit event binding",
     "runtime/evidence admission"
   ]

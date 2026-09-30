@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json",
+  "title": "MODERATION-001 Trusted Reviewer Admission Input Contract",
+  "version": "1.0.0",
+  "status": "BLOCKED_NOT_ADMITTED",
+  "featureId": "MODERATION-001",
+  "operationIds": [
+    "listModerationQueue",
+    "getModerationCase",
+    "decideModerationCase"
+  ],
+  "canonicalOwnership": {
+    "domain": "MODERATION",
+    "task": "T19",
+    "worker": "W06",
+    "d1": "D1-03"
+  },
+  "purpose": "Define the minimum trusted server-side reviewer context required before W06 moderation Queue/Case/Decision runtime may execute. This contract does not create a new transport or authority.",
+  "inputContract": {
+    "authenticatedPrincipal": {
+      "field": "actorUserId",
+      "source": "W01 authenticated server principal established through existing W01→W02 session-authority path",
+      "clientWritable": false,
+      "required": true
+    },
+    "reviewerIdentity": {
+      "field": "reviewerId",
+      "source": "server-derived principal identity bound to the current authenticated administrative session",
+      "clientWritable": false,
+      "requiredFor": [
+        "decideModerationCase"
+      ],
+      "currentTransportEvidence": "NO_CURRENT_EVIDENCE_BOUND",
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "reviewerLayer": {
+      "field": "reviewerLayer",
+      "source": "canonical authorization layer/role authority; minimum L6 for moderation permissions",
+      "clientWritable": false,
+      "requiredFor": [
+        "listModerationQueue",
+        "getModerationCase",
+        "decideModerationCase"
+      ],
+      "currentTransportEvidence": "NO_CURRENT_EVIDENCE_BOUND",
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "permissionContext": {
+      "field": "permissionContext",
+      "source": "canonical authz permissions + server-derived reviewer scope",
+      "clientWritable": false,
+      "required": true,
+      "currentTransportEvidence": "CONTRACTED_NOT_VERIFIED"
+    },
+    "caseId": {
+      "field": "caseId",
+      "source": "canonical route/path parameter for case-scoped operations",
+      "clientWritable": true,
+      "requiredFor": [
+        "getModerationCase",
+        "decideModerationCase"
+      ]
+    },
+    "expectedVersion": {
+      "field": "expectedVersion",
+      "source": "client DTO value checked against authoritative W06 case version",
+      "clientWritable": true,
+      "requiredFor": [
+        "decideModerationCase"
+      ]
+    },
+    "conditionalRequest": {
+      "field": "If-Match",
+      "source": "canonical conditional-request contract; representation must match current case version/ETag",
+      "clientWritable": true,
+      "requiredFor": [
+        "decideModerationCase"
+      ],
+      "missingStatus": 428,
+      "mismatchStatus": 412
+    },
+    "idempotency": {
+      "field": "Idempotency-Key",
+      "source": "canonical idempotency contract",
+      "clientWritable": true,
+      "requiredFor": [
+        "decideModerationCase"
+      ],
+      "serverOwnedSemantics": true
+    },
+    "provenance": {
+      "fields": [
+        "caller",
+        "transportVersion",
+        "correlationId",
+        "requestId"
+      ],
+      "source": "trusted internal transport",
+      "clientWritable": false,
+      "required": true
+    }
+  },
+  "admissionDecision": {
+    "field": "decision",
+    "allowedValues": [
+      "ALLOW",
+      "DENY"
+    ],
+    "rule": "W06 MUST fail closed unless authenticated principal, reviewer layer, permission scope, and required concurrency/provenance inputs are present and bound to admitted authorities.",
+    "clientWritable": false
+  },
+  "transportSecurity": {
+    "rules": [
+      "No end-user bearer token is forwarded to W06 as an authority credential.",
+      "Reviewer identity and layer MUST be server-derived; client fields with those meanings are rejected or ignored.",
+      "Internal origin alone MUST NOT establish moderation authority.",
+      "The transport MUST preserve actor, subject/case scope and correlation context.",
+      "Reviewer scope MUST be checked for every queue/case/decision operation.",
+      "Missing reviewer authority input MUST fail closed.",
+      "Decision writes MUST require Idempotency-Key and If-Match/expectedVersion consistency.",
+      "Raw evidence and internal risk thresholds MUST NOT cross the reviewer DTO boundary unless separately contracted."
+    ]
+  },
+  "topologyConstraints": {
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newPayloadCollections": 0,
+    "crossD1Transactions": 0,
+    "newPublicOperationIds": 0,
+    "directW06ToW03TableAccess": false
+  },
+  "evidenceRequiredBeforeImplementationAdmission": [
+    "verified W01 authenticated principal propagation to the moderation boundary",
+    "verified reviewer identity/layer/permission scope derivation",
+    "trusted internal transport binding to W06",
+    "exact transport source SHA",
+    "fail-closed unauthenticated/insufficient-layer/outsider-scope negative tests",
+    "If-Match 428/412 evidence",
+    "Idempotency replay and key-reuse-conflict evidence"
+  ],
+  "implementationRule": "This contract does not authorize W06 runtime implementation. Runtime remains blocked until each MISSING_AUTHORITY_BINDING is reconciled to an existing authoritative source and admitted evidence is produced.",
+  "nonGoals": [
+    "No new Service Binding is created by this contract.",
+    "No direct W02→W06 business Service Binding is inferred.",
+    "No Payload moderation authority.",
+    "No D1-03 migration execution.",
+    "No canonical OpenAPI promotion.",
+    "No Mapping 0 GREEN claim."
+  ]
+}

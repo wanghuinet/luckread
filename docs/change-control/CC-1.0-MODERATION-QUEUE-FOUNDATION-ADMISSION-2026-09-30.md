@@ -3,7 +3,7 @@
 **Status: GAP / DECISION MATERIAL / IMPLEMENTATION BLOCKED**
 
 Repository: `wanghuinet/luckread`  
-Base head reviewed: `87271d91e938b43952da9d01456d4f45796e6290`
+Base head reviewed: `c6bc180c321a8ff000b863202343e94cd0e72c41`
 
 ## 1. Purpose
 
@@ -66,6 +66,7 @@ The following contract-only bindings are now explicit and remain non-canonical:
 - contracts/entity/MODERATION-CASE-CONTRACT.v1.json defines the authoritative W06/D1-03 ModerationCase vocabulary.
 - contracts/entity/MODERATION-DECISION-CONTRACT.v1.json defines the authoritative W06/D1-03 decision record vocabulary.
 - contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json binds both entities to the existing D1-03/W06 logical persistence target only; no migration is executed or claimed.
+- `contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json` defines the minimum reviewer principal/layer/permission/provenance and conditional-request inputs; it remains `BLOCKED_NOT_ADMITTED`.
 - The entity catalog, field registry and database-entity persistence inventory now carry the same proposed/non-verified records.
 
 This slice does not create a Worker, D1, migration execution, OpenAPI promotion or runtime implementation. The moderation path remains BLOCKED pending canonical OpenAPI, trusted reviewer transport, audit binding and executable evidence.
@@ -80,6 +81,12 @@ This slice does not create a Worker, D1, migration execution, OpenAPI promotion 
 6. Queue ordering, reviewer scope, evidence access, decision semantics and audit requirements must become executable contracts before runtime implementation.
 7. Content state remains authoritative in the existing W03 content runtime; moderation only authorizes the contracted moderator transition.
 
+## 4.2 Trusted reviewer transport / concurrency contract slice
+
+The reviewer transport slice is explicit but intentionally blocked. It binds to the existing W01→W02 authenticated principal boundary, canonical L6 authorization semantics, and the canonical conditional-request/idempotency contract. It does **not** invent a W01→W06 Service Binding and does not authorize runtime.
+
+The decision path now requires both `If-Match` (transport precondition) and `expectedVersion` (DTO mirror) with `428` for a missing precondition and `412` for a mismatch. This aligns the moderation decision with the canonical concurrency contract.
+
 ## 5. Required contract-first closure before implementation
 
 The next admitted slice must establish, at minimum:
@@ -88,9 +95,10 @@ The next admitted slice must establish, at minimum:
 - moderation case DTO and sensitive-field visibility rules;
 - moderation decision DTO including policyVersion/reasonCode/severity/scope/effectiveAt/reviewer identity;
 - authoritative persistence binding and migration plan;
-- trusted internal transport between the owning domains;
+- trusted reviewer transport binding (`contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json`);
+- content-decision transport binding from W06 to W03;
 - permission checks for queue/case/decision;
-- idempotency + expectedVersion rules for decisions;
+- idempotency + If-Match/expectedVersion rules for decisions;
 - audit-event mapping;
 - evidence requirements and remote/runtime verification plan.
 

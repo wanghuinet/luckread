@@ -15,7 +15,9 @@
     "docs/change-control/CC-1.0-MODERATION-QUEUE-FOUNDATION-ADMISSION-2026-09-30.md",
     "contracts/entity/MODERATION-CASE-CONTRACT.v1.json",
     "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
-    "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json"
+    "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
+    "contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json",
+    "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
   ],
   "authorityBoundary": {
     "worker": "W06",
@@ -167,8 +169,11 @@
         "key": "Idempotency-Key"
       },
       "concurrency": {
-        "strategy": "EXPECTED_VERSION",
+        "strategy": "EXPECTED_VERSION_CAS",
+        "header": "If-Match",
+        "expectedVersionBodyField": "expectedVersion",
         "conflictStatus": 412,
+        "missingPreconditionStatus": 428,
         "duplicateDecision": "IDEMPOTENT_REPLAY"
       },
       "decision": {
@@ -198,7 +203,7 @@
         "permission": "CONTRACTED",
         "dto": "MISSING",
         "persistence": "CONTRACTED_NOT_VERIFIED",
-        "transport": "MISSING",
+        "transport": "CONTRACTED_NOT_VERIFIED",
         "integration": "MISSING",
         "securityE2E": "MISSING"
       }
