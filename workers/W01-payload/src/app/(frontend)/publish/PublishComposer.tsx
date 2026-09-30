@@ -12,6 +12,16 @@ type PublishPreflightResult = {
   seoReadiness: 'READY' | 'IMPROVE' | 'BLOCKED'
   summary: string
   findings: Array<{ severity: 'INFO' | 'WARN' | 'BLOCK'; category: string; title: string; message: string; fix: string }>
+  analyzed?: {
+    phoneCount: number
+    mobileNumberCount: number
+    detectedMobileRegions: string[]
+    messengerIdCount: number
+    detectedMessengers: string[]
+    socialProfileCount: number
+    emailCount: number
+    urlCount: number
+  }
 }
 
 type UploadedAsset = {
@@ -545,6 +555,16 @@ export default function PublishComposer({
             <span>质量 / SEO 准备度 {preflightReport.score}</span>
           </div>
           <p>{preflightReport.summary}</p>
+          {preflightReport.analyzed ? (
+            <div className="lr-preflight-summary" aria-label="联系方式检测摘要">
+              <span>电话 {preflightReport.analyzed.phoneCount}</span>
+              <span>即时通讯 {preflightReport.analyzed.messengerIdCount}</span>
+              <span>社交主页 {preflightReport.analyzed.socialProfileCount}</span>
+              <span>邮箱 {preflightReport.analyzed.emailCount}</span>
+              <span>外链 {preflightReport.analyzed.urlCount}</span>
+              {preflightReport.analyzed.detectedMessengers.length ? <span>涉及：{preflightReport.analyzed.detectedMessengers.slice(0, 5).join('、')}{preflightReport.analyzed.detectedMessengers.length > 5 ? '等' : ''}</span> : null}
+            </div>
+          ) : null}
           {preflightReport.findings.slice(0, 8).map((item, index) => (
             <div className="lr-preflight-finding" key={item.category + item.title + index}>
               <strong>{item.severity === 'BLOCK' ? '阻断' : item.severity === 'WARN' ? '建议' : '提示'} · {item.title}</strong>
