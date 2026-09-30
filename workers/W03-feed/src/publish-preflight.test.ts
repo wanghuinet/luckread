@@ -150,4 +150,40 @@ describe('W03 publish preflight', () => {
     ]))
     expect(result.findings.some(item => item.id === 'CONTACT-MESSENGER-ID')).toBe(true)
   })
+
+  it('uses Unicode normalization to catch obfuscated contact intent without blocking normal multilingual text', () => {
+    const obfuscated = '请添加 wеixin: luckread_news 并购买课程' // the e in wеixin is Cyrillic
+    const result = preflightContent({ ...base, body: obfuscated })
+    expect(result.verdict).toBe('RED')
+    expect(result.findings.some(item => item.id === 'SEC-UNICODE-OBFUSCATION')).toBe(true)
+    expect(result.findings.some(item => item.category === 'CONTACT')).toBe(true)
+  })
+
+  it('detects external bare domains with a real URL parser', () => {
+    const result = preflightContent({
+      ...base,
+      body: '参考资料请查看 example.com/docs/publish-preflight。',
+    })
+    expect(result.analyzed.externalUrlCount).toBe(1)
+    expect(result.findings.some(item => item.id === 'LINK-EXTERNAL')).toBe(true)
+  })
+
+  it('does not block a phone number used as a factual/reporting reference by itself', () => {
+    const result = preflightContent({
+      ...base,
+      body: '新闻资料：客服电话为 +86 400 800 1234，来源为官方公告。',
+    })
+    expect(result.analyzed.phoneCount).toBeGreaterThanOrEqual(1)
+    expect(result.findings.some(item => item.id === 'CONTACT-PHONE' && item.severity === 'BLOCK')).toBe(false)
+  })
+
+  it('blocks multiple concrete contact channels when they form a risk combination', () => {
+    const result = preflightContent({
+      ...base,
+      body: '欢迎联系我，WhatsApp: https://wa.me/14155550123，Telegram: @luckread_news。',
+    })
+    expect(result.verdict).toBe('RED')
+    expect(result.findings.some(item => item.id === 'CONTACT-MESSENGER-ID' && item.severity === 'BLOCK')).toBe(true)
+  })
+
 })
