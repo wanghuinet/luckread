@@ -64,6 +64,8 @@
 .lr-preflight-check { display:flex; gap:9px; align-items:flex-start; margin-top:-4px; font-size:14px; line-height:1.55; }
 .lr-preflight-check input { margin-top:4px; }
 .lr-preflight-policy p { margin:10px 0 0; color:#64748b; font-size:12px; line-height:1.55; }
+.lr-preflight-stats { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 14px; }
+.lr-preflight-stats span { border:1px solid rgba(0,0,0,.08); border-radius:999px; padding:4px 9px; font-size:12px; background:rgba(255,255,255,.72); }
 .lr-preflight-report { margin-top:18px; padding:16px; border-radius:16px; border:1px solid #cbd5e1; background:white; }
 .lr-preflight-report-head span { font-size:12px; color:#64748b; }
 .lr-preflight-report > p { margin:9px 0 12px; color:#475569; font-size:13px; }
