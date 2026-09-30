@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { findPhoneNumbersInText, parsePhoneNumberFromString } from 'libphonenumber-js/mobile'
+import { findPhoneNumbersInText } from 'libphonenumber-js/mobile'
 import { parse as parseDomain } from 'tldts'
 
 export type ContactSignalKind = 'PHONE' | 'MESSENGER' | 'SOCIAL' | 'EMAIL' | 'URL'
@@ -240,6 +240,9 @@ const PHONE_CANDIDATE_RE = /(?<![\d+])(?:\+?\d[\d\s().-]{6,}\d)(?!\d)/g
 const PHONE_CONTEXT_RE = /(?:phone|telephone|mobile|cell|call|tel|contact|whatsapp|number|联系电话|电话|手机|手机号|移动电话|联系号码|联系方式|客服热线)/i
 const LEAD_GENERATION_RE = /(?:加我|加v|加vx|加微信|加好友|扫码|私聊|联系我|添加好友|加群|入群|下单|购买|付款|优惠|折扣|促销|代理|加盟|招商|返利|赚钱|课程|咨询|推广|引流|私域|dm me|message me|contact me|book now|buy now|order now|join my group|join us)/gi
 
+const firstMatches = (value: string, pattern: RegExp, max = 6): string[] =>
+  Array.from(value.matchAll(pattern)).slice(0, max).map(match => match[0])
+
 const normalizeContactText = (value: string): { normalized: string; hadObfuscation: boolean } => {
   const nfkc = value.normalize('NFKC')
   const stripped = nfkc.replace(ZERO_WIDTH_RE, '').replace(BIDI_CONTROL_RE, '')
@@ -366,8 +369,8 @@ const detectNationalPhones = (value: string): DetectedMobileNumber[] => {
   return Array.from(dedupe.values()).slice(0, 30)
 }
 
-const sourceIsInternationalCandidate = (raw: string, hasExplicitInternationalPrefix: boolean): boolean =>
-  hasExplicitInternationalPrefix || /^\+?\d{10,15}$/.test(raw.replace(/[^\d+]/g, ''))
+const sourceIsInternationalCandidate = (_raw: string, hasExplicitInternationalPrefix: boolean): boolean =>
+  hasExplicitInternationalPrefix
 
 const dedupeSignals = (signals: ContactSignal[]): ContactSignal[] => {
   const seen = new Set<string>()
