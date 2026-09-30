@@ -1,7 +1,7 @@
 # Change Control: SOCIAL-001 W05 → D1-02 Physical Binding — 2026-09-30
 
 - Change Control ID: `CC-MAPPING-0-SOCIAL-001-W05-D1-02-PHYSICAL-BINDING-2026-09-30`
-- Status: `BINDING-ADMITTED / DEPLOYMENT-PENDING`
+- Status: `BINDING-VERIFIED / MIGRATION-PENDING`
 - Repository authority: GitHub `main`
 - Base main: `d047e774c99319d8ac6d58a6f2d5bef06c7f6ce3`
 - Backup: `backup/social-follow-w05-binding-before-20260930`
@@ -60,6 +60,20 @@ A deployment is admitted only when a controlled workflow proves, against one exa
 6. No unrelated Worker, D1 database or route is mutated.
 
 The resulting evidence must be bound back to `SOCIAL-001` before runtime implementation admission.
+
+## Verified execution evidence
+
+The controlled workflow `W05 D1-02 Physical Binding Deploy` completed successfully:
+
+- Workflow run: `36717067309`
+- Executed source SHA: `72751a271946ba994e5f45e0d4cd1076cecc71a8`
+- Worker: `luckread-w05`
+- D1-02 UUID: `6c342634-97f6-4248-9f4a-85772af4f22c`
+- Live binding inspection: passed
+- Provenance artifact: `w05-d1-02-binding-72751a271946ba994e5f45e0d4cd1076cecc71a8`
+- Artifact SHA-256: `sha256:0308b01662fbd3dcf16d95df4c78d2e38e1e14704ab239364a977f0cd731d28a`
+
+This evidence verifies only the physical Worker-to-D1 binding. It does not verify migration execution or runtime behavior.
 
 ## Next gate
 
