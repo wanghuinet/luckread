@@ -47,6 +47,17 @@ The repository search currently finds the moderation API paths in the contracts 
 
 No executable persistence contract has been admitted for the moderation queue/case/decision objects.
 
+## 4. Contract-first reservation
+
+The following machine-readable drafts now exist on `main` and remain non-canonical:
+
+- `contracts/api/moderation-operation-policy.v1.json` — queue/case/decision operation budgets, permissions and security invariants.
+- `contracts/dto/moderation-dto-contract.v1.json` — stable reserved DTO identities and sensitive-field rules.
+
+Both are explicitly `CONTRACT_DRAFT_OPENAPI_PENDING` and carry `implementationAuthorization: false`.
+
+No OpenAPI promotion, persistence execution or W06 runtime implementation is implied by these files.
+
 ## 4. Non-negotiable authority constraints
 
 1. W06 must not directly read or write W03 content tables merely to make the queue work.
