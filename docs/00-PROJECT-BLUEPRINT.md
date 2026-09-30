@@ -439,6 +439,59 @@ The interfaces do **not** require multiple providers to be deployed now. They es
 - avoid adding distributed databases solely to solve theoretical write latency;
 - define which operations require immediate consistency and which tolerate eventual consistency.
 
+### 8.8 Global Edge Traffic Steering and Regional Read Evolution
+
+**Scope:** future high-concurrency evolution only. This section does not change the current fixed 12 Worker / 4 D1 / 25 Tasks topology.
+
+When measured workload requires geographic traffic distribution, Luckread may use the Cloudflare edge to keep request ingress close to users and may evolve read-heavy paths toward regional read replicas.
+
+The architectural flow is:
+
+```text
+Client
+  ↓
+Cloudflare Edge
+  ↓
+regional / proximity-aware ingress
+  ↓
+Worker execution where beneficial
+  ├── hot read → Edge Cache
+  ├── read-heavy query → regional read replica
+  └── high-volume behavior → lightweight event → Queue/aggregation
+                                      ↓
+                                batch persistence
+                                      ↓
+                                domain authority
+```
+
+Rules:
+
+- geography may steer traffic, but never decides business authority;
+- authoritative Follow, Subscription, Entitlement, Account, Creator and financial writes remain on their defined domain authority path;
+- high-frequency behavior is preferably ingested as events and aggregated before persistence;
+- read replicas and caches are derived/read infrastructure, never authoritative state;
+- user-facing consistency requirements must determine whether a read may use eventual consistency;
+- Smart Placement or explicit traffic steering may be introduced only when measured backend proximity or traffic distribution justifies it;
+- regional infrastructure must not be created merely as a theoretical scaling exercise;
+- any future topology expansion requires its own Change-Control and cost/traffic evidence.
+
+This permits a later evolution from:
+
+```text
+single authoritative write path + global edge
+```
+
+toward:
+
+```text
+global edge
+→ regional execution/read
+→ centralized or domain-scoped authority
+→ asynchronous global projections
+```
+
+without turning geography into a second source of truth.
+
 ### 8.8 Runtime Compatibility
 
 **Risk:** A Worker runtime is not equivalent to a full Node.js server/container. Dependency upgrades can introduce unsupported or partially supported runtime behavior.
