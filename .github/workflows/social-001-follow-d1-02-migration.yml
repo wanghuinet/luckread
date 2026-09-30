@@ -39,17 +39,17 @@ env:
 
 jobs:
   migrate:
-    if: ${{{ inputs.confirm == 'APPLY_SOCIAL_001_MIGRATION' }}
+    if: ${{ inputs.confirm == 'APPLY_SOCIAL_001_MIGRATION' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
       - name: Validate dispatch inputs
         env:
-          SOURCE_SHA: ${{{ inputs.source_sha }}
-          DATABASE_NAME: ${{{ inputs.database_name }}
-          BINDING_RUN_ID: ${{{ inputs.binding_run_id }}
-          BINDING_SOURCE_SHA: ${{{ inputs.binding_source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+          BINDING_RUN_ID: ${{ inputs.binding_run_id }}
+          BINDING_SOURCE_SHA: ${{ inputs.binding_source_sha }}
         run: |
           set -euo pipefail
           printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
@@ -60,12 +60,12 @@ jobs:
       - name: Checkout exact migration source
         uses: actions/checkout@v4
         with:
-          ref: ${{{ inputs.source_sha }}
+          ref: ${{ inputs.source_sha }}
           fetch-depth: 1
 
       - name: Validate exact source SHA
         env:
-          SOURCE_SHA: ${{{ inputs.source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
 
       - name: Setup Node 24
@@ -75,9 +75,9 @@ jobs:
 
       - name: Verify binding provenance
         env:
-          GH_TOKEN: ${{{ github.token }}
-          BINDING_RUN_ID: ${{{ inputs.binding_run_id }}
-          BINDING_SOURCE_SHA: ${{{ inputs.binding_source_sha }}
+          GH_TOKEN: ${{ github.token }}
+          BINDING_RUN_ID: ${{ inputs.binding_run_id }}
+          BINDING_SOURCE_SHA: ${{ inputs.binding_source_sha }}
         run: |
           set -euo pipefail
           conclusion="$(gh run view "$BINDING_RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
@@ -165,9 +165,9 @@ jobs:
       - name: Capture controlled remote preflight
         working-directory: workers/W05-transaction
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{{ secrets.CLOUDFLARE_API_TOKEN }}
-          DATABASE_NAME: ${{{ inputs.database_name }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/artifacts/mapping-0/social-001-migration"
@@ -195,17 +195,17 @@ jobs:
       - name: Apply SOCIAL-001 Follow migration remotely
         working-directory: workers/W05-transaction
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{{ secrets.CLOUDFLARE_API_TOKEN }}
-          DATABASE_NAME: ${{{ inputs.database_name }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
         run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$DATABASE_NAME" --remote --config wrangler.jsonc
 
       - name: Capture and validate post-migration evidence
         working-directory: workers/W05-transaction
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{{ secrets.CLOUDFLARE_API_TOKEN }}
-          DATABASE_NAME: ${{{ inputs.database_name }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
         run: |
           set -euo pipefail
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc \
@@ -275,10 +275,10 @@ jobs:
       - name: Record execution provenance
         if: always()
         env:
-          SOURCE_SHA: ${{{ inputs.source_sha }}
-          DATABASE_NAME: ${{{ inputs.database_name }}
-          BINDING_RUN_ID: ${{{ inputs.binding_run_id }}
-          BINDING_SOURCE_SHA: ${{{ inputs.binding_source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+          BINDING_RUN_ID: ${{ inputs.binding_run_id }}
+          BINDING_SOURCE_SHA: ${{ inputs.binding_source_sha }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/mapping-0/social-001-migration
@@ -304,7 +304,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: social-001-follow-d1-02-migration-${{{ github.run_id }}
+          name: social-001-follow-d1-02-migration-${{ github.run_id }}
           path: artifacts/mapping-0/social-001-migration/
           if-no-files-found: error
           retention-days: 30
