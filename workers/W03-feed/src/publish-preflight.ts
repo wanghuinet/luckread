@@ -451,10 +451,7 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
     15,
   )
   const qrSignals = firstMatches(normalizedRiskBody, /(?:二维码|扫码|扫一扫|识别下方二维码)/gi, 8)
-  const htmlSignals = firstMatches(body, /<\/?(?:script|style|iframe|object|embed|img|a\b)[^>]*>/gi, 8)
-  const hiddenTextSignals = firstMatches(body, /(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0|opacity\s*:\s*0)/gi, 8)
-  const mediaRiskRefs = (input.mediaRefs ?? []).filter(value => /(?:qrcode|qr-code|weixin|wechat|vx|contact|promo|ad\b)/i.test(value)).slice(0, 6)
-  const unicodeRiskSignals = unicodeAnalysis.spoofed || unicodeAnalysis.signals.invisible || unicodeAnalysis.signals.illegal || unicodeAnalysis.signals.confusable_word
+  const unicodeRiskSignals = unicodeAnalysis.spoofed || unicodeAnalysis.signals.invisible || unicodeAnalysis.signals.illegal || unicodeAnalysis.signals.confusable_word || unicodeAnalysis.signals.encoding_damage
   const concreteContactChannelCount = [
     phones.length > 0,
     messengerIds.length > 0,
