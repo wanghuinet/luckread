@@ -1,0 +1,93 @@
+{
+  "evidenceId": "EVID-SOCIAL-001-D1-02-MIGRATION-20260930-RUN36718167892",
+  "status": "PASS_VERIFIED",
+  "featureIds": [
+    "SOCIAL-001"
+  ],
+  "entityId": "ENT-SOCIAL-FOLLOW",
+  "changeControl": "CC-MAPPING-0-SOCIAL-001-FOLLOW-MIGRATION-CONTRACT-2026-09-30",
+  "workflow": {
+    "name": "SOCIAL-001 Follow D1-02 Migration",
+    "runId": 36718167892,
+    "conclusion": "failure",
+    "failureBoundary": "post-migration evidence parser only",
+    "exactSourceSha": "d1b2a0096066c6486cd174e77293b144b9978e93"
+  },
+  "bindingEvidence": {
+    "workflowRunId": 36717067309,
+    "sourceSha": "72751a271946ba994e5f45e0d4cd1076cecc71a8",
+    "worker": "luckread-w05",
+    "d1DatabaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+    "bindingVerified": true
+  },
+  "migration": {
+    "name": "20260930_001_social_001_follow_v1.sql",
+    "remoteExecution": true,
+    "executionStepConclusion": "success",
+    "appliedAt": "2026-09-30 12:57:30",
+    "migrationHistoryEntryCount": 1
+  },
+  "postSchema": {
+    "table": "social_follow_relationships",
+    "columns": [
+      {
+        "name": "relationship_id",
+        "type": "TEXT",
+        "notnull": true,
+        "primaryKey": true
+      },
+      {
+        "name": "follower_user_id",
+        "type": "TEXT",
+        "notnull": true,
+        "primaryKey": false
+      },
+      {
+        "name": "target_user_id",
+        "type": "TEXT",
+        "notnull": true,
+        "primaryKey": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "notnull": true,
+        "primaryKey": false
+      }
+    ],
+    "indexes": [
+      {
+        "name": "uq_social_follow_follower_target",
+        "unique": true
+      },
+      {
+        "name": "ix_social_follow_follower_created",
+        "unique": false
+      },
+      {
+        "name": "ix_social_follow_target_created",
+        "unique": false
+      }
+    ],
+    "physicalForeignKeys": 0,
+    "unexpectedSchemaExpansion": false
+  },
+  "preflight": {
+    "targetTablePresent": false,
+    "targetMigrationRecorded": false,
+    "existingMigrationHistory": [
+      "0001_content_core.sql",
+      "0002_content_2_0_types_media.sql"
+    ]
+  },
+  "artifacts": {
+    "artifactId": 11097261149,
+    "artifactName": "social-001-follow-d1-02-migration-36718167892",
+    "zipSha256": "sha256:4b5ed42a15e8af0eea6b5fff83b988bea707e53ecefe03e2c7f0d7729517ff86"
+  },
+  "verificationNote": "The migration execution itself succeeded and the remote post-migration query evidence proves the contracted schema. Run failure was caused by duplicate collection of nested results in the verifier, not by the D1 migration.",
+  "promotion": {
+    "mappingGreen": false,
+    "runtimeGreen": false
+  }
+}
