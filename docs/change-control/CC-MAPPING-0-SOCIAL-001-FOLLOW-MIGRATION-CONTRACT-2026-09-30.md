@@ -47,7 +47,7 @@ schema evidence
 1. Confirm exact W05 deployment SHA and live D1-02 binding evidence.
 2. Materialize the versioned migration artifact from this contract without semantic expansion.
 3. Record the migration artifact hash before execution.
-4. Execute the migration only against the admitted D1 UUID.
+4. Execute the migration only against the admitted D1 UUID through the controlled `SOCIAL-001 Follow D1-02 Migration` workflow.
 5. Capture applied migration version and target schema evidence.
 6. Validate unique relation constraint and both pagination indexes.
 7. Bind execution evidence to SOCIAL-001.
