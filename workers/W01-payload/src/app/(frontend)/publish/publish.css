@@ -92,3 +92,19 @@
 .lr-preflight-red { border-color:#fecaca; background:#fff7f7; }
 .lr-preflight-yellow { border-color:#fde68a; background:#fffbeb; }
 .lr-preflight-pass { border-color:#bbf7d0; background:#f0fdf4; }
+
+.lr-preflight-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.lr-preflight-summary span {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: .82;
+}
