@@ -34,6 +34,7 @@ export interface PublishPreflightResult {
   summary: string
   findings: PreflightFinding[]
   positiveSignals: string[]
+  contactSignals: ContactSignal[]
   analyzed: {
     titleChars: number
     bodyChars: number
@@ -42,9 +43,13 @@ export interface PublishPreflightResult {
     externalUrlCount: number
     phoneCount: number
     mobileNumberCount: number
-    detectedPhoneRegions: string[]
+    detectedMobileRegions: string[]
     messengerIdCount: number
     detectedMessengers: string[]
+    socialProfileCount: number
+    emailCount: number
+    urlCount: number
+    obfuscationDetected: boolean
   }
 }
 
@@ -376,11 +381,15 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
       paragraphCount: paragraphs.length,
       headingCount,
       externalUrlCount: externalUrls.length,
-      phoneCount: phoneDetections.phoneCount,
-      mobileNumberCount: phoneDetections.mobileCount,
-      detectedPhoneRegions: phoneDetections.regions,
-      messengerIdCount: messengerIds.length,
-      detectedMessengers: Array.from(new Set(messengerIds.map(item => item.platform))),
+      phoneCount: contactDetection.phoneCount,
+      mobileNumberCount: contactDetection.mobileNumberCount,
+      detectedMobileRegions: contactDetection.detectedMobileRegions,
+      messengerIdCount: contactDetection.messengerIdCount,
+      detectedMessengers: contactDetection.detectedMessengers,
+      socialProfileCount: contactDetection.socialProfileCount,
+      emailCount: contactDetection.emailCount,
+      urlCount: contactDetection.urlCount,
+      obfuscationDetected: contactDetection.obfuscationDetected,
     },
   }
 }
