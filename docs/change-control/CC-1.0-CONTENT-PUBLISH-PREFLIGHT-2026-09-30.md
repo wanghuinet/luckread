@@ -51,3 +51,17 @@ This decision document does not declare GREEN. Implementation becomes admitted o
 The first-layer preflight registry now screens for phone-number candidates across major target markets in the Americas, Europe, East Asia and Southeast Asia, using country-code and national mobile-number patterns derived from public numbering-plan material. It also detects representative mainstream messaging identifiers or invite links for ten platforms: WhatsApp, Telegram, Facebook Messenger, WeChat, LINE, QQ, Signal, Viber, KakaoTalk and Discord.
 
 This is intentionally a local screening layer. It does not claim live carrier ownership, HLR status, SIM status, or account ownership. Number portability means a prefix cannot establish the subscriber's current operator; those checks belong to a later external verification layer.
+
+## v1 stack refactor — fast-path contact engine
+
+The first-layer detector is refactored into a dedicated W03 contact engine while preserving the existing preflight wire and content lifecycle.
+
+- Phone parsing/validation uses `libphonenumber-js/mobile`; the existing conservative national-format rules remain as a fallback for local-format numbers where no default country is known.
+- Domain parsing uses `tldts`.
+- Contact normalization performs NFKC, zero-width/bidi-control removal and targeted homoglyph normalization before pattern matching.
+- The platform registry is expanded beyond the initial ten messenger platforms to include social, regional, enterprise and community channels without treating a platform name alone as a violation.
+- Contact results are confidence-aware and deduplicated; UI findings expose counts/platforms and masked identifiers rather than full contact values.
+- Email addresses and social profile links are first-class contact signals.
+- This remains a synchronous deterministic fast path. OCR, QR pixel decoding, external AI moderation, number intelligence and OSINT remain later/conditional paths and are not introduced into the v1 synchronous request.
+
+Status remains **PENDING CI EVIDENCE** until the repository gates prove this implementation slice.
