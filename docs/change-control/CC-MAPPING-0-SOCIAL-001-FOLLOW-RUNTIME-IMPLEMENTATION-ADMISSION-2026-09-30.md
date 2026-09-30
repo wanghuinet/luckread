@@ -4,7 +4,11 @@
 - Status: `BLOCKED / AUTHORIZATION-PENDING`
 - Repository authority: GitHub `main`
 - Base main: `d1932602e7c3deeb96fca636c23ee1cb63c433ef`
-- Backup: `backup/main-social-runtime-before-20260930`
+- Latest reconciliation commit: `43c76445722a2dd8c79fabf2ff82dc5cebf99d64`
+- Backups:
+  - `backup/main-social-runtime-before-20260930`
+  - `backup/main-social-admission-contract-before-20260930`
+  - `backup/main-social-admission-cc-before-20260930`
 - Feature: `SOCIAL-001`
 - Entity: `ENT-SOCIAL-FOLLOW`
 - Canonical ownership: `SOCIAL → T11 → W05 → D1-02`
@@ -42,21 +46,30 @@ The remaining gate is the executable security/transport boundary required before
    - atomic uniqueness/concurrency semantics;
    - no synchronous downstream fan-out.
 
+## Trusted admission-input contract
+
+The missing security-input shape is now explicitly contracted at:
+
+`contracts/transport/SOCIAL-001-follow-trusted-admission-input.v1.json`
+
+The contract is intentionally `BLOCKED_NOT_ADMITTED`. It names the required server-only inputs and, for each currently unavailable policy input, records `MISSING_AUTHORITY_BINDING`.
+
+This prevents a W05 implementation from silently treating client input, cache state, a D1-02 copy, or an ad-hoc cross-Worker call as authorization authority.
+
 ## Blocking gap
 
 The current W05 runtime contains only the bootstrap health response and has no admitted Follow business handler.
 
-More importantly, W05 currently has only the D1-02 binding. The repository does not yet contain a single admitted transport contract that supplies W05 with all required trusted security inputs while preserving the frozen topology and operation budgets.
+The repository still lacks a single evidence-bound authority chain that supplies W05 with all required trusted security inputs while preserving the frozen topology and operation budgets.
 
-Specifically, there is no current evidence-bound W05 runtime input contract covering all of:
+Outstanding authority bindings are:
 
-- authenticated server principal;
-- canonical target User resolution;
 - actor account-state decision;
 - target followability decision;
-- block/privacy/scope decision;
-- anti-abuse admission decision;
-- caller provenance for the W01 → W05 transport.
+- block-policy decision;
+- privacy/scope decision;
+- anti-abuse admission;
+- trusted W01→W05 caller provenance.
 
 The existing W01 → W02 session path proves authenticated session authority, but it is not itself a Follow authorization decision and must not be silently repurposed as one.
 
@@ -86,6 +99,17 @@ The eventual runtime slice must:
 5. preserve duplicate-follow and missing-unfollow idempotency;
 6. avoid synchronous event fan-out and avoid adding a second relation/idempotency store.
 
+## CI evidence on current reconciliation commit
+
+The new admission-input contract triggered the existing repository gates on `43c76445722a2dd8c79fabf2ff82dc5cebf99d64`.
+
+Observed runs:
+
+- Mapping 0 Structural Gate: run `36720599134` — `success`
+- AUTH-013 Persistence Schema Evidence: run `36720599310` — `success`
+
+These are structural/evidence checks only and do not promote SOCIAL-001 or authorize runtime implementation.
+
 ## Explicit non-actions
 
 - No Follow runtime handler is added by this Change Control.
@@ -100,7 +124,7 @@ The eventual runtime slice must:
 The next contract-first slice is:
 
 ```
-Trusted Follow Admission Transport Contract
+Trusted Follow Admission Authority Binding
   ↓
 W01 authenticated principal + target/policy admission
   ↓
@@ -119,6 +143,7 @@ The admission contract must explicitly name which existing authoritative source 
 DTO: ADMITTED
 W05 physical binding: VERIFIED
 D1-02 migration/schema: VERIFIED
+Trusted admission-input contract: CREATED / BLOCKED_NOT_ADMITTED
 Runtime transport/admission: BLOCKED
 W05 runtime: NOT ADMITTED
 Runtime evidence: REQUIRED
