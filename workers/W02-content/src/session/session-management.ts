@@ -138,6 +138,64 @@ export async function listCurrentUserSessions(
     throw new SessionManagementError('SERVICE_UNAVAILABLE', 'session permission authority is unavailable')
   }
 
+  const authorizationSql = `
+    SELECT
+      EXISTS (
+        SELECT 1
+        FROM users AS u
+        WHERE CAST(u.id AS TEXT) = ?
+          AND u.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')
+          AND EXISTS (
+            SELECT 1
+            FROM role_assignments AS ra
+            WHERE ra.subject_id = CAST(u.id AS TEXT)
+              AND ra.status = 'ACTIVE'
+              AND ra.scope_type = 'global'
+              AND ra.valid_from <= ?
+              AND (ra.valid_until IS NULL OR ? < ra.valid_until)
+              AND ra.role_id IN (${rolePlaceholders(SESSION_READ_ROLES)})
+          )
+      ) AS permissionAllowed,
+      EXISTS (
+        SELECT 1
+        FROM users_sessions AS current_session
+        INNER JOIN auth_session_state AS current_state
+          ON CAST(current_state.session_id AS TEXT) = CAST(current_session.id AS TEXT)
+         AND current_state.user_id = CAST(current_session._parent_id AS TEXT)
+        WHERE CAST(current_session.id AS TEXT) = ?
+          AND CAST(current_session._parent_id AS TEXT) = ?
+          AND current_state.token_version = ?
+          AND current_state.revoked_at IS NULL
+          AND current_session.expires_at > ?
+      ) AS currentSessionValid
+  `
+
+  try {
+    const authorization = await db.prepare(authorizationSql).bind(
+      input.userId,
+      now,
+      now,
+      ...SESSION_READ_ROLES,
+      input.currentSessionId,
+      input.userId,
+      input.tokenVersion,
+      now,
+    ).first<{
+      permissionAllowed: number
+      currentSessionValid: number
+    }>()
+
+    if (!authorization || authorization.permissionAllowed !== 1) {
+      throw new SessionManagementError('PERMISSION_DENIED', 'session permission denied')
+    }
+    if (authorization.currentSessionValid !== 1) {
+      throw new SessionManagementError('UNAUTHENTICATED', 'current session is not valid')
+    }
+  } catch (error) {
+    if (error instanceof SessionManagementError) throw error
+    throw new SessionManagementError('SERVICE_UNAVAILABLE', 'session authorization unavailable')
+  }
+
   const cursorSql = cursor
     ? ' AND (s.created_at < ? OR (s.created_at = ? AND CAST(s.id AS TEXT) < ?))'
     : ''
@@ -157,34 +215,6 @@ export async function listCurrentUserSessions(
       AND a.revoked_at IS NULL
       AND s.created_at IS NOT NULL
       AND s.expires_at > ?
-      AND EXISTS (
-        SELECT 1
-        FROM users AS u
-        WHERE CAST(u.id AS TEXT) = ?
-          AND u.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')
-          AND EXISTS (
-            SELECT 1
-            FROM role_assignments AS ra
-            WHERE ra.subject_id = CAST(u.id AS TEXT)
-              AND ra.status = 'ACTIVE'
-              AND ra.scope_type = 'global'
-              AND ra.valid_from <= ?
-              AND (ra.valid_until IS NULL OR ? < ra.valid_until)
-              AND ra.role_id IN (${rolePlaceholders(SESSION_READ_ROLES)})
-          )
-      )
-      AND EXISTS (
-        SELECT 1
-        FROM users_sessions AS current_session
-        INNER JOIN auth_session_state AS current_state
-          ON CAST(current_state.session_id AS TEXT) = CAST(current_session.id AS TEXT)
-         AND current_state.user_id = CAST(current_session._parent_id AS TEXT)
-        WHERE CAST(current_session.id AS TEXT) = ?
-          AND CAST(current_session._parent_id AS TEXT) = ?
-          AND current_state.token_version = ?
-          AND current_state.revoked_at IS NULL
-          AND current_session.expires_at > ?
-      )
       ${cursorSql}
     ORDER BY s.created_at DESC, CAST(s.id AS TEXT) DESC
     LIMIT ?
@@ -192,14 +222,6 @@ export async function listCurrentUserSessions(
 
   const bindings: unknown[] = [
     input.userId,
-    now,
-    input.userId,
-    now,
-    now,
-    ...SESSION_READ_ROLES,
-    input.currentSessionId,
-    input.userId,
-    input.tokenVersion,
     now,
   ]
 
