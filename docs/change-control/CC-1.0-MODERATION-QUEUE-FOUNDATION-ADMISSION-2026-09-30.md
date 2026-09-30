@@ -3,7 +3,7 @@
 **Status: GAP / DECISION MATERIAL / IMPLEMENTATION BLOCKED**
 
 Repository: `wanghuinet/luckread`  
-Authoritative head reviewed: `78a99392f9f7ab163dd883065511f9abe2fd832a`
+Base head reviewed: `87271d91e938b43952da9d01456d4f45796e6290`
 
 ## 1. Purpose
 
@@ -57,6 +57,18 @@ The following machine-readable drafts now exist on `main` and remain non-canonic
 Both are explicitly `CONTRACT_DRAFT_OPENAPI_PENDING` and carry `implementationAuthorization: false`.
 
 No OpenAPI promotion, persistence execution or W06 runtime implementation is implied by these files.
+
+## 4.1 Entity / persistence contract slice admitted for further reconciliation
+
+The following contract-only bindings are now explicit and remain non-canonical:
+
+- contracts/authz/permissions.json adds moderation.queue.read and moderation.case.read at L6/platform scope with sensitive access and audit required.
+- contracts/entity/MODERATION-CASE-CONTRACT.v1.json defines the authoritative W06/D1-03 ModerationCase vocabulary.
+- contracts/entity/MODERATION-DECISION-CONTRACT.v1.json defines the authoritative W06/D1-03 decision record vocabulary.
+- contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json binds both entities to the existing D1-03/W06 logical persistence target only; no migration is executed or claimed.
+- The entity catalog, field registry and database-entity persistence inventory now carry the same proposed/non-verified records.
+
+This slice does not create a Worker, D1, migration execution, OpenAPI promotion or runtime implementation. The moderation path remains BLOCKED pending canonical OpenAPI, trusted reviewer transport, audit binding and executable evidence.
 
 ## 4. Non-negotiable authority constraints
 

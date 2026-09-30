@@ -106,8 +106,6 @@
   },
   "requiredNextContracts": [
     "canonical OpenAPI paths",
-    "moderation entity contracts",
-    "D1-03 persistence contract",
     "trusted reviewer transport binding",
     "audit event binding",
     "runtime/evidence admission"

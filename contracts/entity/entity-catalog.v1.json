@@ -133,6 +133,34 @@
         "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
         "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json"
       ]
+    },
+    {
+      "entityId": "ENT-MODERATION-CASE",
+      "name": "ModerationCase",
+      "domainId": "D1-03",
+      "classification": "AUTHORITATIVE",
+      "status": "PROPOSED",
+      "implementationRef": "contracts/entity/MODERATION-CASE-CONTRACT.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/MODERATION-CASE-CONTRACT.v1.json",
+        "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
+        "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
+        "docs/150-MODERATION-GOVERNANCE-CENTER-EXPERIENCE-CONTRACT-v1.0.md"
+      ]
+    },
+    {
+      "entityId": "ENT-MODERATION-DECISION",
+      "name": "ModerationDecision",
+      "domainId": "D1-03",
+      "classification": "AUTHORITATIVE",
+      "status": "PROPOSED",
+      "implementationRef": "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
+        "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
+        "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
+        "contracts/api/moderation-operation-policy.v1.json"
+      ]
     }
   ],
   "rules": {

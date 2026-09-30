@@ -168,6 +168,40 @@
       "evidenceRefs": [
         "contracts/entity/entity-catalog.v1.json"
       ]
+    },
+    {
+      "entityId": "ENT-MODERATION-CASE",
+      "entityName": "ModerationCase",
+      "domainId": "D1-03",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+      "adapter": "Cloudflare D1 (D1-03) / W06 logical binding",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "persistenceContractRef": "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/MODERATION-CASE-CONTRACT.v1.json",
+        "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json"
+      ]
+    },
+    {
+      "entityId": "ENT-MODERATION-DECISION",
+      "entityName": "ModerationDecision",
+      "domainId": "D1-03",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+      "adapter": "Cloudflare D1 (D1-03) / W06 logical binding",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "persistenceContractRef": "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
+        "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json"
+      ]
     }
   ],
   "rules": {
@@ -185,6 +219,7 @@
     "ENT-DEVICE-RECORD is still proposed; the physical device foreign-key target therefore cannot be promoted by inference.",
     "Entity completeness against the full Blueprint v2.0 domain inventory is not yet reconciled.",
     "Step 03 remains NOT_GREEN until implementation, migration, authority and completeness evidence are reconciled.",
-    "ENT-IDENTITY remains PROPOSED because no production identity materialization/ownership implementation is independently evidenced; AUTH-003 credential runtime consumes pre-existing auth_identities rows."
+    "ENT-IDENTITY remains PROPOSED because no production identity materialization/ownership implementation is independently evidenced; AUTH-003 credential runtime consumes pre-existing auth_identities rows.",
+    "ModerationCase/ModerationDecision persistence is contract-defined but remains unexecuted and unverified until migration and runtime evidence are admitted."
   ]
 }

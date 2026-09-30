@@ -1,0 +1,314 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
+  "title": "Moderation Queue Foundation D1-03 Logical Persistence Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "entityIds": [
+    "ENT-MODERATION-CASE",
+    "ENT-MODERATION-DECISION"
+  ],
+  "entityFieldContract": "contracts/entity/entity-field-contract.v1.json",
+  "sourceOfTruth": "contracts/api/moderation-operation-policy.v1.json",
+  "authoritativeDomain": "D1-03",
+  "primaryTask": "T19",
+  "primaryWorker": "W06",
+  "physicalResource": {
+    "binding": "D1_03",
+    "worker": "W06",
+    "databaseUuid": "bda1d247-a371-4244-91ae-aef96034db7f",
+    "databaseName": "secondary",
+    "databaseNameAuthority": "display label only; UUID is authoritative",
+    "allocationStatus": "ADMITTED"
+  },
+  "tables": {
+    "moderation_cases": {
+      "purpose": "Authoritative W06 moderation case and reviewer-queue source state.",
+      "primaryKey": "case_id",
+      "columns": {
+        "case_id": {
+          "fieldId": "ENT-MODERATION-CASE-F-CASE-ID",
+          "type": "TEXT",
+          "required": true,
+          "unique": true,
+          "immutable": true
+        },
+        "target_type": {
+          "fieldId": "ENT-MODERATION-CASE-F-TARGET-TYPE",
+          "type": "TEXT",
+          "required": true,
+          "immutable": true
+        },
+        "target_id": {
+          "fieldId": "ENT-MODERATION-CASE-F-TARGET-ID",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "target_version": {
+          "fieldId": "ENT-MODERATION-CASE-F-TARGET-VERSION",
+          "type": "INTEGER",
+          "required": false,
+          "indexed": true,
+          "immutable": true
+        },
+        "policy_version": {
+          "fieldId": "ENT-MODERATION-CASE-F-POLICY-VERSION",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "state": {
+          "fieldId": "ENT-MODERATION-CASE-F-STATE",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true
+        },
+        "priority": {
+          "fieldId": "ENT-MODERATION-CASE-F-PRIORITY",
+          "type": "INTEGER",
+          "required": true,
+          "indexed": true
+        },
+        "assigned_reviewer_id": {
+          "fieldId": "ENT-MODERATION-CASE-F-ASSIGNED-REVIEWER-ID",
+          "type": "TEXT",
+          "required": false,
+          "indexed": true
+        },
+        "current_decision_id": {
+          "fieldId": "ENT-MODERATION-CASE-F-CURRENT-DECISION-ID",
+          "type": "TEXT",
+          "required": false,
+          "indexed": true
+        },
+        "evidence_bundle_ref": {
+          "fieldId": "ENT-MODERATION-CASE-F-EVIDENCE-BUNDLE-REF",
+          "type": "TEXT",
+          "required": false
+        },
+        "version": {
+          "fieldId": "ENT-MODERATION-CASE-F-VERSION",
+          "type": "INTEGER",
+          "required": true,
+          "indexed": true
+        },
+        "created_at": {
+          "fieldId": "ENT-MODERATION-CASE-F-CREATED-AT",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true
+        },
+        "updated_at": {
+          "fieldId": "ENT-MODERATION-CASE-F-UPDATED-AT",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true
+        }
+      },
+      "constraints": [
+        "case_id is never reused.",
+        "state values are constrained by contracts/enums/moderation-case-state.json.",
+        "version increments monotonically on authoritative case mutation.",
+        "Raw evidence is never stored in the queue table."
+      ],
+      "indexes": [
+        "uq_moderation_cases_case_id UNIQUE (case_id)",
+        "ix_moderation_cases_queue (state, priority, created_at, case_id)",
+        "ix_moderation_cases_reviewer_state (assigned_reviewer_id, state, priority, created_at)"
+      ]
+    },
+    "moderation_decisions": {
+      "purpose": "Authoritative W06 decision records linked to a specific moderation case version.",
+      "primaryKey": "decision_id",
+      "columns": {
+        "decision_id": {
+          "fieldId": "ENT-MODERATION-DECISION-F-DECISION-ID",
+          "type": "TEXT",
+          "required": true,
+          "unique": true,
+          "immutable": true
+        },
+        "case_id": {
+          "fieldId": "ENT-MODERATION-DECISION-F-CASE-ID",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "case_version": {
+          "fieldId": "ENT-MODERATION-DECISION-F-CASE-VERSION",
+          "type": "INTEGER",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "outcome": {
+          "fieldId": "ENT-MODERATION-DECISION-F-OUTCOME",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "target_type": {
+          "fieldId": "ENT-MODERATION-DECISION-F-TARGET-TYPE",
+          "type": "TEXT",
+          "required": true,
+          "immutable": true
+        },
+        "target_id": {
+          "fieldId": "ENT-MODERATION-DECISION-F-TARGET-ID",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "target_version": {
+          "fieldId": "ENT-MODERATION-DECISION-F-TARGET-VERSION",
+          "type": "INTEGER",
+          "required": false,
+          "immutable": true
+        },
+        "policy_version": {
+          "fieldId": "ENT-MODERATION-DECISION-F-POLICY-VERSION",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "reason_code": {
+          "fieldId": "ENT-MODERATION-DECISION-F-REASON-CODE",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "severity": {
+          "fieldId": "ENT-MODERATION-DECISION-F-SEVERITY",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "scope": {
+          "fieldId": "ENT-MODERATION-DECISION-F-SCOPE",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "effective_at": {
+          "fieldId": "ENT-MODERATION-DECISION-F-EFFECTIVE-AT",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "expires_at": {
+          "fieldId": "ENT-MODERATION-DECISION-F-EXPIRES-AT",
+          "type": "TEXT",
+          "required": false,
+          "indexed": true,
+          "immutable": true
+        },
+        "source_kind": {
+          "fieldId": "ENT-MODERATION-DECISION-F-SOURCE-KIND",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "reviewer_id": {
+          "fieldId": "ENT-MODERATION-DECISION-F-REVIEWER-ID",
+          "type": "TEXT",
+          "required": false,
+          "indexed": true,
+          "immutable": true
+        },
+        "reviewer_layer": {
+          "fieldId": "ENT-MODERATION-DECISION-F-REVIEWER-LAYER",
+          "type": "TEXT",
+          "required": false,
+          "immutable": true
+        },
+        "request_id": {
+          "fieldId": "ENT-MODERATION-DECISION-F-REQUEST-ID",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        },
+        "created_at": {
+          "fieldId": "ENT-MODERATION-DECISION-F-CREATED-AT",
+          "type": "TEXT",
+          "required": true,
+          "indexed": true,
+          "immutable": true
+        }
+      },
+      "constraints": [
+        "decision_id is never reused.",
+        "(case_id, case_version) is unique for authoritative manual/automated decisions.",
+        "outcome is APPROVED or REJECTED.",
+        "Human decisions require server-derived reviewer identity and layer.",
+        "No raw evidence or internal risk threshold is persisted here."
+      ],
+      "indexes": [
+        "uq_moderation_decisions_case_version UNIQUE (case_id, case_version)",
+        "ix_moderation_decisions_case_created (case_id, created_at)",
+        "ix_moderation_decisions_policy (policy_version, created_at)"
+      ]
+    }
+  },
+  "mutationBudgets": {
+    "queueRead": {
+      "d1ReadMax": 1
+    },
+    "caseRead": {
+      "d1ReadMax": 1
+    },
+    "decisionWrite": {
+      "d1ReadMax": 1,
+      "d1WriteTransactionMax": 1
+    },
+    "distributedTransactions": false
+  },
+  "migrationPlan": {
+    "migrationId": "MIG-MODERATION-QUEUE-FOUNDATION-D1-03-V1",
+    "status": "NOT_AUTHORIZED",
+    "targetTables": [
+      "moderation_cases",
+      "moderation_decisions"
+    ],
+    "executionEvidenceRequired": [
+      "schema/table evidence",
+      "column/index evidence",
+      "applied migration evidence",
+      "remote D1 evidence"
+    ],
+    "rollback": "No destructive rollback of live moderation decisions; use compensating migration only."
+  },
+  "crossDomainRules": [
+    "W06 does not read/write W03 content tables directly.",
+    "Content identifiers remain logical references across D1 domains.",
+    "Content state changes occur only through an admitted trusted transport/command path.",
+    "Queue reads are private and bounded; no shared cache is authoritative."
+  ],
+  "nonGoals": [
+    "No migration execution.",
+    "No Worker creation.",
+    "No D1 creation.",
+    "No runtime implementation.",
+    "No physical schema evidence claim.",
+    "No runtime GREEN claim."
+  ],
+  "readiness": {
+    "entity": "CONTRACTED_NOT_VERIFIED",
+    "persistence": "CONTRACTED_NOT_VERIFIED",
+    "migration": "NOT_STARTED",
+    "runtime": "BLOCKED",
+    "evidence": "NOT_BOUND"
+  }
+}

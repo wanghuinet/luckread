@@ -12,7 +12,10 @@
     "docs/301-L0-L8-PERMISSION-LAYER-CONTRACT-v1.0.md",
     "contracts/authz/permissions.json",
     "contracts/state-machines/content.json",
-    "docs/change-control/CC-1.0-MODERATION-QUEUE-FOUNDATION-ADMISSION-2026-09-30.md"
+    "docs/change-control/CC-1.0-MODERATION-QUEUE-FOUNDATION-ADMISSION-2026-09-30.md",
+    "contracts/entity/MODERATION-CASE-CONTRACT.v1.json",
+    "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
+    "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json"
   ],
   "authorityBoundary": {
     "worker": "W06",
@@ -20,7 +23,8 @@
     "contentStateAuthority": "W03",
     "payloadAuthority": false,
     "newWorkerAllowed": false,
-    "newDatabaseAllowed": false
+    "newDatabaseAllowed": false,
+    "persistenceContract": "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json"
   },
   "invariants": [
     "Moderation owns reviewer queue, case, decision and enforcement intent; Content remains authoritative for content lifecycle state.",
@@ -78,7 +82,7 @@
         "openapi": "MISSING",
         "permission": "CONTRACTED",
         "dto": "MISSING",
-        "persistence": "MISSING",
+        "persistence": "CONTRACTED_NOT_VERIFIED",
         "transport": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
@@ -122,7 +126,7 @@
         "openapi": "MISSING",
         "permission": "CONTRACTED",
         "dto": "MISSING",
-        "persistence": "MISSING",
+        "persistence": "CONTRACTED_NOT_VERIFIED",
         "transport": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
@@ -193,7 +197,7 @@
         "openapi": "MISSING",
         "permission": "CONTRACTED",
         "dto": "MISSING",
-        "persistence": "MISSING",
+        "persistence": "CONTRACTED_NOT_VERIFIED",
         "transport": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
@@ -208,5 +212,10 @@
     "No public moderation API exposure.",
     "No promotion to canonical OpenAPI until explicitly reconciled.",
     "No implementation GREEN claim."
-  ]
+  ],
+  "contractClosure": {
+    "entityContracts": "CONTRACTED_NOT_VERIFIED",
+    "persistenceContract": "CONTRACTED_NOT_VERIFIED",
+    "implementationAuthorization": false
+  }
 }

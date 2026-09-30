@@ -262,11 +262,29 @@
       "scope": "own"
     },
     {
+      "name": "moderation.case.read",
+      "resource": "moderation",
+      "action": "case_read",
+      "minLayer": "L6",
+      "scope": "platform",
+      "sensitive": true,
+      "auditRequired": true
+    },
+    {
       "name": "moderation.decide",
       "resource": "moderation",
       "action": "decide",
       "minLayer": "L6",
       "scope": "platform",
+      "auditRequired": true
+    },
+    {
+      "name": "moderation.queue.read",
+      "resource": "moderation",
+      "action": "queue_read",
+      "minLayer": "L6",
+      "scope": "platform",
+      "sensitive": true,
       "auditRequired": true
     },
     {
