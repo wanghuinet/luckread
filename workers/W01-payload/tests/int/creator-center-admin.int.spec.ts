@@ -62,6 +62,8 @@ describe('Creator Center admin extension', () => {
 
     expect(publisher).toContain('const [preview, setPreview]')
     expect(publisher).toContain('aria-label="发布预览"')
+    expect(publisher).toContain("const CONTENT_MUTATED_EVENT = 'luckread:content-mutated'")
+    expect(publisher).toContain('window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))')
     expect(publisher).toContain("type === 'video' && assets.length === 0")
 
 
@@ -100,6 +102,8 @@ describe('Creator Center admin extension', () => {
     expect(list).toContain("['UNPUBLISHED', '已下线']")
     expect(list).toContain("'下线'")
     expect(list).toContain("'重新发布'")
+    expect(list).toContain("window.addEventListener('luckread:content-mutated'")
+    expect(list).toContain("window.removeEventListener('luckread:content-mutated'")
     expect(list).toContain("href={\`/content/\${encodeURIComponent(item.id)}\`}")
     expect(list).toContain('加载更多')
     expect(route).toContain('export async function GET')
