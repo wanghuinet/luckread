@@ -102,13 +102,15 @@ async function authorizedFetch(input: RequestInfo | URL, init: RequestInit = {})
 
 type PublishComposerProps = {
   contentBasePath?: string
+  initialType?: ContentType
 }
 
 export default function PublishComposer({
   contentBasePath = '/api/v1/contents',
+  initialType = 'article',
 }: PublishComposerProps) {
   const router = useRouter()
-  const [type, setType] = useState<ContentType>('article')
+  const [type, setType] = useState<ContentType>(initialType)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [assets, setAssets] = useState<UploadedAsset[]>([])
@@ -126,12 +128,7 @@ export default function PublishComposer({
 
   useEffect(() => {
     let cancelled = false
-    const url = new URL(window.location.href)
-    const draftId = url.searchParams.get('draft')?.trim()
-    const requestedType = url.searchParams.get('type')?.trim()
-    if (!draftId && (requestedType === 'article' || requestedType === 'post' || requestedType === 'video')) {
-      setType(requestedType)
-    }
+    const draftId = new URL(window.location.href).searchParams.get('draft')?.trim()
     if (!draftId) return
 
     async function restoreDraft() {
