@@ -149,8 +149,61 @@ const PHONE_REGION_LABELS: Record<string, string> = {
   MM: 'Myanmar (+95)', BN: 'Brunei (+673)',
 }
 
+const PHONE_CALLING_CODE_FALLBACKS: Record<string, string> = {
+  '1': 'United States/Canada (NANP)',
+  '33': 'France (+33)',
+  '34': 'Spain (+34)',
+  '39': 'Italy (+39)',
+  '44': 'United Kingdom (+44)',
+  '49': 'Germany (+49)',
+  '52': 'Mexico (+52)',
+  '55': 'Brazil (+55)',
+  '60': 'Malaysia (+60)',
+  '61': 'Australia (+61)',
+  '62': 'Indonesia (+62)',
+  '63': 'Philippines (+63)',
+  '64': 'New Zealand (+64)',
+  '65': 'Singapore (+65)',
+  '66': 'Thailand (+66)',
+  '81': 'Japan (+81)',
+  '82': 'South Korea (+82)',
+  '84': 'Vietnam (+84)',
+  '86': 'China (+86)',
+  '90': 'Türkiye (+90)',
+  '91': 'India (+91)',
+  '92': 'Pakistan (+92)',
+  '95': 'Myanmar (+95)',
+  '98': 'Iran (+98)',
+  '212': 'Morocco (+212)',
+  '213': 'Algeria (+213)',
+  '216': 'Tunisia (+216)',
+  '218': 'Libya (+218)',
+  '234': 'Nigeria (+234)',
+  '254': 'Kenya (+254)',
+  '255': 'Tanzania (+255)',
+  '256': 'Uganda (+256)',
+  '260': 'Zambia (+260)',
+  '263': 'Zimbabwe (+263)',
+  '351': 'Portugal (+351)',
+  '353': 'Ireland (+353)',
+  '358': 'Finland (+358)',
+  '420': 'Czechia (+420)',
+  '421': 'Slovakia (+421)',
+  '852': 'Hong Kong (+852)',
+  '853': 'Macao (+853)',
+  '855': 'Cambodia (+855)',
+  '856': 'Laos (+856)',
+  '880': 'Bangladesh (+880)',
+  '886': 'Taiwan (+886)',
+  '972': 'Israel (+972)',
+  '971': 'United Arab Emirates (+971)',
+  '966': 'Saudi Arabia (+966)',
+}
+
 const phoneRegionLabel = (country: string | undefined, countryCallingCode: string): string =>
-  (country && PHONE_REGION_LABELS[country]) ?? 'International (+' + countryCallingCode + ')'
+  (country && PHONE_REGION_LABELS[country]) ??
+  PHONE_CALLING_CODE_FALLBACKS[countryCallingCode] ??
+  'International (+' + countryCallingCode + ')'
 
 const isDateLike = (raw: string): boolean =>
   /^\+?\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(raw.trim())
