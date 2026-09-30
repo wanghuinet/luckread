@@ -434,6 +434,9 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
   const positiveSignals: string[] = []
   const title = input.title
   const body = input.body
+  const titleLower = title.toLowerCase()
+  const aiMode = normalizedMode(input.aiMode)
+  const humanContribution = normalizedHumanContribution(input.humanContribution)
   const bodyLower = body.toLowerCase()
   const unicodeAnalysis = analyzeUnicodeSpoofing(body)
   const normalizedRiskBody = normalizeRiskText(decodeCommonHtmlEntities(unicodeAnalysis.normalized))
