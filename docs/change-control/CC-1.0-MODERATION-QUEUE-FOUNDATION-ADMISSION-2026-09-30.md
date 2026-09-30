@@ -67,7 +67,7 @@ The following contract-only bindings are now explicit and remain non-canonical:
 - contracts/entity/MODERATION-CASE-CONTRACT.v1.json defines the authoritative W06/D1-03 ModerationCase vocabulary.
 - contracts/entity/MODERATION-DECISION-CONTRACT.v1.json defines the authoritative W06/D1-03 decision record vocabulary.
 - contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json binds both entities to the existing D1-03/W06 logical persistence target only; no migration is executed or claimed.
-- `contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json` defines the minimum reviewer principal/layer/permission/provenance and conditional-request inputs; it remains `BLOCKED_NOT_ADMITTED`.
+- `contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json` defines the minimum reviewer principal/layer/permission/provenance and conditional-request inputs; it remains `CONTRACTED_NOT_VERIFIED`.
 - The entity catalog, field registry and database-entity persistence inventory now carry the same proposed/non-verified records.
 
 This slice does not create a Worker, D1, migration execution, or runtime implementation. OpenAPI and DTO are already canonically bound; the moderation path remains BLOCKED pending trusted reviewer authority, W06→W03 content transport, and executable evidence.
@@ -84,7 +84,7 @@ This slice does not create a Worker, D1, migration execution, or runtime impleme
 
 ## 4.2 Trusted reviewer transport / concurrency contract slice
 
-The reviewer transport slice is explicit but intentionally blocked. It binds to the existing W01→W02 authenticated principal boundary, canonical L6 authorization semantics, and the canonical conditional-request/idempotency contract. It does **not** invent a W01→W06 Service Binding and does not authorize runtime.
+The reviewer transport slice is contract-bound but not runtime-verified. The W01→W06 binding is defined by `contracts/transport/W01-W06-moderation-http-binding.v1.json`; deployment and security evidence remain missing.
 
 The decision path now requires both `If-Match` (transport precondition) and `expectedVersion` (DTO mirror) with `428` for a missing precondition and `412` for a mismatch. This aligns the moderation decision with the canonical concurrency contract.
 
@@ -130,4 +130,4 @@ This moderation foundation maps to Blueprint features `GOV-003` (moderation queu
 
 ## 10. Current Authority Gate
 
-The W01→W06 trusted transport boundary is already contract-bound by `docs/change-control/CC-1.1-MODERATION-W01-W06-TRUSTED-TRANSPORT-2026-10-01.md`; runtime and deployment evidence are still missing. The next contract gate is the W06→W03 content-state transition boundary. Until that transport is contracted and runtime-evidenced, W06 moderation runtime remains BLOCKED.
+The W01→W06 trusted transport boundary is already contract-bound; runtime and deployment evidence are still missing. The W06→W03 content-state transition boundary is now contract-defined by `contracts/transport/W06-W03-content-moderation-http-binding.v1.json`; its authority/runtime evidence is the remaining transport gate before W06 moderation runtime.
