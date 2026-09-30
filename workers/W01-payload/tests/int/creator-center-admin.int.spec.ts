@@ -128,7 +128,7 @@ describe('Creator Center admin extension', () => {
     expect(view).toContain('id="content-management"')
     expect(view).toContain('id="publisher"')
     expect(view).toContain('id="creator-tools"')
-    expect(view).toContain('文章 / 动态 / 视频')
+    expect(view).toContain('文章管理 · 动态 · 视频')
     expect(view).toContain('内容管理')
     expect(view).toContain('发布中心')
     expect(view).toContain('发布前检测助手')
