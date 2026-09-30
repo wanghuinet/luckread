@@ -209,7 +209,7 @@ export const preflightContent = (rawInput: unknown): PublishPreflightResult => {
   }
 
   if (externalUrls.length) {
-    const hasPromotion = salesSignals.length > 0 || contactSignals.length > 0 || qrSignals.length > 0
+    const hasPromotion = salesSignals.length > 0 || contactKeywordSignals.length > 0 || qrSignals.length > 0
     addFinding(
       findings,
       'LINK-EXTERNAL',
