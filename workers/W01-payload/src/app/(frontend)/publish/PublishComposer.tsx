@@ -13,15 +13,6 @@ type PublishPreflightResult = {
   summary: string
   findings: Array<{ severity: 'INFO' | 'WARN' | 'BLOCK'; category: string; title: string; message: string; fix: string }>
 }
-type AiMode = 'none' | 'outline' | 'assist' | 'full'
-
-type PublishPreflightResult = {
-  verdict: 'PASS' | 'YELLOW' | 'RED'
-  score: number
-  seoReadiness: 'READY' | 'IMPROVE' | 'BLOCKED'
-  summary: string
-  findings: Array<{ severity: 'INFO' | 'WARN' | 'BLOCK'; category: string; title: string; message: string; fix: string }>
-}
 
 type UploadedAsset = {
   id: string
@@ -117,9 +108,6 @@ export default function PublishComposer({
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [preview, setPreview] = useState(false)
-  const [aiMode, setAiMode] = useState<AiMode>('none')
-  const [humanConfirmed, setHumanConfirmed] = useState(false)
-  const [preflightReport, setPreflightReport] = useState<PublishPreflightResult | null>(null)
   const [aiMode, setAiMode] = useState<AiMode>('none')
   const [humanConfirmed, setHumanConfirmed] = useState(false)
   const [preflightReport, setPreflightReport] = useState<PublishPreflightResult | null>(null)
