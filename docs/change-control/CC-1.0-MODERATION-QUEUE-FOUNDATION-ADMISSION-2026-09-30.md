@@ -92,7 +92,7 @@ The decision path now requires both `If-Match` (transport precondition) and `exp
 
 The remaining contract/authority closure must establish:
 
-- trusted reviewer authority binding (`contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json`);
+- W01→W06 reviewer transport runtime evidence (`contracts/transport/W01-W06-moderation-http-binding.v1.json`);
 - W06→W03 content-decision transport binding;
 - permission/transport negative evidence;
 - idempotency + If-Match/expectedVersion runtime evidence;
@@ -130,4 +130,4 @@ This moderation foundation maps to Blueprint features `GOV-003` (moderation queu
 
 ## 10. Current Authority Gate
 
-The only new architectural decision still required for the moderation execution path is the trusted internal transport boundary. The decision packet `docs/change-control/CC-1.0-MODERATION-TRUSTED-TRANSPORT-AUTHORITY-2026-10-01.md` records the candidate topology and explicit non-goals. Until that gate is authorized and evidence-bound, W06 runtime remains BLOCKED.
+The W01→W06 trusted transport boundary is already contract-bound by `docs/change-control/CC-1.1-MODERATION-W01-W06-TRUSTED-TRANSPORT-2026-10-01.md`; runtime and deployment evidence are still missing. The next contract gate is the W06→W03 content-state transition boundary. Until that transport is contracted and runtime-evidenced, W06 moderation runtime remains BLOCKED.
