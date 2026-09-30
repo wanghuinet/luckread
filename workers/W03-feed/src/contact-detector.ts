@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { findPhoneNumbersInText } from 'libphonenumber-js/mobile'
+import { parsePhoneNumberFromString } from 'libphonenumber-js/mobile'
 import { parse as parseDomain } from 'tldts'
 
 export type ContactSignalKind = 'PHONE' | 'MESSENGER' | 'SOCIAL' | 'EMAIL' | 'URL'
@@ -296,28 +296,31 @@ const regionLabel = (country?: string, callingCode?: string): string => {
 const detectInternationalPhonesWithLibrary = (value: string): DetectedMobileNumber[] => {
   const matches: DetectedMobileNumber[] = []
   const seen = new Set<string>()
-  const intlText = value.replace(/\b00(?=\d{7,})/g, '+')
-  try {
-    for (const found of findPhoneNumbersInText(intlText).slice(0, 30)) {
-      const number = found.number
-      const e164 = number.number
-      const key = e164
-      if (seen.has(key)) continue
-      seen.add(key)
+  for (const match of value.matchAll(PHONE_CANDIDATE_RE)) {
+    const raw = match[0].trim()
+    if (!/^(?:\+|00)/.test(raw)) continue
+    const candidate = raw.replace(/^00/, '+')
+    try {
+      const number = parsePhoneNumberFromString(candidate)
+      if (!number) continue
       const valid = number.isValid()
       const possible = number.isPossible()
       if (!valid && !possible) continue
+      const key = number.number
+      if (seen.has(key)) continue
+      seen.add(key)
       const type = number.getType()
       matches.push({
-        raw: value.slice(found.startsAt, found.endsAt),
+        raw,
         region: regionLabel(number.country, number.countryCallingCode),
-        mobileSpecific: type === 'MOBILE' || type === 'FIXED_LINE_OR_MOBILE' ? true : false,
+        mobileSpecific: type === 'MOBILE' || type === 'FIXED_LINE_OR_MOBILE',
         confidence: valid ? 'HIGH' : 'MEDIUM',
         source: 'library',
       })
+      if (matches.length >= 30) break
+    } catch {
+      // Invalid individual candidates do not invalidate the rest of the scan.
     }
-  } catch {
-    return matches
   }
   return matches
 }
