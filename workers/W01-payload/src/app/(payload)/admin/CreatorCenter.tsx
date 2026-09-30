@@ -7,6 +7,7 @@ import React from 'react'
 import CreatorContentList from './CreatorContentList'
 import PublishComposer from '../../(frontend)/publish/PublishComposer'
 import '../../(frontend)/publish/publish.css'
+import CreatorCenterAssistant from './CreatorCenterAssistant'
 import styles from './creator-center.module.css'
 
 type CreatorNavItem = {
@@ -333,13 +334,7 @@ export function CreatorCenter({
           </Gutter>
         </main>
 
-        <Link className={styles.floatingAssistant} href="#quality" aria-label="打开发布前检测助手">
-          <span className={styles.assistantDot}><i className="fa-solid fa-check" aria-hidden="true" /></span>
-          <span className={styles.floatingAssistantText}>
-            <strong>检测助手</strong>
-            <small>发布前自检</small>
-          </span>
-        </Link>
+        <CreatorCenterAssistant />
       </div>
     </DefaultTemplate>
   )
