@@ -221,7 +221,7 @@
     "No new Worker or D1.",
     "No direct W06→W03 database access.",
     "No public moderation API exposure.",
-    "No promotion to canonical OpenAPI until explicitly reconciled.",
+    "Canonical moderation OpenAPI remains bound separately; this policy does not redefine its paths.",
     "No implementation GREEN claim."
   ],
   "contractClosure": {
