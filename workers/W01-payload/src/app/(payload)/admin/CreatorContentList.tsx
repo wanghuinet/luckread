@@ -136,6 +136,9 @@ export default function CreatorContentList() {
           ['', '全部'],
           ['DRAFT', '草稿'],
           ['PENDING_REVIEW', '审核中'],
+          ['REJECTED', '审核退回'],
+          ['APPROVED', '待发布'],
+          ['SCHEDULED', '定时发布'],
           ['PUBLISHED', '已发布'],
           ['UNPUBLISHED', '已下线'],
         ].map(([value, label]) => (

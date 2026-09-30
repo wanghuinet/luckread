@@ -102,13 +102,15 @@ async function authorizedFetch(input: RequestInfo | URL, init: RequestInit = {})
 
 type PublishComposerProps = {
   contentBasePath?: string
+  initialType?: ContentType
 }
 
 export default function PublishComposer({
   contentBasePath = '/api/v1/contents',
+  initialType = 'article',
 }: PublishComposerProps) {
   const router = useRouter()
-  const [type, setType] = useState<ContentType>('article')
+  const [type, setType] = useState<ContentType>(initialType)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [assets, setAssets] = useState<UploadedAsset[]>([])
