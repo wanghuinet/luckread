@@ -18,7 +18,8 @@
     "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
     "contracts/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json",
     "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
-    "contracts/events/GOV-004-moderation-decision-audit-binding.v1.json"
+    "contracts/events/GOV-004-moderation-decision-audit-binding.v1.json",
+    "contracts/transport/W01-W06-moderation-http-binding.v1.json"
   ],
   "authorityBoundary": {
     "worker": "W06",
@@ -86,7 +87,7 @@
         "permission": "CONTRACTED",
         "dto": "CONTRACTED_NOT_VERIFIED",
         "persistence": "CONTRACTED_NOT_VERIFIED",
-        "transport": "MISSING_AUTHORITY_BINDING",
+        "transport": "CONTRACTED_NOT_VERIFIED",
         "integration": "MISSING",
         "securityE2E": "MISSING"
       }
@@ -130,7 +131,7 @@
         "permission": "CONTRACTED",
         "dto": "CONTRACTED_NOT_VERIFIED",
         "persistence": "CONTRACTED_NOT_VERIFIED",
-        "transport": "MISSING_AUTHORITY_BINDING",
+        "transport": "CONTRACTED_NOT_VERIFIED",
         "integration": "MISSING",
         "securityE2E": "MISSING"
       }
@@ -225,6 +226,7 @@
     "persistenceContract": "CONTRACTED_NOT_VERIFIED",
     "openApi": "BOUND_CANONICAL",
     "implementationAuthorization": false,
-    "auditBinding": "CONTRACTED_NOT_VERIFIED"
+    "auditBinding": "CONTRACTED_NOT_VERIFIED",
+    "transport": "CONTRACTED_NOT_VERIFIED"
   }
 }
