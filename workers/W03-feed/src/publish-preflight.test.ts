@@ -119,6 +119,68 @@ describe('W03 publish preflight', () => {
     expect(result.findings.some(item => item.id === 'CONTACT-PHONE')).toBe(false)
   })
 
+  it('detects expanded social, regional and enterprise contact channels', () => {
+    const result = preflightContent({
+      ...base,
+      body: [
+        'Instagram: https://instagram.com/luckread',
+        'Snapchat username: luckread_snap',
+        'Zalo ID: luckread_zalo',
+        'Microsoft Teams invite: https://teams.microsoft.com/l/chat/0/0?users=test@example.com',
+        'Slack invite: https://join.slack.com/t/luckread/shared_invite/test',
+        'Google Chat: https://chat.google.com/room/test',
+        '企业微信: work_contact_123',
+        '钉钉 ID: luckread_ding',
+        '飞书: https://feishu.cn/test',
+        'Matrix: https://matrix.to/#/@luckread:example.org',
+        'XMPP JID: user@example.org',
+        'SimpleX: https://simplex.chat/contact/#test',
+      ].join('\n'),
+    })
+    expect(result.analyzed.socialProfileCount).toBeGreaterThanOrEqual(2)
+    expect(result.analyzed.messengerIdCount).toBeGreaterThanOrEqual(7)
+    expect(result.analyzed.detectedMessengers).toEqual(expect.arrayContaining([
+      'Zalo',
+      'Microsoft Teams',
+      'Slack',
+      'Google Chat',
+      'WeCom',
+      'DingTalk',
+      'Feishu/Lark',
+      'Matrix/Element',
+      'XMPP',
+      'SimpleX',
+    ]))
+  })
+
+  it('detects obfuscated platform labels while avoiding plain platform mentions', () => {
+    const result = preflightContent({
+      ...base,
+      body: 'W e C h a t ID: luckread_news；本文只是介绍微信的发展历史。',
+    })
+    expect(result.analyzed.messengerIdCount).toBeGreaterThanOrEqual(1)
+    expect(result.analyzed.detectedMessengers).toContain('WeChat')
+    expect(result.positiveSignals.some(value => value.includes('Unicode'))).toBe(true)
+  })
+
+  it('detects national mobile numbers when explicit phone context exists', () => {
+    const result = preflightContent({
+      ...base,
+      body: '联系电话 13812345678，韩国手机 01012345678，日本手机 09012345678。',
+    })
+    expect(result.analyzed.phoneCount).toBeGreaterThanOrEqual(3)
+    expect(result.analyzed.mobileNumberCount).toBeGreaterThanOrEqual(3)
+  })
+
+  it('detects email addresses as contact signals', () => {
+    const result = preflightContent({
+      ...base,
+      body: '联系邮箱 editor@luckread.com，购买课程请邮件联系。',
+    })
+    expect(result.analyzed.emailCount).toBe(1)
+    expect(result.findings.some(item => item.id === 'CONTACT-EMAIL')).toBe(true)
+  })
+
   it('detects representative top-tier messaging IDs and invite links', () => {
     const result = preflightContent({
       ...base,
