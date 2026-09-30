@@ -333,6 +333,22 @@ const MESSENGER_RULES: MessengerRule[] = [
   ]},
 ]
 
+const detectMessengerIds = (value: string): { platform: string; match: string }[] => {
+  const hits: { platform: string; match: string }[] = []
+  const seen = new Set<string>()
+  for (const rule of MESSENGER_RULES) {
+    for (const pattern of rule.patterns) {
+      for (const match of firstMatches(value, pattern, 6)) {
+        const key = rule.platform + '|' + match.toLowerCase()
+        if (seen.has(key)) continue
+        seen.add(key)
+        hits.push({ platform: rule.platform, match })
+      }
+    }
+  }
+  return hits
+}
+
 const titleSignals = (title: string): string[] =>
   Array.from(new Set(
     title
