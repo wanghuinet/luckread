@@ -165,7 +165,8 @@
         "supportsParentId": true
       },
       "response": {
-        "commentContractRef": "contracts/enums/comment-state.json"
+        "commentContractRef": "contracts/dto/social-comment.v1.json",
+        "entityId": "ENT-SOCIAL-COMMENT"
       },
       "visibility": {
         "serverSidePolicy": true,
@@ -186,7 +187,8 @@
         "supportsParentId": true
       },
       "response": {
-        "commentContractRef": "contracts/enums/comment-state.json"
+        "commentContractRef": "contracts/dto/social-comment.v1.json",
+        "entityId": "ENT-SOCIAL-COMMENT"
       },
       "visibility": {
         "serverSidePolicy": true,
