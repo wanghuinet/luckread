@@ -112,9 +112,30 @@ D1-03 owns platform operational, governance and runtime state.
 - Reconciliation operation state
 - Platform runtime state
 
+### Bounded Worker owner matrix
+
+| D1-03 entity class | Primary Worker | Write boundary |
+|---|---|---|
+| ModerationCase | W06 | Moderation/case workflow only |
+| ModerationDecision | W06 | Moderation decision workflow only |
+| Report / Appeal | W06 | Governance workflow only |
+| PlatformRuntime | W09 | Platform/runtime operations only |
+| RecoveryOperation | W09 | Recovery control state only |
+| ReconciliationOperation | W09 | Reconciliation control state only |
+| AuditEvent | W09 | Append-only platform audit events |
+| Job / Retry / DLQ | W10 | Async execution state only |
+| ExecutionInbox / ExecutionOutbox | W10 | Async delivery/execution records only |
+| OperationalIdempotency | W10 | Platform execution idempotency only |
+| Campaign | W11 | Growth/campaign operations only |
+| AnalyticsOperation | W11 | Analytics/operations state only |
+| GrowthOperation | W11 | Growth/operations state only |
+
+Domain-local outbox/inbox/idempotency records remain in their source D1 and are not D1-03 entities. W10 executes asynchronous work but does not become a second owner of business state.
+
 ### Invariants
 
 - D1-03 is not a generic business-data sink.
+- Every authoritative D1-03 entity has exactly one primary Worker owner.
 - Audit records are append-oriented or controlled-state records and cannot be silently rewritten by ordinary business flows.
 - Runtime/job state does not become business authority.
 - Analytics and operational projections do not become identity, content or financial authority.
@@ -314,6 +335,7 @@ Cross-D1 transaction rule      = FROZEN
 Financial authority            = FROZEN to D1-04
 Subscription/access authority  = FROZEN to D1-01
 Historical topology            = HISTORICAL
+D1-03 Worker owner partition   = FROZEN
 Worker → D1 binding             = NEXT
 Mapping Freeze                 = BLOCKED until binding/audit
 Contract generation            = BLOCKED until Mapping Freeze
