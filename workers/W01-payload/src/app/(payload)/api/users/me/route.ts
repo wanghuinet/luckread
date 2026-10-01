@@ -64,7 +64,7 @@ async function authenticate(request: Request) {
     return null
   }
 
-  const user = authResult.user as ({ id?: string | number; _sid?: string } & Record<string, unknown>) | null
+  const user = authResult.user as unknown as ({ id?: string | number; _sid?: string } & Record<string, unknown>) | null
   if (!user?.id || typeof user._sid !== 'string' || user._sid.length === 0) return null
 
   const tokenVersion = readVerifiedPayloadTokenVersion(request)
