@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/SOCIAL-001-follow-trusted-authority-binding.v1.json",
+  "title": "SOCIAL-001 Follow Trusted Authority Binding Contract",
+  "version": "1.0.0",
+  "status": "AUTHORITY_MAPPING_PENDING",
+  "featureId": "SOCIAL-001",
+  "operationIds": [
+    "follow",
+    "unfollow"
+  ],
+  "canonicalOwnership": {
+    "domain": "SOCIAL",
+    "task": "T11",
+    "worker": "W05",
+    "d1": "D1-02"
+  },
+  "purpose": "Reconcile the existing authoritative sources that must feed the already-contracted SOCIAL-001 trusted admission boundary. This contract is decision material only and does not admit runtime implementation or a new transport binding.",
+  "authorityInputs": [
+    {
+      "field": "actorUserId",
+      "authority": "W01 authenticated Payload server principal",
+      "supportingContracts": [
+        "contracts/authz/authorization-decision.json"
+      ],
+      "existingTransportPattern": "W01->W02 W02_AUTH authenticated-principal/session path",
+      "clientWritable": false,
+      "status": "SOURCE_EXISTS_REUSE_TRANSPORT_PENDING"
+    },
+    {
+      "field": "actorAccountState",
+      "authority": "D1-01 account-state authority",
+      "supportingContracts": [
+        "contracts/state-machines/account.json",
+        "contracts/authz/authorization-decision.json"
+      ],
+      "clientWritable": false,
+      "status": "SOURCE_EXISTS_SOCIAL_BINDING_PENDING"
+    },
+    {
+      "field": "followPermission",
+      "authority": "Canonical authorization decision + permission catalog",
+      "supportingContracts": [
+        "contracts/authz/authorization-decision.json",
+        "contracts/authz/permissions.json",
+        "contracts/api/interaction-operation-policy.v1.json"
+      ],
+      "permission": "social.follow",
+      "clientWritable": false,
+      "status": "SOURCE_EXISTS_SOCIAL_BINDING_PENDING"
+    },
+    {
+      "field": "targetUserId",
+      "authority": "ENT-USER authoritative identity",
+      "supportingContracts": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json"
+      ],
+      "clientWritable": true,
+      "serverResolved": true,
+      "status": "SOURCE_EXISTS_SOCIAL_BINDING_PENDING"
+    },
+    {
+      "field": "targetFollowability",
+      "authority": "Authoritative Social/Creator/User followability policy",
+      "supportingContracts": [
+        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+        "docs/76-CREATOR-SYSTEM-CONTRACT-v1.0.md",
+        "docs/188-L5-L6-SOCIAL-COMMUNITY-INTERACTION-INSTANCE-REGISTRY-v1.0.md"
+      ],
+      "clientWritable": false,
+      "status": "MISSING_OPERATIONAL_AUTHORITY_BINDING"
+    },
+    {
+      "field": "blockPolicyAllows",
+      "authority": "Authoritative Social/Trust & Safety block policy",
+      "supportingContracts": [
+        "contracts/api/block-mute.v1.json",
+        "docs/188-L5-L6-SOCIAL-COMMUNITY-INTERACTION-INSTANCE-REGISTRY-v1.0.md"
+      ],
+      "clientWritable": false,
+      "status": "SOURCE_EXISTS_FOLLOW_TRANSPORT_PENDING"
+    },
+    {
+      "field": "privacyScopeAllows",
+      "authority": "Authoritative privacy/audience policy",
+      "supportingContracts": [
+        "docs/73-PERSONAL-CONTENT-SPACE-CONTRACT-v1.0.md",
+        "docs/188-L5-L6-SOCIAL-COMMUNITY-INTERACTION-INSTANCE-REGISTRY-v1.0.md"
+      ],
+      "clientWritable": false,
+      "status": "MISSING_OPERATIONAL_AUTHORITY_BINDING"
+    },
+    {
+      "field": "antiAbuseAdmission",
+      "authority": "Canonical interaction anti-abuse admission layer",
+      "supportingContracts": [
+        "contracts/api/interaction-operation-policy.v1.json",
+        "docs/188-L5-L6-SOCIAL-COMMUNITY-INTERACTION-INSTANCE-REGISTRY-v1.0.md"
+      ],
+      "allowedValues": [
+        "ALLOW",
+        "THROTTLE",
+        "CHALLENGE",
+        "BLOCK",
+        "REVIEW"
+      ],
+      "clientWritable": false,
+      "status": "SOURCE_EXISTS_FOLLOW_TRANSPORT_PENDING"
+    },
+    {
+      "field": "callerProvenance",
+      "authority": "Trusted internal Worker transport",
+      "supportingContracts": [
+        "contracts/transport/SOCIAL-001-follow-trusted-admission-input.v1.json"
+      ],
+      "requiredFields": [
+        "caller",
+        "transportVersion",
+        "correlationId"
+      ],
+      "clientWritable": false,
+      "status": "TRANSPORT_BINDING_REQUIRED"
+    }
+  ],
+  "minimumTransportDecision": {
+    "logicalPath": "W01 authenticated public ingress -> trusted server-side admission context -> W01 to W05 internal transport -> W05 authoritative D1-02 mutation",
+    "transportKind": "Cloudflare Worker Service Binding HTTP",
+    "bindingName": "UNASSIGNED_PENDING_AUTHORITY_DECISION",
+    "publicExposure": false,
+    "newWorkerCount": 0,
+    "newD1Count": 0,
+    "newPayloadCollectionCount": 0,
+    "newPublicOperationCount": 0,
+    "decisionStatus": "NOT_ADMITTED"
+  },
+  "operationBudgets": {
+    "follow": {
+      "d1ReadMax": 1,
+      "d1WriteMax": 1,
+      "rpcMax": 0,
+      "asyncEventMax": 1
+    },
+    "unfollow": {
+      "d1ReadMax": 0,
+      "d1WriteMax": 1,
+      "rpcMax": 0,
+      "asyncEventMax": 1
+    }
+  },
+  "failClosedRules": [
+    "Missing or ambiguous trusted authority input produces DENY.",
+    "actorUserId MUST originate from the authenticated server principal.",
+    "Client input MUST NOT establish actor account state, permission result, block policy, privacy scope, anti-abuse result, counters, or relation state.",
+    "No cache, projection, copied D1 record, or raw event may substitute for an admitted authority.",
+    "The W05 authoritative mutation MUST remain inside the existing W05/D1-02 boundary.",
+    "No synchronous business-Worker fan-out is introduced for Follow/Unfollow."
+  ],
+  "implementationAdmissionEvidenceRequired": [
+    "explicit authority binding for actor account state",
+    "explicit operational authority binding for target followability",
+    "explicit authority binding for block policy",
+    "explicit operational authority binding for privacy/audience scope",
+    "explicit authority binding for anti-abuse admission",
+    "admitted private W01->W05 transport contract and exact binding name",
+    "exact source SHA provenance for each admitted boundary",
+    "negative evidence for missing/forged trusted inputs",
+    "positive/duplicate/concurrency evidence for the W05 D1-02 mutation"
+  ],
+  "nonAuthorizations": [
+    "Does not authorize a new Service Binding.",
+    "Does not authorize a new Worker or D1 database.",
+    "Does not authorize a W05 runtime handler.",
+    "Does not authorize a W05 call to W02 or W06 for policy lookup.",
+    "Does not introduce a second policy authority or policy store.",
+    "Does not promote SOCIAL-001 or SOCIAL-002 to GREEN.",
+    "Does not promote Mapping 0 to GREEN."
+  ],
+  "sourceRefs": [
+    "contracts/transport/SOCIAL-001-follow-trusted-admission-input.v1.json",
+    "contracts/api/interaction-operation-policy.v1.json",
+    "contracts/authz/authorization-decision.json",
+    "contracts/authz/permissions.json",
+    "contracts/state-machines/account.json",
+    "contracts/api/block-mute.v1.json",
+    "docs/11-P0-SOCIAL-INTERACTION-AND-EVENT-CONTRACT-v1.0.md",
+    "docs/188-L5-L6-SOCIAL-COMMUNITY-INTERACTION-INSTANCE-REGISTRY-v1.0.md"
+  ]
+}
