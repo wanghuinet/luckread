@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.cn/contracts/v1/public-worker-terminal-routing.v1.json",
+  "title": "LuckRead Public Ingress and Business Terminal Worker Boundary",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PARTIAL",
+  "purpose": "Separate public HTTP ingress from authoritative business execution so W01 does not become a universal business owner or mandatory worker-to-worker hop.",
+  "topology": {
+    "workerCount": 12,
+    "d1Count": 4,
+    "taskCount": 25,
+    "newWorker": false,
+    "newD1": false
+  },
+  "rules": {
+    "ingress": "W01 is the public HTTP/API ingress boundary for currently admitted public routes.",
+    "terminalAuthority": "The Worker listed as terminalWorker is the authoritative business execution boundary for the operation's domain.",
+    "noUniversalProxy": "W01 must not become a universal business-data proxy or a second authoritative owner.",
+    "noReturnToIngress": "A Worker-to-Worker call must not be routed back through W01 merely to reach another Worker.",
+    "contractRequired": "Any W01 ingress-to-terminal hop requires an explicit transport contract with caller, callee, operationId/version, principal provenance, timeout, retry, idempotency, and failure semantics."
+  },
+  "routes": [
+    {
+      "operationIdFamily": "auth",
+      "publicPaths": ["/auth/register", "/auth/login", "/auth/logout", "/auth/password/*", "/auth/refresh", "/auth/sessions/*"],
+      "ingressWorker": "W01",
+      "terminalWorker": "W01",
+      "authorityNote": "W01 owns the public authentication execution boundary only where the admitted Payload-native route is the execution surface; W02 remains the Identity/Account/Authorization authority and receives explicit delegated identity/session mutations."
+    },
+    {
+      "operationIdFamily": "content",
+      "publicPaths": ["/api/v1/contents", "/api/v1/contents/*", "/api/creator/contents", "/api/creator/contents/*"],
+      "ingressWorker": "W01",
+      "terminalWorker": "W03",
+      "transportBinding": "W01-W03-content-http-binding.v1",
+      "authorityNote": "W03 is the Content/Article/Media/Translation authority and D1-02 owner."
+    },
+    {
+      "operationIdFamily": "moderation",
+      "publicPaths": ["/api/v1/admin/moderation/*"],
+      "ingressWorker": "W01",
+      "terminalWorker": "W06",
+      "transportBinding": "W01-W06-moderation-http-binding.v1",
+      "authorityNote": "W06 is the Rights/Trust & Safety/Governance authority and D1-03 moderation owner."
+    }
+  ],
+  "workerToWorkerInvariant": {
+    "forbiddenPattern": "business Worker -> W01 -> another business Worker",
+    "allowedPattern": "public ingress W01 -> contract-declared business terminal Worker",
+    "internalPattern": "business Worker -> explicitly contracted business Worker where required; W01 is not inserted as a routing hop"
+  },
+  "nonGoals": [
+    "No new public namespace is introduced by this contract.",
+    "No direct public exposure of W03/W06 is required by this contract.",
+    "No Worker or D1 topology expansion.",
+    "No Mapping 0 GREEN promotion."
+  ]
+}
