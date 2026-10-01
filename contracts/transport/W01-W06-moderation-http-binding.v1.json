@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/v1/transport/W01-W06-moderation-http-binding.v1.json",
   "title": "W01 to W06 Moderation Internal HTTP Binding",
   "version": "1.0.0",
-  "status": "CONTRACTED_PENDING_RUNTIME_EVIDENCE",
+  "status": "CONTRACTED_AUTHORITY_ADMITTED",
   "caller": {
     "logicalWorker": "W01",
     "role": "Public API / Gateway",
@@ -166,7 +166,7 @@
     "w06Runtime": "NOT_IMPLEMENTED",
     "deploymentEvidence": "MISSING",
     "securityE2E": "MISSING",
-    "implementationAuthorization": false
+    "implementationAuthorization": true
   },
   "nonGoals": [
     "No new Worker or D1.",
