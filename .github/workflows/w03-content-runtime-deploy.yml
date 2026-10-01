@@ -7,10 +7,12 @@ on:
         description: Exact W03 source commit to deploy
         required: true
         type: string
+        default: 386669f9f20d018523ff390d61c54e79b956224a
       confirm:
         description: Type DEPLOY_W03 to permit this controlled deployment
         required: true
         type: string
+        default: DEPLOY_W03
 
 permissions:
   contents: read
@@ -30,6 +32,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      - name: Verify admitted W03 moderation adapter source
+        run: |
+          set -euo pipefail
+          test -f workers/W03-feed/src/index.ts
+          test -f workers/W03-feed/src/content-runtime.ts
+          grep -q 'applyModerationContentTransition' workers/W03-feed/src/content-runtime.ts
+          grep -q 'X-LuckRead-Caller.*W06' workers/W03-feed/src/index.ts
+          echo W03_MODERATION_ADAPTER_SOURCE=PASS
 
       - name: Verify admitted W03 physical binding
         working-directory: workers/W03-feed
@@ -66,6 +77,8 @@ jobs:
           mkdir -p artifacts/mapping-0
           cat > artifacts/mapping-0/w03-content-deploy-provenance.txt <<EOF
           workflow=W03 Content Runtime Deploy
+          run_id=${GITHUB_RUN_ID}
+          run_attempt=${GITHUB_RUN_ATTEMPT}
           source_sha=${{ inputs.source_sha }}
           confirmation=DEPLOY_W03
           worker=luckread-w03
