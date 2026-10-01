@@ -142,7 +142,9 @@
     "stale content version rejection evidence",
     "idempotency replay evidence",
     "no direct D1-02 access evidence",
-    "decision-to-content-transition attribution evidence"
+    "decision-to-content-transition attribution evidence",
+    "decision acceptance remains successful when W03 delivery is unavailable",
+    "durable outbox row exists in same D1-03 transaction as decision and audit"
   ],
   "nonGoals": [
     "No new Worker or D1.",
@@ -151,5 +153,12 @@
     "No new public operationId.",
     "No content-state authority in W06.",
     "No runtime GREEN claim."
-  ]
+  ],
+  "delivery": {
+    "mode": "transactional_outbox_with_post_commit_best_effort_delivery",
+    "authoritativeWrite": "W06/D1-03",
+    "W03Transition": "asynchronous side effect; W03 is D1-02 content-state authority",
+    "failureHandling": "Persisted retry in W06/D1-03 outbox; scheduled W06 drain",
+    "decisionAcceptanceIndependentOfW03": "true"
+  }
 }
