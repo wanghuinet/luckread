@@ -1,3 +1,4 @@
+import './session-runtime-principal.test.js'
 import { describe, expect, it } from 'vitest'
 import {
   createSessionExtension,
