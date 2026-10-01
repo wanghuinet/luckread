@@ -7,7 +7,7 @@ on:
         description: Exact admitted source SHA under test
         required: true
         type: string
-        default: 11515498e0a0c81148a9e59e0d77f42755838ab3
+        default: 8b815d5fa699bb2df647b2092257cf27a27151f3
       base_url:
         description: W01 public moderation base URL
         required: true
