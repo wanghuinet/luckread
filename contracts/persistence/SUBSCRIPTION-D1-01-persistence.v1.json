@@ -201,7 +201,7 @@
   "verificationRequirements": [
     "exact D1-01 target UUID evidence",
     "migration artifact hash",
-    "schema inspection proving all 13 columns and nullability",
+    "schema inspection proving all 14 columns and nullability",
     "index inspection",
     "no cross-D1 foreign-key evidence",
     "W07 runtime binding evidence",
