@@ -167,7 +167,7 @@
       "name": "SocialLikeRelationship",
       "domainId": "D1-02",
       "classification": "AUTHORITATIVE",
-      "status": "CONTRACTED_NOT_VERIFIED",
+      "status": "PROPOSED",
       "implementationRef": "workers/W05-social/src/like-runtime.ts",
       "evidenceRefs": [
         "contracts/entity/SOCIAL-003-like-relationship-contract.v1.json",
