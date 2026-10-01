@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/v1/transport/SOCIAL-001-follow-trusted-authority-binding.v1.json",
   "title": "SOCIAL-001 Follow Trusted Authority Binding Contract",
   "version": "1.0.0",
-  "status": "AUTHORITY_MAPPING_PENDING",
+  "status": "AUTHORITY_MAPPING_PARTIAL",
   "featureId": "SOCIAL-001",
   "operationIds": [
     "follow",
@@ -126,13 +126,13 @@
   "minimumTransportDecision": {
     "logicalPath": "W01 authenticated public ingress -> trusted server-side admission context -> W01 to W05 internal transport -> W05 authoritative D1-02 mutation",
     "transportKind": "Cloudflare Worker Service Binding HTTP",
-    "bindingName": "UNASSIGNED_PENDING_AUTHORITY_DECISION",
+    "bindingName": "W05_SOCIAL",
     "publicExposure": false,
     "newWorkerCount": 0,
     "newD1Count": 0,
     "newPayloadCollectionCount": 0,
     "newPublicOperationCount": 0,
-    "decisionStatus": "NOT_ADMITTED"
+    "decisionStatus": "TRANSPORT_CONTRACT_ADMITTED / AUTHORITY_INPUTS_PENDING"
   },
   "operationBudgets": {
     "follow": {
@@ -184,6 +184,9 @@
     "contracts/state-machines/account.json",
     "contracts/api/block-mute.v1.json",
     "docs/11-P0-SOCIAL-INTERACTION-AND-EVENT-CONTRACT-v1.0.md",
-    "docs/188-L5-L6-SOCIAL-COMMUNITY-INTERACTION-INSTANCE-REGISTRY-v1.0.md"
-  ]
+    "docs/188-L5-L6-SOCIAL-COMMUNITY-INTERACTION-INSTANCE-REGISTRY-v1.0.md",
+    "contracts/transport/W01-W05-social-follow-http-binding.v1.json"
+  ],
+  "transportContract": "contracts/transport/W01-W05-social-follow-http-binding.v1.json",
+  "notes": "The private W01→W05 caller/provenance boundary is now contractually admitted. Target followability, block, privacy/scope, anti-abuse and actor account-state authority inputs remain explicitly pending; this does not authorize W05 runtime."
 }
