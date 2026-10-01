@@ -173,7 +173,7 @@
     "No direct W02→W06 business Service Binding.",
     "No public W06 route.",
     "No D1 migration execution.",
-    "No moderation runtime implementation.",
+    "No runtime GREEN claim; deployment and security evidence remain required.",
     "No Mapping 0 GREEN claim."
   ],
   "verificationRequirements": [
