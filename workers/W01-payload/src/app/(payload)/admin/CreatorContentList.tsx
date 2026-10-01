@@ -138,7 +138,7 @@ export default function CreatorContentList() {
   }
 
   return (
-    <section className={styles.contentManageSection}>
+    <section aria-busy={loading || actionId !== null} className={styles.contentManageSection}>
       <div className={styles.contentManageHeading}>
         <div>
           <span className={styles.eyebrow}>CONTENT MANAGEMENT</span>
@@ -229,6 +229,7 @@ export default function CreatorContentList() {
                   ) : null}
                   {item.state === 'APPROVED' ? (
                     <button
+                      aria-busy={actionId === item.id}
                       className={styles.primaryButton}
                       disabled={actionId !== null}
                       onClick={() => void transition(item, 'PUBLISHED')}
@@ -243,6 +244,7 @@ export default function CreatorContentList() {
                         查看内容
                       </Link>
                       <button
+                        aria-busy={actionId === item.id}
                         className={styles.secondaryButton}
                         disabled={actionId !== null}
                         onClick={() => void transition(item, 'UNPUBLISHED')}
