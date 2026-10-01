@@ -647,7 +647,7 @@ paths:
           description: Comment thread (cursor paginated, depth-limited).
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ListResponse' }
+              schema: { $ref: '#/components/schemas/SocialCommentListResponse' }
         '4XX': { $ref: '#/components/responses/ClientError' }
     post:
       tags: [Comments]
@@ -1692,13 +1692,7 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [body]
-              additionalProperties: false
-              properties:
-                body: { type: string, minLength: 1, maxLength: 10000 }
-                parentId: { $ref: '#/components/schemas/ResourceId' }
+            schema: { $ref: '#/components/schemas/SocialCommentCreateRequest' }
       responses:
         '201':
           description: Created. May enter PENDING when moderation is required.
@@ -2798,10 +2792,49 @@ components:
     Comment:
       type: object
       required: [id, body, state]
+      additionalProperties: false
       properties:
         id: { $ref: '#/components/schemas/ResourceId' }
-        body: { type: string }
+        body: { type: string, minLength: 1, maxLength: 10000 }
         state: { $ref: '#/components/schemas/CommentState' }
+        parentId:
+          anyOf:
+            - $ref: '#/components/schemas/ResourceId'
+            - type: 'null'
+        createdAt: { type: string, format: date-time }
+    SocialComment:
+      $ref: '#/components/schemas/Comment'
+    SocialCommentListResponse:
+      type: object
+      required: [data, requestId]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [items, nextCursor, hasMore]
+          additionalProperties: false
+          properties:
+            items:
+              type: array
+              maxItems: 50
+              items: { $ref: '#/components/schemas/SocialComment' }
+            nextCursor:
+              anyOf:
+                - type: string
+                  maxLength: 1024
+                - type: 'null'
+            hasMore: { type: boolean }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    SocialCommentCreateRequest:
+      type: object
+      required: [body]
+      additionalProperties: false
+      properties:
+        body: { type: string, minLength: 1, maxLength: 10000 }
+        parentId:
+          anyOf:
+            - $ref: '#/components/schemas/ResourceId'
+            - type: 'null'
     InteractionTarget:
       type: object
       required: [targetType, targetId]
