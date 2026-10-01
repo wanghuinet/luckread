@@ -7,7 +7,7 @@ on:
         description: Exact main commit containing the admitted Moderation D1-03 migration
         required: true
         type: string
-        default: e5187e7eef2285577fd3984c2f79dd1cdbc17880
+        default: 81986b7510efb20a5dd44f9971ca40794989ddff
       database_name:
         description: D1-03 display name bound by W06 wrangler.jsonc
         required: true
@@ -25,14 +25,14 @@ permissions:
 
 jobs:
   migrate:
-    if: \${{ inputs.confirm == 'APPLY' }}
+    if: ${{ inputs.confirm == 'APPLY' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout exact migration source
         uses: actions/checkout@v4
         with:
-          ref: \${{ inputs.source_sha }}
+          ref: ${{ inputs.source_sha }}
 
       - name: Setup Node 24
         uses: actions/setup-node@v4
@@ -41,8 +41,8 @@ jobs:
 
       - name: Verify moderation source CI
         env:
-          GH_TOKEN: \${{ github.token }}
-          SOURCE_SHA: \${{ inputs.source_sha }}
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
           conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow moderation-runtime-source-ci.yml --commit "$SOURCE_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
@@ -54,7 +54,7 @@ jobs:
       - name: Verify controlled D1-03 binding
         working-directory: workers/W06-governance
         env:
-          EXPECTED_DB_NAME: \${{ inputs.database_name }}
+          EXPECTED_DB_NAME: ${{ inputs.database_name }}
           EXPECTED_DB_ID: bda1d247-a371-4244-91ae-aef96034db7f
         run: |
           node - <<'NODE'
@@ -88,12 +88,12 @@ jobs:
       - name: Preflight remote target
         working-directory: workers/W06-governance
         env:
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/artifacts/mapping-0/moderation-d1-03-migration"
-          npx --yes wrangler@4.116.0 d1 execute "\${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard') ORDER BY name;" > "$GITHUB_WORKSPACE/artifacts/mapping-0/moderation-d1-03-migration/preflight.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard') ORDER BY name;" > "$GITHUB_WORKSPACE/artifacts/mapping-0/moderation-d1-03-migration/preflight.json"
           node - <<'NODE'
           const fs=require('fs');
           const data=JSON.parse(fs.readFileSync(process.env.GITHUB_WORKSPACE+'/artifacts/mapping-0/moderation-d1-03-migration/preflight.json','utf8'));
@@ -105,23 +105,23 @@ jobs:
       - name: Apply D1-03 moderation migration
         working-directory: workers/W06-governance
         env:
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx --yes wrangler@4.116.0 d1 migrations apply "\${{ inputs.database_name }}" --remote --config wrangler.jsonc
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 d1 migrations apply "${{ inputs.database_name }}" --remote --config wrangler.jsonc
 
       - name: Capture remote D1-03 evidence
         working-directory: workers/W06-governance
         env:
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
           out="$GITHUB_WORKSPACE/artifacts/mapping-0/moderation-d1-03-migration"
           for table in moderation_cases moderation_decisions moderation_decision_idempotency moderation_txn_guard moderation_enforcement_outbox; do
-            npx --yes wrangler@4.116.0 d1 execute "\${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "PRAGMA table_info(\"$table\");" > "$out/$table-schema.json"
-            npx --yes wrangler@4.116.0 d1 execute "\${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "PRAGMA index_list(\"$table\");" > "$out/$table-indexes.json"
+            npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "PRAGMA table_info(\"$table\");" > "$out/$table-schema.json"
+            npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "PRAGMA index_list(\"$table\");" > "$out/$table-indexes.json"
           done
-          npx --yes wrangler@4.116.0 d1 execute "\${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM d1_migrations ORDER BY id;' > "$out/d1-migrations.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM d1_migrations ORDER BY id;' > "$out/d1-migrations.json"
           node - <<'NODE'
           const fs=require('fs');
           const dir=process.env.GITHUB_WORKSPACE+'/artifacts/mapping-0/moderation-d1-03-migration';
@@ -135,7 +135,7 @@ jobs:
       - name: Upload D1-03 migration evidence
         uses: actions/upload-artifact@v4
         with:
-          name: moderation-d1-03-migration-\${{ github.run_id }}
-          path: \${{ github.workspace }}/artifacts/mapping-0/moderation-d1-03-migration/
+          name: moderation-d1-03-migration-${{ github.run_id }}
+          path: ${{ github.workspace }}/artifacts/mapping-0/moderation-d1-03-migration/
           if-no-files-found: error
           retention-days: 14
