@@ -4440,3 +4440,13 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Previous Security E2E runs `36797669090`, `36797792430`, `36797870423`, `36798890134`, `36799194666`, `36799559279` remain inherited external observations against the old bearer-secret workflow and are not repeated.
 - Moderation Runtime remains `NOT_GREEN` until the full Security E2E evidence chain is executed and reconciled.
 - Backup before this workflow slice: `backup/pre-moderation-native-e2e-workflow-20261001`.
+
+
+## 2026-10-01 — Moderation L6 readiness run #1 diagnostic
+
+- Run `36799947914` executed the new native-L6 workflow and successfully passed checkout/setup; it no longer hit the old bearer-secret gate.
+- Failure occurred inside the real Payload-native registration call: `POST https://api.luckread.cn/auth/register` returned HTTP `400`.
+- No moderation queue/decision operation was executed; no evidence artifact was produced.
+- The readiness probe was updated at `f62b6614d26e095db349adf29c01d09873ceb758` to include the sanitized JSON response body in the registration failure diagnostic. Secret material is not included.
+- Status remains `NOT_GREEN`; this is now a concrete W01 authentication transport/runtime diagnostic, not the prior external-secret blocker.
+- Next execution: rerun the dedicated Readiness workflow from the updated main head to capture the exact 400 body; then correct only the fixture/input mismatch if the response identifies one.
