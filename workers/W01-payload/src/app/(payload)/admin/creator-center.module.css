@@ -342,6 +342,12 @@
 }
 .contentListItem:hover { transform:translateY(-1px); border-color:#dde6f2; background:#fbfdff; box-shadow:0 9px 22px rgba(15,23,42,.045); }
 .contentListMain { min-width:0; flex:1 1 auto; }
+.contentListThumb {
+  width:72px; height:54px; flex:none; overflow:hidden; display:grid; place-items:center;
+  border:1px solid #e7edf5; border-radius:10px; background:#f8fafc; color:var(--lr-text-3); font-size:8px; font-weight:760;
+}
+.contentListThumb img { width:100%; height:100%; display:block; object-fit:cover; }
+.contentMediaHint { display:block; margin-top:4px; color:#7b8799; font-size:9px; }
 .contentMeta { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
 .contentMeta span {
   display:inline-flex; align-items:center; min-height:22px; padding:0 7px; border-radius:999px; background:#f4f7fb;

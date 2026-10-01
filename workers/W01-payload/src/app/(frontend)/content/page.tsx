@@ -18,6 +18,11 @@ type ContentPage = {
   hasMore: boolean
 }
 
+type ContentApiResponse = {
+  data?: ContentPage
+  error?: { message?: string } | null
+}
+
 const labels: Record<ContentType | 'all', string> = {
   all: '全部',
   article: '文章',
@@ -38,7 +43,7 @@ export default function ContentBrowsePage() {
     return () => window.clearTimeout(timer)
   }, [])
 
-  async function load(cursor: string | null = null) {
+  async function load(cursor: string | null = null): Promise<void> {
     if (cursor) setLoadingMore(true)
     else setLoading(true)
     setError('')
@@ -51,7 +56,7 @@ export default function ContentBrowsePage() {
         headers: { accept: 'application/json' },
         cache: 'no-store',
       })
-      const data = await response.json().catch(() => null)
+      const data: ContentApiResponse = await response.json().catch((): null => null)
       if (!response.ok || !data?.data) {
         throw new Error(data?.error?.message || '内容加载失败')
       }
@@ -83,19 +88,6 @@ export default function ContentBrowsePage() {
           <Link className="button button-primary" href="/publish">开始创作 ↗</Link>
         </div>
       </header>
-
-      <nav className="content-browse-filters" aria-label="内容类型筛选">
-        {(Object.keys(labels) as Array<ContentType | 'all'>).map((value) => (
-          <button
-            className={value === type ? 'active' : ''}
-            key={value}
-            onClick={() => setType(value)}
-            type="button"
-          >
-            {labels[value]}
-          </button>
-        ))}
-      </nav>
 
       {loading ? <div className="content-browse-state">正在加载内容…</div> : null}
       {!loading && error ? (
