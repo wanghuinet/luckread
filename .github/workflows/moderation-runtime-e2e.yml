@@ -13,6 +13,11 @@ on:
         required: true
         type: string
         default: https://luckread.cn
+      w03_source_sha:
+        description: Exact W03 content runtime source required for moderation enforcement
+        required: true
+        type: string
+        default: 386669f9f20d018523ff390d61c54e79b956224a
       w01_source_sha:
         description: Exact W01 deployed source SHA to verify
         required: true
@@ -78,6 +83,21 @@ jobs:
           mkdir -p /tmp/w06-deployment-evidence
           gh run download "${{ inputs.w06_deploy_run_id }}" --repo "$GITHUB_REPOSITORY" --name "moderation-runtime-deployment-$SOURCE_SHA" --dir /tmp/w06-deployment-evidence
           grep -Fx "source_sha=$SOURCE_SHA" /tmp/w06-deployment-evidence/provenance.txt
+
+      - name: Verify exact W03 deployment evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          W03_SOURCE_SHA: ${{ inputs.w03_source_sha }}
+        run: |
+          set -euo pipefail
+          w03_run_id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow w03-content-runtime-deploy.yml --status success --limit 20 --json databaseId,headSha --jq '.[] | select(.headSha == env.W03_SOURCE_SHA) | .databaseId' | head -n 1)"
+          test -n "$w03_run_id" || { echo "No successful W03 deployment found for $W03_SOURCE_SHA"; exit 1; }
+          rm -rf /tmp/w03-deployment-evidence
+          mkdir -p /tmp/w03-deployment-evidence
+          gh run download "$w03_run_id" --repo "$GITHUB_REPOSITORY" --name "w03-content-deployment-$W03_SOURCE_SHA" --dir /tmp/w03-deployment-evidence
+          grep -Fx "source_sha=$W03_SOURCE_SHA" /tmp/w03-deployment-evidence/w03-content-deploy-provenance.txt
+          grep -Fx "migration_execution=false" /tmp/w03-deployment-evidence/w03-content-deploy-provenance.txt
+          echo "W03_DEPLOYMENT_EVIDENCE=PASS run_id=$w03_run_id source_sha=$W03_SOURCE_SHA"
 
       - name: Setup Node 24
         uses: actions/setup-node@v4
