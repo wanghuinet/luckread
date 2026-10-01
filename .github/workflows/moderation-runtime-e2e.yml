@@ -148,7 +148,7 @@ jobs:
               let resolveBody: any = null
               try { resolveBody = resolveRaw ? JSON.parse(resolveRaw) : null } catch {}
 
-              const establishResponse = await env.W02_AUTH.fetch(new Request(base + 'session/establish', {
+              const establishResponse = await env.W02_AUTH.fetch(new Request(base + '/internal/auth/session/establish', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
                 body: JSON.stringify({
