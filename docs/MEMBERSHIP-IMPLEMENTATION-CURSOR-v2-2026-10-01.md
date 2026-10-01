@@ -21,6 +21,9 @@ Subscription state machine
 - Payment-provider callback admission boundary documented without inventing a provider.
 - Current W01-facing transition boundary hardened to self-service ACTIVE→CANCELED only; W02 enforces subscriber ownership and entitlement-to-subscription scope.
 - Existing API contract IDs reconciled without invention: createSubscription, cancelSubscription (If-Match / ETag CAS), getSubscription, getEntitlements, checkEntitlement.
+- Terminal subscription cancellation/expiry now revokes all ACTIVE entitlement grants for the transitioning subscription atomically.
+- W07 no longer trusts W01-supplied subscription state/version; it reads the authoritative D1-01 snapshot from W02 before lifecycle validation.
+- `getSubscription` public read path implemented as W01→W07→W02 with authenticated L2 self scope.
 
 ## Still blocked
 
