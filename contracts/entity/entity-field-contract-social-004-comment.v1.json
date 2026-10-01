@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/entity/entity-field-contract-social-004-comment.v1.json",
+  "title": "SOCIAL-004 Comment Field Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "entityId": "ENT-SOCIAL-COMMENT",
+  "fields": [
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-COMMENT-ID",
+      "name": "commentId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": true,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_IDENTIFIER",
+      "apiExposure": "SCOPED_IDENTIFIER",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-AUTHOR-USER-ID",
+      "name": "authorUserId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_RELATION",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-CONTENT-ID",
+      "name": "contentId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_RELATION",
+      "apiExposure": "SCOPED_IDENTIFIER",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-PARENT-COMMENT-ID",
+      "name": "parentCommentId",
+      "type": "text",
+      "nullable": true,
+      "required": false,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_RELATION",
+      "apiExposure": "SCOPED_IDENTIFIER",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-BODY",
+      "name": "body",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": false,
+      "lifecycle": "mutable",
+      "classification": "USER_GENERATED_CONTENT",
+      "apiExposure": "SCOPED",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-STATE",
+      "name": "state",
+      "type": "enum",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "mutable",
+      "classification": "LIFECYCLE_STATE",
+      "apiExposure": "SCOPED",
+      "allowedValues": [
+        "PENDING",
+        "VISIBLE",
+        "HIDDEN",
+        "FLAGGED",
+        "UNDER_REVIEW",
+        "REJECTED",
+        "DELETED",
+        "AUTHOR_DELETED"
+      ],
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-CREATED-AT",
+      "name": "createdAt",
+      "type": "datetime",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "AUDIT_METADATA",
+      "apiExposure": "SCOPED",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    }
+  ],
+  "nonGoals": [
+    "No moderation decision duplication.",
+    "No counter/projection fields.",
+    "No Payload-native duplicate fields."
+  ]
+}
