@@ -28,10 +28,17 @@ const domainById = Object.fromEntries(
 
 const bindingPattern = /\\.\\s*(D1(?:_0[1-4])?|DB)\\b/g
 const destructuredBindingPattern = /\\{\\s*(D1(?:_0[1-4])?|DB)\\s*(?:,|\\})/g
+const stripCommentsAndStrings = (source) =>
+  source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1')
+    .replace(/'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"/g, '')
+
 const extractBindings = (source) => {
+  const code = stripCommentsAndStrings(source)
   const bindings = new Set()
-  for (const match of source.matchAll(bindingPattern)) bindings.add(match[1])
-  for (const match of source.matchAll(destructuredBindingPattern)) bindings.add(match[1])
+  for (const match of code.matchAll(bindingPattern)) bindings.add(match[1])
+  for (const match of code.matchAll(destructuredBindingPattern)) bindings.add(match[1])
   return bindings
 }
 const codeExts = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs'])
