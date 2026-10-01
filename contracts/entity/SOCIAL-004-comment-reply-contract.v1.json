@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/entity/SOCIAL-004-comment-reply-contract.v1.json",
+  "title": "SOCIAL-004 Comment / Reply Entity Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "entityId": "ENT-SOCIAL-COMMENT",
+  "featureRefs": [
+    "SOCIAL-004"
+  ],
+  "authority": {
+    "domainId": "D1-02",
+    "classification": "AUTHORITATIVE",
+    "primaryTask": "T11",
+    "primaryWorker": "W05",
+    "entityStatus": "PROPOSED_UNTIL_PERSISTENCE_AND_RUNTIME_EVIDENCE"
+  },
+  "sourceRefs": [
+    "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+    "docs/11-P0-SOCIAL-INTERACTION-AND-EVENT-CONTRACT-v1.0.md",
+    "contracts/enums/comment-state.json",
+    "contracts/api/social-comment-operation-policy.v1.json",
+    "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-API-SURFACE-2026-10-01.md",
+    "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-AUTHORITY-CONFLICT-2026-10-01.md"
+  ],
+  "fields": [
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-COMMENT-ID",
+      "name": "commentId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": true,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_IDENTIFIER",
+      "apiExposure": "SCOPED_IDENTIFIER"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-AUTHOR-USER-ID",
+      "name": "authorUserId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_RELATION",
+      "apiExposure": "NONE"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-CONTENT-ID",
+      "name": "contentId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_RELATION",
+      "apiExposure": "SCOPED_IDENTIFIER"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-PARENT-COMMENT-ID",
+      "name": "parentCommentId",
+      "type": "text",
+      "nullable": true,
+      "required": false,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_RELATION",
+      "apiExposure": "SCOPED_IDENTIFIER"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-BODY",
+      "name": "body",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": false,
+      "lifecycle": "mutable",
+      "classification": "USER_GENERATED_CONTENT",
+      "apiExposure": "SCOPED"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-STATE",
+      "name": "state",
+      "type": "enum",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "mutable",
+      "classification": "LIFECYCLE_STATE",
+      "apiExposure": "SCOPED",
+      "allowedValues": [
+        "PENDING",
+        "VISIBLE",
+        "HIDDEN",
+        "FLAGGED",
+        "UNDER_REVIEW",
+        "REJECTED",
+        "DELETED",
+        "AUTHOR_DELETED"
+      ]
+    },
+    {
+      "fieldId": "ENT-SOCIAL-COMMENT-F-CREATED-AT",
+      "name": "createdAt",
+      "type": "datetime",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "AUDIT_METADATA",
+      "apiExposure": "SCOPED"
+    }
+  ],
+  "constraints": {
+    "replyParentScope": "parentCommentId, when present, MUST resolve to a Comment in the same contentId scope.",
+    "authorSource": "authorUserId is resolved from the authenticated server-side principal; clients cannot authoritatively set it.",
+    "contentSource": "contentId is resolved from the canonical request path and must resolve to authoritative Content in D1-02.",
+    "stateAuthority": "CommentState is authoritative for client-visible lifecycle state; W06 owns moderation decisions, not Comment storage ownership.",
+    "visibility": "Server-side block/privacy/moderation policy MUST be evaluated before exposing or creating a Comment.",
+    "idempotency": "Create Comment MUST converge under an identical Idempotency-Key and request identity."
+  },
+  "nonGoals": [
+    "No moderation decision fields are duplicated into Comment.",
+    "No comment counter is authoritative here.",
+    "No Payload Collection authority is introduced.",
+    "No cache/projection is authoritative.",
+    "No runtime GREEN or persistence execution is claimed."
+  ],
+  "verificationRequirements": {
+    "requiredEvidence": [
+      "entity catalog admission",
+      "field registry admission",
+      "D1-02 table/column evidence",
+      "W05 physical Worker binding",
+      "create/list runtime tests",
+      "duplicate-idempotency test",
+      "reply same-content scope negative test",
+      "block/privacy/moderation negative tests",
+      "concurrency evidence",
+      "remote D1 runtime evidence",
+      "Evidence Registry record"
+    ],
+    "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until executable persistence/runtime/security/evidence chain is admitted."
+  },
+  "fieldContract": "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+  "persistenceContract": "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json"
+}
