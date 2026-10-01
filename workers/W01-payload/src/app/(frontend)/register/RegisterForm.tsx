@@ -126,7 +126,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
           </div>
 
           {status === 'success' && result ? (
-            <div className="registerSuccess" role="status">
+            <div className="registerSuccess" role="status" aria-live="polite">
               <div className="successIcon" aria-hidden="true">
                 ✓
               </div>
@@ -207,6 +207,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
               ) : null}
 
               <button
+                aria-busy={status === 'submitting'}
                 className="registerPrimaryButton"
                 disabled={status === 'submitting'}
                 type="submit"
