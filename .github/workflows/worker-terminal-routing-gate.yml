@@ -1,0 +1,43 @@
+name: Worker Terminal Routing Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W01-payload/**'
+      - 'workers/W02-identity/**'
+      - 'workers/W03-content/**'
+      - 'workers/W06-governance/**'
+      - 'contracts/transport/public-worker-terminal-routing.v1.json'
+      - 'contracts/transport/W01-W03-content-http-binding.v1.json'
+      - 'contracts/transport/W01-W06-moderation-http-binding.v1.json'
+      - 'scripts/verify-worker-terminal-routing.mjs'
+  pull_request:
+    paths:
+      - 'workers/W01-payload/**'
+      - 'workers/W02-identity/**'
+      - 'workers/W03-content/**'
+      - 'workers/W06-governance/**'
+      - 'contracts/transport/public-worker-terminal-routing.v1.json'
+      - 'contracts/transport/W01-W03-content-http-binding.v1.json'
+      - 'contracts/transport/W01-W06-moderation-http-binding.v1.json'
+      - 'scripts/verify-worker-terminal-routing.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify terminal Worker boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify terminal routing contract
+        run: node scripts/verify-worker-terminal-routing.mjs
