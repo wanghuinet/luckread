@@ -6764,33 +6764,52 @@
     {
       "featureId": "SOCIAL-003",
       "status": "UNRESOLVED",
-      "apiOperationIds": [],
-      "entityIds": [],
+      "apiOperationIds": [
+        "like",
+        "unlike"
+      ],
+      "entityIds": [
+        "ENT-SOCIAL-REACTION"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
         "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/api/SOCIAL-003-reaction-contract.v1.json",
+        "contracts/entity/SOCIAL-003-reaction-entity-contract.v1.json",
+        "contracts/persistence/SOCIAL-003-reaction-persistence-contract.v1.json"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Runtime, remote D1 schema/migration, abuse/security E2E, aggregation/event evidence and Evidence Registry provenance remain unresolved."
       ]
     },
     {
       "featureId": "SOCIAL-004",
       "status": "UNRESOLVED",
-      "apiOperationIds": [],
-      "entityIds": [],
+      "apiOperationIds": [
+        "listComments",
+        "createComment",
+        "patchCommentsCommentId",
+        "deleteCommentsCommentId"
+      ],
+      "entityIds": [
+        "ENT-SOCIAL-COMMENT"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
         "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/api/SOCIAL-004-comment-contract.v1.json",
+        "contracts/entity/SOCIAL-004-comment-entity-contract.v1.json",
+        "contracts/persistence/SOCIAL-004-comment-persistence-contract.v1.json",
+        "contracts/dto/SOCIAL-INTERACTION-DTO.v1.json"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Runtime, remote D1 schema/migration, moderation/security E2E, concurrency and Evidence Registry provenance remain unresolved."
       ]
     },
     {
