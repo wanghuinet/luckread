@@ -213,6 +213,9 @@ describe('Creator Center admin extension', () => {
     expect(styles).toContain('.quickCreate')
     expect(styles).toContain('.toolGrid')
     expect(styles).toContain('.futureGrid')
+    expect(styles).toContain('.creatorLayout a:focus-visible')
+    expect(styles).toContain('.creatorLayout button:focus-visible')
+    expect(styles).toContain('.creatorLayout select:focus-visible')
   })
 
   it('exposes login submission and error status', () => {
