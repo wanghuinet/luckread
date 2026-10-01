@@ -1,0 +1,108 @@
+name: LuckRead W01 Auth Establish Retry One-Time Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/change-control/CC-1.7-MODERATION-W01-TRANSIENT-ESTABLISH-RETRY-DEPLOY-2026-10-01.md
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact main commit containing the approved W01 auth establish retry
+        required: true
+        default: 699a421c6dd027d425ff0a950713063ec5060b5b
+        type: string
+      confirm:
+        description: Type DEPLOY_W01_AUTH_RETRY to permit the one-time W01 deployment
+        required: true
+        default: DEPLOY_W01_AUTH_RETRY
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'push' || inputs.confirm == 'DEPLOY_W01_AUTH_RETRY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.sha || inputs.source_sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+          run_install: false
+
+      - name: Verify approved W01 auth retry source
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          grep -q "setTimeout(resolve, 250)" src/app/auth/login/route.ts
+          grep -q "error.status !== 503" src/app/auth/login/route.ts
+          git status --short
+          test -z "$(git status --short)"
+
+      - name: Install locked W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck W01
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit --project tsconfig.json --pretty false
+
+      - name: Ensure W01 PAYLOAD_SECRET runtime secret
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          secret_list="$(npx --yes wrangler@4.116.0 secret list --name luckread-w01-payload --format json)"
+          has_payload_secret="$(printf '%s' "$secret_list" | node --input-type=module -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const parsed=JSON.parse(data); const names=new Set(Array.isArray(parsed) ? parsed.map(item => item?.name) : []); process.stdout.write(names.has("PAYLOAD_SECRET") ? "true" : "false"); })')"
+          test "$has_payload_secret" = "true"
+
+      - name: Build W01 without database migration
+        working-directory: workers/W01-payload
+        run: pnpm exec opennextjs-cloudflare build
+
+      - name: Deploy W01 only
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -o pipefail
+          mkdir -p ../../artifacts/mapping-0
+          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w01-auth-establish-retry-deploy.log
+
+      - name: Write deployment provenance
+        run: |
+          mkdir -p artifacts/mapping-0
+          cat > artifacts/mapping-0/w01-auth-establish-retry-deploy-provenance.txt <<EOF
+          workflow=LuckRead W01 Auth Establish Retry One-Time Deploy
+          source_sha=${{ github.event_name == 'push' && github.sha || inputs.source_sha }}
+          worker=luckread-w01-payload
+          scope=W01 auth establish retry only
+          database_migration=false
+          new_worker=false
+          new_d1=false
+          EOF
+          cat artifacts/mapping-0/w01-auth-establish-retry-deploy-provenance.txt
+
+      - name: Upload deployment evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: w01-auth-establish-retry-deployment-${{ github.run_id }}
+          path: |
+            artifacts/mapping-0/w01-auth-establish-retry-deploy.log
+            artifacts/mapping-0/w01-auth-establish-retry-deploy-provenance.txt
