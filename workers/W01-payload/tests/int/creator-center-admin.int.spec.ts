@@ -154,7 +154,7 @@ describe('Creator Center admin extension', () => {
     expect(list).toContain("/api/creator/contents?")
     expect(list).toContain("['DRAFT', 'REJECTED'].includes(item.state)")
     expect(list).toContain("item.state === 'PUBLISHED'")
-    expect(list).toContain("async function transition(item: Item, to: 'PUBLISHED' | 'UNPUBLISHED')")
+    expect(list).toContain("async function transition(item: Item, to: 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'RESTORED' | 'DRAFT')")
     expect(list).toContain("/api/creator/contents/")
     expect(list).toContain("/state")
     expect(list).toContain("method: 'POST'")
