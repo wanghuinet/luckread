@@ -515,7 +515,12 @@ export default function PublishComposer({
           <div className="lr-asset-list">
             {assets.map((asset) => (
               <div className="lr-asset" key={asset.id}>
-                <div>
+                <div className="lr-asset-preview">
+                  {asset.mimeType.startsWith('video/')
+                    ? <video aria-label={asset.filename ?? '已上传视频'} muted playsInline preload="metadata" src={asset.url} />
+                    : <img alt="" loading="lazy" src={asset.url} />}
+                </div>
+                <div className="lr-asset-info">
                   <strong>{asset.filename ?? asset.id}</strong>
                   <span>{asset.mimeType}</span>
                 </div>
