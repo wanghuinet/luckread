@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import styles from './creator-center.module.css'
 
@@ -52,8 +52,10 @@ export default function CreatorContentList() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
   const [actionId, setActionId] = useState<string | null>(null)
+  const requestIdRef = useRef(0)
 
   const load = useCallback(async (cursor: string | null = null) => {
+    const requestId = ++requestIdRef.current
     if (cursor) setLoadingMore(true)
     else setLoading(true)
     setError('')
@@ -72,6 +74,7 @@ export default function CreatorContentList() {
       if (!response.ok || !data?.data) {
         throw new Error(data?.error?.message || '内容列表加载失败')
       }
+      if (requestId !== requestIdRef.current) return
       const next = data.data as Page
       setPage((current) =>
         cursor
@@ -83,8 +86,10 @@ export default function CreatorContentList() {
           : next,
       )
     } catch (cause) {
+      if (requestId !== requestIdRef.current) return
       setError(cause instanceof Error ? cause.message : '内容列表加载失败')
     } finally {
+      if (requestId !== requestIdRef.current) return
       setLoading(false)
       setLoadingMore(false)
     }
