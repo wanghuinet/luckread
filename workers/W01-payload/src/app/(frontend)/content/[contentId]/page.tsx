@@ -128,14 +128,17 @@ export default function ContentDetailPage({
         </header>
 
         {content.contentType === 'video' && content.mediaRefs?.length ? (
-          <div className="content-detail-media">
-            <video
-              controls
-              playsInline
-              preload="metadata"
-              poster={content.coverRef || undefined}
-              src={content.mediaRefs[0]}
-            />
+          <div className="content-detail-media content-detail-video-gallery">
+            {content.mediaRefs.map((url, index) => (
+              <video
+                controls
+                key={url}
+                playsInline
+                preload={index === 0 ? 'metadata' : 'none'}
+                poster={index === 0 ? content.coverRef || undefined : undefined}
+                src={url}
+              />
+            ))}
           </div>
         ) : null}
 
