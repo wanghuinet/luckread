@@ -14,6 +14,8 @@ type Item = {
   state: ContentState
   version: number
   title: string
+  mediaRefs?: string[]
+  coverRef?: string | null
   updatedAt: string
 }
 
@@ -188,6 +190,11 @@ export default function CreatorContentList() {
           <div className={styles.contentList}>
             {page.items.map((item) => (
               <article className={styles.contentListItem} key={item.id}>
+                {(item.coverRef || item.mediaRefs?.length) ? (
+                  <div className={styles.contentListThumb} aria-hidden="true">
+                    {item.coverRef ? <img alt="" loading="lazy" src={item.coverRef} /> : <span>{item.mediaRefs?.length} 个媒体</span>}
+                  </div>
+                ) : null}
                 <div className={styles.contentListMain}>
                   <div className={styles.contentMeta}>
                     <span>{typeLabels[item.contentType]}</span>
@@ -195,6 +202,9 @@ export default function CreatorContentList() {
                     <span>v{item.version}</span>
                   </div>
                   <h3>{item.title}</h3>
+                  {item.mediaRefs?.length ? (
+                    <span className={styles.contentMediaHint}>媒体 {item.mediaRefs.length} 个</span>
+                  ) : null}
                   <time dateTime={item.updatedAt}>
                     更新于 {new Date(item.updatedAt).toLocaleString('zh-CN', { hour12: false })}
                   </time>
