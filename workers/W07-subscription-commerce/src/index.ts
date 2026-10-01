@@ -4,6 +4,7 @@ import {
   type SubscriptionActor,
   type SubscriptionStatus,
 } from './subscription-state-machine.js'
+import { callW02Membership } from './w02-membership-client.js'
 
 const actors = new Set<SubscriptionActor>(['system', 'payment', 'user', 'creator', 'admin'])
 const statuses = new Set<SubscriptionStatus>(['PENDING', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'EXPIRED'])
@@ -22,6 +23,71 @@ export default {
 
     if (url.pathname === '/health') {
       return json({ worker: 'luckread-w07', status: 'ok' })
+    }
+
+    if (url.pathname === '/internal/membership/subscriptions' && request.method === 'POST') {
+      if (
+        request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+        request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+        !request.headers.get('X-LuckRead-Correlation-Id')
+      ) {
+        return json({ error: { code: 'UNTRUSTED_CALLER' } }, 403)
+      }
+
+      let body: {
+        subscriptionId?: unknown
+        subscriberId?: unknown
+        planId?: unknown
+        planVersion?: unknown
+        startedAt?: unknown
+        currentPeriodStart?: unknown
+        currentPeriodEnd?: unknown
+      }
+
+      try {
+        body = await request.json() as typeof body
+      } catch {
+        return json({ error: { code: 'VALIDATION_FAILED' } }, 400)
+      }
+
+      const actorUserId = request.headers.get('X-LuckRead-Principal-User-Id') ?? ''
+      if (
+        typeof body.subscriptionId !== 'string' ||
+        typeof body.subscriberId !== 'string' ||
+        typeof body.planId !== 'string' ||
+        typeof body.planVersion !== 'number' ||
+        typeof body.startedAt !== 'string' ||
+        typeof body.currentPeriodStart !== 'string' ||
+        typeof body.currentPeriodEnd !== 'string' ||
+        actorUserId !== body.subscriberId
+      ) {
+        return json({ error: { code: 'VALIDATION_FAILED' } }, 400)
+      }
+
+      try {
+        const response = await callW02Membership({
+          operation: 'create',
+          correlationId: request.headers.get('X-LuckRead-Correlation-Id')!,
+          idempotencyKey: request.headers.get('Idempotency-Key') ?? crypto.randomUUID(),
+          actorUserId,
+          body: {
+            subscriptionId: body.subscriptionId,
+            subscriberId: body.subscriberId,
+            planId: body.planId,
+            planVersion: body.planVersion,
+            startedAt: body.startedAt,
+            currentPeriodStart: body.currentPeriodStart,
+            currentPeriodEnd: body.currentPeriodEnd,
+          },
+        })
+        return new Response(await response.arrayBuffer(), {
+          status: response.status,
+          headers: { 'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+        })
+      } catch (error) {
+        const status = error instanceof Error && 'status' in error ? Number((error as { status?: number }).status) : 503
+        return json({ error: { code: status === 403 ? 'ACCESS_DENIED' : 'SERVICE_UNAVAILABLE' } }, status === 403 ? 403 : 503)
+      }
     }
 
     if (url.pathname !== '/internal/membership/subscription/transition' || request.method !== 'POST') {
