@@ -1,0 +1,29 @@
+name: W05 Social Runtime Contract CI
+on:
+  pull_request:
+    paths:
+      - 'workers/W05-social/**'
+      - 'workers/W01-payload/src/content/w05-social-client.ts'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - 'contracts/transport/W01-W05-social-follow-trusted-transport.v1.json'
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W05-social/**'
+      - 'workers/W01-payload/src/content/w05-social-client.ts'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - 'contracts/transport/W01-W05-social-follow-trusted-transport.v1.json'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm exec vitest run workers/W05-social/src/follow-runtime.test.ts
