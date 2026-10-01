@@ -4380,3 +4380,22 @@ The moderation decision path is now:
 `W01 authenticated principal → W06 permission/layer check → D1-03 Decision + Case + Idempotency + AuditEvent + EnforcementOutbox transaction → best-effort W06→W03 delivery → scheduled W06 retry on failure`.
 
 Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-03 migration, coordinated W01/W03/W06 deployment, and Security E2E evidence are produced and reconciled.
+
+
+## 2026-10-01 — Moderation D1-03 remote migration evidence closed
+
+- Evidence run: GitHub Actions 36797152185 — SUCCESS.
+- Execution mode: VERIFY_ONLY; the remote D1-03 mutation was not repeated after the successful earlier migration execution.
+- Source under evidence: 81986b7510efb20a5dd44f9971ca40794989ddff.
+- D1-03 target: secondary / bda1d247-a371-4244-91ae-aef96034db7f.
+- Remote preflight confirmed the complete Moderation foundation schema is present:
+  - moderation_cases
+  - moderation_decisions
+  - moderation_decision_idempotency
+  - moderation_txn_guard
+  - moderation_enforcement_outbox
+- Remote evidence capture completed successfully and produced artifact moderation-d1-03-migration-36797152185 (artifact id 11134545673, not expired at verification time).
+- The evidence workflow also captured the remote D1 migration metadata and the Moderation schema SQL/index definitions.
+- D1-03 migration evidence status: VERIFIED.
+- This does not promote Moderation runtime GREEN. Remaining sequence is coordinated W03/W06/W01 deployment evidence → Security E2E → decision/audit/outbox/W03 convergence evidence → Evidence Registry reconciliation.
+- Backup before this governance update: backup/pre-moderation-d1-evidence-final-20261001.
