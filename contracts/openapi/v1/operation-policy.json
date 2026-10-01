@@ -619,13 +619,72 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "analytics.read"
+      ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/CREATOR-003-006-AUDIENCE-DASHBOARD-READ.v1.json",
+      "resource": {
+        "class": "CACHE_FIRST_BOUNDED_READ",
+        "d1ReadMax": 0,
+        "d1WriteMax": 0,
+        "rpcMax": 0,
+        "responseItemsMax": 1
+      },
+      "pagination": {
+        "style": "NONE"
+      },
+      "cache": {
+        "mode": "SHORT_DERIVED_PRIVATE_CACHE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "device",
+          "account",
+          "endpoint"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "security": [
+        "creator_scope_server_derived",
+        "social_authority_not_duplicated",
+        "membership_authority_not_duplicated",
+        "staleness_observable"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "MISSING",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     },
     {
       "operationId": "getCreatorProfile",
