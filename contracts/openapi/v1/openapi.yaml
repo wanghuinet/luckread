@@ -2393,24 +2393,112 @@ paths:
   /users/{userId}/followers:
     get:
       tags: [Users]
-      summary: Discovery draft for GET undefined
+      summary: List the user's current followers
       operationId: getUsersUserIdFollowers
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/SOCIAL-002-followers-following-read.v1.json
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Cursor-paginated current followers with derived totalCount.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [items, nextCursor, hasMore, totalCount]
+                    additionalProperties: false
+                    properties:
+                      items:
+                        type: array
+                        maxItems: 50
+                        items:
+                          type: object
+                          required: [userId, followedAt]
+                          additionalProperties: false
+                          properties:
+                            userId: { $ref: '#/components/schemas/ResourceId' }
+                            followedAt: { type: string, format: date-time }
+                      nextCursor:
+                        anyOf:
+                          - $ref: '#/components/schemas/Cursor'
+                          - type: 'null'
+                      hasMore:
+                        type: boolean
+                      totalCount:
+                        type: integer
+                        minimum: 0
+                        description: Derived current follower count; never an authoritative counter.
+                  requestId:
+                    $ref: '#/components/schemas/RequestId'
+                  traceId:
+                    $ref: '#/components/schemas/TraceId'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /users/{userId}/following:
     get:
       tags: [Users]
-      summary: Discovery draft for GET undefined
+      summary: List users currently followed by the user
       operationId: getUsersUserIdFollowing
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/SOCIAL-002-followers-following-read.v1.json
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Cursor-paginated current following set with derived totalCount.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [items, nextCursor, hasMore, totalCount]
+                    additionalProperties: false
+                    properties:
+                      items:
+                        type: array
+                        maxItems: 50
+                        items:
+                          type: object
+                          required: [userId, followedAt]
+                          additionalProperties: false
+                          properties:
+                            userId: { $ref: '#/components/schemas/ResourceId' }
+                            followedAt: { type: string, format: date-time }
+                      nextCursor:
+                        anyOf:
+                          - $ref: '#/components/schemas/Cursor'
+                          - type: 'null'
+                      hasMore:
+                        type: boolean
+                      totalCount:
+                        type: integer
+                        minimum: 0
+                        description: Derived current following count; never an authoritative counter.
+                  requestId:
+                    $ref: '#/components/schemas/RequestId'
+                  traceId:
+                    $ref: '#/components/schemas/TraceId'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /users/{userId}/profile:
     get:
