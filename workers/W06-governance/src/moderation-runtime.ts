@@ -203,33 +203,58 @@ export async function listModerationQueue(
   let tail = ''
 
   if (decoded) {
-    tail = ' AND (priority < ? OR (priority = ? AND (created_at > ? OR (created_at = ? AND case_id > ?))))'
+    tail = ' AND (c.priority < ? OR (c.priority = ? AND (c.created_at > ? OR (c.created_at = ? AND c.case_id > ?))))'
     params.push(decoded.priority, decoded.priority, decoded.createdAt, decoded.createdAt, decoded.caseId)
   }
 
-  const rows = await db
-    .prepare(
-      `SELECT case_id,target_type,target_id,target_version,policy_version,state,priority,
-              assigned_reviewer_id,current_decision_id,evidence_bundle_ref,version,created_at,updated_at
-         FROM moderation_cases
-        WHERE state IN (${statePlaceholders})
-          AND (assigned_reviewer_id IS NULL OR assigned_reviewer_id = ?)
-          ${tail}
-        ORDER BY priority DESC, created_at ASC, case_id ASC
-        LIMIT ?`,
-    )
-    .bind(...params, pageSize + 1)
-    .all<ModerationCaseRow>()
+  const rows = await db.prepare(
+    `SELECT c.case_id,c.target_type,c.target_id,c.target_version,c.policy_version,c.state,c.priority,
+            c.assigned_reviewer_id,c.current_decision_id,c.evidence_bundle_ref,c.version,c.created_at,c.updated_at,
+            d.decision_id,d.case_version,d.outcome,d.policy_version AS decision_policy_version,
+            d.effective_at AS decision_effective_at,d.request_id AS decision_request_id,
+            d.created_at AS decision_created_at
+       FROM moderation_cases c
+       LEFT JOIN moderation_decisions d ON d.decision_id = c.current_decision_id
+      WHERE c.state IN (${statePlaceholders})
+        AND c.target_type = 'content'
+        AND (c.assigned_reviewer_id IS NULL OR c.assigned_reviewer_id = ?)
+        ${tail}
+      ORDER BY c.priority DESC, c.created_at ASC, c.case_id ASC
+      LIMIT ?`,
+  ).bind(...params, pageSize + 1).all<ModerationCaseRow & {
+    decision_id: string | null
+    case_version: number | null
+    outcome: ModerationOutcome | null
+    decision_policy_version: string | null
+    decision_effective_at: string | null
+    decision_request_id: string | null
+    decision_created_at: string | null
+  }>()
 
   const hasMore = rows.results.length > pageSize
   const page = rows.results.slice(0, pageSize)
   const last = page.at(-1)
-  const items = await Promise.all(
-    page.map(async (row) => responseForCase(row, await readCurrentDecision(db, row.case_id))),
-  )
-
   return {
-    items,
+    items: page.map((row) => responseForCase(row, row.decision_id ? ({
+      decision_id: row.decision_id,
+      case_id: row.case_id,
+      case_version: row.case_version ?? row.version,
+      outcome: row.outcome as ModerationOutcome,
+      target_type: row.target_type,
+      target_id: row.target_id,
+      target_version: row.target_version,
+      policy_version: row.decision_policy_version ?? row.policy_version,
+      reason_code: '',
+      severity: '',
+      scope: '',
+      effective_at: row.decision_effective_at ?? row.updated_at,
+      expires_at: null,
+      source_kind: 'HUMAN_REVIEW',
+      reviewer_id: null,
+      reviewer_layer: null,
+      request_id: row.decision_request_id ?? 'req_' + row.case_id.replaceAll('-', '').slice(0, 123),
+      created_at: row.decision_created_at ?? row.updated_at,
+    } satisfies ModerationDecisionRow) : null)),
     hasMore,
     nextCursor: hasMore && last ? opaqueCursor(last.priority, last.created_at, last.case_id) : null,
   }
@@ -242,9 +267,50 @@ export async function getModerationCase(
 ): Promise<ReturnType<typeof responseForCase>> {
   requireResource('reviewer_id', reviewerId)
   requireResource('case_id', caseId)
-  const row = await readCase(db, caseId, reviewerId)
+  const row = await db.prepare(
+    `SELECT c.case_id,c.target_type,c.target_id,c.target_version,c.policy_version,c.state,c.priority,
+            c.assigned_reviewer_id,c.current_decision_id,c.evidence_bundle_ref,c.version,c.created_at,c.updated_at,
+            d.decision_id,d.case_version,d.outcome,d.policy_version AS decision_policy_version,
+            d.effective_at AS decision_effective_at,d.reason_code,d.severity,d.scope,d.expires_at,
+            d.source_kind,d.reviewer_id,d.reviewer_layer,d.request_id,d.created_at AS decision_created_at,
+            d.target_type AS decision_target_type,d.target_id AS decision_target_id,
+            d.target_version AS decision_target_version
+       FROM moderation_cases c
+       LEFT JOIN moderation_decisions d ON d.decision_id = c.current_decision_id
+      WHERE c.case_id = ?
+        AND c.target_type = 'content'
+        AND (c.assigned_reviewer_id IS NULL OR c.assigned_reviewer_id = ?)
+      LIMIT 1`,
+  ).bind(caseId, reviewerId).first<ModerationCaseRow & Partial<ModerationDecisionRow & {
+    decision_policy_version: string
+    decision_effective_at: string
+    decision_created_at: string
+    decision_target_type: string
+    decision_target_id: string
+    decision_target_version: number | null
+  }>>()
   if (!row) throw new ModerationRuntimeError('NOT_FOUND', 404)
-  return responseForCase(row, await readCurrentDecision(db, caseId))
+  const decision = row.decision_id ? ({
+    decision_id: row.decision_id,
+    case_id: row.case_id,
+    case_version: row.case_version ?? row.version,
+    outcome: row.outcome as ModerationOutcome,
+    target_type: row.decision_target_type ?? row.target_type,
+    target_id: row.decision_target_id ?? row.target_id,
+    target_version: row.decision_target_version ?? row.target_version,
+    policy_version: row.decision_policy_version ?? row.policy_version,
+    reason_code: row.reason_code ?? '',
+    severity: row.severity ?? '',
+    scope: row.scope ?? '',
+    effective_at: row.decision_effective_at ?? row.updated_at,
+    expires_at: row.expires_at ?? null,
+    source_kind: row.source_kind ?? 'HUMAN_REVIEW',
+    reviewer_id: row.reviewer_id ?? null,
+    reviewer_layer: row.reviewer_layer ?? null,
+    request_id: row.request_id ?? '',
+    created_at: row.decision_created_at ?? row.updated_at,
+  } satisfies ModerationDecisionRow) : null
+  return responseForCase(row, decision)
 }
 
 export async function decideModerationCase(
@@ -323,10 +389,12 @@ export async function decideModerationCase(
     throw new ModerationRuntimeError('PRECONDITION_FAILED', 412)
   }
   const bodyExpectedVersion = input.expectedVersion
+  if (bodyExpectedVersion !== row.version) throw new ModerationRuntimeError('PRECONDITION_FAILED', 412)
 
   if (row.target_type !== 'content') {
     throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   }
+  if (input.policyVersion !== row.policy_version) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   if (!row.target_version || row.target_version < 1) {
     throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   }
@@ -473,6 +541,10 @@ export async function decideModerationCase(
 
   const statements = [
     db.prepare(
+      `DELETE FROM moderation_decision_idempotency
+        WHERE reviewer_id = ? AND case_id = ? AND idempotency_key = ? AND expires_at <= ?`,
+    ).bind(input.reviewerId, row.case_id, input.idempotencyKey, now),
+    db.prepare(
       `INSERT INTO moderation_decisions (
         decision_id,case_id,case_version,outcome,target_type,target_id,target_version,
         policy_version,reason_code,severity,scope,effective_at,expires_at,source_kind,
@@ -538,6 +610,10 @@ export async function decideModerationCase(
       audit.ip ?? null,
       audit.userAgent ?? null,
       audit.occurredAt,
+    ),
+    db.prepare(
+      `INSERT OR REPLACE INTO moderation_txn_guard(id, successful)
+       VALUES (1, changes())`,
     ),
   ]
 
