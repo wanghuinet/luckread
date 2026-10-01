@@ -57,13 +57,14 @@ function getDeviceId() {
   return value
 }
 
-async function refreshAccessToken() {
+async function refreshAccessToken(signal?: AbortSignal) {
   const refreshToken = sessionStorage.getItem(REFRESH_KEY)
   if (!refreshToken) return null
   const response = await fetch('/auth/refresh', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ refreshToken, deviceId: getDeviceId() }),
+    signal,
   })
   const data = await response.json().catch((): null => null)
   if (!response.ok || !data?.accessToken) return null
@@ -86,7 +87,7 @@ async function authorizedFetch(input: RequestInfo | URL, init: RequestInit = {})
   })
 
   if (response.status === 401 && token) {
-    token = await refreshAccessToken()
+    token = await refreshAccessToken(init.signal)
     if (!token) throw new Error('AUTH_REQUIRED')
     headers.set('Authorization', 'Bearer ' + token)
     response = await fetch(input, {
@@ -128,6 +129,7 @@ export default function PublishComposer({
 
   useEffect(() => {
     let cancelled = false
+    const controller = new AbortController()
     const draftId = new URL(window.location.href).searchParams.get('draft')?.trim()
     if (!draftId) return
 
@@ -138,14 +140,14 @@ export default function PublishComposer({
       try {
         const response = await authorizedFetch(
           `${contentBasePath}/${encodeURIComponent(draftId)}`,
-          { method: 'GET' },
+          { method: 'GET', signal: controller.signal },
         )
         const data = await response.json().catch((): null => null)
         if (!response.ok || !data?.id || !data?.etag) throw new Error(data?.error?.message || 'DRAFT_RECOVERY_FAILED')
         const recovered = data as ContentResponse
         let recoveredBody = ''
         if (recovered.bodyRef) {
-          const bodyResponse = await fetch(recovered.bodyRef, { method: 'GET', credentials: 'same-origin' })
+          const bodyResponse = await fetch(recovered.bodyRef, { method: 'GET', credentials: 'same-origin', signal: controller.signal })
           if (bodyResponse.ok) recoveredBody = await bodyResponse.text()
         }
         if (cancelled) return
@@ -163,7 +165,8 @@ export default function PublishComposer({
         })))
         setMessage(recovered.state === 'PENDING_REVIEW' ? '草稿已恢复，当前正在审核。' : '草稿已恢复。')
       } catch (caught) {
-        if (cancelled) return
+        if (cancelled || controller.signal.aborted) return
+        if (caught instanceof DOMException && caught.name === 'AbortError') return
         const code = caught instanceof Error ? caught.message : ''
         setError(code === 'AUTH_REQUIRED' ? '登录已失效，请重新登录。' : '草稿恢复失败，请检查链接或稍后重试。')
         setMessage('')
@@ -177,7 +180,10 @@ export default function PublishComposer({
     }
 
     void restoreDraft()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
   }, [contentBasePath, router])
 
   async function uploadFile(file: File): Promise<UploadedAsset> {
