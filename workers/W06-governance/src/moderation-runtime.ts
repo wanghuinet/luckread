@@ -466,8 +466,8 @@ export async function drainModerationOutbox(
       attempts: row.attempts,
       correlationId: `moderation-${row.decision_id}`,
       requestId: row.request_id,
-      reviewerId: result.reviewer_id,
-      reviewerLayer: result.reviewer_layer,
+      reviewerId: row.reviewer_id,
+      reviewerLayer: row.reviewer_layer,
     })
     if (delivery === 'DELIVERED') delivered++
     else retry++
