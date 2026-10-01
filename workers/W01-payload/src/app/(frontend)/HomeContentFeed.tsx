@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type ContentType = 'article' | 'post' | 'video'
 
@@ -29,10 +29,12 @@ export default function HomeContentFeed() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     const timer = window.setTimeout((): void => {
       void (async () => {
+        const requestId = ++requestIdRef.current
         try {
           setError(false)
           const response = await fetch('/api/v1/contents?limit=6', {
@@ -41,13 +43,17 @@ export default function HomeContentFeed() {
           })
           const data = await response.json().catch((): null => null)
           if (!response.ok || !data?.data) {
+            if (requestId !== requestIdRef.current) return
             setError(true)
             return
           }
+          if (requestId !== requestIdRef.current) return
           setItems((data.data as Page).items ?? [])
         } catch {
+          if (requestId !== requestIdRef.current) return
           setError(true)
         } finally {
+          if (requestId !== requestIdRef.current) return
           setLoading(false)
         }
       })()
