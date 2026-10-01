@@ -30,9 +30,9 @@
   "preconditions": [
     "state-machine reconciliation contract present",
     "D1-01 persistence contract present",
-    "D1-01 migration evidence exists",
+    "controlled D1-01 migration workflow is present; remote execution evidence is required",
     "W07 physical binding evidence exists",
-    "security/lifecycle/payment/entitlement E2E exists",
+    "security/lifecycle/payment/entitlement E2E evidence is required before GREEN",
     "W07-W02 membership access-state binding contract is present",
     "Payment Provider Event Admission contract is present",
     "A concrete provider adapter must be admitted before payment-originated ACTIVE transitions",
