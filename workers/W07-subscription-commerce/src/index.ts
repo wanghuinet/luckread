@@ -29,7 +29,8 @@ export default {
       if (
         request.headers.get('X-LuckRead-Caller') !== 'W01' ||
         request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
-        !request.headers.get('X-LuckRead-Correlation-Id')
+        !request.headers.get('X-LuckRead-Correlation-Id') ||
+        !request.headers.get('Idempotency-Key')
       ) {
         return json({ error: { code: 'UNTRUSTED_CALLER' } }, 403)
       }
@@ -68,7 +69,7 @@ export default {
         const response = await callW02Membership({
           operation: 'create',
           correlationId: request.headers.get('X-LuckRead-Correlation-Id')!,
-          idempotencyKey: request.headers.get('Idempotency-Key') ?? crypto.randomUUID(),
+          idempotencyKey: request.headers.get('Idempotency-Key')!,
           actorUserId,
           body: {
             subscriptionId: body.subscriptionId,
@@ -122,7 +123,8 @@ export default {
       !actors.has(body.actor as SubscriptionActor) ||
       typeof body.expectedVersion !== 'number' ||
       !Number.isSafeInteger(body.expectedVersion) ||
-      typeof body.idempotencyKey !== 'string'
+      typeof body.idempotencyKey !== 'string' ||
+      body.idempotencyKey !== request.headers.get('Idempotency-Key')
     ) {
       return json({ error: { code: 'VALIDATION_FAILED' } }, 400)
     }
