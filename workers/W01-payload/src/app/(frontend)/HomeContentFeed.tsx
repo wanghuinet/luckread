@@ -30,8 +30,12 @@ export default function HomeContentFeed() {
   const [error, setError] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
   const requestIdRef = useRef(0)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
+    const controller = new AbortController()
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = controller
     const timer = window.setTimeout((): void => {
       void (async () => {
         const requestId = ++requestIdRef.current
@@ -40,6 +44,7 @@ export default function HomeContentFeed() {
           const response = await fetch('/api/v1/contents?limit=6', {
             headers: { accept: 'application/json' },
             cache: 'no-store',
+            signal: controller.signal,
           })
           const data = await response.json().catch((): null => null)
           if (!response.ok || !data?.data) {
@@ -49,17 +54,23 @@ export default function HomeContentFeed() {
           }
           if (requestId !== requestIdRef.current) return
           setItems((data.data as Page).items ?? [])
-        } catch {
-          if (requestId !== requestIdRef.current) return
+        } catch (cause) {
+          if (requestId !== requestIdRef.current || controller.signal.aborted) return
+          if (cause instanceof DOMException && cause.name === 'AbortError') return
           setError(true)
         } finally {
-          if (requestId !== requestIdRef.current) return
+          if (requestId !== requestIdRef.current || controller.signal.aborted) return
           setLoading(false)
         }
       })()
     }, 0)
 
-    return () => window.clearTimeout(timer)
+    return () => {
+      requestIdRef.current += 1
+      controller.abort()
+      if (abortControllerRef.current === controller) abortControllerRef.current = null
+      window.clearTimeout(timer)
+    }
   }, [retryKey])
 
   if (!loading && items.length === 0 && !error) return null
