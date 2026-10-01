@@ -4478,3 +4478,16 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - No production runtime, schema, Contract, topology, or API semantics changed.
 - L6 readiness remains `NOT_GREEN`; corrected execution is required before evaluating login, L6 and W06 Queue authorization.
 - Next admissible execution: run `.github/workflows/moderation-native-l6-readiness.yml` from the corrected main head after the governance record updates; do not reuse prior failed runs as current evidence.
+
+
+## 2026-10-01 — Moderation L6 readiness run #4 login boundary
+
+- Run `36800726387` tested main head `bcf49c29f10b70df05cf98770d9bf3dd961b9f63`.
+- The corrected probe passed the two previously diagnosed fixture boundaries: live `/auth/register` succeeded and the synthetic canonical `moderator` RoleAssignment INSERT succeeded with SQL `NULL` scope values.
+- Failure occurred at live `POST https://api.luckread.cn/auth/login` with HTTP `503`; no queue authorization or Moderation operation was reached.
+- Because the readiness probe currently records only the login HTTP status, the exact W01 503 branch is not yet proven. Source review limits the branch to: native token/expiry unavailable, native `_sid` unavailable, W02 `establishSession` unavailable/failing, or W01 access-token issuance failure.
+- W01 deployment evidence confirms `luckread-w01-payload` was deployed with the existing `W02_AUTH -> luckread-w02` Service Binding and the custom domains `api.luckread.cn` / `luckread.cn`; W02 production deployment run `36598659798` succeeded with D1-01 binding and relevant W02 source unchanged relative to current main.
+- Existing D1-01 evidence confirms `auth_session_state` exists; existing RoleAssignment migration evidence confirms `role_assignments` and its checks. These do not constitute current login success evidence.
+- A bounded diagnostic was attempted conceptually but no production change was admitted; no Contract, topology, schema, or Worker implementation change follows from this 503.
+- Status: `NOT_GREEN`.
+- Next diagnostic: capture the sanitized login response body and/or W01 Worker runtime tail for the exact login attempt before changing production code or W02 schema.
