@@ -4,6 +4,8 @@ import { consumeAccountStateChanged } from './auth-013-queue-consumer'
 import {
   ModerationRuntimeError,
   decideModerationCase,
+  deliverModerationOutbox,
+  drainModerationOutbox,
   getModerationCase,
   listModerationQueue,
 } from './moderation-runtime'
@@ -248,6 +250,14 @@ export default {
     }
 
     return new Response(null, { status: 404 })
+  },
+
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    try {
+      await drainModerationOutbox(env.D1_03, env.W03_CONTENT_MODERATION, 10)
+    } catch {
+      // The next scheduled run retries durable outbox records.
+    }
   },
 
   async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
