@@ -96,7 +96,7 @@ export function validateTransition(input: TransitionInput): void {
       throw new MembershipAccessStateError('INVALID_ENTITLEMENT_GRANT')
     }
   }
-  if (input.entitlementAction === 'REVOKE' && !input.entitlementId) {
+  if (input.entitlementAction === 'REVOKE' && !['CANCELED', 'EXPIRED'].includes(input.to)) {
     throw new MembershipAccessStateError('INVALID_ENTITLEMENT_REVOKE')
   }
 }
