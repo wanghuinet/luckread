@@ -4575,3 +4575,14 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Backup before this change: `backup/pre-moderation-e2e-eventual-convergence-20261001`.
 - No production API, Worker topology, D1 topology, binding, schema, or Contract semantic was changed.
 - Status remains `NOT_GREEN` pending a clean E2E run proving eventual W03 convergence and final Decision + AuditEvent + Outbox evidence.
+
+## 2026-10-01 — Security E2E run 36811377935 W03 enforcement diagnosis and deployment provenance gate
+
+- Run `36811377935` again passed exact W01/W06 deployment verification, native L6 reviewer setup, APPROVED Decision, W06 persistence, idempotent replay, idempotency key reuse `422`, and `428/412` preconditions.
+- The W06 scheduled outbox drain did execute, proving the recovery scheduler is active, but every delivery received `W03_412`; after three attempts the outbox remained `RETRY` and W03 content remained `PENDING_REVIEW/v1`.
+- Source comparison shows current main W03 `index.ts` is byte-identical to commit `386669f9f20d018523ff390d61c54e79b956224a`, which is the admitted commit that added the trusted W06 moderation transport branch and `applyModerationContentTransition` adapter. No W03 runtime source change is required.
+- Main commit `a601cef82f1bb12c3b103d2baff207d6a91b8e42` pins the W03 deployment workflow default to source `386669f9f20d018523ff390d61c54e79b956224a`, adds a source-level moderation-adapter admission check, and records exact deployment run provenance.
+- Main commit `6c1c149736e01d115a0deadf5683cd4946582ce1` makes Security E2E require and verify a successful W03 deployment artifact for that exact source before testing moderation enforcement; the W03 deployment run ID is resolved automatically from successful workflow runs.
+- Backup before these W03/E2E evidence-gate changes: `backup/pre-moderation-w03-deploy-provenance-gate-20261001`.
+- The next runtime action is to run W03 Content Runtime Deploy with its prefilled source/confirmation, then rerun Security E2E. No new Worker, D1, binding, schema, public API, or Contract semantic was introduced.
+- Status remains `NOT_GREEN` pending exact W03 deployment evidence and a clean E2E proving W03 convergence plus final remote Decision + AuditEvent + Outbox evidence.
