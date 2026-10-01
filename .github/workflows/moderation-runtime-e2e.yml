@@ -342,6 +342,38 @@ jobs:
           test "$stale_status" = 412
           echo PRECONDITION_428_412=PASS
 
+      - name: Wait for W06 outbox eventual W03 convergence
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/moderation-runtime-e2e
+          converged=0
+          for attempt in $(seq 1 20); do
+            npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --json --config workers/W03-feed/wrangler.jsonc --command "SELECT id,state,version,etag FROM contents WHERE id='$CONTENT_ID' LIMIT 1;" > /tmp/convergence-content.json
+            npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc --command "SELECT outbox_id,status,attempts,last_error,delivered_at,next_attempt_at FROM moderation_enforcement_outbox WHERE case_id='$CASE_ID' ORDER BY created_at DESC LIMIT 1;" > /tmp/convergence-outbox.json
+            if node - <<'NODE'
+          const fs=require('fs');
+          const content=JSON.parse(fs.readFileSync('/tmp/convergence-content.json'))?.[0]?.results?.[0] ?? null;
+          const outbox=JSON.parse(fs.readFileSync('/tmp/convergence-outbox.json'))?.[0]?.results?.[0] ?? null;
+          console.log('CONVERGENCE_POLL='+JSON.stringify({content,outbox}));
+          process.exit(content?.state === 'APPROVED' && Number(content?.version) === 2 && outbox?.status === 'DELIVERED' ? 0 : 1);
+          NODE
+            then
+              converged=1
+              break
+            fi
+            sleep 5
+          done
+          if [ "$converged" -ne 1 ]; then
+            echo "W06_OUTBOX_EVENTUAL_W03_CONVERGENCE=TIMEOUT"
+            cat /tmp/convergence-content.json || true
+            cat /tmp/convergence-outbox.json || true
+            exit 1
+          fi
+          echo "W06_OUTBOX_EVENTUAL_W03_CONVERGENCE=PASS"
+
       - name: Verify remote D1 evidence
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
