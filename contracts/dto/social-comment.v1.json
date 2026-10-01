@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/dto/social-comment.v1.json",
+  "title": "LuckRead SOCIAL-004 Comment / Reply DTO Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_OPENAPI_BOUND",
+  "sourceOfTruth": "contracts/openapi/v1/openapi.yaml",
+  "purpose": "Canonical bounded DTOs for Comment listing and creation; runtime remains unauthorized.",
+  "records": [
+    {
+      "featureId": "SOCIAL-004",
+      "operationId": "getContentContentIdComments",
+      "requestDtoId": null,
+      "responseDtoId": "DTO-SOCIAL-COMMENT-LIST-RESPONSE",
+      "requestSchemaRef": null,
+      "responseSchemaRef": "#/paths/~1content~1{contentId}~1comments/get/responses/200/content/application~1json/schema",
+      "entityIds": [
+        "ENT-SOCIAL-COMMENT"
+      ],
+      "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "SOCIAL-004",
+      "operationId": "postContentContentIdComments",
+      "requestDtoId": "DTO-SOCIAL-COMMENT-CREATE-REQUEST",
+      "responseDtoId": "DTO-SOCIAL-COMMENT-RESPONSE",
+      "requestSchemaRef": "#/paths/~1content~1{contentId}~1comments/post/requestBody/content/application~1json/schema",
+      "responseSchemaRef": "#/paths/~1content~1{contentId}~1comments/post/responses/201/content/application~1json/schema",
+      "entityIds": [
+        "ENT-SOCIAL-COMMENT"
+      ],
+      "status": "CONTRACT_BOUND"
+    }
+  ],
+  "schemas": {
+    "SocialComment": {
+      "required": [
+        "id",
+        "body",
+        "state"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "VISIBLE",
+            "HIDDEN",
+            "FLAGGED",
+            "UNDER_REVIEW",
+            "REJECTED",
+            "DELETED",
+            "AUTHOR_DELETED"
+          ]
+        },
+        "parentId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SocialCommentListResponse": {
+      "required": [
+        "data",
+        "requestId"
+      ],
+      "properties": {
+        "data": {
+          "type": "object",
+          "required": [
+            "items",
+            "nextCursor",
+            "hasMore"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "type": "array",
+              "maxItems": 50,
+              "items": {
+                "$ref": "#/schemas/SocialComment"
+              }
+            },
+            "nextCursor": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 1024
+            },
+            "hasMore": {
+              "type": "boolean"
+            }
+          }
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "additionalProperties": false
+    },
+    "SocialCommentCreateRequest": {
+      "required": [
+        "body"
+      ],
+      "properties": {
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "parentId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "rules": [
+    "authorUserId remains internal and is resolved from the authenticated server-side principal.",
+    "contentId is resolved from the canonical /v1/content/{contentId}/comments path and is not duplicated in the request body.",
+    "parentId is nullable and, when present, must resolve within the same content scope.",
+    "CommentState is bound to contracts/enums/comment-state.json.",
+    "Create Comment requires Idempotency-Key and must converge under retry.",
+    "No counters, moderation-decision fields or cache/projection authority are exposed by these DTOs."
+  ],
+  "verification": {
+    "runtime": "NOT_VERIFIED",
+    "security": "NOT_VERIFIED",
+    "paginationConcurrency": "NOT_VERIFIED",
+    "evidenceRegistry": "NOT_VERIFIED"
+  }
+}
