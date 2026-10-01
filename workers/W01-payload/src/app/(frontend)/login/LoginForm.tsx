@@ -42,10 +42,6 @@ export default function LoginForm() {
         return
       }
 
-      sessionStorage.setItem('luckread.accessToken', data.accessToken)
-      sessionStorage.setItem('luckread.refreshToken', data.refreshToken)
-      sessionStorage.setItem('luckread.expiresIn', String(data.expiresIn ?? ''))
-      sessionStorage.setItem('luckread.layer', String(data.layer ?? ''))
       const requestedReturnTo = new URLSearchParams(window.location.search).get('returnTo')
       const returnTo =
         requestedReturnTo &&
