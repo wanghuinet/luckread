@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/dto/social-relationship-read.v1.json",
+  "title": "LuckRead Social Relationship Read DTO Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_OPENAPI_BOUND",
+  "sourceOfTruth": "contracts/openapi/v1/openapi.yaml",
+  "purpose": "Canonical bounded response DTOs for SOCIAL-002 followers/following queries.",
+  "records": [
+    {
+      "featureId": "SOCIAL-002",
+      "operationId": "getUsersUserIdFollowers",
+      "requestDtoId": null,
+      "responseDtoId": "DTO-SOCIAL-FOLLOWERS-LIST-RESPONSE",
+      "requestSchemaRef": null,
+      "responseSchemaRef": "#/paths/~1users~1{userId}~1followers/get/responses/200/content/application~1json/schema",
+      "entityIds": ["ENT-SOCIAL-FOLLOW", "ENT-USER"],
+      "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "SOCIAL-002",
+      "operationId": "getUsersUserIdFollowing",
+      "requestDtoId": null,
+      "responseDtoId": "DTO-SOCIAL-FOLLOWING-LIST-RESPONSE",
+      "requestSchemaRef": null,
+      "responseSchemaRef": "#/paths/~1users~1{userId}~1following/get/responses/200/content/application~1json/schema",
+      "entityIds": ["ENT-SOCIAL-FOLLOW", "ENT-USER"],
+      "status": "CONTRACT_BOUND"
+    }
+  ],
+  "schemas": {
+    "SocialRelationshipListItem": {
+      "required": ["userId", "createdAt"],
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "SocialRelationshipListResponse": {
+      "required": ["items", "nextCursor", "hasMore", "requestId"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/components/schemas/SocialRelationshipListItem" }
+        },
+        "nextCursor": { "type": ["string", "null"], "maxLength": 1024 },
+        "hasMore": { "type": "boolean" },
+        "requestId": { "$ref": "#/components/schemas/RequestId" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "rules": [
+    "The list returns relation members only; account state, layer, moderation state and counters are not exposed by this DTO.",
+    "Ordering is createdAt DESC, relationshipId DESC at the authoritative query boundary; relationshipId remains internal.",
+    "The opaque cursor must encode the last authoritative (createdAt, relationshipId) position and is not client-interpretable.",
+    "Maximum page size is 50 even though the repository-wide generic Limit component permits larger values elsewhere.",
+    "The authoritative source is the existing D1-02 social_follow_relationships table; no projection table is introduced by this DTO.",
+    "Block, mute and relationship-visibility policy must be evaluated before exposing list members.",
+    "A missing or unavailable policy authority fails closed; no client-supplied visibility decision is accepted."
+  ],
+  "verification": {
+    "runtime": "NOT_VERIFIED",
+    "security": "NOT_VERIFIED",
+    "paginationConcurrency": "NOT_VERIFIED",
+    "evidenceRegistry": "NOT_VERIFIED"
+  }
+}
