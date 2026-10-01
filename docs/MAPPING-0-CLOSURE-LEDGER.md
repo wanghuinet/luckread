@@ -4536,3 +4536,12 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Backups created before each bounded change: `backup/pre-moderation-w06-deploy-source-gate-20261001` and `backup/pre-moderation-w06-deploy-artifact-proof-20261001`.
 - No new Worker, D1, binding, migration, API path, Contract semantic, or distributed transaction was introduced.
 - Status remains `NOT_GREEN` until W06 source `158a5221d87ce74123338bcf1f5a4a174ec55e33` is actually deployed and a clean Security E2E run proves Decision + AuditEvent + Outbox + W03 convergence and is reconciled into the Evidence Registry.
+
+## 2026-10-01 — W06 deployment run 36809502414
+
+- Run `36809502414` completed SUCCESS for source `158a5221d87ce74123338bcf1f5a4a174ec55e33`.
+- Admission, physical binding, TypeScript verification, and pinned Wrangler deployment all passed; Cloudflare reported Worker `luckread-w06` Current Version ID `d15d01cb-43e3-412f-8da9-bc9e32e620f0`.
+- This run predates commit `d98d5c27e2107706a15ea9f1df95df83fe111222`, which adds the exact deployment provenance artifact required by the Security E2E gate.
+- Therefore `36809502414` is valid deployment fact but is not yet the exact provenance evidence input for the current Security E2E workflow.
+- Next required runtime-evidence step: rerun `W06 Governance Deploy` with `source_sha=158a5221d87ce74123338bcf1f5a4a174ec55e33` so the successful run publishes `moderation-runtime-deployment-158a5221d87ce74123338bcf1f5a4a174ec55e33`; then use that new run ID in `Moderation Runtime Security E2E`.
+- Status remains `NOT_GREEN` pending clean Security E2E and Evidence Registry reconciliation.
