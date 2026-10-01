@@ -27,6 +27,7 @@ describe('Creator Center admin extension', () => {
   it('embeds the existing publisher with a scoped W03 content bridge', () => {
     const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    const contentDetail = read('src/app/(frontend)/content/[contentId]/page.tsx')
     const page = read('src/app/(frontend)/publish/page.tsx')
     const contentClient = read('src/content/w03-content-client.ts')
     const createRoute = read('src/app/(payload)/api/creator/contents/route.ts')
@@ -57,6 +58,10 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("const reviewLocked = draft?.state === 'PENDING_REVIEW'")
     expect(publisher).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
     expect(publisher).toContain("router.replace('/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(contentDetail).toContain("const [actionMessage, setActionMessage] = useState('')")
+    expect(contentDetail).toContain("setActionMessage('无法复制链接，请从地址栏复制当前页面地址。')")
+    expect(contentDetail).toContain('content-detail-action-status')
+    expect(read('src/app/(frontend)/styles.css')).toContain('.content-detail-action-status')
     expect(publisher).toContain('function startNewContent()')
     expect(publisher).toContain("setDraft(null)")
     expect(publisher).toContain('新建内容')

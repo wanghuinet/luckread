@@ -293,6 +293,11 @@ a { color: inherit; }
   cursor: pointer;
 }
 .content-detail-share:hover { border-color: #aebbd0; }
+.content-detail-action-status {
+  color: var(--lr-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
 .content-detail-top a {
   color: var(--lr-ink);
   text-decoration: none;
