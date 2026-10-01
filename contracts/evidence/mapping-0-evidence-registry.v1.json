@@ -1152,6 +1152,23 @@
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36527170976",
       "freshnessMode": "EXACT_SHA",
       "note": "Controlled remote D1 lifecycle matrix passed ACTIVE→RESTRICTED→FROZEN→SUSPENDED→BANNED→RESTORED→ACTIVE; L7 approval was required for BAN; rejected BAN caused no mutation; direct BANNED→ACTIVE was rejected; suspension and ban retained session revocation; final account state/version were ACTIVE/7; journal source versions 2–7 were canonical identity.account_state_changed events; synthetic user/session/journal cleanup completed."
+    },
+    {
+      "evidenceId": "EVD-SAFETY001-MODERATION-RUNTIME-E2E-001",
+      "type": "SECURITY",
+      "claimId": "SAFETY-001::MODERATION-RUNTIME-SECURITY-E2E",
+      "subjectType": "FEATURE",
+      "subjectId": "SAFETY-001",
+      "source": "GitHub Actions Moderation Runtime Security E2E",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36812935998#artifact-11139813551",
+      "commitSha": "158a5221d87ce74123338bcf1f5a4a174ec55e33",
+      "timestamp": "2026-10-01T04:00:31Z",
+      "producer": "Moderation Runtime Security E2E run 36812935998 with remote Cloudflare D1 evidence",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "MODERATION-RUNTIME-SECURITY-E2E",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36812935998",
+      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT"
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
