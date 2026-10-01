@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W07-W02-membership-access-state-binding.v1.json",
+  "title": "W07 to W02 Membership Access-State Binding",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "caller": {
+    "logicalWorker": "W07",
+    "role": "Subscription / Commerce / Payment",
+    "authority": "membership lifecycle decision"
+  },
+  "callee": {
+    "logicalWorker": "W02",
+    "role": "Identity / Account / Authorization",
+    "authority": "D1-01 access-state persistence"
+  },
+  "transport": {
+    "kind": "Cloudflare Worker Service Binding HTTP",
+    "binding": "W02_IDENTITY",
+    "targetWorker": "luckread-w02",
+    "publicExposure": false
+  },
+  "operations": [
+    {
+      "operationId": "createSubscription",
+      "method": "POST",
+      "internalPath": "/internal/membership/subscriptions",
+      "idempotency": "Idempotency-Key"
+    },
+    {
+      "operationId": "transitionSubscription",
+      "method": "POST",
+      "internalPath": "/internal/membership/subscriptions/transition",
+      "idempotency": "Idempotency-Key",
+      "optimisticConcurrency": "expectedVersion"
+    }
+  ],
+  "headers": {
+    "required": {
+      "X-LuckRead-Caller": "W07",
+      "X-LuckRead-Transport-Version": "1.0",
+      "X-LuckRead-Correlation-Id": "required",
+      "Idempotency-Key": "required"
+    },
+    "principal": {
+      "header": "X-LuckRead-Principal-User-Id",
+      "source": "W01 authenticated subject forwarded by W07 without client override",
+      "clientWritable": false
+    }
+  },
+  "rules": [
+    "W02 never accepts payment provider credentials or client-authoritative subscription state.",
+    "W07 decides the lifecycle transition; W02 persists only after validating current status and expectedVersion.",
+    "Subscription version is persisted in D1-01 and incremented atomically.",
+    "Entitlement grants/revokes, when required, are written in the same D1-01 atomic batch as the accepted subscription transition.",
+    "No D1-01 write is exposed to W01 or public clients.",
+    "Missing caller/version/principal/policy input fails closed."
+  ],
+  "evidenceRequired": [
+    "exact W07/W02 source SHAs",
+    "service binding deployment evidence",
+    "positive create/activate/cancel/expire evidence",
+    "stale-version rejection evidence",
+    "idempotent replay evidence",
+    "entitlement grant/revoke convergence evidence"
+  ]
+}
