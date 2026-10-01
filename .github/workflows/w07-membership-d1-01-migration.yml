@@ -1,0 +1,63 @@
+name: W07 Membership D1-01 Controlled Migration
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Explicitly authorize the scoped D1-01 Subscription + Entitlement migration'
+        required: true
+        type: choice
+        options: [APPLY_MEMBERSHIP_D1_01, CANCEL]
+        default: CANCEL
+permissions:
+  contents: read
+env:
+  EXPECTED_DB_UUID: 2f80471e-3756-49f9-8db1-7707a433ad64
+  MIGRATION: workers/W07-subscription-commerce/migrations/0001_membership_subscription_entitlement.sql
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY_MEMBERSHIP_D1_01' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 1}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24}
+      - name: Verify exact source
+        run: |
+          set -euo pipefail
+          test -f "$MIGRATION"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          sha256sum "$MIGRATION"
+      - name: Verify scoped admission
+        run: |
+          set -euo pipefail
+          jq -e '.status == "BOUNDED_ADMISSION_MIGRATION_PENDING"' contracts/admission/W07-subscription-implementation-admission.v1.json >/dev/null
+          jq -e '.database.databaseUuid == "2f80471e-3756-49f9-8db1-7707a433ad64"' contracts/persistence/MEMBERSHIP-D1-01-subscription-entitlement-persistence.v1.json >/dev/null
+      - name: Install pinned Wrangler
+        run: npm install --no-save wrangler@4.116.0
+      - name: Execute scoped remote D1-01 migration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --file "$MIGRATION"
+      - name: Verify tables and indexes
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('membership_subscriptions','membership_entitlement_grants') ORDER BY name;"
+          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('uq_membership_subscription_active_subscriber_plan','uq_membership_entitlement_active_scope') ORDER BY name;"
+      - name: Capture provenance
+        run: |
+          mkdir -p artifacts/membership
+          printf '%s\n' "{\"workflow\":\"W07 Membership D1-01 Controlled Migration\",\"runId\":\"$GITHUB_RUN_ID\",\"sourceSha\":\"$GITHUB_SHA\",\"databaseUuid\":\"$EXPECTED_DB_UUID\",\"migration\":\"$MIGRATION\",\"confirmation\":\"${{ inputs.confirm }}\",\"executed\":true}" > artifacts/membership/w07-d1-01-migration-provenance.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: w07-d1-01-migration-${{ github.sha }}
+          path: artifacts/membership/w07-d1-01-migration-provenance.json
