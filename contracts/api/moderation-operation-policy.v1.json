@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "domain": "moderation",
   "status": "CONTRACTED_OPENAPI_BOUND",
-  "implementationAuthorization": false,
+  "implementationAuthorization": true,
   "sourceRefs": [
     "contracts/authz/permissions.json",
     "contracts/entity/MODERATION-CASE-CONTRACT.v1.json",
@@ -339,9 +339,9 @@
     "entityContracts": "CONTRACTED_NOT_VERIFIED",
     "persistenceContract": "CONTRACTED_NOT_VERIFIED",
     "openApi": "BOUND_CANONICAL",
-    "implementationAuthorization": false,
+    "implementationAuthorization": true,
     "auditBinding": "CONTRACTED_NOT_VERIFIED",
-    "transport": "CONTRACTED_NOT_VERIFIED",
-    "contentTransitionTransport": "CONTRACTED_PENDING_AUTHORITY"
+    "transport": "CONTRACTED_AUTHORITY_ADMITTED",
+    "contentTransitionTransport": "CONTRACTED_AUTHORITY_ADMITTED"
   }
 }
