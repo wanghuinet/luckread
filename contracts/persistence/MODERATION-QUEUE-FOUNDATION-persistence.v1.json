@@ -321,6 +321,25 @@
         "uq_moderation_decision_idempotency UNIQUE (reviewer_id, case_id, idempotency_key)",
         "ix_moderation_idem_expiry (expires_at)"
       ]
+    },
+    "moderation_txn_guard": {
+      "purpose": "Single-row fail-closed guard used in the same D1 batch so a zero-row moderation case CAS rolls back decision/idempotency/audit writes.",
+      "primaryKey": "id",
+      "columns": {
+        "id": {
+          "type": "INTEGER",
+          "required": true,
+          "unique": true
+        },
+        "successful": {
+          "type": "INTEGER",
+          "required": true
+        }
+      },
+      "constraints": [
+        "id is always 1.",
+        "successful must equal 1."
+      ]
     }
   },
   "mutationBudgets": {
@@ -342,7 +361,8 @@
     "targetTables": [
       "moderation_cases",
       "moderation_decisions",
-      "moderation_decision_idempotency"
+      "moderation_decision_idempotency",
+      "moderation_txn_guard"
     ],
     "executionEvidenceRequired": [
       "schema/table evidence",
