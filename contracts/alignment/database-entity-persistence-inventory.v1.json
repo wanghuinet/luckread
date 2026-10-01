@@ -237,13 +237,16 @@
       "implementationRef": "",
       "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
       "adapter": "Cloudflare D1 (D1-02) / W05 DB binding",
-      "migrationRefs": [],
+      "migrationRefs": [
+        "workers/W05-social/migrations/0003_social_004_comment.sql"
+      ],
       "fieldContractRef": "contracts/entity/entity-field-contract-social-004-comment.v1.json",
       "persistenceContractRef": "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json",
       "evidenceRefs": [
         "contracts/entity/SOCIAL-004-comment-reply-contract.v1.json",
         "contracts/entity/entity-field-contract-social-004-comment.v1.json",
-        "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json"
+        "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json",
+        ".github/workflows/w05-social-d1-02-comment-migration.yml"
       ]
     }
   ],
