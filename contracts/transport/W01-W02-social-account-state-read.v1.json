@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W01-W02-social-account-state-read.v1.json",
+  "title": "W01 to W02 Social Actor Account-State Read",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "purpose": "Expose the existing authoritative D1-01 AccountState as a trusted read for Social admission without creating a second authority.",
+  "caller": { "logicalWorker": "W01", "role": "authenticated public boundary" },
+  "callee": { "logicalWorker": "W02", "role": "Identity / Account / Authorization", "authority": "D1-01 account state" },
+  "transport": {
+    "kind": "Cloudflare Worker Service Binding HTTP",
+    "binding": "W02_AUTH",
+    "targetWorker": "luckread-w02",
+    "publicExposure": false
+  },
+  "operation": {
+    "method": "POST",
+    "internalPath": "/internal/social/actor-account-state",
+    "operationId": null,
+    "idempotency": "not required: read-only"
+  },
+  "request": {
+    "headers": {
+      "X-LuckRead-Caller": "W01",
+      "X-LuckRead-Transport-Version": "1.0",
+      "X-LuckRead-Principal-User-Id": "authenticated W01 subject",
+      "X-LuckRead-Correlation-Id": "required"
+    },
+    "body": {
+      "userId": "target principal; MUST equal X-LuckRead-Principal-User-Id"
+    }
+  },
+  "response": {
+    "success": { "userId": "string", "accountState": "canonical AccountState", "accountStateVersion": "positive integer" },
+    "notFound": "NOT_FOUND",
+    "denied": "UNTRUSTED_CALLER"
+  },
+  "rules": [
+    "W02 reads account state directly from authoritative D1-01 users storage.",
+    "W01 cannot supply or override accountState/accountStateVersion.",
+    "No copy of AccountState is created in Social.",
+    "No public client can call this endpoint.",
+    "Missing or mismatched caller/principal/correlation fails closed."
+  ],
+  "evidenceRequired": [
+    "source SHA",
+    "W01 W02_AUTH binding evidence",
+    "positive account-state read evidence",
+    "principal-scope negative evidence"
+  ]
+}
