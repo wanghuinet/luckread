@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'workers/W02-content/migrations/0002_auth_013_account_state.sql'
+      - 'workers/W02-identity/migrations/0002_auth_013_account_state.sql'
       - 'scripts/auth-013-migration-static-audit.mjs'
       - '.github/workflows/auth-013-migration-static-verification.yml'
   workflow_dispatch:

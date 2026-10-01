@@ -4,15 +4,15 @@ on:
   push:
     branches: [main]
     paths:
-      - "workers/W02-content/src/account/publication-journal-publisher.ts"
-      - "workers/W02-content/src/account/publication-journal-publisher.test.ts"
-      - "workers/W02-content/wrangler.jsonc"
+      - "workers/W02-identity/src/account/publication-journal-publisher.ts"
+      - "workers/W02-identity/src/account/publication-journal-publisher.test.ts"
+      - "workers/W02-identity/wrangler.jsonc"
       - ".github/workflows/auth-013-w02-publication-fanout-ci.yml"
   pull_request:
     paths:
-      - "workers/W02-content/src/account/publication-journal-publisher.ts"
-      - "workers/W02-content/src/account/publication-journal-publisher.test.ts"
-      - "workers/W02-content/wrangler.jsonc"
+      - "workers/W02-identity/src/account/publication-journal-publisher.ts"
+      - "workers/W02-identity/src/account/publication-journal-publisher.test.ts"
+      - "workers/W02-identity/wrangler.jsonc"
       - ".github/workflows/auth-013-w02-publication-fanout-ci.yml"
   workflow_dispatch:
 
@@ -37,14 +37,14 @@ jobs:
         run: npm ci
 
       - name: Run focused publisher tests
-        run: npx vitest@3.2.4 run workers/W02-content/src/account/publication-journal-publisher.test.ts
+        run: npx vitest@3.2.4 run workers/W02-identity/src/account/publication-journal-publisher.test.ts
 
       - name: Validate W02 projection queue binding
         run: |
           set -euo pipefail
           node - <<'NODE'
           const fs = require('fs')
-          const c = JSON.parse(fs.readFileSync('workers/W02-content/wrangler.jsonc','utf8'))
+          const c = JSON.parse(fs.readFileSync('workers/W02-identity/wrangler.jsonc','utf8'))
           const producers = c.queues?.producers ?? []
           const audit = producers.find(x => x.binding === 'AUTH013_QUEUE')
           const projection = producers.find(x => x.binding === 'AUTH013_PROJECTION_QUEUE')
