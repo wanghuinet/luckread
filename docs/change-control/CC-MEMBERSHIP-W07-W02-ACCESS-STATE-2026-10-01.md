@@ -14,6 +14,9 @@
 5. Entitlement grant/revoke is executed in the same D1-01 batch as the accepted subscription transition.
 6. Public clients cannot write subscription status, payment success or entitlement state.
 7. Payment-originated ACTIVE transitions remain blocked until a trusted Commerce/Payment decision source is bound.
+8. The current W01-facing Membership boundary derives actor=user and permits only ACTIVE→CANCELED; system/creator/admin/payment transitions require a separately admitted trusted source.
+9. W07 derives entitlement action from the transition; W01 client input cannot author entitlement grant/revoke semantics.
+10. W02 enforces user subscription ownership and entitlement-to-subscription scope at the D1-01 write boundary.
 
 ## Gate
 
