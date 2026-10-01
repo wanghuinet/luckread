@@ -1,34 +1,33 @@
-# Change Control: SOCIAL-004 Comment Authority Conflict — 2026-10-01
+# Change Control: SOCIAL-004 Comment Authority Reconciliation — 2026-10-01
 
-- Status: BLOCKED / DECISION_MATERIAL_REQUIRED
+- Status: RESOLVED_CONFLICT / IMPLEMENTATION_STILL_BLOCKED
 - Feature: SOCIAL-004 comment/reply
-- Current canonical Worker Master owner: W05 / T11 / D1-02
-- Conflicting legacy evidence: `contracts/enums/comment-state.json` names `W00` as authoritative writer.
+- Canonical Worker Master owner: W05 / T11 / D1-02
+- Reconciled artifact: `contracts/enums/comment-state.json`
 
-## Conflict
+## Decision
 
-The active Worker Master defines a 12-Worker topology with W05 as the Social / Community owner of T11-T14. The existing CommentState enum still contains a historical `W00` authoritative-writer declaration.
+The active Worker Master is the canonical ownership source for the frozen 12-Worker topology. W05 owns Social / Community / Messaging / Notification and T11-T14. The prior `W00` value in CommentState was a stale legacy declaration and has been reconciled to W05.
 
-These statements cannot both be authoritative.
+This resolves the **writer-owner conflict only**. It does not grant Comment runtime implementation admission.
 
-## Control
+## Controls
 
-1. No Comment runtime, migration, entity-owner promotion or Evidence Registry PASS is admitted while the conflict remains unresolved.
-2. The CommentState enum is not rewritten in this slice because it is an existing contract artifact with historical provenance.
-3. The decision must explicitly select the active owner and then reconcile the affected contract references in a dedicated Change Control.
-4. Until the decision is recorded, Comment remains BLOCKED_NOT_GREEN.
+1. Comment lifecycle state remains in D1-02.
+2. W05 is the authoritative Comment runtime writer boundary when SOCIAL-004 implementation is later admitted.
+3. W06 remains the Rights / Trust & Safety / Governance authority for moderation decisions; moderation outcomes must not be confused with Comment ownership.
+4. No Comment migration, public route, runtime GREEN or Evidence Registry PASS is implied by this reconciliation.
+5. SOCIAL-004 still requires the remaining API/DTO/entity/field/persistence/policy/anti-abuse/idempotency/runtime/security evidence before implementation admission.
 
-## Related evidence
+## Related authority
 
 - `docs/04-WORKER-MASTER-v1.0.md`
 - `docs/03-WORKER-BINDING-MAPPING-v1.0.md`
 - `contracts/enums/comment-state.json`
 - `contracts/api/interaction-operation-policy.v1.json`
-- `contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md`
+- `contracts/alignment/cross-system-mapping.v1.json`
+- `contracts/alignment/five-way-reconciliation.v1.json`
 
-## STOP conditions
+## Result
 
-- Do not invent a second Comment authority.
-- Do not create a W00 directory or Worker.
-- Do not execute a Comment migration.
-- Do not claim SOCIAL-004 implementation GREEN.
+The stale W00/W05 ownership contradiction is closed. The feature remains **BLOCKED / NOT_GREEN** on its independent implementation-admission requirements.
