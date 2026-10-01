@@ -23,6 +23,8 @@ Subscriber permissions:
 self.read
 self.manage
 self.cancel
+self.pause
+self.resume
 self.change_plan
 ```
 
@@ -39,6 +41,14 @@ membership.policy.manage
 Organization/MCN permissions are delegated only within explicit resource scope.
 
 Admin/support actions require elevated authorization and audit.
+
+## 3. Machine-Readable Permission Reconciliation
+
+The canonical machine-readable permission set now includes:
+
+`subscription.create`, `subscription.read`, `subscription.cancel`, `subscription.pause`, `subscription.resume`, `subscription.change_plan`.
+
+Pause/resume/change-plan remain subject to ownership/scope, optimistic locking, idempotency and audit requirements defined by the Membership API contract.
 
 ## 3. Security Rules
 
