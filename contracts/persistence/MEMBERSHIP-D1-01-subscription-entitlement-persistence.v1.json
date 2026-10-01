@@ -24,7 +24,8 @@
         "CANCELED",
         "EXPIRED"
       ],
-      "noCrossDomainForeignKeys": true
+      "noCrossDomainForeignKeys": true,
+      "versionColumn": "version"
     },
     "membership_entitlement_grants": {
       "entityId": "ENT-ENTITLEMENT-GRANT",
@@ -49,7 +50,8 @@
     "Entitlement mutations are idempotent and derive from trusted subscription/payment decisions.",
     "Payment providers cannot write these tables directly.",
     "Membership cannot write ledger balance or transaction truth.",
-    "Cancellation/expiry must converge entitlement access state."
+    "Cancellation/expiry must converge entitlement access state.",
+    "Subscription writes use atomic WHERE subscription_id = ? AND version = expectedVersion; successful transition increments version by one."
   ],
   "migration": {
     "path": "workers/W07-subscription-commerce/migrations/0001_membership_subscription_entitlement.sql",
