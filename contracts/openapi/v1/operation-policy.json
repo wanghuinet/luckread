@@ -2023,7 +2023,7 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "subscription"
+      "stateMachine": "none"
     },
     {
       "operationId": "cancelSubscription",
@@ -2036,7 +2036,7 @@
       "auditRequired": true,
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
-      "stateMachine": "subscription"
+      "stateMachine": "none"
     },
     {
       "operationId": "postNotificationsNotificationIdRead",
