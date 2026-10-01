@@ -6755,9 +6755,10 @@
       "blockers": [
         "API and Entity/Field/Persistence contracts are bound.",
         "Private W01→W05 transport boundary is contractually admitted.",
-        "Actor account-state, target followability, block/privacy/anti-abuse authority inputs, runtime, tests and Evidence Registry provenance remain unverified."
-      ]
-    },
+        "Actor principal, actor account state, follow permission, target identity, block policy, anti-abuse admission and caller provenance are bound to existing authoritative contracts.",
+        "Target followability and privacy/audience operational authority remain unresolved.",
+        "Runtime, tests and Evidence Registry provenance remain unverified."
+      ]    },
     {
       "featureId": "SOCIAL-002",
       "status": "UNRESOLVED",
