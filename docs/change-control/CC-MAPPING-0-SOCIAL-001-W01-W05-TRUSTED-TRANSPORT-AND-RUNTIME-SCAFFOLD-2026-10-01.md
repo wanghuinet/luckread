@@ -21,9 +21,11 @@
 
 ## Gate
 W01→W05 binding = CREATED / NOT_REMOTE_VERIFIED
+W01→W02 actor AccountState read = IMPLEMENTED / REMOTE_NOT_VERIFIED
 W05 Follow runtime = IMPLEMENTED / UNIT_VERIFIED
 D1-02 migration = PREVIOUSLY EXECUTED
 Public policy admission = BLOCKED
+Actor AccountState authority = BOUND_TO_W02 / REMOTE_NOT_VERIFIED
 Remote runtime E2E = REQUIRED
 SOCIAL-001 = NOT_GREEN
 
