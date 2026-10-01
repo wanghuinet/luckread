@@ -138,8 +138,8 @@ jobs:
               ).bind(env.USER_ID).first<{ id: string }>()
               if (!session?.id) return json({ status: 'NO_NATIVE_SESSION' }, 409)
 
-              const base = 'https://luckread-w02.internal/internal/auth/'
-              const resolveResponse = await env.W02_AUTH.fetch(new Request(base + 'authz/resolve-layer'.replace('/auth/', '/'), {
+              const base = 'https://luckread-w02.internal'
+              const resolveResponse = await env.W02_AUTH.fetch(new Request(base + '/internal/authz/resolve-layer', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
                 body: JSON.stringify({ subjectId: env.USER_ID, accountState: 'ACTIVE' }),
