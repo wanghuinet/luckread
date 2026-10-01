@@ -80,7 +80,7 @@ export default function ContentDetailPage({
   }, [params, retryKey])
 
   if (loading) {
-    return <main className="content-detail"><p className="content-detail-state">正在加载内容…</p></main>
+    return <main aria-busy={loading} className="content-detail"><p className="content-detail-state" role="status">正在加载内容…</p></main>
   }
 
   if (error || !content) {

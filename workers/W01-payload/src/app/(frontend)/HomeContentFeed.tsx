@@ -66,7 +66,7 @@ export default function HomeContentFeed() {
   }
 
   return (
-    <section className="content-feed" id="content-feed" aria-labelledby="content-feed-title">
+    <section className="content-feed" id="content-feed" aria-labelledby="content-feed-title" aria-busy={loading}>
       <div className="content-feed-heading">
         <div>
           <p className="eyebrow">Latest from LuckRead</p>

@@ -81,6 +81,8 @@ describe('Creator Center admin extension', () => {
     expect(contentDetail).toContain('const [retryKey, setRetryKey] = useState(0)')
     expect(contentDetail).toContain('setRetryKey((value) => value + 1)')
     expect(contentDetail).toContain('content-detail-retry')
+    expect(contentDetail).toContain('<main aria-busy={loading} className="content-detail">')
+    expect(contentDetail).toContain('<p className="content-detail-state" role="status">正在加载内容…</p>')
     expect(contentDetail).toContain("aria-label={content.title + ' 视频 ' + (index + 1)}")
     expect(contentDetail).toContain("alt={content.title + ' 封面'}")
     expect(contentDetail).toContain("alt={content.title + ' 配图 ' + (index + 1)}")
