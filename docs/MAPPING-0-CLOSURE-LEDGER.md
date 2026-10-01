@@ -4586,3 +4586,13 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Backup before these W03/E2E evidence-gate changes: `backup/pre-moderation-w03-deploy-provenance-gate-20261001`.
 - The next runtime action is to run W03 Content Runtime Deploy with its prefilled source/confirmation, then rerun Security E2E. No new Worker, D1, binding, schema, public API, or Contract semantic was introduced.
 - Status remains `NOT_GREEN` pending exact W03 deployment evidence and a clean E2E proving W03 convergence plus final remote Decision + AuditEvent + Outbox evidence.
+
+
+## 2026-10-01 — W06 AuditEvent D1-03 evidence run 36813814855 diagnosis
+
+- Run `36813814855` checked out the intended admitted W06 source `81986b7510efb20a5dd44f9971ca40794989ddff` and passed the exact D1-03 binding check plus five remote Cloudflare D1 evidence queries.
+- The run failed only in validation because the evidence script incorrectly required `audit_events_count === 0`; production D1-03 currently contains `16` audit events, which is compatible with the live moderation runtime and is not a schema/migration failure.
+- Main commit `3ed60ed5a05522a8c8e2ad4fab076a6e195cd0e3` changes the check to require a valid non-negative integer count and preserves the structural checks for required columns, indexes, immutable UPDATE/DELETE triggers, and migration history.
+- The failed run is diagnostic only and is not registered as PASS evidence. A fresh manual run on the corrected workflow is required to produce the evidence artifact.
+- Backup before the evidence-workflow correction: `backup/pre-moderation-d1-03-audit-evidence-inputs-20261001`.
+- Status remains `NOT_GREEN` pending the corrected AuditEvent evidence run and subsequent Evidence Registry reconciliation.
