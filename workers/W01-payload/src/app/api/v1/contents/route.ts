@@ -1,6 +1,6 @@
 import {
   callW03Content,
-  resolveContentPrincipal,
+  resolveCookieContentPrincipal,
   W03ContentClientError,
 } from '../../../../content/w03-content-client.js'
 
@@ -33,7 +33,7 @@ export async function GET(request: Request): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const principal = await resolveContentPrincipal(request)
+    const principal = await resolveCookieContentPrincipal(request)
     if (principal instanceof Response) return principal
 
     let body: unknown
