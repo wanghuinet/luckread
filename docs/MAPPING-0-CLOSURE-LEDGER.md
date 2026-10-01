@@ -4417,3 +4417,14 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Backup created before this governance update: `backup/pre-moderation-e2e-secret-gate-20261001`.
 - Next admissible execution: Security E2E against the unchanged admitted source, with the workflow defaults already populated; then reconcile only the resulting remote evidence.
 
+
+
+## 2026-10-01 — Moderation native L6 E2E harness prepared
+
+- Current main head after harness/readiness records: `cf0dfd6cfc738ada3dd96c89aeab34d109499a41`.
+- Prepared `scripts/moderation-native-reviewer-fixture.mjs` to use the existing Payload-native registration/login chain and canonical `moderator` role, yielding an actual L6 reviewer JWT for controlled evidence.
+- This harness is evidence tooling only; the admitted runtime source remains `81986b7510efb20a5dd44f9971ca40794989ddff`.
+- The existing Moderation Security E2E workflow is not yet wired to the harness. It still references repository secret `MODERATION_E2E_BEARER_TOKEN`.
+- Therefore status remains `BLOCKED_EXTERNAL`; no Security E2E, Decision/Audit/Outbox/W03 convergence, Evidence Registry PASS, or Moderation Runtime GREEN is promoted.
+- Backup: `backup/pre-moderation-native-auth-e2e-20261001`.
+- Next admissible change is workflow wiring plus controlled cleanup, followed by one real Security E2E execution.
