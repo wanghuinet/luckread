@@ -6,6 +6,8 @@ on:
       - 'workers/W01-payload/src/content/w05-social-client.ts'
       - 'workers/W01-payload/wrangler.jsonc'
       - 'contracts/transport/W01-W05-social-follow-trusted-transport.v1.json'
+      - 'contracts/entity/SOCIAL-003-like-relationship-contract.v1.json'
+      - 'contracts/persistence/SOCIAL-003-like-d1-02-persistence.v1.json'
   push:
     branches: [main]
     paths:
@@ -13,6 +15,8 @@ on:
       - 'workers/W01-payload/src/content/w05-social-client.ts'
       - 'workers/W01-payload/wrangler.jsonc'
       - 'contracts/transport/W01-W05-social-follow-trusted-transport.v1.json'
+      - 'contracts/entity/SOCIAL-003-like-relationship-contract.v1.json'
+      - 'contracts/persistence/SOCIAL-003-like-d1-02-persistence.v1.json'
 permissions:
   contents: read
 jobs:
@@ -25,4 +29,4 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx vitest run workers/W05-social/src/follow-runtime.test.ts
+      - run: npx vitest run workers/W05-social/src/follow-runtime.test.ts workers/W05-social/src/like-runtime.test.ts
