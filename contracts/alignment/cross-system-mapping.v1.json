@@ -4529,10 +4529,13 @@
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
         "contracts/api/MEMBERSHIP-SUBSCRIPTION-ENTITY-BINDING.v1.json",
-        "contracts/dto/MEMBERSHIP-SUBSCRIPTION-DTO.v1.json"
+        "contracts/dto/MEMBERSHIP-SUBSCRIPTION-DTO.v1.json",
+        "contracts/persistence/MEMBERSHIP-SUBSCRIPTION-PERSISTENCE-CONTRACT.v1.json",
+        "docs/change-control/CC-1.0-MEMBERSHIP-STATE-RECONCILIATION-2026-10-01.md"
       ],
       "blockers": [
-        "Runtime/persistence/migration, payment reconciliation, lifecycle E2E and Evidence Registry provenance remain unresolved."
+        "Runtime/persistence/migration, payment reconciliation, lifecycle E2E and Evidence Registry provenance remain unresolved.",
+        "Membership persistence contract is present but blocked by the unresolved subscription lifecycle state-machine conflict."
       ]
     },
     {
@@ -4553,10 +4556,13 @@
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
         "contracts/api/MEMBERSHIP-SUBSCRIPTION-ENTITY-BINDING.v1.json",
-        "contracts/dto/MEMBERSHIP-SUBSCRIPTION-DTO.v1.json"
+        "contracts/dto/MEMBERSHIP-SUBSCRIPTION-DTO.v1.json",
+        "contracts/persistence/MEMBERSHIP-SUBSCRIPTION-PERSISTENCE-CONTRACT.v1.json",
+        "docs/change-control/CC-1.0-MEMBERSHIP-STATE-RECONCILIATION-2026-10-01.md"
       ],
       "blockers": [
-        "Runtime/persistence/migration, fail-closed security E2E, cache invalidation and Evidence Registry provenance remain unresolved."
+        "Runtime/persistence/migration, fail-closed security E2E, cache invalidation and Evidence Registry provenance remain unresolved.",
+        "Entitlement persistence contract depends on the unresolved canonical Subscription lifecycle state vocabulary."
       ]
     },
     {
@@ -6810,7 +6816,8 @@
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/api/SOCIAL-003-reaction-contract.v1.json",
         "contracts/entity/SOCIAL-003-reaction-entity-contract.v1.json",
-        "contracts/persistence/SOCIAL-003-reaction-persistence-contract.v1.json"
+        "contracts/persistence/SOCIAL-003-reaction-persistence-contract.v1.json",
+        "contracts/transport/SOCIAL-003-004-trusted-admission-input.v1.json"
       ],
       "blockers": [
         "Runtime, remote D1 schema/migration, abuse/security E2E, aggregation/event evidence and Evidence Registry provenance remain unresolved."
@@ -6837,7 +6844,8 @@
         "contracts/api/SOCIAL-004-comment-contract.v1.json",
         "contracts/entity/SOCIAL-004-comment-entity-contract.v1.json",
         "contracts/persistence/SOCIAL-004-comment-persistence-contract.v1.json",
-        "contracts/dto/SOCIAL-INTERACTION-DTO.v1.json"
+        "contracts/dto/SOCIAL-INTERACTION-DTO.v1.json",
+        "contracts/transport/SOCIAL-003-004-trusted-admission-input.v1.json"
       ],
       "blockers": [
         "Runtime, remote D1 schema/migration, moderation/security E2E, concurrency and Evidence Registry provenance remain unresolved."
