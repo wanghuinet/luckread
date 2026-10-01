@@ -90,7 +90,7 @@
 - **用户类型：** 已验证普通用户
 - **可访问：** public + 自身全部 + 社交互动 + 收藏 + 举报
 - **不可访问：** 创作能力（需显式开通）、他人私有数据、任何后台
-- **默认权限：** L1 + `comment.create`、`comment.read`、`interaction.like`、`interaction.unlike`、
+- **默认权限：** L1 + `comment.create`、`comment.read`、`comment.update`、`comment.delete`、`interaction.like`、`interaction.unlike`、
   `interaction.favorite`、`social.follow`、`social.unfollow`、`social.block`、`social.mute`、
   `report.create`、`notification.read.self`、`notification.update.self`
 - **API 权限：** 全部 `/api/v1/*` 读端点 + 互动类写端点
