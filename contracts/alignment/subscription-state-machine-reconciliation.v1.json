@@ -1,0 +1,20 @@
+{
+  "schemaVersion":"1.0.0",
+  "status":"RECONCILED_NOT_VERIFIED",
+  "authority":{"subscriptionLifecycle":"Membership","accessState":"D1-01","transactionOutcome":"Commerce/Payment","financialTruth":"Ledger"},
+  "stateField":"status",
+  "requiresOptimisticLock":true,
+  "terminalStates":["EXPIRED","CANCELED"],
+  "transitions":[
+    ["PENDING","ACTIVE",["system","payment"]],
+    ["ACTIVE","PAST_DUE",["system","payment"]],
+    ["PAST_DUE","ACTIVE",["system","payment"]],
+    ["ACTIVE","CANCELED",["user","creator","admin","system"]],
+    ["PAST_DUE","CANCELED",["admin","system"]],
+    ["ACTIVE","EXPIRED",["system"]],
+    ["PAST_DUE","EXPIRED",["system"]]
+  ],
+  "forbiddenTransitions":[["CANCELED","ACTIVE"],["EXPIRED","ACTIVE"],["EXPIRED","CANCELED"]],
+  "reconciliationRules":["stale expectedVersion cannot mutate authoritative state","duplicate replay converges idempotently","out-of-order events require authoritative ordering before mutation","payment success is a trusted Commerce/Payment input, not a Membership financial fact","cancellation and expiry converge entitlement access state"],
+  "implementationAdmission":{"stateEngine":"ADMITTED_FOR_BOUNDED_UNIT_RUNTIME","persistenceMutation":"BLOCKED_UNTIL_D1_01_SCHEMA_EVIDENCE","publicMembershipAPI":"BLOCKED","remoteE2E":"REQUIRED"}
+}
