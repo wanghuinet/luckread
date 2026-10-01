@@ -121,13 +121,11 @@ export async function transitionSubscription(
   }
 
   if (input.entitlementAction === 'REVOKE') {
-    if (!input.entitlementId) throw new MembershipAccessStateError('INVALID_ENTITLEMENT_REVOKE')
     statements.push(
       db.prepare(
         `UPDATE membership_entitlement_grants
             SET status = 'REVOKED', updated_at = ?
-          WHERE entitlement_id = ?
-            AND subscription_id = ?
+          WHERE subscription_id = ?
             AND status = 'ACTIVE'
             AND EXISTS (
               SELECT 1 FROM membership_subscriptions
@@ -135,7 +133,6 @@ export async function transitionSubscription(
             )`,
       ).bind(
         timestamp,
-        input.entitlementId,
         input.subscriptionId,
         input.subscriptionId,
         input.to,
@@ -154,6 +151,6 @@ export async function transitionSubscription(
     subscriptionId: input.subscriptionId,
     status: input.to,
     version: nextVersion,
-    entitlementChanged: input.entitlementAction !== 'NONE',
+    entitlementChanged: (results[1]?.meta?.changes ?? 0) > 0,
   }
 }
