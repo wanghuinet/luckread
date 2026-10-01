@@ -13,6 +13,7 @@ describe('Media upload access', () => {
     expect(media).toContain("operation === 'create'")
     expect(media).toContain('data.ownerUserId = String(req.user.id)')
     expect(media).not.toContain("ownerUserId: req.body")
+    expect(media).toContain("data.ownerUserId = (originalDoc as unknown as { ownerUserId?: string | number | null } | undefined)?.ownerUserId ?? null")
   })
 
   it('limits update and delete to the stored owner', () => {
