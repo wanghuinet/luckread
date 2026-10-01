@@ -1121,9 +1121,11 @@
       "path": "/v1/users/{userId}/followers",
       "openapiPath": "/users/{userId}/followers",
       "domain": "users_accounts",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "SOCIAL-002"
+      ],
+      "schemaRef": "contracts/api/SOCIAL-002-followers-following-read.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/users/{userId}/followers",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
@@ -1136,9 +1138,11 @@
       "path": "/v1/users/{userId}/following",
       "openapiPath": "/users/{userId}/following",
       "domain": "users_accounts",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "SOCIAL-002"
+      ],
+      "schemaRef": "contracts/api/SOCIAL-002-followers-following-read.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/users/{userId}/following",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
@@ -2300,5 +2304,25 @@
         "contracts/api/api-inventory.v1.json"
       ]
     }
-  ]
+  
+    ,
+    {
+      "operationId": "getUsersUserIdFollow",
+      "method": "GET",
+      "path": "/v1/users/{userId}/follow",
+      "openapiPath": "/users/{userId}/follow",
+      "domain": "interaction",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "SOCIAL-001"
+      ],
+      "schemaRef": "contracts/dto/DTO-SOCIAL-FOLLOW-STATUS.v1.json",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/users/{userId}/follow",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/SOCIAL-001-follow-status-read.v1.json",
+        "contracts/dto/DTO-SOCIAL-FOLLOW-STATUS.v1.json"
+      ]
+    }
+]
 }
