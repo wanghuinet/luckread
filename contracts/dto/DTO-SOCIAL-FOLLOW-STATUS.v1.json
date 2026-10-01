@@ -1,0 +1,28 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/dto/DTO-SOCIAL-FOLLOW-STATUS.v1.json",
+  "title":"DTO-SOCIAL-FOLLOW-STATUS",
+  "version":"1.0.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "request":{
+    "pathParameters":{
+      "userId":{
+        "schema":"ResourceId",
+        "role":"targetUserId",
+        "clientWritable":true
+      }
+    },
+    "body":null
+  },
+  "response":{
+    "data":{
+      "following":{
+        "type":"boolean",
+        "authoritativeSource":"ENT-SOCIAL-FOLLOW",
+        "description":"True only when an active relation exists from the authenticated viewer to the target user."
+      }
+    },
+    "requestId":"RequestId"
+  },
+  "privacy":"Relationship status is viewer-scoped and must not be treated as public aggregate state."
+}
