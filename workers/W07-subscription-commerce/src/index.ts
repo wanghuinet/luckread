@@ -3,7 +3,7 @@ import {
   transitionSubscription,
   type SubscriptionStatus,
 } from './subscription-state-machine.js'
-import { callW02Membership, readW02MembershipSubscription } from './w02-membership-client.js'
+import { callW02Membership, readW02MembershipSubscription, W02MembershipClientError } from './w02-membership-client.js'
 import { deriveW01MembershipTransition } from './w01-transition-boundary.js'
 
 const statuses = new Set<SubscriptionStatus>(['PENDING', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'EXPIRED'])
@@ -183,8 +183,25 @@ export default {
         headers: { 'content-type': accessState.headers.get('content-type') ?? 'application/json; charset=utf-8', 'cache-control': 'no-store' },
       })
     } catch (error) {
+      if (error instanceof W02MembershipClientError) {
+        const code =
+          error.status === 403 ? 'ACCESS_DENIED' :
+          error.status === 404 ? 'NOT_FOUND' :
+          error.status === 409 ? 'INVALID_STATE' :
+          error.status === 412 ? 'VERSION_CONFLICT' :
+          'SERVICE_UNAVAILABLE'
+        const status =
+          error.status === 403 || error.status === 404 || error.status === 409 || error.status === 412
+            ? error.status
+            : 503
+        return json({ error: { code, details: {} } }, status)
+      }
+
       const code = error instanceof SubscriptionStateError ? error.code : 'SERVICE_UNAVAILABLE'
-      const status = code === 'VERSION_CONFLICT' ? 412 : code === 'INVALID_STATE_TRANSITION' ? 409 : 400
+      const status =
+        code === 'VERSION_CONFLICT' ? 412 :
+        code === 'INVALID_STATE_TRANSITION' ? 409 :
+        400
       return json({ error: { code, details: {} } }, status)
     }
   },
