@@ -192,3 +192,10 @@ Global Mapping Consolidation GREEN
 ```
 
 No code or infrastructure is authorized by this document.
+
+
+## 2026-10-01 Reconciliation Addendum — SOCIAL-002 Read Surface
+
+The historical discovery status recorded on 2026-09-30 is superseded by the contract reconciliation recorded in `CC-MAPPING-0-SOCIAL-002-FOLLOWER-FOLLOWING-READ-CONTRACT-2026-10-01.md`.
+
+The current contract state is `CONTRACTED_PARTIAL` for both follower/following reads, with canonical OpenAPI response schemas and DTO bindings, while executable/runtime/security/Evidence Registry closure remains outstanding.
