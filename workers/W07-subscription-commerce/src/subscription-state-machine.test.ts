@@ -42,12 +42,18 @@ describe('Membership subscription state machine', () => {
     )).toThrow('VERSION_CONFLICT')
   })
 
-  it('reconciles stale replay and identifies terminal state', () => {
-    const current = { status: 'EXPIRED' as const, version: 7 }
+  it('reconciles stale and duplicate replay without a second transition', () => {
+    const current = { status: 'ACTIVE' as const, version: 7 }
 
     expect(reconcileSubscriptionEvent(
       current,
-      { to: 'ACTIVE', actor: 'system', expectedVersion: 6, idempotencyKey: 'replay' },
+      { to: 'PAST_DUE', actor: 'system', expectedVersion: 6, idempotencyKey: 'stale' },
+    )).toEqual({ state: current, applied: false })
+
+    expect(reconcileSubscriptionEvent(
+      current,
+      { to: 'PAST_DUE', actor: 'system', expectedVersion: 7, idempotencyKey: 'already-applied' },
+      new Set(['already-applied']),
     )).toEqual({ state: current, applied: false })
 
     expect(isTerminal('CANCELED')).toBe(true)
