@@ -12,7 +12,7 @@ on:
         description: Exact admitted source SHA under test
         required: true
         type: string
-        default: 81986b7510efb20a5dd44f9971ca40794989ddff
+        default: 825fc273dc7f64bd9413f0493c55c9017ab27268
       base_url:
         description: W01 public moderation base URL
         required: true
@@ -35,7 +35,7 @@ jobs:
     timeout-minutes: 20
     env:
       BASE_URL: ${{ github.event_name == 'push' && 'https://luckread.cn' || inputs.base_url }}
-      SOURCE_SHA: ${{ github.event_name == 'push' && '81986b7510efb20a5dd44f9971ca40794989ddff' || inputs.source_sha }}
+      SOURCE_SHA: ${{ github.event_name == 'push' && '825fc273dc7f64bd9413f0493c55c9017ab27268' || inputs.source_sha }}
       DATABASE_NAME_W03: luckreadpro
       DATABASE_NAME_W06: secondary
       WRANGLER_VERSION: 4.116.0
@@ -43,16 +43,16 @@ jobs:
       - name: Checkout exact source
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_sha  }}
+          ref: ${{ github.event_name == 'push' && github.sha || inputs.source_sha }}
 
-      - name: Verify source CI
+      - name: Verify exact W01 production deployment
         env:
-          GH_TOKEN: ${{ github.token  }}
+          GH_TOKEN: ${{ github.token }}
+          W01_DEPLOY_RUN_ID: "36804071530"
         run: |
           set -euo pipefail
-          conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow moderation-runtime-source-ci.yml --commit "$SOURCE_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
-          test "$conclusion" = success || { echo "Source CI not SUCCESS for $SOURCE_SHA"; exit 1; }
-
+          run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$W01_DEPLOY_RUN_ID")"
+          node -e "const r=JSON.parse(process.argv[1]); if(r.conclusion!==\"success\") throw new Error(\"W01 deployment run is not SUCCESS\"); if(r.head_sha!==process.env.SOURCE_SHA) throw new Error(\"W01 deployment SHA mismatch: \"+r.head_sha+\" != \"+process.env.SOURCE_SHA); console.log(JSON.stringify({deploymentRun:r.id,headSha:r.head_sha,conclusion:r.conclusion,workflow:r.name}));" "$run_json"
       - name: Start W02 runtime error tail
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
