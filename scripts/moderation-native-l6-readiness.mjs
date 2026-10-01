@@ -39,7 +39,9 @@ try {
     username,
     consent:{purpose:'ACCOUNT_REGISTRATION',policyVersion:'PROD-2026-09-28.1'},
   })
-  if (registered.status !== 201) throw new Error('register failed: HTTP ' + registered.status)
+  if (registered.status !== 201) {
+    throw new Error('register failed: HTTP ' + registered.status + ' body=' + JSON.stringify(registered.data))
+  }
   userId = String(registered.data?.userId || '')
   if (!userId) throw new Error('register userId missing')
 
