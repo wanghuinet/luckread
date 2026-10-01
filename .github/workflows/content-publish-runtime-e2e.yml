@@ -88,10 +88,10 @@ jobs:
           DATABASE_NAME_W01: ${{ env.DATABASE_NAME_W01 }}
         run: |
           set -euo pipefail
-          node <<'NODE'
-          const { randomBytes } = require('node:crypto');
-          const { appendFileSync } = require('node:fs');
-          const { execFileSync } = require('node:child_process');
+          node --input-type=module <<'NODE'
+          import { randomBytes } from 'node:crypto';
+          import { appendFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
           const base = String(process.env.AUTH_BASE_URL).replace(/\/$/, '');
           const runId = String(process.env.GITHUB_RUN_ID);
           const suffix = 'CRL3-' + runId + '-' + randomBytes(5).toString('hex');
@@ -287,8 +287,11 @@ jobs:
         run: |
           set -euo pipefail
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc             --command "DELETE FROM moderation_enforcement_outbox WHERE decision_id IN (SELECT decision_id FROM moderation_decisions WHERE case_id LIKE 'content-e2e-%'); DELETE FROM moderation_decision_idempotency WHERE case_id LIKE 'content-e2e-%'; DELETE FROM moderation_decisions WHERE case_id LIKE 'content-e2e-%'; DELETE FROM moderation_cases WHERE case_id LIKE 'content-e2e-%';"
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-content/wrangler.jsonc             --command "DELETE FROM content_mutation_idempotency WHERE owner_user_id='$CREATOR_AUTH_USER_ID'; DELETE FROM contents WHERE owner_user_id='$CREATOR_AUTH_USER_ID';"
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W01" --remote --yes --config workers/W01-payload/wrangler.jsonc             --command "DELETE FROM role_assignments WHERE id='$CREATOR_ROLE_ID' OR subject_id='$CREATOR_AUTH_USER_ID'; DELETE FROM auth_session_state WHERE user_id='$CREATOR_AUTH_USER_ID'; DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)='$CREATOR_AUTH_USER_ID'; DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT)='$CREATOR_AUTH_USER_ID' OR CAST(owner_subject_id AS TEXT)='$CREATOR_AUTH_USER_ID'; DELETE FROM auth_registration_envelopes WHERE idempotency_key='$CREATOR_REGISTRATION_KEY'; DELETE FROM users WHERE CAST(id AS TEXT)='$CREATOR_AUTH_USER_ID';"
+          CREATOR_USER="${CREATOR_AUTH_USER_ID:-__none__}"
+          CREATOR_ROLE="${CREATOR_ROLE_ID:-__none__}"
+          CREATOR_REG_KEY="${CREATOR_REGISTRATION_KEY:-__none__}"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-content/wrangler.jsonc             --command "DELETE FROM content_mutation_idempotency WHERE owner_user_id='$CREATOR_USER'; DELETE FROM contents WHERE owner_user_id='$CREATOR_USER';"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W01" --remote --yes --config workers/W01-payload/wrangler.jsonc             --command "DELETE FROM role_assignments WHERE id='$CREATOR_ROLE' OR subject_id='$CREATOR_USER'; DELETE FROM auth_session_state WHERE user_id='$CREATOR_USER'; DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)='$CREATOR_USER'; DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT)='$CREATOR_USER' OR CAST(owner_subject_id AS TEXT)='$CREATOR_USER'; DELETE FROM auth_registration_envelopes WHERE idempotency_key='$CREATOR_REG_KEY'; DELETE FROM users WHERE CAST(id AS TEXT)='$CREATOR_USER';"
 
       - name: Upload content publish runtime evidence
         if: always()
