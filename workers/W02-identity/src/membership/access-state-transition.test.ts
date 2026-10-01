@@ -53,7 +53,7 @@ describe('W02 membership access-state boundary', () => {
     })).toThrow('PRINCIPAL_SCOPE_DENIED')
   })
 
-  it('requires a valid optimistic-concurrency transition', () => {
+  it('requires a terminal transition to carry the derived revoke action', () => {
     expect(() => validateTransition({
       ...principal,
       subscriptionId: 'sub-1',
@@ -62,7 +62,17 @@ describe('W02 membership access-state boundary', () => {
       expectedVersion: 3,
       actor: 'user',
       entitlementAction: 'NONE',
-    })).toThrow()
+    })).toThrow('INVALID_ENTITLEMENT_REVOKE')
+
+    expect(() => validateTransition({
+      ...principal,
+      subscriptionId: 'sub-1',
+      from: 'ACTIVE',
+      to: 'CANCELED',
+      expectedVersion: 3,
+      actor: 'user',
+      entitlementAction: 'REVOKE',
+    })).not.toThrow()
   })
 
   it('maps the boundary errors without leaking storage internals', () => {
