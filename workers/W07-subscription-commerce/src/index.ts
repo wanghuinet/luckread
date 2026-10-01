@@ -108,13 +108,6 @@ export default {
       to?: unknown
       expectedVersion?: unknown
       idempotencyKey?: unknown
-      entitlementId?: unknown
-      entitlementType?: unknown
-      scopeType?: unknown
-      scopeId?: unknown
-      sourcePlanVersion?: unknown
-      effectiveAt?: unknown
-      expiresAt?: unknown
     }
 
     try {
@@ -176,13 +169,6 @@ export default {
           actor: w01Transition.actor,
           expectedVersion: body.expectedVersion,
           entitlementAction: derivedEntitlementAction,
-          entitlementId: typeof body.entitlementId === 'string' ? body.entitlementId : undefined,
-          entitlementType: typeof body.entitlementType === 'string' ? body.entitlementType : undefined,
-          scopeType: typeof body.scopeType === 'string' ? body.scopeType : undefined,
-          scopeId: typeof body.scopeId === 'string' ? body.scopeId : undefined,
-          sourcePlanVersion: typeof body.sourcePlanVersion === 'number' ? body.sourcePlanVersion : undefined,
-          effectiveAt: typeof body.effectiveAt === 'string' ? body.effectiveAt : undefined,
-          expiresAt: typeof body.expiresAt === 'string' ? body.expiresAt : null,
         },
       })
 
