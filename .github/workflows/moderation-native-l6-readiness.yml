@@ -1,6 +1,11 @@
 name: Moderation Native L6 Readiness
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/moderation-native-l6-readiness.yml
   workflow_dispatch:
     inputs:
       base_url:
@@ -19,7 +24,7 @@ permissions:
 
 jobs:
   readiness:
-    if: ${{ inputs.confirm == 'RUN_MODERATION_L6_READY' }}
+    if: ${{ github.event_name == 'push' || inputs.confirm == 'RUN_MODERATION_L6_READY' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
