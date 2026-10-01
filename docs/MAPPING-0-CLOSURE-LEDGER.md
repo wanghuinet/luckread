@@ -4403,7 +4403,7 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 
 ## 2026-10-01 — Moderation Security E2E external credential gate
 
-- Current main head: `7d4eda1b75ebdddd474d7cb14aa0443b09707f56`.
+- Evidence baseline main before this governance record: `7d4eda1b75ebdddd474d7cb14aa0443b09707f56`.
 - Admitted runtime source under test: `81986b7510efb20a5dd44f9971ca40794989ddff`.
 - Source CI, D1-03 remote migration evidence, and coordinated W01/W03/W06 deployment evidence remain valid and are inherited; the latest main change is evidence-only.
 - Security E2E observations:
