@@ -1,0 +1,101 @@
+name: Moderation Runtime Source CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W01-payload/src/app/api/v1/admin/moderation/**'
+      - 'workers/W01-payload/src/moderation/**'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/W06-governance/src/**'
+      - 'workers/W06-governance/wrangler.jsonc'
+      - 'workers/W06-governance/migrations/**'
+      - 'workers/W03-feed/src/content-runtime.ts'
+      - 'workers/W03-feed/src/index.ts'
+      - 'contracts/api/moderation-operation-policy.v1.json'
+      - 'contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json'
+      - 'contracts/transport/W01-W06-moderation-http-binding.v1.json'
+      - 'contracts/transport/W06-W03-content-moderation-http-binding.v1.json'
+      - '.github/workflows/moderation-runtime-source-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - 'workers/W01-payload/src/app/api/v1/admin/moderation/**'
+      - 'workers/W01-payload/src/moderation/**'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/W06-governance/src/**'
+      - 'workers/W06-governance/wrangler.jsonc'
+      - 'workers/W06-governance/migrations/**'
+      - 'workers/W03-feed/src/content-runtime.ts'
+      - 'workers/W03-feed/src/index.ts'
+      - 'contracts/api/moderation-operation-policy.v1.json'
+      - 'contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json'
+      - 'contracts/transport/W01-W06-moderation-http-binding.v1.json'
+      - 'contracts/transport/W06-W03-content-moderation-http-binding.v1.json'
+      - '.github/workflows/moderation-runtime-source-ci.yml'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  moderation-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck W06 moderation runtime
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/moderation-runtime.ts workers/W06-governance/src/index.ts
+
+      - name: Typecheck W03 moderation boundary
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W03-feed/src/content-runtime.ts workers/W03-feed/src/index.ts
+
+      - name: Typecheck W01 moderation gateway
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W01-payload/src/moderation/w06-moderation-client.ts workers/W01-payload/src/app/api/v1/admin/moderation/[[...path]]/route.ts
+
+      - name: Run W06 moderation tests
+        run: npx vitest@3.2.4 run workers/W06-governance/src/moderation-runtime.test.ts
+
+      - name: Validate migration locally
+        working-directory: workers/W06-governance
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sqlite3
+          rm -f /tmp/luckread-moderation.sqlite
+          sqlite3 /tmp/luckread-moderation.sqlite < migrations/0001_audit_event.sql
+          sqlite3 /tmp/luckread-moderation.sqlite < migrations/0002_moderation_queue_foundation.sql
+          sqlite3 -json /tmp/luckread-moderation.sqlite 'PRAGMA table_info("moderation_cases");'
+          sqlite3 -json /tmp/luckread-moderation.sqlite 'PRAGMA table_info("moderation_decisions");'
+          sqlite3 -json /tmp/luckread-moderation.sqlite 'PRAGMA table_info("moderation_decision_idempotency");'
+          sqlite3 -json /tmp/luckread-moderation.sqlite 'PRAGMA table_info("moderation_txn_guard");'
+          echo "MODERATION_D1_03_MIGRATION_STATIC=PASS"
+
+      - name: Verify frozen topology and admitted transport
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const w01 = JSON.parse(fs.readFileSync('workers/W01-payload/wrangler.jsonc','utf8'));
+          const w06 = JSON.parse(fs.readFileSync('workers/W06-governance/wrangler.jsonc','utf8'));
+          const w03 = JSON.parse(fs.readFileSync('workers/W03-feed/wrangler.jsonc','utf8'));
+          const w01m = w01.services?.find(x => x.binding === 'W06_MODERATION');
+          const w06m = w06.services?.find(x => x.binding === 'W03_CONTENT_MODERATION');
+          if (!w01m || w01m.service !== 'luckread-w06') throw new Error('W01 W06_MODERATION binding mismatch');
+          if (!w06m || w06m.service !== 'luckread-w03') throw new Error('W06 W03_CONTENT_MODERATION binding mismatch');
+          if (!w06.d1_databases?.some(x => x.binding === 'D1_03' && x.database_id === 'bda1d247-a371-4244-91ae-aef96034db7f')) throw new Error('W06 D1-03 binding mismatch');
+          if (!w03.d1_databases?.some(x => x.binding === 'D1_02' && x.database_id === '6c342634-97f6-4248-9f4a-85772af4f22c')) throw new Error('W03 D1-02 binding mismatch');
+          console.log('MODERATION_TOPOLOGY=PASS');
+          NODE
