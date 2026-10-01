@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json",
+  "title": "LuckRead Membership / Subscription Foundation Entity Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "domain": "MEMBERSHIP",
+  "worker": "W07",
+  "d1": "D1-01",
+  "purpose": "Freeze the minimum domain entities and field authority for MembershipPlan, Subscription and Entitlement without creating runtime persistence.",
+  "authorityBoundary": {
+    "membership": [
+      "membership plan lifecycle",
+      "subscription lifecycle",
+      "entitlement lifecycle",
+      "creator membership offering state",
+      "membership access state"
+    ],
+    "outsideAuthority": [
+      "User identity",
+      "Creator identity",
+      "Social graph truth",
+      "payment authorization and settlement",
+      "Commerce order truth",
+      "Wallet/Ledger financial facts",
+      "Content body"
+    ]
+  },
+  "entities": [
+    {
+      "entityId": "ENT-MEMBERSHIP-PLAN",
+      "name": "MembershipPlan",
+      "classification": "AUTHORITATIVE",
+      "fields": [
+        ["ENT-MEMBERSHIP-PLAN-F-PLAN-ID","planId","text",false,true,true,"immutable","INTERNAL_IDENTIFIER"],
+        ["ENT-MEMBERSHIP-PLAN-F-OWNER-TYPE","ownerType","enum",false,true,false,"immutable","OWNERSHIP_SCOPE"],
+        ["ENT-MEMBERSHIP-PLAN-F-OWNER-ID","ownerId","text",false,true,false,"immutable","INTERNAL_RELATION"],
+        ["ENT-MEMBERSHIP-PLAN-F-VERSION","version","integer",false,true,false,"versioned","SCHEMA_METADATA"],
+        ["ENT-MEMBERSHIP-PLAN-F-NAME","name","text",false,true,false,"mutable","PUBLIC_LABEL"],
+        ["ENT-MEMBERSHIP-PLAN-F-TIER","tier","text",false,true,false,"versioned","PLAN_TIER"],
+        ["ENT-MEMBERSHIP-PLAN-F-BILLING-INTERVAL","billingInterval","text",false,true,false,"versioned","BILLING_REFERENCE"],
+        ["ENT-MEMBERSHIP-PLAN-F-STATUS","status","enum",false,true,false,"stateful","LIFECYCLE_STATE"],
+        ["ENT-MEMBERSHIP-PLAN-F-VISIBILITY","visibility","enum",false,true,false,"policy-controlled","VISIBILITY"],
+        ["ENT-MEMBERSHIP-PLAN-F-CREATED-AT","createdAt","datetime",false,true,false,"immutable","AUDIT_METADATA"],
+        ["ENT-MEMBERSHIP-PLAN-F-UPDATED-AT","updatedAt","datetime",false,true,false,"mutable","AUDIT_METADATA"]
+      ],
+      "keyRules": [
+        "planId + version uniquely identifies a plan definition.",
+        "Historical plan versions are immutable.",
+        "Only an authorized owner can activate, pause or retire a plan."
+      ]
+    },
+    {
+      "entityId": "ENT-SUBSCRIPTION",
+      "name": "Subscription",
+      "classification": "AUTHORITATIVE",
+      "fields": [
+        ["ENT-SUBSCRIPTION-F-SUBSCRIPTION-ID","subscriptionId","text",false,true,true,"immutable","INTERNAL_IDENTIFIER"],
+        ["ENT-SUBSCRIPTION-F-SUBSCRIBER-ID","subscriberId","text",false,true,false,"immutable","INTERNAL_RELATION"],
+        ["ENT-SUBSCRIPTION-F-PLAN-ID","planId","text",false,true,false,"immutable","INTERNAL_RELATION"],
+        ["ENT-SUBSCRIPTION-F-PLAN-VERSION","planVersion","integer",false,true,false,"immutable","SCHEMA_METADATA"],
+        ["ENT-SUBSCRIPTION-F-STATUS","status","enum",false,true,false,"stateful","LIFECYCLE_STATE"],
+        ["ENT-SUBSCRIPTION-F-STARTED-AT","startedAt","datetime",false,true,false,"immutable","LIFECYCLE_METADATA"],
+        ["ENT-SUBSCRIPTION-F-CURRENT-PERIOD-START","currentPeriodStart","datetime",false,true,false,"stateful","BILLING_PERIOD"],
+        ["ENT-SUBSCRIPTION-F-CURRENT-PERIOD-END","currentPeriodEnd","datetime",false,true,false,"stateful","BILLING_PERIOD"],
+        ["ENT-SUBSCRIPTION-F-CANCEL-AT","cancelAt","datetime",true,false,false,"stateful","LIFECYCLE_METADATA"],
+        ["ENT-SUBSCRIPTION-F-CREATED-AT","createdAt","datetime",false,true,false,"immutable","AUDIT_METADATA"],
+        ["ENT-SUBSCRIPTION-F-UPDATED-AT","updatedAt","datetime",false,true,false,"mutable","AUDIT_METADATA"]
+      ],
+      "keyRules": [
+        "One authoritative current status exists per subscription.",
+        "planVersion is retained so historical subscription semantics are stable.",
+        "No client input can assert paid, active or renewed state.",
+        "Duplicate active subscriptions are prevented only where the applicable business scope requires uniqueness.",
+        "Payment and settlement facts remain external references to Commerce/Payment and Wallet/Ledger authorities."
+      ]
+    },
+    {
+      "entityId": "ENT-ENTITLEMENT-GRANT",
+      "name": "Entitlement",
+      "classification": "AUTHORITATIVE",
+      "fields": [
+        ["ENT-ENTITLEMENT-GRANT-F-ENTITLEMENT-ID","entitlementId","text",false,true,true,"immutable","INTERNAL_IDENTIFIER"],
+        ["ENT-ENTITLEMENT-GRANT-F-SUBSCRIPTION-ID","subscriptionId","text",false,true,false,"immutable","INTERNAL_RELATION"],
+        ["ENT-ENTITLEMENT-GRANT-F-TYPE","entitlementType","text",false,true,false,"versioned","ENTITLEMENT_TYPE"],
+        ["ENT-ENTITLEMENT-GRANT-F-SCOPE-TYPE","scopeType","enum",false,true,false,"immutable","RESOURCE_SCOPE"],
+        ["ENT-ENTITLEMENT-GRANT-F-SCOPE-ID","scopeId","text",false,true,false,"immutable","INTERNAL_RELATION"],
+        ["ENT-ENTITLEMENT-GRANT-F-STATUS","status","enum",false,true,false,"stateful","LIFECYCLE_STATE"],
+        ["ENT-ENTITLEMENT-GRANT-F-EFFECTIVE-AT","effectiveAt","datetime",false,true,false,"immutable","LIFECYCLE_METADATA"],
+        ["ENT-ENTITLEMENT-GRANT-F-EXPIRES-AT","expiresAt","datetime",true,false,false,"stateful","LIFECYCLE_METADATA"],
+        ["ENT-ENTITLEMENT-GRANT-F-SOURCE-PLAN-VERSION","sourcePlanVersion","integer",false,true,false,"immutable","SCHEMA_METADATA"],
+        ["ENT-ENTITLEMENT-GRANT-F-CREATED-AT","createdAt","datetime",false,true,false,"immutable","AUDIT_METADATA"],
+        ["ENT-ENTITLEMENT-GRANT-F-UPDATED-AT","updatedAt","datetime",false,true,false,"mutable","AUDIT_METADATA"]
+      ],
+      "keyRules": [
+        "Entitlement state is derived from validated subscription state but is authoritative for current access decisions.",
+        "Every entitlement records its source plan version.",
+        "Grant/revoke/expiry transitions are idempotent and replayable.",
+        "No financial amount or ledger balance is copied into entitlement state."
+      ]
+    }
+  ],
+  "lifecycleStates": {
+    "membershipPlan": ["draft","active","paused","retired"],
+    "subscription": ["pending","active","grace","paused","canceled","expired"],
+    "entitlement": ["pending","active","revoked","expired"]
+  },
+  "consistency": {
+    "subscription": "single authoritative lifecycle state with auditable transitions",
+    "entitlement": "rebuildable from subscription + plan version and access policy",
+    "creatorMemberCount": "derived projection",
+    "rebuildPath": "Subscription → Entitlement → cache/projection"
+  },
+  "persistenceBoundary": {
+    "status": "NOT_CREATED",
+    "rule": "This contract does not create a D1 table, migration or Payload Collection.",
+    "portability": "PostgreSQL-compatible logical field semantics"
+  },
+  "requiredNextGate": "Entity/Field registry reconciliation → API/DTO reconciliation → persistence contract → W07 implementation admission → runtime/security/concurrency evidence"
+}
