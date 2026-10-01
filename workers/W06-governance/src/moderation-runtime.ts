@@ -83,6 +83,12 @@ const requireRequestId = (value: string): void => {
   if (!REQUEST_ID.test(value)) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
 }
 
+const requireText = (name: string, value: string, maxLength: number): void => {
+  if (!value.trim() || value.length > maxLength) {
+    throw new ModerationRuntimeError(`INVALID_${name.toUpperCase()}`, 400)
+  }
+}
+
 const normalizeEtag = (value: string): string => {
   const trimmed = value.trim()
   const match = /^(?:W\/)?"?v?(\d+)"?$/.exec(trimmed)
@@ -116,7 +122,8 @@ const decodeCursor = (value: string): { priority: number; createdAt: string; cas
       throw new Error('INVALID')
     }
     requireResource('case_id', parsed.caseId)
-    return { priority: parsed.priority, createdAt: parsed.createdAt, caseId: parsed.caseId }
+    const priority = parsed.priority as number
+    return { priority, createdAt: parsed.createdAt, caseId: parsed.caseId }
   } catch {
     throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   }
