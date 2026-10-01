@@ -2,6 +2,7 @@ import { publishPendingAccountStateEvents } from './account/publication-journal-
 import { reconcileCompletedRegistrationMaterialization } from './account/registration-materializer.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
 import { mapMembershipError } from './membership/access-state-transition.js'
+import { readSocialActorAccountState, mapSocialAccountStateReadError } from './social/account-state-read.js'
 import { createSubscription, transitionSubscription } from './membership/access-state-persistence.js'
 import {
   AccountStateTransitionError,
@@ -69,6 +70,25 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
+
+    if (request.method === 'POST' && url.pathname === '/internal/social/actor-account-state') {
+      const body = await readJsonBody<{ userId?: unknown }>(request)
+      const input = {
+        caller: request.headers.get('X-LuckRead-Caller') ?? '',
+        transportVersion: request.headers.get('X-LuckRead-Transport-Version') ?? '',
+        principalUserId: request.headers.get('X-LuckRead-Principal-User-Id') ?? '',
+        correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
+        userId: typeof body?.userId === 'string' ? body.userId : '',
+      }
+
+      try {
+        const result = await readSocialActorAccountState(env.D1_01, input)
+        return json(result)
+      } catch (error) {
+        const mapped = mapSocialAccountStateReadError(error)
+        return json({ error: { code: mapped.code, message: 'social account-state read denied or unavailable' } }, mapped.status)
+      }
+    }
 
     if (request.method === 'POST' && (url.pathname === '/internal/membership/subscriptions' || url.pathname === '/internal/membership/subscriptions/transition')) {
       if (
