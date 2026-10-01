@@ -57,6 +57,9 @@ export default function CreatorContentList() {
 
   const load = useCallback(async (cursor: string | null = null) => {
     const requestId = ++requestIdRef.current
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
     if (cursor) setLoadingMore(true)
     else setLoading(true)
     setError('')
@@ -70,6 +73,7 @@ export default function CreatorContentList() {
         method: 'GET',
         credentials: 'include',
         headers: { accept: 'application/json' },
+        signal: controller.signal,
       })
       const data = await response.json().catch((): null => null)
       if (!response.ok || !data?.data) {
@@ -87,12 +91,14 @@ export default function CreatorContentList() {
           : next,
       )
     } catch (cause) {
-      if (requestId !== requestIdRef.current) return
+      if (requestId !== requestIdRef.current || controller.signal.aborted) return
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
       setError(cause instanceof Error ? cause.message : '内容列表加载失败')
     } finally {
-      if (requestId !== requestIdRef.current) return
+      if (requestId !== requestIdRef.current || controller.signal.aborted) return
       setLoading(false)
       setLoadingMore(false)
+      if (abortControllerRef.current === controller) abortControllerRef.current = null
     }
   }, [status, type])
 
