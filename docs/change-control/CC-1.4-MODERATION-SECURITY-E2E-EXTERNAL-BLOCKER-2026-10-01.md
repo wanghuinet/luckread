@@ -5,7 +5,7 @@ Record the current external blocker for the admitted Moderation runtime Security
 
 ## Authoritative scope
 - Repository: `wanghuinet/luckread`
-- Current main: `7d4eda1b75ebdddd474d7cb14aa0443b09707f56`
+- Evidence baseline main before this governance record: `7d4eda1b75ebdddd474d7cb14aa0443b09707f56`
 - Runtime source under test: `81986b7510efb20a5dd44f9971ca40794989ddff`
 - Workflow: `.github/workflows/moderation-runtime-e2e.yml`
 - Required repository secret: `MODERATION_E2E_BEARER_TOKEN`
@@ -23,6 +23,9 @@ The latest run `36798890134` never executed fixture creation, moderation decisio
 Status remains `BLOCKED_EXTERNAL`. The workflow is not to be repeatedly rerun while the required repository secret is absent.
 
 No runtime GREEN status is promoted.
+
+## Record head
+- This governance record is now on main at `8d72dc707bfda9f0b24e806fe2b7ced9304fd132`.
 
 ## Next execution condition
 After the repository secret is provisioned through the GitHub repository settings, execute the existing workflow with its prefilled defaults:
