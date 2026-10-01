@@ -39,6 +39,13 @@
         "fieldId": "ENT-SUBSCRIPTION-F-SUBSCRIBER-ID"
       },
       {
+        "name": "version",
+        "type": "INTEGER",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-VERSION"
+      },
+      {
         "name": "plan_id",
         "type": "TEXT",
         "nullable": false,
@@ -150,6 +157,7 @@
   },
   "constraints": {
     "subscriptionIdUnique": "subscription_id is the primary key and is never reused.",
+    "versionMonotonic": "version starts at 1 and increments exactly once per successful authoritative mutation.",
     "subscriberReference": "subscriber_id references authoritative ENT-USER by stable identifier only; no cross-D1 physical foreign key.",
     "planVersionReference": "plan_id + plan_version identifies the immutable plan definition consumed by the subscription.",
     "statusAuthority": "status is constrained by contracts/state-machines/subscription.json.",
@@ -160,9 +168,9 @@
   "concurrency": {
     "required": true,
     "apiBoundary": "If-Match / expected-version semantics from Membership API contract.",
-    "physicalVersionField": "NOT_SEPARATELY_CONTRACTED",
-    "decision": "The current Entity field contract has no standalone version field. A later admission must bind the HTTP concurrency token to an already-authoritative version source without inventing a duplicate lifecycle field.",
-    "status": "PENDING_BINDING"
+    "physicalVersionField": "ENT-SUBSCRIPTION-F-VERSION",
+    "decision": "The Subscription entity field contract now defines version as the authoritative concurrency source. If-Match/expectedVersion MUST compare-and-set against this field; ETag remains representation metadata only.",
+    "status": "CONTRACTED_NOT_VERIFIED"
   },
   "uniqueness": {
     "activeSubscriptionKey": "NOT_YET_FIXED",
