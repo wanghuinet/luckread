@@ -1,0 +1,23 @@
+# Change Control: Membership W07→W02 Access-State Persistence — 2026-10-01
+
+- Status: BOUNDED_IMPLEMENTATION / NOT_GREEN
+- Caller: W07 Membership / Commerce
+- Persistence owner: W02 / D1-01
+- Scope: Subscription creation and lifecycle persistence; EntitlementGrant convergence
+
+## Controls
+
+1. W07 remains the lifecycle decision owner.
+2. W02 remains the D1-01 persistence owner.
+3. No W07 direct D1-01 binding is added.
+4. Subscription version is persisted and incremented atomically under expectedVersion.
+5. Entitlement grant/revoke is executed in the same D1-01 batch as the accepted subscription transition.
+6. Public clients cannot write subscription status, payment success or entitlement state.
+7. Payment-originated ACTIVE transitions remain blocked until a trusted Commerce/Payment decision source is bound.
+
+## Gate
+
+- D1-01 migration: controlled workflow, not yet executed.
+- W07→W02 service binding: source implemented, remote verification required.
+- Lifecycle/payment/entitlement remote E2E: required.
+- Evidence Registry: not promoted.
