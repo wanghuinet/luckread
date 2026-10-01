@@ -1165,7 +1165,7 @@
       "timestamp": "2026-10-01T04:00:31Z",
       "producer": "Moderation Runtime Security E2E run 36812935998 with remote Cloudflare D1 evidence",
       "result": "PASS",
-      "status": "VERIFIED",
+      "status": "CREATED",
       "checkId": "MODERATION-RUNTIME-SECURITY-E2E",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36812935998",
       "freshnessMode": "EXECUTED_AT_TESTED_COMMIT"
