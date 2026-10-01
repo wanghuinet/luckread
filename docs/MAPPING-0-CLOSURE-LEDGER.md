@@ -4462,4 +4462,4 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Backup before correction: `backup/pre-moderation-l6-header-fix-20261001`.
 - No production runtime/schema/topology/Contract change was introduced by this correction.
 - Corrected probe has not yet produced runtime evidence. Therefore L6 readiness remains `NOT_GREEN`, and the moderation Security E2E / Decision-Audit-Outbox-W03 evidence chain remains unproven.
-- Next admissible execution: run `.github/workflows/moderation-native-l6-readiness.yml` from the corrected main head `e02eaf21ecbc0f6a093af78d2a514bf5f61dcb53`. Do not rerun the old failed run as current-head evidence.
+- Next admissible execution: run `.github/workflows/moderation-native-l6-readiness.yml` from the current main head `55362079f9de2e4fbb7a17e30be7dc91129df7d6` (the post-fix docs commits are evidence/governance-only and do not alter the corrected probe or production runtime). Do not rerun the old failed run as current-head evidence.
