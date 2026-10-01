@@ -6782,17 +6782,26 @@
     {
       "featureId": "SOCIAL-004",
       "status": "UNRESOLVED",
-      "apiOperationIds": [],
+      "apiOperationIds": [
+        "getContentContentIdComments",
+        "postContentContentIdComments"
+      ],
       "entityIds": [],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
-        "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
-        "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "contracts/api/social-comment-operation-policy.v1.json",
+        "contracts/openapi/v1/openapi.yaml#/content/{contentId}/comments",
+        "contracts/enums/comment-state.json",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-AUTHORITY-CONFLICT-2026-10-01.md",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-API-SURFACE-2026-10-01.md",
+        "docs/11-P0-SOCIAL-INTERACTION-AND-EVENT-CONTRACT-v1.0.md"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Canonical Comment entity and field persistence binding remain unresolved.",
+        "D1-02 Comment persistence schema/migration is not yet contracted.",
+        "Server-side block/privacy/moderation decision authority is not yet bound to executable inputs.",
+        "W05 runtime, concurrency/security tests, remote runtime evidence and Evidence Registry admission remain unresolved."
       ]
     },
     {
