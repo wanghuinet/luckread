@@ -34,6 +34,7 @@ jobs:
           set -euo pipefail
           jq -e '.status == "BOUNDED_ADMISSION_MIGRATION_PENDING"' contracts/admission/W07-subscription-implementation-admission.v1.json >/dev/null
           jq -e '.database.databaseUuid == "2f80471e-3756-49f9-8db1-7707a433ad64"' contracts/persistence/MEMBERSHIP-D1-01-subscription-entitlement-persistence.v1.json >/dev/null
+          jq -e '.persistenceOwner == "W02" and .lifecycleOwner == "W07"' contracts/persistence/MEMBERSHIP-D1-01-subscription-entitlement-persistence.v1.json >/dev/null
       - name: Install pinned Wrangler
         run: npm install --no-save wrangler@4.116.0
       - name: Execute scoped remote D1-01 migration
@@ -53,7 +54,7 @@ jobs:
           set -euo pipefail
           npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('membership_mutation_idempotency','membership_subscriptions','membership_entitlement_grants','membership_txn_guard') ORDER BY name;"
           npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('uq_membership_subscription_active_subscriber_plan','uq_membership_entitlement_active_scope','ix_membership_mutation_idempotency_expiry') ORDER BY name;"
-          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "PRAGMA table_info(membership_subscriptions);"
+          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "PRAGMA table_info(membership_subscriptions); SELECT sql FROM sqlite_master WHERE type='table' AND name IN ('membership_mutation_idempotency','membership_txn_guard');"
       - name: Capture provenance
         run: |
           mkdir -p artifacts/membership
