@@ -1,0 +1,168 @@
+{
+  "schemaVersion": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "domain": "D1-01",
+  "scope": "Subscription + EntitlementGrant only; MembershipPlan is not persisted by this slice.",
+  "entities": {
+    "ENT-SUBSCRIPTION": {
+      "name": "Subscription",
+      "fields": [
+        [
+          "ENT-SUBSCRIPTION-F-SUBSCRIPTION-ID",
+          "subscriptionId",
+          "text",
+          false
+        ],
+        [
+          "ENT-SUBSCRIPTION-F-SUBSCRIBER-ID",
+          "subscriberId",
+          "text",
+          false
+        ],
+        [
+          "ENT-SUBSCRIPTION-F-PLAN-ID",
+          "planId",
+          "text",
+          false
+        ],
+        [
+          "ENT-SUBSCRIPTION-F-PLAN-VERSION",
+          "planVersion",
+          "integer",
+          false
+        ],
+        [
+          "ENT-SUBSCRIPTION-F-STATUS",
+          "status",
+          "enum",
+          false
+        ],
+        [
+          "ENT-SUBSCRIPTION-F-STARTED-AT",
+          "startedAt",
+          "datetime",
+          false
+        ],
+        [
+          "ENT-SUBSCRIPTION-F-CURRENT-PERIOD-START",
+          "currentPeriodStart",
+          "datetime",
+          false
+        ],
+        [
+          "ENT-SUBSCRIPTION-F-CURRENT-PERIOD-END",
+          "currentPeriodEnd",
+          "datetime",
+          false
+        ],
+        [
+          "ENT-SUBSCRIPTION-F-CANCEL-AT",
+          "cancelAt",
+          "datetime",
+          true
+        ],
+        [
+          "ENT-SUBSCRIPTION-F-CREATED-AT",
+          "createdAt",
+          "datetime",
+          false
+        ],
+        [
+          "ENT-SUBSCRIPTION-F-UPDATED-AT",
+          "updatedAt",
+          "datetime",
+          false
+        ]
+      ],
+      "statusEnum": [
+        "PENDING",
+        "ACTIVE",
+        "PAST_DUE",
+        "CANCELED",
+        "EXPIRED"
+      ]
+    },
+    "ENT-ENTITLEMENT-GRANT": {
+      "name": "EntitlementGrant",
+      "fields": [
+        [
+          "ENT-ENTITLEMENT-GRANT-F-ENTITLEMENT-ID",
+          "entitlementId",
+          "text",
+          false
+        ],
+        [
+          "ENT-ENTITLEMENT-GRANT-F-SUBSCRIPTION-ID",
+          "subscriptionId",
+          "text",
+          false
+        ],
+        [
+          "ENT-ENTITLEMENT-GRANT-F-ENTITLEMENT-TYPE",
+          "entitlementType",
+          "text",
+          false
+        ],
+        [
+          "ENT-ENTITLEMENT-GRANT-F-SCOPE-TYPE",
+          "scopeType",
+          "text",
+          false
+        ],
+        [
+          "ENT-ENTITLEMENT-GRANT-F-SCOPE-ID",
+          "scopeId",
+          "text",
+          false
+        ],
+        [
+          "ENT-ENTITLEMENT-GRANT-F-STATUS",
+          "status",
+          "enum",
+          false
+        ],
+        [
+          "ENT-ENTITLEMENT-GRANT-F-EFFECTIVE-AT",
+          "effectiveAt",
+          "datetime",
+          false
+        ],
+        [
+          "ENT-ENTITLEMENT-GRANT-F-EXPIRES-AT",
+          "expiresAt",
+          "datetime",
+          true
+        ],
+        [
+          "ENT-ENTITLEMENT-GRANT-F-SOURCE-PLAN-VERSION",
+          "sourcePlanVersion",
+          "integer",
+          false
+        ],
+        [
+          "ENT-ENTITLEMENT-GRANT-F-CREATED-AT",
+          "createdAt",
+          "datetime",
+          false
+        ],
+        [
+          "ENT-ENTITLEMENT-GRANT-F-UPDATED-AT",
+          "updatedAt",
+          "datetime",
+          false
+        ]
+      ],
+      "statusEnum": [
+        "ACTIVE",
+        "REVOKED",
+        "EXPIRED"
+      ]
+    }
+  },
+  "nonGoals": [
+    "No payment card/provider secret fields",
+    "No ledger balance fields",
+    "No Social membership authority",
+    "No Payload Core schema mutation"
+  ]
+}
