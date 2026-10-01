@@ -16,7 +16,10 @@
 7. Payment-originated ACTIVE transitions remain blocked until a trusted Commerce/Payment decision source is bound.
 8. The current W01-facing Membership boundary derives actor=user and permits only ACTIVE→CANCELED; system/creator/admin/payment transitions require a separately admitted trusted source.
 9. W07 derives entitlement action from the transition; W01 client input cannot author entitlement grant/revoke semantics.
-10. W02 enforces user subscription ownership and entitlement-to-subscription scope at the D1-01 write boundary.
+10. W02 enforces user subscription ownership at the D1-01 read/write boundary.
+11. W02 terminal REVOKE derives scope from subscription_id and revokes all ACTIVE grants for that subscription.
+12. W07 reads authoritative Subscription status/version from W02 before lifecycle decision; W01-supplied state/version is non-authoritative.
+13. The existing getSubscription public read path is implemented as W01→W07→W02, with authenticated L2 self scope; getEntitlements remains blocked by the pre-existing duplicate operationId conflict.
 
 ## Gate
 
