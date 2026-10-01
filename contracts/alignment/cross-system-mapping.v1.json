@@ -6717,37 +6717,37 @@
       ]
     },
     {
-  "featureId": "SOCIAL-001",
-  "status": "PARTIAL",
-  "apiOperationIds": [
-    "follow",
-    "unfollow"
-  ],
-  "entityIds": [
-    "ENT-SOCIAL-FOLLOW"
-  ],
-  "payloadCollections": [],
-  "codeEvidenceRefs": [],
-  "evidence": [
-    "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
-    "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
-    "contracts/api/interaction-operation-policy.v1.json",
-    "contracts/dto/auth-dto-contract.v1.json",
-    "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
-    "contracts/openapi/v1/openapi.yaml#/social/follows",
-    "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
-    "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-    "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
-    "contracts/transport/W01-W05-social-follow-http-binding.v1.json",
-    "contracts/transport/SOCIAL-001-follow-trusted-authority-binding.v1.json"
-  ],
-  "blockers": [
-    "API, Entity/Field/Persistence and W01→W05 private transport contracts are bound.",
-    "Actor principal, actor account state, follow permission, target identity, block policy, anti-abuse admission and caller provenance are bound to existing authoritative contracts.",
-    "Target followability and privacy/audience operational authority remain unresolved.",
-    "Runtime, tests and Evidence Registry provenance remain unverified."
-  ]
-},
+      "featureId": "SOCIAL-001",
+      "status": "PARTIAL",
+      "apiOperationIds": [
+        "follow",
+        "unfollow"
+      ],
+      "entityIds": [
+        "ENT-SOCIAL-FOLLOW"
+      ],
+      "payloadCollections": [],
+      "codeEvidenceRefs": [],
+      "evidence": [
+        "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
+        "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
+        "contracts/api/interaction-operation-policy.v1.json",
+        "contracts/dto/auth-dto-contract.v1.json",
+        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+        "contracts/openapi/v1/openapi.yaml#/social/follows",
+        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
+        "contracts/transport/W01-W05-social-follow-http-binding.v1.json",
+        "contracts/transport/SOCIAL-001-follow-trusted-authority-binding.v1.json"
+      ],
+      "blockers": [
+        "API and Entity/Field/Persistence contracts are bound.",
+        "Private W01→W05 transport boundary is contractually admitted.",
+        "Actor principal, actor account state, follow permission, target identity, block policy, anti-abuse admission and caller provenance are bound to existing authoritative contracts.",
+        "Target followability and privacy/audience operational authority remain unresolved.",
+        "Runtime, tests and Evidence Registry provenance remain unverified."
+      ]    },
     {
       "featureId": "SOCIAL-002",
       "status": "UNRESOLVED",
