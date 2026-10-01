@@ -2,6 +2,7 @@ import { getPayload } from 'payload'
 
 import config from '@payload-config'
 
+import { buildPayloadClearCookie } from '../../../auth/payload-access-token.js'
 import { revokeSession, W02AuthClientError } from '../../../auth/w02-session-client.js'
 
 const json = (body: unknown, status = 200) =>
@@ -47,7 +48,7 @@ export async function POST(request: Request): Promise<Response> {
       status: 204,
       headers: {
         'cache-control': 'no-store',
-        'set-cookie': 'payload-token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0',
+        'set-cookie': buildPayloadClearCookie(request),
       },
     })
   }
@@ -67,7 +68,7 @@ export async function POST(request: Request): Promise<Response> {
     status: 204,
     headers: {
       'cache-control': 'no-store',
-      'set-cookie': 'payload-token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0',
+      'set-cookie': buildPayloadClearCookie(request),
     },
   })
 }
