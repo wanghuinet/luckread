@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/persistence/SOCIAL-003-like-d1-02-persistence.v1.json",
+  "title": "SOCIAL-003 Like D1-02 Persistence Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "entityId": "ENT-SOCIAL-LIKE",
+  "authoritativeDomain": "D1-02",
+  "primaryWorker": "W05",
+  "database": {
+    "binding": "DB",
+    "databaseId": "6c342634-97f6-4248-9f4a-85772af4f22c"
+  },
+  "table": {
+    "name": "social_like_relationships",
+    "primaryKey": "like_id",
+    "uniqueIndex": "uq_social_like_actor_resource",
+    "columns": [
+      "like_id",
+      "actor_user_id",
+      "resource_type",
+      "resource_id",
+      "created_at"
+    ]
+  },
+  "migration": {
+    "path": "workers/W05-social/migrations/0002_social_003_like.sql",
+    "executionMode": "controlled-manual",
+    "executionEvidence": "REQUIRED",
+    "reexecute": false
+  },
+  "mutationRules": [
+    "INSERT OR IGNORE for like",
+    "DELETE for unlike",
+    "No cross-D1 transaction",
+    "No counter table as authority"
+  ]
+}
