@@ -1,13 +1,11 @@
 import {
   SubscriptionStateError,
   transitionSubscription,
-  type SubscriptionActor,
   type SubscriptionStatus,
 } from './subscription-state-machine.js'
 import { callW02Membership } from './w02-membership-client.js'
 import { deriveW01MembershipTransition } from './w01-transition-boundary.js'
 
-const actors = new Set<SubscriptionActor>(['system', 'payment', 'user', 'creator', 'admin'])
 const statuses = new Set<SubscriptionStatus>(['PENDING', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'EXPIRED'])
 
 const json = (body: unknown, status = 200) => Response.json(body, {
@@ -108,17 +106,9 @@ export default {
       subscriptionId?: unknown
       from?: unknown
       to?: unknown
-      actor?: unknown
       expectedVersion?: unknown
       idempotencyKey?: unknown
-      entitlementAction?: unknown
       entitlementId?: unknown
-      entitlementType?: unknown
-      scopeType?: unknown
-      scopeId?: unknown
-      sourcePlanVersion?: unknown
-      effectiveAt?: unknown
-      expiresAt?: unknown
     }
 
     try {
