@@ -587,6 +587,7 @@
     {
       "entityId": "ENT-ENTITLEMENT-GRANT",
       "status": "PROPOSED",
+      "fieldContractRef": "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json#ENT-ENTITLEMENT-GRANT",
       "fields": [
         {
           "fieldId": "ENT-ENTITLEMENT-GRANT-F-ENTITLEMENT-ID",
@@ -843,15 +844,14 @@
         }
       ],
       "evidenceRefs": [
-        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
         "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json",
         "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md"
-      ],
-      "fieldContractRef": "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json#ENT-ENTITLEMENT-GRANT"
+      ]
     },
     {
       "entityId": "ENT-SUBSCRIPTION",
       "status": "PROPOSED",
+      "fieldContractRef": "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json#ENT-SUBSCRIPTION",
       "fields": [
         {
           "fieldId": "ENT-SUBSCRIPTION-F-SUBSCRIPTION-ID",
@@ -1108,11 +1108,9 @@
         }
       ],
       "evidenceRefs": [
-        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
         "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json",
         "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md"
-      ],
-      "fieldContractRef": "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json#ENT-SUBSCRIPTION"
+      ]
     },
     {
       "entityId": "ENT-ORG-MEMBERSHIP",
@@ -2224,10 +2222,12 @@
         "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
         "contracts/api/moderation-operation-policy.v1.json"
       ]
-    },
+    }
+    ,
     {
       "entityId": "ENT-MEMBERSHIP-PLAN",
       "status": "PROPOSED",
+      "fieldContractRef": "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json#ENT-MEMBERSHIP-PLAN",
       "fields": [
         {
           "fieldId": "ENT-MEMBERSHIP-PLAN-F-PLAN-ID",
@@ -2486,9 +2486,9 @@
       "evidenceRefs": [
         "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json",
         "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md"
-      ],
-      "fieldContractRef": "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json#ENT-MEMBERSHIP-PLAN"
+      ]
     }
+
   ],
   "rules": {
     "noInference": true,
