@@ -164,6 +164,8 @@ describe('Creator Center admin extension', () => {
     expect(list).toContain('role="status" aria-busy="true"')
     expect(list).toContain('<div className={styles.contentManageState} role="alert">')
     expect(list).toContain('aria-busy={loadingMore}')
+    expect(list).toContain('<section aria-busy={loading || actionId !== null} className={styles.contentManageSection}>')
+    expect(list).toContain('aria-busy={actionId === item.id}')
     expect(list).toContain('items: [...current.items, ...(next.items ?? [])]')
     expect(list).toContain('const [loadingMore, setLoadingMore]')
     expect(list).toContain('if (cursor) setLoadingMore(true)')
