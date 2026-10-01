@@ -114,3 +114,28 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+
+      - name: Capture exact W06 deployment provenance
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/moderation-runtime-deployment
+          cat > artifacts/mapping-0/moderation-runtime-deployment/provenance.txt <<EOF
+          workflow=W06 Governance Deploy
+          run_id=$GITHUB_RUN_ID
+          run_attempt=$GITHUB_RUN_ATTEMPT
+          source_sha=${{ inputs.source_sha }}
+          worker=luckread-w06
+          d1_binding=D1_03
+          d1_database_uuid=bda1d247-a371-4244-91ae-aef96034db7f
+          wrangler_version=4.116.0
+          deployed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          EOF
+          cat artifacts/mapping-0/moderation-runtime-deployment/provenance.txt
+
+      - name: Upload exact W06 deployment provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: moderation-runtime-deployment-${{ inputs.source_sha }}
+          path: artifacts/mapping-0/moderation-runtime-deployment/provenance.txt
+          if-no-files-found: error
+          retention-days: 14
