@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { canTransitionContentState, decodeCursor, encodeCursor, isState, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, validateInput, validateListFilters } from './content-runtime.js'
 
 describe('W03 content contract core', () => {
   it('accepts the canonical lifecycle vocabulary and cursor round-trip', () => {
@@ -57,5 +57,44 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true)).toBe(false)
     expect(canTransitionContentState('DELETED', 'PUBLISHED', 'CREATOR', true)).toBe(false)
     expect(canTransitionContentState('ARCHIVED', 'PUBLISHED', 'CREATOR', true)).toBe(false)
+  })
+
+  it('returns media references from the public listing query', async () => {
+    const preparedQueries: string[] = []
+    const row = {
+      id: 'content_123',
+      content_type: 'article',
+      owner_user_id: 'user_123',
+      creator_id: 'user_123',
+      ip_id: null,
+      state: 'PUBLISHED',
+      version: 2,
+      revision: 2,
+      title: 'Published article',
+      body_ref: 'https://cdn.example.com/body.txt',
+      media_refs_json: '["https://cdn.example.com/image.jpg"]',
+      cover_ref: 'https://cdn.example.com/image.jpg',
+      etag: 'W/"2"',
+      created_at: '2026-10-01T12:00:00.000Z',
+      updated_at: '2026-10-01T12:01:00.000Z',
+    }
+
+    const db = {
+      prepare(query: string) {
+        preparedQueries.push(query)
+        return {
+          bind: () => ({
+            all: async () => ({ results: [row] }),
+          }),
+        }
+      },
+    } as never
+
+    const page = await listContents(db, null, 20)
+
+    expect(page.items).toHaveLength(1)
+    expect(page.items[0]?.mediaRefs).toEqual(['https://cdn.example.com/image.jpg'])
+    expect(preparedQueries[0]).toContain('media_refs_json')
+    expect(preparedQueries[0]).toContain('cover_ref')
   })
 })
