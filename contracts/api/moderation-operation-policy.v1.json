@@ -39,7 +39,7 @@
     "Every decision MUST record target, policyVersion, reasonCode, severity, scope and reviewer or automation source as required by the parent moderation contract.",
     "Decision mutations MUST be idempotent and protected by expectedVersion/optimistic concurrency where the case can race.",
     "Queue reads MUST be bounded and reviewer-scope filtered.",
-    "No synchronous fan-out to content, creator, feed or notification projections is allowed in the request path.",
+    "W06 may perform a best-effort post-commit delivery attempt to W03, but decision acceptance MUST NOT depend on that delivery; durable enforcement uses the D1-03 transactional outbox.",
     "Content transition to APPROVED or REJECTED MUST remain attributable to a moderation decision.",
     "Runtime GREEN remains blocked until executable deployment, security, persistence and reconciliation evidence is current."
   ],
@@ -289,9 +289,11 @@
       "contentTransitionTransport": "CONTRACTED_AUTHORITY_ADMITTED",
       "contentTransitionTransportRef": "contracts/transport/W06-W03-content-moderation-http-binding.v1.json",
       "event": {
-        "syncConsumersMax": 0,
+        "syncConsumersMax": 1,
         "asyncEventsMax": 1,
-        "fanoutMax": 0
+        "fanoutMax": 0,
+        "syncDelivery": "best_effort_non_authoritative_after_commit",
+        "deliveryFailure": "persisted_in_moderation_enforcement_outbox_and_retried_by_W06"
       },
       "queue": {
         "enqueueMax": 0,
@@ -342,6 +344,7 @@
     "implementationAuthorization": true,
     "auditBinding": "CONTRACTED_NOT_VERIFIED",
     "transport": "CONTRACTED_AUTHORITY_ADMITTED",
-    "contentTransitionTransport": "CONTRACTED_AUTHORITY_ADMITTED"
+    "contentTransitionTransport": "CONTRACTED_AUTHORITY_ADMITTED",
+    "outboxDelivery": "ADMITTED_TRANSACTIONAL_OUTBOX"
   }
 }
