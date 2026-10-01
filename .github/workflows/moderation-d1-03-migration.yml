@@ -13,6 +13,14 @@ on:
         required: true
         type: string
         default: secondary
+      mode:
+        description: APPLY when the target is expected to be unmigrated; VERIFY_ONLY when migration is already present
+        required: true
+        type: choice
+        options:
+          - VERIFY_ONLY
+          - APPLY
+        default: VERIFY_ONLY
       confirm:
         description: Type APPLY to permit remote D1 mutation
         required: true
@@ -90,19 +98,26 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/artifacts/mapping-0/moderation-d1-03-migration"
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard') ORDER BY name;" > "$GITHUB_WORKSPACE/artifacts/mapping-0/moderation-d1-03-migration/preflight.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard','moderation_enforcement_outbox') ORDER BY name;" > "$GITHUB_WORKSPACE/artifacts/mapping-0/moderation-d1-03-migration/preflight.json"
           node - <<'NODE'
           const fs=require('fs');
-          const data=JSON.parse(fs.readFileSync(process.env.GITHUB_WORKSPACE+'/artifacts/mapping-0/moderation-d1-03-migration/preflight.json','utf8'));
-          const rows=data?.[0]?.results??[];
-          if(rows.length) throw new Error('Fail-closed: one or more moderation tables already exist');
-          console.log('MODERATION_TARGET_EMPTY=PASS');
+          const path=process.env.GITHUB_WORKSPACE+'/artifacts/mapping-0/moderation-d1-03-migration/preflight.json';
+          const data=JSON.parse(fs.readFileSync(path,'utf8'));
+          const rows=data?.[0]?.results ?? data?.results ?? data?.[0]?.result?.results ?? data?.result?.results ?? [];
+          const names=new Set(rows.map(x=>x.name));
+          const expected=['moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard','moderation_enforcement_outbox'];
+          const complete=expected.every(x=>names.has(x));
+          if(process.env.MODE==='APPLY' && rows.length) throw new Error('Fail-closed APPLY: moderation tables already exist; use VERIFY_ONLY');
+          if(process.env.MODE==='VERIFY_ONLY' && !complete) throw new Error('VERIFY_ONLY requires the complete moderation schema to already exist');
+          console.log(process.env.MODE==='APPLY' ? 'MODERATION_TARGET_EMPTY=PASS' : 'MODERATION_TARGET_ALREADY_MIGRATED=PASS');
           NODE
 
       - name: Apply D1-03 moderation migration
+        if: ${{ inputs.mode == 'APPLY' }}
         working-directory: workers/W06-governance
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -117,18 +132,19 @@ jobs:
         run: |
           set -euo pipefail
           out="$GITHUB_WORKSPACE/artifacts/mapping-0/moderation-d1-03-migration"
-          for table in moderation_cases moderation_decisions moderation_decision_idempotency moderation_txn_guard moderation_enforcement_outbox; do
-            npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "PRAGMA table_info(\"$table\");" > "$out/$table-schema.json"
-            npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "PRAGMA index_list(\"$table\");" > "$out/$table-indexes.json"
-          done
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "SELECT type,name,tbl_name,sql FROM sqlite_master WHERE type IN ('table','index') AND (name IN ('moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard','moderation_enforcement_outbox') OR tbl_name IN ('moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard','moderation_enforcement_outbox')) ORDER BY type,name;" > "$out/schema.json"
           npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM d1_migrations ORDER BY id;' > "$out/d1-migrations.json"
           node - <<'NODE'
           const fs=require('fs');
           const dir=process.env.GITHUB_WORKSPACE+'/artifacts/mapping-0/moderation-d1-03-migration';
-          for(const table of ['moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard','moderation_enforcement_outbox']){
-            const rows=JSON.parse(fs.readFileSync(dir+'/'+table+'-schema.json'))?.[0]?.results??[];
-            if(!rows.length) throw new Error('Missing remote table '+table);
-          }
+          const data=JSON.parse(fs.readFileSync(dir+'/schema.json','utf8'));
+          const rows=data?.[0]?.results ?? data?.results ?? data?.[0]?.result?.results ?? data?.result?.results ?? [];
+          const expected=['moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard','moderation_enforcement_outbox'];
+          const names=new Set(rows.filter(x=>x.type==='table').map(x=>x.name));
+          for(const name of expected) if(!names.has(name)) throw new Error('Missing remote table '+name);
+          const migrations=JSON.parse(fs.readFileSync(dir+'/d1-migrations.json','utf8'));
+          const migrationRows=migrations?.[0]?.results ?? migrations?.results ?? migrations?.[0]?.result?.results ?? migrations?.result?.results ?? [];
+          if(!migrationRows.some(x=>x.name==='0002_moderation_queue_foundation')) throw new Error('Missing remote migration record');
           console.log('MODERATION_D1_03_REMOTE_SCHEMA=PASS');
           NODE
 
