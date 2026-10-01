@@ -7,7 +7,7 @@ const ownsMedia: Access = async ({ req, id }) => {
   if (!req.user?.id || !id || !req.payload) return false
   try {
     const media = await req.payload.findByID({ collection: 'media', id, depth: 0 })
-    return String(media.ownerUserId ?? '') === String(req.user.id)
+    return String((media as unknown as { ownerUserId?: string | number | null }).ownerUserId ?? '') === String(req.user.id)
   } catch {
     return false
   }
