@@ -82,6 +82,28 @@
       "scope": "public"
     },
     {
+      "name": "comment.delete",
+      "resource": "comment",
+      "action": "delete",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "comment.read",
+      "resource": "comment",
+      "action": "read",
+      "minLayer": "L2",
+      "scope": "public"
+    },
+    {
+      "name": "comment.update",
+      "resource": "comment",
+      "action": "update",
+      "minLayer": "L2",
+      "scope": "own"
+    },
+    {
       "name": "content.archive.own",
       "resource": "content",
       "action": "archive",
