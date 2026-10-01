@@ -10,4 +10,20 @@ describe('users/me route imports', () => {
     expect(source).not.toContain("../../../../../auth/payload-access-token.js")
     expect(source).not.toContain("../../../../../auth/w02-session-client.js")
   })
+
+  it('exposes authenticated self-profile GET/PATCH with conditional writes and no mass assignment', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'),
+      'utf8',
+    )
+
+    expect(source).toContain('export async function GET')
+    expect(source).toContain('export async function PATCH')
+    expect(source).toContain("if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED'")
+    expect(source).toContain("if (normalizeEtag(ifMatch) !== normalizeEtag(currentEtag))")
+    expect(source).toContain('PROFILE_MUTABLE_FIELDS')
+    expect(source).toContain('where:')
+    expect(source).toContain("{ updatedAt: { equals: current.updatedAt } }")
+    expect(source).not.toContain('data: input')
+  })
 })
