@@ -50,7 +50,8 @@ export async function transitionSubscription(
           SET status = ?, version = version + 1, updated_at = ?, cancel_at = CASE WHEN ? IN ('CANCELED','EXPIRED') THEN ? ELSE cancel_at END
         WHERE subscription_id = ?
           AND status = ?
-          AND version = ?`,
+          AND version = ?
+          AND (? != 'user' OR subscriber_id = ?)`,
     ).bind(
       input.to,
       timestamp,
@@ -59,6 +60,8 @@ export async function transitionSubscription(
       input.subscriptionId,
       input.from,
       input.expectedVersion,
+      input.actor,
+      input.actorUserId,
     ),
   ]
 
@@ -96,6 +99,7 @@ export async function transitionSubscription(
         `UPDATE membership_entitlement_grants
             SET status = 'REVOKED', updated_at = ?
           WHERE entitlement_id = ?
+            AND subscription_id = ?
             AND status = 'ACTIVE'
             AND EXISTS (
               SELECT 1 FROM membership_subscriptions
@@ -104,6 +108,7 @@ export async function transitionSubscription(
       ).bind(
         timestamp,
         input.entitlementId,
+        input.subscriptionId,
         input.subscriptionId,
         input.to,
         nextVersion,
