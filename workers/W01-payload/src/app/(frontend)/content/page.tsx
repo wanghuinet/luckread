@@ -26,7 +26,6 @@ const labels: Record<ContentType | 'all', string> = {
 }
 
 export default function ContentBrowsePage() {
-  const [type, setType] = useState<ContentType | 'all'>('all')
   const [page, setPage] = useState<ContentPage>({ items: [], nextCursor: null, hasMore: false })
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -37,7 +36,7 @@ export default function ContentBrowsePage() {
       void load()
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [type])
+  }, [])
 
   async function load(cursor: string | null = null) {
     if (cursor) setLoadingMore(true)
@@ -46,7 +45,6 @@ export default function ContentBrowsePage() {
 
     try {
       const params = new URLSearchParams({ limit: '18' })
-      if (type !== 'all') params.set('type', type)
       if (cursor) params.set('cursor', cursor)
 
       const response = await fetch('/api/v1/contents?' + params.toString(), {
