@@ -48,15 +48,15 @@ jobs:
       - name: Verify binding contract before deployment
         run: |
           set -euo pipefail
-          test -f workers/W05-transaction/wrangler.jsonc
-          jq -e --arg worker "$EXPECTED_WORKER" '.name == $worker' workers/W05-transaction/wrangler.jsonc >/dev/null
-          jq -e --arg db "$EXPECTED_DB_UUID"             '.d1_databases | length == 1 and .[0].binding == "DB" and .[0].database_id == $db'             workers/W05-transaction/wrangler.jsonc >/dev/null
+          test -f workers/W05-social/wrangler.jsonc
+          jq -e --arg worker "$EXPECTED_WORKER" '.name == $worker' workers/W05-social/wrangler.jsonc >/dev/null
+          jq -e --arg db "$EXPECTED_DB_UUID"             '.d1_databases | length == 1 and .[0].binding == "DB" and .[0].database_id == $db'             workers/W05-social/wrangler.jsonc >/dev/null
 
       - name: Deploy W05 with D1-02 binding
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        working-directory: workers/W05-transaction
+        working-directory: workers/W05-social
         run: |
           set -euo pipefail
           npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc

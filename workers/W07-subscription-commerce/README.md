@@ -5,7 +5,7 @@ Canonical responsibility: **Subscription / Commerce / Payment / Advertising**
 Primary Tasks: **T16, T17, T18**
 Primary D1 authority: **D1-04**; scoped D1-01 entitlement transition only under explicit Contract authority.
 
-Repository path `workers/W07-async` is a physical path retained for repository compatibility. Worker authority comes from `docs/04-WORKER-MASTER-v1.0.md`.
+Canonical repository path: `workers/W07-subscription-commerce`.
 
 Boundary:
 - Subscription, commerce, payment, and advertising business workflows belong to W07.

@@ -112,7 +112,7 @@ jobs:
           PY
 
       - name: Verify W05 D1-02 binding and migration source
-        working-directory: workers/W05-transaction
+        working-directory: workers/W05-social
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -137,7 +137,7 @@ jobs:
           test -z "$(git status --short)"
 
       - name: Static migration invariant check
-        working-directory: workers/W05-transaction
+        working-directory: workers/W05-social
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -167,7 +167,7 @@ jobs:
           PY
 
       - name: Capture controlled remote preflight
-        working-directory: workers/W05-transaction
+        working-directory: workers/W05-social
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -208,7 +208,7 @@ jobs:
 
       - name: Apply SOCIAL-001 Follow migration remotely
         if: ${{ env.SKIP_MIGRATION != 'true' }}
-        working-directory: workers/W05-transaction
+        working-directory: workers/W05-social
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -216,7 +216,7 @@ jobs:
         run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$DATABASE_NAME" --remote --config wrangler.jsonc
 
       - name: Capture and validate post-migration evidence
-        working-directory: workers/W05-transaction
+        working-directory: workers/W05-social
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
