@@ -4363,3 +4363,20 @@ Required sequence:
 ### Do not repeat
 
 Do not recreate Workers or D1s, do not re-open the already-contracted Moderation API/Entity vocabulary, and do not rerun previously verified baseline evidence unless the authoritative source or scope changes.
+
+
+## 2026-10-01 — Moderation runtime cursor refresh
+
+Latest main head: `a9c8df39ae9d9f2ba844f39cd5df068803900637`.
+
+Implementation source head for the admitted moderation runtime: `e5187e7eef2285577fd3984c2f79dd1cdbc17880`.
+
+The three controlled execution workflows now default to `e5187e7eef2285577fd3984c2f79dd1cdbc17880`:
+- `.github/workflows/moderation-d1-03-migration.yml`
+- `.github/workflows/moderation-runtime-deploy.yml`
+- `.github/workflows/moderation-runtime-e2e.yml`
+
+The moderation decision path is now:
+`W01 authenticated principal → W06 permission/layer check → D1-03 Decision + Case + Idempotency + AuditEvent + EnforcementOutbox transaction → best-effort W06→W03 delivery → scheduled W06 retry on failure`.
+
+Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-03 migration, coordinated W01/W03/W06 deployment, and Security E2E evidence are produced and reconciled.
