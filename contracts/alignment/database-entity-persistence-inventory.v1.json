@@ -215,7 +215,6 @@
       "adapter": "",
       "migrationRefs": [],
       "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
-      "persistenceContractRef": "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json",
       "evidenceRefs": [
         "contracts/entity/entity-catalog.v1.json",
         "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json"
