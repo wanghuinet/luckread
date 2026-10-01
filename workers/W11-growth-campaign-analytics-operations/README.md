@@ -5,7 +5,7 @@ Canonical responsibility: **Growth / Campaign / Analytics / Operations**
 Primary Tasks: **T22, T23**
 Primary D1 authority: **D1-03**
 
-Repository path `workers/W11-analytics-ads` is a physical path retained for repository compatibility. Worker authority comes from `docs/04-WORKER-MASTER-v1.0.md`.
+Canonical repository path: `workers/W11-growth-campaign-analytics-operations`.
 
 Boundary:
 - Growth, campaign, analytics, and operations capabilities belong to W11.
