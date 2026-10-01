@@ -6,6 +6,9 @@ on:
       - 'workers/W01-payload/src/content/w05-social-client.ts'
       - 'workers/W01-payload/wrangler.jsonc'
       - 'contracts/transport/W01-W05-social-follow-trusted-transport.v1.json'
+      - 'contracts/api/social-relationship-read-operation-policy.v1.json'
+      - 'contracts/dto/social-relationship-read.v1.json'
+      - 'contracts/openapi/v1/openapi.yaml'
       - 'contracts/entity/SOCIAL-003-like-relationship-contract.v1.json'
       - 'contracts/persistence/SOCIAL-003-like-d1-02-persistence.v1.json'
   push:
@@ -15,6 +18,9 @@ on:
       - 'workers/W01-payload/src/content/w05-social-client.ts'
       - 'workers/W01-payload/wrangler.jsonc'
       - 'contracts/transport/W01-W05-social-follow-trusted-transport.v1.json'
+      - 'contracts/api/social-relationship-read-operation-policy.v1.json'
+      - 'contracts/dto/social-relationship-read.v1.json'
+      - 'contracts/openapi/v1/openapi.yaml'
       - 'contracts/entity/SOCIAL-003-like-relationship-contract.v1.json'
       - 'contracts/persistence/SOCIAL-003-like-d1-02-persistence.v1.json'
 permissions:
