@@ -49,3 +49,25 @@ CREATE INDEX IF NOT EXISTS ix_membership_entitlement_scope
 CREATE UNIQUE INDEX IF NOT EXISTS uq_membership_entitlement_active_scope
   ON membership_entitlement_grants (subscription_id, entitlement_type, scope_type, scope_id)
   WHERE status = 'ACTIVE';
+
+CREATE TABLE IF NOT EXISTS membership_mutation_idempotency (
+  id TEXT NOT NULL PRIMARY KEY,
+  owner_user_id TEXT NOT NULL,
+  operation_id TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('IN_PROGRESS','COMPLETED')),
+  response_status INTEGER,
+  response_json TEXT,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  UNIQUE(owner_user_id, operation_id, idempotency_key)
+);
+
+CREATE INDEX IF NOT EXISTS ix_membership_mutation_idempotency_expiry
+  ON membership_mutation_idempotency (expires_at);
+
+CREATE TABLE IF NOT EXISTS membership_txn_guard (
+  id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+  successful INTEGER NOT NULL CHECK (successful = 1)
+);
