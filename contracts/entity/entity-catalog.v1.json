@@ -178,6 +178,34 @@
         "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md"
       ]
     }
+
+    ,
+    {
+      "entityId": "ENT-SOCIAL-REACTION",
+      "name": "SocialReaction",
+      "domainId": "D1-02",
+      "classification": "AUTHORITATIVE",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "contracts/entity/SOCIAL-003-reaction-entity-contract.v1.json",
+        "contracts/persistence/SOCIAL-003-reaction-persistence-contract.v1.json",
+        "contracts/api/SOCIAL-003-reaction-contract.v1.json"
+      ]
+    }
+
+    ,
+    {
+      "entityId": "ENT-SOCIAL-COMMENT",
+      "name": "SocialComment",
+      "domainId": "D1-02",
+      "classification": "AUTHORITATIVE",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "contracts/entity/SOCIAL-004-comment-entity-contract.v1.json",
+        "contracts/persistence/SOCIAL-004-comment-persistence-contract.v1.json",
+        "contracts/api/SOCIAL-004-comment-contract.v1.json"
+      ]
+    }
 ],
   "rules": {
     "featureInventoryMustExist": true,
