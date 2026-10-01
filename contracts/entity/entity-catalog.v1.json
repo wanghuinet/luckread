@@ -94,7 +94,10 @@
       "classification": "BILLING",
       "status": "PROPOSED",
       "evidenceRefs": [
-        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
+        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md",
+        "contracts/state-machines/subscription.json"
       ]
     },
     {
