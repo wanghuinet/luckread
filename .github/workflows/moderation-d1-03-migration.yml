@@ -7,7 +7,7 @@ on:
         description: Exact main commit containing the admitted Moderation D1-03 migration
         required: true
         type: string
-        default: 057669c327582b42ceefc270b29bfe5a2ac439f7
+        default: 11515498e0a0c81148a9e59e0d77f42755838ab3
       database_name:
         description: D1-03 display name bound by W06 wrangler.jsonc
         required: true
@@ -79,7 +79,7 @@ jobs:
           rm -f /tmp/luckread-moderation.sqlite
           sqlite3 /tmp/luckread-moderation.sqlite < migrations/0001_audit_event.sql
           sqlite3 /tmp/luckread-moderation.sqlite < migrations/0002_moderation_queue_foundation.sql
-          for table in moderation_cases moderation_decisions moderation_decision_idempotency moderation_txn_guard; do
+          for table in moderation_cases moderation_decisions moderation_decision_idempotency moderation_txn_guard moderation_enforcement_outbox; do
             sqlite3 -cmd '.mode json' /tmp/luckread-moderation.sqlite "PRAGMA table_info(\"$table\");" > "/tmp/$table.json"
             test "$(node -e "const fs=require('fs'); const r=JSON.parse(fs.readFileSync('/tmp/$table.json')); console.log(r.length)")" -gt 0
           done
@@ -117,7 +117,7 @@ jobs:
         run: |
           set -euo pipefail
           out="$GITHUB_WORKSPACE/artifacts/mapping-0/moderation-d1-03-migration"
-          for table in moderation_cases moderation_decisions moderation_decision_idempotency moderation_txn_guard; do
+          for table in moderation_cases moderation_decisions moderation_decision_idempotency moderation_txn_guard moderation_enforcement_outbox; do
             npx --yes wrangler@4.116.0 d1 execute "\${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "PRAGMA table_info(\"$table\");" > "$out/$table-schema.json"
             npx --yes wrangler@4.116.0 d1 execute "\${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "PRAGMA index_list(\"$table\");" > "$out/$table-indexes.json"
           done
@@ -125,7 +125,7 @@ jobs:
           node - <<'NODE'
           const fs=require('fs');
           const dir=process.env.GITHUB_WORKSPACE+'/artifacts/mapping-0/moderation-d1-03-migration';
-          for(const table of ['moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard']){
+          for(const table of ['moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard','moderation_enforcement_outbox']){
             const rows=JSON.parse(fs.readFileSync(dir+'/'+table+'-schema.json'))?.[0]?.results??[];
             if(!rows.length) throw new Error('Missing remote table '+table);
           }
