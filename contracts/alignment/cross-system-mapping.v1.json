@@ -6736,7 +6736,10 @@
     {
       "featureId": "SOCIAL-002",
       "status": "UNRESOLVED",
-      "apiOperationIds": [],
+      "apiOperationIds": [
+        "getUsersUserIdFollowers",
+        "getUsersUserIdFollowing"
+      ],
       "entityIds": [
         "ENT-SOCIAL-FOLLOW"
       ],
@@ -6748,10 +6751,11 @@
         "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
         "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
+        "contracts/api/SOCIAL-002-followers-following-read.v1.json"
       ],
       "blockers": [
-        "Canonical followers/following API/DTO/Field/Persistence/Payload/Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; followers/following operations remain DISCOVERY_DRAFT."
+        "Runtime handler, privacy/block authorization binding, anti-abuse admission, pagination/count runtime evidence, security-E2E and Evidence Registry provenance remain unresolved; API/query contract is now bound."
       ]
     },
     {
