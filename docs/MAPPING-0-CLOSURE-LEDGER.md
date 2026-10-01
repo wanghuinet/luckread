@@ -4525,3 +4525,14 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - The push-trigger remains bound to the currently admitted/deployed runtime source `825fc273dc7f64bd9413f0493c55c9017ab27268`; no production redeployment is claimed by this test-tooling correction.
 - Status: `NOT_GREEN` pending the next clean Security E2E run.
 
+
+## 2026-10-01 — Moderation W06 deployment admission and E2E source separation correction
+
+- Runs `36809171269` and `36809220126` were inspected.
+- `36809171269` failed before deployment because the W06 deployment gate compared the current source against an old admitted commit and rejected unrelated main-branch workflow deltas (`.github/workflows/admin-readonly-audit.yml`). No W06 deployment occurred.
+- `36809220126` executed the E2E fixture successfully through native L6 reviewer setup, queue/case visibility, APPROVED decision and W06 persistence, but the production W06 runtime was still the pre-correction deployment, so replay remained HTTP 412. This run is not admissible as current runtime evidence.
+- Main commit `e8908f4e3d9dc3caed26cf8cd14870ee8828b744` scopes W06 deployment admission to the actual W06 implementation/governance delta instead of rejecting unrelated main history.
+- Main commit `0b33a06becbb6dac4777fd33aa930ae43b5c444f` makes Security E2E require a successful W06 deployment run and validates the exact `source_sha` from the deployment provenance artifact; W01 deployment source remains a separately verified input.
+- Backups created before each bounded change: `backup/pre-moderation-w06-deploy-source-gate-20261001` and `backup/pre-moderation-w06-deploy-artifact-proof-20261001`.
+- No new Worker, D1, binding, migration, API path, Contract semantic, or distributed transaction was introduced.
+- Status remains `NOT_GREEN` until W06 source `158a5221d87ce74123338bcf1f5a4a174ec55e33` is actually deployed and a clean Security E2E run proves Decision + AuditEvent + Outbox + W03 convergence and is reconciled into the Evidence Registry.
