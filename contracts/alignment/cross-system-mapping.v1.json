@@ -4482,34 +4482,44 @@
     },
     {
       "featureId": "MON-004",
-      "status": "UNRESOLVED",
+      "status": "PARTIAL",
       "apiOperationIds": [],
-      "entityIds": [],
+      "entityIds": [
+        "ENT-SUBSCRIPTION"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json",
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Entity/Field contract binding is admitted.",
+        "API/DTO, physical persistence, authorization/security, runtime, tests and Evidence Registry provenance remain unverified."
       ]
     },
     {
       "featureId": "MON-005",
-      "status": "UNRESOLVED",
+      "status": "PARTIAL",
       "apiOperationIds": [],
-      "entityIds": [],
+      "entityIds": [
+        "ENT-SUBSCRIPTION"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json",
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Entity/Field contract binding is admitted.",
+        "API/DTO, physical persistence, authorization/security, runtime, tests and Evidence Registry provenance remain unverified."
       ]
     },
     {
