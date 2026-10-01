@@ -1,0 +1,79 @@
+name: W05 Social D1-02 Comment Controlled Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Explicitly authorize the scoped SOCIAL-004 Comment migration'
+        required: true
+        type: choice
+        options:
+          - APPLY_SOCIAL_004_COMMENT_D1_02
+          - CANCEL
+        default: CANCEL
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_DB_UUID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  MIGRATION: workers/W05-social/migrations/0003_social_004_comment.sql
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY_SOCIAL_004_COMMENT_D1_02' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Verify exact source
+        run: |
+          set -euo pipefail
+          test -f "$MIGRATION"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          sha256sum "$MIGRATION"
+
+      - name: Verify contract admission
+        run: |
+          set -euo pipefail
+          jq -e '.status == "CONTRACTED_NOT_VERIFIED"' contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json >/dev/null
+          jq -e '.authoritativeDomain == "D1-02"' contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json >/dev/null
+          jq -e '.primaryWorker == "W05"' contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json >/dev/null
+          jq -e '.physicalResource.databaseUuid == "6c342634-97f6-4248-9f4a-85772af4f22c"' contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json >/dev/null
+          jq -e '.migration.executionMode == "controlled-manual"' contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json >/dev/null
+
+      - name: Install pinned Wrangler
+        run: npm install --no-save wrangler@4.116.0
+
+      - name: Execute scoped remote D1-02 migration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --file "$MIGRATION"
+
+      - name: Verify table and indexes
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name='social_comments';"
+          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('ix_social_comments_content_created','ix_social_comments_content_parent_created','ix_social_comments_author_created') ORDER BY name;"
+
+      - name: Capture provenance
+        run: |
+          mkdir -p artifacts/social
+          printf '%s
+' "{"workflow":"W05 Social D1-02 Comment Controlled Migration","runId":"$GITHUB_RUN_ID","sourceSha":"$GITHUB_SHA","databaseUuid":"$EXPECTED_DB_UUID","migration":"$MIGRATION","confirmation":"${{ inputs.confirm }}","executed":true}" > artifacts/social/w05-social-004-comment-migration-provenance.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: w05-social-004-comment-migration-${{ github.sha }}
+          path: artifacts/social/w05-social-004-comment-migration-provenance.json
