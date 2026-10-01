@@ -65,6 +65,7 @@ describe('Creator Center admin extension', () => {
     expect(contentDetail).toContain('setRetryKey((value) => value + 1)')
     expect(contentDetail).toContain('content-detail-retry')
     expect(read('src/app/(frontend)/styles.css')).toContain('.content-detail-action-status')
+    expect(read('src/app/(frontend)/styles.css')).toContain('.content-detail-retry')
     expect(publisher).toContain('function startNewContent()')
     expect(publisher).toContain("setDraft(null)")
     expect(publisher).toContain('新建内容')
