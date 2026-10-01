@@ -92,7 +92,7 @@
     "executionMode": "controlled-manual",
     "executionEvidence": "REQUIRED",
     "reexecute": false,
-    "status": "PENDING_CONTRACT_REVIEW"
+    "status": "PENDING_CONTROLLED_EXECUTION"
   },
   "mutationBudgets": {
     "d1ReadMax": 2,
