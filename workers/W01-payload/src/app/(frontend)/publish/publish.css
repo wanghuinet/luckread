@@ -268,8 +268,25 @@
   background: #fff;
 }
 
-.lr-asset > div {
+.lr-asset-preview {
+  width: 54px;
+  height: 54px;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid #e5eaf1;
+  border-radius: 9px;
+  background: #f1f4f8;
+}
+.lr-asset-preview img,
+.lr-asset-preview video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.lr-asset-info {
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .lr-asset strong,
