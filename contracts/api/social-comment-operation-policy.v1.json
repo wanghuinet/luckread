@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/social-comment-operation-policy.v1.json",
+  "title": "Social Comment Operation Policy",
+  "description": "Bounded contract surface for SOCIAL-004 comment/reply API admission. This file does not authorize runtime implementation.",
+  "type": "object",
+  "required": [
+    "version",
+    "featureId",
+    "status",
+    "owner",
+    "dataAuthority",
+    "operations",
+    "blockingConditions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "1.0.0"
+    },
+    "featureId": {
+      "const": "SOCIAL-004"
+    },
+    "status": {
+      "const": "CONTRACTED_PARTIAL"
+    },
+    "owner": {
+      "const": "W05"
+    },
+    "dataAuthority": {
+      "const": "D1-02"
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "operationId",
+          "method",
+          "path",
+          "authPermission",
+          "idempotency",
+          "request",
+          "response",
+          "visibility"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "GET",
+              "POST"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "authPermission": {
+            "type": "string"
+          },
+          "idempotency": {
+            "type": "object",
+            "required": [
+              "required",
+              "header"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "required": {
+                "type": "boolean"
+              },
+              "header": {
+                "const": "Idempotency-Key"
+              }
+            }
+          },
+          "request": {
+            "type": "object",
+            "required": [
+              "bodyMaxLength",
+              "supportsParentId"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "bodyMaxLength": {
+                "const": 10000
+              },
+              "supportsParentId": {
+                "type": "boolean"
+              }
+            }
+          },
+          "response": {
+            "type": "object",
+            "required": [
+              "commentContractRef"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "commentContractRef": {
+                "const": "contracts/enums/comment-state.json"
+              }
+            }
+          },
+          "visibility": {
+            "type": "object",
+            "required": [
+              "serverSidePolicy",
+              "blockAndModeration"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "serverSidePolicy": {
+                "const": true
+              },
+              "blockAndModeration": {
+                "const": "REQUIRED_BEFORE_RUNTIME"
+              }
+            }
+          }
+        }
+      }
+    },
+    "blockingConditions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "x-luckread": {
+    "noNewWorkerOrD1": true,
+    "runtimeAdmission": false,
+    "canonicalPathRule": "The singular /v1/content/{contentId}/comments surface is the canonical P0 interaction path; plural /v1/contents/{contentId}/comments remains discovery-only until separately reconciled.",
+    "sourceRefs": [
+      "docs/11-P0-SOCIAL-INTERACTION-AND-EVENT-CONTRACT-v1.0.md",
+      "contracts/enums/comment-state.json",
+      "contracts/api/api-inventory.v1.json",
+      "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-AUTHORITY-CONFLICT-2026-10-01.md"
+    ]
+  },
+  "version": "1.0.0",
+  "featureId": "SOCIAL-004",
+  "status": "CONTRACTED_PARTIAL",
+  "owner": "W05",
+  "dataAuthority": "D1-02",
+  "operations": [
+    {
+      "operationId": "getContentContentIdComments",
+      "method": "GET",
+      "path": "/v1/content/{contentId}/comments",
+      "authPermission": "content.read.public",
+      "idempotency": {
+        "required": false,
+        "header": "Idempotency-Key"
+      },
+      "request": {
+        "bodyMaxLength": 10000,
+        "supportsParentId": true
+      },
+      "response": {
+        "commentContractRef": "contracts/enums/comment-state.json"
+      },
+      "visibility": {
+        "serverSidePolicy": true,
+        "blockAndModeration": "REQUIRED_BEFORE_RUNTIME"
+      }
+    },
+    {
+      "operationId": "postContentContentIdComments",
+      "method": "POST",
+      "path": "/v1/content/{contentId}/comments",
+      "authPermission": "comment.create",
+      "idempotency": {
+        "required": true,
+        "header": "Idempotency-Key"
+      },
+      "request": {
+        "bodyMaxLength": 10000,
+        "supportsParentId": true
+      },
+      "response": {
+        "commentContractRef": "contracts/enums/comment-state.json"
+      },
+      "visibility": {
+        "serverSidePolicy": true,
+        "blockAndModeration": "REQUIRED_BEFORE_RUNTIME"
+      }
+    }
+  ],
+  "blockingConditions": [
+    "Canonical Comment entity and field contract are not yet bound.",
+    "D1-02 Comment persistence schema and migration are not yet contracted.",
+    "Concrete block/privacy/moderation decision inputs are not yet bound to a machine-readable authority.",
+    "W05 runtime, concurrency/security tests, remote D1 evidence and Evidence Registry admission are not yet verified."
+  ]
+}
