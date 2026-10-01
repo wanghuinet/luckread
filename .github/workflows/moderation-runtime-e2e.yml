@@ -204,6 +204,8 @@ jobs:
           set -euo pipefail
           echo "CASE_ID=mod-e2e-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
           echo "CONTENT_ID=mod-e2e-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          echo "CASE2_ID=mod-e2e-reuse-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          echo "CONTENT2_ID=mod-e2e-reuse-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
           echo "IDEMPOTENCY_KEY=mod-e2e-key-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
           echo "REASON_CODE=E2E_SECURITY_PROBE" >> "$GITHUB_ENV"
           echo "NOW=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" >> "$GITHUB_ENV"
@@ -273,8 +275,16 @@ jobs:
           printf '%s' "$replay" > /tmp/mod-replay.json
           node -e "const r=require('/tmp/mod-replay.json'), a=require('/tmp/mod-decision-response.json'); if(r.decisionId!==a.decisionId||r.version!==a.version) throw new Error('Idempotent replay mismatch'); console.log('IDEMPOTENT_REPLAY=PASS')"
 
-          sed 's/E2E_SECURITY_PROBE/E2E_SECURITY_CONFLICT/; s/"expectedVersion":1/"expectedVersion":2/' /tmp/mod-decision.json > /tmp/mod-conflict.json
-          status="$(curl --silent --output /tmp/mod-conflict-response.json --write-out '%{http_code}'             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: $IDEMPOTENCY_KEY"             -H "If-Match: v2"             --data @/tmp/mod-conflict.json             "$BASE_URL/api/v1/admin/moderation/cases/$CASE_ID/decision")"
+          REUSE_KEY="mod-e2e-reuse-key-$GITHUB_RUN_ID"
+          REUSE_DECISION_ID="dec_seed_reuse_$GITHUB_RUN_ID"
+          REUSE_EXPIRES_AT="$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%S.000Z)"
+          CONTENT_REUSE_SQL="INSERT INTO contents (id,content_type,owner_user_id,creator_id,ip_id,state,version,revision,title,body_ref,media_refs_json,cover_ref,etag,created_at,updated_at) VALUES ('$CONTENT2_ID','article','mod-e2e-owner-$GITHUB_RUN_ID',NULL,NULL,'PENDING_REVIEW',1,1,'Moderation E2E Idempotency Reuse Fixture','r2://moderation-e2e/reuse/$GITHUB_RUN_ID','[]',NULL,'v1','$NOW','$NOW');"
+          CASE_REUSE_SQL="INSERT INTO moderation_cases (case_id,target_type,target_id,target_version,policy_version,state,priority,assigned_reviewer_id,current_decision_id,evidence_bundle_ref,version,created_at,updated_at) VALUES ('$CASE2_ID','content','$CONTENT2_ID',1,'moderation-v1.0','UNDER_REVIEW',80,NULL,NULL,'e2e/reuse/$GITHUB_RUN_ID',1,'$NOW','$NOW');"
+          IDEM_REUSE_SQL="INSERT INTO moderation_decision_idempotency (id,reviewer_id,case_id,idempotency_key,request_hash,decision_id,response_status,response_json,created_at,expires_at) VALUES ('seed-idem-$GITHUB_RUN_ID','$MODERATION_AUTH_USER_ID','$CASE2_ID','$REUSE_KEY','seeded-hash-$GITHUB_RUN_ID','$REUSE_DECISION_ID',200,'{\"caseId\":\"$CASE2_ID\",\"decisionId\":\"$REUSE_DECISION_ID\",\"outcome\":\"APPROVED\",\"version\":2,\"effectiveAt\":\"$NOW\",\"requestId\":\"req_seed_reuse_$GITHUB_RUN_ID\"}','$NOW','$REUSE_EXPIRES_AT');"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-feed/wrangler.jsonc --command "$CONTENT_REUSE_SQL"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc --command "$CASE_REUSE_SQL"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc --command "$IDEM_REUSE_SQL"
+          status="$(curl --silent --output /tmp/mod-conflict-response.json --write-out '%{http_code}'             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: $REUSE_KEY"             -H "If-Match: v1"             --data '{"expectedVersion":1,"decision":"REJECTED","policyVersion":"moderation-v1.0","reasonCode":"E2E_SECURITY_CONFLICT","severity":"medium","scope":"content","effectiveAt":"'$NOW'","expiresAt":null}'             "$BASE_URL/api/v1/admin/moderation/cases/$CASE2_ID/decision")"
           test "$status" = 422
           echo IDEMPOTENCY_CONFLICT=PASS
 
