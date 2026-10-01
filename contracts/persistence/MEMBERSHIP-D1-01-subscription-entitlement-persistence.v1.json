@@ -51,7 +51,8 @@
     "Payment providers cannot write these tables directly.",
     "Membership cannot write ledger balance or transaction truth.",
     "Cancellation/expiry must converge entitlement access state.",
-    "Subscription writes use atomic WHERE subscription_id = ? AND version = expectedVersion; successful transition increments version by one."
+    "Subscription writes use atomic WHERE subscription_id = ? AND version = expectedVersion; successful transition increments version by one.",
+    "Payment/Subscription mutating operations that require Idempotency-Key persist the Membership-scoped replay record in the same D1-01 transaction as the authoritative access-state mutation."
   ],
   "migration": {
     "path": "workers/W07-subscription-commerce/migrations/0001_membership_subscription_entitlement.sql",
@@ -63,5 +64,35 @@
     "newWorkers": 0,
     "newD1": 0,
     "crossD1Transactions": 0
+  },
+  "operationalSupport": {
+    "membership_mutation_idempotency": {
+      "purpose": "Per-membership-mutation replay protection kept in D1-01 so the idempotency record and Subscription/Entitlement mutation share one transaction.",
+      "primaryKey": "id",
+      "uniqueKey": [
+        "owner_user_id",
+        "operation_id",
+        "idempotency_key"
+      ],
+      "status": [
+        "IN_PROGRESS",
+        "COMPLETED"
+      ],
+      "ttlHours": 24,
+      "rules": [
+        "Same owner + operation + key + same request_hash replays the committed response without repeating the mutation.",
+        "Same owner + operation + key + different request_hash is rejected with IDEMPOTENCY_KEY_REUSE_CONFLICT.",
+        "Concurrent same-key requests converge by the unique key boundary; a losing request must not apply a second business mutation.",
+        "The idempotency record is scoped to Membership operations and is not a generic D1-03 platform idempotency authority."
+      ]
+    },
+    "membership_txn_guard": {
+      "purpose": "Fail-closed same-transaction guard proving the expected-version Subscription update changed exactly one row before the idempotency record can commit.",
+      "fields": [
+        "id",
+        "successful",
+        "entitlement_changed"
+      ]
+    }
   }
 }
