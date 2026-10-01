@@ -41,7 +41,7 @@
     "Queue reads MUST be bounded and reviewer-scope filtered.",
     "No synchronous fan-out to content, creator, feed or notification projections is allowed in the request path.",
     "Content transition to APPROVED or REJECTED MUST remain attributable to a moderation decision.",
-    "Moderation implementation remains blocked until canonical OpenAPI, DTO, persistence, transport and evidence bindings reconcile."
+    "Runtime GREEN remains blocked until executable deployment, security, persistence and reconciliation evidence is current."
   ],
   "operations": [
     {
@@ -286,7 +286,7 @@
         "integration": "MISSING",
         "securityE2E": "MISSING"
       },
-      "contentTransitionTransport": "CONTRACTED_PENDING_AUTHORITY",
+      "contentTransitionTransport": "CONTRACTED_AUTHORITY_ADMITTED",
       "contentTransitionTransportRef": "contracts/transport/W06-W03-content-moderation-http-binding.v1.json",
       "event": {
         "syncConsumersMax": 0,
@@ -327,7 +327,7 @@
     }
   ],
   "nonGoals": [
-    "No W06 runtime implementation.",
+    "No runtime GREEN claim.",
     "No D1-03 migration execution.",
     "No new Worker or D1.",
     "No direct W06→W03 database access.",
