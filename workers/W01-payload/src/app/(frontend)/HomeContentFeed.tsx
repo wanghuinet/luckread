@@ -27,20 +27,25 @@ type Page = {
 export default function HomeContentFeed() {
   const [items, setItems] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     const timer = window.setTimeout((): void => {
       void (async () => {
         try {
+          setError(false)
           const response = await fetch('/api/v1/contents?limit=6', {
             headers: { accept: 'application/json' },
             cache: 'no-store',
           })
           const data = await response.json().catch((): null => null)
-          if (!response.ok || !data?.data) return
+          if (!response.ok || !data?.data) {
+            setError(true)
+            return
+          }
           setItems((data.data as Page).items ?? [])
         } catch {
-          // The homepage remains usable when the optional content feed is unavailable.
+          setError(true)
         } finally {
           setLoading(false)
         }
@@ -50,7 +55,16 @@ export default function HomeContentFeed() {
     return () => window.clearTimeout(timer)
   }, [])
 
-  if (!loading && items.length === 0) return null
+  if (!loading && items.length === 0 && !error) return null
+
+  const retry = () => {
+    setLoading(true)
+    setError(false)
+    setItems([])
+    void window.setTimeout(() => {
+      window.dispatchEvent(new Event('luckread:home-feed-retry'))
+    }, 0)
+  }
 
   return (
     <section className="content-feed" id="content-feed" aria-labelledby="content-feed-title">
@@ -61,6 +75,12 @@ export default function HomeContentFeed() {
         </div>
         <Link className="content-feed-all" href="/content">查看全部 ↗</Link>
       </div>
+      {error && !loading ? (
+        <div className="content-feed-error" role="status">
+          <p>内容暂时无法加载。</p>
+          <button className="button button-quiet" onClick={retry} type="button">重新加载</button>
+        </div>
+      ) : null}
       <div className="content-feed-grid">
         {loading ? (
           Array.from({ length: 3 }, (_, index) => (
