@@ -26,3 +26,16 @@ D1-02 migration = PREVIOUSLY EXECUTED
 Public policy admission = BLOCKED
 Remote runtime E2E = REQUIRED
 SOCIAL-001 = NOT_GREEN
+
+## Policy-authority gap before public success
+
+The W01→W05 runtime envelope currently contains policy facts, but those facts are admission inputs only and are not client-authoritative.
+
+Required authority bindings/evidence:
+1. Actor account state → W02 authoritative account/access state.
+2. Target followability, privacy scope and block relationship → canonical Social/Profile authority must be identified and transport-bound; no W01 inference.
+3. Anti-abuse admission → canonical anti-abuse decision source must be identified and transport-bound.
+4. Like resource visibility/interactability → Content authority must expose an admitted trusted decision source before Like becomes public.
+5. W05 remains the sole mutation authority for Follow/Like in D1-02; policy sources do not become write owners.
+
+Until these are bound and remotely evidenced, W01 must not expose successful public Follow/Like mutation based on caller-supplied policy fields.
