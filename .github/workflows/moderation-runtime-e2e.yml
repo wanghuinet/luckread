@@ -94,13 +94,12 @@ jobs:
           w03_run_id=""
           while IFS= read -r candidate_run_id; do
             test -n "$candidate_run_id" || continue
-            artifact_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_run_id/artifacts?per_page=100" --jq '.artifacts[] | select(.name == env.EXPECTED_ARTIFACT and .expired == false) | .id' 2>/dev/null | head -n 1)" || true
+            artifact_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_run_id/artifacts?per_page=100" --jq ".artifacts[] | select(.name == \"w03-content-deployment-$W03_SOURCE_SHA\" and .expired == false) | .id" 2>/dev/null | head -n 1)" || true
             if [ -n "$artifact_id" ]; then
               w03_run_id="$candidate_run_id"
               break
             fi
           done < <(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/w03-content-runtime-deploy.yml/runs?status=success&per_page=50" --jq '.workflow_runs[].id')
-          export EXPECTED_ARTIFACT="$expected_artifact"
           test -n "$w03_run_id" || { echo "No successful W03 deployment evidence found for $W03_SOURCE_SHA"; exit 1; }
           rm -rf /tmp/w03-deployment-evidence
           mkdir -p /tmp/w03-deployment-evidence
