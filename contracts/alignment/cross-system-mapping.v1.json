@@ -4525,12 +4525,14 @@
         "contracts/openapi/v1/operation-policy.json",
         "contracts/authz/permissions.json",
         "contracts/state-machines/subscription.json",
-        "docs/change-control/CC-SUBSCRIPTION-STATE-API-RECONCILIATION-2026-10-02.md"
+        "docs/change-control/CC-SUBSCRIPTION-STATE-API-RECONCILIATION-2026-10-02.md",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json"
       ],
       "blockers": [
-        "Entity/Field contract binding is admitted.",
-        "Canonical API/state/permission vocabulary is now reconciled.",
-        "Physical D1-01 persistence, runtime, cross-domain payment transition, tests and Evidence Registry provenance remain unverified."
+        "Entity/Field contract binding admitted.",
+        "Lifecycle API/state/permission vocabulary reconciled on the stacked branch.",
+        "D1-01 logical persistence contract defined but physical migration/runtime verification is pending.",
+        "Optimistic-lock source binding and active-subscription uniqueness policy remain decision-required."
       ]
     },
     {
