@@ -2,7 +2,7 @@ import { getPayload } from 'payload'
 
 import config from '@payload-config'
 
-import { issuePayloadAccessToken } from '../../../auth/payload-access-token.js'
+import { buildPayloadAccessCookie, issuePayloadAccessToken } from '../../../auth/payload-access-token.js'
 import { establishSession, W02AuthClientError } from '../../../auth/w02-session-client.js'
 
 const json = (body: unknown, status = 200) =>
@@ -169,14 +169,7 @@ export async function POST(request: Request): Promise<Response> {
         headers: {
           'content-type': 'application/json; charset=utf-8',
           'cache-control': 'no-store',
-          'set-cookie': [
-            `payload-token=${encodeURIComponent(access.token)}`,
-            'Path=/',
-            'HttpOnly',
-            process.env.NODE_ENV === 'production' ? 'Secure' : '',
-            'SameSite=Lax',
-            `Max-Age=${Math.max(1, Math.floor(access.expiresIn))}`,
-          ].filter(Boolean).join('; '),
+          'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request),
         },
       },
     )
