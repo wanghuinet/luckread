@@ -162,7 +162,7 @@ jobs:
       - name: Create article through public API
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bear""er $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-CREATE"             --data '{"contentType":"article","title":"Content E2E Article","bodyRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/article","mediaRefs":[],"coverRef":null}'             "$CONTENT_API_BASE_URL/api/v1/contents" > /tmp/article-create.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-CREATE"             --data '{"contentType":"article","title":"Content E2E Article","bodyRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/article","mediaRefs":[],"coverRef":null}'             "$CONTENT_API_BASE_URL/api/v1/contents" > /tmp/article-create.json
 
           node <<'NODE'
           const fs = require('node:fs');
@@ -174,7 +174,7 @@ jobs:
       - name: Create video through public API
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bear""er $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-CREATE"             --data '{"contentType":"video","title":"Content E2E Video","bodyRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/video","mediaRefs":["r2://content-e2e/'"$GITHUB_RUN_ID"'/video.mp4"],"coverRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/video-cover.jpg"}'             "$CONTENT_API_BASE_URL/api/v1/contents" > /tmp/video-create.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-CREATE"             --data '{"contentType":"video","title":"Content E2E Video","bodyRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/video","mediaRefs":["r2://content-e2e/'"$GITHUB_RUN_ID"'/video.mp4"],"coverRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/video-cover.jpg"}'             "$CONTENT_API_BASE_URL/api/v1/contents" > /tmp/video-create.json
 
           node <<'NODE'
           const fs = require('node:fs');
@@ -189,9 +189,9 @@ jobs:
           ARTICLE_PREFLIGHT_BODY='{"contentType":"article","title":"Content E2E Article","body":"我实测这条受控文章发布链，记录创建、审核和公开展示结果。这里包含真实测试过程、版本、时间、数据和结论，作为创作者本人完成实质补充与核验的测试正文。结果将由生产 API 和远程 D1 再次确认。","mediaRefs":[],"coverRef":null,"aiMode":"outline","humanContribution":"substantial"}'
           VIDEO_PREFLIGHT_BODY='{"contentType":"video","title":"Content E2E Video","body":"这是一条受控视频发布链测试，记录创建、审核、发布和公开访问结果。","mediaRefs":["r2://content-e2e/'"$GITHUB_RUN_ID"'/video.mp4"],"coverRef":"r2://content-e2e/'"$GITHUB_RUN_ID"'/video-cover.jpg","aiMode":"outline","humanContribution":"substantial"}'
 
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bear""er $CREATOR_TOKEN"             -H "Content-Type: application/json"             --data "$ARTICLE_PREFLIGHT_BODY"             "$CONTENT_API_BASE_URL/api/creator/contents/$ARTICLE_ID/preflight" > /tmp/article-preflight.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             --data "$ARTICLE_PREFLIGHT_BODY"             "$CONTENT_API_BASE_URL/api/creator/contents/$ARTICLE_ID/preflight" > /tmp/article-preflight.json
 
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bear""er $CREATOR_TOKEN"             -H "Content-Type: application/json"             --data "$VIDEO_PREFLIGHT_BODY"             "$CONTENT_API_BASE_URL/api/creator/contents/$VIDEO_ID/preflight" > /tmp/video-preflight.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             --data "$VIDEO_PREFLIGHT_BODY"             "$CONTENT_API_BASE_URL/api/creator/contents/$VIDEO_ID/preflight" > /tmp/video-preflight.json
 
           node <<'NODE'
           const fs=require('node:fs');
@@ -206,14 +206,14 @@ jobs:
         run: |
           set -euo pipefail
           node -e "const fs=require('fs'); const p={contentType:'article',title:'Content E2E Article',body:'我实测这条受控文章发布链，记录创建、审核和公开展示结果。这里包含真实测试过程、版本、时间、数据和结论，作为创作者本人完成实质补充与核验的测试正文。结果将由生产 API 和远程 D1 再次确认。',mediaRefs:[],coverRef:null,aiMode:'outline',humanContribution:'substantial'}; fs.writeFileSync('/tmp/article-review-request.json', JSON.stringify({to:'PENDING_REVIEW',preflight:p}));"
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bear""er $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-REVIEW"             -H "If-Match: $ARTICLE_ETAG"             --data @/tmp/article-review-request.json             "$CONTENT_API_BASE_URL/api/v1/contents/$ARTICLE_ID/state" > /tmp/article-review.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-REVIEW"             -H "If-Match: $ARTICLE_ETAG"             --data @/tmp/article-review-request.json             "$CONTENT_API_BASE_URL/api/v1/contents/$ARTICLE_ID/state" > /tmp/article-review.json
           node -e "const v=require('/tmp/article-review.json'); if(v.from!=='DRAFT'||v.to!=='PENDING_REVIEW'||Number(v.version)!==2) throw new Error('article review transition failed: '+JSON.stringify(v));"
 
       - name: Submit video for review
         run: |
           set -euo pipefail
           node -e "const fs=require('fs'); const runId=process.env.GITHUB_RUN_ID; const p={contentType:'video',title:'Content E2E Video',body:'这是一条受控视频发布链测试，记录创建、审核、发布和公开访问结果。',mediaRefs:['r2://content-e2e/'+runId+'/video.mp4'],coverRef:'r2://content-e2e/'+runId+'/video-cover.jpg',aiMode:'outline',humanContribution:'substantial'}; fs.writeFileSync('/tmp/video-review-request.json', JSON.stringify({to:'PENDING_REVIEW',preflight:p}));"
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bear""er $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-REVIEW"             -H "If-Match: $VIDEO_ETAG"             --data @/tmp/video-review-request.json             "$CONTENT_API_BASE_URL/api/v1/contents/$VIDEO_ID/state" > /tmp/video-review.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-REVIEW"             -H "If-Match: $VIDEO_ETAG"             --data @/tmp/video-review-request.json             "$CONTENT_API_BASE_URL/api/v1/contents/$VIDEO_ID/state" > /tmp/video-review.json
           node -e "const v=require('/tmp/video-review.json'); if(v.from!=='DRAFT'||v.to!=='PENDING_REVIEW'||Number(v.version)!==2) throw new Error('video review transition failed: '+JSON.stringify(v));"
 
       - name: Seed controlled moderation cases
@@ -233,21 +233,59 @@ jobs:
       - name: Approve article through moderation boundary
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bear""er $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-APPROVE"             -H "If-Match: v1"             --data '{"expectedVersion":1,"decision":"APPROVED","policyVersion":"moderation-v1.0","reasonCode":"CONTENT_PUBLISH_E2E","severity":"medium","scope":"content","effectiveAt":"'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","expiresAt":null}'             "$MODERATION_BASE_URL/api/v1/admin/moderation/cases/$CASE_ARTICLE_ID/decision" > /tmp/article-approve.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-APPROVE"             -H "If-Match: v1"             --data '{"expectedVersion":1,"decision":"APPROVED","policyVersion":"moderation-v1.0","reasonCode":"CONTENT_PUBLISH_E2E","severity":"medium","scope":"content","effectiveAt":"'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","expiresAt":null}'             "$MODERATION_BASE_URL/api/v1/admin/moderation/cases/$CASE_ARTICLE_ID/decision" > /tmp/article-approve.json
           node -e "const v=require('/tmp/article-approve.json'); if(v.outcome!=='APPROVED'||Number(v.version)!==2) throw new Error('article moderation approval failed: '+JSON.stringify(v));"
 
       - name: Approve video through moderation boundary
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bear""er $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-APPROVE"             -H "If-Match: v1"             --data '{"expectedVersion":1,"decision":"APPROVED","policyVersion":"moderation-v1.0","reasonCode":"CONTENT_PUBLISH_E2E","severity":"medium","scope":"content","effectiveAt":"'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","expiresAt":null}'             "$MODERATION_BASE_URL/api/v1/admin/moderation/cases/$CASE_VIDEO_ID/decision" > /tmp/video-approve.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-APPROVE"             -H "If-Match: v1"             --data '{"expectedVersion":1,"decision":"APPROVED","policyVersion":"moderation-v1.0","reasonCode":"CONTENT_PUBLISH_E2E","severity":"medium","scope":"content","effectiveAt":"'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","expiresAt":null}'             "$MODERATION_BASE_URL/api/v1/admin/moderation/cases/$CASE_VIDEO_ID/decision" > /tmp/video-approve.json
           node -e "const v=require('/tmp/video-approve.json'); if(v.outcome!=='APPROVED'||Number(v.version)!==2) throw new Error('video moderation approval failed: '+JSON.stringify(v));"
+
+      - name: Wait for W06 approval propagation
+        run: |
+          set -euo pipefail
+
+          wait_for_approved() {
+            local kind="$1"
+            local content_id="$2"
+            local output_file="$3"
+            local etag_var="$4"
+
+            for attempt in $(seq 1 20); do
+              curl --silent --show-error --fail-with-body                 -H "Authorization: Bearer $CREATOR_TOKEN"                 "$CONTENT_API_BASE_URL/api/v1/contents/$content_id" > "$output_file"
+
+              state="$(node -e "const v=require(process.argv[1]); process.stdout.write(String(v.state||''))" "$output_file")"
+              etag="$(node -e "const v=require(process.argv[1]); process.stdout.write(String(v.etag||''))" "$output_file")"
+
+              if [ "$state" = "APPROVED" ] && [ -n "$etag" ]; then
+                echo "$kind approved with etag=$etag"
+                echo "$etag_var=$etag" >> "$GITHUB_ENV"
+                return 0
+              fi
+
+              if [ "$state" = "PUBLISHED" ]; then
+                echo "$kind unexpectedly already PUBLISHED" >&2
+                return 1
+              fi
+
+              sleep 2
+            done
+
+            echo "$kind approval did not propagate within 40 seconds" >&2
+            cat "$output_file" >&2
+            return 1
+          }
+
+          wait_for_approved article "$ARTICLE_ID" /tmp/article-approved.json ARTICLE_PUBLISH_ETAG
+          wait_for_approved video "$VIDEO_ID" /tmp/video-approved.json VIDEO_PUBLISH_ETAG
 
       - name: Publish article and video
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bear""er $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-PUBLISH"             -H "If-Match: v3"             --data '{"to":"PUBLISHED"}'             "$CONTENT_API_BASE_URL/api/v1/contents/$ARTICLE_ID/state" > /tmp/article-publish.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-ARTICLE-PUBLISH"             -H "If-Match: $ARTICLE_PUBLISH_ETAG"             --data '{"to":"PUBLISHED"}'             "$CONTENT_API_BASE_URL/api/v1/contents/$ARTICLE_ID/state" > /tmp/article-publish.json
 
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bear""er $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-PUBLISH"             -H "If-Match: v3"             --data '{"to":"PUBLISHED"}'             "$CONTENT_API_BASE_URL/api/v1/contents/$VIDEO_ID/state" > /tmp/video-publish.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CREATOR_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-E2E-$GITHUB_RUN_ID-VIDEO-PUBLISH"             -H "If-Match: $VIDEO_PUBLISH_ETAG"             --data '{"to":"PUBLISHED"}'             "$CONTENT_API_BASE_URL/api/v1/contents/$VIDEO_ID/state" > /tmp/video-publish.json
 
           node <<'NODE'
           const fs=require('node:fs');
