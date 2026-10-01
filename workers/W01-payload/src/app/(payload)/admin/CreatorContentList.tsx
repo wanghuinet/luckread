@@ -266,7 +266,7 @@ export default function CreatorContentList() {
               </article>
             ))}
           </div>
-          {page.hasMore ? (
+          {page.hasMore && page.nextCursor ? (
             <button
               className={styles.secondaryButton}
               disabled={loadingMore}

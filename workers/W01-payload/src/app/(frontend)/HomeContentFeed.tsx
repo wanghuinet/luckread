@@ -27,20 +27,26 @@ type Page = {
 export default function HomeContentFeed() {
   const [items, setItems] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     const timer = window.setTimeout((): void => {
       void (async () => {
         try {
+          setError(false)
           const response = await fetch('/api/v1/contents?limit=6', {
             headers: { accept: 'application/json' },
             cache: 'no-store',
           })
           const data = await response.json().catch((): null => null)
-          if (!response.ok || !data?.data) return
+          if (!response.ok || !data?.data) {
+            setError(true)
+            return
+          }
           setItems((data.data as Page).items ?? [])
         } catch {
-          // The homepage remains usable when the optional content feed is unavailable.
+          setError(true)
         } finally {
           setLoading(false)
         }
@@ -48,9 +54,16 @@ export default function HomeContentFeed() {
     }, 0)
 
     return () => window.clearTimeout(timer)
-  }, [])
+  }, [retryKey])
 
-  if (!loading && items.length === 0) return null
+  if (!loading && items.length === 0 && !error) return null
+
+  const retry = () => {
+    setLoading(true)
+    setError(false)
+    setItems([])
+    setRetryKey((value) => value + 1)
+  }
 
   return (
     <section className="content-feed" id="content-feed" aria-labelledby="content-feed-title">
@@ -61,8 +74,26 @@ export default function HomeContentFeed() {
         </div>
         <Link className="content-feed-all" href="/content">查看全部 ↗</Link>
       </div>
+      {error && !loading ? (
+        <div className="content-feed-error" role="status">
+          <p>内容暂时无法加载。</p>
+          <button className="button button-quiet" onClick={retry} type="button">重新加载</button>
+        </div>
+      ) : null}
       <div className="content-feed-grid">
-        {items.map((item) => {
+        {loading ? (
+          Array.from({ length: 3 }, (_, index) => (
+            <div className="content-feed-card content-feed-card-skeleton" key={index} aria-hidden="true">
+              <div className="content-feed-cover content-feed-skeleton-block" />
+              <div className="content-feed-body">
+                <span className="content-feed-skeleton-line content-feed-skeleton-line-short" />
+                <span className="content-feed-skeleton-line content-feed-skeleton-line-title" />
+                <span className="content-feed-skeleton-line content-feed-skeleton-line-title" />
+                <span className="content-feed-skeleton-line content-feed-skeleton-line-meta" />
+              </div>
+            </div>
+          ))
+        ) : items.map((item) => {
           const cover = item.coverRef
           return (
             <Link className="content-feed-card" href={`/content/${encodeURIComponent(item.id)}`} key={item.id}>
