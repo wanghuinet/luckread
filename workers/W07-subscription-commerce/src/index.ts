@@ -51,7 +51,14 @@ export default {
           actorUserId: request.headers.get('X-LuckRead-Principal-User-Id')!,
           subscriptionId: body.subscriptionId,
         })
-        return json(snapshot)
+        return new Response(JSON.stringify(snapshot), {
+          status: 200,
+          headers: {
+            'cache-control': 'no-store',
+            'content-type': 'application/json; charset=utf-8',
+            ETag: `W/"${snapshot.version}"`,
+          },
+        })
       } catch (error) {
         if (error instanceof W02MembershipClientError) {
           const status = error.status === 404 ? 404 : error.status === 403 ? 403 : 503
