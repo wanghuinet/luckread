@@ -47,6 +47,19 @@ const requiredPrincipal = (request: Request): { userId: string; layer: string } 
   return { userId, layer }
 }
 
+export const hasCreatorContentPermission = (layer: string): boolean => {
+  if (!/^L[0-8]$/.test(layer)) return false
+  return Number(layer.slice(1)) >= 3
+}
+
+const requiredCreatorPrincipal = (request: Request): { userId: string; layer: string } => {
+  const principal = requiredPrincipal(request)
+  if (!hasCreatorContentPermission(principal.layer)) {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
+  return principal
+}
+
 const requireIfMatch = (request: Request): string => {
   const value = request.headers.get('If-Match')?.trim() ?? ''
   if (!value) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
@@ -149,7 +162,7 @@ export default {
       const path = getPath(url.pathname)
 
       if (request.method === 'GET' && url.pathname === '/internal/content/creator-contents') {
-        const principal = requiredPrincipal(request)
+        const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')
         const limitParam = url.searchParams.get('limit')
         const limit = parseListLimit(limitParam)
@@ -207,7 +220,7 @@ export default {
       if (!path) return new Response(null, { status: 404 })
 
       if (request.method === 'POST' && path.id && path.preflight) {
-        requiredPrincipal(request)
+        requiredCreatorPrincipal(request)
         const body = await parseBody(request)
         try {
           return json(preflightContent(normalizePreflightInput(body)))
@@ -248,7 +261,7 @@ export default {
       }
 
       if (request.method === 'POST' && path.id === undefined) {
-        const principal = requiredPrincipal(request)
+        const principal = requiredCreatorPrincipal(request)
         const body = await parseBody(request)
         const content = await createContent(
           env.D1_02,
@@ -270,7 +283,8 @@ export default {
       }
 
       if (request.method === 'GET' && path.id) {
-        const principalUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        const principal = requiredCreatorPrincipal(request)
+        const principalUserId = principal.userId
         const content = await getContent(env.D1_02, path.id, principalUserId)
         return json({
           id: content.id,
@@ -288,7 +302,7 @@ export default {
       }
 
       if (request.method === 'PATCH' && path.id) {
-        const principal = requiredPrincipal(request)
+        const principal = requiredCreatorPrincipal(request)
         const body = await parseBody(request)
         const content = await updateContent(
           env.D1_02,
@@ -309,7 +323,7 @@ export default {
       }
 
       if (request.method === 'DELETE' && path.id) {
-        const principal = requiredPrincipal(request)
+        const principal = requiredCreatorPrincipal(request)
         await deleteContent(
           env.D1_02,
           principal.userId,
