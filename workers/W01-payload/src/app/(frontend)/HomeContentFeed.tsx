@@ -63,7 +63,7 @@ export default function HomeContentFeed() {
       </div>
       <div className="content-feed-grid">
         {items.map((item) => {
-          const cover = item.coverRef || item.mediaRefs?.[0]
+          const cover = item.coverRef
           return (
             <Link className="content-feed-card" href={`/content/${encodeURIComponent(item.id)}`} key={item.id}>
               <div className="content-feed-cover">
