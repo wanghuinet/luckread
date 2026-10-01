@@ -26,6 +26,7 @@ Subscription state machine
 - `getSubscription` public read path implemented as W01→W07→W02 with authenticated L2 self scope.
 - `getSubscription` exposes authoritative Subscription.version through ETag for subsequent If-Match CAS.
 - Bounded public `cancelSubscription` path implemented as authenticated L2 self → W07 → W02 ACTIVE→CANCELED; If-Match and Idempotency-Key are required and remote verification remains pending.
+- Membership mutation idempotency is now a D1-01 domain-local transaction record with SHA-256 request binding and committed-response replay; public GREEN remains gated by migration and runtime evidence.
 - SOCIAL-004 ownership conflict reconciled: stale `W00` CommentState writer is now aligned to canonical W05; Comment implementation admission remains separate and blocked.
 - SOCIAL-003 Like W01→W05 trusted transport now composes W02 authoritative actor AccountState; public Like remains blocked on resource-policy/anti-abuse authority and E2E evidence.
 
