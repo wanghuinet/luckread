@@ -23,6 +23,11 @@ on:
         required: true
         type: string
         default: "36804071530"
+      w06_deploy_run_id:
+        description: Successful W06 deployment run ID that deployed source_sha
+        required: true
+        type: string
+        default: "REPLACE_WITH_SUCCESSFUL_W06_DEPLOY_RUN_ID"
       confirm:
         description: Type RUN_MODERATION_E2E to permit controlled remote fixture/test mutations
         required: true
@@ -60,6 +65,17 @@ jobs:
           set -euo pipefail
           run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$W01_DEPLOY_RUN_ID")"
           node -e "const r=JSON.parse(process.argv[1]); if(r.conclusion!==\"success\") throw new Error(\"W01 deployment run is not SUCCESS\"); if(r.head_sha!==process.env.W01_SOURCE_SHA) throw new Error(\"W01 deployment SHA mismatch: \"+r.head_sha+\" != \"+process.env.SOURCE_SHA); console.log(JSON.stringify({deploymentRun:r.id,headSha:r.head_sha,conclusion:r.conclusion,workflow:r.name}));" "$run_json"
+
+      - name: Verify exact W06 deployment evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "${{ inputs.w06_deploy_run_id }}" != "REPLACE_WITH_SUCCESSFUL_W06_DEPLOY_RUN_ID"
+          run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/${{ inputs.w06_deploy_run_id }}")"
+          node -e "const r=JSON.parse(process.argv[1]); if(r.conclusion!==\"success\") throw new Error(\"W06 deployment run is not SUCCESS\"); if(r.name!==\"W06 Governance Deploy\") throw new Error(\"Unexpected W06 deployment workflow: \"+r.name); console.log(JSON.stringify({deploymentRun:r.id,headSha:r.head_sha,conclusion:r.conclusion,workflow:r.name}));" "$run_json"
+          log="$(gh run view "${{ inputs.w06_deploy_run_id }}" --repo "$GITHUB_REPOSITORY" --log)"
+          printf '%s\n' "$log" | grep -F "source_sha=$SOURCE_SHA"
 
       - name: Setup Node 24
         uses: actions/setup-node@v4
