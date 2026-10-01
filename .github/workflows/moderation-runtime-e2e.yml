@@ -132,8 +132,8 @@ jobs:
           printf '%s' "$replay" > /tmp/mod-replay.json
           node -e "const r=require('/tmp/mod-replay.json'), a=require('/tmp/mod-decision-response.json'); if(r.decisionId!==a.decisionId||r.version!==a.version) throw new Error('Idempotent replay mismatch'); console.log('IDEMPOTENT_REPLAY=PASS')"
 
-          sed 's/E2E_SECURITY_PROBE/E2E_SECURITY_CONFLICT/' /tmp/mod-decision.json > /tmp/mod-conflict.json
-          status="$(curl --silent --output /tmp/mod-conflict-response.json --write-out '%{http_code}'             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: $IDEMPOTENCY_KEY"             -H "If-Match: v1"             --data @/tmp/mod-conflict.json             "$BASE_URL/api/v1/admin/moderation/cases/$CASE_ID/decision")"
+          sed 's/E2E_SECURITY_PROBE/E2E_SECURITY_CONFLICT/; s/"expectedVersion":1/"expectedVersion":2/' /tmp/mod-decision.json > /tmp/mod-conflict.json
+          status="$(curl --silent --output /tmp/mod-conflict-response.json --write-out '%{http_code}'             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: $IDEMPOTENCY_KEY"             -H "If-Match: v2"             --data @/tmp/mod-conflict.json             "$BASE_URL/api/v1/admin/moderation/cases/$CASE_ID/decision")"
           test "$status" = 422
           echo IDEMPOTENCY_CONFLICT=PASS
 
