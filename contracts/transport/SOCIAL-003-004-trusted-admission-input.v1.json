@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/SOCIAL-003-004-trusted-admission-input.v1.json",
+  "title": "SOCIAL-003/004 Trusted Admission Input Contract",
+  "version": "1.0.0",
+  "status": "BLOCKED_NOT_ADMITTED",
+  "featureIds": [
+    "SOCIAL-003",
+    "SOCIAL-004"
+  ],
+  "operations": [
+    "like",
+    "unlike",
+    "listComments",
+    "createComment",
+    "patchCommentsCommentId",
+    "deleteCommentsCommentId"
+  ],
+  "canonicalOwnership": {
+    "domain": "SOCIAL",
+    "worker": "W05",
+    "d1": "D1-02"
+  },
+  "purpose": "Freeze the minimum trusted server-side admission inputs for Social reaction and comment mutations without inventing a new authority or authorizing runtime execution.",
+  "inputContract": {
+    "actor": {
+      "field": "actorUserId",
+      "source": "authenticated server principal resolved through the existing identity/session authority",
+      "clientWritable": false,
+      "required": true
+    },
+    "target": {
+      "fields": [
+        "targetType",
+        "targetId"
+      ],
+      "source": "public request identifier resolved against authoritative target domain",
+      "clientWritable": [
+        "targetType",
+        "targetId"
+      ],
+      "required": true
+    },
+    "actorAccountState": {
+      "field": "actorAccountState",
+      "source": "authoritative account lifecycle authority",
+      "clientWritable": false,
+      "required": [
+        "like",
+        "unlike",
+        "createComment",
+        "patchCommentsCommentId",
+        "deleteCommentsCommentId"
+      ],
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "targetVisibility": {
+      "field": "targetVisibility",
+      "source": "authoritative resource visibility policy",
+      "clientWritable": false,
+      "required": [
+        "like",
+        "unlike",
+        "listComments",
+        "createComment"
+      ],
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "commentability": {
+      "field": "commentable",
+      "source": "authoritative Content policy",
+      "clientWritable": false,
+      "required": [
+        "createComment"
+      ],
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "commentScope": {
+      "fields": [
+        "commentExists",
+        "parentScopeValid",
+        "commentEditable"
+      ],
+      "source": "authoritative Social comment state",
+      "clientWritable": false,
+      "required": [
+        "patchCommentsCommentId",
+        "deleteCommentsCommentId"
+      ],
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "blockMutePolicy": {
+      "field": "blockMuteAllows",
+      "source": "authoritative Social / Trust & Safety policy",
+      "clientWritable": false,
+      "required": [
+        "like",
+        "unlike",
+        "listComments",
+        "createComment",
+        "patchCommentsCommentId",
+        "deleteCommentsCommentId"
+      ],
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "moderationAdmission": {
+      "field": "moderationDecision",
+      "source": "authoritative moderation policy / admission boundary",
+      "clientWritable": false,
+      "required": [
+        "createComment",
+        "patchCommentsCommentId"
+      ],
+      "allowedValues": [
+        "ALLOW",
+        "REVIEW",
+        "BLOCK"
+      ],
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "antiAbuse": {
+      "field": "antiAbuseAdmission",
+      "source": "canonical interaction anti-abuse admission layer",
+      "clientWritable": false,
+      "required": [
+        "like",
+        "unlike",
+        "createComment",
+        "patchCommentsCommentId",
+        "deleteCommentsCommentId"
+      ],
+      "allowedValues": [
+        "ALLOW",
+        "THROTTLE",
+        "CHALLENGE",
+        "BLOCK",
+        "REVIEW"
+      ],
+      "status": "MISSING_AUTHORITY_BINDING"
+    },
+    "callerProvenance": {
+      "fields": [
+        "caller",
+        "transportVersion",
+        "correlationId",
+        "requestId"
+      ],
+      "source": "trusted internal transport",
+      "clientWritable": false,
+      "required": true
+    }
+  },
+  "decision": {
+    "field": "decision",
+    "allowedValues": [
+      "ALLOW",
+      "DENY"
+    ],
+    "clientWritable": false,
+    "rule": "W05 MUST fail closed unless all required policy inputs are present, fresh and sourced from an admitted authority."
+  },
+  "mutationRules": {
+    "like": "single authoritative reaction write protected by actor+target+reactionType uniqueness; duplicate is idempotent success",
+    "unlike": "single atomic reaction delete; missing relation is idempotent success",
+    "createComment": "single authoritative comment write after visibility/commentability/moderation/anti-abuse checks; client cannot set author or final state",
+    "patchCommentsCommentId": "single authoritative update protected by If-Match/version comparison; client cannot set author/state/version",
+    "deleteCommentsCommentId": "single authoritative durable state transition to DELETED; client cannot force physical deletion"
+  },
+  "transportSecurity": [
+    "No end-user bearer token is forwarded to W05 as authority credential.",
+    "Actor identity is server-derived.",
+    "Policy decision fields are never accepted from the public client.",
+    "Missing or ambiguous authority input fails closed.",
+    "Transport is internal-only and carries provenance metadata."
+  ],
+  "topologyConstraints": {
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newTasks": 0,
+    "newPayloadCollections": 0,
+    "crossD1Transactions": 0,
+    "newPublicOperationIds": 0
+  },
+  "admissionBlockers": [
+    "trusted W01 to W05 transport binding",
+    "exact authoritative source for actor account state",
+    "exact target visibility/commentability authority",
+    "exact block/mute authority",
+    "exact moderation admission authority",
+    "exact anti-abuse admission authority",
+    "source SHAs for each authority boundary",
+    "fail-closed negative tests"
+  ],
+  "implementationRule": "This contract does not authorize W05 runtime implementation. Implementation remains blocked until the admission blockers are reconciled to existing authoritative contracts and evidence."
+}
