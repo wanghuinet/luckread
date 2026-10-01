@@ -7,7 +7,7 @@ on:
         description: Exact source commit to deploy for the coordinated W01/W03/W06 moderation slice
         required: true
         type: string
-        default: 4427d2ed40b680ec2e714ed33081be0cf8ca30c6
+        default: 99f20528d997937f00585247dec264833d5fc099
       confirm:
         description: Type DEPLOY_MODERATION to permit this controlled deployment
         required: true
