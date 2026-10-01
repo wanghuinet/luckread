@@ -4512,3 +4512,16 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Backup branch was created before the change: `backup/pre-moderation-clean-e2e-trigger-20261001` from main head `bf8435cddd46ee4342378dd2fbfa2287f91f013d`.
 - The correction is intended to trigger the existing `main` push-based Security E2E; execution result is not promoted until the actual Actions run is observed and its remote evidence is inspected.
 - Status remains `NOT_GREEN` until one clean full Security E2E run and Evidence Registry reconciliation.
+
+## 2026-10-01 — Moderation idempotency conflict E2E diagnostic correction
+
+- Main commit: `9542e917d97946641e62ccf1a9ccd01d052fcaae`.
+- Run `36806189983` reached the real native L6 reviewer path, Decision persistence, and cleanup, but its idempotency key-reuse assertion received HTTP 412 instead of the contracted 422 and therefore was not admissible as Security E2E PASS.
+- Source inspection confirms the authoritative W06 runtime checks case/version preconditions before the existing idempotency branch; the E2E fixture is now instrumented to prove the seeded `moderation_decision_idempotency` row is visible to the same reviewer/case/key tuple before making the conflict request.
+- The seeded idempotency row now uses a fixed future expiry so test expiry cannot divert execution into the insert/unique-conflict fallback that maps to HTTP 412.
+- The negative assertion now records the response body and fails explicitly for any non-422 status.
+- No production runtime, Contract, schema, Worker topology, binding, or API semantics changed.
+- Backup: `backup/pre-moderation-idempotency-join-diagnostic-20261001`.
+- The push-trigger remains bound to the currently admitted/deployed runtime source `825fc273dc7f64bd9413f0493c55c9017ab27268`; no production redeployment is claimed by this test-tooling correction.
+- Status: `NOT_GREEN` pending the next clean Security E2E run.
+
