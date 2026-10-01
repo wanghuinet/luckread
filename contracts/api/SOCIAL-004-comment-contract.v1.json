@@ -1,0 +1,26 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/api/SOCIAL-004-comment-contract.v1.json",
+  "title":"SOCIAL-004 Comment / Reply Contract",
+  "version":"1.0.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "featureId":"SOCIAL-004",
+  "authority":{"domain":"SOCIAL","worker":"W05","d1":"D1-02","entity":"ENT-SOCIAL-COMMENT","table":"social_comments"},
+  "operations":[
+    {"operationId":"listComments","method":"GET","path":"/v1/contents/{contentId}/comments","semantics":"Cursor-paginated visible comments and replies for one content resource.","d1ReadMax":1,"d1WriteMax":0,"pageSizeDefault":20,"pageSizeMax":50,"replyDepthMax":3},
+    {"operationId":"createComment","method":"POST","path":"/v1/contents/{contentId}/comments","semantics":"Create a root comment or reply when parentId is supplied.","d1ReadMax":1,"d1WriteMax":1,"idempotencyRequired":true,"idempotencyKey":"clientOperationId","requestBody":["body","parentId?"]},
+    {"operationId":"patchCommentsCommentId","method":"PATCH","path":"/v1/comments/{commentId}","semantics":"Edit an owned comment under optimistic version/state checks.","d1ReadMax":1,"d1WriteMax":1,"idempotencyRequired":true,"idempotencyKey":"clientOperationId"},
+    {"operationId":"deleteCommentsCommentId","method":"DELETE","path":"/v1/comments/{commentId}","semantics":"Soft-delete a comment with durable deletion state; repeated delete is idempotent.","d1ReadMax":1,"d1WriteMax":1,"idempotencyRequired":true,"idempotencyKey":"clientOperationId"}
+  ],
+  "target":{"targetType":"content","targetId":"contentId","parentRelation":"parentId references an existing comment in the same content scope"},
+  "authorization":{"createPermission":"comment.create","readPermission":"comment.read","editPermission":"comment.update","deletePermission":"comment.delete","actorServerDerived":true,"ownerServerDerived":true,"contentScopeVerified":true,"blockMutePolicy":true,"moderationPolicyRequired":true,"failClosedWhenAuthorityUnavailable":true},
+  "lifecycle":{"states":["PENDING","PUBLISHED","REJECTED","DELETED"],"initial":"PENDING","editable":["PUBLISHED"],"terminal":["REJECTED","DELETED"],"moderation":"A comment may be accepted, rejected or held without trusting client-supplied state."},
+  "tree":{"rootParentId":null,"maxDepth":3,"stableOrder":"createdAt DESC, commentId DESC","noUnboundedRecursion":true},
+  "persistence":{"authoritativeEntity":"ENT-SOCIAL-COMMENT","table":"social_comments","d1ReadMax":1,"d1WriteMax":1,"rpcMax":0,"counterNotAuthoritative":true},
+  "events":{"created":"comment.created","deleted":"comment.deleted","syncConsumersMax":0,"asyncEventsMax":1,"fanoutMax":0},
+  "antiAbuse":{"required":true,"beforeMutation":true,"scopes":["ip","device","account","endpoint","resource","global"],"actions":["ALLOW","THROTTLE","CHALLENGE","BLOCK","REVIEW"]},
+  "moderation":{"policyHookRequired":true,"blockedOrRejectedContentNeverExposed":true,"reportBoundary":"SOCIAL comment may create a ModerationCase without duplicating moderation authority"},
+  "cache":{"publicOnlyWhenPolicyAllows":true,"nonAuthoritative":true,"invalidationOnMutationRequired":true},
+  "nonGoals":["No Payload Collection.","No new Worker.","No new D1 database.","No new Task.","No synchronous fan-out.","No runtime GREEN claim."],
+  "requiredEvidence":["OpenAPI","DTO","permission","state","resource","persistence","moderation","anti-abuse","runtime","concurrency","security-E2E","Evidence Registry"]
+}
