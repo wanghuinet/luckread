@@ -1,0 +1,31 @@
+name: W07 Membership State Machine CI
+on:
+  pull_request:
+    paths:
+      - 'workers/W07-subscription-commerce/**'
+      - 'contracts/alignment/subscription-state-machine-reconciliation.v1.json'
+      - 'contracts/entity/MEMBERSHIP-SUBSCRIPTION-ENTITLEMENT-field-contract.v1.json'
+      - 'contracts/persistence/MEMBERSHIP-D1-01-subscription-entitlement-persistence.v1.json'
+      - 'contracts/admission/W07-subscription-implementation-admission.v1.json'
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W07-subscription-commerce/**'
+      - 'contracts/alignment/subscription-state-machine-reconciliation.v1.json'
+      - 'contracts/entity/MEMBERSHIP-SUBSCRIPTION-ENTITLEMENT-field-contract.v1.json'
+      - 'contracts/persistence/MEMBERSHIP-D1-01-subscription-entitlement-persistence.v1.json'
+      - 'contracts/admission/W07-subscription-implementation-admission.v1.json'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm exec vitest run workers/W07-subscription-commerce/src/subscription-state-machine.test.ts
