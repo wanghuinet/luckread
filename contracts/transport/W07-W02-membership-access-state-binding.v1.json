@@ -55,7 +55,7 @@
     },
     "defenseInDepth": {
       "userScope": "W02 requires actor=user transitions to target a subscription whose subscriber_id equals X-LuckRead-Principal-User-Id.",
-      "entitlementScope": "W02 REVOKE requires entitlement_id to belong to the same subscription_id being transitioned."
+      "entitlementScope": "W02 terminal REVOKE derives scope from subscription_id and revokes all ACTIVE grants for that subscription; client entitlement identifiers are not authoritative."
     },
     "futureTrustedActors": "system/creator/admin/payment require a separately admitted trusted authority path; they are not reachable through the current W01-facing transition boundary."
   },
