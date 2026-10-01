@@ -139,13 +139,58 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "comment.delete"
+      ],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/SOCIAL-004-comment-contract.v1.json",
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 1,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 2,
+        "d1WriteRowsMax": 2,
+        "rpcMax": 0,
+        "responseItemsMax": 1
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "depthBounded": true
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "device",
+          "account",
+          "endpoint",
+          "resource"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "security": [
+        "author_or_moderator_server_derived",
+        "durable_delete",
+        "block_policy",
+        "mass_assignment_protection"
+      ]
     },
     {
       "operationId": "deleteCommentsCommentIdLikes",
@@ -579,7 +624,7 @@
         "mode": "permission"
       },
       "permissions": [
-        "content.read.public"
+        "comment.read"
       ],
       "auditRequired": false,
       "optimisticLockRequired": false,
@@ -1511,13 +1556,61 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "permissions": [
+        "comment.update"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/SOCIAL-004-comment-contract.v1.json",
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 1,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 4,
+        "d1WriteRowsMax": 2,
+        "rpcMax": 0,
+        "responseItemsMax": 1
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "depthBounded": true
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "device",
+          "account",
+          "endpoint",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK",
+          "REVIEW"
+        ]
+      },
+      "security": [
+        "author_server_derived",
+        "version_compare_and_swap",
+        "moderation_policy",
+        "mass_assignment_protection"
+      ]
     },
     {
       "operationId": "patchContentContentId",
@@ -2050,7 +2143,7 @@
       ],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none"
     },
     {
