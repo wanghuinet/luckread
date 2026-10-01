@@ -18,6 +18,11 @@ type ContentPage = {
   hasMore: boolean
 }
 
+type ContentApiResponse = {
+  data?: ContentPage
+  error?: { message?: string } | null
+}
+
 const labels: Record<ContentType | 'all', string> = {
   all: '全部',
   article: '文章',
@@ -51,7 +56,7 @@ export default function ContentBrowsePage() {
         headers: { accept: 'application/json' },
         cache: 'no-store',
       })
-      const data: unknown = await response.json().catch((): null => null)
+      const data: ContentApiResponse = await response.json().catch((): null => null)
       if (!response.ok || !data?.data) {
         throw new Error(data?.error?.message || '内容加载失败')
       }
