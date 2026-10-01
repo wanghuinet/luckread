@@ -2232,45 +2232,6 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "pauseSubscription",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "subscription.pause"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": true,
-      "stateMachine": "subscription"
-    },
-    {
-      "operationId": "resumeSubscription",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "subscription.resume"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": true,
-      "stateMachine": "subscription"
-    },
-    {
-      "operationId": "changeSubscriptionPlan",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "subscription.change_plan"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": true,
-      "stateMachine": "subscription"
     }
   ]
 }
