@@ -64,6 +64,8 @@ describe('Creator Center admin extension', () => {
     expect(homeFeed).toContain('const cover = item.coverRef')
     expect(homeFeed).not.toContain('item.coverRef || item.mediaRefs?.[0]')
     expect(homeFeed).toContain('content-feed-card-skeleton')
+    expect(homeFeed).toContain('const [retryKey, setRetryKey] = useState(0)')
+    expect(homeFeed).toContain('setRetryKey((value) => value + 1)')
     expect(homeFeed).toContain('Array.from({ length: 3 }')
     expect(homeFeed).toContain("const [error, setError] = useState(false)")
     expect(homeFeed).toContain('内容暂时无法加载。')
