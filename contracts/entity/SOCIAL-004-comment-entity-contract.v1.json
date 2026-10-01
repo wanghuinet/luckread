@@ -1,0 +1,25 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/entity/SOCIAL-004-comment-entity-contract.v1.json",
+  "title":"SOCIAL-004 Comment Entity Contract",
+  "version":"1.0.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "entityId":"ENT-SOCIAL-COMMENT",
+  "name":"SocialComment",
+  "classification":"AUTHORITATIVE",
+  "domainId":"D1-02",
+  "fields":[
+    {"fieldId":"ENT-SOCIAL-COMMENT-F-COMMENT-ID","name":"commentId","type":"text","nullable":false,"required":true,"unique":true,"indexed":true,"lifecycle":"immutable","classification":"INTERNAL_IDENTIFIER"},
+    {"fieldId":"ENT-SOCIAL-COMMENT-F-AUTHOR-USER-ID","name":"authorUserId","type":"text","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"INTERNAL_RELATION"},
+    {"fieldId":"ENT-SOCIAL-COMMENT-F-TARGET-TYPE","name":"targetType","type":"enum","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"RESOURCE_SCOPE","allowedValues":["content"]},
+    {"fieldId":"ENT-SOCIAL-COMMENT-F-TARGET-ID","name":"targetId","type":"text","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"INTERNAL_RELATION"},
+    {"fieldId":"ENT-SOCIAL-COMMENT-F-PARENT-ID","name":"parentId","type":"text","nullable":true,"required":false,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"THREAD_RELATION"},
+    {"fieldId":"ENT-SOCIAL-COMMENT-F-BODY","name":"body","type":"text","nullable":false,"required":true,"unique":false,"indexed":false,"lifecycle":"mutable","classification":"USER_CONTENT"},
+    {"fieldId":"ENT-SOCIAL-COMMENT-F-STATE","name":"state","type":"enum","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"stateful","classification":"LIFECYCLE_STATE","allowedValues":["PENDING","PUBLISHED","REJECTED","DELETED"]},
+    {"fieldId":"ENT-SOCIAL-COMMENT-F-VERSION","name":"version","type":"integer","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"monotonic","classification":"RESOURCE_VERSION"},
+    {"fieldId":"ENT-SOCIAL-COMMENT-F-CREATED-AT","name":"createdAt","type":"datetime","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"AUDIT_METADATA"},
+    {"fieldId":"ENT-SOCIAL-COMMENT-F-UPDATED-AT","name":"updatedAt","type":"datetime","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"mutable","classification":"AUDIT_METADATA"},
+    {"fieldId":"ENT-SOCIAL-COMMENT-F-DELETED-AT","name":"deletedAt","type":"datetime","nullable":true,"required":false,"unique":false,"indexed":true,"lifecycle":"stateful","classification":"AUDIT_METADATA"}
+  ],
+  "keyRules":["parentId must remain in the same target content scope.","Maximum nesting depth is 3.","Deleted comments retain durable state; display uses policy-filtered projection rather than physical row deletion.","Body is bounded by API at 10000 characters.","Author is server-derived and cannot be mass-assigned by client input."]
+}
