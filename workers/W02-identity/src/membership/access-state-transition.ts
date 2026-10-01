@@ -85,12 +85,18 @@ export function validateTransition(input: TransitionInput): void {
   if (!transitions[input.from + ':' + input.to].includes(input.actor)) {
     throw new MembershipAccessStateError('ACTOR_NOT_ALLOWED')
   }
+  if (input.to === 'ACTIVE' && input.entitlementAction !== 'GRANT') {
+    throw new MembershipAccessStateError('INVALID_ENTITLEMENT_GRANT')
+  }
+  if ((input.to === 'CANCELED' || input.to === 'EXPIRED') && input.entitlementAction !== 'REVOKE') {
+    throw new MembershipAccessStateError('INVALID_ENTITLEMENT_REVOKE')
+  }
   if (input.entitlementAction === 'GRANT') {
     if (input.to !== 'ACTIVE' || !input.entitlementId || !input.entitlementType || !input.scopeType || !input.scopeId || !input.sourcePlanVersion) {
       throw new MembershipAccessStateError('INVALID_ENTITLEMENT_GRANT')
     }
   }
-  if (input.entitlementAction === 'REVOKE' && input.to !== 'CANCELED' && input.to !== 'EXPIRED') {
+  if (input.entitlementAction === 'REVOKE' && !input.entitlementId) {
     throw new MembershipAccessStateError('INVALID_ENTITLEMENT_REVOKE')
   }
 }
