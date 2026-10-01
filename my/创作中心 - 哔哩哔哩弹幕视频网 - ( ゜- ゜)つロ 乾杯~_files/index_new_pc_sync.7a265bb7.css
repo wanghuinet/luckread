@@ -1,0 +1,152 @@
+html {
+  -ms-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, Helvetica Neue, Helvetica, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif;;
+}
+
+@media screen and (-webkit-min-device-pixel-ratio: 2), screen and (min-resolution: 2dppx) {
+  html {
+    -webkit-font-smoothing: antialiased;
+    font-smoothing: antialiased;
+  }
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+.im-root,
+.im-root * {
+  font-size: 8.13953vw;
+  line-height: 20.93023vw;
+}
+
+.im-root {
+  text-decoration: none;
+  color: #212121;
+}
+
+.im-root a,
+.im-root a:hover,
+.im-root a:active,
+.im-root a:link,
+.im-root a:visited {
+  text-decoration: none;
+  color: inherit;
+}
+
+.im-root {
+  position: absolute;
+  overflow: hidden;
+  width: 100%;
+  height: 99%;
+  cursor: pointer;
+}
+
+.im-text {
+  display: block;
+  width: 100%;
+  height: 100%;
+  text-align: left;
+  text-decoration: none;
+}
+
+.im-list-box {
+  width: 100vw;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: #fff;
+  box-shadow: 0 1.74419vw 3.48837vw 0 rgba(0, 0, 0, 0.2);
+  border-radius: 1.16279vw;
+  overflow: hidden;
+  padding: 5.81395vw 0;
+}
+
+.im-list {
+  display: block;
+  text-align: left;
+  position: relative;
+  line-height: 20.93023vw;
+  height: 20.93023vw;
+  padding-left: 11.62791vw;
+  transition: background-color 0.3s;
+}
+
+.im-list:hover {
+  color: #212121 !important;
+  background-color: #f4f4f4 !important;
+}
+
+.im-notify {
+  position: absolute;
+  background-color: #fa5a57;
+}
+
+.im-notify.im-number {
+  box-sizing: border-box;
+  min-width: 9.30233vw;
+  height: 9.30233vw;
+  padding: 0 2.32558vw;
+  border-radius: 4.65116vw;
+  line-height: 9.30233vw;
+  font-size: 6.97674vw;
+  text-align: center;
+  color: #fff;
+}
+
+.im-notify.im-number.im-center {
+  top: 5.81395vw;
+  right: 11.62791vw;
+}
+
+.im-notify.im-dot {
+  top: 7.55814vw;
+  right: -5.81395vw;
+  width: 3.48837vw;
+  height: 3.48837vw;
+  border-radius: 100%;
+}
+
+.im-notify.im-dot.im-center {
+  top: 8.72093vw;
+  right: 11.62791vw;
+}
+
+.im-show {
+  display: block !important;
+}
+
+.arrow {
+  position: absolute;
+  top: 4.06977vw;
+  right: 11.62791vw;
+  width: 8.13953vw;
+  height: 12.7907vw;
+}
+
+.arrow::before,
+.arrow::after {
+  content: '';
+  display: block;
+  background: #979797;
+  width: 4.65116vw;
+  height: 1px;
+  position: absolute;
+}
+
+.arrow::before {
+  top: 4.65116vw;
+  right: 1.16279vw;
+  transform: rotate(45deg);
+}
+
+.arrow::after {
+  bottom: 4.65116vw;
+  right: 1.16279vw;
+  transform: rotate(-45deg);
+}
+
