@@ -26,6 +26,7 @@ const domainById = Object.fromEntries(
     .map(([domain, id]) => [id, domain]),
 )
 
+// Scan runtime binding syntax only; comments and quoted literals are removed before matching.
 const bindingPattern = /\.\s*(D1(?:_0[1-4])?|DB)\b/g
 const destructuredBindingPattern = /\{\s*(D1(?:_0[1-4])?|DB)\s*(?:,|\})/g
 const stripCommentsAndStrings = (source) =>
