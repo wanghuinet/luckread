@@ -154,6 +154,7 @@ export default function ContentBrowsePage() {
           {page.hasMore && page.nextCursor ? (
             <div className="content-browse-more">
               <button
+                aria-busy={loadingMore}
                 className="button button-quiet"
                 disabled={loadingMore}
                 onClick={() => void load(page.nextCursor)}

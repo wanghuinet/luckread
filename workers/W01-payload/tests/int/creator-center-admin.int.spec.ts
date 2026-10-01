@@ -72,6 +72,7 @@ describe('Creator Center admin extension', () => {
     expect(contentBrowse).toContain('content-feed-card-skeleton')
     expect(contentBrowse).toContain('Array.from({ length: 6 }')
     expect(contentBrowse).toContain('aria-busy="true"')
+    expect(contentBrowse).toContain('aria-busy={loadingMore}')
     expect(contentBrowse).toContain('role="status"')
     expect(read('src/app/(frontend)/styles.css')).toContain('@media (prefers-reduced-motion: reduce)')
     expect(read('src/app/(frontend)/styles.css')).toContain('.content-feed-card-skeleton')
@@ -90,6 +91,7 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('新建内容')
 
     expect(publisher).toContain('disabled={busy || reviewLocked}')
+    expect(publisher).toContain('<div className="lr-composer-card" aria-busy={busy}>')
 
     expect(publisher).toContain('当前状态')
     expect(publisher).toContain('版本 {draft.version}')
