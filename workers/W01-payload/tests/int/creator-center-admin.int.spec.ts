@@ -155,7 +155,7 @@ describe('Creator Center admin extension', () => {
     expect(list).toContain('加载更多')
     expect(list).toContain('page.hasMore && page.nextCursor')
     expect(list).toContain('role="status" aria-busy="true"')
-    expect(list).toContain('className={styles.contentManageState} role="alert"')
+    expect(list).toContain('<div className={styles.contentManageState} role="alert">')
     expect(list).toContain('aria-busy={loadingMore}')
     expect(list).toContain('items: [...current.items, ...(next.items ?? [])]')
     expect(list).toContain('const [loadingMore, setLoadingMore]')
