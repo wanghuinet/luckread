@@ -24,6 +24,7 @@ Subscription state machine
 - Terminal subscription cancellation/expiry now revokes all ACTIVE entitlement grants for the transitioning subscription atomically.
 - W07 no longer trusts W01-supplied subscription state/version; it reads the authoritative D1-01 snapshot from W02 before lifecycle validation.
 - `getSubscription` public read path implemented as W01→W07→W02 with authenticated L2 self scope.
+- SOCIAL-004 ownership conflict reconciled: stale `W00` CommentState writer is now aligned to canonical W05; Comment implementation admission remains separate and blocked.
 
 ## Still blocked
 
