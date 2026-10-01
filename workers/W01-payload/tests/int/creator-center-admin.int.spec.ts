@@ -125,6 +125,8 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("credentials: 'include'")
     expect(contentClient).toContain('resolveCookieContentPrincipal')
     expect(createRoute).toContain('resolveCookieContentPrincipal')
+    expect(read('src/app/api/v1/contents/route.ts')).toContain('resolveCookieContentPrincipal')
+    expect(read('src/app/api/v1/contents/route.ts')).toContain("pathname: '/internal/content/contents'")
     expect(createRoute).toContain("pathname: '/internal/content/contents'")
     expect(updateRoute).toContain('export async function DELETE')
     expect(updateRoute).toContain('export async function PATCH')
