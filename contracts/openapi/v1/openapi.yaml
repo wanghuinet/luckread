@@ -635,8 +635,10 @@ paths:
       - $ref: '#/components/parameters/ContentId'
     get:
       tags: [Comments]
-      summary: List content comments
+      summary: Discovery-only plural alias for Comment listing; canonical path is singular.
       operationId: listComments
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
@@ -649,8 +651,10 @@ paths:
         '4XX': { $ref: '#/components/responses/ClientError' }
     post:
       tags: [Comments]
-      summary: Create content comment
+      summary: Discovery-only plural alias for Comment creation; canonical path is singular.
       operationId: createComment
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -1657,25 +1661,51 @@ paths:
           description: Discovery-only operation; detailed response contract remains to be closed.
 
   /content/{contentId}/comments:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
     get:
-      tags: [Interactions]
-      summary: Discovery draft for GET undefined
+      tags: [Comments]
+      summary: Canonical content comment listing surface
       operationId: getContentContentIdComments
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/social-comment-operation-policy.v1.json
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Comment thread (cursor paginated, depth-limited).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListResponse' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
 
     post:
-      tags: [Interactions]
-      summary: Discovery draft for POST undefined
+      tags: [Comments]
+      summary: Canonical content comment creation surface
       operationId: postContentContentIdComments
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/social-comment-operation-policy.v1.json
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              additionalProperties: false
+              properties:
+                body: { type: string, minLength: 1, maxLength: 10000 }
+                parentId: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '201':
+          description: Created. May enter PENDING when moderation is required.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Comment' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /content/{contentId}/favorites:
     delete:
@@ -2761,13 +2791,17 @@ components:
         size: { type: integer, minimum: 1 }
         checksum: { type: string }
         status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
+    CommentState:
+      type: string
+      enum: [PENDING, VISIBLE, HIDDEN, FLAGGED, UNDER_REVIEW, REJECTED, DELETED, AUTHOR_DELETED]
+      description: Canonical Comment lifecycle/moderation state; authoritative source is contracts/enums/comment-state.json.
     Comment:
       type: object
       required: [id, body, state]
       properties:
         id: { $ref: '#/components/schemas/ResourceId' }
         body: { type: string }
-        state: { enum: [PENDING, PUBLISHED, REJECTED] }
+        state: { $ref: '#/components/schemas/CommentState' }
     InteractionTarget:
       type: object
       required: [targetType, targetId]
