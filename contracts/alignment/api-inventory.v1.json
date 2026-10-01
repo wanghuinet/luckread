@@ -680,13 +680,17 @@
       "path": "/v1/entitlements/{subjectId}",
       "openapiPath": "/entitlements/{subjectId}",
       "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "MON-006"
+      ],
+      "schemaRef": "contracts/dto/MEMBERSHIP-SUBSCRIPTION-DTO.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/entitlements/{subjectId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+        "contracts/api/MEMBERSHIP-SUBSCRIPTION-ENTITY-BINDING.v1.json"
       ]
     },
     {
@@ -905,13 +909,17 @@
       "path": "/v1/memberships/subscriptions/{subscriptionId}",
       "openapiPath": "/memberships/subscriptions/{subscriptionId}",
       "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "MON-005"
+      ],
+      "schemaRef": "contracts/dto/MEMBERSHIP-SUBSCRIPTION-DTO.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/memberships/subscriptions/{subscriptionId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+        "contracts/api/MEMBERSHIP-SUBSCRIPTION-ENTITY-BINDING.v1.json"
       ]
     },
     {
@@ -1873,13 +1881,17 @@
       "path": "/v1/entitlements/check",
       "openapiPath": "/entitlements/check",
       "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "MON-006"
+      ],
+      "schemaRef": "contracts/dto/MEMBERSHIP-SUBSCRIPTION-DTO.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/entitlements/check",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+        "contracts/api/MEMBERSHIP-SUBSCRIPTION-ENTITY-BINDING.v1.json"
       ]
     },
     {
@@ -2085,13 +2097,17 @@
       "path": "/v1/memberships/subscriptions",
       "openapiPath": "/memberships/subscriptions",
       "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "MON-005"
+      ],
+      "schemaRef": "contracts/dto/MEMBERSHIP-SUBSCRIPTION-DTO.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+        "contracts/api/MEMBERSHIP-SUBSCRIPTION-ENTITY-BINDING.v1.json"
       ]
     },
     {
@@ -2100,13 +2116,17 @@
       "path": "/v1/memberships/subscriptions/{subscriptionId}/cancel",
       "openapiPath": "/memberships/subscriptions/{subscriptionId}/cancel",
       "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "MON-005"
+      ],
+      "schemaRef": "contracts/dto/MEMBERSHIP-SUBSCRIPTION-DTO.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/cancel",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+        "contracts/api/MEMBERSHIP-SUBSCRIPTION-ENTITY-BINDING.v1.json"
       ]
     },
     {
