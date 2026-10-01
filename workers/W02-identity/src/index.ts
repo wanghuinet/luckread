@@ -3,6 +3,7 @@ import { reconcileCompletedRegistrationMaterialization } from './account/registr
 import { resolveGlobalLayer } from './authz/role-assignment.js'
 import { mapMembershipError } from './membership/access-state-transition.js'
 import { readSocialActorAccountState, mapSocialAccountStateReadError } from './social/account-state-read.js'
+import { readMembershipSubscription, mapMembershipSubscriptionReadError } from './membership/subscription-read.js'
 import { createSubscription, transitionSubscription } from './membership/access-state-persistence.js'
 import {
   AccountStateTransitionError,
@@ -70,6 +71,25 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
+
+    if (request.method === 'POST' && url.pathname === '/internal/membership/subscriptions/read') {
+      const body = await readJsonBody<{ subscriptionId?: unknown }>(request)
+      const input = {
+        caller: request.headers.get('X-LuckRead-Caller') ?? '',
+        transportVersion: request.headers.get('X-LuckRead-Transport-Version') ?? '',
+        correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
+        principalUserId: request.headers.get('X-LuckRead-Principal-User-Id') ?? '',
+        subscriptionId: typeof body?.subscriptionId === 'string' ? body.subscriptionId : '',
+      }
+
+      try {
+        const result = await readMembershipSubscription(env.D1_01, input)
+        return json(result)
+      } catch (error) {
+        const mapped = mapMembershipSubscriptionReadError(error)
+        return json({ error: { code: mapped.code, message: 'membership subscription read denied or unavailable' } }, mapped.status)
+      }
+    }
 
     if (request.method === 'POST' && url.pathname === '/internal/social/actor-account-state') {
       const body = await readJsonBody<{ userId?: unknown }>(request)
