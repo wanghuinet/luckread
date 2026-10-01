@@ -14,14 +14,14 @@ function listDb(
     currentSessionValid: 1,
   },
 ) {
-  let seenSql = ''
-  let seenArgs: unknown[] = []
+  const seenSql: string[] = []
+  const seenArgs: unknown[][] = []
   const db = {
     prepare: (sql: string) => {
-      seenSql = sql
+      seenSql.push(sql)
       return {
         bind: (...args: unknown[]) => {
-          seenArgs = args
+          seenArgs.push(args)
           return {
             all: async <T>() => ({ results: rows as T[] }),
             first: async <T>() => ({ ...authorization, targetOwned: 1 } as T),
@@ -31,7 +31,7 @@ function listDb(
     },
     getSeen: () => ({ seenSql, seenArgs }),
   }
-  return db as unknown as D1Database & { getSeen: () => { seenSql: string; seenArgs: unknown[] } }
+  return db as unknown as D1Database & { getSeen: () => { seenSql: string[]; seenArgs: unknown[][] } }
 }
 
 describe('AUTH-010 session list', () => {
@@ -71,8 +71,10 @@ describe('AUTH-010 session list', () => {
     })
     expect(typeof result.nextCursor).toBe('string')
     expect(result.nextCursor).not.toContain('42')
-    expect(db.getSeen().seenSql).toContain('role_assignments')
-    expect(db.getSeen().seenSql).toContain('current_state.token_version = ?')
+
+    const sql = db.getSeen().seenSql
+    expect(sql.some((statement) => statement.includes('role_assignments'))).toBe(true)
+    expect(sql.some((statement) => statement.includes('current_state.token_version = ?'))).toBe(true)
   })
 
   it('rejects malformed cursors before database execution', async () => {
