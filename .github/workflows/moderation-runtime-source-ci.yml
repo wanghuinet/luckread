@@ -64,8 +64,19 @@ jobs:
       - name: Typecheck W03 moderation boundary
         run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W03-feed/src/content-runtime.ts workers/W03-feed/src/index.ts
 
-      - name: Typecheck W01 moderation gateway
-        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W01-payload/src/moderation/w06-moderation-client.ts workers/W01-payload/src/app/api/v1/admin/moderation/[[...path]]/route.ts
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+          run_install: false
+
+      - name: Install W01 locked dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck W01 moderation gateway and host application
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit --project tsconfig.json --pretty false
 
       - name: Run W06 moderation tests
         run: npx vitest@3.2.4 run workers/W06-governance/src/moderation-runtime.test.ts
