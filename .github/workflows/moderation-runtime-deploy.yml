@@ -7,7 +7,7 @@ on:
         description: Exact source commit to deploy for the coordinated W01/W03/W06 moderation slice
         required: true
         type: string
-        default: 057669c327582b42ceefc270b29bfe5a2ac439f7
+        default: 81986b7510efb20a5dd44f9971ca40794989ddff
       confirm:
         description: Type DEPLOY_MODERATION to permit this controlled deployment
         required: true
@@ -20,19 +20,19 @@ permissions:
 
 jobs:
   deploy:
-    if: ${ inputs.confirm == 'DEPLOY_MODERATION' }}
+    if: ${{ inputs.confirm == 'DEPLOY_MODERATION'  }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
       - name: Checkout exact source commit
         uses: actions/checkout@v4
         with:
-          ref: ${ inputs.source_sha }}
+          ref: ${{ inputs.source_sha  }}
 
       - name: Verify moderation source CI admission
         env:
-          GH_TOKEN: ${ github.token }}
-          SOURCE_SHA: ${ inputs.source_sha }}
+          GH_TOKEN: ${{ github.token  }}
+          SOURCE_SHA: ${{ inputs.source_sha  }}
         run: |
           set -euo pipefail
           conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow moderation-runtime-source-ci.yml --commit "$SOURCE_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
@@ -75,8 +75,8 @@ jobs:
       - name: Deploy W03 content authority first
         working-directory: workers/W03-feed
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
         run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
 
       - name: Record W03 deployment
@@ -85,14 +85,14 @@ jobs:
       - name: Deploy W06 moderation authority
         working-directory: workers/W06-governance
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
         run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
 
       - name: Verify W06 deployment record
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
         run: |
           set -euo pipefail
           npx --yes wrangler@4.116.0 deployments list --name luckread-w06 --json > /tmp/w06-deployments.json
@@ -109,8 +109,8 @@ jobs:
       - name: Deploy W01 moderation gateway
         working-directory: workers/W01-payload
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
         run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
 
       - name: Capture coordinated deployment provenance
@@ -118,7 +118,7 @@ jobs:
           mkdir -p artifacts/mapping-0/moderation-runtime-deploy
           cat > artifacts/mapping-0/moderation-runtime-deploy/provenance.txt <<EOF
           workflow=Moderation Runtime Deploy
-          source_sha=${ inputs.source_sha }}
+          source_sha=${{ inputs.source_sha  }}
           confirmation=DEPLOY_MODERATION
           workers=luckread-w03,luckread-w06,luckread-w01-payload
           new_workers=0
@@ -129,7 +129,7 @@ jobs:
       - name: Upload deployment evidence
         uses: actions/upload-artifact@v4
         with:
-          name: moderation-runtime-deployment-${ inputs.source_sha }}
+          name: moderation-runtime-deployment-${{ inputs.source_sha  }}
           path: artifacts/mapping-0/moderation-runtime-deploy/
           if-no-files-found: error
           retention-days: 14
