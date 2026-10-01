@@ -408,3 +408,10 @@
     animation-duration:.01ms !important; animation-iteration-count:1 !important;
   }
 }
+
+.creatorLayout a:focus-visible,
+.creatorLayout button:focus-visible,
+.creatorLayout select:focus-visible {
+  outline:3px solid rgba(37,99,235,.4);
+  outline-offset:2px;
+}
