@@ -286,6 +286,9 @@ a { color: inherit; }
   font-size: 18px;
   line-height: 2;
 }
+.content-detail-paragraph + .content-detail-paragraph {
+  margin-top: 1.35em;
+}
 .content-detail-muted { color: #8a97a9 !important; }
 .content-detail-state {
   min-height: 70vh;
