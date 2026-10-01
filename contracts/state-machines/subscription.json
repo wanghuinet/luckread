@@ -6,101 +6,29 @@
   "x-luckread": {
     "state-field": "status",
     "requires-optimistic-lock": true,
-    "terminal-states": [
-      "EXPIRED",
-      "CANCELED"
-    ],
-    "states": [
-      "PENDING",
-      "ACTIVE",
-      "PAST_DUE",
-      "PAUSED",
-      "CANCELED",
-      "EXPIRED"
-    ]
+    "terminal-states": ["EXPIRED", "CANCELED"],
+    "states": ["PENDING", "ACTIVE", "PAST_DUE", "PAUSED", "CANCELED", "EXPIRED"]
   },
   "x-transitions": [
-    {
-      "from": "PENDING",
-      "to": "ACTIVE",
-      "actor": "system|payment"
-    },
-    {
-      "from": "ACTIVE",
-      "to": "PAST_DUE",
-      "actor": "system|payment"
-    },
-    {
-      "from": "PAST_DUE",
-      "to": "ACTIVE",
-      "actor": "system|payment"
-    },
-    {
-      "from": "ACTIVE",
-      "to": "PAUSED",
-      "actor": "user|admin"
-    },
-    {
-      "from": "PAUSED",
-      "to": "ACTIVE",
-      "actor": "user|admin"
-    },
-    {
-      "from": "ACTIVE",
-      "to": "CANCELED",
-      "actor": "user|creator|admin|system"
-    },
-    {
-      "from": "PAST_DUE",
-      "to": "CANCELED",
-      "actor": "admin|system"
-    },
-    {
-      "from": "PAUSED",
-      "to": "CANCELED",
-      "actor": "user|admin|system"
-    },
-    {
-      "from": "ACTIVE",
-      "to": "EXPIRED",
-      "actor": "system"
-    },
-    {
-      "from": "PAST_DUE",
-      "to": "EXPIRED",
-      "actor": "system"
-    },
-    {
-      "from": "PAUSED",
-      "to": "EXPIRED",
-      "actor": "system"
-    }
+    {"from":"PENDING","to":"ACTIVE","actor":"system|payment"},
+    {"from":"ACTIVE","to":"PAST_DUE","actor":"system|payment"},
+    {"from":"PAST_DUE","to":"ACTIVE","actor":"system|payment"},
+    {"from":"ACTIVE","to":"PAUSED","actor":"user|admin"},
+    {"from":"PAUSED","to":"ACTIVE","actor":"user|admin"},
+    {"from":"ACTIVE","to":"CANCELED","actor":"user|creator|admin|system"},
+    {"from":"PAST_DUE","to":"CANCELED","actor":"admin|system"},
+    {"from":"PAUSED","to":"CANCELED","actor":"user|admin|system"},
+    {"from":"ACTIVE","to":"EXPIRED","actor":"system"},
+    {"from":"PAST_DUE","to":"EXPIRED","actor":"system"},
+    {"from":"PAUSED","to":"EXPIRED","actor":"system"}
   ],
   "x-forbidden": [
-    {
-      "from": "CANCELED",
-      "to": "ACTIVE"
-    },
-    {
-      "from": "CANCELED",
-      "to": "PAUSED"
-    },
-    {
-      "from": "EXPIRED",
-      "to": "ACTIVE"
-    },
-    {
-      "from": "EXPIRED",
-      "to": "CANCELED"
-    },
-    {
-      "from": "EXPIRED",
-      "to": "PAUSED"
-    },
-    {
-      "from": "PAUSED",
-      "to": "PENDING"
-    }
+    {"from":"CANCELED","to":"ACTIVE"},
+    {"from":"CANCELED","to":"PAUSED"},
+    {"from":"EXPIRED","to":"ACTIVE"},
+    {"from":"EXPIRED","to":"CANCELED"},
+    {"from":"EXPIRED","to":"PAUSED"},
+    {"from":"PAUSED","to":"PENDING"}
   ],
   "reconciliation": {
     "changeControl": "CC-SUBSCRIPTION-STATE-API-RECONCILIATION-2026-10-02",
