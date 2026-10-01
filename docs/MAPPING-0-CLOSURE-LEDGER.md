@@ -4607,3 +4607,14 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Registry record: `EVD-SAFETY001-MODERATION-AUDITEVENT-D1-03-001`, result `PASS`, status `CREATED` because the canonical registry freshness anchor `testedCommitSha=53e3bcbb855be8e1240171390c69dd034bf04f8b` predates this evidence.
 - Backup before Registry update: `backup/pre-moderation-audit-evidence-registry-20261001`.
 - This evidence proves the D1-03 AuditEvent persistence boundary; it does not by itself close the broader SAFETY-001 feature or Mapping 0.
+
+
+## 2026-10-01 — Moderation D1-03 migration verification run 36814197276 PASS
+
+- Run `36814197276` completed SUCCESS for `Moderation D1-03 Migration` using `mode=VERIFY_ONLY`.
+- Exact source checked out: `81986b7510efb20a5dd44f9971ca40794989ddff`; D1-03 binding matched `secondary` and UUID `bda1d247-a371-4244-91ae-aef96034db7f`.
+- Moderation source CI, local migration syntax/schema invariants, remote preflight, required moderation tables, and remote migration-record capture all passed. The APPLY step was skipped by design, so this run performed no remote schema mutation.
+- Remote artifact: `11140833570`, `moderation-d1-03-migration-36814197276`, digest `sha256:e98eda3422cec0ba632723b4bffbd8bf649aff2c0268bb54d154906414ecaf0f`.
+- Registry record: `EVD-SAFETY001-MODERATION-D1-03-MIGRATION-001`, result `PASS`, status `CREATED` because the canonical registry freshness anchor remains historical.
+- Backup before Registry update: `backup/pre-moderation-d1-03-migration-evidence-registry-20261001`.
+- This verifies the existing D1-03 moderation persistence boundary; it does not by itself make the global Evidence Registry or Mapping 0 GREEN.
