@@ -607,7 +607,21 @@ export default function PublishComposer({
             <span className="lr-preview-type">{type === 'article' ? '文章' : type === 'post' ? '动态' : '视频'}</span>
             <h2>{title.trim() || '未填写标题'}</h2>
             <p className="lr-preview-body">{body.trim() || '暂无正文'}</p>
-            {assets.length ? <div className="lr-preview-media">已添加 {assets.length} 个媒体文件</div> : null}
+            {coverRef.trim() || assets[0]?.url ? (
+              <div className="lr-preview-cover">
+                <img alt="" loading="eager" src={coverRef.trim() || assets[0]?.url} />
+              </div>
+            ) : null}
+            {assets.length ? (
+              <div className="lr-preview-media">
+                {assets.slice(0, 4).map((asset) =>
+                  asset.mimeType.startsWith('video/')
+                    ? <video controls key={asset.id} muted playsInline preload="metadata" src={asset.url} />
+                    : <img alt={asset.filename ?? ''} key={asset.id} loading="lazy" src={asset.url} />,
+                )}
+                {assets.length > 4 ? <span>+{assets.length - 4} 个媒体</span> : null}
+              </div>
+            ) : null}
           </article>
         </section>
       ) : null}
