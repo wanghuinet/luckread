@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS membership_subscriptions (
   plan_id TEXT NOT NULL,
   plan_version INTEGER NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('PENDING','ACTIVE','PAST_DUE','CANCELED','EXPIRED')),
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
   started_at TEXT NOT NULL,
   current_period_start TEXT NOT NULL,
   current_period_end TEXT NOT NULL,
