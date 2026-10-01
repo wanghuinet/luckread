@@ -256,5 +256,37 @@
       ],
       "status": "BLOCKED"
     }
+
+    ,
+    {
+      "entityId": "ENT-SOCIAL-REACTION",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "schemaEvidenceRefs": [],
+      "migrationEvidenceRefs": [],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "No concrete implementation evidence recorded; contract-only model."
+      ],
+      "status": "BLOCKED"
+    }
+
+    ,
+    {
+      "entityId": "ENT-SOCIAL-COMMENT",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "schemaEvidenceRefs": [],
+      "migrationEvidenceRefs": [],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "No concrete implementation evidence recorded; contract-only model."
+      ],
+      "status": "BLOCKED"
+    }
 ]
 }
