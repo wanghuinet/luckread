@@ -74,8 +74,10 @@ jobs:
           test "${{ inputs.w06_deploy_run_id }}" != "REPLACE_WITH_SUCCESSFUL_W06_DEPLOY_RUN_ID"
           run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/${{ inputs.w06_deploy_run_id }}")"
           node -e "const r=JSON.parse(process.argv[1]); if(r.conclusion!==\"success\") throw new Error(\"W06 deployment run is not SUCCESS\"); if(r.name!==\"W06 Governance Deploy\") throw new Error(\"Unexpected W06 deployment workflow: \"+r.name); console.log(JSON.stringify({deploymentRun:r.id,headSha:r.head_sha,conclusion:r.conclusion,workflow:r.name}));" "$run_json"
-          log="$(gh run view "${{ inputs.w06_deploy_run_id }}" --repo "$GITHUB_REPOSITORY" --log)"
-          printf '%s\n' "$log" | grep -F "source_sha=$SOURCE_SHA"
+          rm -rf /tmp/w06-deployment-evidence
+          mkdir -p /tmp/w06-deployment-evidence
+          gh run download "${{ inputs.w06_deploy_run_id }}" --repo "$GITHUB_REPOSITORY" --name "moderation-runtime-deployment-$SOURCE_SHA" --dir /tmp/w06-deployment-evidence
+          grep -Fx "source_sha=$SOURCE_SHA" /tmp/w06-deployment-evidence/provenance.txt
 
       - name: Setup Node 24
         uses: actions/setup-node@v4
