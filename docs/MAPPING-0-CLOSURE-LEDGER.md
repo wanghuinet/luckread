@@ -4450,3 +4450,16 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - The readiness probe was updated at `f62b6614d26e095db349adf29c01d09873ceb758` to include the sanitized JSON response body in the registration failure diagnostic. Secret material is not included.
 - Status remains `NOT_GREEN`; this is now a concrete W01 authentication transport/runtime diagnostic, not the prior external-secret blocker.
 - Next execution: rerun the dedicated Readiness workflow from the updated main head to capture the exact 400 body; then correct only the fixture/input mismatch if the response identifies one.
+
+
+## 2026-10-01 — Moderation L6 readiness run #2 root cause and fixture correction
+
+- Run `36800162350` executed at main head `28a7b2c10a4034af22971ffba7f14bab940da538` and reached the live `POST https://api.luckread.cn/auth/register` call.
+- Exact response: HTTP `400`, code `IDEMPOTENCY_KEY_REQUIRED`, message `Idempotency-Key is required`.
+- Root cause is confirmed in the evidence probe, not the W01 production route: `scripts/moderation-native-l6-readiness.mjs` generated `registerKey` but its `post()` helper discarded custom headers, so the register request omitted the required `Idempotency-Key` header.
+- Cross-check: W01 `/auth/register` explicitly returns this exact 400 when `Idempotency-Key` is missing, while the established AUTH-010 remote E2E helper passes the header explicitly.
+- Corrective commit on main: `e02eaf21ecbc0f6a093af78d2a514bf5f61dcb53`; diff is limited to `scripts/moderation-native-l6-readiness.mjs`.
+- Backup before correction: `backup/pre-moderation-l6-header-fix-20261001`.
+- No production runtime/schema/topology/Contract change was introduced by this correction.
+- Corrected probe has not yet produced runtime evidence. Therefore L6 readiness remains `NOT_GREEN`, and the moderation Security E2E / Decision-Audit-Outbox-W03 evidence chain remains unproven.
+- Next admissible execution: run `.github/workflows/moderation-native-l6-readiness.yml` from the corrected main head `e02eaf21ecbc0f6a093af78d2a514bf5f61dcb53`. Do not rerun the old failed run as current-head evidence.
