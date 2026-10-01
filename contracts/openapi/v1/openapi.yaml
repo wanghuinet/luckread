@@ -1763,13 +1763,53 @@ paths:
   /creator/analytics:
     get:
       tags: [Analytics]
-      summary: Discovery draft for GET undefined
+      summary: Creator-scoped audience and analytics summary
       operationId: getCreatorAnalytics
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/CREATOR-003-006-AUDIENCE-DASHBOARD-READ.v1.json
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Derived creator audience summary; follower/subscriber counts are non-authoritative snapshots.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [audience, source]
+                    additionalProperties: false
+                    properties:
+                      audience:
+                        type: object
+                        required: [followers, subscribers]
+                        additionalProperties: false
+                        properties:
+                          followers:
+                            type: object
+                            required: [total, asOf]
+                            properties:
+                              total: { type: integer, minimum: 0 }
+                              asOf: { type: string, format: date-time }
+                          subscribers:
+                            type: object
+                            required: [activeTotal, asOf]
+                            properties:
+                              activeTotal: { type: integer, minimum: 0 }
+                              asOf: { type: string, format: date-time }
+                      source:
+                        type: object
+                        required: [socialSnapshotVersion, membershipSnapshotVersion]
+                        properties:
+                          socialSnapshotVersion: { type: [string, 'null'] }
+                          membershipSnapshotVersion: { type: [string, 'null'] }
+                  requestId:
+                    $ref: '#/components/schemas/RequestId'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /creator/profile:
     get:
