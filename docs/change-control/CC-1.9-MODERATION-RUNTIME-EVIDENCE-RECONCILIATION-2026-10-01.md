@@ -24,7 +24,7 @@ Proven: exact deployment evidence; Payload-native L6 reviewer; moderation schema
 Observed final remote state: `content=APPROVED/v2/W/"2"`; `case=ACTION_TAKEN/v2`; `decision=APPROVED`; `reviewerLayer=L6`; `outbox=DELIVERED/attempts=1`.
 
 ## Evidence Registry
-Registered evidence: `EVD-SAFETY001-MODERATION-RUNTIME-E2E-001`.
+Recorded evidence: `EVD-SAFETY001-MODERATION-RUNTIME-E2E-001` (`result=PASS`, `status=CREATED`).
 Claim binding: `SAFETY-001::MODERATION-RUNTIME-SECURITY-E2E`.
 Global Registry status remains **NOT_GREEN**. This is a verified sub-gate, not complete SAFETY-001 closure.
 
