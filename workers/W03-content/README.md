@@ -2,7 +2,7 @@
 
 Canonical Worker role: **Content / Article / Media / Translation**.
 
-The repository path `workers/W03-feed` is a physical path retained for compatibility with existing repository history. It is not the logical role name.
+The directory `workers/W03-content` is the canonical physical path for W03; Worker authority remains defined by the Worker Master.
 
 Current authoritative ownership:
 - Primary Tasks: T05, T06, T07, T15
