@@ -161,6 +161,18 @@
         "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
         "contracts/api/moderation-operation-policy.v1.json"
       ]
+    },
+    {
+      "entityId": "ENT-MEMBERSHIP-PLAN",
+      "name": "MembershipPlan",
+      "domainId": "D1-01",
+      "classification": "AUTHORITATIVE",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json",
+        "docs/108-MEMBERSHIP-AND-SUBSCRIPTION-SYSTEM-CONTRACT-v1.0.md",
+        "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md"
+      ]
     }
   ],
   "rules": {
@@ -176,19 +188,5 @@
     "The current entity baseline covers only the explicitly established identity/account contract entities and is not yet proven complete against all Blueprint v2.0 domains.",
     "Proposed entities require explicit field, persistence, authority and lifecycle evidence before promotion.",
     "Step 03 cannot become GREEN until entity completeness and downstream persistence reconciliation pass fail-closed validation."
-    ,
-    {
-      "entityId": "ENT-MEMBERSHIP-PLAN",
-      "name": "MembershipPlan",
-      "domainId": "D1-01",
-      "classification": "AUTHORITATIVE",
-      "status": "PROPOSED",
-      "evidenceRefs": [
-        "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json",
-        "docs/108-MEMBERSHIP-AND-SUBSCRIPTION-SYSTEM-CONTRACT-v1.0.md",
-        "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md"
-      ]
-    }
-
   ]
 }
