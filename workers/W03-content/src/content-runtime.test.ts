@@ -57,6 +57,9 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true)).toBe(false)
     expect(canTransitionContentState('DELETED', 'PUBLISHED', 'CREATOR', true)).toBe(false)
     expect(canTransitionContentState('ARCHIVED', 'PUBLISHED', 'CREATOR', true)).toBe(false)
+    expect(canTransitionContentState('DELETED', 'RESTORED', 'CREATOR', true)).toBe(true)
+    expect(canTransitionContentState('RESTORED', 'DRAFT', 'CREATOR', true)).toBe(true)
+    expect(canTransitionContentState('RESTORED', 'PENDING_REVIEW', 'CREATOR', true)).toBe(false)
   })
 
   it('returns media references from the public listing query', async () => {
