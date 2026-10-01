@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/entity/entity-field-contract-social-003-like.v1.json",
+  "title": "SOCIAL-003 Like Field Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "entityId": "ENT-SOCIAL-LIKE",
+  "fields": [
+    {
+      "fieldId": "ENT-SOCIAL-LIKE-F-LIKE-ID",
+      "name": "likeId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": true,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_IDENTIFIER",
+      "apiExposure": "SCOPED_IDENTIFIER",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-LIKE-F-ACTOR-USER-ID",
+      "name": "actorUserId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_RELATION",
+      "apiExposure": "NONE",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-LIKE-F-RESOURCE-TYPE",
+      "name": "resourceType",
+      "type": "enum",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "RESOURCE_SCOPE",
+      "apiExposure": "SCOPED",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-LIKE-F-RESOURCE-ID",
+      "name": "resourceId",
+      "type": "text",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "INTERNAL_RELATION",
+      "apiExposure": "SCOPED_IDENTIFIER",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SOCIAL-LIKE-F-CREATED-AT",
+      "name": "createdAt",
+      "type": "datetime",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "AUDIT_METADATA",
+      "apiExposure": "SCOPED",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    }
+  ],
+  "allowedResourceTypes": [
+    "content"
+  ],
+  "uniqueness": [
+    "actorUserId + resourceType + resourceId"
+  ],
+  "nonGoals": [
+    "No like counter authority",
+    "No moderation decision authority",
+    "No synchronous projection writes"
+  ]
+}
