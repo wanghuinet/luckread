@@ -1169,6 +1169,24 @@
       "checkId": "MODERATION-RUNTIME-SECURITY-E2E",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36812935998",
       "freshnessMode": "EXECUTED_AT_TESTED_COMMIT"
+    },
+    {
+      "evidenceId": "EVD-SAFETY001-MODERATION-AUDITEVENT-D1-03-001",
+      "type": "SECURITY",
+      "claimId": "SAFETY-001::MODERATION-AUDIT-EVENT-D1-03",
+      "subjectType": "FEATURE",
+      "subjectId": "SAFETY-001",
+      "source": "GitHub Actions W06 AuditEvent D1-03 Evidence",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/36813978768#artifact-11139889690",
+      "commitSha": "81986b7510efb20a5dd44f9971ca40794989ddff",
+      "timestamp": "2026-10-01T04:12:39Z",
+      "producer": "W06 AuditEvent D1-03 Evidence run 36813978768 with remote Cloudflare D1 evidence",
+      "result": "PASS",
+      "status": "CREATED",
+      "checkId": "W06-AUDIT-EVENT-D1-03-EVIDENCE",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36813978768",
+      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "note": "Remote D1-03 evidence passed required audit_events columns, action/target indexes, immutable UPDATE/DELETE triggers, migration history, and valid production row count. Registry status remains CREATED because testedCommitSha is historical."
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
