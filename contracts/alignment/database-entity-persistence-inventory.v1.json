@@ -210,6 +210,24 @@
         "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
         "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json"
       ]
+    },
+    {
+      "entityId": "ENT-SOCIAL-LIKE",
+      "entityName": "SocialLikeRelationship",
+      "domainId": "D1-02",
+      "entityStatus": "CONTRACTED_NOT_VERIFIED",
+      "implementationRef": "workers/W05-social/src/like-runtime.ts",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+      "adapter": "Cloudflare D1 (D1-02) / W05 DB binding",
+      "migrationRefs": [
+        "workers/W05-social/migrations/0002_social_003_like.sql"
+      ],
+      "fieldContractRef": "contracts/entity/entity-field-contract-social-003-like.v1.json",
+      "persistenceContractRef": "contracts/persistence/SOCIAL-003-like-d1-02-persistence.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/SOCIAL-003-like-relationship-contract.v1.json",
+        "contracts/admission/SOCIAL-003-like-runtime-admission.v1.json"
+      ]
     }
   ],
   "rules": {
