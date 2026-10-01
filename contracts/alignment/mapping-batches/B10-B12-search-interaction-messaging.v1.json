@@ -217,10 +217,20 @@
       "featureId": "SOCIAL-004",
       "status": "UNRESOLVED",
       "evidenceRefs": [
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "docs/11-P0-SOCIAL-INTERACTION-AND-EVENT-CONTRACT-v1.0.md",
+        "contracts/enums/comment-state.json",
+        "contracts/api/social-comment-operation-policy.v1.json",
+        "contracts/openapi/v1/openapi.yaml#/content/{contentId}/comments",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-AUTHORITY-CONFLICT-2026-10-01.md",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-API-SURFACE-2026-10-01.md"
       ],
       "blockers": [
-        "API/DTO/Entity/Field/Payload/Security/Lifecycle/Code mapping not yet evidence-bound"
+        "API surface is now bound to the canonical singular paths and operationIds; Entity/DTO/Field/Payload/Persistence/Security/Lifecycle/Runtime/Test/Evidence remain unresolved."
+      ],
+      "apiOperationIds": [
+        "getContentContentIdComments",
+        "postContentContentIdComments"
       ]
     },
     {
