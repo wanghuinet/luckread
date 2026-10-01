@@ -46,7 +46,7 @@ jobs:
           node - <<'NODE'
           const fs=require('fs');
           const w01=JSON.parse(fs.readFileSync('workers/W01-payload/wrangler.jsonc','utf8'));
-          const w03=JSON.parse(fs.readFileSync('workers/W03-feed/wrangler.jsonc','utf8'));
+          const w03=JSON.parse(fs.readFileSync('workers/W03-content/wrangler.jsonc','utf8'));
           const w06=JSON.parse(fs.readFileSync('workers/W06-governance/wrangler.jsonc','utf8'));
           if (w01.name!=='luckread-w01-payload') throw new Error('W01 identity mismatch');
           if (w03.name!=='luckread-w03') throw new Error('W03 identity mismatch');
@@ -73,7 +73,7 @@ jobs:
         run: npm ci
 
       - name: Deploy W03 content authority first
-        working-directory: workers/W03-feed
+        working-directory: workers/W03-content
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}

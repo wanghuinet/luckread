@@ -61,13 +61,13 @@ jobs:
                 ;;
               docs/MAPPING-0-CLOSURE-LEDGER.md)
                 ;;
-              workers/W02-content/src/account/publication-journal-publisher.ts)
+              workers/W02-identity/src/account/publication-journal-publisher.ts)
                 ;;
-              workers/W02-content/src/account/publication-journal-publisher.test.ts)
+              workers/W02-identity/src/account/publication-journal-publisher.test.ts)
                 ;;
-              workers/W02-content/src/index.ts)
+              workers/W02-identity/src/index.ts)
                 ;;
-              workers/W02-content/wrangler.jsonc)
+              workers/W02-identity/wrangler.jsonc)
                 ;;
               workers/W06-governance/src/auth-013-queue-consumer.ts)
                 ;;

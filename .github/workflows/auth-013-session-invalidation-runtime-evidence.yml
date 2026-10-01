@@ -68,8 +68,8 @@ jobs:
           // kernel against real D1-01 and proves the token/session security side effect.
           // It never changes Worker/D1 topology and only uses synthetic records.
           // @ts-nocheck
-          import { applyAccountStateTransition } from './workers/W02-content/src/account/account-state-transition.ts'
-          import { rotateRefreshCredential } from './workers/W02-content/src/session/session-runtime.ts'
+          import { applyAccountStateTransition } from './workers/W02-identity/src/account/account-state-transition.ts'
+          import { rotateRefreshCredential } from './workers/W02-identity/src/session/session-runtime.ts'
 
           const json = (body: unknown, status = 200) =>
             new Response(JSON.stringify(body, null, 2), {

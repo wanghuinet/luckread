@@ -42,7 +42,7 @@ With authority and canonical Field IDs admitted, establish the authoritative D1-
 - The logical state-machine initial state remains `UNREGISTERED`; the first persisted User lifecycle state is now explicitly admitted as `PENDING_VERIFICATION` with `account_state_version = 1`.
 - Every successful state-machine transition must increment the version exactly once; unsuccessful or stale transitions must not mutate it.
 - Current D1-01 row applicability is `0/0 PASS_VERIFIED`; therefore the migration is admissible only for the captured zero-row target.
-- A guarded W02 migration source is now admitted at `workers/W02-content/migrations/0002_auth_013_account_state.sql` with a fail-closed zero-row guard.
+- A guarded W02 migration source is now admitted at `workers/W02-identity/migrations/0002_auth_013_account_state.sql` with a fail-closed zero-row guard.
 - Remote execution remains **NOT_EXECUTED** until the controlled migration workflow is explicitly dispatched with `confirm=APPLY`.
 
 ### Current cursor

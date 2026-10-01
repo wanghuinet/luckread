@@ -36,7 +36,7 @@ jobs:
           node-version: 24
 
       - name: Verify W02 D1-01 binding
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         shell: bash
         run: |
           node - <<'NODE'
@@ -55,11 +55,11 @@ jobs:
       - name: Verify admitted migration source
         run: |
           test -f contracts/migration/AUTH-013-publication-journal.v1.json
-          test -f workers/W02-content/migrations/0003_auth_013_publication_journal.sql
+          test -f workers/W02-identity/migrations/0003_auth_013_publication_journal.sql
           test -z "$(git status --short)"
 
       - name: Preflight controlled target
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -76,14 +76,14 @@ jobs:
           NODE
 
       - name: Apply AUTH-013 publication journal migration remotely
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx --yes wrangler@4.116.0 d1 migrations apply "${{ inputs.database_name }}" --remote --config wrangler.jsonc
 
       - name: Capture post-migration journal schema
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

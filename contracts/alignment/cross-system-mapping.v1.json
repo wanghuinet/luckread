@@ -31,8 +31,8 @@
         "workers/W01-payload/src/app/auth/register/route.ts",
         "workers/W01-payload/src/collections/Users.ts",
         "workers/W01-payload/src/payload.config.ts",
-        "workers/W02-content/src/credentials/credential-add.ts",
-        "workers/W02-content/src/credentials/credential-add.test.ts"
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/src/credentials/credential-add.test.ts"
       ],
       "evidence": [
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
@@ -116,10 +116,10 @@
       ],
       "payloadCollections": [],
       "codeEvidenceRefs": [
-        "workers/W02-content/src/credentials/credential-add.ts",
-        "workers/W02-content/src/credentials/credential-add.test.ts",
-        "workers/W02-content/src/credentials/credential-list.ts",
-        "workers/W02-content/src/credentials/credential-lifecycle.ts"
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/src/credentials/credential-add.test.ts",
+        "workers/W02-identity/src/credentials/credential-list.ts",
+        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
       ],
       "evidence": [
         "artifacts/mapping-0/auth-003-wire-projection-authority-2026-09-26.json",
@@ -144,8 +144,8 @@
         "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
         "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
         "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
-        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
-        "workers/W02-content/src/credentials/credential-add.ts"
+        "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
+        "workers/W02-identity/src/credentials/credential-add.ts"
       ],
       "blockers": [
         "ENT-IDENTITY materialization ownership is now executable-evidence verified through the AUTH-001 W02 scheduled materializer; final entity catalog promotion remains blocked.",
@@ -405,8 +405,8 @@
         "W02"
       ],
       "codeEvidenceRefs": [
-        "workers/W02-content/src/account/account-state-transition.ts",
-        "workers/W02-content/src/account/account-state-transition.test.ts",
+        "workers/W02-identity/src/account/account-state-transition.ts",
+        "workers/W02-identity/src/account/account-state-transition.test.ts",
         "workers/W01-payload/src/app/users/[userId]/account-state/route.ts",
         "workers/W01-payload/src/app/v1/users/[userId]/account-state/route.ts"
       ],

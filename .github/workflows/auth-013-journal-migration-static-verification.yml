@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'contracts/migration/AUTH-013-publication-journal.v1.json'
-      - 'workers/W02-content/migrations/0003_auth_013_publication_journal.sql'
+      - 'workers/W02-identity/migrations/0003_auth_013_publication_journal.sql'
       - 'scripts/auth-013-journal-migration-static-audit.mjs'
       - '.github/workflows/auth-013-journal-migration-static-verification.yml'
   workflow_dispatch:

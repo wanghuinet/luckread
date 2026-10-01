@@ -40,8 +40,8 @@ jobs:
           set -euo pipefail
           test "${{ inputs.source_sha }}" = "763a857759233c5a23d7bd733a72e0729b20a373"
           test "${{ inputs.database_name }}" = "luckread"
-          test -f workers/W02-content/src/account/account-state-transition.ts
-          test -f workers/W02-content/migrations/0003_auth_013_publication_journal.sql
+          test -f workers/W02-identity/src/account/account-state-transition.ts
+          test -f workers/W02-identity/migrations/0003_auth_013_publication_journal.sql
           test -z "$(git status --short)"
 
       - name: Create ephemeral remote D1 runtime harness
@@ -75,7 +75,7 @@ jobs:
           // It invokes the admitted W02 transition kernel against the real D1-01
           // binding and cleans the synthetic row/journal before returning evidence.
           // @ts-nocheck
-          import { applyAccountStateTransition } from './workers/W02-content/src/account/account-state-transition.ts'
+          import { applyAccountStateTransition } from './workers/W02-identity/src/account/account-state-transition.ts'
 
           const json = (body: unknown, status = 200) =>
             new Response(JSON.stringify(body, null, 2), {

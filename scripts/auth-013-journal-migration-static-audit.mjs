@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 const contractPath = 'contracts/migration/AUTH-013-publication-journal.v1.json'
-const migrationPath = 'workers/W02-content/migrations/0003_auth_013_publication_journal.sql'
+const migrationPath = 'workers/W02-identity/migrations/0003_auth_013_publication_journal.sql'
 const contract = JSON.parse(readFileSync(contractPath, 'utf8'))
 const sql = readFileSync(migrationPath, 'utf8')
 

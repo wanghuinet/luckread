@@ -99,7 +99,7 @@
       },
       "migrationId": "MIG-AUTH-003-CREDENTIAL-V1",
       "evidenceRefs": [
-        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
+        "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
         "https://github.com/wanghuinet/luckread/actions/runs/36296831559",
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
         "https://github.com/wanghuinet/luckread/actions/runs/36299334577",

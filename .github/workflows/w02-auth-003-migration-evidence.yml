@@ -47,21 +47,21 @@ jobs:
           node-version: 24
 
       - name: Verify exact source and D1 target
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           node --input-type=module -e "import fs from 'node:fs'; const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8')); const d=c.d1_databases?.find(x=>x.binding==='D1_01'); if(!d) throw new Error('D1_01 binding missing'); if(d.database_name !== process.env.DATABASE_NAME) throw new Error('database_name mismatch'); if(d.database_id !== process.env.D1_01_ID) throw new Error('D1_01 database_id mismatch'); console.log(JSON.stringify({binding:d.binding,database_name:d.database_name,database_id:d.database_id},null,2))"
 
       - name: Verify migration source
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         run: |
           set -euo pipefail
           test -s "migrations/$EXPECTED_MIGRATION"
           test "$(git log -1 --format=%H)" = "$SOURCE_SHA"
 
       - name: Preflight remote migration ledger
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         run: |
           set -euo pipefail
           mkdir -p ../../artifacts/mapping-0/auth-003-migration-evidence
@@ -76,7 +76,7 @@ jobs:
           fi
 
       - name: Preflight AUTH-003 tables absent
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         run: |
           set -euo pipefail
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT COUNT(*) AS c FROM sqlite_master WHERE type='table' AND name IN ('auth_identities','auth_credentials');"             > ../../artifacts/mapping-0/auth-003-migration-evidence/pre_schema_guard.txt
@@ -85,13 +85,13 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT name,type,tbl_name,sql FROM sqlite_master WHERE name IN ('auth_identities','auth_credentials') ORDER BY name;"             > ../../artifacts/mapping-0/auth-003-migration-evidence/pre_schema_named_objects.txt
 
       - name: Apply admitted migration
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         run: |
           set -euo pipefail
           npx --yes wrangler@4.116.0 d1 migrations apply "$DATABASE_NAME" --remote --config wrangler.jsonc
 
       - name: Capture post-migration evidence
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         run: |
           set -euo pipefail
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc             --command "SELECT name,type,tbl_name,sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND (name LIKE 'auth_identities%' OR name LIKE 'auth_credentials%') ORDER BY type,name;"             > ../../artifacts/mapping-0/auth-003-migration-evidence/post_schema.txt
@@ -113,7 +113,7 @@ jobs:
             > ../../artifacts/mapping-0/auth-003-migration-evidence/provenance.txt
 
       - name: Validate evidence
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         run: |
           set -euo pipefail
           test -s ../../artifacts/mapping-0/auth-003-migration-evidence/pre_migrations.txt

@@ -39,7 +39,7 @@ jobs:
           node-version: 24
 
       - name: Verify D1-01 binding identity
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         run: >-
           node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
           const d=c.d1_databases?.find(x=>x.binding==='D1_01');
@@ -47,7 +47,7 @@ jobs:
           console.log(JSON.stringify({binding:d.binding,database_name:d.database_name,database_id:d.database_id},null,2))"
 
       - name: Validate controlled D1 target identity
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         env:
           D1_01_ID: "2f80471e-3756-49f9-8db1-7707a433ad64"
           DATABASE_NAME: ${{ inputs.database_name }}
@@ -56,7 +56,7 @@ jobs:
           node --input-type=module -e "import fs from 'node:fs'; const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8')); const d=c.d1_databases?.find(x=>x.binding==='D1_01'); if(!d) throw new Error('D1_01 binding missing'); if(d.database_name !== process.env.DATABASE_NAME) throw new Error('database_name mismatch'); if(d.database_id !== process.env.D1_01_ID) throw new Error('D1_01 database_id mismatch'); console.log(JSON.stringify({binding:d.binding,database_name:d.database_name,database_id:d.database_id},null,2))"
 
       - name: Read and persist remote schema snapshot
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -101,7 +101,7 @@ jobs:
             > ../../artifacts/mapping-0/auth-003-d1-schema/auth_credentials_foreign_key_check.txt
 
       - name: Read and persist remote migration ledger
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
