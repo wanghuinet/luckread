@@ -21,7 +21,7 @@ export default function HomePage() {
         </Link>
         <nav className="site-nav" aria-label="主导航">
           <a className="nav-link nav-link-active" href="#top">首页</a>
-          <a className="nav-link" href="#explore">发现</a>
+          <Link className="nav-link" href="/content">发现</Link>
           <a className="nav-link" href="#creator">创作者</a>
           <a className="nav-link" href="#about">关于 LuckRead</a>
         </nav>
@@ -43,7 +43,7 @@ export default function HomePage() {
             </p>
             <div className="hero-actions">
               <Link className="button button-primary" href="/publish">立即创作<span aria-hidden="true">↗</span></Link>
-              <a className="button button-quiet" href="#content-feed">探索内容</a>
+              <Link className="button button-quiet" href="/content">探索内容</Link>
             </div>
           </div>
 
