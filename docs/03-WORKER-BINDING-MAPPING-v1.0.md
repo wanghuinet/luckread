@@ -126,6 +126,185 @@ Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
 - No default business D1 authority.
 - Integration callbacks/mutations must use explicit owning-domain contracts and cannot acquire unrestricted D1 write access.
 
+## 6. Public ingress / terminal Worker rules
+
+1. W01 is the public HTTP/API ingress boundary for currently admitted public operations.
+2. Public ingress does not transfer domain ownership to W01.
+3. Every forwarded business operation must have an explicit terminal Worker and transport contract.
+4. W01 must not be inserted as a Worker-to-Worker routing hop.
+5. W03 is the terminal Worker for admitted Content/Article/Media operations; W06 is the terminal Worker for admitted Moderation operations.
+6. Auth operations may use W01 as the Payload-native execution boundary where explicitly admitted, while W02 remains the Identity/Account/Authorization authority.
+7. A Worker may expose a direct public route only after a corresponding transport/public-route contract and deployment evidence are admitted.
+
+See `contracts/transport/public-worker-terminal-routing.v1.json`.
+
+## 7. Worker-specific binding rules
+
+
+
+Cross-D1 mutation is never an implicit direct write permission.
+
+Canonical pattern:
+
+```text
+Owning-domain authoritative transaction
+        ↓
+Outbox / versioned event
+        ↓
+Queue / authorized consumer
+        ↓
+Idempotent transition in target domain
+        ↓
+Audit / reconciliation / evidence
+```
+
+Required for every cross-D1 mutation:
+
+1. explicit source and target domain;
+2. caller and callee Worker IDs;
+3. operation/event ID and version;
+4. authorization scope;
+5. idempotency identity;
+6. timeout/retry behavior;
+7. failure/backpressure semantics;
+8. audit/correlation identifiers;
+9. reconciliation behavior;
+10. test and evidence references.
+
+No distributed database transaction is assumed.
+
+## 6. High-risk cross-D1 boundaries
+
+### Subscription / payment
+
+```text
+D1-04 payment/order authority
+        ↓ validated event
+D1-01 entitlement/access transition
+```
+
+W07 does not own D1-01; W02 remains the D1-01 authority.
+
+### Notification/runtime
+
+W05 may write scoped D1-03 runtime delivery state, while W09/W10 retain their respective platform/runtime and job execution responsibilities. This scoped access does not transfer D1-03 authority.
+
+### Financial effects from advertising
+
+Advertising business state remains with its owning Blueprint domain. Only reconciled authoritative financial effects enter D1-04. No advertising flow may create a parallel ledger or wallet authority.
+
+## 7. Global invariants
+
+1. Exactly 12 canonical Workers.
+2. Exactly 4 canonical D1 domains.
+3. Exactly 25 Contract Tasks.
+4. Every Task has exactly one Primary Worker.
+5. Every authoritative entity has exactly one Primary D1.
+6. No implicit fifth D1.
+7. No unrestricted cross-domain database writer.
+8. Public API exposure does not create business-state ownership.
+9. Runtime access does not imply authoritative ownership.
+10. Cache, feed, recommendation, search, analytics and snapshots are not authoritative replacements.
+11. Payload Core remains immutable.
+12. Historical Worker/D1 models remain non-authoritative.
+13. Cloudflare-specific storage/runtime choices remain replaceable for PostgreSQL/GCP migration.
+
+## 8. Gate result
+
+| Dimension | Result |
+|---|---|
+| Worker Master | **12/12 CANONICAL** |
+| D1 Master | **4/4 CANONICAL** |
+| Worker × D1 binding | **12/12 BOUND** |
+| Primary Task ownership | **25/25 CANONICAL** |
+| Cross-D1 rules | **FROZEN** |
+| Unrestricted writer audit | **PROHIBITED** |
+| Fifth-D1 audit | **CLOSED** |
+| Feature → Task → Worker → D1 | **NEXT GATE** |
+| Mapping Freeze | **BLOCKED until next mapping audit** |
+| Contract generation | **BLOCKED** |
+| Implementation authorization | **BLOCKED** |
+
+## 9. Next mandatory gate
+
+The next batch must update the Final Mapping so every Blueprint feature-domain mapping can resolve:
+
+**Feature → Task → Primary Worker → Primary D1 → API → Data → Security → Event → Test → Evidence**.
+
+Only after that reverse/forward consistency audit passes may Mapping Freeze be authorized.
+### W01
+
+- API/gateway boundary only.
+- No general authoritative D1 write authority.
+- Bounded AUTH-001 exception: W01 may execute the initial Payload-native registration transaction at the native persistence boundary; this is an execution boundary, not Identity/Account/Authorization ownership.
+- Must route authenticated operations to the owning Worker/contract for non-registration business state.
+- Public API exposure never creates data ownership.
+
+### W02
+
+- Sole Worker authority for T01/T02/T03 and D1-01 identity/account/authorization state.
+- Owns authorization decisions for identity/access state under the applicable contracts.
+- Must not become owner of payment or financial facts.
+
+### W03
+
+- Sole Primary Worker for T05/T06/T07/T15 and D1-02 content/article/media/translation state.
+- Physical media storage remains subject to the storage boundary; D1-02 owns metadata/reference state.
+- Must not create financial authority in D1-02.
+
+### W04
+
+- Executes feed/recommendation/search capabilities.
+- No authoritative D1 ownership.
+- May consume explicitly authorized source data/projections.
+- Cannot turn a feed, recommendation, search index, cache, or analytics projection into source-of-truth state.
+
+### W05
+
+- Primary D1-02 authority for T11/T12/T13/T14 content/community-side state assigned by the Blueprint.
+- D1-03 access is limited to scoped notification/runtime delivery state.
+- Does not become general D1-03 operational authority.
+
+### W06
+
+- Sole Primary Worker for T19/T20/T21 and D1-03 governance/moderation/report/appeal operational state assigned by contract.
+- Cross-domain references remain references and do not transfer entity ownership.
+
+### W07
+
+- Sole Primary Worker for T16/T17/T18 and D1-04 commerce/financial workflows.
+- D1-04 is authoritative for orders, payments, ledger, settlement and related financial facts.
+- Subscription/access entitlement remains D1-01 authority.
+- Any D1-01 entitlement effect is an explicit validated cross-D1 transition, never unrestricted direct ownership.
+
+### W08
+
+- Sole Primary Worker for T04 and D1-01 creator/organization identity relationships.
+- Must not become general identity/account authorization authority outside its assigned entities and contracts.
+
+### W09
+
+- Sole Primary Worker for T25 and D1-03 platform/reliability/runtime authority.
+- D1-03 authority is limited to platform entities assigned by the D1 Master and contracts.
+- Must not become a generic business-data writer.
+
+### W10
+
+- Executes asynchronous jobs under the authority of the owning Worker/Task.
+- D1-03 writes are limited to job/execution/idempotency/retry/DLQ/runtime records explicitly assigned by contract.
+- Does not become a second Primary Worker for T25.
+
+### W11
+
+- Primary Worker for T22/T23 and D1-03 operational/analytics/campaign state assigned by contract.
+- Analytics and operational projections cannot replace D1-01, D1-02, or D1-04 authoritative state.
+
+### W12
+
+- External integration execution boundary.
+- No default business D1 authority.
+- Integration callbacks/mutations must use explicit owning-domain contracts and cannot acquire unrestricted D1 write access.
+
 ## 5. Public ingress / terminal Worker rules
 
 1. W01 is the public HTTP/API ingress boundary for currently admitted public operations.
