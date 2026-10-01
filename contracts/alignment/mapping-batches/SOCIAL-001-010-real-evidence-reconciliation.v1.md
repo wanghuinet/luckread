@@ -51,7 +51,7 @@ These are inventory evidence only. No operation is promoted to MATCH until a can
 
 **Evidence:** `contracts/api/SOCIAL-003-reaction-contract.v1.json`, `contracts/entity/SOCIAL-003-reaction-entity-contract.v1.json` and `contracts/persistence/SOCIAL-003-reaction-persistence-contract.v1.json` bind the existing like/unlike operations to the authoritative `ENT-SOCIAL-REACTION` model in D1-02. Idempotency, uniqueness, anti-abuse, derived counters and asynchronous event boundaries are now contract-defined.
 
-**Not evidence-bound:** migration/remote schema evidence; W05 runtime; concurrency runtime evidence; abuse/security E2E; accepted event delivery/aggregation evidence; Evidence Registry provenance.
+**Not evidence-bound:** migration/remote schema evidence; W05 runtime; trusted admission inputs are documented but not admitted; concurrency runtime evidence; abuse/security E2E; accepted event delivery/aggregation evidence; Evidence Registry provenance.
 
 ### SOCIAL-004 — comment/reply
 
@@ -59,7 +59,7 @@ These are inventory evidence only. No operation is promoted to MATCH until a can
 
 **Evidence:** `contracts/api/SOCIAL-004-comment-contract.v1.json`, `contracts/entity/SOCIAL-004-comment-entity-contract.v1.json`, `contracts/persistence/SOCIAL-004-comment-persistence-contract.v1.json` and `contracts/dto/SOCIAL-INTERACTION-DTO.v1.json` bind the existing comment create/list/edit/delete operations. `parentId` provides bounded replies (max depth 3); moderation, visibility, idempotency and durable deletion are contract-defined.
 
-**Not evidence-bound:** migration/remote schema evidence; W05 runtime; moderation runtime evidence; concurrency/security E2E; event delivery evidence; Evidence Registry provenance.
+**Not evidence-bound:** migration/remote schema evidence; W05 runtime; trusted admission inputs are documented but not admitted; moderation runtime evidence; concurrency/security E2E; event delivery evidence; Evidence Registry provenance.
 
 ### SOCIAL-005 — favorite/bookmark
 
