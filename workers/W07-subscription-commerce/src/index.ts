@@ -5,6 +5,7 @@ import {
   type SubscriptionStatus,
 } from './subscription-state-machine.js'
 import { callW02Membership } from './w02-membership-client.js'
+import { deriveW01MembershipTransition } from './w01-transition-boundary.js'
 
 const actors = new Set<SubscriptionActor>(['system', 'payment', 'user', 'creator', 'admin'])
 const statuses = new Set<SubscriptionStatus>(['PENDING', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'EXPIRED'])
@@ -140,7 +141,10 @@ export default {
       return json({ error: { code: 'VALIDATION_FAILED' } }, 400)
     }
 
-    if (body.to === 'ACTIVE' || body.from !== 'ACTIVE' || body.to !== 'CANCELED') {
+    let w01Transition: ReturnType<typeof deriveW01MembershipTransition>
+    try {
+      w01Transition = deriveW01MembershipTransition(body.from as SubscriptionStatus, body.to as SubscriptionStatus)
+    } catch {
       return json({ error: { code: 'TRANSITION_REQUIRES_TRUSTED_AUTHORITY' } }, 403)
     }
 
@@ -156,14 +160,13 @@ export default {
         { status: state, version },
         {
           to: body.to as SubscriptionStatus,
-          actor: 'user',
+          actor: w01Transition.actor,
           expectedVersion: body.expectedVersion,
           idempotencyKey: body.idempotencyKey,
         },
       )
 
-      const derivedEntitlementAction =
-        body.to === 'CANCELED' ? 'REVOKE' : 'NONE'
+      const derivedEntitlementAction = w01Transition.entitlementAction
 
       const accessState = await callW02Membership({
         operation: 'transition',
@@ -174,7 +177,7 @@ export default {
           subscriptionId: body.subscriptionId,
           from: body.from,
           to: body.to,
-          actor: 'user',
+          actor: w01Transition.actor,
           expectedVersion: body.expectedVersion,
           entitlementAction: derivedEntitlementAction,
           entitlementId: typeof body.entitlementId === 'string' ? body.entitlementId : undefined,
