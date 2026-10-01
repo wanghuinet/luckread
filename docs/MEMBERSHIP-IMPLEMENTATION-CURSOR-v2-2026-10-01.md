@@ -32,6 +32,6 @@ Subscription state machine
 - Trusted payment success source for ACTIVE.
 - Remote lifecycle/payment/entitlement E2E.
 - Evidence Registry verification.
-- Public API implementation remains blocked until the corresponding Mapping 0/API admission and remote security/E2E evidence are complete.
+- Remaining public Membership mutation APIs remain blocked until their Mapping 0/API admission and remote security/E2E evidence are complete; bounded getSubscription read is implemented but not remotely verified.
 
 No new Worker, no new D1, no direct W07 D1-01 binding, and no client-authoritative payment state.
