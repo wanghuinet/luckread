@@ -133,13 +133,16 @@
       "domainId": "D1-01",
       "entityStatus": "PROPOSED",
       "implementationRef": "",
-      "persistenceStatus": "NOT_APPLICABLE",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
       "adapter": "",
       "migrationRefs": [],
       "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
       "evidenceRefs": [
-        "contracts/entity/entity-catalog.v1.json"
-      ]
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/persistence/MEMBERSHIP-SUBSCRIPTION-PERSISTENCE-CONTRACT.v1.json",
+        "docs/change-control/CC-1.0-MEMBERSHIP-STATE-RECONCILIATION-2026-10-01.md"
+      ],
+      "persistenceContractRef": "contracts/persistence/MEMBERSHIP-SUBSCRIPTION-PERSISTENCE-CONTRACT.v1.json"
     },
     {
       "entityId": "ENT-SUBSCRIPTION",
@@ -147,13 +150,16 @@
       "domainId": "D1-01",
       "entityStatus": "PROPOSED",
       "implementationRef": "",
-      "persistenceStatus": "NOT_APPLICABLE",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
       "adapter": "",
       "migrationRefs": [],
       "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
       "evidenceRefs": [
-        "contracts/entity/entity-catalog.v1.json"
-      ]
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/persistence/MEMBERSHIP-SUBSCRIPTION-PERSISTENCE-CONTRACT.v1.json",
+        "docs/change-control/CC-1.0-MEMBERSHIP-STATE-RECONCILIATION-2026-10-01.md"
+      ],
+      "persistenceContractRef": "contracts/persistence/MEMBERSHIP-SUBSCRIPTION-PERSISTENCE-CONTRACT.v1.json"
     },
     {
       "entityId": "ENT-ORG-MEMBERSHIP",
@@ -202,26 +208,25 @@
         "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
         "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json"
       ]
-    }
-  
-    ,
-        {
+    },
+    {
       "entityId": "ENT-MEMBERSHIP-PLAN",
       "entityName": "MembershipPlan",
       "domainId": "D1-01",
       "entityStatus": "PROPOSED",
       "implementationRef": "",
-      "persistenceStatus": "NOT_APPLICABLE",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
       "adapter": "",
       "migrationRefs": [],
       "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
       "evidenceRefs": [
         "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json"
-      ]
-    }
-
-    ,
+        "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json",
+        "contracts/persistence/MEMBERSHIP-SUBSCRIPTION-PERSISTENCE-CONTRACT.v1.json",
+        "docs/change-control/CC-1.0-MEMBERSHIP-STATE-RECONCILIATION-2026-10-01.md"
+      ],
+      "persistenceContractRef": "contracts/persistence/MEMBERSHIP-SUBSCRIPTION-PERSISTENCE-CONTRACT.v1.json"
+    },
     {
       "entityId": "ENT-SOCIAL-REACTION",
       "entityName": "SocialReaction",
@@ -237,9 +242,7 @@
         "contracts/entity/SOCIAL-003-reaction-entity-contract.v1.json",
         "contracts/persistence/SOCIAL-003-reaction-persistence-contract.v1.json"
       ]
-    }
-
-    ,
+    },
     {
       "entityId": "ENT-SOCIAL-COMMENT",
       "entityName": "SocialComment",
@@ -256,7 +259,7 @@
         "contracts/persistence/SOCIAL-004-comment-persistence-contract.v1.json"
       ]
     }
-],
+  ],
   "rules": {
     "noInference": true,
     "persistenceRequiresImplementationEvidence": true,
