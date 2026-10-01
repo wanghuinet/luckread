@@ -1,7 +1,10 @@
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
-import { readVerifiedPayloadTokenVersion } from '../../../../auth/payload-access-token.js'
+import {
+  getPayloadAuthorizationHeader,
+  readVerifiedPayloadTokenVersion,
+} from '../../../../auth/payload-access-token.js'
 import {
   listSessions,
   revokeOwnedSession,
@@ -42,9 +45,15 @@ async function authenticate(request: Request): Promise<AuthenticatedSubject> {
   let authResult: Awaited<ReturnType<typeof payload.auth>>
   try {
     authResult = await payload.auth({
-      headers: new Headers({
-        Authorization: request.headers.get('Authorization') ?? '',
-      }),
+      headers: new Headers(
+        request.headers.get('Authorization')
+          ? request.headers
+          : {
+              ...(getPayloadAuthorizationHeader(request)
+                ? { Authorization: getPayloadAuthorizationHeader(request)! }
+                : {}),
+            },
+      ),
       canSetHeaders: false,
     })
   } catch {
