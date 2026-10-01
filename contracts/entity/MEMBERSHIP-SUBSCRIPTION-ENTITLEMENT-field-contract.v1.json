@@ -38,6 +38,12 @@
           false
         ],
         [
+          "ENT-SUBSCRIPTION-F-VERSION",
+          "version",
+          "integer",
+          false
+        ],
+        [
           "ENT-SUBSCRIPTION-F-STARTED-AT",
           "startedAt",
           "datetime",
