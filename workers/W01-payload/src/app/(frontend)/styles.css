@@ -153,12 +153,13 @@ a { color: inherit; }
   line-height: 1.05;
   letter-spacing: -.055em;
 }
-.content-feed-note {
-  color: #8a97a9;
-  font-size: 11px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
+.content-feed-all {
+  color: var(--lr-accent);
+  font-size: 12px;
+  font-weight: 750;
+  text-decoration: none;
 }
+.content-feed-all:hover { text-decoration: underline; }
 .content-feed-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
