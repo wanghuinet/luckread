@@ -26,6 +26,5 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: corepack enable
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: pnpm exec vitest run workers/W07-subscription-commerce/src/subscription-state-machine.test.ts
+      - run: npm ci
+      - run: npx vitest run workers/W07-subscription-commerce/src/subscription-state-machine.test.ts
