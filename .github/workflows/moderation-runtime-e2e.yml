@@ -209,9 +209,14 @@ jobs:
           set -euo pipefail
           CASE2="${CASE2_ID:-mod-e2e-stale-$GITHUB_RUN_ID}"
           CONTENT2="${CONTENT2_ID:-mod-e2e-stale-$GITHUB_RUN_ID}"
+          STALE_RUN_ID="36802840247"
+          STALE_USER_ID="55"
+          STALE_ROLE_ID="MODERATION-E2E-ROLE-36802840247-01f459a0c4"
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc --command "DELETE FROM moderation_enforcement_outbox WHERE decision_id IN (SELECT decision_id FROM moderation_decisions WHERE case_id IN ('$CASE_ID','$CASE2')); DELETE FROM moderation_decision_idempotency WHERE case_id IN ('$CASE_ID','$CASE2'); DELETE FROM moderation_decisions WHERE case_id IN ('$CASE_ID','$CASE2'); DELETE FROM moderation_cases WHERE case_id IN ('$CASE_ID','$CASE2');"
-          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-feed/wrangler.jsonc --command "DELETE FROM contents WHERE id IN ('$CONTENT_ID','$CONTENT2_ID');"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-feed/wrangler.jsonc --command "DELETE FROM contents WHERE id IN ('$CONTENT_ID','$CONTENT2');"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --yes --config workers/W01-payload/wrangler.jsonc --command "DELETE FROM role_assignments WHERE id='$STALE_ROLE_ID';"
           if [ -n "${MODERATION_ROLE_ID:-}" ]; then npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --yes --config workers/W01-payload/wrangler.jsonc --command "DELETE FROM role_assignments WHERE id='$MODERATION_ROLE_ID';"; fi
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --yes --config workers/W01-payload/wrangler.jsonc --command "DELETE FROM auth_session_state WHERE user_id='$STALE_USER_ID'; DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)='$STALE_USER_ID'; DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT)='$STALE_USER_ID' OR CAST(owner_subject_id AS TEXT)='$STALE_USER_ID'; DELETE FROM auth_registration_envelopes WHERE idempotency_key='MODERATION-E2E-$STALE_RUN_ID-register'; DELETE FROM users WHERE CAST(id AS TEXT)='$STALE_USER_ID';"
           if [ -n "${MODERATION_AUTH_USER_ID:-}" ]; then
             npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --yes --config workers/W01-payload/wrangler.jsonc --command "DELETE FROM auth_session_state WHERE user_id='$MODERATION_AUTH_USER_ID'; DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)='$MODERATION_AUTH_USER_ID'; DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT)='$MODERATION_AUTH_USER_ID' OR CAST(owner_subject_id AS TEXT)='$MODERATION_AUTH_USER_ID'; DELETE FROM auth_registration_envelopes WHERE idempotency_key='MODERATION-E2E-$GITHUB_RUN_ID-register'; DELETE FROM users WHERE CAST(id AS TEXT)='$MODERATION_AUTH_USER_ID';";
           fi
