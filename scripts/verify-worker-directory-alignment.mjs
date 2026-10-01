@@ -4,8 +4,8 @@ import { join } from 'node:path'
 
 const expected = [
   'W01-payload',
-  'W02-content',
-  'W03-feed',
+  'W02-identity',
+  'W03-content',
   'W04-feed-search',
   'W05-social',
   'W06-governance',

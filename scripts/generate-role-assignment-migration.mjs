@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 
 const root = resolve(process.cwd())
 const contractPath = resolve(root, 'contracts/entity/AUTHZ-role-assignment-authority.v1.json')
-const outputPath = resolve(root, 'workers/W02-content/migrations/0001_role_assignments.sql')
+const outputPath = resolve(root, 'workers/W02-identity/migrations/0001_role_assignments.sql')
 const contract = JSON.parse(readFileSync(contractPath, 'utf8'))
 
 const expected = [

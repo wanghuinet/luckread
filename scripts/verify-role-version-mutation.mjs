@@ -9,8 +9,8 @@ const dbPath = join(dir, 'role-version.sqlite')
 
 try {
   const db = new DatabaseSync(dbPath)
-  db.exec(readFileSync(resolve(root, 'workers/W02-content/migrations/0001_role_assignments.sql'), 'utf8'))
-  db.exec(readFileSync(resolve(root, 'workers/W02-content/migrations/0003_role_authorization_versions.sql'), 'utf8'))
+  db.exec(readFileSync(resolve(root, 'workers/W02-identity/migrations/0001_role_assignments.sql'), 'utf8'))
+  db.exec(readFileSync(resolve(root, 'workers/W02-identity/migrations/0003_role_authorization_versions.sql'), 'utf8'))
 
   const insert = db.prepare(`
     INSERT INTO role_assignments (

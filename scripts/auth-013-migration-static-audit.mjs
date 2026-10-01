@@ -3,7 +3,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const root = process.cwd();
-const migrationPath = path.join(root, 'workers/W02-content/migrations/0002_auth_013_account_state.sql');
+const migrationPath = path.join(root, 'workers/W02-identity/migrations/0002_auth_013_account_state.sql');
 if (!fs.existsSync(migrationPath)) throw new Error('AUTH-013 migration file missing');
 const sql = fs.readFileSync(migrationPath, 'utf8');
 
