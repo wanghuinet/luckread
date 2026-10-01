@@ -3,7 +3,7 @@ import {
   transitionSubscription,
   type SubscriptionStatus,
 } from './subscription-state-machine.js'
-import { callW02Membership } from './w02-membership-client.js'
+import { callW02Membership, readW02MembershipSubscription } from './w02-membership-client.js'
 import { deriveW01MembershipTransition } from './w01-transition-boundary.js'
 
 const statuses = new Set<SubscriptionStatus>(['PENDING', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'EXPIRED'])
@@ -137,16 +137,22 @@ export default {
       return json({ error: { code: 'TRANSITION_REQUIRES_TRUSTED_AUTHORITY' } }, 403)
     }
 
-    const state = request.headers.get('X-LuckRead-Subscription-State') as SubscriptionStatus | null
-    const version = Number(request.headers.get('X-LuckRead-Subscription-Version') ?? '1')
-
-    if (!state || !statuses.has(state) || body.from !== state || !Number.isSafeInteger(version) || version < 1 || body.expectedVersion !== version) {
-      return json({ error: { code: 'VALIDATION_FAILED' } }, 400)
-    }
-
     try {
+      const snapshot = await readW02MembershipSubscription({
+        correlationId: request.headers.get('X-LuckRead-Correlation-Id')!,
+        actorUserId: request.headers.get('X-LuckRead-Principal-User-Id') ?? '',
+        subscriptionId: body.subscriptionId,
+      })
+
+      if (
+        body.from !== snapshot.status ||
+        body.expectedVersion !== snapshot.version
+      ) {
+        return json({ error: { code: 'VERSION_CONFLICT' } }, 412)
+      }
+
       transitionSubscription(
-        { status: state, version },
+        { status: snapshot.status, version: snapshot.version },
         {
           to: body.to as SubscriptionStatus,
           actor: w01Transition.actor,
