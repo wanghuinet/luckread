@@ -61,6 +61,10 @@ export default {
       return json({ error: { code: 'VALIDATION_FAILED' } }, 400)
     }
 
+    if (body.actor === 'payment') {
+      return json({ error: { code: 'PAYMENT_ACTOR_REQUIRES_TRUSTED_COMMERCE' } }, 403)
+    }
+
     const state = request.headers.get('X-LuckRead-Subscription-State') as SubscriptionStatus | null
     const version = Number(request.headers.get('X-LuckRead-Subscription-Version') ?? '1')
 
