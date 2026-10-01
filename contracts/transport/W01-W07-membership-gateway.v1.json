@@ -28,6 +28,15 @@
       "internalMethod": "POST",
       "internalPath": "/internal/membership/subscription/read",
       "idempotency": "not-required-read"
+    },
+    {
+      "publicOperationId": "cancelSubscription",
+      "method": "POST",
+      "publicPath": "/memberships/subscriptions/{subscriptionId}/cancel",
+      "internalMethod": "POST",
+      "internalPath": "/internal/membership/subscription/transition",
+      "idempotency": "required",
+      "precondition": "If-Match must match the authoritative Subscription ETag W/\"version\""
     }
   ],
   "headers": {
@@ -49,9 +58,11 @@
     "W01 does not accept client-supplied subscriberId or membership state as authoritative input.",
     "W07 remains the Membership lifecycle/read business boundary.",
     "W07 obtains authoritative subscription status/version from W02/D1-01.",
-    "Read responses are no-store and contain only the contracted Subscription snapshot.",
     "Missing authentication, principal, ownership or downstream authority fails closed.",
-    "No new Worker or D1 is introduced."
+    "No new Worker or D1 is introduced.",
+    "Read responses are no-store and expose the authoritative Subscription version as ETag W/\"version\".",
+    "cancelSubscription requires Idempotency-Key and If-Match; W01 never supplies actor or entitlement authority.",
+    "W07 re-reads W02/D1-01 immediately before lifecycle mutation and W02 applies expectedVersion CAS."
   ],
   "evidenceRequired": [
     "W01 W07 binding deployment evidence",
