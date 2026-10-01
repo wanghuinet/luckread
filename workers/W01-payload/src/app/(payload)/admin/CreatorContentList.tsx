@@ -49,11 +49,13 @@ export default function CreatorContentList() {
   const [type, setType] = useState<string>('')
   const [page, setPage] = useState<Page>({ items: [], nextCursor: null, hasMore: false })
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
   const [actionId, setActionId] = useState<string | null>(null)
 
   const load = useCallback(async (cursor: string | null = null) => {
-    setLoading(true)
+    if (cursor) setLoadingMore(true)
+    else setLoading(true)
     setError('')
     try {
       const params = new URLSearchParams({ limit: '20' })
@@ -84,6 +86,7 @@ export default function CreatorContentList() {
       setError(cause instanceof Error ? cause.message : '内容列表加载失败')
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }, [status, type])
 
@@ -266,11 +269,11 @@ export default function CreatorContentList() {
           {page.hasMore ? (
             <button
               className={styles.secondaryButton}
-              disabled={loading}
+              disabled={loadingMore}
               onClick={() => void load(page.nextCursor)}
               type="button"
             >
-              加载更多
+              {loadingMore ? '加载中…' : '加载更多'}
             </button>
           ) : null}
         </>
