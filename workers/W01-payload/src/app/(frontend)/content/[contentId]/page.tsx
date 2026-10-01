@@ -21,6 +21,12 @@ const typeLabels: Record<ContentType, string> = {
   video: '视频',
 }
 
+const splitBodyIntoParagraphs = (value: string): string[] =>
+  value
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+
 export default function ContentDetailPage({
   params,
 }: {
@@ -102,20 +108,39 @@ export default function ContentDetailPage({
           ) : null}
         </header>
 
-        {content.mediaRefs?.length ? (
+        {content.contentType === 'video' && content.mediaRefs?.length ? (
           <div className="content-detail-media">
-            {content.mediaRefs.map((url, index) => (
-              content.contentType === 'video' ? (
-                <video controls key={url} playsInline preload="metadata" src={url} />
-              ) : (
-                <img alt="" key={url} loading={index > 0 ? 'lazy' : 'eager'} src={url} />
-              )
-            ))}
+            <video
+              controls
+              playsInline
+              preload="metadata"
+              poster={content.coverRef || undefined}
+              src={content.mediaRefs[0]}
+            />
+          </div>
+        ) : null}
+
+        {content.contentType !== 'video' && (content.coverRef || content.mediaRefs?.length) ? (
+          <div className="content-detail-media">
+            {content.coverRef ? (
+              <img alt="" loading="eager" src={content.coverRef} />
+            ) : null}
+            {content.mediaRefs
+              ?.filter((url) => url !== content.coverRef)
+              .map((url) => (
+                <img alt="" key={url} loading="lazy" src={url} />
+              ))}
           </div>
         ) : null}
 
         <div className="content-detail-body">
-          {body ? <p>{body}</p> : <p className="content-detail-muted">正文内容正在准备中。</p>}
+          {body ? (
+            splitBodyIntoParagraphs(body).map((paragraph, index) => (
+              <p className="content-detail-paragraph" key={index}>{paragraph}</p>
+            ))
+          ) : (
+            <p className="content-detail-muted">正文内容正在准备中。</p>
+          )}
         </div>
       </article>
     </main>
