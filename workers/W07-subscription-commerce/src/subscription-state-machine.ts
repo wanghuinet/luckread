@@ -63,7 +63,12 @@ export function transitionSubscription(
 export function reconcileSubscriptionEvent(
   current: SubscriptionState,
   event: SubscriptionEvent,
+  appliedIdempotencyKeys: ReadonlySet<string> = new Set(),
 ): { state: SubscriptionState; applied: boolean } {
+  if (appliedIdempotencyKeys.has(event.idempotencyKey)) {
+    return { state: current, applied: false }
+  }
+
   if (event.expectedVersion < current.version) {
     return { state: current, applied: false }
   }
