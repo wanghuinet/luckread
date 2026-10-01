@@ -285,8 +285,8 @@ export async function decideModerationCase(
   if (input.decision !== 'APPROVED' && input.decision !== 'REJECTED') {
     throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   }
-  requireResource('policy_version', input.policyVersion)
-  requireResource('reason_code', input.reasonCode)
+  requireText('policyVersion', input.policyVersion, 128)
+  requireText('reasonCode', input.reasonCode, 128)
   if (!input.severity || input.severity.length > 64 || !input.scope || input.scope.length > 128) {
     throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   }
@@ -297,7 +297,24 @@ export async function decideModerationCase(
     throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   }
 
-  const row = await readCase(db, input.caseId, input.reviewerId)
+  const row = await db
+    .prepare(
+      `SELECT c.case_id,c.target_type,c.target_id,c.target_version,c.policy_version,c.state,c.priority,
+              c.assigned_reviewer_id,c.current_decision_id,c.evidence_bundle_ref,c.version,c.created_at,c.updated_at,
+              i.request_hash AS idem_request_hash,i.response_json AS idem_response_json,i.expires_at AS idem_expires_at
+         FROM moderation_cases c
+         LEFT JOIN moderation_decision_idempotency i
+           ON i.reviewer_id = ? AND i.case_id = c.case_id AND i.idempotency_key = ?
+        WHERE c.case_id = ?
+          AND (c.assigned_reviewer_id IS NULL OR c.assigned_reviewer_id = ?)
+        LIMIT 1`,
+    )
+    .bind(input.reviewerId, input.idempotencyKey, input.caseId, input.reviewerId)
+    .first<ModerationCaseRow & {
+      idem_request_hash: string | null
+      idem_response_json: string | null
+      idem_expires_at: string | null
+    }>()
   if (!row) throw new ModerationRuntimeError('NOT_FOUND', 404)
 
   const expectedVersion = Number(normalizeEtag(input.ifMatch))
@@ -326,20 +343,16 @@ export async function decideModerationCase(
     expiresAt: input.expiresAt,
   })
   const decisionId = decisionIdFor(hash)
-  const existing = await db
-    .prepare(
-      `SELECT request_hash,decision_id,response_status,response_json,expires_at
-         FROM moderation_decision_idempotency
-        WHERE reviewer_id = ? AND case_id = ? AND idempotency_key = ?
-        LIMIT 1`,
-    )
-    .bind(input.reviewerId, input.caseId, input.idempotencyKey)
-    .first<IdempotencyRow>()
+  const existing = (row as ModerationCaseRow & { idem_request_hash?: string | null; idem_response_json?: string | null; idem_expires_at?: string | null }).idem_request_hash
+    ? {
+        request_hash: (row as ModerationCaseRow & { idem_request_hash?: string }).idem_request_hash!,
+        response_json: (row as ModerationCaseRow & { idem_response_json?: string }).idem_response_json!,
+        expires_at: (row as ModerationCaseRow & { idem_expires_at?: string }).idem_expires_at!,
+      }
+    : null
 
   if (existing && Date.parse(existing.expires_at) > Date.now()) {
-    if (existing.request_hash !== hash) {
-      throw new ModerationRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
-    }
+    if (existing.request_hash !== hash) throw new ModerationRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
     return JSON.parse(existing.response_json) as {
       caseId: string
       decisionId: string
