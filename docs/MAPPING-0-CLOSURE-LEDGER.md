@@ -4556,3 +4556,12 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Backup before the E2E default pin: `backup/pre-moderation-w06-e2e-default-20261001`. Backup before this ledger update: `backup/pre-moderation-w06-deploy-ledger-20261001`.
 - No new Worker, D1, binding, migration, API path, Contract semantic, or distributed transaction was introduced.
 - Status remains `NOT_GREEN` pending one clean Security E2E run using this exact deployment evidence, followed by Evidence Registry reconciliation and end-to-end proof of Decision + AuditEvent + Outbox + W03 convergence.
+
+## 2026-10-01 — Security E2E run 36810799928 CI fixture environment correction
+
+- Run `36810799928` verified exact W01 and exact W06 deployment provenance successfully, then passed native L6 reviewer setup, queue/case visibility, APPROVED decision, Decision persistence, and `IDEMPOTENT_REPLAY=PASS`.
+- The run failed only inside the E2E step `Verify replay and idempotency key-reuse rejection` when the step invoked remote Wrangler D1 commands without `CLOUDFLARE_API_TOKEN`; failure was CI environment configuration, not a production W06 runtime failure.
+- Main commit `a0da235e9a5c7c98ff9e65373a46e42b2b05b23d` adds `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` to that E2E step so the seeded idempotency fixture can be created and verified before asserting HTTP 422.
+- Backup before the correction: `backup/pre-moderation-e2e-cloudflare-env-20261001`.
+- The failed run produced no admissible final Security E2E evidence because 422, 428/412, remote evidence, and provenance steps were not reached; the artifact remains diagnostic only.
+- Status: `NOT_GREEN`, pending a new clean Security E2E run on the corrected workflow.
