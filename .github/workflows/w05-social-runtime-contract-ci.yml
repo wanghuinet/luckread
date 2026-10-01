@@ -35,4 +35,4 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx vitest run workers/W05-social/src/follow-runtime.test.ts workers/W05-social/src/like-runtime.test.ts
+      - run: npx vitest run workers/W05-social/src/follow-runtime.test.ts workers/W05-social/src/like-runtime.test.ts workers/W05-social/src/follow-read-runtime.test.ts
