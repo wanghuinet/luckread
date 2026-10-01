@@ -73,15 +73,13 @@ export async function POST(
     if (
       typeof snapshot.status !== 'string' ||
       !subscriptionStatuses.has(snapshot.status) ||
-      snapshot.status !== 'ACTIVE' ||
       !Number.isSafeInteger(snapshot.version) ||
       snapshot.version !== expectedVersion
     ) {
-      return error(
-        snapshot.status === 'ACTIVE' ? 503 : 409,
-        snapshot.status === 'ACTIVE' ? 'SERVICE_UNAVAILABLE' : 'INVALID_STATE',
-        snapshot.status === 'ACTIVE' ? 'Invalid authoritative membership snapshot' : 'Subscription is not active',
-      )
+      return error(503, 'SERVICE_UNAVAILABLE', 'Invalid authoritative membership snapshot')
+    }
+    if (snapshot.status !== 'ACTIVE') {
+      return error(409, 'INVALID_STATE', 'Subscription is not active')
     }
 
     const transition = await transitionMembershipSubscription({
