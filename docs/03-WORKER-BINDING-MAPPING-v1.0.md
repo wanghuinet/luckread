@@ -138,7 +138,20 @@ Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
 
 See `contracts/transport/public-worker-terminal-routing.v1.json`.
 
-## 5. Cross-D1 mutation rules
+## 5. D1 access verification
+
+The physical D1 bindings are guarded by `contracts/transport/worker-d1-access-boundary.v1.json` and `scripts/verify-worker-d1-access-boundary.mjs`.
+
+The guard verifies:
+
+- a bound database UUID is registered in the canonical physical D1 registry;
+- a Worker only binds a D1 domain allowed by its current Worker policy;
+- raw D1 binding names referenced by Worker code are actually declared in that Worker configuration;
+- missing physical Worker configuration remains allowed until that Worker's physical binding is separately admitted.
+
+The guard is a static boundary check, not a replacement for runtime evidence and does not infer table-level authority from SQL text.
+
+## 6. Cross-D1 mutation rules
 
 Cross-D1 mutation is never an implicit direct write permission.
 
@@ -171,7 +184,7 @@ Required for every cross-D1 mutation:
 
 No distributed database transaction is assumed.
 
-## 6. High-risk cross-D1 boundaries
+## 7. High-risk cross-D1 boundaries
 
 ### Subscription / payment
 
@@ -191,7 +204,7 @@ W05 may write scoped D1-03 runtime delivery state, while W09/W10 retain their re
 
 Advertising business state remains with its owning Blueprint domain. Only reconciled authoritative financial effects enter D1-04. No advertising flow may create a parallel ledger or wallet authority.
 
-## 7. Global invariants
+## 8. Global invariants
 
 1. Exactly 12 canonical Workers.
 2. Exactly 4 canonical D1 domains.
@@ -207,7 +220,7 @@ Advertising business state remains with its owning Blueprint domain. Only reconc
 12. Historical Worker/D1 models remain non-authoritative.
 13. Cloudflare-specific storage/runtime choices remain replaceable for PostgreSQL/GCP migration.
 
-## 8. Gate result
+## 9. Gate result
 
 | Dimension | Result |
 |---|---|
@@ -223,7 +236,7 @@ Advertising business state remains with its owning Blueprint domain. Only reconc
 | Contract generation | **BLOCKED** |
 | Implementation authorization | **BLOCKED** |
 
-## 9. Next mandatory gate
+## 10. Next mandatory gate
 
 The next batch must update the Final Mapping so every Blueprint feature-domain mapping can resolve:
 
