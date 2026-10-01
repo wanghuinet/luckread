@@ -4398,18 +4398,24 @@
     {
       "featureId": "MON-003",
       "status": "UNRESOLVED",
-      "entityIds": [],
-      "apiOperationIds": [],
+      "entityIds": [
+        "ENT-MEMBERSHIP-PLAN"
+      ],
+      "apiOperationIds": [
+        "getPlans"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L252",
         "contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json",
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/api/MEMBERSHIP-SUBSCRIPTION-ENTITY-BINDING.v1.json",
+        "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Plan API is not yet fully bound; existing getPlans remains discovery-only, while the MembershipPlan entity model is now frozen."
       ]
     },
     {
@@ -4432,35 +4438,52 @@
     {
       "featureId": "MON-005",
       "status": "UNRESOLVED",
-      "entityIds": [],
-      "apiOperationIds": [],
+      "entityIds": [
+        "ENT-SUBSCRIPTION"
+      ],
+      "apiOperationIds": [
+        "createSubscription",
+        "cancelSubscription",
+        "getSubscription"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L254",
         "contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json",
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+        "contracts/api/MEMBERSHIP-SUBSCRIPTION-ENTITY-BINDING.v1.json",
+        "contracts/dto/MEMBERSHIP-SUBSCRIPTION-DTO.v1.json"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Runtime/persistence/migration, payment reconciliation, lifecycle E2E and Evidence Registry provenance remain unresolved."
       ]
     },
     {
       "featureId": "MON-006",
       "status": "UNRESOLVED",
-      "entityIds": [],
-      "apiOperationIds": [],
+      "entityIds": [
+        "ENT-ENTITLEMENT-GRANT"
+      ],
+      "apiOperationIds": [
+        "getEntitlements",
+        "checkEntitlement"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L255",
         "contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json",
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+        "contracts/api/MEMBERSHIP-SUBSCRIPTION-ENTITY-BINDING.v1.json",
+        "contracts/dto/MEMBERSHIP-SUBSCRIPTION-DTO.v1.json"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Runtime/persistence/migration, fail-closed security E2E, cache invalidation and Evidence Registry provenance remain unresolved."
       ]
     },
     {
