@@ -62,6 +62,20 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/moderation-native-reviewer-fixture.mjs
 
+      - name: Diagnose native login state after reviewer fixture
+        if: always()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MODERATION_AUTH_USER_ID:-}" ]; then
+            echo "NATIVE_LOGIN_STATE_DIAGNOSTIC=SKIPPED_NO_USER_ID"
+            exit 0
+          fi
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --json --config workers/W01-payload/wrangler.jsonc --command "SELECT (SELECT COUNT(*) FROM users_sessions WHERE CAST(_parent_id AS TEXT)='$MODERATION_AUTH_USER_ID') AS native_session_count, (SELECT COUNT(*) FROM auth_session_state WHERE user_id='$MODERATION_AUTH_USER_ID') AS auth_session_state_count, (SELECT COUNT(*) FROM role_assignments WHERE subject_id='$MODERATION_AUTH_USER_ID' AND status='ACTIVE') AS active_role_assignment_count;" > /tmp/native-login-state.json
+          node -e "const r=require('/tmp/native-login-state.json'); const row=r[0]?.results?.[0]; if(!row) throw new Error('native login state diagnostic row missing'); console.log('NATIVE_LOGIN_STATE_DIAGNOSTIC=' + JSON.stringify({nativeSessionCount:Number(row.native_session_count),authSessionStateCount:Number(row.auth_session_state_count),activeRoleAssignmentCount:Number(row.active_role_assignment_count)}));"
+
       - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
