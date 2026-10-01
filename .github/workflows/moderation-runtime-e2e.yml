@@ -81,6 +81,122 @@ jobs:
         with:
           node-version: 24
 
+      - name: Diagnose W02 establish through ephemeral binding harness
+        if: always()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${MODERATION_TOKEN:-}" ] || [ -z "${MODERATION_AUTH_USER_ID:-}" ]; then
+            echo "W02_ESTABLISH_BINDING_DIAGNOSTIC=SKIPPED"
+            exit 0
+          fi
+          mkdir -p artifacts/mapping-0/moderation-runtime-e2e
+          cat > .w02-binding-diagnostic.wrangler.jsonc <<EOF
+          {
+            "\$schema": "./node_modules/wrangler/config-schema.json",
+            "name": "luckread-w02-binding-diagnostic-${GITHUB_RUN_ID}",
+            "main": ".w02-binding-diagnostic.ts",
+            "compatibility_date": "2025-08-15",
+            "services": [{ "binding": "W02_AUTH", "service": "luckread-w02" }],
+            "d1_databases": [{
+              "binding": "D1_01",
+              "database_name": "luckread",
+              "database_id": "2f80471e-3756-49f9-8db1-7707a433ad64",
+              "remote": true
+            }],
+            "vars": {
+              "PROBE_TOKEN": "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}",
+              "USER_ID": "${MODERATION_AUTH_USER_ID}",
+              "RUN_ID": "${GITHUB_RUN_ID}"
+            }
+          }
+          EOF
+          cat > .w02-binding-diagnostic.ts <<'EOF'
+          const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+            status,
+            headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+          })
+
+          const safeBody = (value: any) => ({
+            code: typeof value?.error?.code === 'string' ? value.error.code : undefined,
+            message: typeof value?.error?.message === 'string' ? value.error.message : undefined,
+            success: value?.error === undefined,
+            layer: typeof value?.layer === 'string' ? value.layer : undefined,
+            tokenVersion: typeof value?.tokenVersion === 'number' ? value.tokenVersion : undefined,
+            nativeExpiresAtPresent: typeof value?.nativeExpiresAt === 'string',
+            refreshTokenPresent: typeof value?.refreshToken === 'string',
+          })
+
+          export default {
+            async fetch(request: Request, env: { D1_01: D1Database; W02_AUTH: Fetcher; PROBE_TOKEN: string; USER_ID: string; RUN_ID: string }) {
+              if (request.method !== 'POST' || new URL(request.url).pathname !== '/diagnose') return new Response(null, { status: 404 })
+              if (request.headers.get('x-probe-token') !== env.PROBE_TOKEN) return json({ status: 'DENY' }, 403)
+              const session = await env.D1_01.prepare(
+                'SELECT id FROM users_sessions WHERE CAST(_parent_id AS TEXT)=? ORDER BY created_at DESC LIMIT 1',
+              ).bind(env.USER_ID).first<{ id: string }>()
+              if (!session?.id) return json({ status: 'NO_NATIVE_SESSION' }, 409)
+
+              const base = 'https://luckread-w02.internal/internal/auth/'
+              const resolveResponse = await env.W02_AUTH.fetch(new Request(base + 'authz/resolve-layer'.replace('/auth/', '/'), {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ subjectId: env.USER_ID, accountState: 'ACTIVE' }),
+              }))
+              const resolveRaw = await resolveResponse.text()
+              let resolveBody: any = null
+              try { resolveBody = resolveRaw ? JSON.parse(resolveRaw) : null } catch {}
+
+              const establishResponse = await env.W02_AUTH.fetch(new Request(base + 'session/establish', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                  sessionId: String(session.id),
+                  userId: env.USER_ID,
+                  deviceId: 'moderation-w02-diagnostic-' + env.RUN_ID,
+                }),
+              }))
+              const establishRaw = await establishResponse.text()
+              let establishBody: any = null
+              try { establishBody = establishRaw ? JSON.parse(establishRaw) : null } catch {}
+
+              const extension = await env.D1_01.prepare(
+                'SELECT COUNT(*) AS count FROM auth_session_state WHERE user_id=?',
+              ).bind(env.USER_ID).first<{ count: number }>()
+
+              return json({
+                status: 'DIAGNOSTIC',
+                nativeSessionPresent: true,
+                resolveLayer: { status: resolveResponse.status, body: safeBody(resolveBody) },
+                establish: { status: establishResponse.status, body: safeBody(establishBody) },
+                authSessionStateCount: Number(extension?.count ?? 0),
+              })
+            },
+          }
+          EOF
+          npx --yes wrangler@$WRANGLER_VERSION dev --remote --config .w02-binding-diagnostic.wrangler.jsonc --ip 127.0.0.1 --port 8788 > w02-binding-diagnostic.log 2>&1 &
+          echo $! > /tmp/w02-binding-diagnostic.pid
+          ready=0
+          for _ in $(seq 1 60); do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8788/diagnose || true)
+            if [ "$code" != "000" ]; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat w02-binding-diagnostic.log || true
+            echo "W02_ESTABLISH_BINDING_DIAGNOSTIC=HARNESS_START_FAILED"
+            exit 0
+          fi
+          set +e
+          curl_exit=0
+          curl --silent --show-error --max-time 15 -X POST -H "x-probe-token: ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" http://127.0.0.1:8788/diagnose > artifacts/mapping-0/moderation-runtime-e2e/w02-establish-binding-diagnostic.json
+          curl_exit=$?
+          set -e
+          cat artifacts/mapping-0/moderation-runtime-e2e/w02-establish-binding-diagnostic.json || true
+          cp w02-binding-diagnostic.log artifacts/mapping-0/moderation-runtime-e2e/w02-binding-diagnostic.log || true
+          echo "W02_ESTABLISH_BINDING_DIAGNOSTIC_CURL_EXIT=$curl_exit"
+
       - name: Setup fixture IDs
         run: |
           set -euo pipefail
