@@ -51,8 +51,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('membership_subscriptions','membership_entitlement_grants') ORDER BY name;"
-          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('uq_membership_subscription_active_subscriber_plan','uq_membership_entitlement_active_scope') ORDER BY name;"
+          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('membership_mutation_idempotency','membership_subscriptions','membership_entitlement_grants','membership_txn_guard') ORDER BY name;"
+          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('uq_membership_subscription_active_subscriber_plan','uq_membership_entitlement_active_scope','ix_membership_mutation_idempotency_expiry') ORDER BY name;"
           npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "PRAGMA table_info(membership_subscriptions);"
       - name: Capture provenance
         run: |
