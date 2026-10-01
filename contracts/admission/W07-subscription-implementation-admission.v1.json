@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0.0",
+  "status": "BOUNDED_ADMISSION_MIGRATION_PENDING",
+  "featureIds": [
+    "MON-001",
+    "MON-003",
+    "MON-004",
+    "MON-005",
+    "MON-006"
+  ],
+  "worker": "W07",
+  "task": "T16",
+  "authoritativeD1": "D1-01",
+  "scope": {
+    "admitted": [
+      "subscription state transition/reconciliation engine",
+      "scoped Subscription + EntitlementGrant D1-01 schema",
+      "controlled D1-01 migration"
+    ],
+    "blocked": [
+      "public membership APIs",
+      "payment webhook trust",
+      "production entitlement grant/revoke",
+      "creator/member projection",
+      "full lifecycle remote E2E"
+    ]
+  },
+  "preconditions": [
+    "state-machine reconciliation contract present",
+    "D1-01 persistence contract present",
+    "D1-01 migration evidence exists",
+    "W07 physical binding evidence exists",
+    "security/lifecycle/payment/entitlement E2E exists"
+  ],
+  "authorityInvariants": [
+    "Commerce/Payment owns transaction outcome",
+    "Ledger owns financial truth",
+    "Membership owns subscription and entitlement lifecycle",
+    "Client cannot author subscription status, payment success or entitlement status",
+    "Social stores no second membership authority"
+  ],
+  "runtimeBudgets": {
+    "newWorkers": 0,
+    "newD1": 0,
+    "distributedTransactions": 0
+  }
+}
