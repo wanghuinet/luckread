@@ -59,7 +59,7 @@ export default function HomeContentFeed() {
           <p className="eyebrow">Latest from LuckRead</p>
           <h2 id="content-feed-title">正在发生的内容</h2>
         </div>
-        <span className="content-feed-note">实时读取已发布内容</span>
+        <Link className="content-feed-all" href="/content">查看全部 ↗</Link>
       </div>
       <div className="content-feed-grid">
         {items.map((item) => {
