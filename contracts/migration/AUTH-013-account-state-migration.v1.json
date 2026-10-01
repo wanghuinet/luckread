@@ -76,6 +76,6 @@
     "successfulTransitionVersionRule": "previous_version + 1",
     "unsuccessfulTransitionMutatesVersion": false
   },
-  "migrationFile": "workers/W02-content/migrations/0002_auth_013_account_state.sql",
+  "migrationFile": "workers/W02-identity/migrations/0002_auth_013_account_state.sql",
   "nonEmptyTargetPolicy": "Migration MUST stop for users_count > 0; no existing-user values may be auto-assigned on a non-empty target."
 }

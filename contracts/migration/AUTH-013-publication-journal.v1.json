@@ -14,8 +14,8 @@
   },
   "target": {
     "physicalTable": "auth_013_publication_journal",
-    "sourceMigration": "workers/W02-content/migrations/0003_auth_013_publication_journal.sql",
-    "databaseBinding": "workers/W02-content/wrangler.jsonc:D1_01"
+    "sourceMigration": "workers/W02-identity/migrations/0003_auth_013_publication_journal.sql",
+    "databaseBinding": "workers/W02-identity/wrangler.jsonc:D1_01"
   },
   "columns": [
     {"column":"journal_id","dbType":"TEXT","nullable":false,"primaryKey":true},
