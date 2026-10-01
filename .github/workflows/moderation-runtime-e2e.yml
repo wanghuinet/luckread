@@ -7,7 +7,7 @@ on:
         description: Exact admitted source SHA under test
         required: true
         type: string
-        default: 057669c327582b42ceefc270b29bfe5a2ac439f7
+        default: 11515498e0a0c81148a9e59e0d77f42755838ab3
       base_url:
         description: W01 public moderation base URL
         required: true
@@ -157,6 +157,7 @@ jobs:
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --json --config workers/W03-feed/wrangler.jsonc --command "SELECT id,state,version,etag FROM contents WHERE id IN ('$CONTENT_ID','mod-e2e-stale-$GITHUB_RUN_ID') ORDER BY id;" > artifacts/mapping-0/moderation-runtime-e2e/content-state.json
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc --command "SELECT case_id,state,version,current_decision_id FROM moderation_cases WHERE case_id IN ('$CASE_ID','mod-e2e-stale-$GITHUB_RUN_ID') ORDER BY case_id;" > artifacts/mapping-0/moderation-runtime-e2e/cases.json
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc --command "SELECT decision_id,case_id,case_version,outcome,policy_version,reviewer_id,reviewer_layer FROM moderation_decisions WHERE case_id='$CASE_ID';" > artifacts/mapping-0/moderation-runtime-e2e/decision.json
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc --command "SELECT outbox_id,decision_id,status,attempts,last_error,delivered_at FROM moderation_enforcement_outbox WHERE decision_id=(SELECT decision_id FROM moderation_decisions WHERE case_id='$CASE_ID');" > artifacts/mapping-0/moderation-runtime-e2e/outbox.json
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc --command "SELECT event_id,action,target_type,target_id,request_id,trace_id FROM audit_events WHERE target_type='ModerationCase' AND target_id='$CASE_ID';" > artifacts/mapping-0/moderation-runtime-e2e/audit.json
           node - <<'NODE'
           const fs=require('fs');
@@ -168,6 +169,7 @@ jobs:
           if(!cases.some(x=>x.case_id===process.env.CASE_ID&&x.state==='ACTION_TAKEN'&&x.version===2)) throw new Error('W06 case transition missing');
           if(decisions.length!==1||decisions[0].outcome!=='APPROVED'||decisions[0].reviewer_id===null) throw new Error('Decision persistence missing');
           if(audits.length!==1||audits[0].action!=='moderation.decide') throw new Error('Audit binding missing');
+          if(outbox.length!==1||outbox[0].decision_id!==decisions[0].decision_id) throw new Error('Transactional outbox missing');
           console.log('MODERATION_REMOTE_EVIDENCE=PASS');
           NODE
 
