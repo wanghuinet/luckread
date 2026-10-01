@@ -1,0 +1,20 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/persistence/SOCIAL-004-comment-persistence-contract.v1.json",
+  "title":"SOCIAL-004 Comment Persistence Contract",
+  "version":"1.0.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "domainId":"D1-02",
+  "worker":"W05",
+  "table":"social_comments",
+  "database":"D1-02",
+  "authoritativeEntity":"ENT-SOCIAL-COMMENT",
+  "migrationStatus":"NOT_CREATED",
+  "columns":["comment_id","author_user_id","target_type","target_id","parent_id","body","state","version","created_at","updated_at","deleted_at"],
+  "constraints":["CHECK(target_type = 'content')","parent_id, when present, must resolve to a comment within the same target content scope","CHECK(version >= 1)"],
+  "indexes":["INDEX(target_id,state,created_at DESC,comment_id DESC)","INDEX(parent_id,created_at DESC,comment_id DESC)","INDEX(author_user_id,created_at DESC,comment_id DESC)"],
+  "writeRules":["Create validates target visibility/commentability, parent scope/depth, moderation policy and anti-abuse before insert.","Edit uses author scope + version check.","Delete transitions state to DELETED and records deleted_at.","No synchronous counter update is authoritative."],
+  "readBudget":{"d1ReadMax":1,"d1WriteMax":1,"rpcMax":0},
+  "portability":"PostgreSQL-compatible logical schema",
+  "requiredEvidence":["migration","remote D1 schema","moderation","concurrency","runtime","security-E2E","reconciliation"]
+}
