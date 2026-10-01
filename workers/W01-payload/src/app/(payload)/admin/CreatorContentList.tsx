@@ -53,6 +53,7 @@ export default function CreatorContentList() {
   const [error, setError] = useState('')
   const [actionId, setActionId] = useState<string | null>(null)
   const requestIdRef = useRef(0)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const load = useCallback(async (cursor: string | null = null) => {
     const requestId = ++requestIdRef.current
@@ -101,6 +102,14 @@ export default function CreatorContentList() {
     }, 0)
     return () => window.clearTimeout(timer)
   }, [load])
+
+  useEffect(() => {
+    return () => {
+      requestIdRef.current += 1
+      abortControllerRef.current?.abort()
+      abortControllerRef.current = null
+    }
+  }, [])
 
   useEffect(() => {
     const handleContentMutation = () => {
