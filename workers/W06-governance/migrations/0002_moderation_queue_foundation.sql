@@ -71,3 +71,24 @@ CREATE TABLE IF NOT EXISTS moderation_txn_guard (
   id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
   successful INTEGER NOT NULL CHECK (successful = 1)
 );
+
+CREATE TABLE IF NOT EXISTS moderation_enforcement_outbox (
+  outbox_id TEXT NOT NULL PRIMARY KEY,
+  decision_id TEXT NOT NULL UNIQUE,
+  case_id TEXT NOT NULL,
+  target_type TEXT NOT NULL CHECK (target_type = 'content'),
+  target_id TEXT NOT NULL,
+  target_version INTEGER NOT NULL CHECK (target_version >= 1),
+  outcome TEXT NOT NULL CHECK (outcome IN ('APPROVED','REJECTED')),
+  policy_version TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('PENDING','DELIVERED','RETRY')),
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  next_attempt_at TEXT NOT NULL,
+  last_error TEXT,
+  created_at TEXT NOT NULL,
+  delivered_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ix_moderation_enforcement_outbox_ready
+  ON moderation_enforcement_outbox(status, next_attempt_at);
