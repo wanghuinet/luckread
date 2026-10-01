@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/SOCIAL-002-followers-following-read.v1.json",
+  "title": "SOCIAL-002 Followers / Following Read Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureId": "SOCIAL-002",
+  "authority": {
+    "domain": "SOCIAL",
+    "task": "T11",
+    "worker": "W05",
+    "d1": "D1-02",
+    "sourceOfTruth": "social_follow_relationships"
+  },
+  "operations": [
+    {
+      "operationId": "getUsersUserIdFollowers",
+      "method": "GET",
+      "path": "/v1/users/{userId}/followers",
+      "purpose": "Return a cursor-paginated view of users who currently follow the target user.",
+      "authorization": {
+        "target": "authoritative ENT-USER",
+        "viewerScope": "server-derived",
+        "privacyBlockScope": "server-enforced",
+        "failClosedWhenPolicyUnavailable": true
+      },
+      "query": {
+        "cursor": "opaque cursor; optional",
+        "limit": {
+          "default": 20,
+          "maximum": 50
+        },
+        "sort": "createdAt DESC, relationshipId DESC"
+      },
+      "response": {
+        "items": [
+          {
+            "userId": "ENT-USER identifier",
+            "followedAt": "relationship createdAt"
+          }
+        ],
+        "page": {
+          "nextCursor": "opaque cursor or null",
+          "hasMore": "boolean"
+        },
+        "totalCount": "derived current follower count for the target user"
+      },
+      "consistency": {
+        "relation": "authoritative",
+        "count": "derived",
+        "countRebuildable": true
+      },
+      "persistenceRead": {
+        "table": "social_follow_relationships",
+        "filter": "target_user_id = requested userId",
+        "queryShape": "bounded cursor read; count derived from the same authoritative relation set",
+        "noCounterColumn": true,
+        "noProjectionAsAuthority": true
+      },
+      "security": [
+        "target user existence/scope is resolved by authoritative User policy",
+        "block/privacy rules are evaluated before relationship disclosure",
+        "caller cannot override viewer identity",
+        "no follower relation data from another D1 domain is copied into D1-02"
+      ],
+      "budgets": {
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "rpcMax": 0,
+        "responseItemsMax": 50
+      },
+      "statusReason": "Contract closes API/query/field semantics only; W05 runtime, privacy authority binding, anti-abuse and remote evidence remain pending."
+    },
+    {
+      "operationId": "getUsersUserIdFollowing",
+      "method": "GET",
+      "path": "/v1/users/{userId}/following",
+      "purpose": "Return a cursor-paginated view of users currently followed by the target user.",
+      "authorization": {
+        "target": "authoritative ENT-USER",
+        "viewerScope": "server-derived",
+        "privacyBlockScope": "server-enforced",
+        "failClosedWhenPolicyUnavailable": true
+      },
+      "query": {
+        "cursor": "opaque cursor; optional",
+        "limit": {
+          "default": 20,
+          "maximum": 50
+        },
+        "sort": "createdAt DESC, relationshipId DESC"
+      },
+      "response": {
+        "items": [
+          {
+            "userId": "ENT-USER identifier",
+            "followedAt": "relationship createdAt"
+          }
+        ],
+        "page": {
+          "nextCursor": "opaque cursor or null",
+          "hasMore": "boolean"
+        },
+        "totalCount": "derived current following count for the target user"
+      },
+      "consistency": {
+        "relation": "authoritative",
+        "count": "derived",
+        "countRebuildable": true
+      },
+      "persistenceRead": {
+        "table": "social_follow_relationships",
+        "filter": "follower_user_id = requested userId",
+        "queryShape": "bounded cursor read; count derived from the same authoritative relation set",
+        "noCounterColumn": true,
+        "noProjectionAsAuthority": true
+      },
+      "security": [
+        "target user existence/scope is resolved by authoritative User policy",
+        "block/privacy rules are evaluated before relationship disclosure",
+        "caller cannot override viewer identity",
+        "no follower relation data from another D1 domain is copied into D1-02"
+      ],
+      "budgets": {
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "rpcMax": 0,
+        "responseItemsMax": 50
+      },
+      "statusReason": "Contract closes API/query/field semantics only; W05 runtime, privacy authority binding, anti-abuse and remote evidence remain pending."
+    }
+  ],
+  "relationshipStatus": {
+    "follow": "authoritative active relation",
+    "unfollow": "atomic removal",
+    "duplicateFollow": "idempotent success",
+    "missingUnfollow": "idempotent success"
+  },
+  "interactionStatus": {
+    "isFollowed": "For a specific viewer/target pair, derive from the authoritative follow relation; do not store a second boolean authority.",
+    "recommendedReadShape": "A caller-scoped status check may reuse the same relation authority; UI/API implementation must not infer state from follower counts."
+  },
+  "nonGoals": [
+    "No follower/following counter table.",
+    "No Payload Collection.",
+    "No new Worker.",
+    "No new D1 database.",
+    "No new Task.",
+    "No duplicate User profile authority.",
+    "No Creator Center write authority.",
+    "No runtime GREEN claim."
+  ],
+  "requiredEvidence": [
+    "canonical OpenAPI operation binding",
+    "DTO binding",
+    "W05 runtime handler",
+    "W05 D1-02 read evidence",
+    "privacy/block scope negative evidence",
+    "pagination boundary evidence",
+    "count consistency/rebuild evidence",
+    "Evidence Registry provenance"
+  ]
+}
