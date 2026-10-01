@@ -154,7 +154,7 @@ const parseDecision = (value: unknown): {
   }
 }
 
-const errorResponse = (error: unknown): Response => {
+const errorResponse = (error: unknown, requestId?: string): Response => {
   if (error instanceof ModerationRuntimeError) {
     const code = error.code
     const message =
@@ -167,9 +167,9 @@ const errorResponse = (error: unknown): Response => {
       code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' ? 'Idempotency-Key cannot be reused with different input' :
       code === 'SERVICE_UNAVAILABLE' ? 'Moderation service unavailable' :
       'Invalid moderation request'
-    return json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, error.status)
+    return json({ error: { code, message, details: {} }, requestId: requestId ?? crypto.randomUUID() }, error.status)
   }
-  return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Moderation service unavailable', details: {} }, requestId: crypto.randomUUID() }, 503)
+  return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Moderation service unavailable', details: {} }, requestId: requestId ?? crypto.randomUUID() }, 503)
 }
 
 export default {
@@ -194,7 +194,7 @@ export default {
           requestId: principal.requestId,
         })
       } catch (error) {
-        return errorResponse(error)
+        return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim())
       }
     }
 
@@ -208,7 +208,7 @@ export default {
           requestId: principal.requestId,
         })
       } catch (error) {
-        return errorResponse(error)
+        return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim())
       }
     }
 
@@ -229,7 +229,7 @@ export default {
         })
         return json(result, 200)
       } catch (error) {
-        return errorResponse(error)
+        return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim())
       }
     }
 
