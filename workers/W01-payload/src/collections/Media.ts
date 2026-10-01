@@ -37,9 +37,11 @@ export const Media: CollectionConfig = {
   ],
   hooks: {
     beforeChange: [
-      ({ data, req, operation }) => {
+      ({ data, req, operation, originalDoc }) => {
         if (operation === 'create' && req.user?.id) {
           data.ownerUserId = String(req.user.id)
+        } else if (operation === 'update') {
+          data.ownerUserId = (originalDoc as unknown as { ownerUserId?: string | number | null } | undefined)?.ownerUserId ?? null
         }
         return data
       },
