@@ -92,3 +92,10 @@ The four contract-defined Follow fields are now bound to the D1-02 logical persi
 `contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json`
 
 The contract defines the authoritative `social_follow_relationships` table, its primary key, active-relation uniqueness boundary, and follower/created and target/created query indexes. It deliberately does not claim migration execution or runtime evidence.
+
+
+## 2026-10-01 Reconciliation Addendum — SOCIAL-002
+
+The earlier record's SOCIAL-002 discovery-only statement is superseded for the contract surface by `CC-MAPPING-0-SOCIAL-002-FOLLOWER-FOLLOWING-READ-CONTRACT-2026-10-01.md`.
+
+As of this addendum, the two follower/following read operations have explicit OpenAPI response schemas and canonical DTO bindings. This does not change the earlier SOCIAL-001 runtime boundary and does not promote SOCIAL-002 to GREEN. Runtime, policy-authority, security-E2E, concurrency and Evidence Registry gates remain open.
