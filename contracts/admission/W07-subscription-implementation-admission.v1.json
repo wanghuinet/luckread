@@ -30,7 +30,8 @@
     "D1-01 persistence contract present",
     "D1-01 migration evidence exists",
     "W07 physical binding evidence exists",
-    "security/lifecycle/payment/entitlement E2E exists"
+    "security/lifecycle/payment/entitlement E2E exists",
+    "W07-W02 membership access-state binding contract is present"
   ],
   "authorityInvariants": [
     "Commerce/Payment owns transaction outcome",
