@@ -41,9 +41,11 @@
       "path": "/v1/comments/{commentId}",
       "openapiPath": "/comments/{commentId}",
       "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "SOCIAL-004"
+      ],
+      "schemaRef": "contracts/api/SOCIAL-004-comment-contract.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/comments/{commentId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
@@ -176,9 +178,11 @@
       "path": "/v1/interactions/likes",
       "openapiPath": "/interactions/likes",
       "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "SOCIAL-003"
+      ],
+      "schemaRef": "contracts/api/SOCIAL-003-reaction-contract.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/interactions/likes",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
@@ -491,9 +495,11 @@
       "path": "/v1/contents/{contentId}/comments",
       "openapiPath": "/contents/{contentId}/comments",
       "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "SOCIAL-004"
+      ],
+      "schemaRef": "contracts/api/SOCIAL-004-comment-contract.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}/comments",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
@@ -1215,9 +1221,11 @@
       "path": "/v1/comments/{commentId}",
       "openapiPath": "/comments/{commentId}",
       "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "SOCIAL-004"
+      ],
+      "schemaRef": "contracts/api/SOCIAL-004-comment-contract.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#patch:/comments/{commentId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
@@ -1755,9 +1763,11 @@
       "path": "/v1/contents/{contentId}/comments",
       "openapiPath": "/contents/{contentId}/comments",
       "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "SOCIAL-004"
+      ],
+      "schemaRef": "contracts/api/SOCIAL-004-comment-contract.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/comments",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
@@ -1905,9 +1915,11 @@
       "path": "/v1/interactions/likes",
       "openapiPath": "/interactions/likes",
       "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "SOCIAL-003"
+      ],
+      "schemaRef": "contracts/api/SOCIAL-003-reaction-contract.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/interactions/likes",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
@@ -2303,9 +2315,7 @@
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
       ]
-    }
-  
-    ,
+    },
     {
       "operationId": "getUsersUserIdFollow",
       "method": "GET",
@@ -2324,5 +2334,5 @@
         "contracts/dto/DTO-SOCIAL-FOLLOW-STATUS.v1.json"
       ]
     }
-]
+  ]
 }
