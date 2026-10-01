@@ -61,6 +61,7 @@ describe('Creator Center admin extension', () => {
     expect(contentDetail).toContain("const [actionMessage, setActionMessage] = useState('')")
     expect(contentDetail).toContain("setActionMessage('无法复制链接，请从地址栏复制当前页面地址。')")
     expect(contentDetail).toContain('content-detail-action-status')
+    expect(read('src/app/(frontend)/styles.css')).toContain('.content-detail-action-status')
     expect(publisher).toContain('function startNewContent()')
     expect(publisher).toContain("setDraft(null)")
     expect(publisher).toContain('新建内容')
