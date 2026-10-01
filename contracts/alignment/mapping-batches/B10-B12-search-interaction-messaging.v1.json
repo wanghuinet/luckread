@@ -221,16 +221,21 @@
         "docs/11-P0-SOCIAL-INTERACTION-AND-EVENT-CONTRACT-v1.0.md",
         "contracts/enums/comment-state.json",
         "contracts/api/social-comment-operation-policy.v1.json",
+        "contracts/entity/SOCIAL-004-comment-reply-contract.v1.json",
+        "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+        "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json",
         "contracts/openapi/v1/openapi.yaml#/content/{contentId}/comments",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-AUTHORITY-CONFLICT-2026-10-01.md",
         "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-API-SURFACE-2026-10-01.md"
       ],
       "blockers": [
-        "API surface is now bound to the canonical singular paths and operationIds; Entity/DTO/Field/Payload/Persistence/Security/Lifecycle/Runtime/Test/Evidence remain unresolved."
+        "API + Entity + Field + logical D1-02 persistence are contract-bound; migration, runtime, policy/security, concurrency/E2E and evidence remain unresolved."
       ],
       "apiOperationIds": [
         "getContentContentIdComments",
         "postContentContentIdComments"
+      ],
+      "entityIds": [
+        "ENT-SOCIAL-COMMENT"
       ]
     },
     {
