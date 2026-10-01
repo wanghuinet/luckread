@@ -18,6 +18,10 @@
       "service": "luckread-w02"
     },
     {
+      "binding": "W05_SOCIAL",
+      "service": "luckread-w05"
+    },
+    {
       "binding": "W03_CONTENT",
       "service": "luckread-w03"
     },

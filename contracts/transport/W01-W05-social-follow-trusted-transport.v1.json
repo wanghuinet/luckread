@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W01-W05-social-follow-trusted-transport.v1.json",
+  "title": "W01 to W05 Trusted Social Follow Transport Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureIds": ["SOCIAL-001"],
+  "operationIds": ["follow", "unfollow"],
+  "ownership": {"ingressWorker":"W01","authoritativeWorker":"W05","authoritativeD1":"D1-02","task":"T11"},
+  "binding": {"serviceBinding":"W05_SOCIAL","serviceName":"luckread-w05","internalHost":"https://luckread-w05.internal"},
+  "trustedHeaders": {
+    "X-LuckRead-Caller": "W01",
+    "X-LuckRead-Transport-Version": "1.0",
+    "X-LuckRead-Principal-User-Id": "server-derived authenticated subject",
+    "X-LuckRead-Correlation-Id": "request correlation identifier"
+  },
+  "body": {
+    "targetUserId": "public target identifier resolved against ENT-USER",
+    "actorAccountState": "trusted D1-01 account-state result",
+    "targetFollowability": "trusted target policy result",
+    "blockPolicyAllows": "trusted block-policy result",
+    "privacyScopeAllows": "trusted privacy/scope result",
+    "antiAbuseAdmission": "trusted anti-abuse admission result"
+  },
+  "security": [
+    "W05 rejects every request unless X-LuckRead-Caller is exactly W01.",
+    "W05 rejects missing or unsupported transport version.",
+    "W05 derives followerUserId only from X-LuckRead-Principal-User-Id.",
+    "No end-user bearer credential is forwarded as an authority credential.",
+    "Policy fields are trusted only when delivered through this internal binding; public client input never reaches this boundary.",
+    "Missing, malformed, stale or ambiguous policy input fails closed.",
+    "Idempotency-Key is mandatory for both operations."
+  ],
+  "admission": {
+    "decision": "DENY",
+    "reason": "Policy authority sources are not yet evidenced for public success.",
+    "runtimeAuthorization": "No public success path is enabled by this contract alone."
+  },
+  "budgets": {"d1ReadMax":1,"d1WriteMax":1,"rpcMax":0,"crossD1Transactions":0,"syncFanoutMax":0},
+  "evidenceRequired": ["exact W01 binding SHA","exact W05 source SHA","trusted principal propagation","policy authority bindings","fail-closed security","positive/negative/concurrency remote runtime evidence"]
+}
