@@ -39,11 +39,31 @@ jobs:
         with:
           node-version: 24
 
+      - name: Start controlled W01 runtime tail
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/moderation-runtime-e2e
+          nohup npx --yes "wrangler@${WRANGLER_VERSION}" tail luckread-w01-payload --format json --method POST --status error > artifacts/mapping-0/moderation-runtime-e2e/w01-runtime-tail.jsonl 2>&1 &
+          echo $! > /tmp/moderation-l6-w01-tail.pid
+          sleep 3
+
       - name: Run native L6 moderation authorization readiness
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/moderation-native-l6-readiness.mjs
+
+      - name: Stop controlled W01 runtime tail
+        if: always()
+        run: |
+          set +e
+          if [ -f /tmp/moderation-l6-w01-tail.pid ]; then
+            kill "$(cat /tmp/moderation-l6-w01-tail.pid)" >/dev/null 2>&1 || true
+            sleep 2
+          fi
 
       - name: Upload readiness evidence
         if: always()
