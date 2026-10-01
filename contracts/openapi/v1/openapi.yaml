@@ -637,6 +637,8 @@ paths:
       tags: [Comments]
       summary: List content comments
       operationId: listComments
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/SOCIAL-004-comment-contract.v1.json
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
@@ -651,6 +653,8 @@ paths:
       tags: [Comments]
       summary: Create content comment
       operationId: createComment
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/SOCIAL-004-comment-contract.v1.json
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -676,6 +680,8 @@ paths:
       tags: [Interactions]
       summary: Idempotent like. Repeating MUST NOT create a second like.
       operationId: like
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/SOCIAL-003-reaction-contract.v1.json
       requestBody:
         required: true
         content:
@@ -689,6 +695,8 @@ paths:
       tags: [Interactions]
       summary: Idempotent unlike.
       operationId: unlike
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/SOCIAL-003-reaction-contract.v1.json
       requestBody:
         required: true
         content:
