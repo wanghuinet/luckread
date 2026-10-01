@@ -1,0 +1,47 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/api/CREATOR-003-006-AUDIENCE-DASHBOARD-READ.v1.json",
+  "title":"Creator Audience Dashboard Read Contract",
+  "version":"1.0.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "featureIds":["CREATOR-003","CREATOR-006"],
+  "operationId":"getCreatorAnalytics",
+  "method":"GET",
+  "path":"/v1/creator/analytics",
+  "purpose":"Return a creator-scoped derived audience summary for Creator Center without exposing Social or Membership storage internals.",
+  "authorization":{"required":true,"permission":"analytics.read","scope":"owner_or_attribution.creator_id = self","creatorServerDerived":true,"failClosedWhenScopeUnavailable":true},
+  "response":{
+    "data":{
+      "audience":{
+        "followers":{
+          "total":"derived current follower count from Social authority/projection",
+          "asOf":"date-time"
+        },
+        "subscribers":{
+          "activeTotal":"derived current entitled subscriber count from Membership authority/projection",
+          "asOf":"date-time"
+        }
+      },
+      "source":{
+        "socialSnapshotVersion":"opaque version or null",
+        "membershipSnapshotVersion":"opaque version or null"
+      }
+    },
+    "requestId":"RequestId"
+  },
+  "authorityBoundary":{
+    "followerTruth":"SOCIAL / ENT-SOCIAL-FOLLOW",
+    "subscriptionTruth":"MEMBERSHIP / ENT-SUBSCRIPTION + ENT-ENTITLEMENT-GRANT",
+    "dashboard":"derived read only; never authoritative",
+    "cache":"non-authoritative"
+  },
+  "consistency":{
+    "mode":"eventually_consistent_derived_snapshot",
+    "countsRebuildable":true,
+    "stalenessMustBeObservable":true,
+    "noCrossDomainDistributedTransaction":true
+  },
+  "resourceBudget":{"class":"CACHE_FIRST_BOUNDED_READ","d1ReadMax":0,"d1WriteMax":0,"rpcMax":0,"responseItemsMax":1},
+  "privacy":["creator may read only its own audience summary","individual subscriber records are not returned by this endpoint","block/privacy rules remain enforced by source domain APIs/projections"],
+  "nonGoals":["No direct Social D1-02 reads from Creator Center.","No direct Membership D1 reads from Creator Center.","No new Worker.","No new D1 database.","No new Task.","No runtime GREEN claim."]
+}
