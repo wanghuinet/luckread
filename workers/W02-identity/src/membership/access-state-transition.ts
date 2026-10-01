@@ -110,8 +110,10 @@ export function mapMembershipError(error: unknown): { status: number; code: stri
     code === 'INVALID_PLAN_VERSION' || code === 'INVALID_EXPECTED_VERSION' ||
     code === 'INVALID_ENTITLEMENT_GRANT' || code === 'INVALID_ENTITLEMENT_REVOKE'
       ? 400
-      : code === 'SUBSCRIPTION_ID_CONFLICT'
-        ? 409
+      : code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT'
+        ? 422
+        : code === 'IDEMPOTENCY_IN_PROGRESS' || code === 'SUBSCRIPTION_ID_CONFLICT'
+          ? 409
       : code === 'PRINCIPAL_SCOPE_DENIED' || code === 'ACTOR_NOT_ALLOWED'
         ? 403
         : code === 'INVALID_STATE_TRANSITION' || code === 'VERSION_CONFLICT'
