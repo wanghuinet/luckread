@@ -141,7 +141,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
               </Link>
             </div>
           ) : (
-            <form className="registerForm" onSubmit={handleSubmit} noValidate>
+            <form aria-busy={status === 'submitting'} className="registerForm" onSubmit={handleSubmit} noValidate>
               <label className="registerField">
                 <span>邮箱</span>
                 <input
