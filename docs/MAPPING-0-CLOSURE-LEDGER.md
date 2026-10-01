@@ -4618,3 +4618,12 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Registry record: `EVD-SAFETY001-MODERATION-D1-03-MIGRATION-001`, result `PASS`, status `CREATED` because the canonical registry freshness anchor remains historical.
 - Backup before Registry update: `backup/pre-moderation-d1-03-migration-evidence-registry-20261001`.
 - This verifies the existing D1-03 moderation persistence boundary; it does not by itself make the global Evidence Registry or Mapping 0 GREEN.
+
+
+## 2026-10-01 — AUTH-013 W04 side-effect evidence execution input prepared
+
+- The authoritative current cursor remains `AUTH-013-LIFECYCLE-SIDE-EFFECT-COVERAGE-001 / TODO_VERIFY`.
+- The required controlled runtime gate is `.github/workflows/auth-013-w04-side-effect-matrix-evidence.yml`, which validates the already-admitted live W04 deployment, queue consumer, derived KV destination, lifecycle deindex/restore/replay semantics, bounded stale window, and synthetic cleanup.
+- Main commit `3dfc139366f56105d3f3496ac5b227c089300509` only adds `default: RUN` to the existing workflow_dispatch choice input so the authorized evidence action is prefilled in the GitHub UI. No runtime, schema, Worker/D1 topology, queue, or policy semantics changed.
+- Backup: `backup/pre-auth013-w04-side-effect-run-default-20261001`.
+- The runtime evidence itself is not claimed until a successful Actions run is observed and its artifact is inspected.
