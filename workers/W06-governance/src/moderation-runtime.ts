@@ -313,6 +313,173 @@ export async function getModerationCase(
   return responseForCase(row, decision)
 }
 
+export async function deliverModerationOutbox(
+  db: D1Database,
+  w03: Fetcher,
+  outbox: {
+    outboxId: string
+    decisionId: string
+    caseId: string
+    targetId: string
+    targetVersion: number
+    outcome: ModerationOutcome
+    policyVersion: string
+    idempotencyKey: string
+    attempts?: number
+    correlationId: string
+    requestId: string
+    reviewerId: string
+    reviewerLayer: string
+  },
+): Promise<'DELIVERED' | 'RETRY'> {
+  const headers = new Headers({
+    'X-LuckRead-Caller': 'W06',
+    'X-LuckRead-Transport-Version': '1.0',
+    'X-LuckRead-Correlation-Id': outbox.correlationId,
+    'X-LuckRead-Request-Id': outbox.requestId,
+    'X-LuckRead-Principal-User-Id': outbox.reviewerId,
+    'X-LuckRead-Principal-Layer': outbox.reviewerLayer,
+    'X-LuckRead-Moderation-Decision-Id': outbox.decisionId,
+    'X-LuckRead-Moderation-Policy-Version': outbox.policyVersion,
+    'X-LuckRead-Moderation-Outcome': outbox.outcome,
+    'If-Match': `W/"${outbox.targetVersion}"`,
+    'Idempotency-Key': outbox.idempotencyKey,
+    'content-type': 'application/json; charset=utf-8',
+  })
+  const response = await w03.fetch(
+    new Request(
+      `https://luckread-w03.internal/internal/content/contents/${encodeURIComponent(outbox.targetId)}/state`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          to: outbox.outcome,
+          decisionId: outbox.decisionId,
+          policyVersion: outbox.policyVersion,
+          targetContentState: 'PENDING_REVIEW',
+        }),
+      },
+    ),
+  )
+
+  const now = new Date().toISOString()
+  if (
+    response.ok &&
+    response.headers.get('content-type')?.includes('application/json')
+  ) {
+    const result = await response.json() as { from?: string; to?: string; version?: number; etag?: string }
+    if (
+      result.from === 'PENDING_REVIEW' &&
+      result.to === outbox.outcome &&
+      Number.isInteger(result.version) &&
+      typeof result.etag === 'string'
+    ) {
+      await db
+        .prepare(
+          `UPDATE moderation_enforcement_outbox
+              SET status='DELIVERED', attempts=attempts+1, delivered_at=?, last_error=NULL
+            WHERE outbox_id=? AND status IN ('PENDING','RETRY')`,
+        )
+        .bind(now, outbox.outboxId)
+        .run()
+      return 'DELIVERED'
+    }
+  }
+
+  const errorCode = `W03_${response.status}`
+  const attempts = (outbox.attempts ?? 0) + 1
+  const backoffSeconds = Math.min(3600, Math.max(5, 2 ** Math.min(attempts, 10)))
+  const nextAttemptAt = new Date(Date.now() + backoffSeconds * 1000).toISOString()
+  await db
+    .prepare(
+      `UPDATE moderation_enforcement_outbox
+          SET status='RETRY', attempts=?, next_attempt_at=?, last_error=?
+        WHERE outbox_id=? AND status IN ('PENDING','RETRY')`,
+    )
+    .bind(attempts, nextAttemptAt, errorCode, outbox.outboxId)
+    .run()
+  return 'RETRY'
+}
+
+export async function drainModerationOutbox(
+  db: D1Database,
+  w03: Fetcher,
+  limit = 10,
+): Promise<{ attempted: number; delivered: number; retry: number }> {
+  const boundedLimit = Math.min(Math.max(limit, 1), 20)
+  const rows = await db
+    .prepare(
+      `SELECT outbox_id,decision_id,case_id,target_type,target_id,target_version,outcome,
+              policy_version,idempotency_key,status,attempts,next_attempt_at
+         FROM moderation_enforcement_outbox
+        WHERE status IN ('PENDING','RETRY') AND next_attempt_at <= ?
+        ORDER BY next_attempt_at ASC, created_at ASC
+        LIMIT ?`,
+    )
+    .bind(new Date().toISOString(), boundedLimit)
+    .all<{
+      outbox_id: string
+      decision_id: string
+      case_id: string
+      target_type: string
+      target_id: string
+      target_version: number
+      outcome: ModerationOutcome
+      policy_version: string
+      idempotency_key: string
+      status: 'PENDING' | 'RETRY'
+      attempts: number
+      next_attempt_at: string
+    }>()
+
+  let delivered = 0
+  let retry = 0
+  for (const row of rows.results) {
+    const result = await db
+      .prepare(
+        `SELECT reviewer_id,reviewer_layer,request_id
+           FROM moderation_decisions
+          WHERE decision_id=?
+          LIMIT 1`,
+      )
+      .bind(row.decision_id)
+      .first<{ reviewer_id: string | null; reviewer_layer: string | null; request_id: string }>()
+    if (!result?.reviewer_id || !result.reviewer_layer) {
+      await db
+        .prepare(
+          `UPDATE moderation_enforcement_outbox
+              SET status='RETRY', attempts=attempts+1,
+                  next_attempt_at=?, last_error='MISSING_DECISION_ACTOR'
+            WHERE outbox_id=?`,
+        )
+        .bind(new Date(Date.now() + 60000).toISOString(), row.outbox_id)
+        .run()
+      retry++
+      continue
+    }
+
+    const delivery = await deliverModerationOutbox(db, w03, {
+      outboxId: row.outbox_id,
+      decisionId: row.decision_id,
+      caseId: row.case_id,
+      targetId: row.target_id,
+      targetVersion: row.target_version,
+      outcome: row.outcome,
+      policyVersion: row.policy_version,
+      idempotencyKey: row.idempotency_key,
+      attempts: row.attempts,
+      correlationId: `moderation-${row.decision_id}`,
+      requestId: result.request_id,
+      reviewerId: result.reviewer_id,
+      reviewerLayer: result.reviewer_layer,
+    })
+    if (delivery === 'DELIVERED') delivered++
+    else retry++
+  }
+
+  return { attempted: rows.results.length, delivered, retry }
+}
+
 export async function decideModerationCase(
   db: D1Database,
   w03: Fetcher,
@@ -346,20 +513,14 @@ export async function decideModerationCase(
   requireResource('case_id', input.caseId)
   requireRequestId(input.requestId)
 
-  if (!input.ifMatch || !input.idempotencyKey) {
-    throw new ModerationRuntimeError('PRECONDITION_REQUIRED', 428)
-  }
-  if (input.decision !== 'APPROVED' && input.decision !== 'REJECTED') {
-    throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
-  }
+  if (!input.ifMatch || !input.idempotencyKey) throw new ModerationRuntimeError('PRECONDITION_REQUIRED', 428)
+  if (input.decision !== 'APPROVED' && input.decision !== 'REJECTED') throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   requireText('policyVersion', input.policyVersion, 128)
   requireText('reasonCode', input.reasonCode, 128)
   if (!input.severity || input.severity.length > 64 || !input.scope || input.scope.length > 128) {
     throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   }
-  if (!Number.isFinite(Date.parse(input.effectiveAt))) {
-    throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
-  }
+  if (!Number.isFinite(Date.parse(input.effectiveAt))) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   if (input.expiresAt !== null && !Number.isFinite(Date.parse(input.expiresAt))) {
     throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   }
@@ -388,23 +549,14 @@ export async function decideModerationCase(
   if (input.expectedVersion !== row.version || headerExpectedVersion !== row.version) {
     throw new ModerationRuntimeError('PRECONDITION_FAILED', 412)
   }
-  const bodyExpectedVersion = input.expectedVersion
-  if (bodyExpectedVersion !== row.version) throw new ModerationRuntimeError('PRECONDITION_FAILED', 412)
-
-  if (row.target_type !== 'content') {
-    throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
-  }
+  if (row.target_type !== 'content') throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
   if (input.policyVersion !== row.policy_version) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
-  if (!row.target_version || row.target_version < 1) {
-    throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
-  }
-  if (!['OPEN', 'UNDER_REVIEW'].includes(row.state)) {
-    throw new ModerationRuntimeError('INVALID_STATE', 409)
-  }
+  if (!row.target_version || row.target_version < 1) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
+  if (!['OPEN', 'UNDER_REVIEW'].includes(row.state)) throw new ModerationRuntimeError('INVALID_STATE', 409)
 
   const hash = await requestHash('decideModerationCase', {
     caseId: input.caseId,
-    expectedVersion: bodyExpectedVersion,
+    expectedVersion: input.expectedVersion,
     decision: input.decision,
     policyVersion: input.policyVersion,
     reasonCode: input.reasonCode,
@@ -414,81 +566,19 @@ export async function decideModerationCase(
     expiresAt: input.expiresAt,
   })
   const decisionId = decisionIdFor(hash)
-  const existing = (row as ModerationCaseRow & { idem_request_hash?: string | null; idem_response_json?: string | null; idem_expires_at?: string | null }).idem_request_hash
+
+  const existing = row.idem_request_hash
     ? {
-        request_hash: (row as ModerationCaseRow & { idem_request_hash?: string }).idem_request_hash!,
-        response_json: (row as ModerationCaseRow & { idem_response_json?: string }).idem_response_json!,
-        expires_at: (row as ModerationCaseRow & { idem_expires_at?: string }).idem_expires_at!,
+        request_hash: row.idem_request_hash,
+        response_json: row.idem_response_json ?? '',
+        expires_at: row.idem_expires_at ?? '',
       }
     : null
-
   if (existing && Date.parse(existing.expires_at) > Date.now()) {
     if (existing.request_hash !== hash) throw new ModerationRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
     return JSON.parse(existing.response_json) as {
-      caseId: string
-      decisionId: string
-      outcome: ModerationOutcome
-      version: number
-      effectiveAt: string
-      requestId: string
+      caseId: string; decisionId: string; outcome: ModerationOutcome; version: number; effectiveAt: string; requestId: string
     }
-  }
-
-  const moderationHeaders = new Headers({
-    'X-LuckRead-Caller': 'W06',
-    'X-LuckRead-Transport-Version': '1.0',
-    'X-LuckRead-Correlation-Id': input.correlationId,
-    'X-LuckRead-Request-Id': input.requestId,
-    'X-LuckRead-Principal-User-Id': input.reviewerId,
-    'X-LuckRead-Principal-Layer': input.reviewerLayer,
-    'X-LuckRead-Moderation-Decision-Id': decisionId,
-    'X-LuckRead-Moderation-Policy-Version': input.policyVersion,
-    'X-LuckRead-Moderation-Outcome': input.decision,
-    'If-Match': `W/"${row.target_version}"`,
-    'Idempotency-Key': input.idempotencyKey,
-    'content-type': 'application/json; charset=utf-8',
-  })
-  const transitionResponse = await w03.fetch(
-    new Request(`https://luckread-w03.internal/internal/content/contents/${encodeURIComponent(row.target_id)}/state`, {
-      method: 'POST',
-      headers: moderationHeaders,
-      body: JSON.stringify({
-        to: input.decision,
-        decisionId,
-        policyVersion: input.policyVersion,
-        targetContentState: 'PENDING_REVIEW',
-      }),
-    }),
-  )
-
-  if (!transitionResponse.ok) {
-    const text = await transitionResponse.text()
-    let body: Record<string, unknown> | null = null
-    try {
-      body = JSON.parse(text) as Record<string, unknown>
-    } catch {
-      body = null
-    }
-    const code = typeof body?.error?.code === 'string' ? body.error.code : 'CONTENT_TRANSITION_FAILED'
-    const status = [400, 401, 403, 404, 409, 412, 428, 422].includes(transitionResponse.status)
-      ? transitionResponse.status
-      : 503
-    throw new ModerationRuntimeError(code, status)
-  }
-
-  const transition = await transitionResponse.json() as {
-    from?: string
-    to?: string
-    version?: number
-    etag?: string
-  }
-  if (
-    transition.from !== 'PENDING_REVIEW' ||
-    transition.to !== input.decision ||
-    !Number.isInteger(transition.version) ||
-    typeof transition.etag !== 'string'
-  ) {
-    throw new ModerationRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
 
   const now = new Date().toISOString()
@@ -515,25 +605,12 @@ export async function decideModerationCase(
     action: 'moderation.decide',
     targetType: 'ModerationCase',
     targetId: row.case_id,
-    before: {
-      caseId: row.case_id,
-      version: row.version,
-      state: row.state,
-      currentDecisionId: row.current_decision_id,
-    },
+    before: { caseId: row.case_id, version: row.version, state: row.state, currentDecisionId: row.current_decision_id },
     after: {
-      caseId: row.case_id,
-      version: nextCaseVersion,
-      state: 'ACTION_TAKEN',
-      currentDecisionId: decisionId,
-      decisionId,
-      outcome: input.decision,
-      policyVersion: input.policyVersion,
-      reasonCode: input.reasonCode,
-      severity: input.severity,
-      scope: input.scope,
-      effectiveAt: input.effectiveAt,
-      expiresAt: input.expiresAt,
+      caseId: row.case_id, version: nextCaseVersion, state: 'ACTION_TAKEN',
+      currentDecisionId: decisionId, decisionId, outcome: input.decision,
+      policyVersion: input.policyVersion, reasonCode: input.reasonCode, severity: input.severity,
+      scope: input.scope, effectiveAt: input.effectiveAt, expiresAt: input.expiresAt,
     },
     reason: input.reasonCode,
     occurredAt: now,
@@ -541,55 +618,42 @@ export async function decideModerationCase(
 
   const statements = [
     db.prepare(
-      `DELETE FROM moderation_decision_idempotency
-        WHERE reviewer_id = ? AND case_id = ? AND idempotency_key = ? AND expires_at <= ?`,
-    ).bind(input.reviewerId, row.case_id, input.idempotencyKey, now),
-    db.prepare(
       `INSERT INTO moderation_decisions (
         decision_id,case_id,case_version,outcome,target_type,target_id,target_version,
         policy_version,reason_code,severity,scope,effective_at,expires_at,source_kind,
         reviewer_id,reviewer_layer,request_id,created_at
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     ).bind(
-      decisionId,
-      row.case_id,
-      row.version,
-      input.decision,
-      row.target_type,
-      row.target_id,
-      row.target_version,
-      input.policyVersion,
-      input.reasonCode,
-      input.severity,
-      input.scope,
-      input.effectiveAt,
-      input.expiresAt,
-      'HUMAN_REVIEW',
-      input.reviewerId,
-      input.reviewerLayer,
-      input.requestId,
-      now,
+      decisionId,row.case_id,row.version,input.decision,row.target_type,row.target_id,row.target_version,
+      input.policyVersion,input.reasonCode,input.severity,input.scope,input.effectiveAt,input.expiresAt,
+      'HUMAN_REVIEW',input.reviewerId,input.reviewerLayer,input.requestId,now,
     ),
     db.prepare(
       `UPDATE moderation_cases
-          SET state = 'ACTION_TAKEN', current_decision_id = ?, version = ?, updated_at = ?
-        WHERE case_id = ? AND version = ?`,
-    ).bind(decisionId, nextCaseVersion, now, row.case_id, row.version),
+          SET state='ACTION_TAKEN',current_decision_id=?,version=?,updated_at=?
+        WHERE case_id=? AND version=?`,
+    ).bind(decisionId,nextCaseVersion,now,row.case_id,row.version),
+    db.prepare(
+      `INSERT OR REPLACE INTO moderation_txn_guard(id,successful)
+       VALUES (1, changes())`,
+    ),
+    db.prepare(
+      `DELETE FROM moderation_decision_idempotency
+        WHERE reviewer_id=? AND case_id=? AND idempotency_key=? AND expires_at<=?`,
+    ).bind(input.reviewerId,row.case_id,input.idempotencyKey,now),
     db.prepare(
       `INSERT INTO moderation_decision_idempotency (
         id,reviewer_id,case_id,idempotency_key,request_hash,decision_id,response_status,response_json,created_at,expires_at
       ) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    ).bind(crypto.randomUUID(),input.reviewerId,row.case_id,input.idempotencyKey,hash,decisionId,200,JSON.stringify(response),now,expiresAt),
+    db.prepare(
+      `INSERT INTO moderation_enforcement_outbox (
+        outbox_id,decision_id,case_id,target_type,target_id,target_version,outcome,
+        policy_version,idempotency_key,status,attempts,next_attempt_at,last_error,created_at,delivered_at
+      ) VALUES (?,?,?,?,?,?,?,?,?,'PENDING',0,?,NULL,?,NULL)`,
     ).bind(
-      crypto.randomUUID(),
-      input.reviewerId,
-      row.case_id,
-      input.idempotencyKey,
-      hash,
-      decisionId,
-      200,
-      JSON.stringify(response),
-      now,
-      expiresAt,
+      crypto.randomUUID(),decisionId,row.case_id,row.target_type,row.target_id,row.target_version,
+      input.decision,input.policyVersion,input.idempotencyKey,now,now,
     ),
     db.prepare(
       `INSERT INTO audit_events (
@@ -597,47 +661,48 @@ export async function decideModerationCase(
         before_json,after_json,reason,ip,user_agent,occurred_at
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     ).bind(
-      audit.eventId,
-      audit.requestId ?? null,
-      audit.traceId ?? null,
-      JSON.stringify(audit.actor),
-      audit.action,
-      audit.targetType,
-      audit.targetId,
-      JSON.stringify(audit.before),
-      JSON.stringify(audit.after),
-      audit.reason ?? null,
-      audit.ip ?? null,
-      audit.userAgent ?? null,
-      audit.occurredAt,
-    ),
-    db.prepare(
-      `INSERT OR REPLACE INTO moderation_txn_guard(id, successful)
-       VALUES (1, changes())`,
+      audit.eventId,audit.requestId ?? null,audit.traceId ?? null,JSON.stringify(audit.actor),audit.action,
+      audit.targetType,audit.targetId,JSON.stringify(audit.before),JSON.stringify(audit.after),audit.reason ?? null,
+      audit.ip ?? null,audit.userAgent ?? null,audit.occurredAt,
     ),
   ]
 
   try {
     const results = await db.batch(statements)
-    if (!results.every((result) => result.success)) {
-      throw new ModerationRuntimeError('SERVICE_UNAVAILABLE', 503)
-    }
+    if (!results.every((result) => result.success)) throw new ModerationRuntimeError('SERVICE_UNAVAILABLE',503)
   } catch (error) {
     if (error instanceof ModerationRuntimeError) throw error
     if (/UNIQUE constraint|constraint failed/i.test(error instanceof Error ? error.message : String(error))) {
-      const replay = await db
-        .prepare(
-          `SELECT request_hash,response_json
-             FROM moderation_decision_idempotency
-            WHERE reviewer_id = ? AND case_id = ? AND idempotency_key = ?
-            LIMIT 1`,
-        )
-        .bind(input.reviewerId, row.case_id, input.idempotencyKey)
-        .first<{ request_hash: string; response_json: string }>()
-      if (replay?.request_hash === hash) return JSON.parse(replay.response_json)
-      throw new ModerationRuntimeError('PRECONDITION_FAILED', 412)
+      const replay = await db.prepare(
+        `SELECT request_hash,response_json
+           FROM moderation_decision_idempotency
+          WHERE reviewer_id=? AND case_id=? AND idempotency_key=?
+          LIMIT 1`,
+      ).bind(input.reviewerId,row.case_id,input.idempotencyKey).first<{request_hash:string;response_json:string}>()
+      if (replay?.request_hash === hash) return JSON.parse(replay.response_json) as typeof response
+      throw new ModerationRuntimeError('PRECONDITION_FAILED',412)
     }
-    throw new ModerationRuntimeError('SERVICE_UNAVAILABLE', 503)
+    throw new ModerationRuntimeError('SERVICE_UNAVAILABLE',503)
+  }
+
+  try {
+    await deliverModerationOutbox(db,w03,{
+      outboxId: JSON.parse(JSON.stringify(response)).decisionId ? decisionId : decisionId,
+      decisionId,
+      caseId: row.case_id,
+      targetId: row.target_id,
+      targetVersion: row.target_version,
+      outcome: input.decision,
+      policyVersion: input.policyVersion,
+      idempotencyKey: input.idempotencyKey,
+      attempts: 0,
+      correlationId: input.correlationId,
+      requestId: input.requestId,
+      reviewerId: input.reviewerId,
+      reviewerLayer: input.reviewerLayer,
+    })
+  } catch {
+    // The durable outbox remains pending; scheduled drain will retry.
   }
 
   return response
