@@ -453,7 +453,7 @@ export default function PublishComposer({
   }
 
   return (
-    <div className="lr-composer-card">
+    <div className="lr-composer-card" aria-busy={busy}>
       <div className="lr-type-tabs" role="tablist" aria-label="内容类型">
         {([
           ['article', '文章'],
