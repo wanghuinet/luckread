@@ -109,6 +109,12 @@ export default {
       expectedVersion?: unknown
       idempotencyKey?: unknown
       entitlementId?: unknown
+      entitlementType?: unknown
+      scopeType?: unknown
+      scopeId?: unknown
+      sourcePlanVersion?: unknown
+      effectiveAt?: unknown
+      expiresAt?: unknown
     }
 
     try {
