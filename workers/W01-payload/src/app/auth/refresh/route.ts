@@ -2,7 +2,7 @@ import { getPayload } from 'payload'
 
 import config from '@payload-config'
 
-import { issuePayloadAccessToken } from '../../../auth/payload-access-token.js'
+import { buildPayloadAccessCookie, issuePayloadAccessToken } from '../../../auth/payload-access-token.js'
 import { refreshSession, W02AuthClientError } from '../../../auth/w02-session-client.js'
 
 const json = (body: unknown, status = 200) =>
@@ -76,12 +76,22 @@ export async function POST(request: Request): Promise<Response> {
       tokenVersion: session.tokenVersion,
     })
 
-    return json({
-      accessToken: access.token,
-      refreshToken: session.refreshToken,
-      expiresIn: access.expiresIn,
-      layer: session.layer,
-    })
+    return new Response(
+      JSON.stringify({
+        accessToken: access.token,
+        refreshToken: session.refreshToken,
+        expiresIn: access.expiresIn,
+        layer: session.layer,
+      }),
+      {
+        status: 200,
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'no-store',
+          'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request),
+        },
+      },
+    )
   } catch {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Access-token issuance is unavailable')
   }
