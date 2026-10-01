@@ -48,6 +48,17 @@
       "clientWritable": false
     }
   },
+  "authorization": {
+    "currentW01Boundary": {
+      "actor": "W01-facing transition requests are restricted to actor=user; W07 derives actor from the authenticated W01 subject and does not accept a client-selected actor.",
+      "entitlementAction": "W07 derives entitlementAction from target state: ACTIVE→GRANT, CANCELED/EXPIRED→REVOKE, otherwise NONE; client input is not authoritative."
+    },
+    "defenseInDepth": {
+      "userScope": "W02 requires actor=user transitions to target a subscription whose subscriber_id equals X-LuckRead-Principal-User-Id.",
+      "entitlementScope": "W02 REVOKE requires entitlement_id to belong to the same subscription_id being transitioned."
+    },
+    "futureTrustedActors": "system/creator/admin/payment require a separately admitted trusted authority path; they are not reachable through the current W01-facing transition boundary."
+  },
   "rules": [
     "W02 never accepts payment provider credentials or client-authoritative subscription state.",
     "W07 decides the lifecycle transition; W02 persists only after validating current status and expectedVersion.",
