@@ -3,5 +3,11 @@
   "name": "luckread-w07",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-30",
-  "workers_dev": false
+  "workers_dev": false,
+  "services": [
+    {
+      "binding": "W02_IDENTITY",
+      "service": "luckread-w02"
+    }
+  ]
 }
