@@ -449,7 +449,7 @@ export async function listContents(
       ).bind(decoded.updatedAt, decoded.updatedAt, decoded.id, pageSize + 1).all<ContentRow>()
     : await db.prepare(
         `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
-                title, body_ref, etag, created_at, updated_at
+                title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
            FROM contents
           WHERE state = 'PUBLISHED'
           ORDER BY updated_at DESC, id DESC

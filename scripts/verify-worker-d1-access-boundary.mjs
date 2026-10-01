@@ -46,7 +46,7 @@ const codeExts = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs'])
 const runtimeFile = (name) => !name.includes('.test.') && !name.includes('.spec.')
 if (!runtimeFile('example.ts') || runtimeFile('example.test.ts') || runtimeFile('example.spec.ts')) throw new Error('Runtime file filter self-check failed')
 if (JSON.stringify([...extractBindings('env.D1_01; context.env.DB; const { D1_02, DB } = env')].sort()) !== JSON.stringify(['D1_01','D1_02','DB'])) throw new Error('D1 binding detector self-check failed')
-if (extractBindings('// env.D1_01\nconst x = 'D1_02'\nconst path = ".DB"\ntype T = D1Database').size !== 0) throw new Error('D1 binding detector false-positive self-check failed')
+if (extractBindings(`// env.D1_01\nconst x = 'D1_02'\nconst path = ".DB"\ntype T = D1Database`).size !== 0) throw new Error('D1 binding detector false-positive self-check failed')
 
 let checkedConfigs = 0
 let checkedCodeFiles = 0
