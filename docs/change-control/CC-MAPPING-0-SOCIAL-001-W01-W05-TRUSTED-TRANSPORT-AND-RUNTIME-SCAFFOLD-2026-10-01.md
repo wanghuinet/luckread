@@ -22,6 +22,7 @@
 ## Gate
 W01→W05 binding = CREATED / NOT_REMOTE_VERIFIED
 W01→W02 actor AccountState read = IMPLEMENTED / REMOTE_NOT_VERIFIED
+W01→W05 Like trusted transport = CONTRACTED / IMPLEMENTED / REMOTE_NOT_VERIFIED
 W05 Follow runtime = IMPLEMENTED / UNIT_VERIFIED
 D1-02 migration = PREVIOUSLY EXECUTED
 Public policy admission = BLOCKED
@@ -38,6 +39,7 @@ Required authority bindings/evidence:
 2. Target followability, privacy scope and block relationship → canonical Social/Profile authority must be identified and transport-bound; no W01 inference.
 3. Anti-abuse admission → canonical anti-abuse decision source must be identified and transport-bound.
 4. Like resource visibility/interactability → Content authority must expose an admitted trusted decision source before Like becomes public.
+5. Like actor AccountState → W02 authoritative account/access state; W01 is the composition boundary and does not accept caller-provided account state.
 5. W05 remains the sole mutation authority for Follow/Like in D1-02; policy sources do not become write owners.
 
 Until these are bound and remotely evidenced, W01 must not expose successful public Follow/Like mutation based on caller-supplied policy fields.
