@@ -2370,6 +2370,39 @@ paths:
           description: Discovery-only operation; detailed response contract remains to be closed.
 
   /users/{userId}/follow:
+    get:
+      tags: [Interactions]
+      summary: Get whether the authenticated viewer follows the target user
+      operationId: getUsersUserIdFollow
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/SOCIAL-001-follow-status-read.v1.json
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Viewer-scoped follow status.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [following]
+                    additionalProperties: false
+                    properties:
+                      following:
+                        type: boolean
+                        description: Derived from the authoritative active Follow relation.
+                  requestId:
+                    $ref: '#/components/schemas/RequestId'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
     delete:
       tags: [Interactions]
       summary: Discovery draft for DELETE undefined
