@@ -22,8 +22,12 @@ const sql = (v) => "'" + String(v).replaceAll("'", "''") + "'"
 const d1 = (command) => JSON.parse(execFileSync('npx', ['--yes','wrangler@' + wrangler,'d1','execute',database,'--remote','--yes','--json','--config',config,'--command',command], {encoding:'utf8',env:process.env}))
 const rows = (v) => Array.isArray(v) ? v.flatMap((x) => Array.isArray(x?.results) ? x.results : []) : (Array.isArray(v?.results) ? v.results : [])
 
-async function post(path, body) {
-  const r = await fetch(authBase + path, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body) })
+async function post(path, body, headers = {}) {
+  const r = await fetch(authBase + path, {
+    method:'POST',
+    headers:{'content-type':'application/json', ...headers},
+    body:JSON.stringify(body),
+  })
   const text = await r.text()
   let data = null
   try { data = text ? JSON.parse(text) : null } catch {}
@@ -33,11 +37,14 @@ async function post(path, body) {
 const cleanup = []
 try {
   const registered = await post('/auth/register', {
+
     identityType:'email',
     identity:email,
     credential:password,
     username,
     consent:{purpose:'ACCOUNT_REGISTRATION',policyVersion:'PROD-2026-09-28.1'},
+  }, {
+    'Idempotency-Key': registerKey,
   })
   if (registered.status !== 201) {
     throw new Error('register failed: HTTP ' + registered.status + ' body=' + JSON.stringify(registered.data))
