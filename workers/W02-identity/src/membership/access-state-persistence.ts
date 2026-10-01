@@ -32,7 +32,35 @@ export async function createSubscription(
   ).run()
 
   const created = (result.meta?.changes ?? 0) > 0
-  return { subscriptionId: input.subscriptionId, created, version: 1 }
+  if (created) return { subscriptionId: input.subscriptionId, created: true, version: 1 }
+
+  const existing = await db.prepare(
+    `SELECT subscriber_id AS subscriberId, plan_id AS planId, plan_version AS planVersion,
+            started_at AS startedAt, current_period_start AS currentPeriodStart, current_period_end AS currentPeriodEnd
+       FROM membership_subscriptions
+      WHERE subscription_id = ?`,
+  ).bind(input.subscriptionId).first<{
+    subscriberId: string
+    planId: string
+    planVersion: number
+    startedAt: string
+    currentPeriodStart: string
+    currentPeriodEnd: string
+  }>()
+
+  if (
+    !existing ||
+    existing.subscriberId !== input.subscriberId ||
+    existing.planId !== input.planId ||
+    existing.planVersion !== input.planVersion ||
+    existing.startedAt !== input.startedAt ||
+    existing.currentPeriodStart !== input.currentPeriodStart ||
+    existing.currentPeriodEnd !== input.currentPeriodEnd
+  ) {
+    throw new MembershipAccessStateError('SUBSCRIPTION_ID_CONFLICT')
+  }
+
+  return { subscriptionId: input.subscriptionId, created: false, version: 1 }
 }
 
 export async function transitionSubscription(
