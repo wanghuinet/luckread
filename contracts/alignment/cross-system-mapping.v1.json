@@ -6798,12 +6798,14 @@
         "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json",
         "contracts/openapi/v1/openapi.yaml#/content/{contentId}/comments",
         "contracts/enums/comment-state.json",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-API-SURFACE-2026-10-01.md"
+        "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-API-SURFACE-2026-10-01.md",
+        "contracts/admission/SOCIAL-004-comment-runtime-admission.v1.json",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-RUNTIME-ADMISSION-2026-10-01.md"
       ],
       "blockers": [
-        "D1-02 Comment migration is not yet created or executed.",
-        "Server-side block/privacy/moderation decision authority is not yet bound to executable inputs.",
-        "W05 Comment runtime, concurrency/security tests, remote runtime evidence and Evidence Registry admission remain unresolved."
+        "Comment API/DTO/Entity/Field/logical Persistence are contract-bound.",
+        "AccountState(Content)/moderation/block/anti-abuse runtime inputs are contract-bound as dependencies but not execution-verified for Comment.",
+        "W05 Comment runtime, concurrency/security/E2E, remote D1 evidence and Evidence Registry admission remain unresolved."
       ]
     },
     {
