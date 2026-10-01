@@ -61,10 +61,10 @@
         "workers/W01-payload/src/app/auth/register/route.ts",
         "workers/W01-payload/src/collections/Users.ts",
         "workers/W01-payload/src/payload.config.ts",
-        "workers/W02-content/src/credentials/credential-add.ts"
+        "workers/W02-identity/src/credentials/credential-add.ts"
       ],
       "testRefs": [
-        "workers/W02-content/src/credentials/credential-add.test.ts"
+        "workers/W02-identity/src/credentials/credential-add.test.ts"
       ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
@@ -2304,12 +2304,12 @@
       "subjectId": "transitionAccountState",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "workers/W02-content/src/account/account-state-transition.ts",
+        "workers/W02-identity/src/account/account-state-transition.ts",
         "workers/W01-payload/src/app/users/[userId]/account-state/route.ts",
         "workers/W01-payload/src/app/v1/users/[userId]/account-state/route.ts"
       ],
       "testRefs": [
-        "workers/W02-content/src/account/account-state-transition.test.ts"
+        "workers/W02-identity/src/account/account-state-transition.test.ts"
       ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
@@ -2437,10 +2437,10 @@
       "subjectId": "ENT-CREDENTIAL",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "workers/W02-content/src/credentials/credential-add.ts",
-        "workers/W02-content/migrations/0004_auth_003_credentials.sql",
-        "workers/W02-content/src/credentials/credential-list.ts",
-        "workers/W02-content/src/credentials/credential-lifecycle.ts"
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
+        "workers/W02-identity/src/credentials/credential-list.ts",
+        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
       ],
       "testRefs": [],
       "schemaEvidenceRefs": [
@@ -2494,7 +2494,7 @@
       "subjectId": "ENT-IDENTITY",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "workers/W02-content/src/account/registration-materializer.ts"
+        "workers/W02-identity/src/account/registration-materializer.ts"
       ],
       "testRefs": [],
       "schemaEvidenceRefs": [
@@ -2531,12 +2531,12 @@
       "subjectId": "ENT-ROLE-ASSIGNMENT",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "workers/W02-content/src/authz/role-assignment.ts",
-        "workers/W02-content/src/index.ts"
+        "workers/W02-identity/src/authz/role-assignment.ts",
+        "workers/W02-identity/src/index.ts"
       ],
       "testRefs": [],
       "schemaEvidenceRefs": [
-        "workers/W02-content/migrations/0001_role_assignments.sql"
+        "workers/W02-identity/migrations/0001_role_assignments.sql"
       ],
       "sourceRefs": [
         "contracts/entity/entity-catalog.v1.json",
@@ -2553,8 +2553,8 @@
       "subjectId": "ENT-SESSION",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "workers/W02-content/src/session/session-runtime.ts",
-        "workers/W02-content/src/index.ts",
+        "workers/W02-identity/src/session/session-runtime.ts",
+        "workers/W02-identity/src/index.ts",
         "workers/W01-payload/src/app/auth/login/route.ts",
         "workers/W01-payload/src/app/auth/refresh/route.ts",
         "workers/W01-payload/src/app/auth/logout/route.ts"

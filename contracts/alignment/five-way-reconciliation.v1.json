@@ -1036,8 +1036,8 @@
         "workers/W01-payload/src/app/auth/register/route.ts",
         "workers/W01-payload/src/collections/Users.ts",
         "workers/W01-payload/src/payload.config.ts",
-        "workers/W02-content/src/credentials/credential-add.ts",
-        "workers/W02-content/src/credentials/credential-add.test.ts"
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/src/credentials/credential-add.test.ts"
       ],
       "evidence": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L32",
@@ -1370,8 +1370,8 @@
       ],
       "payloadCollections": [],
       "codeEvidenceRefs": [
-        "workers/W02-content/src/account/account-state-transition.ts",
-        "workers/W02-content/src/account/account-state-transition.test.ts",
+        "workers/W02-identity/src/account/account-state-transition.ts",
+        "workers/W02-identity/src/account/account-state-transition.test.ts",
         "workers/W01-payload/src/app/users/[userId]/account-state/route.ts",
         "workers/W01-payload/src/app/v1/users/[userId]/account-state/route.ts"
       ],

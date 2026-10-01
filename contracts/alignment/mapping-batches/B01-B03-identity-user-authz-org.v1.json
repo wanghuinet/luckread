@@ -29,8 +29,8 @@
         "workers/W01-payload/src/app/auth/register/route.ts",
         "workers/W01-payload/src/collections/Users.ts",
         "workers/W01-payload/src/payload.config.ts",
-        "workers/W02-content/src/credentials/credential-add.ts",
-        "workers/W02-content/src/credentials/credential-add.test.ts"
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/src/credentials/credential-add.test.ts"
       ],
       "evidence": [
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
@@ -71,9 +71,9 @@
       "entityIds": [],
       "payloadCollections": [],
       "codeEvidenceRefs": [
-        "workers/W02-content/src/session/session-runtime.ts",
-        "workers/W02-content/src/session/session-runtime.test.ts",
-        "workers/W02-content/src/index.ts",
+        "workers/W02-identity/src/session/session-runtime.ts",
+        "workers/W02-identity/src/session/session-runtime.test.ts",
+        "workers/W02-identity/src/index.ts",
         "workers/W01-payload/src/app/auth/login/route.ts",
         "workers/W01-payload/src/app/auth/logout/route.ts"
       ],
@@ -248,8 +248,8 @@
         "W02"
       ],
       "codeEvidenceRefs": [
-        "workers/W02-content/src/account/account-state-transition.ts",
-        "workers/W02-content/src/account/account-state-transition.test.ts",
+        "workers/W02-identity/src/account/account-state-transition.ts",
+        "workers/W02-identity/src/account/account-state-transition.test.ts",
         "workers/W01-payload/src/app/users/[userId]/account-state/route.ts",
         "workers/W01-payload/src/app/v1/users/[userId]/account-state/route.ts"
       ],
