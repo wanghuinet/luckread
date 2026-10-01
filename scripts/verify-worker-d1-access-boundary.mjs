@@ -27,7 +27,7 @@ const domainById = Object.fromEntries(
 )
 
 const bindingPattern = /\\.\\s*(D1(?:_0[1-4])?|DB)\\b/g
-const destructuredBindingPattern = /\\{\\s*(D1(?:_0[1-4])?|DB)\\s*(?:,|\\})/g
+const destructuredBindingPattern = /\{\s*(D1(?:_0[1-4])?|DB)\s*(?:,|\})/g
 const stripCommentsAndStrings = (source) =>
   source
     .replace(/\/\*[\s\S]*?\*\//g, '')
