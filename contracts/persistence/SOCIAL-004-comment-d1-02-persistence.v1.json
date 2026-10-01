@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json",
+  "title": "SOCIAL-004 Comment D1-02 Logical Persistence Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureId": "SOCIAL-004",
+  "entityId": "ENT-SOCIAL-COMMENT",
+  "entityFieldContract": "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+  "sourceOfTruth": "contracts/entity/SOCIAL-004-comment-reply-contract.v1.json",
+  "authoritativeDomain": "D1-02",
+  "primaryTask": "T11",
+  "primaryWorker": "W05",
+  "physicalResource": {
+    "binding": "D1_02",
+    "worker": "W05",
+    "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+    "databaseNameAuthority": "UUID is authoritative"
+  },
+  "table": {
+    "name": "social_comments",
+    "purpose": "Authoritative Comment and Reply state for SOCIAL-004.",
+    "primaryKey": "comment_id",
+    "columns": {
+      "comment_id": {
+        "fieldId": "ENT-SOCIAL-COMMENT-F-COMMENT-ID",
+        "type": "TEXT",
+        "required": true,
+        "unique": true,
+        "immutable": true
+      },
+      "author_user_id": {
+        "fieldId": "ENT-SOCIAL-COMMENT-F-AUTHOR-USER-ID",
+        "type": "TEXT",
+        "required": true,
+        "indexed": true,
+        "immutable": true
+      },
+      "content_id": {
+        "fieldId": "ENT-SOCIAL-COMMENT-F-CONTENT-ID",
+        "type": "TEXT",
+        "required": true,
+        "indexed": true,
+        "immutable": true
+      },
+      "parent_comment_id": {
+        "fieldId": "ENT-SOCIAL-COMMENT-F-PARENT-COMMENT-ID",
+        "type": "TEXT",
+        "required": false,
+        "nullable": true,
+        "indexed": true,
+        "immutable": true
+      },
+      "body": {
+        "fieldId": "ENT-SOCIAL-COMMENT-F-BODY",
+        "type": "TEXT",
+        "required": true,
+        "maxLength": 10000,
+        "mutable": true
+      },
+      "state": {
+        "fieldId": "ENT-SOCIAL-COMMENT-F-STATE",
+        "type": "TEXT",
+        "required": true,
+        "indexed": true,
+        "mutable": true
+      },
+      "created_at": {
+        "fieldId": "ENT-SOCIAL-COMMENT-F-CREATED-AT",
+        "type": "TEXT",
+        "required": true,
+        "format": "date-time",
+        "indexed": true,
+        "immutable": true
+      }
+    },
+    "constraints": [
+      "No inferred cross-D1 foreign key is required; user/content/parent identifiers are logical relations validated by runtime authority.",
+      "A non-null parent_comment_id must belong to the same content_id.",
+      "CommentState values must match contracts/enums/comment-state.json.",
+      "Create is idempotent by the public operation contract; duplicate application must not create a second authoritative Comment for the same mutation identity.",
+      "No counter/projection table is authoritative for Comment state."
+    ],
+    "indexes": [
+      "ix_social_comments_content_created (content_id, created_at)",
+      "ix_social_comments_content_parent_created (content_id, parent_comment_id, created_at)",
+      "ix_social_comments_author_created (author_user_id, created_at)"
+    ]
+  },
+  "migration": {
+    "path": "workers/W05-social/migrations/0003_social_004_comment.sql",
+    "executionMode": "controlled-manual",
+    "executionEvidence": "REQUIRED",
+    "reexecute": false,
+    "status": "PENDING_CONTRACT_REVIEW"
+  },
+  "mutationBudgets": {
+    "d1ReadMax": 2,
+    "d1WriteTransactionMax": 1,
+    "distributedTransactions": false
+  },
+  "runtimeGates": {
+    "physicalD1Binding": "REQUIRED",
+    "migrationExecution": "REQUIRED",
+    "runtimePositive": "REQUIRED",
+    "runtimeNegative": "REQUIRED",
+    "concurrency": "REQUIRED",
+    "securityE2E": "REQUIRED",
+    "remoteRuntimeEvidence": "REQUIRED"
+  },
+  "nonGoals": [
+    "No migration execution is claimed.",
+    "No runtime GREEN is claimed.",
+    "No separate D1 is introduced.",
+    "No synchronous counter/projection write is introduced."
+  ]
+}
