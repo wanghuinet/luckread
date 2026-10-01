@@ -1,0 +1,30 @@
+name: W01 W02 Social Account-State Binding CI
+on:
+  pull_request:
+    paths:
+      - 'workers/W01-payload/src/content/w05-social-client.ts'
+      - 'workers/W02-identity/src/social/account-state-read.ts'
+      - 'workers/W02-identity/src/social/account-state-read.test.ts'
+      - 'workers/W02-identity/src/index.ts'
+      - 'contracts/transport/W01-W02-social-account-state-read.v1.json'
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W01-payload/src/content/w05-social-client.ts'
+      - 'workers/W02-identity/src/social/account-state-read.ts'
+      - 'workers/W02-identity/src/social/account-state-read.test.ts'
+      - 'workers/W02-identity/src/index.ts'
+      - 'contracts/transport/W01-W02-social-account-state-read.v1.json'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run workers/W02-identity/src/social/account-state-read.test.ts
