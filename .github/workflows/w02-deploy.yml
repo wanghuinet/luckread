@@ -35,10 +35,10 @@ jobs:
           node scripts/generate-role-version-migration.mjs
       - name: Assert generated migrations are committed
         run: |
-          git diff --exit-code -- workers/W02-content/migrations/0001_role_assignments.sql
-          git diff --exit-code -- workers/W02-content/migrations/0003_role_authorization_versions.sql
+          git diff --exit-code -- workers/W02-identity/migrations/0001_role_assignments.sql
+          git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
       - name: Deploy W02 with pinned Wrangler
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -31,7 +31,7 @@ jobs:
           grep -q "LAUNCH_2_0_R9=AUTHORIZED_BY_MAIN_MERGE" docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R9.md
 
       - name: Verify W03 binding
-        working-directory: workers/W03-feed
+        working-directory: workers/W03-content
         run: |
           node - <<'NODE'
           const fs = require('fs');
@@ -45,16 +45,16 @@ jobs:
 
       - name: W03 typecheck and tests
         run: |
-          npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W03-feed/src/content-runtime.ts workers/W03-feed/src/index.ts
-          npx --yes vitest@3.2.4 run workers/W03-feed/src/content-runtime.test.ts
+          npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W03-content/src/content-runtime.ts workers/W03-content/src/index.ts
+          npx --yes vitest@3.2.4 run workers/W03-content/src/content-runtime.test.ts
 
       - name: W02 typecheck and tests
         run: |
-          npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W02-content/src/index.ts
-          npx --yes vitest@3.2.4 run workers/W02-content/src/authz/role-assignment.test.ts workers/W02-content/src/session/session-runtime.test.ts workers/W02-content/src/session/session-management.test.ts
+          npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W02-identity/src/index.ts
+          npx --yes vitest@3.2.4 run workers/W02-identity/src/authz/role-assignment.test.ts workers/W02-identity/src/session/session-runtime.test.ts workers/W02-identity/src/session/session-management.test.ts
 
       - name: Deploy W02
-        working-directory: workers/W02-content
+        working-directory: workers/W02-identity
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -62,7 +62,7 @@ jobs:
           npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
 
       - name: Apply pending D1-02 migrations
-        working-directory: workers/W03-feed
+        working-directory: workers/W03-content
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -70,7 +70,7 @@ jobs:
           npx --yes wrangler@4.116.0 d1 migrations apply D1_02 --remote --config wrangler.jsonc
 
       - name: Deploy W03
-        working-directory: workers/W03-feed
+        working-directory: workers/W03-content
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
