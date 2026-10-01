@@ -169,7 +169,7 @@ jobs:
           if(!cases.some(x=>x.case_id===process.env.CASE_ID&&x.state==='ACTION_TAKEN'&&x.version===2)) throw new Error('W06 case transition missing');
           if(decisions.length!==1||decisions[0].outcome!=='APPROVED'||decisions[0].reviewer_id===null) throw new Error('Decision persistence missing');
           if(audits.length!==1||audits[0].action!=='moderation.decide') throw new Error('Audit binding missing');
-          if(outbox.length!==1||outbox[0].decision_id!==decisions[0].decision_id) throw new Error('Transactional outbox missing');
+          if(outbox.length!==1||outbox[0].decision_id!==decisions[0].decision_id||outbox[0].status!=='DELIVERED') throw new Error('Transactional outbox delivery missing');
           console.log('MODERATION_REMOTE_EVIDENCE=PASS');
           NODE
 
