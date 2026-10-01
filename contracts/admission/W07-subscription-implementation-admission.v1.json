@@ -31,7 +31,9 @@
     "D1-01 migration evidence exists",
     "W07 physical binding evidence exists",
     "security/lifecycle/payment/entitlement E2E exists",
-    "W07-W02 membership access-state binding contract is present"
+    "W07-W02 membership access-state binding contract is present",
+    "Payment Provider Event Admission contract is present",
+    "A concrete provider adapter must be admitted before payment-originated ACTIVE transitions"
   ],
   "authorityInvariants": [
     "Commerce/Payment owns transaction outcome",
