@@ -1,0 +1,52 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/dto/SOCIAL-INTERACTION-DTO.v1.json",
+  "title":"SOCIAL Interaction DTO Contract",
+  "version":"1.0.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "reaction":{
+    "request":"components.schemas.InteractionTarget",
+    "required":["targetType","targetId"],
+    "actor":"server-derived",
+    "reactionType":"like"
+  },
+  "comment":{
+    "createRequest":{
+      "contentId":"path ResourceId",
+      "body":{"type":"string","minLength":1,"maxLength":10000},
+      "parentId":{"type":"ResourceId","nullable":true},
+      "clientOperationId":{"type":"string","minLength":1,"maxLength":128}
+    },
+    "response":{
+      "id":"ResourceId",
+      "body":"string",
+      "state":["PENDING","PUBLISHED","REJECTED","DELETED"],
+      "version":"integer >= 1",
+      "createdAt":"date-time",
+      "updatedAt":"date-time"
+    },
+    "listResponse":{
+      "items":"Comment[]",
+      "nextCursor":"opaque cursor or null",
+      "hasMore":"boolean",
+      "requestId":"RequestId"
+    },
+    "updateRequest":{
+      "body":"string 1..10000",
+      "version":"integer >= 1",
+      "clientOperationId":"string"
+    },
+    "deleteRequest":{"clientOperationId":"string"}
+  },
+  "rules":[
+    "actor/author identity is never client-authoritative",
+    "moderation state is server-authoritative",
+    "parentId must remain within the target content scope",
+    "no unbounded comment tree expansion"
+  ],
+  "sourceRefs":[
+    "contracts/api/SOCIAL-003-reaction-contract.v1.json",
+    "contracts/api/SOCIAL-004-comment-contract.v1.json",
+    "contracts/openapi/v1/openapi.yaml"
+  ]
+}
