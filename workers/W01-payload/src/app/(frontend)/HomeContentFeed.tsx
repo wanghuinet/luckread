@@ -62,7 +62,19 @@ export default function HomeContentFeed() {
         <Link className="content-feed-all" href="/content">查看全部 ↗</Link>
       </div>
       <div className="content-feed-grid">
-        {items.map((item) => {
+        {loading ? (
+          Array.from({ length: 3 }, (_, index) => (
+            <div className="content-feed-card content-feed-card-skeleton" key={index} aria-hidden="true">
+              <div className="content-feed-cover content-feed-skeleton-block" />
+              <div className="content-feed-body">
+                <span className="content-feed-skeleton-line content-feed-skeleton-line-short" />
+                <span className="content-feed-skeleton-line content-feed-skeleton-line-title" />
+                <span className="content-feed-skeleton-line content-feed-skeleton-line-title" />
+                <span className="content-feed-skeleton-line content-feed-skeleton-line-meta" />
+              </div>
+            </div>
+          ))
+        ) : items.map((item) => {
           const cover = item.coverRef
           return (
             <Link className="content-feed-card" href={`/content/${encodeURIComponent(item.id)}`} key={item.id}>
