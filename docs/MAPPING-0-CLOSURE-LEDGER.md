@@ -4463,3 +4463,18 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - No production runtime/schema/topology/Contract change was introduced by this correction.
 - Corrected probe has not yet produced runtime evidence. Therefore L6 readiness remains `NOT_GREEN`, and the moderation Security E2E / Decision-Audit-Outbox-W03 evidence chain remains unproven.
 - Next admissible execution: run `.github/workflows/moderation-native-l6-readiness.yml` from the current main head `55362079f9de2e4fbb7a17e30be7dc91129df7d6` (the post-fix docs commits are evidence/governance-only and do not alter the corrected probe or production runtime). Do not rerun the old failed run as current-head evidence.
+
+
+## 2026-10-01 — Moderation L6 readiness run #3 fixture SQL diagnosis
+
+- Run `36800515287` tested main head `5f4d2488b95f2d2f7512489399885703e82be710`.
+- The previous Header defect is resolved: the live `POST /auth/register` succeeded and created synthetic user `55`.
+- Failure then occurred in the evidence fixture while inserting the canonical `moderator` role into existing D1-01 `role_assignments`.
+- Exact failing SQL contained `scope_id='null'` and `valid_until='null'`; D1 rejected it with the existing role-assignment CHECK constraint, code 7500.
+- Root cause: generic `sql()` helper quoted JavaScript `null` instead of emitting SQL `NULL`.
+- Canonical cross-check: generated `workers/W02-content/migrations/0001_role_assignments.sql` and established AUTH-010 fixtures use SQL `NULL` for global scope and open-ended validity.
+- Corrective commit: `a36774fe416327b21b16aaa48e9098c32533f2c8` added `sqlNullable()` and applied it to the synthetic role-assignment values only.
+- Backup before correction: `backup/pre-moderation-l6-null-scope-fix-20261001`.
+- No production runtime, schema, Contract, topology, or API semantics changed.
+- L6 readiness remains `NOT_GREEN`; corrected execution is required before evaluating login, L6 and W06 Queue authorization.
+- Next admissible execution: run `.github/workflows/moderation-native-l6-readiness.yml` from the corrected main head after the governance record updates; do not reuse prior failed runs as current evidence.
