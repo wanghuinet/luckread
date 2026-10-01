@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/entity/SOCIAL-003-like-relationship-contract.v1.json",
+  "title": "SOCIAL-003 Like Relationship Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureIds": [
+    "SOCIAL-003"
+  ],
+  "entityId": "ENT-SOCIAL-LIKE",
+  "authoritativeDomain": "D1-02",
+  "primaryWorker": "W05",
+  "primaryTask": "T11",
+  "table": "social_like_relationships",
+  "fields": [
+    "likeId",
+    "actorUserId",
+    "resourceType",
+    "resourceId",
+    "createdAt"
+  ],
+  "invariants": [
+    "One effective like per actor/resource pair.",
+    "Actor identity is derived from the trusted server principal.",
+    "Resource visibility/interactability and block/mute policy must be admitted before mutation.",
+    "Unlike is an atomic delete and missing relation is idempotent success.",
+    "Counters are projections and never determine mutation success.",
+    "No synchronous fan-out is required on the authoritative write path."
+  ],
+  "budgets": {
+    "d1ReadMax": 1,
+    "d1WriteMax": 1,
+    "distributedTransactions": false
+  },
+  "statusGate": {
+    "runtimePositive": "REQUIRED",
+    "runtimeNegative": "REQUIRED",
+    "concurrency": "REQUIRED",
+    "securityE2E": "REQUIRED",
+    "evidenceRegistry": "REQUIRED"
+  }
+}
