@@ -4545,3 +4545,14 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Therefore `36809502414` is valid deployment fact but is not yet the exact provenance evidence input for the current Security E2E workflow.
 - Next required runtime-evidence step: rerun `W06 Governance Deploy` with `source_sha=158a5221d87ce74123338bcf1f5a4a174ec55e33` so the successful run publishes `moderation-runtime-deployment-158a5221d87ce74123338bcf1f5a4a174ec55e33`; then use that new run ID in `Moderation Runtime Security E2E`.
 - Status remains `NOT_GREEN` pending clean Security E2E and Evidence Registry reconciliation.
+
+## 2026-10-01 — W06 deployment run 36809834389 exact provenance
+
+- Run `36809834389` completed SUCCESS for W06 source `158a5221d87ce74123338bcf1f5a4a174ec55e33`.
+- Admission, physical binding, TypeScript verification, and pinned Wrangler deployment all passed; Cloudflare reported Worker `luckread-w06` Current Version ID `6779eb3c-9815-4fba-8338-4e1e0cae73b5`.
+- The run successfully captured and uploaded exact deployment provenance artifact `moderation-runtime-deployment-158a5221d87ce74123338bcf1f5a4a174ec55e33`, artifact ID `11138752384`, SHA-256 `b2fa6948f819d448e355fb236cbb19cf0d8dcfee3be3417258968dee8478e330`.
+- The provenance records run `36809834389`, worker `luckread-w06`, binding `D1_03`, database UUID `bda1d247-a371-4244-91ae-aef96034db7f`, and Wrangler `4.116.0`.
+- Main commit `8eba1a0c03ceb603a8248ffb41e90900c0596e16` pins this successful deployment run as the default `w06_deploy_run_id` for the Security E2E workflow.
+- Backup before the E2E default pin: `backup/pre-moderation-w06-e2e-default-20261001`. Backup before this ledger update: `backup/pre-moderation-w06-deploy-ledger-20261001`.
+- No new Worker, D1, binding, migration, API path, Contract semantic, or distributed transaction was introduced.
+- Status remains `NOT_GREEN` pending one clean Security E2E run using this exact deployment evidence, followed by Evidence Registry reconciliation and end-to-end proof of Decision + AuditEvent + Outbox + W03 convergence.
