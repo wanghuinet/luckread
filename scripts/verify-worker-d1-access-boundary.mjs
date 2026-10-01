@@ -26,10 +26,26 @@ const domainById = Object.fromEntries(
     .map(([domain, id]) => [id, domain]),
 )
 
-const suspiciousBinding = /\b(D1(?:_0[1-4])?|DB)\b/g
+const bindingPattern = /\\.\\s*(D1(?:_0[1-4])?|DB)\\b/g
+const destructuredBindingPattern = /\{\s*(D1(?:_0[1-4])?|DB)\s*(?:,|\})/g
+const stripCommentsAndStrings = (source) =>
+  source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1')
+    .replace(/'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"/g, '')
+
+const extractBindings = (source) => {
+  const code = stripCommentsAndStrings(source)
+  const bindings = new Set()
+  for (const match of code.matchAll(bindingPattern)) bindings.add(match[1])
+  for (const match of code.matchAll(destructuredBindingPattern)) bindings.add(match[1])
+  return bindings
+}
 const codeExts = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs'])
 const runtimeFile = (name) => !name.includes('.test.') && !name.includes('.spec.')
-if (runtimeFile('example.test.ts') || runtimeFile('example.spec.ts') === true && false) throw new Error('Runtime file filter self-check failed')
+if (!runtimeFile('example.ts') || runtimeFile('example.test.ts') || runtimeFile('example.spec.ts')) throw new Error('Runtime file filter self-check failed')
+if (JSON.stringify([...extractBindings('env.D1_01; context.env.DB; const { D1_02, DB } = env')].sort()) !== JSON.stringify(['D1_01','D1_02','DB'])) throw new Error('D1 binding detector self-check failed')
+if (extractBindings('// env.D1_01\nconst x = \'D1_02\'\ntype T = D1Database').size !== 0) throw new Error('D1 binding detector false-positive self-check failed')
 
 let checkedConfigs = 0
 let checkedCodeFiles = 0
@@ -75,8 +91,7 @@ for (const dir of dirs) {
   for (const path of files) {
     checkedCodeFiles += 1
     const source = readFileSync(path, 'utf8')
-    const bindings = new Set()
-    for (const match of source.matchAll(suspiciousBinding)) bindings.add(match[1])
+    const bindings = extractBindings(source)
     for (const binding of bindings) {
       const declaredBindings = new Set(
         (configExists ? (jsonc(wranglerPath).d1_databases ?? []) : []).map((x) => x.binding),
