@@ -15,10 +15,11 @@
     "admitted": [
       "subscription state transition/reconciliation engine",
       "scoped Subscription + EntitlementGrant D1-01 schema",
-      "controlled D1-01 migration"
+      "controlled D1-01 migration",
+      "bounded getSubscription authenticated self-read path"
     ],
     "blocked": [
-      "public membership APIs",
+      "public membership mutation APIs and unresolved public read operations",
       "payment webhook trust",
       "production entitlement grant/revoke",
       "creator/member projection",
@@ -33,7 +34,8 @@
     "security/lifecycle/payment/entitlement E2E exists",
     "W07-W02 membership access-state binding contract is present",
     "Payment Provider Event Admission contract is present",
-    "A concrete provider adapter must be admitted before payment-originated ACTIVE transitions"
+    "A concrete provider adapter must be admitted before payment-originated ACTIVE transitions",
+    "W01-W07 membership gateway transport contract is present"
   ],
   "authorityInvariants": [
     "Commerce/Payment owns transaction outcome",
