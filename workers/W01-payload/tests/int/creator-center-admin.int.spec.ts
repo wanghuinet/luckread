@@ -39,6 +39,11 @@ describe('Creator Center admin extension', () => {
 
     expect(view).toContain('<PublishComposer contentBasePath="/api/creator/contents" />')
     expect(publisher).toContain("contentBasePath = '/api/v1/contents'")
+    expect(publisher).toContain("credentials: 'include'")
+    expect(publisher).not.toContain('sessionStorage')
+    expect(publisher).not.toContain('luckread.accessToken')
+    expect(publisher).not.toContain('luckread.refreshToken')
+    expect(publisher).not.toContain("Authorization', 'Bearer '")
     expect(publisher).toContain('const [draft, setDraft]')
     expect(publisher).toContain('const [savedBody, setSavedBody]')
     expect(publisher).toContain('const isUpdate = Boolean(draft?.id && draft.etag)')
