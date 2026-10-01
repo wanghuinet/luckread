@@ -256,10 +256,8 @@ describe('Creator Center admin extension', () => {
     const accountState = read('src/app/users/[userId]/account-state/route.ts')
     const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
 
-    expect(login).toContain("'set-cookie': [")
-    expect(login).toContain('payload-token=')
-    expect(login).toContain('HttpOnly')
-    expect(login).toContain('SameSite=Lax')
+    expect(login).toContain('buildPayloadAccessCookie')
+    expect(login).toContain("'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request)")
     expect(refresh).toContain('buildPayloadAccessCookie')
     expect(refresh).toContain("'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request)")
     expect(logout).toContain('buildPayloadClearCookie(request)')
