@@ -10,6 +10,7 @@ import {
   validateListFilters,
   toErrorResponse,
   transitionContentState,
+  applyModerationContentTransition,
   updateContent,
   type ContentState,
   type ContentD1,
@@ -90,8 +91,53 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
-      requireTransport(request)
       const url = new URL(request.url)
+      const isModerationTransition =
+        request.method === 'POST' &&
+        /^\/internal\/content\/contents\/[^/]+\/state$/.test(url.pathname) &&
+        request.headers.get('X-LuckRead-Caller') === 'W06'
+
+      if (isModerationTransition) {
+        if (
+          request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+          !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+          request.headers.has('Authorization')
+        ) {
+          throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        }
+        const principal = requiredPrincipal(request)
+        if (!/^L[0-8]$/.test(principal.layer) || Number(principal.layer.slice(1)) < 6) {
+          throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        }
+        const decisionId = request.headers.get('X-LuckRead-Moderation-Decision-Id')?.trim() ?? ''
+        const policyVersion = request.headers.get('X-LuckRead-Moderation-Policy-Version')?.trim() ?? ''
+        const outcome = request.headers.get('X-LuckRead-Moderation-Outcome')?.trim() ?? ''
+        if (!decisionId || !policyVersion || !['APPROVED', 'REJECTED'].includes(outcome)) {
+          throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        }
+        const ifMatch = requireIfMatch(request)
+        const idempotencyKey = requireIdempotency(request)
+        const body = await parseBody(request)
+        if (
+          body.decisionId !== decisionId ||
+          body.policyVersion !== policyVersion ||
+          body.to !== outcome ||
+          body.targetContentState !== 'PENDING_REVIEW'
+        ) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const parts = url.pathname.split('/').filter(Boolean)
+        return json(await applyModerationContentTransition(env.D1_02, {
+          contentId: decodeURIComponent(parts[3]),
+          decisionId,
+          policyVersion,
+          outcome: outcome as 'APPROVED' | 'REJECTED',
+          ifMatch,
+          idempotencyKey,
+        }))
+      }
+
+      requireTransport(request)
       const path = getPath(url.pathname)
 
       if (request.method === 'GET' && url.pathname === '/internal/content/creator-contents') {
