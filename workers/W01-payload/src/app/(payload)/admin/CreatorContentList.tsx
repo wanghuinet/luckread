@@ -110,12 +110,18 @@ export default function CreatorContentList() {
     return () => window.removeEventListener('luckread:content-mutated', handleContentMutation)
   }, [load])
 
-  async function transition(item: Item, to: 'PUBLISHED' | 'UNPUBLISHED') {
+  async function transition(item: Item, to: 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'RESTORED' | 'DRAFT') {
     const verb = to === 'UNPUBLISHED'
       ? '下线'
-      : item.state === 'APPROVED'
-        ? '发布'
-        : '重新发布'
+      : to === 'ARCHIVED'
+        ? '归档'
+        : to === 'RESTORED'
+          ? '恢复'
+          : to === 'DRAFT'
+            ? '恢复为草稿'
+            : item.state === 'APPROVED'
+              ? '发布'
+              : '重新发布'
     if (!window.confirm(`确定要${verb}“${item.title}”吗？`)) return
 
     setActionId(item.id)
@@ -164,6 +170,9 @@ export default function CreatorContentList() {
           ['SCHEDULED', '定时发布'],
           ['PUBLISHED', '已发布'],
           ['UNPUBLISHED', '已下线'],
+          ['ARCHIVED', '已归档'],
+          ['DELETED', '已删除'],
+          ['RESTORED', '已恢复'],
         ].map(([value, label]) => (
           <button
             className={status === value ? styles.filterActive : styles.filterButton}
@@ -267,6 +276,39 @@ export default function CreatorContentList() {
                       type="button"
                     >
                       {actionId === item.id ? '处理中…' : '重新发布'}
+                    </button>
+                  ) : null}
+                  {item.state === 'ARCHIVED' ? (
+                    <button
+                      aria-busy={actionId === item.id}
+                      className={styles.secondaryButton}
+                      disabled={actionId !== null}
+                      onClick={() => void transition(item, 'DRAFT')}
+                      type="button"
+                    >
+                      {actionId === item.id ? '处理中…' : '恢复为草稿'}
+                    </button>
+                  ) : null}
+                  {item.state === 'DELETED' ? (
+                    <button
+                      aria-busy={actionId === item.id}
+                      className={styles.secondaryButton}
+                      disabled={actionId !== null}
+                      onClick={() => void transition(item, 'RESTORED')}
+                      type="button"
+                    >
+                      {actionId === item.id ? '处理中…' : '恢复'}
+                    </button>
+                  ) : null}
+                  {item.state === 'RESTORED' ? (
+                    <button
+                      aria-busy={actionId === item.id}
+                      className={styles.secondaryButton}
+                      disabled={actionId !== null}
+                      onClick={() => void transition(item, 'DRAFT')}
+                      type="button"
+                    >
+                      {actionId === item.id ? '处理中…' : '恢复为草稿'}
                     </button>
                   ) : null}
                 </div>
