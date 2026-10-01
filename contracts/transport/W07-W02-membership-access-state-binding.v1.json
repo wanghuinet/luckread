@@ -28,6 +28,12 @@
       "idempotency": "Idempotency-Key"
     },
     {
+      "operationId": "readSubscription",
+      "method": "POST",
+      "internalPath": "/internal/membership/subscriptions/read",
+      "idempotency": "not-required-read"
+    },
+    {
       "operationId": "transitionSubscription",
       "method": "POST",
       "internalPath": "/internal/membership/subscriptions/transition",
@@ -39,7 +45,9 @@
     "required": {
       "X-LuckRead-Caller": "W07",
       "X-LuckRead-Transport-Version": "1.0",
-      "X-LuckRead-Correlation-Id": "required",
+      "X-LuckRead-Correlation-Id": "required"
+    },
+    "mutation": {
       "Idempotency-Key": "required"
     },
     "principal": {
@@ -55,7 +63,8 @@
     },
     "defenseInDepth": {
       "userScope": "W02 requires actor=user transitions to target a subscription whose subscriber_id equals X-LuckRead-Principal-User-Id.",
-      "entitlementScope": "W02 terminal REVOKE derives scope from subscription_id and revokes all ACTIVE grants for that subscription; client entitlement identifiers are not authoritative."
+      "entitlementScope": "W02 terminal REVOKE derives scope from subscription_id and revokes all ACTIVE grants for that subscription; client entitlement identifiers are not authoritative.",
+      "stateSource": "W07 reads current subscription state/version from W02 before lifecycle decision; W01-supplied state/version headers are not authoritative."
     },
     "futureTrustedActors": "system/creator/admin/payment require a separately admitted trusted authority path; they are not reachable through the current W01-facing transition boundary."
   },
@@ -73,6 +82,7 @@
     "positive create/activate/cancel/expire evidence",
     "stale-version rejection evidence",
     "idempotent replay evidence",
-    "entitlement grant/revoke convergence evidence"
+    "entitlement grant/revoke convergence evidence",
+    "authoritative W07 read-before-transition evidence"
   ]
 }
