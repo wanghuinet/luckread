@@ -656,7 +656,7 @@ paths:
       x-luckread-contract-status: CONTRACTED_PARTIAL
       x-luckread-source: contracts/api/SOCIAL-004-comment-contract.v1.json
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       requestBody:
         required: true
         content:
