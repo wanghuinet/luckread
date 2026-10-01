@@ -146,14 +146,17 @@
       "entityName": "Subscription",
       "domainId": "D1-01",
       "entityStatus": "PROPOSED",
-      "implementationRef": "",
-      "persistenceStatus": "NOT_APPLICABLE",
-      "adapter": "",
+      "implementationRef": "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+      "adapter": "Cloudflare D1 (D1-01) / W07 T16 scoped membership access transition",
       "migrationRefs": [],
       "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
       "evidenceRefs": [
-        "contracts/entity/entity-catalog.v1.json"
-      ]
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json"
+      ],
+      "persistenceContractRef": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json"
     },
     {
       "entityId": "ENT-ORG-MEMBERSHIP",
