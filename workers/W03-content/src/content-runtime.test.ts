@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, validateInput, validateListFilters } from './content-runtime.js'
+import { parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
   it('accepts the canonical lifecycle vocabulary and cursor round-trip', () => {
@@ -43,6 +44,16 @@ describe('W03 content contract core', () => {
       bodyRef: 'https://cdn.example.com/body.txt',
       mediaRefs: ['https://cdn.example.com/video.mp4'],
     }).contentType).toBe('video')
+  })
+
+  it('rejects malformed and out-of-range public pagination limits', () => {
+    expect(parseListLimit(null)).toBe(20)
+    expect(parseListLimit('1')).toBe(1)
+    expect(parseListLimit('50')).toBe(50)
+    expect(() => parseListLimit('0')).toThrow()
+    expect(() => parseListLimit('51')).toThrow()
+    expect(() => parseListLimit('1.5')).toThrow()
+    expect(() => parseListLimit('abc')).toThrow()
   })
 
   it('validates creator content list filters', () => {
