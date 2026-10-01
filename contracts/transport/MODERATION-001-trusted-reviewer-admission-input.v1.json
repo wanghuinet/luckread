@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/v1/transport/MODERATION-001-trusted-reviewer-admission-input.v1.json",
   "title": "GOV-003/GOV-004 Trusted Reviewer Admission Input Contract",
   "version": "1.0.0",
-  "status": "CONTRACTED_NOT_VERIFIED",
+  "status": "CONTRACTED_AUTHORITY_ADMITTED",
   "featureId": "GOV-003",
   "operationIds": [
     "listModerationQueue",
@@ -130,16 +130,7 @@
     "newPublicOperationIds": 0,
     "directW06ToW03TableAccess": false
   },
-  "evidenceRequiredBeforeImplementationAdmission": [
-    "verified W01 authenticated principal propagation to the moderation boundary",
-    "verified reviewer identity/layer/permission scope derivation",
-    "W01→W06 Service Binding deployment evidence",
-    "exact transport source SHA",
-    "fail-closed unauthenticated/insufficient-layer/outsider-scope negative tests",
-    "If-Match 428/412 evidence",
-    "Idempotency replay and key-reuse-conflict evidence"
-  ],
-  "implementationRule": "The transport binding is contract-defined but not runtime-verified. W06 runtime remains blocked until deployment, principal/layer/permission scope checks and fail-closed negative evidence are produced.",
+  "implementationRule": "Implementation is admitted by CC-1.2. W06 runtime remains non-GREEN until deployment, principal/layer/permission-scope and fail-closed negative evidence are produced.",
   "nonGoals": [
     "No new Service Binding is created by this contract.",
     "No direct W02→W06 business Service Binding is inferred.",
@@ -147,7 +138,7 @@
     "No D1-03 migration execution.",
     "No Mapping 0 GREEN claim.",
     "Canonical moderation OpenAPI is already bound separately; this contract does not promote or redefine its paths.",
-    "No W06 runtime implementation is authorized until reviewer identity/layer authority is evidence-bound."
+    "No runtime GREEN without executable evidence."
   ],
   "relatedFeatureIds": [
     "GOV-004"
@@ -155,5 +146,15 @@
   "sourceRefs": [
     "contracts/transport/W01-W06-moderation-http-binding.v1.json"
   ],
-  "bindingContract": "contracts/transport/W01-W06-moderation-http-binding.v1.json"
+  "bindingContract": "contracts/transport/W01-W06-moderation-http-binding.v1.json",
+  "implementationAuthorization": true,
+  "evidenceRequiredBeforeRuntimeGreen": [
+    "verified W01 authenticated principal propagation to the moderation boundary",
+    "verified reviewer identity/layer/permission scope derivation",
+    "W01→W06 Service Binding deployment evidence",
+    "exact transport source SHA",
+    "fail-closed unauthenticated/insufficient-layer/outsider-scope negative tests",
+    "If-Match 428/412 evidence",
+    "Idempotency replay and key-reuse-conflict evidence"
+  ]
 }
