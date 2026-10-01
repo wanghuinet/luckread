@@ -13,7 +13,7 @@ import { r2Storage } from '@payloadcms/storage-r2'
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
 import { authSessionStateSchemaHook } from './db/auth-session-state-schema'
-import { clampWorkerPbkdf2Iterations } from './runtime/pbkdf2-worker-compat'
+import { wrapWorkerPbkdf2 } from './runtime/pbkdf2-worker-compat'
 
 export const AUTH001_USER_CAPTURE_CONTEXT = '__luckreadAuth001UserCapture'
 
@@ -43,10 +43,7 @@ const isWorkerRuntime =
 // not a second authentication implementation.
 if (isWorkerRuntime) {
   const nativePbkdf2 = nodeCrypto.pbkdf2.bind(nodeCrypto)
-  nodeCrypto.pbkdf2 = ((...args: Parameters<typeof nodeCrypto.pbkdf2>) => {
-    args[2] = clampWorkerPbkdf2Iterations(args[2])
-    return nativePbkdf2(...args)
-  }) as typeof nodeCrypto.pbkdf2
+  nodeCrypto.pbkdf2 = wrapWorkerPbkdf2(nativePbkdf2)
 }
 
 const createLog =
