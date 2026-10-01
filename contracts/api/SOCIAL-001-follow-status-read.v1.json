@@ -1,0 +1,61 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/api/SOCIAL-001-follow-status-read.v1.json",
+  "title":"SOCIAL-001 Follow Status Read Contract",
+  "version":"1.0.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "featureId":"SOCIAL-001",
+  "operationId":"getUsersUserIdFollow",
+  "method":"GET",
+  "path":"/v1/users/{userId}/follow",
+  "purpose":"Return whether the authenticated viewer currently follows the target user.",
+  "authorization":{
+    "required":true,
+    "permission":"social.follow",
+    "scope":"actor_and_target",
+    "actorServerDerived":true,
+    "targetServerDerived":true,
+    "blockPolicyServerEnforced":true,
+    "failClosedWhenAuthorityUnavailable":true
+  },
+  "response":{
+    "data":{
+      "following":"boolean; derived from the authoritative active Follow relation"
+    },
+    "requestId":"canonical request identifier"
+  },
+  "persistence":{
+    "authoritativeEntity":"ENT-SOCIAL-FOLLOW",
+    "table":"social_follow_relationships",
+    "readFilter":"follower_user_id = authenticated viewer AND target_user_id = path userId",
+    "d1ReadMax":1,
+    "d1WriteMax":0,
+    "rpcMax":0,
+    "counterNotUsed":true
+  },
+  "security":[
+    "viewer identity is derived from the authenticated server principal",
+    "target user is resolved by authoritative User identity",
+    "client cannot submit actorUserId or override authorization decisions",
+    "block/privacy scope is evaluated before relation disclosure"
+  ],
+  "nonGoals":[
+    "No second relationship table.",
+    "No cached boolean as authority.",
+    "No Payload Collection.",
+    "No new Worker.",
+    "No new D1 database.",
+    "No new Task.",
+    "No runtime GREEN claim."
+  ],
+  "requiredEvidence":[
+    "OpenAPI binding",
+    "DTO binding",
+    "W01 trusted principal propagation",
+    "W05 runtime handler",
+    "D1-02 read evidence",
+    "privacy/block negative evidence",
+    "security-E2E evidence",
+    "Evidence Registry provenance"
+  ]
+}
