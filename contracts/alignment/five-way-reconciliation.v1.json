@@ -6868,7 +6868,8 @@
       ],
       "apiOperationIds": [
         "follow",
-        "unfollow"
+        "unfollow",
+        "getUsersUserIdFollow"
       ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
@@ -6882,10 +6883,12 @@
         "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
         "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
         "contracts/dto/auth-dto-contract.v1.json",
-        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json"
+        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
+        "contracts/api/SOCIAL-001-follow-status-read.v1.json",
+        "contracts/dto/DTO-SOCIAL-FOLLOW-STATUS.v1.json"
       ],
       "blockers": [
-        "Canonical Payload/Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; Field and physical persistence contract are now bound."
+        "Canonical W05 Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; API, DTO, Entity/Field and physical persistence contracts are now bound."
       ]
     },
     {
