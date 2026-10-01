@@ -28,6 +28,7 @@ export default function HomeContentFeed() {
   const [items, setItems] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     const timer = window.setTimeout((): void => {
@@ -53,7 +54,7 @@ export default function HomeContentFeed() {
     }, 0)
 
     return () => window.clearTimeout(timer)
-  }, [])
+  }, [retryKey])
 
   if (!loading && items.length === 0 && !error) return null
 
@@ -61,9 +62,7 @@ export default function HomeContentFeed() {
     setLoading(true)
     setError(false)
     setItems([])
-    void window.setTimeout(() => {
-      window.dispatchEvent(new Event('luckread:home-feed-retry'))
-    }, 0)
+    setRetryKey((value) => value + 1)
   }
 
   return (
