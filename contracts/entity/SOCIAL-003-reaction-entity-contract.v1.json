@@ -1,0 +1,20 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/entity/SOCIAL-003-reaction-entity-contract.v1.json",
+  "title":"SOCIAL-003 Reaction Entity Contract",
+  "version":"1.0.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "entityId":"ENT-SOCIAL-REACTION",
+  "name":"SocialReaction",
+  "classification":"AUTHORITATIVE",
+  "domainId":"D1-02",
+  "fields":[
+    {"fieldId":"ENT-SOCIAL-REACTION-F-REACTION-ID","name":"reactionId","type":"text","nullable":false,"required":true,"unique":true,"indexed":true,"lifecycle":"immutable","classification":"INTERNAL_IDENTIFIER"},
+    {"fieldId":"ENT-SOCIAL-REACTION-F-ACTOR-USER-ID","name":"actorUserId","type":"text","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"INTERNAL_RELATION"},
+    {"fieldId":"ENT-SOCIAL-REACTION-F-TARGET-TYPE","name":"targetType","type":"enum","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"RESOURCE_SCOPE","allowedValues":["content","comment","creator","ip"]},
+    {"fieldId":"ENT-SOCIAL-REACTION-F-TARGET-ID","name":"targetId","type":"text","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"INTERNAL_RELATION"},
+    {"fieldId":"ENT-SOCIAL-REACTION-F-REACTION-TYPE","name":"reactionType","type":"enum","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"INTERACTION_TYPE","allowedValues":["like"]},
+    {"fieldId":"ENT-SOCIAL-REACTION-F-CREATED-AT","name":"createdAt","type":"datetime","nullable":false,"required":true,"unique":false,"indexed":true,"lifecycle":"immutable","classification":"AUDIT_METADATA"}
+  ],
+  "keyRules":["One effective reaction per actor + target + reactionType.","Unlike removes the authoritative relation; counters remain derived.","Actor identity is never accepted from client payload as authority."]
+}
