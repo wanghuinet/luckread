@@ -70,5 +70,4 @@ It is pinned to the admitted W04 source/version and has `confirm=RUN` as the def
 
 ## Current main
 
-Latest main after the current boundary-control work:
-`4484de32df9b32e6648a881441b6cbc2facc1229`
+The boundary-control status cursor was last reconciled from main at baseline commit `4484de32df9b32e6648a881441b6cbc2facc1229`. The live repository head must always be read from `main` itself.
