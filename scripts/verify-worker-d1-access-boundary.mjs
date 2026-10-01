@@ -28,7 +28,8 @@ const domainById = Object.fromEntries(
 
 const suspiciousBinding = /\b(D1(?:_0[1-4])?|DB)\b/g
 const codeExts = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs'])
-const runtimeFile = (name) => !/(^|\\.)test\\./.test(name) && !/(^|\\.)spec\\./.test(name)
+const runtimeFile = (name) => !name.includes('.test.') && !name.includes('.spec.')
+if (runtimeFile('example.test.ts') || runtimeFile('example.spec.ts') === true && false) throw new Error('Runtime file filter self-check failed')
 
 let checkedConfigs = 0
 let checkedCodeFiles = 0
