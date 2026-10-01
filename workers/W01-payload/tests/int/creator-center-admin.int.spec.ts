@@ -248,13 +248,29 @@ describe('Creator Center admin extension', () => {
 
   it('keeps frontend and Admin on the same Payload cookie session lifecycle', () => {
     const login = read('src/app/auth/login/route.ts')
+    const refresh = read('src/app/auth/refresh/route.ts')
     const logout = read('src/app/auth/logout/route.ts')
+    const accessToken = read('src/auth/payload-access-token.ts')
+    const sessions = read('src/app/auth/sessions/[[...segments]]/route.ts')
+    const usersMe = read('src/app/(payload)/api/users/me/route.ts')
+    const accountState = read('src/app/users/[userId]/account-state/route.ts')
+    const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
 
     expect(login).toContain("'set-cookie': [")
     expect(login).toContain('payload-token=')
     expect(login).toContain('HttpOnly')
     expect(login).toContain('SameSite=Lax')
-    expect(logout).toContain("set-cookie': 'payload-token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'")
+    expect(refresh).toContain('buildPayloadAccessCookie')
+    expect(refresh).toContain("'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request)")
+    expect(logout).toContain('buildPayloadClearCookie(request)')
+    expect(accessToken).toContain("return getCookieValue(request, 'payload-token')")
+    expect(accessToken).toContain('export function getPayloadAuthorizationHeader')
+    expect(sessions).toContain('getPayloadAuthorizationHeader(request)')
+    expect(usersMe).toContain('readVerifiedPayloadTokenVersion(request)')
+    expect(accountState).toContain('getPayloadAuthorizationHeader(request)')
+    expect(loginForm).not.toContain("sessionStorage.setItem('luckread.accessToken'")
+    expect(loginForm).not.toContain("sessionStorage.setItem('luckread.refreshToken'")
+    expect(loginForm).not.toContain("sessionStorage.setItem('luckread.layer'")
   })
 
   it('keeps the existing native admin import map entries', () => {
