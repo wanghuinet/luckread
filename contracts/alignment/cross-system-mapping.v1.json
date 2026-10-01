@@ -6729,7 +6729,7 @@
     },
     {
       "featureId": "SOCIAL-001",
-      "status": "UNRESOLVED",
+      "status": "PARTIAL",
       "apiOperationIds": [
         "follow",
         "unfollow"
@@ -6748,10 +6748,14 @@
         "contracts/openapi/v1/openapi.yaml#/social/follows",
         "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
+        "contracts/transport/W01-W05-social-follow-http-binding.v1.json",
+        "contracts/transport/SOCIAL-001-follow-trusted-authority-binding.v1.json"
       ],
       "blockers": [
-        "Canonical Payload/Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; Field and physical persistence contract are now bound."
+        "API and Entity/Field/Persistence contracts are bound.",
+        "Private W01→W05 transport boundary is contractually admitted.",
+        "Actor account-state, target followability, block/privacy/anti-abuse authority inputs, runtime, tests and Evidence Registry provenance remain unverified."
       ]
     },
     {
