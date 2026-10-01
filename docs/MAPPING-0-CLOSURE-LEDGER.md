@@ -4596,3 +4596,14 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - The failed run is diagnostic only and is not registered as PASS evidence. A fresh manual run on the corrected workflow is required to produce the evidence artifact.
 - Backup before the evidence-workflow correction: `backup/pre-moderation-d1-03-audit-evidence-inputs-20261001`.
 - Status remains `NOT_GREEN` pending the corrected AuditEvent evidence run and subsequent Evidence Registry reconciliation.
+
+
+## 2026-10-01 — W06 AuditEvent D1-03 evidence run 36813978768 PASS
+
+- Run `36813978768` completed SUCCESS for workflow `W06 AuditEvent D1-03 Evidence`.
+- Exact D1-03 binding was verified against database UUID `bda1d247-a371-4244-91ae-aef96034db7f` and display name `secondary`.
+- Remote evidence passed required `audit_events` columns, action/occurred_at and target/occurred_at indexes, immutable UPDATE/DELETE triggers, migration history containing `0001_audit_event.sql`, and a valid non-negative production row count. The observed row count was 16; the prior `count === 0` assertion was corrected because production AuditEvent records are expected to persist.
+- Artifact: `11139889690`, `w06-audit-event-d1-03-evidence-36813978768`, digest `sha256:4db52d2ee678db73fa7912662dde5da613e1a3a34ba49ef28ac73b8ec82a543f`.
+- Registry record: `EVD-SAFETY001-MODERATION-AUDITEVENT-D1-03-001`, result `PASS`, status `CREATED` because the canonical registry freshness anchor `testedCommitSha=53e3bcbb855be8e1240171390c69dd034bf04f8b` predates this evidence.
+- Backup before Registry update: `backup/pre-moderation-audit-evidence-registry-20261001`.
+- This evidence proves the D1-03 AuditEvent persistence boundary; it does not by itself close the broader SAFETY-001 feature or Mapping 0.
