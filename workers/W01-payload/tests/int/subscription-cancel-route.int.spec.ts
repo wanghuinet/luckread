@@ -13,6 +13,7 @@ describe('subscription cancel public boundary', () => {
     expect(source).toContain('MIN_MEMBERSHIP_MUTATION_LAYER = 2')
     expect(source).toContain("request.headers.get('If-Match')")
     expect(source).toContain("request.headers.get('Idempotency-Key')")
+    expect(source).toContain('match(/^(?:W\\/)?"([1-9]\\\\d{0,17})"$/)')
     expect(source).toContain('transitionMembershipSubscription({')
     expect(source).not.toContain('D1')
     expect(source).not.toContain('subscriberId:')
