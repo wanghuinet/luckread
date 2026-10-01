@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "authoritativeDomain": "D1-01",
+  "primaryWorker": "W07",
+  "database": {
+    "binding": "D1_01",
+    "databaseName": "luckread",
+    "databaseUuid": "2f80471e-3756-49f9-8db1-7707a433ad64"
+  },
+  "tables": {
+    "membership_subscriptions": {
+      "entityId": "ENT-SUBSCRIPTION",
+      "sourceFieldContract": "contracts/entity/MEMBERSHIP-SUBSCRIPTION-ENTITLEMENT-field-contract.v1.json#ENT-SUBSCRIPTION",
+      "primaryKey": "subscription_id",
+      "activeUnique": [
+        "subscriber_id",
+        "plan_id"
+      ],
+      "statusCheck": [
+        "PENDING",
+        "ACTIVE",
+        "PAST_DUE",
+        "CANCELED",
+        "EXPIRED"
+      ],
+      "noCrossDomainForeignKeys": true
+    },
+    "membership_entitlement_grants": {
+      "entityId": "ENT-ENTITLEMENT-GRANT",
+      "sourceFieldContract": "contracts/entity/MEMBERSHIP-SUBSCRIPTION-ENTITLEMENT-field-contract.v1.json#ENT-ENTITLEMENT-GRANT",
+      "primaryKey": "entitlement_id",
+      "activeUnique": [
+        "subscription_id",
+        "entitlement_type",
+        "scope_type",
+        "scope_id"
+      ],
+      "statusCheck": [
+        "ACTIVE",
+        "REVOKED",
+        "EXPIRED"
+      ],
+      "noCrossDomainForeignKeys": true
+    }
+  },
+  "mutationRules": [
+    "Subscription mutations use expectedVersion optimistic concurrency.",
+    "Entitlement mutations are idempotent and derive from trusted subscription/payment decisions.",
+    "Payment providers cannot write these tables directly.",
+    "Membership cannot write ledger balance or transaction truth.",
+    "Cancellation/expiry must converge entitlement access state."
+  ],
+  "migration": {
+    "path": "workers/W07-subscription-commerce/migrations/0001_membership_subscription_entitlement.sql",
+    "executionMode": "controlled-manual",
+    "executionEvidence": "REQUIRED",
+    "reexecute": false
+  },
+  "topology": {
+    "newWorkers": 0,
+    "newD1": 0,
+    "crossD1Transactions": 0
+  }
+}
