@@ -126,7 +126,19 @@ Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
 - No default business D1 authority.
 - Integration callbacks/mutations must use explicit owning-domain contracts and cannot acquire unrestricted D1 write access.
 
-## 5. Cross-D1 mutation rules
+## 5. Public ingress / terminal Worker rules
+
+1. W01 is the public HTTP/API ingress boundary for currently admitted public operations.
+2. Public ingress does not transfer domain ownership to W01.
+3. Every forwarded business operation must have an explicit terminal Worker and transport contract.
+4. W01 must not be inserted as a Worker-to-Worker routing hop.
+5. W03 is the terminal Worker for admitted Content/Article/Media operations; W06 is the terminal Worker for admitted Moderation operations.
+6. Auth operations may use W01 as the Payload-native execution boundary where explicitly admitted, while W02 remains the Identity/Account/Authorization authority.
+7. A Worker may expose a direct public route only after a corresponding transport/public-route contract and deployment evidence are admitted.
+
+See `contracts/transport/public-worker-terminal-routing.v1.json`.
+
+## 8. Cross-D1 mutation rules
 
 Cross-D1 mutation is never an implicit direct write permission.
 
