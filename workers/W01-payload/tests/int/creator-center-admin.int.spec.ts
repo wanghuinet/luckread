@@ -140,6 +140,7 @@ describe('Creator Center admin extension', () => {
     expect(list).toContain("transition(item, 'PUBLISHED')")
     expect(list).toContain('立即发布')
     expect(list).toContain('加载更多')
+    expect(list).toContain('page.hasMore && page.nextCursor')
     expect(list).toContain('items: [...current.items, ...(next.items ?? [])]')
     expect(list).toContain('const [loadingMore, setLoadingMore]')
     expect(list).toContain('if (cursor) setLoadingMore(true)')
