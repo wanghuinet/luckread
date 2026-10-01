@@ -256,6 +256,7 @@ export async function decideModerationCase(
     caseId: string
     ifMatch: string | null
     idempotencyKey: string | null
+    expectedVersion: number
     correlationId: string
     requestId: string
     decision: ModerationOutcome
@@ -317,9 +318,11 @@ export async function decideModerationCase(
     }>()
   if (!row) throw new ModerationRuntimeError('NOT_FOUND', 404)
 
-  const expectedVersion = Number(normalizeEtag(input.ifMatch))
-  if (expectedVersion !== row.version) throw new ModerationRuntimeError('PRECONDITION_FAILED', 412)
-  const bodyExpectedVersion = row.version
+  const headerExpectedVersion = Number(normalizeEtag(input.ifMatch))
+  if (input.expectedVersion !== row.version || headerExpectedVersion !== row.version) {
+    throw new ModerationRuntimeError('PRECONDITION_FAILED', 412)
+  }
+  const bodyExpectedVersion = input.expectedVersion
 
   if (row.target_type !== 'content') {
     throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
