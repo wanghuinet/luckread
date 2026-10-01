@@ -1,0 +1,21 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/api/SOCIAL-003-reaction-contract.v1.json",
+  "title":"SOCIAL-003 Like / Reaction Contract",
+  "version":"1.0.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "featureId":"SOCIAL-003",
+  "authority":{"domain":"SOCIAL","worker":"W05","d1":"D1-02","entity":"ENT-SOCIAL-REACTION","table":"social_reactions"},
+  "operations":[
+    {"operationId":"like","method":"POST","path":"/v1/interactions/likes","target":"InteractionTarget","semantics":"Create one effective reaction for the authenticated actor and target; duplicate is idempotent success.","idempotencyKey":"actorId:targetType:targetId:reactionType","concurrency":"ATOMIC_UNIQUE_CONSTRAINT_OR_UPSERT","reactionTypeDefault":"like"},
+    {"operationId":"unlike","method":"DELETE","path":"/v1/interactions/likes","target":"InteractionTarget","semantics":"Remove the authenticated actor's effective reaction; absent relation is idempotent success.","idempotencyKey":"actorId:targetType:targetId:reactionType","concurrency":"ATOMIC_DELETE"}
+  ],
+  "targetTypes":["content","comment","creator","ip"],
+  "authorization":{"actorServerDerived":true,"targetServerDerived":true,"permission":"interaction.like","scope":"actor_and_resource","blockMutePolicy":true,"resourceVisibilityRequired":true,"failClosedWhenAuthorityUnavailable":true},
+  "persistence":{"authoritativeEntity":"ENT-SOCIAL-REACTION","table":"social_reactions","d1ReadMax":1,"d1WriteMax":1,"rpcMax":0,"counterNotAuthoritative":true},
+  "events":{"created":"reaction.created","deleted":"reaction.deleted","syncConsumersMax":0,"asyncEventsMax":1,"fanoutMax":0},
+  "antiAbuse":{"required":true,"beforeMutation":true,"scopes":["ip","device","account","endpoint","resource","global"],"actions":["ALLOW","THROTTLE","CHALLENGE","BLOCK","REVIEW"]},
+  "projection":{"counters":"derived","cache":"non-authoritative","rebuildPath":"authoritative reaction rows + accepted events"},
+  "nonGoals":["No Payload Collection.","No new Worker.","No new D1 database.","No new Task.","No synchronous fan-out.","No runtime GREEN claim."],
+  "requiredEvidence":["OpenAPI","DTO","permission","state","resource","persistence","anti-abuse","runtime","concurrency","security-E2E","Evidence Registry"]
+}
