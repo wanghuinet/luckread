@@ -2092,6 +2092,189 @@
         "contracts/entity/SOCIAL-003-like-relationship-contract.v1.json",
         "contracts/persistence/SOCIAL-003-like-d1-02-persistence.v1.json"
       ]
+    },
+    {
+      "entityId": "ENT-SOCIAL-COMMENT",
+      "status": "PROPOSED",
+      "fieldContractRef": "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+      "fields": [
+        {
+          "fieldId": "ENT-SOCIAL-COMMENT-F-COMMENT-ID",
+          "name": "commentId",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": true,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "INTERNAL_IDENTIFIER",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+          "apiExposure": "SCOPED_IDENTIFIER",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED",
+          "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/SOCIAL-004-comment-reply-contract.v1.json",
+            "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json"
+          ]
+        },
+        {
+          "fieldId": "ENT-SOCIAL-COMMENT-F-AUTHOR-USER-ID",
+          "name": "authorUserId",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "INTERNAL_RELATION",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+          "apiExposure": "NONE",
+          "adminExposure": "SCOPED",
+          "eventExposure": "NONE",
+          "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/SOCIAL-004-comment-reply-contract.v1.json",
+            "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json"
+          ]
+        },
+        {
+          "fieldId": "ENT-SOCIAL-COMMENT-F-CONTENT-ID",
+          "name": "contentId",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "INTERNAL_RELATION",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+          "apiExposure": "SCOPED_IDENTIFIER",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED",
+          "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/SOCIAL-004-comment-reply-contract.v1.json",
+            "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json"
+          ]
+        },
+        {
+          "fieldId": "ENT-SOCIAL-COMMENT-F-PARENT-COMMENT-ID",
+          "name": "parentCommentId",
+          "type": "text",
+          "nullable": true,
+          "required": false,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "INTERNAL_RELATION",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+          "apiExposure": "SCOPED_IDENTIFIER",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED",
+          "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/SOCIAL-004-comment-reply-contract.v1.json",
+            "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json"
+          ]
+        },
+        {
+          "fieldId": "ENT-SOCIAL-COMMENT-F-BODY",
+          "name": "body",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": false,
+          "lifecycle": "mutable",
+          "classification": "USER_GENERATED_CONTENT",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+          "apiExposure": "SCOPED",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED",
+          "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/SOCIAL-004-comment-reply-contract.v1.json",
+            "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json"
+          ]
+        },
+        {
+          "fieldId": "ENT-SOCIAL-COMMENT-F-STATE",
+          "name": "state",
+          "type": "enum",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "mutable",
+          "classification": "LIFECYCLE_STATE",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+          "apiExposure": "SCOPED",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED",
+          "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
+          "postgresqlPortability": "PORTABLE",
+          "allowedValues": [
+            "PENDING",
+            "VISIBLE",
+            "HIDDEN",
+            "FLAGGED",
+            "UNDER_REVIEW",
+            "REJECTED",
+            "DELETED",
+            "AUTHOR_DELETED"
+          ],
+          "evidenceRefs": [
+            "contracts/entity/SOCIAL-004-comment-reply-contract.v1.json",
+            "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json"
+          ]
+        },
+        {
+          "fieldId": "ENT-SOCIAL-COMMENT-F-CREATED-AT",
+          "name": "createdAt",
+          "type": "datetime",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "AUDIT_METADATA",
+          "status": "PROPOSED",
+          "payloadNative": false,
+          "sourceRef": "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+          "apiExposure": "SCOPED",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED",
+          "migrationVersion": "PENDING_PERSISTENCE_CONTRACT",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/entity/SOCIAL-004-comment-reply-contract.v1.json",
+            "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json"
+          ]
+        }
+      ],
+      "evidenceRefs": [
+        "contracts/entity/SOCIAL-004-comment-reply-contract.v1.json",
+        "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+        "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json"
+      ]
     }
   ],
   "rules": {
