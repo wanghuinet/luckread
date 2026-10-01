@@ -104,10 +104,20 @@ export default {
     }
 
     let body: {
+      subscriptionId?: unknown
+      from?: unknown
       to?: unknown
       actor?: unknown
       expectedVersion?: unknown
       idempotencyKey?: unknown
+      entitlementAction?: unknown
+      entitlementId?: unknown
+      entitlementType?: unknown
+      scopeType?: unknown
+      scopeId?: unknown
+      sourcePlanVersion?: unknown
+      effectiveAt?: unknown
+      expiresAt?: unknown
     }
 
     try {
@@ -117,6 +127,9 @@ export default {
     }
 
     if (
+      typeof body.subscriptionId !== 'string' ||
+      typeof body.from !== 'string' ||
+      !statuses.has(body.from as SubscriptionStatus) ||
       typeof body.to !== 'string' ||
       !statuses.has(body.to as SubscriptionStatus) ||
       typeof body.actor !== 'string' ||
@@ -124,7 +137,9 @@ export default {
       typeof body.expectedVersion !== 'number' ||
       !Number.isSafeInteger(body.expectedVersion) ||
       typeof body.idempotencyKey !== 'string' ||
-      body.idempotencyKey !== request.headers.get('Idempotency-Key')
+      body.idempotencyKey !== request.headers.get('Idempotency-Key') ||
+      typeof body.entitlementAction !== 'string' ||
+      !['NONE','GRANT','REVOKE'].includes(body.entitlementAction)
     ) {
       return json({ error: { code: 'VALIDATION_FAILED' } }, 400)
     }
@@ -136,21 +151,46 @@ export default {
     const state = request.headers.get('X-LuckRead-Subscription-State') as SubscriptionStatus | null
     const version = Number(request.headers.get('X-LuckRead-Subscription-Version') ?? '1')
 
-    if (!state || !statuses.has(state) || !Number.isSafeInteger(version) || version < 1) {
+    if (!state || !statuses.has(state) || body.from !== state || !Number.isSafeInteger(version) || version < 1 || body.expectedVersion !== version) {
       return json({ error: { code: 'VALIDATION_FAILED' } }, 400)
     }
 
     try {
-      return json({
-        data: transitionSubscription(
-          { status: state, version },
-          {
-            to: body.to as SubscriptionStatus,
-            actor: body.actor as SubscriptionActor,
-            expectedVersion: body.expectedVersion,
-            idempotencyKey: body.idempotencyKey,
-          },
-        ),
+      const local = transitionSubscription(
+        { status: state, version },
+        {
+          to: body.to as SubscriptionStatus,
+          actor: body.actor as SubscriptionActor,
+          expectedVersion: body.expectedVersion,
+          idempotencyKey: body.idempotencyKey,
+        },
+      )
+
+      const accessState = await callW02Membership({
+        operation: 'transition',
+        correlationId: request.headers.get('X-LuckRead-Correlation-Id')!,
+        idempotencyKey: request.headers.get('Idempotency-Key')!,
+        actorUserId: request.headers.get('X-LuckRead-Principal-User-Id') ?? '',
+        body: {
+          subscriptionId: body.subscriptionId,
+          from: body.from,
+          to: body.to,
+          actor: body.actor,
+          expectedVersion: body.expectedVersion,
+          entitlementAction: body.entitlementAction,
+          entitlementId: typeof body.entitlementId === 'string' ? body.entitlementId : undefined,
+          entitlementType: typeof body.entitlementType === 'string' ? body.entitlementType : undefined,
+          scopeType: typeof body.scopeType === 'string' ? body.scopeType : undefined,
+          scopeId: typeof body.scopeId === 'string' ? body.scopeId : undefined,
+          sourcePlanVersion: typeof body.sourcePlanVersion === 'number' ? body.sourcePlanVersion : undefined,
+          effectiveAt: typeof body.effectiveAt === 'string' ? body.effectiveAt : undefined,
+          expiresAt: typeof body.expiresAt === 'string' ? body.expiresAt : null,
+        },
+      })
+
+      return new Response(await accessState.arrayBuffer(), {
+        status: accessState.status,
+        headers: { 'content-type': accessState.headers.get('content-type') ?? 'application/json; charset=utf-8', 'cache-control': 'no-store' },
       })
     } catch (error) {
       const code = error instanceof SubscriptionStateError ? error.code : 'SERVICE_UNAVAILABLE'
