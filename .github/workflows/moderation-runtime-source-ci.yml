@@ -93,6 +93,7 @@ jobs:
           sqlite3 -json /tmp/luckread-moderation.sqlite 'PRAGMA table_info("moderation_decisions");'
           sqlite3 -json /tmp/luckread-moderation.sqlite 'PRAGMA table_info("moderation_decision_idempotency");'
           sqlite3 -json /tmp/luckread-moderation.sqlite 'PRAGMA table_info("moderation_txn_guard");'
+          sqlite3 -json /tmp/luckread-moderation.sqlite 'PRAGMA table_info("moderation_enforcement_outbox");'
           echo "MODERATION_D1_03_MIGRATION_STATIC=PASS"
 
       - name: Verify frozen topology and admitted transport
