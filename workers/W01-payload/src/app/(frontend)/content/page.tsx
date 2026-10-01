@@ -89,7 +89,24 @@ export default function ContentBrowsePage() {
         </div>
       </header>
 
-      {loading ? <div className="content-browse-state">正在加载内容…</div> : null}
+      {loading ? (
+        <>
+          <div className="content-browse-state">正在加载内容…</div>
+          <section className="content-browse-grid" aria-label="正在加载公开内容" aria-busy="true">
+            {Array.from({ length: 6 }, (_, index) => (
+              <div className="content-feed-card content-feed-card-skeleton" key={index} aria-hidden="true">
+                <div className="content-feed-cover content-feed-skeleton-block" />
+                <div className="content-feed-body">
+                  <span className="content-feed-skeleton-line content-feed-skeleton-line-short" />
+                  <span className="content-feed-skeleton-line content-feed-skeleton-line-title" />
+                  <span className="content-feed-skeleton-line content-feed-skeleton-line-title" />
+                  <span className="content-feed-skeleton-line content-feed-skeleton-line-meta" />
+                </div>
+              </div>
+            ))}
+          </section>
+        </>
+      ) : null}
       {!loading && error ? (
         <div className="content-browse-state">
           <p>{error}</p>
