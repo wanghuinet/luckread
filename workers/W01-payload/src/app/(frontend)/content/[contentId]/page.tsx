@@ -136,6 +136,7 @@ export default function ContentDetailPage({
           <div className="content-detail-media content-detail-video-gallery">
             {content.mediaRefs.map((url, index) => (
               <video
+                aria-label={content.title + ' 视频 ' + (index + 1)}
                 controls
                 key={url}
                 playsInline
@@ -150,12 +151,12 @@ export default function ContentDetailPage({
         {content.contentType !== 'video' && (content.coverRef || content.mediaRefs?.length) ? (
           <div className="content-detail-media">
             {content.coverRef ? (
-              <img alt="" loading="eager" src={content.coverRef} />
+              <img alt={content.title + ' 封面'} loading="eager" src={content.coverRef} />
             ) : null}
             {content.mediaRefs
               ?.filter((url) => url !== content.coverRef)
-              .map((url) => (
-                <img alt="" key={url} loading="lazy" src={url} />
+               .map((url, index) => (
+                <img alt={content.title + ' 配图 ' + (index + 1)} key={url} loading="lazy" src={url} />
               ))}
           </div>
         ) : null}
