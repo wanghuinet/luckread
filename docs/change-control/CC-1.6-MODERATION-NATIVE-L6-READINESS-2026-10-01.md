@@ -31,3 +31,15 @@ A successful readiness run proves only the authentication/authorization prerequi
 
 ## Backup
 `backup/pre-moderation-native-e2e-workflow-20261001`
+
+
+## 2026-10-01 — Run 36800162350 diagnostic correction
+
+- Readiness Run `36800162350` reached the real `POST https://api.luckread.cn/auth/register` call.
+- The response was HTTP 400 with canonical error `IDEMPOTENCY_KEY_REQUIRED` / `Idempotency-Key is required`.
+- Root cause was in the readiness probe itself: its `post()` helper sent only `content-type` and the register invocation did not pass the already-generated `registerKey` as the `Idempotency-Key` request header.
+- This is confirmed by the existing W01 registration route, which returns this exact 400 only when that header is absent, and by the already-verified AUTH-010 remote E2E helper, which sends the same header.
+- Corrective commit: `e02eaf21ecbc0f6a093af78d2a514bf5f61dcb53`.
+- The correction is limited to evidence tooling; no production Worker, D1 schema, Contract, route semantics, or topology was changed.
+- Backup before correction: `backup/pre-moderation-l6-header-fix-20261001`.
+- Status remains `NOT_GREEN` until the corrected workflow is actually executed and produces runtime evidence.
