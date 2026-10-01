@@ -143,3 +143,44 @@ export async function readW02MembershipSubscription(input: {
     actorUserId: input.actorUserId,
   })
 }
+
+export async function transitionMembershipSubscription(input: {
+  request: Request
+  actorUserId: string
+  subscriptionId: string
+  from: W02SubscriptionSnapshot['status']
+  expectedVersion: number
+  idempotencyKey: string
+}): Promise<Response> {
+  const service = await getW07Service()
+  const correlationId = input.request.headers.get('X-LuckRead-Correlation-Id')?.trim() || crypto.randomUUID()
+  const response = await service.fetch(new Request(
+    'https://luckread-w07.internal/internal/membership/subscription/transition',
+    {
+      method: 'POST',
+      headers: new Headers({
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Principal-User-Id': input.actorUserId,
+        'X-LuckRead-Correlation-Id': correlationId,
+        'Idempotency-Key': input.idempotencyKey,
+        'content-type': 'application/json; charset=utf-8',
+      }),
+      body: JSON.stringify({
+        subscriptionId: input.subscriptionId,
+        from: input.from,
+        to: 'CANCELED',
+        expectedVersion: input.expectedVersion,
+        idempotencyKey: input.idempotencyKey,
+      }),
+    },
+  ))
+
+  return new Response(await response.arrayBuffer(), {
+    status: response.status,
+    headers: {
+      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  })
+}
