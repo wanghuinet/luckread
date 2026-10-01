@@ -28,4 +28,4 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx vitest run workers/W07-subscription-commerce/src/subscription-state-machine.test.ts workers/W07-subscription-commerce/src/w01-transition-boundary.test.ts workers/W02-identity/src/membership/access-state-transition.test.ts
+      - run: npx vitest run workers/W07-subscription-commerce/src/subscription-state-machine.test.ts workers/W07-subscription-commerce/src/w01-transition-boundary.test.ts workers/W02-identity/src/membership/access-state-transition.test.ts workers/W02-identity/src/membership/access-state-persistence.test.ts
