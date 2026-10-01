@@ -769,3 +769,96 @@ export function toErrorResponse(error: unknown): Response {
   if (error instanceof ContentRuntimeError) return errorResponse(error)
   return errorResponse(new ContentRuntimeError('SERVICE_UNAVAILABLE', 503))
 }
+
+export async function applyModerationContentTransition(
+  db: ContentD1,
+  input: {
+    contentId: string
+    decisionId: string
+    policyVersion: string
+    outcome: Extract<ContentState, 'APPROVED' | 'REJECTED'>
+    ifMatch: string
+    idempotencyKey: string
+  },
+  now = new Date(),
+): Promise<{ from: ContentState; to: ContentState; version: number; etag: string }> {
+  assertResourceId(input.contentId)
+  assertResourceId(input.decisionId)
+  if (!input.policyVersion || input.policyVersion.length > 128) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+  if (!input.ifMatch || !input.idempotencyKey) {
+    throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
+  }
+  if (input.outcome !== 'APPROVED' && input.outcome !== 'REJECTED') {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+
+  const operationId = 'transitionContentState'
+  const hash = await requestHash(operationId, {
+    moderation: true,
+    contentId: input.contentId,
+    decisionId: input.decisionId,
+    policyVersion: input.policyVersion,
+    outcome: input.outcome,
+    ifMatch: normalizeEtag(input.ifMatch),
+  })
+  const { content, idempotency } = await loadMutationRow(
+    db,
+    input.contentId,
+    operationId,
+    input.idempotencyKey,
+    'W06',
+  )
+  const replay = inspectIdempotency(idempotency, 'W06', hash, now)
+  if (replay.replayed) {
+    if (!replay.body) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+    return replay.body as { from: ContentState; to: ContentState; version: number; etag: string }
+  }
+  if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
+
+  assertEtag(content.etag, input.ifMatch)
+  if (content.state !== 'PENDING_REVIEW') {
+    throw new ContentRuntimeError('INVALID_STATE', 409)
+  }
+
+  const nextVersion = content.version + 1
+  const updatedAt = now.toISOString()
+  const result = {
+    from: content.state,
+    to: input.outcome,
+    version: nextVersion,
+    etag: etagForVersion(nextVersion),
+  }
+  const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
+
+  await batchMutation(db, [
+    expireMutationRow(db, 'W06', operationId, input.idempotencyKey, updatedAt),
+    insertCompletedIdempotency(
+      db,
+      'W06',
+      operationId,
+      input.idempotencyKey,
+      hash,
+      200,
+      JSON.stringify(result),
+      updatedAt,
+      expiresAt,
+    ),
+    db.prepare(
+      `UPDATE contents SET state=?, version=?, etag=?, updated_at=?
+        WHERE id=? AND version=? AND etag=?`,
+    ).bind(
+      input.outcome,
+      nextVersion,
+      result.etag,
+      updatedAt,
+      content.id,
+      content.version,
+      content.etag,
+    ),
+    atomicGuard(db),
+  ])
+
+  return result
+}
