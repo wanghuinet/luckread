@@ -69,5 +69,6 @@ CREATE INDEX IF NOT EXISTS ix_membership_mutation_idempotency_expiry
 
 CREATE TABLE IF NOT EXISTS membership_txn_guard (
   id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
-  successful INTEGER NOT NULL CHECK (successful = 1)
+  successful INTEGER NOT NULL CHECK (successful = 1),
+  entitlement_changed INTEGER NOT NULL DEFAULT 0 CHECK (entitlement_changed IN (0,1))
 );
