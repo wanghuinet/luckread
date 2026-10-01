@@ -16,10 +16,12 @@
       "subscription state transition/reconciliation engine",
       "scoped Subscription + EntitlementGrant D1-01 schema",
       "controlled D1-01 migration",
-      "bounded getSubscription authenticated self-read path"
+      "bounded getSubscription authenticated self-read path",
+      "bounded getSubscription authenticated self-read path",
+      "bounded cancelSubscription authenticated self-service ACTIVE→CANCELED path"
     ],
     "blocked": [
-      "public membership mutation APIs and unresolved public read operations",
+      "public membership mutation APIs other than the bounded self-service cancel path and unresolved public read operations",
       "payment webhook trust",
       "production entitlement grant/revoke",
       "creator/member projection",
