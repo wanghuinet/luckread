@@ -66,3 +66,8 @@ CREATE TABLE IF NOT EXISTS moderation_decision_idempotency (
 
 CREATE INDEX IF NOT EXISTS ix_moderation_idem_expiry
   ON moderation_decision_idempotency(expires_at);
+
+CREATE TABLE IF NOT EXISTS moderation_txn_guard (
+  id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+  successful INTEGER NOT NULL CHECK (successful = 1)
+);
