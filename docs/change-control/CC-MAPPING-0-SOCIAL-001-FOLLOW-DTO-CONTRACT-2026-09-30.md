@@ -69,3 +69,10 @@ The admitted Follow mutation DTOs are now linked to the dedicated persistence co
 `contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json`
 
 This link is contractual only; migration and runtime remain unverified.
+
+
+## 2026-10-01 Reconciliation Addendum — SOCIAL-002
+
+The earlier statement that followers/following discovery operations were not assigned DTOs is superseded for current contract state by `contracts/dto/auth-dto-contract.v1.json` and `contracts/dto/social-relationship-read.v1.json`.
+
+`getUsersUserIdFollowers` and `getUsersUserIdFollowing` now have explicit response DTO bindings. This is a contract-only reconciliation; it does not authorize runtime implementation or GREEN promotion.
