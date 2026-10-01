@@ -56,3 +56,16 @@ A successful readiness run proves only the authentication/authorization prerequi
 - Backup before correction: `backup/pre-moderation-l6-null-scope-fix-20261001`.
 - No production Worker, D1 schema, Contract, route behavior, or topology was changed.
 - The run did not reach login or W06 queue authorization, so L6 readiness remains `NOT_GREEN` pending execution of the corrected probe.
+
+
+## 2026-10-01 — Run 36800726387 login-boundary evidence
+
+- Run `36800726387` tested main head `bcf49c29f10b70df05cf98770d9bf3dd961b9f63`.
+- The corrected readiness fixture completed the live registration and canonical `moderator` role assignment steps; failure moved to `POST https://api.luckread.cn/auth/login`, which returned HTTP `503`.
+- The workflow log does not contain the response body, so the exact 503 branch is not yet established as a fact.
+- Current source review confirms W01 login can return 503 only after request-shape validation, either from missing native token/session binding, the W02 `establishSession` call, or access-token issuance; source inspection alone does not select among those runtime branches.
+- The existing W01 `W02_AUTH -> luckread-w02` Service Binding is declared and the verified W02 deployment source for the relevant session/auth files is unchanged from the deployed hotfix baseline. This removes simple source-drift as the current explanation but does not prove live W02 success.
+- Existing D1-01 evidence proves the AUTH-002 `auth_session_state` schema is present; existing RoleAssignment migration evidence proves the `role_assignments` table/checks. These are background evidence, not current login success.
+- No Moderation queue, Case, Decision, AuditEvent, EnforcementOutbox or W03 convergence step was reached.
+- Status remains `NOT_GREEN`.
+- Next diagnostic boundary is the sanitized W01 login response body and/or existing W01 Worker runtime tail for this exact login attempt; no production schema/topology change is admitted from the 503 alone.
