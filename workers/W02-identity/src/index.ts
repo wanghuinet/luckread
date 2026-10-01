@@ -1,6 +1,8 @@
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { reconcileCompletedRegistrationMaterialization } from './account/registration-materializer.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
+import { mapMembershipError } from './membership/access-state-transition.js'
+import { createSubscription, transitionSubscription } from './membership/access-state-persistence.js'
 import {
   AccountStateTransitionError,
   applyAccountStateTransition,
@@ -67,6 +69,66 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
+
+    if (request.method === 'POST' && (url.pathname === '/internal/membership/subscriptions' || url.pathname === '/internal/membership/subscriptions/transition')) {
+      if (
+        request.headers.get('X-LuckRead-Caller') !== 'W07' ||
+        request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+        !request.headers.get('X-LuckRead-Correlation-Id') ||
+        !request.headers.get('Idempotency-Key')
+      ) {
+        return json({ error: { code: 'UNTRUSTED_CALLER' } }, 403)
+      }
+
+      const body = await readJsonBody<Record<string, unknown>>(request)
+      if (!body) return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid membership request' } }, 400)
+
+      try {
+        if (url.pathname === '/internal/membership/subscriptions') {
+          const actorUserId = request.headers.get('X-LuckRead-Principal-User-Id') ?? ''
+          const result = await createSubscription(env.D1_01, {
+            caller: 'W07',
+            transportVersion: '1.0',
+            correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
+            actorUserId,
+            idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
+            subscriptionId: typeof body.subscriptionId === 'string' ? body.subscriptionId : '',
+            subscriberId: typeof body.subscriberId === 'string' ? body.subscriberId : '',
+            planId: typeof body.planId === 'string' ? body.planId : '',
+            planVersion: typeof body.planVersion === 'number' ? body.planVersion : 0,
+            startedAt: typeof body.startedAt === 'string' ? body.startedAt : new Date().toISOString(),
+            currentPeriodStart: typeof body.currentPeriodStart === 'string' ? body.currentPeriodStart : new Date().toISOString(),
+            currentPeriodEnd: typeof body.currentPeriodEnd === 'string' ? body.currentPeriodEnd : new Date().toISOString(),
+          })
+          return json({ data: result }, result.created ? 201 : 200)
+        }
+
+        const result = await transitionSubscription(env.D1_01, {
+          caller: 'W07',
+          transportVersion: '1.0',
+          correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
+          actorUserId: request.headers.get('X-LuckRead-Principal-User-Id') ?? '',
+          idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
+          subscriptionId: typeof body.subscriptionId === 'string' ? body.subscriptionId : '',
+          from: typeof body.from === 'string' ? body.from as never : 'PENDING' as never,
+          to: typeof body.to === 'string' ? body.to as never : 'PENDING' as never,
+          expectedVersion: typeof body.expectedVersion === 'number' ? body.expectedVersion : 0,
+          actor: typeof body.actor === 'string' ? body.actor as never : 'system' as never,
+          entitlementAction: typeof body.entitlementAction === 'string' ? body.entitlementAction as never : 'NONE' as never,
+          entitlementId: typeof body.entitlementId === 'string' ? body.entitlementId : undefined,
+          entitlementType: typeof body.entitlementType === 'string' ? body.entitlementType : undefined,
+          scopeType: typeof body.scopeType === 'string' ? body.scopeType : undefined,
+          scopeId: typeof body.scopeId === 'string' ? body.scopeId : undefined,
+          sourcePlanVersion: typeof body.sourcePlanVersion === 'number' ? body.sourcePlanVersion : undefined,
+          effectiveAt: typeof body.effectiveAt === 'string' ? body.effectiveAt : undefined,
+          expiresAt: typeof body.expiresAt === 'string' ? body.expiresAt : null,
+        })
+        return json({ data: result })
+      } catch (error) {
+        const mapped = mapMembershipError(error)
+        return json({ error: { code: mapped.code, message: 'membership access-state operation denied or unavailable' } }, mapped.status)
+      }
+    }
 
     if (request.method === 'POST' && url.pathname === '/internal/account/transition') {
       const body = await readJsonBody<{
