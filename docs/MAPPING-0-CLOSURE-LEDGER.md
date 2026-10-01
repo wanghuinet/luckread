@@ -4428,3 +4428,15 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Therefore status remains `BLOCKED_EXTERNAL`; no Security E2E, Decision/Audit/Outbox/W03 convergence, Evidence Registry PASS, or Moderation Runtime GREEN is promoted.
 - Backup: `backup/pre-moderation-native-auth-e2e-20261001`.
 - Next admissible change is workflow wiring plus controlled cleanup, followed by one real Security E2E execution.
+
+
+## 2026-10-01 — Moderation native L6 readiness gate added
+
+- Current main tooling head before this ledger record: `3710082419f6a7ad73c12352bc46a1007fa40ac6`.
+- New bounded workflow: `.github/workflows/moderation-native-l6-readiness.yml`.
+- New probe: `scripts/moderation-native-l6-readiness.mjs`.
+- Purpose: establish Payload-native authentication → canonical `moderator` role → L6 → W06 moderation queue authorization, with synthetic-user cleanup.
+- This is a prerequisite/readiness gate only. It does not exercise Decision, Idempotency, AuditEvent, transactional Outbox, or W03 convergence.
+- Previous Security E2E runs `36797669090`, `36797792430`, `36797870423`, `36798890134`, `36799194666`, `36799559279` remain inherited external observations against the old bearer-secret workflow and are not repeated.
+- Moderation Runtime remains `NOT_GREEN` until the full Security E2E evidence chain is executed and reconciled.
+- Backup before this workflow slice: `backup/pre-moderation-native-e2e-workflow-20261001`.
