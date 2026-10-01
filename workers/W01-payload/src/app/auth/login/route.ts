@@ -131,11 +131,22 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const session = await establishSession({
-      sessionId: String(nativeSid),
-      userId: String(nativeUser.id),
-      deviceId: body.deviceId,
-    })
+    let session
+    try {
+      session = await establishSession({
+        sessionId: String(nativeSid),
+        userId: String(nativeUser.id),
+        deviceId: body.deviceId,
+      })
+    } catch (error) {
+      if (!(error instanceof W02AuthClientError) || error.status !== 503) throw error
+      await new Promise((resolve) => setTimeout(resolve, 250))
+      session = await establishSession({
+        sessionId: String(nativeSid),
+        userId: String(nativeUser.id),
+        deviceId: body.deviceId,
+      })
+    }
 
     const access = await issuePayloadAccessToken({
       payloadSecret: payload.secret,
