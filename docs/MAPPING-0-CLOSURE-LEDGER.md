@@ -4501,5 +4501,14 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Cleanup was hardened to run even when fixture setup fails and to remove test residue by the controlled synthetic prefixes. A prior cleanup reference to an unset `CONTENT2_ID` was corrected.
 - Native reviewer fixture diagnostics now include the sanitized registration/login response body on failure, without emitting credentials or bearer tokens.
 - Backup branch: `backup/pre-moderation-native-l6-e2e-diagnostic-20261001` at `9d78c3cbf7dd6c474edf458c74c98c5e13d4b52e`.
-- Latest workflow/test commits: `791f669c71263b60744f09104eff282d93ac7d13`.
+- Latest workflow/test commit before evidence-provenance fix: `791f669c71263b60744f09104eff282d93ac7d13`.
 - Status: `NOT_GREEN` pending one clean full Security E2E run on the corrected workflow.
+
+## 2026-10-01 — Moderation E2E evidence artifact provenance fix
+
+- Main commit: `a2d18d0b40ee4a20098d7f9e34fc4015f816b221`.
+- The Security E2E artifact name now uses the workflow environment `SOURCE_SHA`, so both push-triggered and manually dispatched evidence artifacts identify the exact runtime source under test.
+- No runtime code, Contract, schema, Worker topology, binding, or security semantics changed.
+- Backup branch was created before the change: `backup/pre-moderation-clean-e2e-trigger-20261001` from main head `bf8435cddd46ee4342378dd2fbfa2287f91f013d`.
+- The correction is intended to trigger the existing `main` push-based Security E2E; execution result is not promoted until the actual Actions run is observed and its remote evidence is inspected.
+- Status remains `NOT_GREEN` until one clean full Security E2E run and Evidence Registry reconciliation.
