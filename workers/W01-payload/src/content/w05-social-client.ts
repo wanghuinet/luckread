@@ -60,6 +60,68 @@ async function getW05Service(): Promise<W05SocialService> {
   if (!service) throw new W05SocialClientError(503, 'Social service unavailable')
   return service
 }
+
+export type TrustedLikePolicy = {
+  resourceVisible: boolean
+  resourceInteractable: boolean
+  blockPolicyAllows: boolean
+  mutePolicyAllows: boolean
+  antiAbuseAdmission: 'ALLOW' | 'THROTTLE' | 'CHALLENGE' | 'BLOCK' | 'REVIEW'
+}
+
+export type TrustedLikeRequest = TrustedLikePolicy & {
+  actorUserId: string
+  resourceId: string
+  idempotencyKey: string
+  correlationId: string
+}
+
+export async function callW05Like(
+  input: TrustedLikeRequest & { method: 'POST' | 'DELETE' },
+): Promise<Response> {
+  if (!input.actorUserId || !input.resourceId || !input.idempotencyKey || !input.correlationId) {
+    throw new W05SocialClientError(400, 'Invalid trusted Like request')
+  }
+
+  const actorAccountState = await resolveActorAccountState({
+    actorUserId: input.actorUserId,
+    correlationId: input.correlationId,
+  })
+
+  const response = await (await getW05Service()).fetch(new Request(
+    'https://luckread-w05.internal/internal/social/likes',
+    {
+      method: input.method,
+      headers: new Headers({
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Principal-User-Id': input.actorUserId,
+        'X-LuckRead-Correlation-Id': input.correlationId,
+        'Idempotency-Key': input.idempotencyKey,
+        'content-type': 'application/json; charset=utf-8',
+      }),
+      body: JSON.stringify({
+        resourceType: 'content',
+        resourceId: input.resourceId,
+        actorAccountState,
+        resourceVisible: input.resourceVisible,
+        resourceInteractable: input.resourceInteractable,
+        blockPolicyAllows: input.blockPolicyAllows,
+        mutePolicyAllows: input.mutePolicyAllows,
+        antiAbuseAdmission: input.antiAbuseAdmission,
+      }),
+    },
+  ))
+
+  return new Response(await response.arrayBuffer(), {
+    status: response.status,
+    headers: {
+      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  })
+}
+
 export async function callW05Follow(input: TrustedFollowRequest & { method: 'POST' | 'DELETE' }): Promise<Response> {
   if (!input.actorUserId || !input.targetUserId || !input.idempotencyKey || !input.correlationId) throw new W05SocialClientError(400, 'Invalid trusted Follow request')
   const actorAccountState = await resolveActorAccountState({
