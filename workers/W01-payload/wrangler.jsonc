@@ -28,6 +28,10 @@
     {
       "binding": "W06_MODERATION",
       "service": "luckread-w06"
+    },
+    {
+      "binding": "W07_MEMBERSHIP",
+      "service": "luckread-w07"
     }
   ],
   "d1_databases": [
