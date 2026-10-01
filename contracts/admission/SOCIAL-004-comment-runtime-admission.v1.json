@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/admission/SOCIAL-004-comment-runtime-admission.v1.json",
+  "title": "SOCIAL-004 Comment Runtime Admission",
+  "version": "1.0.0",
+  "status": "BOUNDED_ADMISSION_NOT_GREEN",
+  "featureId": "SOCIAL-004",
+  "purpose": "Define the minimum authoritative inputs W05 must have before Comment/Reply runtime can be admitted. This contract does not create a transport or grant production runtime admission.",
+  "topology": {
+    "publicBoundary": "W01",
+    "runtimeOwner": "W05",
+    "dataAuthority": "D1-02",
+    "newWorker": false,
+    "newD1": false
+  },
+  "operations": [
+    "getContentContentIdComments",
+    "postContentContentIdComments"
+  ],
+  "authoritativeInputs": [
+    {
+      "name": "authenticatedPrincipal",
+      "authority": "W02",
+      "source": "contracts/transport/W01-W02-social-account-state-read.v1.json",
+      "required": true,
+      "clientWritable": false
+    },
+    {
+      "name": "actorAccountState",
+      "authority": "W02 / D1-01",
+      "source": "contracts/transport/W01-W02-social-account-state-read.v1.json",
+      "required": true,
+      "allowedForCommentCreate": [
+        "ACTIVE"
+      ],
+      "failClosed": true
+    },
+    {
+      "name": "contentAuthority",
+      "authority": "W03 / D1-02",
+      "source": "contracts/state-machines/content.json; contracts/transport/W01-W03-content-http-binding.v1.json",
+      "required": true,
+      "rule": "Comment runtime must only operate on an authoritative Content record; no second Content authority may be introduced.",
+      "failClosed": true
+    },
+    {
+      "name": "blockPolicy",
+      "authority": "Social interaction policy",
+      "source": "contracts/api/block-mute.v1.json",
+      "required": true,
+      "rule": "Block takes precedence over Comment visibility/interaction where applicable; client cannot supply the decision.",
+      "currentImplementation": "NOT_VERIFIED",
+      "failClosed": true
+    },
+    {
+      "name": "moderationDecision",
+      "authority": "W06 / D1-03",
+      "source": "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json; contracts/api/moderation-operation-policy.v1.json",
+      "required": "when moderation decision exists or is required by Comment lifecycle",
+      "rule": "W06 owns moderation decisions; W05 owns Comment state storage; moderation fields are not duplicated into Comment.",
+      "currentCommentSpecificCoverage": "NOT_VERIFIED",
+      "failClosed": true
+    },
+    {
+      "name": "antiAbuse",
+      "authority": "canonical Social interaction policy",
+      "source": "contracts/api/interaction-operation-policy.v1.json",
+      "required": true,
+      "rule": "Endpoint/resource/account/device/IP abuse checks must pass before authoritative Comment write.",
+      "currentImplementation": "NOT_VERIFIED",
+      "failClosed": true
+    }
+  ],
+  "runtimeRules": [
+    "W05 must derive authorUserId from the authenticated server principal and never trust a client-supplied author identifier.",
+    "A non-null parentCommentId must resolve to a Comment within the same contentId scope.",
+    "Create Comment requires Idempotency-Key; retries with the same mutation identity must converge.",
+    "Comment visibility must be evaluated server-side before list/create.",
+    "No synchronous counter, feed, search or notification write is part of Comment's authoritative transaction.",
+    "Comment state writes remain in D1-02; W06 moderation decisions remain in D1-03.",
+    "Missing, stale or contradictory policy input fails closed."
+  ],
+  "admissionChecklist": {
+    "entityFieldPersistenceContracts": "BOUND",
+    "accountStateTrustedInput": "CONTRACTED_NOT_VERIFIED",
+    "contentAuthorityInput": "CONTRACTED_NOT_VERIFIED",
+    "blockPolicyInput": "CONTRACTED_NOT_VERIFIED",
+    "commentModerationInput": "CONTRACTED_NOT_VERIFIED",
+    "antiAbuseInput": "CONTRACTED_NOT_VERIFIED",
+    "w05Runtime": "PENDING",
+    "securityNegativeTests": "PENDING",
+    "concurrencyTests": "PENDING",
+    "remoteD1Evidence": "PENDING",
+    "evidenceRegistry": "PENDING"
+  },
+  "blockingConditions": [
+    "No runtime route is admitted by this contract.",
+    "Comment-specific visibility/block/mute executable decision input remains unverified.",
+    "Comment moderation coverage and W06→Comment decision consumption remain unverified.",
+    "W05 runtime, concurrency/security tests, remote D1 evidence and Evidence Registry admission remain pending."
+  ],
+  "evidenceRequired": [
+    "source commit SHA",
+    "trusted W01/W02 principal and AccountState evidence",
+    "authoritative Content availability evidence",
+    "block/privacy negative cases",
+    "moderation negative/positive cases",
+    "anti-abuse negative cases",
+    "duplicate-idempotency and concurrency evidence",
+    "remote D1 schema/runtime evidence"
+  ]
+}
