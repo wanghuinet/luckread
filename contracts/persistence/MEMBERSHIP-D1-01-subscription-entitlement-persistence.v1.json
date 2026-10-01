@@ -2,7 +2,6 @@
   "schemaVersion": "1.0.0",
   "status": "CONTRACTED_NOT_VERIFIED",
   "authoritativeDomain": "D1-01",
-  "primaryWorker": "W07",
   "database": {
     "binding": "D1_01",
     "databaseName": "luckread",
@@ -94,5 +93,7 @@
         "entitlement_changed"
       ]
     }
-  }
+  },
+  "persistenceOwner": "W02",
+  "lifecycleOwner": "W07"
 }
