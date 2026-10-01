@@ -182,9 +182,9 @@ export default function CreatorContentList() {
         </select>
       </div>
 
-      {loading ? <div className={styles.contentManageState}>正在加载内容…</div> : null}
+      {loading ? <div className={styles.contentManageState} role="status" aria-busy="true">正在加载内容…</div> : null}
       {!loading && error ? (
-        <div className={styles.contentManageState}>
+        <div className={styles.contentManageState} role="alert">
           <span>{error}</span>
           <button className={styles.secondaryButton} onClick={() => void load()} type="button">重试</button>
         </div>
@@ -268,6 +268,7 @@ export default function CreatorContentList() {
           </div>
           {page.hasMore && page.nextCursor ? (
             <button
+              aria-busy={loadingMore}
               className={styles.secondaryButton}
               disabled={loadingMore}
               onClick={() => void load(page.nextCursor)}
