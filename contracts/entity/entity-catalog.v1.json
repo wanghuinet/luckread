@@ -84,7 +84,8 @@
       "classification": "AUTHORIZATION",
       "status": "PROPOSED",
       "evidenceRefs": [
-        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
+        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
+        "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json"
       ]
     },
     {
@@ -94,7 +95,8 @@
       "classification": "BILLING",
       "status": "PROPOSED",
       "evidenceRefs": [
-        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
+        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
+        "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json"
       ]
     },
     {
@@ -161,8 +163,10 @@
         "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
         "contracts/api/moderation-operation-policy.v1.json"
       ]
-    },
-    {
+    }
+  
+    ,
+        {
       "entityId": "ENT-MEMBERSHIP-PLAN",
       "name": "MembershipPlan",
       "domainId": "D1-01",
@@ -174,7 +178,7 @@
         "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md"
       ]
     }
-  ],
+],
   "rules": {
     "featureInventoryMustExist": true,
     "noInference": true,
