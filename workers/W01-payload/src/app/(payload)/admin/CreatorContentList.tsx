@@ -266,6 +266,15 @@ export default function CreatorContentList() {
                       >
                         {actionId === item.id ? '处理中…' : '下线'}
                       </button>
+                      <button
+                        aria-busy={actionId === item.id}
+                        className={styles.secondaryButton}
+                        disabled={actionId !== null}
+                        onClick={() => void transition(item, 'ARCHIVED')}
+                        type="button"
+                      >
+                        {actionId === item.id ? '处理中…' : '归档'}
+                      </button>
                     </>
                   ) : null}
                   {item.state === 'UNPUBLISHED' ? (
