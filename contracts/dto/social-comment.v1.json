@@ -146,12 +146,14 @@
     "parentId is nullable and, when present, must resolve within the same content scope.",
     "CommentState is bound to contracts/enums/comment-state.json.",
     "Create Comment requires Idempotency-Key and must converge under retry.",
-    "No counters, moderation-decision fields or cache/projection authority are exposed by these DTOs."
+    "No counters, moderation-decision fields or cache/projection authority are exposed by these DTOs.",
+    "These DTOs are admissible only when the trusted runtime input checks defined by the SOCIAL-004 admission contract pass."
   ],
   "verification": {
     "runtime": "NOT_VERIFIED",
     "security": "NOT_VERIFIED",
     "paginationConcurrency": "NOT_VERIFIED",
     "evidenceRegistry": "NOT_VERIFIED"
-  }
+  },
+  "admissionContractRef": "contracts/admission/SOCIAL-004-comment-runtime-admission.v1.json"
 }
