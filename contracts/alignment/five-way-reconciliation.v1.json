@@ -2393,17 +2393,21 @@
       "featureId": "CREATOR-003",
       "status": "UNRESOLVED",
       "entityIds": [],
-      "apiOperationIds": [],
+      "apiOperationIds": [
+        "getCreatorAnalytics"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L79",
         "contracts/alignment/mapping-batches/B04-B06-content-creator-article.v1.json",
         "contracts/alignment/mapping-batches/ORG-001-007-CREATOR-001-007-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/api/CREATOR-003-006-AUDIENCE-DASHBOARD-READ.v1.json",
+        "docs/77-CREATOR-SYSTEM-L1-L4-TRACEABILITY-AND-CONTRACT-ADMISSION-v1.0.md"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Audience dashboard read contract is bound; runtime analytics projection, Social/Membership source snapshots, cache/security E2E and Evidence Registry provenance remain unresolved."
       ]
     },
     {
@@ -2444,17 +2448,21 @@
       "featureId": "CREATOR-006",
       "status": "UNRESOLVED",
       "entityIds": [],
-      "apiOperationIds": [],
+      "apiOperationIds": [
+        "getCreatorAnalytics"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L82",
         "contracts/alignment/mapping-batches/B04-B06-content-creator-article.v1.json",
         "contracts/alignment/mapping-batches/ORG-001-007-CREATOR-001-007-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/api/CREATOR-003-006-AUDIENCE-DASHBOARD-READ.v1.json",
+        "docs/77-CREATOR-SYSTEM-L1-L4-TRACEABILITY-AND-CONTRACT-ADMISSION-v1.0.md"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Audience dashboard read contract is bound; runtime analytics projection, Social/Membership source snapshots, cache/security E2E and Evidence Registry provenance remain unresolved."
       ]
     },
     {
