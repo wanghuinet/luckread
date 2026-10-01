@@ -25,7 +25,7 @@
       ],
       "existingTransportPattern": "W01->W02 W02_AUTH authenticated-principal/session path",
       "clientWritable": false,
-      "status": "SOURCE_EXISTS_REUSE_TRANSPORT_PENDING"
+      "status": "SOURCE_EXISTS_BOUND_TO_ADMITTED_CONTRACT"
     },
     {
       "field": "actorAccountState",
@@ -35,7 +35,7 @@
         "contracts/authz/authorization-decision.json"
       ],
       "clientWritable": false,
-      "status": "SOURCE_EXISTS_SOCIAL_BINDING_PENDING"
+      "status": "SOURCE_EXISTS_BOUND_TO_ADMITTED_CONTRACT"
     },
     {
       "field": "followPermission",
@@ -47,7 +47,7 @@
       ],
       "permission": "social.follow",
       "clientWritable": false,
-      "status": "SOURCE_EXISTS_SOCIAL_BINDING_PENDING"
+      "status": "SOURCE_EXISTS_BOUND_TO_ADMITTED_CONTRACT"
     },
     {
       "field": "targetUserId",
@@ -58,7 +58,7 @@
       ],
       "clientWritable": true,
       "serverResolved": true,
-      "status": "SOURCE_EXISTS_SOCIAL_BINDING_PENDING"
+      "status": "SOURCE_EXISTS_BOUND_TO_ADMITTED_CONTRACT"
     },
     {
       "field": "targetFollowability",
@@ -79,7 +79,7 @@
         "docs/188-L5-L6-SOCIAL-COMMUNITY-INTERACTION-INSTANCE-REGISTRY-v1.0.md"
       ],
       "clientWritable": false,
-      "status": "SOURCE_EXISTS_FOLLOW_TRANSPORT_PENDING"
+      "status": "SOURCE_EXISTS_BOUND_TO_ADMITTED_CONTRACT"
     },
     {
       "field": "privacyScopeAllows",
@@ -106,7 +106,7 @@
         "REVIEW"
       ],
       "clientWritable": false,
-      "status": "SOURCE_EXISTS_FOLLOW_TRANSPORT_PENDING"
+      "status": "SOURCE_EXISTS_BOUND_TO_ADMITTED_CONTRACT"
     },
     {
       "field": "callerProvenance",
@@ -120,7 +120,7 @@
         "correlationId"
       ],
       "clientWritable": false,
-      "status": "TRANSPORT_BINDING_REQUIRED"
+      "status": "SOURCE_EXISTS_BOUND_TO_ADMITTED_CONTRACT"
     }
   ],
   "minimumTransportDecision": {
@@ -132,7 +132,7 @@
     "newD1Count": 0,
     "newPayloadCollectionCount": 0,
     "newPublicOperationCount": 0,
-    "decisionStatus": "TRANSPORT_CONTRACT_ADMITTED / AUTHORITY_INPUTS_PENDING"
+    "decisionStatus": "TRANSPORT_CONTRACT_ADMITTED / 2 AUTHORITY INPUTS PENDING"
   },
   "operationBudgets": {
     "follow": {
@@ -188,5 +188,5 @@
     "contracts/transport/W01-W05-social-follow-http-binding.v1.json"
   ],
   "transportContract": "contracts/transport/W01-W05-social-follow-http-binding.v1.json",
-  "notes": "The private W01→W05 caller/provenance boundary is now contractually admitted. Target followability, block, privacy/scope, anti-abuse and actor account-state authority inputs remain explicitly pending; this does not authorize W05 runtime."
+  "notes": "Existing authority contracts are now explicitly bound for actor principal, account state, follow permission, target identity, block policy, anti-abuse admission and caller provenance. Only target followability and privacy/audience operational authority remain unresolved."
 }
