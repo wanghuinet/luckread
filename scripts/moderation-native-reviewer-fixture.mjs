@@ -79,7 +79,7 @@ const register = await post('/auth/register', {
 }, { 'Idempotency-Key': registerKey })
 
 if (register.status !== 201 || typeof register.data?.userId !== 'string') {
-  throw new Error('native reviewer registration failed: HTTP ' + register.status)
+  throw new Error('native reviewer registration failed: HTTP ' + register.status + ' body=' + JSON.stringify(register.data))
 }
 
 const userId = String(register.data.userId)
