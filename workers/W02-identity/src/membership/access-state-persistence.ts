@@ -110,6 +110,43 @@ const idempotencyInsert = (
   expiresAt,
 )
 
+const idempotencyInsertFromGuard = (
+  db: D1Database,
+  ownerUserId: string,
+  operationId: string,
+  idempotencyKey: string,
+  requestHashValue: string,
+  responseStatus: number,
+  subscriptionId: string,
+  status: string,
+  version: number,
+  nowIso: string,
+  expiresAt: string,
+) => db.prepare(
+  `INSERT INTO membership_mutation_idempotency
+    (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
+   SELECT ?, ?, ?, ?, ?, 'COMPLETED', ?, json_object(
+      'subscriptionId', ?,
+      'status', ?,
+      'version', ?,
+      'entitlementChanged', entitlement_changed
+   ), ?, ?
+     FROM membership_txn_guard
+    WHERE id = 1 AND successful = 1`,
+).bind(
+  crypto.randomUUID(),
+  ownerUserId,
+  operationId,
+  idempotencyKey,
+  requestHashValue,
+  responseStatus,
+  subscriptionId,
+  status,
+  version,
+  nowIso,
+  expiresAt,
+)
+
 const expireIdempotency = (
   db: D1Database,
   ownerUserId: string,
@@ -122,8 +159,14 @@ const expireIdempotency = (
 ).bind(ownerUserId, operationId, idempotencyKey, nowIso)
 
 const txnGuard = (db: D1Database) => db.prepare(
-  `INSERT OR REPLACE INTO membership_txn_guard(id, successful)
-   VALUES (1, changes())`,
+  `INSERT OR REPLACE INTO membership_txn_guard(id, successful, entitlement_changed)
+   VALUES (1, changes(), 0)`,
+)
+
+const txnEntitlementGuard = (db: D1Database) => db.prepare(
+  `UPDATE membership_txn_guard
+      SET entitlement_changed = changes()
+    WHERE id = 1`,
 )
 
 const isUniqueConstraint = (error: unknown): boolean =>
@@ -350,53 +393,46 @@ export async function transitionSubscription(
     )
   }
 
-  const resultVersion = {
-    subscriptionId: input.subscriptionId,
-    status: input.to,
-    version: nextVersion,
-    entitlementChanged: false,
+  if (input.entitlementAction !== 'NONE') {
+    statements.push(txnEntitlementGuard(db))
   }
 
   const guardIndex = 2
   const entitlementStatementIndex = input.entitlementAction === 'NONE' ? -1 : 3
-  const responseIndex = input.entitlementAction === 'NONE' ? 3 : 4
+  const resultIdempotency = idempotencyInsertFromGuard(
+    db,
+    input.actorUserId,
+    operationId,
+    input.idempotencyKey,
+    hash,
+    200,
+    input.subscriptionId,
+    input.to,
+    nextVersion,
+    timestamp,
+    expiresAt,
+  )
 
   try {
     const results = await db.batch([
       ...statements,
-      idempotencyInsert(
-        db,
-        input.actorUserId,
-        operationId,
-        input.idempotencyKey,
-        hash,
-        200,
-        resultVersion,
-        timestamp,
-        expiresAt,
-      ),
+      resultIdempotency,
     ])
-    const subscriptionChanges = results[guardIndex]?.meta?.changes ?? 0
-    if (subscriptionChanges !== 1 || (results[guardIndex]?.meta?.changes ?? 0) !== 1) {
+    if ((results[guardIndex]?.meta?.changes ?? 0) !== 1) {
       throw new MembershipAccessStateError('VERSION_CONFLICT')
     }
 
-    resultVersion.entitlementChanged =
+    const entitlementChanged =
       entitlementStatementIndex >= 0
         ? (results[entitlementStatementIndex]?.meta?.changes ?? 0) > 0
         : false
 
-    const committedResponse = {
-      ...resultVersion,
-      entitlementChanged: resultVersion.entitlementChanged,
+    return {
+      subscriptionId: input.subscriptionId,
+      status: input.to,
+      version: nextVersion,
+      entitlementChanged,
     }
-
-    // Persist the exact response after the authoritative mutation is represented in the same transaction.
-    // The statement is already in the batch; the result-derived flag is deterministic from the mutation.
-    // The current D1 batch cannot rewrite the earlier JSON value, so the precomputed response remains false.
-    // For replay correctness, entitlementChanged is therefore defined as authoritative only when false or no grant/revoke row changed.
-    // Cancellation/expiry remains semantically converged regardless of this projection detail.
-    return committedResponse
   } catch (error) {
     const replayRow = await readIdempotency(
       db,
