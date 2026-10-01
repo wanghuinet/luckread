@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.cn/contracts/v1/d1-03-entity-owner-boundary.v1.json",
+  "title": "LuckRead D1-03 Entity Owner Boundary",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PARTIAL",
+  "purpose": "Partition D1-03 operational authority by existing Worker responsibilities without creating tables, Workers, or D1 domains.",
+  "domain": "D1-03",
+  "owners": {
+    "W06": ["ModerationCase", "ModerationDecision", "Report", "Appeal"],
+    "W09": ["PlatformRuntime", "RecoveryOperation", "ReconciliationOperation"],
+    "W10": ["Job", "Retry", "DLQ", "ExecutionInbox", "ExecutionOutbox", "OperationalIdempotency"],
+    "W11": ["Campaign", "AnalyticsOperation", "GrowthOperation"]
+  },
+  "crossCutting": {
+    "AuditEvent": { "owner": "W09", "rule": "Append-only platform audit records; source Workers emit versioned audit events and do not acquire D1-03 write ownership." }
+  },
+  "boundaryRules": [
+    "Domain-local outbox/inbox/idempotency records remain in their source D1 and are not treated as D1-03 entities.",
+    "W10 execution authority does not transfer business entity ownership from W06/W09/W11 or any other D1.",
+    "D1-03 is not a generic business-data sink.",
+    "Every authoritative D1-03 entity has exactly one primary Worker owner.",
+    "Cross-owner changes use explicit events/contracts rather than unrestricted direct database access."
+  ],
+  "topology": { "workerCount": 12, "d1Count": 4, "taskCount": 25 }
+}
