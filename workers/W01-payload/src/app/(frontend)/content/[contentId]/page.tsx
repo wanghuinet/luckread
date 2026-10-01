@@ -37,6 +37,7 @@ export default function ContentDetailPage({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [actionMessage, setActionMessage] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -98,7 +99,8 @@ export default function ContentDetailPage({
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1800)
     } catch {
-      setError('无法复制链接，请从地址栏复制当前页面地址。')
+      setActionMessage('无法复制链接，请从地址栏复制当前页面地址。')
+      window.setTimeout(() => setActionMessage(''), 2200)
     }
   }
 
@@ -114,6 +116,7 @@ export default function ContentDetailPage({
           <button className="content-detail-share" onClick={() => void copyContentLink()} type="button">
             {copied ? '已复制' : '复制链接'}
           </button>
+          {actionMessage ? <span className="content-detail-action-status" role="status">{actionMessage}</span> : null}
         </div>
       </div>
       <article className="content-detail-card">
