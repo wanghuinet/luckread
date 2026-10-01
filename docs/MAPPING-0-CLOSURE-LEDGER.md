@@ -1382,7 +1382,7 @@ This section supersedes earlier continuation cursors for current work selection.
 - New audit: `artifacts/mapping-0/worker-physical-layout-reconciliation-2026-09-21.md`
 - Current canonical logical Worker authority remains unchanged.
 - Current physical `workers/*` directories use a legacy/alternative role naming scheme and must not be treated as canonical Worker identity.
-- Critical concrete finding: `workers/W02-content` is an Article/content skeleton, while canonical W02 is Identity/Account/Authorization.
+- Critical concrete finding: `workers/W02-identity` is an Article/content skeleton, while canonical W02 is Identity/Account/Authorization.
 - The same ID/name mismatch exists across the physical W03-W12 skeletons; W01-payload is the substantive Payload runtime boundary but is not thereby promoted to W02 business authority.
 - No directory was renamed, deleted, merged or created.
 - AUTH-002/E6 must not place business authorization into W01-payload or W02-content merely from directory names.
@@ -1438,7 +1438,7 @@ This section supersedes earlier continuation cursors for current work selection.
 - Current-head repository/configuration audit completed without Cloudflare resource mutation.
 - `workers/W01-payload/wrangler.jsonc` declares the concrete Worker name `luckread-w01-payload` and explicitly binds D1 `luckread` (UUID `2f80471e-3756-49f9-8db1-7707a433ad64`).
 - This W01 configuration proves a concrete repository deployment candidate, but not that the corresponding Cloudflare Worker is currently uploaded/deployed; it also does not override the canonical Worker Master because Worker identity must not be inferred from directory/config names.
-- `workers/W02-content/wrangler.jsonc` is absent on current `main`; the inspected W02 root contains only its README skeleton. No current canonical W02 Identity/Account/Authorization deployment binding is therefore established.
+- `workers/W02-identity/wrangler.jsonc` is absent on current `main`; the inspected W02 root contains only its README skeleton. No current canonical W02 Identity/Account/Authorization deployment binding is therefore established.
 - Equivalent Wrangler configuration files were not found at the inspected roots for physical W03-W12 directories.
 - The latest committed Cloudflare resource inventory remains successful run `35480031531` captured on 2026-09-20 and records `uploadedScriptCount=0`; no newer inventory evidence is present in the current repository state.
 - Current physical-to-logical binding therefore remains **NOT_ESTABLISHED**. No historical P01-P08 topology, physical directory name, or naming convention is promoted as authority.
@@ -1606,13 +1606,13 @@ Acceptance:
 ## Superpowers continuation — W02 deployment/transport decision recorded — 2026-09-22
 
 New authority input:
-- W02 source path = `workers/W02-content`.
+- W02 source path = `workers/W02-identity`.
 - W02 physical Worker name = `luckread-w02`.
 - Deployment = controlled GitHub Actions `workflow_dispatch` + Wrangler with exact source-commit provenance.
 - W01 → W02 transport = Cloudflare Service Binding over HTTP, binding `W02_AUTH` → `luckread-w02`.
 - Decision record: `docs/change-control/CC-MAPPING-0-E6-W02-DEPLOYMENT-TRANSPORT-DECISION-2026-09-22.md`.
 
-Static repository verification found `workers/W02-content` previously contained only a legacy Content README; the README is now reconciled to canonical W02 Identity / Account / Authorization responsibility. No Worker was deployed and no D1 mutation occurred.
+Static repository verification found `workers/W02-identity` previously contained only a legacy Content README; the README is now reconciled to canonical W02 Identity / Account / Authorization responsibility. No Worker was deployed and no D1 mutation occurred.
 
 Decision A is therefore recorded, but its deployment evidence is not yet closed. Decision B is now authority-resolved: D1-01 primary = Cloudflare D1 UUID `2f80471e-3756-49f9-8db1-7707a433ad64`; D1-02 secondary = Cloudflare D1 UUID `6c342634-97f6-4248-9f4a-85772af4f22c`. Display names are non-authoritative and may be renamed. This closes the physical-resource authority gap; it does not constitute RoleAssignment persistence/runtime/deployment evidence.
 
@@ -1848,7 +1848,7 @@ Disposition:
 - First persisted `account_state_version`: **1**.
 - Every successful account-state transition increments the version exactly once (`N → N+1`); failed/rejected/stale transitions do not mutate it.
 - This interpretation preserves the existing logical `UNREGISTERED` state and does not alter the state machine or architecture.
-- A guarded W02/D1-01 migration source is now introduced: `workers/W02-content/migrations/0002_auth_013_account_state.sql`.
+- A guarded W02/D1-01 migration source is now introduced: `workers/W02-identity/migrations/0002_auth_013_account_state.sql`.
 - Migration admission is limited to the exact controlled target whose preflight `users_count = 0`; non-empty targets remain blocked and require separate authoritative backfill policy.
 - A manual workflow is provided at `.github/workflows/auth-013-account-state-migration.yml`; it requires `confirm=APPLY`, verifies the D1-01 binding, preflights the zero-row target, applies the migration, and captures post-schema evidence.
 - AUTH-013 remains **BLOCKED_NOT_GREEN** until remote migration evidence and subsequent W02 runtime/security/test evidence are captured.
@@ -2533,7 +2533,7 @@ Latest main source head for this checkpoint: `993739fbf595fa285402e06575190e0b75
 
 Slice 1 source changes now present on main:
 - `contracts/migration/AUTH-013-publication-journal.v1.json`
-- `workers/W02-content/migrations/0003_auth_013_publication_journal.sql`
+- `workers/W02-identity/migrations/0003_auth_013_publication_journal.sql`
 - `scripts/auth-013-journal-migration-static-audit.mjs`
 - `.github/workflows/auth-013-journal-migration-static-verification.yml`
 - `.github/workflows/auth-013-publication-journal-migration.yml`
@@ -2608,7 +2608,7 @@ After Source CI GREEN, controlled W02 deployment:
 Run `36005149649` was inspected. It checked out `bb2a68a36f0db8767b4f795605c8bf8136d4c8b8` and failed at **Typecheck W02**, before source tests.
 
 Exact compiler error:
-`workers/W02-content/src/account/account-state-transition.test.ts(296,60): TS2353 — forceJournalConflict does not exist in fakeDb option type.`
+`workers/W02-identity/src/account/account-state-transition.test.ts(296,60): TS2353 — forceJournalConflict does not exist in fakeDb option type.`
 
 This is a test-fixture typing defect only; no production AUTH-013 implementation or Contract was rejected by this run. Corrective commit:
 `141be1119690d98656ea3686025783b8f19c39fc``
@@ -2624,7 +2624,7 @@ Verified corrected main commit: `0781a4413eb1de477af521b8eaed739d31d4c0e9`.
 GitHub Actions Run `36008591915` — **SUCCESS**:
 - Workflow: `W02 AUTH-013 Runtime Source Verification`
 - Typecheck W02: PASS
-- Source test file: `workers/W02-content/src/account/account-state-transition.test.ts`
+- Source test file: `workers/W02-identity/src/account/account-state-transition.test.ts`
 - Tests: **14 passed / 14 total**
 - Runtime source evidence artifact: `10811706995`
 - Artifact digest: `sha256:715a66064db2a2804a2c7e800a7de0131de34b530b6d0c8dee91cc5b1ff9db07`
@@ -4472,7 +4472,7 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Failure then occurred in the evidence fixture while inserting the canonical `moderator` role into existing D1-01 `role_assignments`.
 - Exact failing SQL contained `scope_id='null'` and `valid_until='null'`; D1 rejected it with the existing role-assignment CHECK constraint, code 7500.
 - Root cause: generic `sql()` helper quoted JavaScript `null` instead of emitting SQL `NULL`.
-- Canonical cross-check: generated `workers/W02-content/migrations/0001_role_assignments.sql` and established AUTH-010 fixtures use SQL `NULL` for global scope and open-ended validity.
+- Canonical cross-check: generated `workers/W02-identity/migrations/0001_role_assignments.sql` and established AUTH-010 fixtures use SQL `NULL` for global scope and open-ended validity.
 - Corrective commit: `a36774fe416327b21b16aaa48e9098c32533f2c8` added `sqlNullable()` and applied it to the synthetic role-assignment values only.
 - Backup before correction: `backup/pre-moderation-l6-null-scope-fix-20261001`.
 - No production runtime, schema, Contract, topology, or API semantics changed.
