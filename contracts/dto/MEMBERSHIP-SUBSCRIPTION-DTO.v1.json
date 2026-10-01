@@ -1,0 +1,14 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/dto/MEMBERSHIP-SUBSCRIPTION-DTO.v1.json",
+  "title":"Membership Subscription DTO Contract",
+  "version":"1.0.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "sourceApiContract":"contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+  "createSubscription":{"request":{"planId":"ResourceId"},"serverOwned":["subscriptionId","subscriberId","status","planVersion","startedAt","currentPeriodStart","currentPeriodEnd"]},
+  "getSubscription":{"response":{"subscriptionId":"ResourceId","subscriberId":"ResourceId","planId":"ResourceId","planVersion":"integer","status":["pending","active","grace","paused","canceled","expired"],"startedAt":"date-time","currentPeriodStart":"date-time","currentPeriodEnd":"date-time","cancelAt":"date-time|null","createdAt":"date-time","updatedAt":"date-time"}},
+  "cancelSubscription":{"path":{"subscriptionId":"ResourceId"},"headers":{"If-Match":"etag","Idempotency-Key":"required"},"requestBody":null},
+  "getEntitlements":{"path":{"subjectId":"ResourceId"},"response":{"items":"Entitlement[]"}},
+  "checkEntitlement":{"request":{"subjectId":"ResourceId","entitlement":"string"},"response":{"allowed":"boolean","entitlement":"string","asOf":"date-time"}},
+  "rules":["client never asserts paid/active/renewed state","subscriber identity is derived from authenticated principal","plan version is preserved for historical semantics","payment/ledger facts are not copied into DTOs","organization scope is enforced where contract permits it"]
+}
