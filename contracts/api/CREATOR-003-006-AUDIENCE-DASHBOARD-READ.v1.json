@@ -9,7 +9,7 @@
   "method":"GET",
   "path":"/v1/creator/analytics",
   "purpose":"Return a creator-scoped derived audience summary for Creator Center without exposing Social or Membership storage internals.",
-  "authorization":{"required":true,"permission":"analytics.read","scope":"owner_or_attribution.creator_id = self","creatorServerDerived":true,"failClosedWhenScopeUnavailable":true},
+  "authorization":{"required":true,"permission":"user.read.self","scope":"owner_or_attribution.creator_id = self","creatorServerDerived":true,"failClosedWhenScopeUnavailable":true},
   "response":{
     "data":{
       "audience":{
