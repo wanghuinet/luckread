@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta charset="utf-8">
+    <meta name="renderer" content="webkit">
+    <meta name="description" content="bilibili是国内知名的视频弹幕网站，这里有最及时的动漫新番，最棒的ACG氛围，最有创意的Up主。大家可以在这里找到许多欢乐。">
+    <meta name="keywords" content="B站,弹幕,字幕,AMV,MAD,MTV,ANIME,动漫,动漫音乐,游戏,游戏解说,ACG,galgame,动画,番组,新番,初音,洛天依,vocaloid">
+    <meta name="application-name" content="哔哩哔哩">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="theme-color" content="#4393E2">
+    <link rel="icon" href="//www.bilibili.com/favicon.ico">
+    <link rel="apple-touch-icon" href="//www.bilibili.com/favicon.ico">
+    <link rel="apple-touch-icon-precomposed" href="//static.hdslb.com/mobile/img/512.png">
+    <title>消息中心 - 哔哩哔哩弹幕视频网 - ( ゜- ゜)つロ 乾杯~ - bilibili</title>
+    <meta name="spm_prefix" content="333.40164">
+    <script src="//www.bilibili.com/gentleman/polyfill.js?features=Promise%2CObject.assign%2CString.prototype.includes%2CNumber.isNaN"></script>
+    <script id="abtest" type="text/javascript">window.abtest={"in_new_ab":true,"ab_version":{"pc_v2":"ON"},"ab_split_num":{"pc_v2":101},"ab_type":2}</script></body>
+    <script type="text/javascript" src="//s1.hdslb.com/bfs/seed/jinkela/short/unios/web.min.js"></script>
+    <link rel="stylesheet" href="//s1.hdslb.com/bfs/svg-next/font/2024-08-21/BDC-erj847ivanq.css" />
+    <style>
+      html {
+        text-size-adjust: 100%;
+        font-family: "Microsoft YaHei", "Microsoft Sans Serif", "Microsoft SanSerf", "微软雅黑";
+        padding: 0px;
+        margin: 0px;
+      }
+      body {
+        line-height: 1.5;
+        color: var(--text1, #18191C);
+        padding: 0;
+        margin: 0;
+      }
+      .bili-ellipsis {
+        text-overflow: ellipsis;
+        word-break: break-word;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+      }
+      @media screen and (-webkit-min-device-pixel-ratio: 2), screen and (min-resolution: 2dppx) {
+        html {
+          -webkit-font-smoothing: antialiased;
+        }
+      }
+      .message-bgc {
+        pointer-events: none;
+        z-index: -1;
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 100%;
+        background-color: #D6EBEA;
+      }
+      .bili_dark .message-bgc {
+        background-color: #1D2736;
+      }
+      .message-bg {
+        pointer-events: none;
+        z-index: -1;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-repeat: no-repeat;
+        background-size: cover;
+        background-position: top;
+        transition: .3s;
+      }
+      .z-top-container {
+        width: 100%;
+        min-height: 64px;
+      }
+    </style>
+    <script>
+      window.__IM_V2__ = true
+      window.__MESSAGE_NOTIFY_MAIN__ = true
+      // window.__MESSAGE_NOTIFY_DEBUG__ = true
+      window.__MIRROR_CONFIG__ = {
+        origin: 'main',
+        module: 'message-pc',
+        config: {
+          isAutoInit: true,
+          whiteScreen: {
+            checkDom: ['#app'],
+            callback: status => {
+              console.log('白屏检测是否正常', status)
+            },
+            isSkeleton: false
+          }
+        },
+        pbOptions: {
+          feature: {
+            tech: true,
+            fingerPrint: true
+          }
+        },
+      }
+    </script>
+    <script src="//s1.hdslb.com/bfs/seed/jinkela/short/b-mirror/biliMirror.umd.mini.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><script defer src="//s1.hdslb.com/bfs/static/2233-monorepo/message-pc/static/js/index.f2b7bca0.js"></script><link href="//s1.hdslb.com/bfs/static/2233-monorepo/message-pc/static/css/index.547d7edd.css" rel="stylesheet"></head>
+  <body>
+    <div id="skeleton-bg" class="message-bg" style="background-image: url(//i0.hdslb.com/bfs/seed/jinkela/short/message/img/light_bg.png@960w_542h.webp);"></div>
+    <header id="message-pc-header" style="height: 64px;">
+      <div class="z-top-container"></div>
+    </header>
+    <div id="message-pc-app"></div>
+    <!--vue-ssr-outlet-->
+  </body>
+</html>

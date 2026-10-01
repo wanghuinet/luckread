@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head><!--300745--><script>window._GreyResult = {method:"direct",versionId:"300745"}</script>
+  <meta charset="utf-8">
+  <meta name="renderer" content="webkit">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+  <meta name="spm_prefix" content="333.885">
+  <meta http-equiv=X-UA-Compatible content="IE=edge">
+  <meta name=renderer content=webkit>
+  <meta name=description content=哔哩哔哩（bilibili）创作中心>
+  <meta name=keywords content=哔哩哔哩，B站，创作中心，B站创作中心>
+  <title>创作中心 - 哔哩哔哩弹幕视频网 - ( ゜- ゜)つロ 乾杯~</title>
+  <!--[if IE 9]>
+    <style>
+      span.flatpickr-weekday {display: inline-block;width: 14.2857143%;}
+      span.flatpickr-current-month {top: 0px !important;}
+      span.flatpickr-day {width: 14.2857143%;margin: 0 2.5px;}
+    </style>
+    <![endif]-->
+  <link rel="shortcut icon" href="//static.hdslb.com/images/favicon.ico">
+  <link rel="stylesheet" href="//s1.hdslb.com/bfs/templar/york-static/cc-iconfont-2.16.2.css">
+  <!-- bili-mirror CDN 接入 -->
+  <script>
+    window.__MIRROR_CONFIG__ = {
+      origin: 'member',
+      module: 'web-creative-center-platform',
+      config: {
+        isAutoInit: true,
+        whiteScreen: {
+          elemArry: ['#creativecenter-v3'],
+          callback: function() {},
+          isSkeleton: false,
+          maxLoop: 5
+        }
+      }
+    }
+  </script>
+  <script src="https://s1.hdslb.com/bfs/seed/jinkela/short/b-mirror/biliMirror.umd.mini.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><script defer src="//s1.hdslb.com/bfs/static/studio/creativecenter-platform-next/static/js/js/creativecenter-v3.lib-vue.087b8a68.js"></script><script defer src="//s1.hdslb.com/bfs/static/studio/creativecenter-platform-next/static/js/js/creativecenter-v3.4528.087b8a68.js"></script><script defer src="//s1.hdslb.com/bfs/static/studio/creativecenter-platform-next/static/js/js/creativecenter-v3.index.087b8a68.js"></script></head>
+
+<body>
+  <script>
+    // 数据埋点
+    window.reportMsgObj = {}
+    window.reportConfig = {
+      sample: 1,
+      scrollTracker: false,
+      msgObjects: 'reportMsgObj'
+    }
+  </script>
+  <style>
+      .skeleton-warp{
+          position: fixed;
+          left: 0;
+          top: 0;
+          width: 100vw;
+          min-width: 1220px;
+          height: 100vh;
+          background: #fafafa;
+          overflow-y: hidden;
+          overflow-x: scroll;
+      }
+      .skeleton-warp .head{
+          background: #fff;height: 60px;width: 100%;box-shadow: 0 2px 10px 0 rgb(0 0 0 / 5%);position: relative;z-index: 10;display: flex;align-items: center
+      }
+      .skeleton-warp .head .logo{
+          width: 151px;height: 26px;margin-left: 32px;background: #ececec
+      }
+      .skeleton-warp .head .logo2{
+          width: 52px;height: 24px;margin-left: 32px;background: #ececec
+      }
+      .skeleton-warp .main-warp{
+          display: flex;height: 100%
+      }
+      .skeleton-warp .main-warp .side-bar{
+          background: #fff;width: 200px;height: 100%;border-right: 1px solid #f4f4f4;
+      }
+      .skeleton-warp .main-warp .side-bar .btn{
+          width: 136px;height: 41px;margin: 24px 32px 17px 32px;background: #ececec;
+      }
+      .skeleton-warp .main-warp .side-bar .menu{
+          margin-left: 32px;
+      }
+      .skeleton-warp .main-warp .side-bar .menu .menu-item{
+          display: flex;align-items: center;height: 46px;
+      }
+      .skeleton-warp .main-warp .side-bar .menu .menu-item .icon{
+          width: 24px;height: 24px;background: #ececec;border-radius: 50%;
+      }
+      .skeleton-warp .main-warp .side-bar .menu .menu-item .text{
+          width: 90px;height: 24px;margin-left:20px;background: #ececec;
+      }
+      .skeleton-warp .main-warp .content-warp {
+          width:100%;min-width: 1124px;
+      }
+      .skeleton-warp .main-warp .content-warp .content {
+          margin:0 auto;
+      }
+      .skeleton-warp .main-warp .content-warp .block {
+          width: 100%;height: 240px;margin-top:16px;background: #e1e1e1
+      }
+
+      .skeleton-warp .flow {
+          position: relative;
+      }
+
+      .skeleton-warp .flow:after {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 5%;
+          bottom: 5%;
+          width: 50%;
+          background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.49), rgba(255, 255, 255, 0));
+          animation: flow 1s infinite linear alternate ;
+      }
+      @keyframes flow {
+          from {
+              transform: translateX(0%);
+          }
+          to {
+              transform: translateX(100%);
+          }
+      }
+
+  </style>
+  <div id="skeleton-index" class="skeleton-warp">
+      <div class="head">
+          <div class="logo"></div>
+          <div class="logo2"></div>
+      </div>
+      <div class="main-warp">
+          <div class="side-bar">
+              <div class="btn"></div>
+              <div class="menu" id="index-skeleton-menu">
+                  <script>
+                    const listDom = document.getElementById('index-skeleton-menu')
+                    if (listDom) {
+                      for (let i = 0; i < 13; i++) {
+                        const listItem = document.createElement('div')
+                        listItem.setAttribute('class', 'menu-item')
+                        const icon = document.createElement('div')
+                        icon.setAttribute('class', 'icon')
+                        const text = document.createElement('div')
+                        text.setAttribute('class', 'text')
+                        listItem.append(icon, text)
+                        listDom.appendChild(listItem)
+                      }
+                    }
+                  </script>
+              </div>
+          </div>
+          <div class="content-warp">
+              <div id="skeleton-content" class="content">
+                  <script>
+                    const bodyWidth =  document.body.clientWidth
+                    let contentWidth = bodyWidth - 200 - 72 * 2
+                    if (contentWidth<980){
+                      contentWidth = 980
+                    }else if (contentWidth>1283){
+                      contentWidth = 1283
+                    }
+                    const contentDom = document.getElementById('skeleton-content')
+                    if (contentDom){
+                      contentDom.style.width = contentWidth+'px'
+                      for (let i = 0; i < 13; i++) {
+                        const block = document.createElement('div')
+                        block.setAttribute('class', 'block flow')
+                        contentDom.appendChild(block)
+                      }
+                    }
+                  </script>
+              </div>
+          </div>
+      </div>
+  </div>
+  <div id="creativecenter-v3"></div>
+  <!-- built files will be auto injected -->
+  <script src="//s1.hdslb.com/bfs/studio/common/js/jquery.min.js"></script>
+  <!-- <script src="//s1.hdslb.com/bfs/static/studio/static/creative-center/echarts.min.js"></script> -->
+  <script src="//s1.hdslb.com/bfs/static/studio/static/creative-center/lodash.min.js"></script>
+  <script>
+    // 锁定 window._，防止浏览器插件覆盖 lodash
+    if (window._) {
+      // Object.freeze(window._)
+      Object.defineProperty(window, '_', {
+        value: window._,
+        writable: false,
+        configurable: false
+      })
+    }
+  </script>
+  <script src="//s1.hdslb.com/bfs/static/studio/static/creative-center/moment.min.js"></script>
+  <script src="//s1.hdslb.com/bfs/static/studio/static/creative-center/moment-timezone-with-data.min.js"></script>
+  <!--配置av/bv开关-->
+  <script async src="//s1.hdslb.com/bfs/seed/jinkela/short/config/biliconfig.js"></script>
+  <script src="//interface.bilibili.com/serverdate.js"></script>
+  <script src="//s1.hdslb.com/bfs/cm/st/bundle.js"></script>
+  <script type="text/javascript"
+    src="//www.bilibili.com/gentleman/polyfill.js?features=Promise%2CObject.assign%2CString.prototype.includes%2CNumber.isNaN"></script>
+  <script src="//s1.hdslb.com/bfs/seed/log/report/log-reporter.js"></script>
+  <script src="//s1.hdslb.com/bfs/seed/jinkela/risk-captcha-sdk/CaptchaLoader.js"></script>
+</body>
+
+</html>
