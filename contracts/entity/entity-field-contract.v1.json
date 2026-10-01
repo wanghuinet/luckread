@@ -2000,6 +2000,85 @@
         "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
         "contracts/api/moderation-operation-policy.v1.json"
       ]
+    },
+    {
+      "entityId": "ENT-SOCIAL-LIKE",
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "fieldContractRef": "contracts/entity/entity-field-contract-social-003-like.v1.json",
+      "fields": [
+        {
+          "fieldId": "ENT-SOCIAL-LIKE-F-LIKE-ID",
+          "name": "likeId",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": true,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "INTERNAL_IDENTIFIER",
+          "apiExposure": "SCOPED_IDENTIFIER",
+          "status": "CONTRACTED_NOT_VERIFIED"
+        },
+        {
+          "fieldId": "ENT-SOCIAL-LIKE-F-ACTOR-USER-ID",
+          "name": "actorUserId",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "INTERNAL_RELATION",
+          "apiExposure": "NONE",
+          "status": "CONTRACTED_NOT_VERIFIED"
+        },
+        {
+          "fieldId": "ENT-SOCIAL-LIKE-F-RESOURCE-TYPE",
+          "name": "resourceType",
+          "type": "enum",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "RESOURCE_SCOPE",
+          "apiExposure": "SCOPED",
+          "status": "CONTRACTED_NOT_VERIFIED",
+          "allowedValues": [
+            "content"
+          ]
+        },
+        {
+          "fieldId": "ENT-SOCIAL-LIKE-F-RESOURCE-ID",
+          "name": "resourceId",
+          "type": "text",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "INTERNAL_RELATION",
+          "apiExposure": "SCOPED_IDENTIFIER",
+          "status": "CONTRACTED_NOT_VERIFIED"
+        },
+        {
+          "fieldId": "ENT-SOCIAL-LIKE-F-CREATED-AT",
+          "name": "createdAt",
+          "type": "datetime",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "AUDIT_METADATA",
+          "apiExposure": "SCOPED",
+          "status": "CONTRACTED_NOT_VERIFIED"
+        }
+      ],
+      "evidenceRefs": [
+        "contracts/entity/SOCIAL-003-like-relationship-contract.v1.json",
+        "contracts/persistence/SOCIAL-003-like-d1-02-persistence.v1.json"
+      ]
     }
   ],
   "rules": {
