@@ -549,14 +549,6 @@ export async function decideModerationCase(
   if (!row) throw new ModerationRuntimeError('NOT_FOUND', 404)
 
   const headerExpectedVersion = Number(normalizeEtag(input.ifMatch))
-  if (input.expectedVersion !== row.version || headerExpectedVersion !== row.version) {
-    throw new ModerationRuntimeError('PRECONDITION_FAILED', 412)
-  }
-  if (row.target_type !== 'content') throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
-  if (input.policyVersion !== row.policy_version) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
-  if (!row.target_version || row.target_version < 1) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
-  if (!['OPEN', 'UNDER_REVIEW'].includes(row.state)) throw new ModerationRuntimeError('INVALID_STATE', 409)
-
   const hash = await requestHash('decideModerationCase', {
     caseId: input.caseId,
     expectedVersion: input.expectedVersion,
@@ -583,6 +575,14 @@ export async function decideModerationCase(
       caseId: string; decisionId: string; outcome: ModerationOutcome; version: number; effectiveAt: string; requestId: string
     }
   }
+
+  if (input.expectedVersion !== row.version || headerExpectedVersion !== row.version) {
+    throw new ModerationRuntimeError('PRECONDITION_FAILED', 412)
+  }
+  if (row.target_type !== 'content') throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
+  if (input.policyVersion !== row.policy_version) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
+  if (!row.target_version || row.target_version < 1) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
+  if (!['OPEN', 'UNDER_REVIEW'].includes(row.state)) throw new ModerationRuntimeError('INVALID_STATE', 409)
 
   const now = new Date().toISOString()
   const nextCaseVersion = row.version + 1
