@@ -59,6 +59,14 @@ const requireIdempotency = (request: Request): string => {
   return value
 }
 
+export const parseListLimit = (value: string | null): number => {
+  if (value === null || value.trim() === '') return 20
+  if (!/^(?:[1-9]|[1-4][0-9]|50)$/.test(value.trim())) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+  return Number(value)
+}
+
 const parseBody = async (request: Request): Promise<Record<string, unknown>> => {
   try {
     const body = await request.json()
@@ -144,7 +152,7 @@ export default {
         const principal = requiredPrincipal(request)
         const cursor = url.searchParams.get('cursor')
         const limitParam = url.searchParams.get('limit')
-        const limit = limitParam ? Number(limitParam) : 20
+        const limit = parseListLimit(limitParam)
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         const filters = validateListFilters(url.searchParams.get('status'), url.searchParams.get('type'))
         const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, filters)
