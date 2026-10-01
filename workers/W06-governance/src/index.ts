@@ -102,12 +102,6 @@ function parseAccountStateChangedInput(value: unknown): AccountStateChangedAudit
   }
 }
 
-const requireReviewerAuthority = (principal: { layer: string }): void => {
-  if (!/^L[0-8]$/.test(principal.layer) || Number(principal.layer.slice(1)) < 6) {
-    throw new ModerationRuntimeError('PERMISSION_DENIED', 403)
-  }
-}
-
 const MODERATION_OPERATION_PERMISSIONS = {
   listModerationQueue: 'moderation.queue.read',
   getModerationCase: 'moderation.case.read',
