@@ -1,23 +1,28 @@
 name: Moderation Runtime Security E2E
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/moderation-runtime-e2e.yml
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact admitted source SHA under test
+        description: Exact W06 runtime source SHA under test
         required: true
         type: string
-        default: 825fc273dc7f64bd9413f0493c55c9017ab27268
+        default: 158a5221d87ce74123338bcf1f5a4a174ec55e33
       base_url:
         description: W01 public moderation base URL
         required: true
         type: string
         default: https://luckread.cn
+      w01_source_sha:
+        description: Exact W01 deployed source SHA to verify
+        required: true
+        type: string
+        default: 825fc273dc7f64bd9413f0493c55c9017ab27268
+      w01_deploy_run_id:
+        description: Successful W01 deployment run ID to verify
+        required: true
+        type: string
+        default: "36804071530"
       confirm:
         description: Type RUN_MODERATION_E2E to permit controlled remote fixture/test mutations
         required: true
@@ -30,13 +35,14 @@ permissions:
 
 jobs:
   e2e:
-    if: ${{ github.event_name == 'push' || inputs.confirm == 'RUN_MODERATION_E2E' }}
+    if: ${{ inputs.confirm == 'RUN_MODERATION_E2E' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      BASE_URL: ${{ github.event_name == 'push' && 'https://luckread.cn' || inputs.base_url }}
-      # Current admitted/deployed runtime evidence boundary; manual dispatch may override explicitly.
-      SOURCE_SHA: ${{ github.event_name == 'push' && '825fc273dc7f64bd9413f0493c55c9017ab27268' || inputs.source_sha }}
+      BASE_URL: ${{ inputs.base_url }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      W01_SOURCE_SHA: ${{ inputs.w01_source_sha }}
+      W01_DEPLOY_RUN_ID: ${{ inputs.w01_deploy_run_id }}
       DATABASE_NAME_W03: luckreadpro
       DATABASE_NAME_W06: secondary
       WRANGLER_VERSION: 4.116.0
@@ -44,16 +50,16 @@ jobs:
       - name: Checkout exact source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'push' && github.sha || inputs.source_sha }}
+          ref: ${{ inputs.source_sha }}
 
       - name: Verify exact W01 production deployment
         env:
           GH_TOKEN: ${{ github.token }}
-          W01_DEPLOY_RUN_ID: "36804071530"
+          W01_DEPLOY_RUN_ID: ${{ inputs.w01_deploy_run_id }}
         run: |
           set -euo pipefail
           run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$W01_DEPLOY_RUN_ID")"
-          node -e "const r=JSON.parse(process.argv[1]); if(r.conclusion!==\"success\") throw new Error(\"W01 deployment run is not SUCCESS\"); if(r.head_sha!==process.env.SOURCE_SHA) throw new Error(\"W01 deployment SHA mismatch: \"+r.head_sha+\" != \"+process.env.SOURCE_SHA); console.log(JSON.stringify({deploymentRun:r.id,headSha:r.head_sha,conclusion:r.conclusion,workflow:r.name}));" "$run_json"
+          node -e "const r=JSON.parse(process.argv[1]); if(r.conclusion!==\"success\") throw new Error(\"W01 deployment run is not SUCCESS\"); if(r.head_sha!==process.env.W01_SOURCE_SHA) throw new Error(\"W01 deployment SHA mismatch: \"+r.head_sha+\" != \"+process.env.SOURCE_SHA); console.log(JSON.stringify({deploymentRun:r.id,headSha:r.head_sha,conclusion:r.conclusion,workflow:r.name}));" "$run_json"
 
       - name: Setup Node 24
         uses: actions/setup-node@v4
