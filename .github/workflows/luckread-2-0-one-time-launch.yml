@@ -5,12 +5,23 @@ on:
     branches: [main]
     paths:
       - docs/release/CONTENT-2.0-LAUNCH-2026-09-29-R9.md
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Run the already-authorized creator publishing production launch"
+        required: true
+        default: RUN
+        type: choice
+        options:
+          - RUN
+          - STOP
 
 permissions:
   contents: read
 
 jobs:
   launch:
+    if: github.event_name != 'workflow_dispatch' || inputs.confirm == 'RUN'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
