@@ -24,6 +24,44 @@ export default {
       return json({ worker: 'luckread-w07', status: 'ok' })
     }
 
+    if (url.pathname === '/internal/membership/subscription/read' && request.method === 'POST') {
+      if (
+        request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+        request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+        !request.headers.get('X-LuckRead-Correlation-Id') ||
+        !request.headers.get('X-LuckRead-Principal-User-Id')
+      ) {
+        return json({ error: { code: 'UNTRUSTED_CALLER' } }, 403)
+      }
+
+      let body: { subscriptionId?: unknown }
+      try {
+        body = await request.json() as typeof body
+      } catch {
+        return json({ error: { code: 'VALIDATION_FAILED' } }, 400)
+      }
+
+      if (typeof body.subscriptionId !== 'string' || body.subscriptionId.length === 0 || body.subscriptionId.length > 128) {
+        return json({ error: { code: 'VALIDATION_FAILED' } }, 400)
+      }
+
+      try {
+        const snapshot = await readW02MembershipSubscription({
+          correlationId: request.headers.get('X-LuckRead-Correlation-Id')!,
+          actorUserId: request.headers.get('X-LuckRead-Principal-User-Id')!,
+          subscriptionId: body.subscriptionId,
+        })
+        return json(snapshot)
+      } catch (error) {
+        if (error instanceof W02MembershipClientError) {
+          const status = error.status === 404 ? 404 : error.status === 403 ? 403 : 503
+          const code = status === 404 ? 'NOT_FOUND' : status === 403 ? 'PERMISSION_DENIED' : 'SERVICE_UNAVAILABLE'
+          return json({ error: { code, details: {} } }, status)
+        }
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', details: {} } }, 503)
+      }
+    }
+
     if (url.pathname === '/internal/membership/subscriptions' && request.method === 'POST') {
       if (
         request.headers.get('X-LuckRead-Caller') !== 'W01' ||
