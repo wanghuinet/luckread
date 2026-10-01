@@ -15,7 +15,7 @@ const error = (status: number, code: string, message: string) =>
   )
 
 const parseIfMatchVersion = (value: string): number | null => {
-  const match = value.trim().match(/^(?:W\\/)?"([1-9]\\d{0,17})"$/)
+  const match = value.trim().match(/^(?:W\/)?"([1-9]\d{0,17})"$/)
   if (!match) return null
   const version = Number(match[1])
   return Number.isSafeInteger(version) && version > 0 ? version : null
