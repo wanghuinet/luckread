@@ -807,6 +807,19 @@
           "status": "CONTRACTED_NOT_VERIFIED"
         },
         {
+          "fieldId": "ENT-SUBSCRIPTION-F-VERSION",
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "mutable",
+          "classification": "CONCURRENCY_METADATA",
+          "apiExposure": "NONE",
+          "status": "CONTRACTED_NOT_VERIFIED"
+        },
+        {
           "fieldId": "ENT-SUBSCRIPTION-F-STARTED-AT",
           "name": "startedAt",
           "type": "datetime",
