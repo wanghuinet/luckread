@@ -409,11 +409,13 @@ export async function drainModerationOutbox(
   const boundedLimit = Math.min(Math.max(limit, 1), 20)
   const rows = await db
     .prepare(
-      `SELECT outbox_id,decision_id,case_id,target_type,target_id,target_version,outcome,
-              policy_version,idempotency_key,status,attempts,next_attempt_at
-         FROM moderation_enforcement_outbox
-        WHERE status IN ('PENDING','RETRY') AND next_attempt_at <= ?
-        ORDER BY next_attempt_at ASC, created_at ASC
+      `SELECT o.outbox_id,o.decision_id,o.case_id,o.target_type,o.target_id,o.target_version,o.outcome,
+              o.policy_version,o.idempotency_key,o.status,o.attempts,o.next_attempt_at,
+              d.reviewer_id,d.reviewer_layer,d.request_id
+         FROM moderation_enforcement_outbox o
+         JOIN moderation_decisions d ON d.decision_id=o.decision_id
+        WHERE o.status IN ('PENDING','RETRY') AND o.next_attempt_at <= ?
+        ORDER BY o.next_attempt_at ASC, o.created_at ASC
         LIMIT ?`,
     )
     .bind(new Date().toISOString(), boundedLimit)
@@ -430,21 +432,15 @@ export async function drainModerationOutbox(
       status: 'PENDING' | 'RETRY'
       attempts: number
       next_attempt_at: string
+      reviewer_id: string | null
+      reviewer_layer: string | null
+      request_id: string
     }>()
 
   let delivered = 0
   let retry = 0
   for (const row of rows.results) {
-    const result = await db
-      .prepare(
-        `SELECT reviewer_id,reviewer_layer,request_id
-           FROM moderation_decisions
-          WHERE decision_id=?
-          LIMIT 1`,
-      )
-      .bind(row.decision_id)
-      .first<{ reviewer_id: string | null; reviewer_layer: string | null; request_id: string }>()
-    if (!result?.reviewer_id || !result.reviewer_layer) {
+    if (!row.reviewer_id || !row.reviewer_layer) {
       await db
         .prepare(
           `UPDATE moderation_enforcement_outbox
@@ -469,7 +465,7 @@ export async function drainModerationOutbox(
       idempotencyKey: row.idempotency_key,
       attempts: row.attempts,
       correlationId: `moderation-${row.decision_id}`,
-      requestId: result.request_id,
+      requestId: row.request_id,
       reviewerId: result.reviewer_id,
       reviewerLayer: result.reviewer_layer,
     })
