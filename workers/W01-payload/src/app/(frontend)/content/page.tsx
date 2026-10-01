@@ -51,7 +51,7 @@ export default function ContentBrowsePage() {
         headers: { accept: 'application/json' },
         cache: 'no-store',
       })
-      const data = await response.json().catch(() => null)
+      const data: unknown = await response.json().catch((): null => null)
       if (!response.ok || !data?.data) {
         throw new Error(data?.error?.message || '内容加载失败')
       }
