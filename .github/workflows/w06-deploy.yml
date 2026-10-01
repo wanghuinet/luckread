@@ -7,10 +7,12 @@ on:
         description: Exact source commit to deploy
         required: true
         type: string
+        default: 158a5221d87ce74123338bcf1f5a4a174ec55e33
       confirm:
         description: Type DEPLOY to permit this controlled W06 deployment
         required: true
         type: string
+        default: DEPLOY
 
 permissions:
   contents: read
@@ -75,7 +77,7 @@ jobs:
           while IFS= read -r file; do
             [ -z "$file" ] && continue
             case "$file" in
-              workers/W06-governance/*|.github/workflows/w06-*|docs/change-control/CC-MAPPING-0-AUTH-013-W06-*|docs/MAPPING-0-CLOSURE-LEDGER.md|artifacts/mapping-0/w06-*)
+              workers/W06-governance/*|.github/workflows/w06-*|docs/change-control/CC-MAPPING-0-AUTH-013-W06-*|docs/change-control/CC-1.8-MODERATION-IDEMPOTENCY-REPLAY-ORDER-2026-10-01.md|docs/MAPPING-0-CLOSURE-LEDGER.md|artifacts/mapping-0/w06-*)
                 ;;
               *)
                 echo "W06 runtime admission rejected unexpected delta: $file"
