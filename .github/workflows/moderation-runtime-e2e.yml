@@ -35,6 +35,7 @@ jobs:
     timeout-minutes: 20
     env:
       BASE_URL: ${{ github.event_name == 'push' && 'https://luckread.cn' || inputs.base_url }}
+      # Current admitted/deployed runtime evidence boundary; manual dispatch may override explicitly.
       SOURCE_SHA: ${{ github.event_name == 'push' && '825fc273dc7f64bd9413f0493c55c9017ab27268' || inputs.source_sha }}
       DATABASE_NAME_W03: luckreadpro
       DATABASE_NAME_W06: secondary
@@ -284,8 +285,14 @@ jobs:
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-feed/wrangler.jsonc --command "$CONTENT_REUSE_SQL"
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc --command "$CASE_REUSE_SQL"
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc --command "$IDEM_REUSE_SQL"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc --command "SELECT reviewer_id,case_id,idempotency_key,request_hash,expires_at FROM moderation_decision_idempotency WHERE reviewer_id='$MODERATION_AUTH_USER_ID' AND case_id='$CASE2_ID' AND idempotency_key='$REUSE_KEY' LIMIT 1;" > /tmp/mod-idem-seed.json
+          node -e "const fs=require('fs'); const x=JSON.parse(fs.readFileSync('/tmp/mod-idem-seed.json')); const row=x[0]&&x[0].results&&x[0].results[0]; if(!row) throw new Error('Seeded idempotency row was not visible to remote W06'); console.log('IDEMPOTENCY_SEED_VISIBLE='+JSON.stringify({reviewerId:String(row.reviewer_id),caseId:String(row.case_id),idempotencyKey:String(row.idempotency_key),expiresAt:String(row.expires_at)}));"
           status="$(curl --silent --output /tmp/mod-conflict-response.json --write-out '%{http_code}'             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: $REUSE_KEY"             -H "If-Match: v1"             --data '{"expectedVersion":1,"decision":"REJECTED","policyVersion":"moderation-v1.0","reasonCode":"E2E_SECURITY_CONFLICT","severity":"medium","scope":"content","effectiveAt":"'$NOW'","expiresAt":null}'             "$BASE_URL/api/v1/admin/moderation/cases/$CASE2_ID/decision")"
-          test "$status" = 422
+          if [ "$status" != "422" ]; then
+            echo "IDEMPOTENCY_CONFLICT_STATUS=$status"
+            cat /tmp/mod-conflict-response.json
+            exit 1
+          fi
           echo IDEMPOTENCY_CONFLICT=PASS
 
       - name: Verify 428 and 412 preconditions on a fresh case
