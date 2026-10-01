@@ -70,7 +70,16 @@ export default function CreatorContentList() {
       if (!response.ok || !data?.data) {
         throw new Error(data?.error?.message || '内容列表加载失败')
       }
-      setPage(data.data as Page)
+      const next = data.data as Page
+      setPage((current) =>
+        cursor
+          ? {
+              items: [...current.items, ...(next.items ?? [])],
+              nextCursor: next.nextCursor,
+              hasMore: next.hasMore,
+            }
+          : next,
+      )
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '内容列表加载失败')
     } finally {

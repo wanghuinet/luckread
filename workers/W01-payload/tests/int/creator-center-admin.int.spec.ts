@@ -124,6 +124,7 @@ describe('Creator Center admin extension', () => {
     expect(list).toContain("transition(item, 'PUBLISHED')")
     expect(list).toContain('立即发布')
     expect(list).toContain('加载更多')
+    expect(list).toContain('items: [...current.items, ...(next.items ?? [])]')
     expect(route).toContain('export async function GET')
     expect(route).toContain('/internal/content/creator-contents')
     expect(client).toContain('X-LuckRead-Principal-User-Id')
