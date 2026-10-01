@@ -105,6 +105,6 @@
   "reconciliation": {
     "changeControl": "CC-SUBSCRIPTION-STATE-API-RECONCILIATION-2026-10-02",
     "pauseResumeSource": "docs/108-MEMBERSHIP-AND-SUBSCRIPTION-SYSTEM-CONTRACT-v1.0.md; docs/111-MEMBERSHIP-API-CONTRACT-v1.0.md; docs/191-L5-L6-MEMBERSHIP-COMMERCE-ADVERTISING-WALLET-LEDGER-INSTANCE-REGISTRY-v1.0.md",
-    "note": "PAUSED is admitted as the machine-readable counterpart of the existing Membership pause/resume capability; no separate lifecycle concept is introduced."
+    "note": "PAUSED is the machine-readable counterpart of the existing Membership pause/resume capability."
   }
 }
