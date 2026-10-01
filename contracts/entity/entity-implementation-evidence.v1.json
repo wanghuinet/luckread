@@ -240,8 +240,9 @@
       ],
       "status": "BLOCKED"
     }
+  
     ,
-    {
+        {
       "entityId": "ENT-MEMBERSHIP-PLAN",
       "catalogStatus": "PROPOSED",
       "implementationStatus": "CONTRACT_ONLY",
@@ -255,6 +256,5 @@
       ],
       "status": "BLOCKED"
     }
-
-  ]
+]
 }
