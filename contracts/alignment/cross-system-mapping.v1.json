@@ -6711,7 +6711,8 @@
       "status": "UNRESOLVED",
       "apiOperationIds": [
         "follow",
-        "unfollow"
+        "unfollow",
+        "getUsersUserIdFollow"
       ],
       "entityIds": [
         "ENT-SOCIAL-FOLLOW"
@@ -6727,10 +6728,12 @@
         "contracts/openapi/v1/openapi.yaml#/social/follows",
         "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
+        "contracts/api/SOCIAL-001-follow-status-read.v1.json",
+        "contracts/dto/DTO-SOCIAL-FOLLOW-STATUS.v1.json"
       ],
       "blockers": [
-        "Canonical Payload/Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; Field and physical persistence contract are now bound."
+        "Canonical W05 Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; API, DTO, Entity/Field and physical persistence contracts are now bound."
       ]
     },
     {
