@@ -29,7 +29,7 @@ Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
 
 | Worker | Primary responsibility | Primary D1 | D1-01 | D1-02 | D1-03 | D1-04 |
 |---|---|---|---|---|---|---|
-| W01 | Public API / Gateway / Developer & Admin API Boundary | None | No direct authority | No direct authority | No direct authority | No direct authority |
+| W01 | Public API / Gateway / Developer & Admin API Boundary | None | No general authority; bounded AUTH-001 Payload-native registration execution only | No direct authority | No direct authority | No direct authority |
 | W02 | Identity / Account / Authorization | D1-01 | RW scoped | No | No | No |
 | W03 | Content / Article / Media / Translation | D1-02 | No | RW scoped | No | No |
 | W04 | Feed / Recommendation / Search | Derived/projection boundary | Read/projection only where explicitly contracted | Read/projection only where explicitly contracted | Read/projection only where explicitly contracted | Read/projection only where explicitly contracted |
@@ -49,14 +49,16 @@ Exactly four D1 domains are authoritative. No implicit fifth D1 exists.
 - **Runtime-delivery only** = D1-03 access is limited to delivery/runtime state and does not grant platform-wide operational authority.
 - **Scoped entitlement transition only** = W07 may initiate the D1-01 entitlement transition through an approved cross-D1 event/contract; it does not become the D1-01 owner.
 - **No direct authority** = Worker must use the owning Worker/API/event contract rather than direct authoritative D1 mutation.
+- **Bounded native execution** = an explicitly contracted Payload-native transaction may write its native persistence state at the execution boundary without changing logical entity ownership.
 
 ## 4. Worker-specific binding rules
 
 ### W01
 
 - API/gateway boundary only.
-- No direct authoritative D1 write authority.
-- Must route authenticated operations to the owning Worker/contract.
+- No general authoritative D1 write authority.
+- Bounded AUTH-001 exception: W01 may execute the initial Payload-native registration transaction at the native persistence boundary; this is an execution boundary, not Identity/Account/Authorization ownership.
+- Must route authenticated operations to the owning Worker/contract for non-registration business state.
 - Public API exposure never creates data ownership.
 
 ### W02
