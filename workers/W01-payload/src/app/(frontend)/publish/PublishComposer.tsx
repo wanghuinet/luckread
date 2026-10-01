@@ -45,56 +45,13 @@ type ContentResponse = {
   coverRef?: string | null
 }
 
-const ACCESS_KEY = 'luckread.accessToken'
-const REFRESH_KEY = 'luckread.refreshToken'
-const DEVICE_KEY = 'luckread.deviceId'
-
-function getDeviceId() {
-  const existing = sessionStorage.getItem(DEVICE_KEY)
-  if (existing) return existing
-  const value = crypto.randomUUID()
-  sessionStorage.setItem(DEVICE_KEY, value)
-  return value
-}
-
-async function refreshAccessToken() {
-  const refreshToken = sessionStorage.getItem(REFRESH_KEY)
-  if (!refreshToken) return null
-  const response = await fetch('/auth/refresh', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ refreshToken, deviceId: getDeviceId() }),
-  })
-  const data = await response.json().catch((): null => null)
-  if (!response.ok || !data?.accessToken) return null
-  sessionStorage.setItem(ACCESS_KEY, data.accessToken)
-  if (data.refreshToken) sessionStorage.setItem(REFRESH_KEY, data.refreshToken)
-  return data.accessToken as string
-}
-
 const CONTENT_MUTATED_EVENT = 'luckread:content-mutated'
 
 async function authorizedFetch(input: RequestInfo | URL, init: RequestInit = {}) {
-  let token = sessionStorage.getItem(ACCESS_KEY)
-  const headers = new Headers(init.headers)
-  if (token) headers.set('Authorization', 'Bearer ' + token)
-
-  let response = await fetch(input, {
+  const response = await fetch(input, {
     ...init,
-    headers,
     credentials: 'include',
   })
-
-  if (response.status === 401 && token) {
-    token = await refreshAccessToken()
-    if (!token) throw new Error('AUTH_REQUIRED')
-    headers.set('Authorization', 'Bearer ' + token)
-    response = await fetch(input, {
-      ...init,
-      headers,
-      credentials: 'include',
-    })
-  }
 
   if (response.status === 401) throw new Error('AUTH_REQUIRED')
   return response
