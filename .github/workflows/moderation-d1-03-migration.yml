@@ -7,7 +7,7 @@ on:
         description: Exact main commit containing the admitted Moderation D1-03 migration
         required: true
         type: string
-        default: 4427d2ed40b680ec2e714ed33081be0cf8ca30c6
+        default: 99f20528d997937f00585247dec264833d5fc099
       database_name:
         description: D1-03 display name bound by W06 wrangler.jsonc
         required: true
