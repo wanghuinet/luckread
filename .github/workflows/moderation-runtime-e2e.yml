@@ -1,6 +1,11 @@
 name: Moderation Runtime Security E2E
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/moderation-runtime-e2e.yml
   workflow_dispatch:
     inputs:
       source_sha:
@@ -25,12 +30,12 @@ permissions:
 
 jobs:
   e2e:
-    if: ${{ inputs.confirm == 'RUN_MODERATION_E2E'  }}
+    if: ${{ github.event_name == 'push' || inputs.confirm == 'RUN_MODERATION_E2E' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      BASE_URL: ${{ inputs.base_url  }}
-      SOURCE_SHA: ${{ inputs.source_sha  }}
+      BASE_URL: ${{ github.event_name == 'push' && 'https://luckread.cn' || inputs.base_url }}
+      SOURCE_SHA: ${{ github.event_name == 'push' && '81986b7510efb20a5dd44f9971ca40794989ddff' || inputs.source_sha }}
       DATABASE_NAME_W03: luckreadpro
       DATABASE_NAME_W06: secondary
       WRANGLER_VERSION: 4.116.0
@@ -202,7 +207,9 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
-          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc --command "DELETE FROM moderation_enforcement_outbox WHERE decision_id IN (SELECT decision_id FROM moderation_decisions WHERE case_id IN ('$CASE_ID','$CASE2_ID')); DELETE FROM moderation_decision_idempotency WHERE case_id IN ('$CASE_ID','$CASE2_ID'); DELETE FROM moderation_decisions WHERE case_id IN ('$CASE_ID','$CASE2_ID'); DELETE FROM moderation_cases WHERE case_id IN ('$CASE_ID','$CASE2_ID');"
+          CASE2="${CASE2_ID:-mod-e2e-stale-$GITHUB_RUN_ID}"
+          CONTENT2="${CONTENT2_ID:-mod-e2e-stale-$GITHUB_RUN_ID}"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc --command "DELETE FROM moderation_enforcement_outbox WHERE decision_id IN (SELECT decision_id FROM moderation_decisions WHERE case_id IN ('$CASE_ID','$CASE2')); DELETE FROM moderation_decision_idempotency WHERE case_id IN ('$CASE_ID','$CASE2'); DELETE FROM moderation_decisions WHERE case_id IN ('$CASE_ID','$CASE2'); DELETE FROM moderation_cases WHERE case_id IN ('$CASE_ID','$CASE2');"
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-feed/wrangler.jsonc --command "DELETE FROM contents WHERE id IN ('$CONTENT_ID','$CONTENT2_ID');"
           if [ -n "${MODERATION_ROLE_ID:-}" ]; then npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --yes --config workers/W01-payload/wrangler.jsonc --command "DELETE FROM role_assignments WHERE id='$MODERATION_ROLE_ID';"; fi
           if [ -n "${MODERATION_AUTH_USER_ID:-}" ]; then
