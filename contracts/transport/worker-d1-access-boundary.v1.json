@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.cn/contracts/v1/worker-d1-access-boundary.v1.json",
+  "title": "LuckRead Worker D1 Access Boundary",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PARTIAL",
+  "purpose": "Make the existing Worker-to-D1 scoping mechanically checkable without introducing a D1 proxy or rewriting business logic.",
+  "topology": { "workerCount": 12, "d1Count": 4, "taskCount": 25 },
+  "physicalD1Registry": {
+    "D1-01": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "D1-02": "6c342634-97f6-4248-9f4a-85772af4f22c",
+    "D1-03": "bda1d247-a371-4244-91ae-aef96034db7f",
+    "D1-04": null
+  },
+  "workers": {
+    "W01": { "allowedDomains": ["D1-01"], "notes": "Bounded Payload-native execution substrate; not general D1 business authority." },
+    "W02": { "allowedDomains": ["D1-01"] },
+    "W03": { "allowedDomains": ["D1-02"] },
+    "W04": { "allowedDomains": [] },
+    "W05": { "allowedDomains": ["D1-02", "D1-03"] },
+    "W06": { "allowedDomains": ["D1-03"] },
+    "W07": { "allowedDomains": ["D1-04"] },
+    "W08": { "allowedDomains": ["D1-01"] },
+    "W09": { "allowedDomains": ["D1-03"] },
+    "W10": { "allowedDomains": ["D1-03"] },
+    "W11": { "allowedDomains": ["D1-03"] },
+    "W12": { "allowedDomains": [] }
+  },
+  "rules": {
+    "unknownD1Id": "FAIL",
+    "disallowedWorkerDomain": "FAIL",
+    "undeclaredRawBindingUse": "FAIL",
+    "missingWorkerConfig": "ALLOW_UNTIL_PHYSICAL_BINDING_ADMITTED",
+    "w01Exception": "Only the admitted Payload-native registration execution boundary may use W01 physical D1 access; this does not change logical entity ownership."
+  },
+  "nonGoals": [
+    "No D1 proxy or database gateway.",
+    "No new D1.",
+    "No SQL semantic inference.",
+    "No Mapping 0 GREEN promotion."
+  ]
+}

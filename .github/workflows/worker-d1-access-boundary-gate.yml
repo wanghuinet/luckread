@@ -1,0 +1,35 @@
+name: Worker D1 Access Boundary Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/**'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'scripts/verify-worker-d1-access-boundary.mjs'
+      - '.github/workflows/worker-d1-access-boundary-gate.yml'
+  pull_request:
+    paths:
+      - 'workers/**'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'scripts/verify-worker-d1-access-boundary.mjs'
+      - '.github/workflows/worker-d1-access-boundary-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify Worker D1 access boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify Worker D1 access boundary
+        run: node scripts/verify-worker-d1-access-boundary.mjs
