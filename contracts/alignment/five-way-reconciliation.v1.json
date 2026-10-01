@@ -4432,7 +4432,11 @@
       "entityIds": [
         "ENT-SUBSCRIPTION"
       ],
-      "apiOperationIds": [],
+      "apiOperationIds": [
+        "cancelSubscription",
+        "pauseSubscription",
+        "resumeSubscription"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
@@ -4441,11 +4445,18 @@
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
-        "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md"
+        "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md",
+        "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/openapi/v1/operation-policy.json",
+        "contracts/authz/permissions.json",
+        "contracts/state-machines/subscription.json",
+        "docs/change-control/CC-SUBSCRIPTION-STATE-API-RECONCILIATION-2026-10-02.md"
       ],
       "blockers": [
         "Entity/Field contract binding is admitted.",
-        "API/DTO, physical persistence, authorization/security, runtime, tests and Evidence Registry provenance remain unverified."
+        "Canonical API/state/permission vocabulary is now reconciled.",
+        "Physical D1-01 persistence, runtime, cross-domain payment transition, tests and Evidence Registry provenance remain unverified."
       ]
     },
     {
@@ -6872,7 +6883,7 @@
     },
     {
       "featureId": "SOCIAL-001",
-      "status": "PARTIAL",
+      "status": "UNRESOLVED",
       "entityIds": [
         "ENT-SOCIAL-FOLLOW"
       ],
@@ -6892,14 +6903,10 @@
         "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
         "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
         "contracts/dto/auth-dto-contract.v1.json",
-        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
-        "contracts/transport/W01-W05-social-follow-http-binding.v1.json",
-        "contracts/transport/SOCIAL-001-follow-trusted-authority-binding.v1.json"
+        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json"
       ],
       "blockers": [
-        "API and Entity/Field/Persistence contracts are bound.",
-        "Private W01→W05 transport boundary is contractually admitted.",
-        "Actor account-state, target followability, block/privacy/anti-abuse authority inputs, runtime, tests and Evidence Registry provenance remain unverified."
+        "Canonical Payload/Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; Field and physical persistence contract are now bound."
       ]
     },
     {

@@ -215,6 +215,9 @@
         "POST /v1/entitlements/check",
         "POST /v1/memberships/subscriptions",
         "POST /v1/memberships/subscriptions/{subscriptionId}/cancel",
+        "POST /v1/memberships/subscriptions/{subscriptionId}/change-plan",
+        "POST /v1/memberships/subscriptions/{subscriptionId}/pause",
+        "POST /v1/memberships/subscriptions/{subscriptionId}/resume",
         "POST /v1/payments/intents",
         "POST /v1/subscriptions"
       ]
