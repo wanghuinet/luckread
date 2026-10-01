@@ -184,7 +184,7 @@ export default function CreatorContentList() {
 
       {loading ? <div className={styles.contentManageState} role="status" aria-busy="true">正在加载内容…</div> : null}
       {!loading && error ? (
-        <div className={styles.contentManageState}>
+        <div className={styles.contentManageState} role="alert">
           <span>{error}</span>
           <button className={styles.secondaryButton} onClick={() => void load()} type="button">重试</button>
         </div>
