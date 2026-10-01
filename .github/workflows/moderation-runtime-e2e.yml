@@ -7,7 +7,7 @@ on:
         description: Exact admitted source SHA under test
         required: true
         type: string
-        default: e5187e7eef2285577fd3984c2f79dd1cdbc17880
+        default: 81986b7510efb20a5dd44f9971ca40794989ddff
       base_url:
         description: W01 public moderation base URL
         required: true
@@ -25,13 +25,13 @@ permissions:
 
 jobs:
   e2e:
-    if: ${ inputs.confirm == 'RUN_MODERATION_E2E' }}
+    if: ${{ inputs.confirm == 'RUN_MODERATION_E2E'  }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      BASE_URL: ${ inputs.base_url }}
-      SOURCE_SHA: ${ inputs.source_sha }}
-      MODERATION_TOKEN: ${ secrets.MODERATION_E2E_BEARER_TOKEN }}
+      BASE_URL: ${{ inputs.base_url  }}
+      SOURCE_SHA: ${{ inputs.source_sha  }}
+      MODERATION_TOKEN: ${{ secrets.MODERATION_E2E_BEARER_TOKEN  }}
       DATABASE_NAME_W03: luckreadpro
       DATABASE_NAME_W06: secondary
       WRANGLER_VERSION: 4.116.0
@@ -39,11 +39,11 @@ jobs:
       - name: Checkout exact source
         uses: actions/checkout@v4
         with:
-          ref: ${ inputs.source_sha }}
+          ref: ${{ inputs.source_sha  }}
 
       - name: Verify source CI
         env:
-          GH_TOKEN: ${ github.token }}
+          GH_TOKEN: ${{ github.token  }}
         run: |
           set -euo pipefail
           conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow moderation-runtime-source-ci.yml --commit "$SOURCE_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
@@ -68,8 +68,8 @@ jobs:
 
       - name: Verify remote schema before fixture
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
         run: |
           set -euo pipefail
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard') ORDER BY name;" > /tmp/mod-schema.json
@@ -77,8 +77,8 @@ jobs:
 
       - name: Seed controlled content fixture in D1-02
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
         run: |
           set -euo pipefail
           SQL="INSERT INTO contents (id,content_type,owner_user_id,creator_id,ip_id,state,version,revision,title,body_ref,media_refs_json,cover_ref,etag,created_at,updated_at) VALUES ('$CONTENT_ID','article','mod-e2e-owner-$GITHUB_RUN_ID',NULL,NULL,'PENDING_REVIEW',1,1,'Moderation E2E Fixture','r2://moderation-e2e/$GITHUB_RUN_ID','[]',NULL,'v1','$NOW','$NOW');"
@@ -86,8 +86,8 @@ jobs:
 
       - name: Seed controlled moderation case in D1-03
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
         run: |
           set -euo pipefail
           SQL="INSERT INTO moderation_cases (case_id,target_type,target_id,target_version,policy_version,state,priority,assigned_reviewer_id,current_decision_id,evidence_bundle_ref,version,created_at,updated_at) VALUES ('$CASE_ID','content','$CONTENT_ID',1,'moderation-v1.0','UNDER_REVIEW',100,NULL,NULL,'e2e/$GITHUB_RUN_ID',1,'$NOW','$NOW');"
@@ -129,8 +129,8 @@ jobs:
 
       - name: Verify 428 and 412 preconditions on a fresh case
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
         run: |
           set -euo pipefail
           echo "CASE2_ID=mod-e2e-stale-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
@@ -149,8 +149,8 @@ jobs:
 
       - name: Verify remote D1 evidence
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/mapping-0/moderation-runtime-e2e
@@ -164,6 +164,7 @@ jobs:
           const content=JSON.parse(fs.readFileSync('artifacts/mapping-0/moderation-runtime-e2e/content-state.json'))?.[0]?.results??[];
           const cases=JSON.parse(fs.readFileSync('artifacts/mapping-0/moderation-runtime-e2e/cases.json'))?.[0]?.results??[];
           const decisions=JSON.parse(fs.readFileSync('artifacts/mapping-0/moderation-runtime-e2e/decision.json'))?.[0]?.results??[];
+          const outbox=JSON.parse(fs.readFileSync('artifacts/mapping-0/moderation-runtime-e2e/outbox.json'))?.[0]?.results??[];
           const audits=JSON.parse(fs.readFileSync('artifacts/mapping-0/moderation-runtime-e2e/audit.json'))?.[0]?.results??[];
           if(!content.some(x=>x.id===process.env.CONTENT_ID&&x.state==='APPROVED'&&x.version===2)) throw new Error('W03 content transition missing');
           if(!cases.some(x=>x.case_id===process.env.CASE_ID&&x.state==='ACTION_TAKEN'&&x.version===2)) throw new Error('W06 case transition missing');
@@ -190,7 +191,7 @@ jobs:
       - name: Upload moderation runtime evidence
         uses: actions/upload-artifact@v4
         with:
-          name: moderation-runtime-e2e-${ inputs.source_sha }}
+          name: moderation-runtime-e2e-${{ inputs.source_sha  }}
           path: artifacts/mapping-0/moderation-runtime-e2e/
           if-no-files-found: error
           retention-days: 14
