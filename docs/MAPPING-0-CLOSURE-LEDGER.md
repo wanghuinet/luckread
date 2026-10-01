@@ -4491,3 +4491,15 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - A bounded diagnostic was attempted conceptually but no production change was admitted; no Contract, topology, schema, or Worker implementation change follows from this 503.
 - Status: `NOT_GREEN`.
 - Next diagnostic: capture the sanitized login response body and/or W01 Worker runtime tail for the exact login attempt before changing production code or W02 schema.
+
+
+## 2026-10-01 — Moderation native L6 E2E diagnostic correction
+
+- Run `36802840247` proved the native L6 reviewer fixture can establish the canonical reviewer and reached the real `APPROVED` moderation decision path.
+- The run did not establish GREEN because its negative idempotency assertion used stale `If-Match: v1`; the service correctly rejected that stale version before the idempotency branch, returning the documented version-conflict response.
+- The E2E workflow was corrected to send the current case version for the idempotency-specific negative assertion; business/runtime code was not changed.
+- Cleanup was hardened to run even when fixture setup fails and to remove test residue by the controlled synthetic prefixes. A prior cleanup reference to an unset `CONTENT2_ID` was corrected.
+- Native reviewer fixture diagnostics now include the sanitized registration/login response body on failure, without emitting credentials or bearer tokens.
+- Backup branch: `backup/pre-moderation-native-l6-e2e-diagnostic-20261001` at `9d78c3cbf7dd6c474edf458c74c98c5e13d4b52e`.
+- Latest workflow/test commits: `791f669c71263b60744f09104eff282d93ac7d13`.
+- Status: `NOT_GREEN` pending one clean full Security E2E run on the corrected workflow.
