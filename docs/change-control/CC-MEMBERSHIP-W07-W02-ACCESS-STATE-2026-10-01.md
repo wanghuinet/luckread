@@ -20,6 +20,8 @@
 11. W02 terminal REVOKE derives scope from subscription_id and revokes all ACTIVE grants for that subscription.
 12. W07 reads authoritative Subscription status/version from W02 before lifecycle decision; W01-supplied state/version is non-authoritative.
 13. The existing getSubscription public read path is implemented as W01→W07→W02, with authenticated L2 self scope; getEntitlements remains blocked by the pre-existing duplicate operationId conflict.
+14. The bounded public cancelSubscription path requires authenticated L2 scope, If-Match against the authoritative Subscription ETag, and Idempotency-Key; W01 supplies no lifecycle actor or entitlement authority.
+15. W07 performs an authoritative W02 read before transition and W02 applies expectedVersion CAS; successful reads expose ETag W/\"version\".
 
 ## Gate
 
