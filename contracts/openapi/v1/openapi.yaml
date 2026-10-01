@@ -1583,23 +1583,47 @@ paths:
   /comments/{commentId}:
     delete:
       tags: [Interactions]
-      summary: Discovery draft for DELETE undefined
+      summary: Delete comment by durable state transition
       operationId: deleteCommentsCommentId
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/SOCIAL-004-comment-contract.v1.json
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '204':
+          description: Comment transitioned to DELETED.
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
     patch:
       tags: [Interactions]
-      summary: Discovery draft for PATCH undefined
+      summary: Edit an existing comment with optimistic concurrency
       operationId: patchCommentsCommentId
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/SOCIAL-004-comment-contract.v1.json
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+        - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              additionalProperties: false
+              properties:
+                body: { type: string, minLength: 1, maxLength: 10000 }
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Updated comment.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Comment' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /comments/{commentId}/likes:
     delete:
