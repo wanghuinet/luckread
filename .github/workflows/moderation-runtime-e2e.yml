@@ -294,6 +294,9 @@ jobs:
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc --command "SELECT case_id,version,state,current_decision_id FROM moderation_cases WHERE case_id='$CASE_ID' LIMIT 1; SELECT decision_id,case_id,case_version,outcome FROM moderation_decisions WHERE case_id='$CASE_ID' ORDER BY created_at DESC LIMIT 3; SELECT id,successful FROM moderation_txn_guard ORDER BY id DESC LIMIT 3; SELECT reviewer_id,case_id,idempotency_key,response_status FROM moderation_decision_idempotency WHERE case_id='$CASE_ID' ORDER BY created_at DESC LIMIT 3; SELECT COUNT(*) AS outbox_count FROM moderation_enforcement_outbox WHERE case_id='$CASE_ID';" > /tmp/mod-decision-state.json
           node -e "const fs=require('fs'); const x=JSON.parse(fs.readFileSync('/tmp/mod-decision-state.json','utf8')); const all=x.flatMap(v=>v.results||[]); console.log('W06_DECISION_PERSISTENCE_STATE='+JSON.stringify(all));"
       - name: Verify replay and idempotency key-reuse rejection
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
           replay="$(curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: $IDEMPOTENCY_KEY"             -H "If-Match: v1"             --data @/tmp/mod-decision.json             "$BASE_URL/api/v1/admin/moderation/cases/$CASE_ID/decision")"
