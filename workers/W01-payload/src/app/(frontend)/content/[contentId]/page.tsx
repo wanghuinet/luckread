@@ -38,6 +38,7 @@ export default function ContentDetailPage({
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
+  const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -76,7 +77,7 @@ export default function ContentDetailPage({
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [params])
+  }, [params, retryKey])
 
   if (loading) {
     return <main className="content-detail"><p className="content-detail-state">正在加载内容…</p></main>
@@ -87,6 +88,7 @@ export default function ContentDetailPage({
       <main className="content-detail">
         <div className="content-detail-state">
           <p>{error || '内容不存在。'}</p>
+          <button className="content-detail-retry" onClick={() => { setError(''); setLoading(true); setContent(null); setBody(''); setRetryKey((value) => value + 1) }} type="button">重新加载</button>
           <Link href="/">返回首页</Link>
         </div>
       </main>
