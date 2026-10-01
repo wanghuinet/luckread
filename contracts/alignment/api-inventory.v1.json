@@ -542,9 +542,12 @@
       "path": "/v1/creator/analytics",
       "openapiPath": "/creator/analytics",
       "domain": "analytics",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "CONTRACTED_PARTIAL",
+      "featureIds": [
+        "CREATOR-003",
+        "CREATOR-006"
+      ],
+      "schemaRef": "contracts/api/CREATOR-003-006-AUDIENCE-DASHBOARD-READ.v1.json",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/creator/analytics",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
