@@ -4310,3 +4310,56 @@ Objective: run the controlled W04 side-effect matrix workflow above against the 
 - Backup: backup/pre-auth011-refresh-runtime-tests-20260929.
 - **NEXT_ITEM_ID:** AUTH-011-REMOTE-RUNTIME-EVIDENCE-001
 - **NEXT_ITEM_STATE:** TODO_VERIFY
+
+
+## 2026-10-01 — Moderation runtime admission / W06→W03 enforcement cursor
+
+Latest main head: `0cba802bf03d856838e1ca6ef0fb10df393e75a2`.
+
+This cursor supersedes the earlier Moderation contract-only blocker description for implementation work, but **does not promote runtime GREEN**.
+
+### Completed on main
+
+- W06 reviewer Queue / Case / Decision runtime source is present under `workers/W06-governance/src/moderation-runtime.ts`.
+- D1-03 Moderation migration source `0002_moderation_queue_foundation.sql` now includes:
+  - `moderation_cases`
+  - `moderation_decisions`
+  - `moderation_decision_idempotency`
+  - `moderation_txn_guard`
+  - `moderation_enforcement_outbox`
+- W01 → W06 private `W06_MODERATION` binding and W06 → W03 private `W03_CONTENT_MODERATION` binding are declared in Worker configs.
+- W03 contains the trusted moderation content-state adapter; W03 remains D1-02 content-state authority.
+- Moderation decision acceptance is now D1-03 authoritative and protected by a transactional outbox; W06→W03 delivery is best-effort after commit with scheduled retry.
+- L6 reviewer authority is enforced for queue/case/decision reads and writes.
+- Runtime Source CI, controlled D1-03 migration, coordinated deployment and Security E2E workflows were added with prefilled `workflow_dispatch` defaults.
+
+### Important non-GREEN state
+
+No current runtime, deployment or remote D1 evidence is being promoted from source code alone.
+
+Required sequence:
+
+`Moderation Runtime Source CI SUCCESS`
+→ `D1-03 remote migration evidence`
+→ `W03/W06/W01 deployment evidence`
+→ `Security E2E`
+→ `decision + audit + outbox + W03 convergence evidence`
+→ `Evidence Registry reconciliation`
+→ `Moderation Runtime GREEN`.
+
+### Controlled workflow entrypoints
+
+- Source CI: `.github/workflows/moderation-runtime-source-ci.yml`
+- D1-03 migration: `.github/workflows/moderation-d1-03-migration.yml`
+- Coordinated deployment: `.github/workflows/moderation-runtime-deploy.yml`
+- Security E2E: `.github/workflows/moderation-runtime-e2e.yml`
+
+### Governance decision
+
+`CC-1.2-MODERATION-RUNTIME-IMPLEMENTATION-ADMISSION-2026-10-01` admits the minimum implementation scope.
+
+`CC-1.3-MODERATION-TRANSACTIONAL-OUTBOX-DELIVERY-DECISION-2026-10-01` records the cross-D1 correction: W06/D1-03 is the authoritative decision transaction; W03 content-state change is durable asynchronous enforcement, not a distributed transaction.
+
+### Do not repeat
+
+Do not recreate Workers or D1s, do not re-open the already-contracted Moderation API/Entity vocabulary, and do not rerun previously verified baseline evidence unless the authoritative source or scope changes.
