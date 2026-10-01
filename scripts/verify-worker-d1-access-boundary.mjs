@@ -28,6 +28,7 @@ const domainById = Object.fromEntries(
 
 const suspiciousBinding = /\b(D1(?:_0[1-4])?|DB)\b/g
 const codeExts = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs'])
+const runtimeFile = (name) => !/(^|\\.)test\\./.test(name) && !/(^|\\.)spec\\./.test(name)
 
 let checkedConfigs = 0
 let checkedCodeFiles = 0
@@ -63,7 +64,7 @@ for (const dir of dirs) {
       const path = join(dirPath, entry.name)
       if (entry.isDirectory()) {
         if (entry.name !== 'node_modules' && entry.name !== '.git') walk(path)
-      } else if (codeExts.has(extname(entry.name))) {
+      } else if (codeExts.has(extname(entry.name)) && runtimeFile(entry.name)) {
         files.push(path)
       }
     }
