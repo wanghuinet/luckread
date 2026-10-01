@@ -131,28 +131,36 @@
       "entityId": "ENT-ENTITLEMENT-GRANT",
       "entityName": "EntitlementGrant",
       "domainId": "D1-01",
-      "entityStatus": "PROPOSED",
-      "implementationRef": "",
-      "persistenceStatus": "NOT_APPLICABLE",
+      "entityStatus": "CONTRACTED_NOT_VERIFIED",
+      "implementationRef": "workers/W07-subscription-commerce/src/subscription-state-machine.ts",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
       "adapter": "",
-      "migrationRefs": [],
-      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "migrationRefs": [
+        "workers/W07-subscription-commerce/migrations/0001_membership_subscription_entitlement.sql"
+      ],
+      "fieldContractRef": "contracts/entity/MEMBERSHIP-SUBSCRIPTION-ENTITLEMENT-field-contract.v1.json",
       "evidenceRefs": [
-        "contracts/entity/entity-catalog.v1.json"
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/persistence/MEMBERSHIP-D1-01-subscription-entitlement-persistence.v1.json",
+        "contracts/admission/W07-subscription-implementation-admission.v1.json"
       ]
     },
     {
       "entityId": "ENT-SUBSCRIPTION",
       "entityName": "Subscription",
       "domainId": "D1-01",
-      "entityStatus": "PROPOSED",
-      "implementationRef": "",
-      "persistenceStatus": "NOT_APPLICABLE",
+      "entityStatus": "CONTRACTED_NOT_VERIFIED",
+      "implementationRef": "workers/W07-subscription-commerce/src/subscription-state-machine.ts",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
       "adapter": "",
-      "migrationRefs": [],
-      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "migrationRefs": [
+        "workers/W07-subscription-commerce/migrations/0001_membership_subscription_entitlement.sql"
+      ],
+      "fieldContractRef": "contracts/entity/MEMBERSHIP-SUBSCRIPTION-ENTITLEMENT-field-contract.v1.json",
       "evidenceRefs": [
-        "contracts/entity/entity-catalog.v1.json"
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/persistence/MEMBERSHIP-D1-01-subscription-entitlement-persistence.v1.json",
+        "contracts/admission/W07-subscription-implementation-admission.v1.json"
       ]
     },
     {
