@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/v1/transport/W06-W03-content-moderation-http-binding.v1.json",
   "title": "W06 to W03 Moderation Content-State Internal HTTP Binding",
   "version": "1.0.0",
-  "status": "CONTRACTED_PENDING_AUTHORITY",
+  "status": "CONTRACTED_AUTHORITY_ADMITTED",
   "caller": {
     "logicalWorker": "W06",
     "role": "Rights / Trust & Safety / Governance",
@@ -122,7 +122,7 @@
     "W03Callee": "EXISTING_RUNTIME_REQUIRES_TRANSPORT_ADAPTER",
     "deploymentEvidence": "MISSING",
     "securityE2E": "MISSING",
-    "implementationAuthorization": false
+    "implementationAuthorization": true
   },
   "sourceRefs": [
     "contracts/api/moderation-operation-policy.v1.json",
