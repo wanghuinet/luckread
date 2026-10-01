@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W01-W05-social-like-trusted-transport.v1.json",
+  "title": "W01 to W05 Trusted Social Like Transport",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "caller": {
+    "logicalWorker": "W01",
+    "role": "Public API / Gateway"
+  },
+  "callee": {
+    "logicalWorker": "W05",
+    "role": "Social / Community / Messaging / Notification",
+    "authoritativeDomain": "D1-02"
+  },
+  "operationIds": [
+    "like",
+    "unlike"
+  ],
+  "transport": {
+    "kind": "Cloudflare Worker Service Binding HTTP",
+    "binding": "W05_SOCIAL",
+    "targetWorker": "luckread-w05",
+    "publicExposure": false
+  },
+  "trustedInputs": {
+    "actorUserId": {
+      "source": "authenticated W01 principal",
+      "clientWritable": false
+    },
+    "actorAccountState": {
+      "source": "W02/D1-01 authoritative account-state read",
+      "clientWritable": false,
+      "required": true
+    },
+    "resourceType": {
+      "value": "content",
+      "clientWritable": false
+    },
+    "resourceId": {
+      "source": "authenticated request resource target",
+      "clientWritable": true,
+      "validatedBy": "W01 public contract"
+    },
+    "resourcePolicy": {
+      "source": "canonical content/social policy authority",
+      "clientWritable": false,
+      "required": true
+    },
+    "antiAbuseAdmission": {
+      "source": "canonical interaction anti-abuse admission layer",
+      "clientWritable": false,
+      "required": true
+    }
+  },
+  "headers": {
+    "required": [
+      "X-LuckRead-Caller=W01",
+      "X-LuckRead-Transport-Version=1.0",
+      "X-LuckRead-Principal-User-Id=authenticated subject",
+      "X-LuckRead-Correlation-Id=required",
+      "Idempotency-Key=required for mutation"
+    ]
+  },
+  "rules": [
+    "W01 resolves actorAccountState from W02 before invoking W05.",
+    "W05 never treats a public client as a trusted caller.",
+    "Actor identity is derived from the trusted principal.",
+    "No client field may override account state or authoritative policy admission.",
+    "W05 is the authoritative Like relationship writer in D1-02.",
+    "No synchronous counter/projection write is required.",
+    "No new Worker or D1 is introduced."
+  ],
+  "evidenceRequired": [
+    "W02 actor-account-state authority evidence",
+    "W01→W05 trusted transport evidence",
+    "positive Like evidence",
+    "duplicate/concurrency evidence",
+    "negative authorization/policy evidence",
+    "exact source SHAs"
+  ]
+}
