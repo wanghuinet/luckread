@@ -59,3 +59,18 @@ This record does not promote SOCIAL-002 to GREEN and does not authorize a public
 Public API (W01) → W05 Social read boundary → D1-02 social_follow_relationships
 
 No additional Worker, D1, synchronous fan-out, or projection table is permitted by this slice.
+## 2026-10-01 Runtime Scaffold Addendum
+
+A non-public W05 read scaffold is now present at `workers/W05-social/src/follow-read-runtime.ts`.
+
+The scaffold is deliberately limited to deterministic query construction and DTO row projection:
+
+- one D1-02 authoritative read;
+- response page maximum 50;
+- read budget maximum 51 rows to establish `hasMore` without a second query;
+- stable `created_at DESC, relationship_id DESC` ordering;
+- opaque cursor validation using the authoritative relation timestamp and internal relationship ID;
+- no dynamic SQL identifiers from client input;
+- relationshipId is not exposed in the response projection.
+
+This scaffold does **not** authorize the public route and does not claim policy, runtime, security, remote-D1 or Evidence Registry verification. Relationship-visibility, block/mute and anti-abuse authorities remain mandatory admission gates.
