@@ -100,6 +100,12 @@ function parseAccountStateChangedInput(value: unknown): AccountStateChangedAudit
   }
 }
 
+const requireReviewerAuthority = (principal: { layer: string }): void => {
+  if (!/^L[0-8]$/.test(principal.layer) || Number(principal.layer.slice(1)) < 6) {
+    throw new ModerationRuntimeError('PERMISSION_DENIED', 403)
+  }
+}
+
 const requireW01Transport = (request: Request): { userId: string; layer: string; correlationId: string; requestId: string } => {
   if (
     request.headers.get('X-LuckRead-Caller') !== 'W01' ||
@@ -177,6 +183,7 @@ export default {
     if (request.method === 'GET' && url.pathname === '/admin/moderation/queue') {
       try {
         const principal = requireW01Transport(request)
+        requireReviewerAuthority(principal)
         return json({
           ...(await listModerationQueue(
             env.D1_03,
@@ -195,6 +202,7 @@ export default {
     if (request.method === 'GET' && caseMatch) {
       try {
         const principal = requireW01Transport(request)
+        requireReviewerAuthority(principal)
         return json({
           ...(await getModerationCase(env.D1_03, principal.userId, decodeURIComponent(caseMatch[1]))),
           requestId: principal.requestId,
