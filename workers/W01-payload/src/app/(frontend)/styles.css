@@ -260,6 +260,12 @@ a { color: inherit; }
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+@media (prefers-reduced-motion: reduce) {
+  .content-feed-skeleton-block,
+  .content-feed-skeleton-line {
+    animation: none;
+  }
+}
 .content-feed-open {
   color: var(--lr-accent);
   font-size: 12px;
