@@ -84,8 +84,7 @@
       "classification": "AUTHORIZATION",
       "status": "PROPOSED",
       "evidenceRefs": [
-        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
-        "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json"
+        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
       ]
     },
     {
@@ -95,8 +94,7 @@
       "classification": "BILLING",
       "status": "PROPOSED",
       "evidenceRefs": [
-        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
-        "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json"
+        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
       ]
     },
     {
