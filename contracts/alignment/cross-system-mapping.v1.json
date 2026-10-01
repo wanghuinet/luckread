@@ -6786,22 +6786,24 @@
         "getContentContentIdComments",
         "postContentContentIdComments"
       ],
-      "entityIds": [],
+      "entityIds": [
+        "ENT-SOCIAL-COMMENT"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "contracts/api/social-comment-operation-policy.v1.json",
+        "contracts/entity/SOCIAL-004-comment-reply-contract.v1.json",
+        "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+        "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json",
         "contracts/openapi/v1/openapi.yaml#/content/{contentId}/comments",
         "contracts/enums/comment-state.json",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-AUTHORITY-CONFLICT-2026-10-01.md",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-API-SURFACE-2026-10-01.md",
-        "docs/11-P0-SOCIAL-INTERACTION-AND-EVENT-CONTRACT-v1.0.md"
+        "docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-API-SURFACE-2026-10-01.md"
       ],
       "blockers": [
-        "Canonical Comment entity and field persistence binding remain unresolved.",
-        "D1-02 Comment persistence schema/migration is not yet contracted.",
+        "D1-02 Comment migration is not yet created or executed.",
         "Server-side block/privacy/moderation decision authority is not yet bound to executable inputs.",
-        "W05 runtime, concurrency/security tests, remote runtime evidence and Evidence Registry admission remain unresolved."
+        "W05 Comment runtime, concurrency/security tests, remote runtime evidence and Evidence Registry admission remain unresolved."
       ]
     },
     {
