@@ -192,6 +192,7 @@ export async function createSubscription(
   const current = new Date()
   const nowIso = current.toISOString()
   const hash = await requestHash(operationId, {
+    subscriptionId: input.subscriptionId,
     subscriberId: input.subscriberId,
     planId: input.planId,
     planVersion: input.planVersion,
