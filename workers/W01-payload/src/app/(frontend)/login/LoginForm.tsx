@@ -62,7 +62,7 @@ export default function LoginForm() {
   }
 
   return (
-    <form className="lr-auth-form" onSubmit={submit}>
+    <form className="lr-auth-form" onSubmit={submit} aria-busy={busy}>
       <label>
         邮箱
         <input
@@ -86,8 +86,8 @@ export default function LoginForm() {
           value={password}
         />
       </label>
-      {error ? <div className="lr-error" role="alert">{error}</div> : null}
-      <button disabled={busy} type="submit">
+      {error ? <div className="lr-error" role="alert" aria-live="assertive">{error}</div> : null}
+      <button aria-busy={busy} disabled={busy} type="submit">
         {busy ? '登录中…' : '登录'}
       </button>
       <a className="lr-link" href="/register">还没有账号？立即注册</a>
