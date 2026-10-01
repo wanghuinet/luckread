@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W01-W07-membership-gateway.v1.json",
+  "title": "W01 to W07 Membership Gateway Binding",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "caller": {
+    "logicalWorker": "W01",
+    "role": "Public API / Gateway",
+    "authority": "authenticated request boundary"
+  },
+  "callee": {
+    "logicalWorker": "W07",
+    "role": "Subscription / Commerce / Payment",
+    "authority": "membership lifecycle/read decision boundary"
+  },
+  "transport": {
+    "kind": "Cloudflare Worker Service Binding HTTP",
+    "binding": "W07_MEMBERSHIP",
+    "targetWorker": "luckread-w07",
+    "publicExposure": false
+  },
+  "operations": [
+    {
+      "publicOperationId": "getSubscription",
+      "method": "GET",
+      "publicPath": "/memberships/subscriptions/{subscriptionId}",
+      "internalMethod": "POST",
+      "internalPath": "/internal/membership/subscription/read",
+      "idempotency": "not-required-read"
+    }
+  ],
+  "headers": {
+    "required": [
+      "X-LuckRead-Caller=W01",
+      "X-LuckRead-Transport-Version=1.0",
+      "X-LuckRead-Principal-User-Id=authenticated subject",
+      "X-LuckRead-Correlation-Id=required"
+    ],
+    "authorization": {
+      "publicBoundary": "W01 authenticated bearer principal",
+      "minimumLayer": "L2",
+      "scope": "self",
+      "resourceOwnership": "W02/D1-01 verifies subscription subscriber_id equals principal"
+    }
+  },
+  "rules": [
+    "W01 never reads or writes D1-01 membership tables directly.",
+    "W01 does not accept client-supplied subscriberId or membership state as authoritative input.",
+    "W07 remains the Membership lifecycle/read business boundary.",
+    "W07 obtains authoritative subscription status/version from W02/D1-01.",
+    "Read responses are no-store and contain only the contracted Subscription snapshot.",
+    "Missing authentication, principal, ownership or downstream authority fails closed.",
+    "No new Worker or D1 is introduced."
+  ],
+  "evidenceRequired": [
+    "W01 W07 binding deployment evidence",
+    "positive owned subscription read evidence",
+    "cross-subscriber negative evidence",
+    "authentication/L2 negative evidence",
+    "exact source SHAs"
+  ]
+}
