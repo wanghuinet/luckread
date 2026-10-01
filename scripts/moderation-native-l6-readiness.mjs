@@ -19,6 +19,7 @@ const registerKey = 'MODERATION-L6-READY-' + runId
 let userId = ''
 
 const sql = (v) => "'" + String(v).replaceAll("'", "''") + "'"
+const sqlNullable = (v) => v === null ? 'NULL' : sql(v)
 const d1 = (command) => JSON.parse(execFileSync('npx', ['--yes','wrangler@' + wrangler,'d1','execute',database,'--remote','--yes','--json','--config',config,'--command',command], {encoding:'utf8',env:process.env}))
 const rows = (v) => Array.isArray(v) ? v.flatMap((x) => Array.isArray(x?.results) ? x.results : []) : (Array.isArray(v?.results) ? v.results : [])
 
@@ -55,7 +56,7 @@ try {
   const now = new Date().toISOString()
   d1("UPDATE users SET account_state='ACTIVE', account_state_version=COALESCE(account_state_version,0)+1 WHERE CAST(id AS TEXT)=" + sql(userId))
   d1("INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (" +
-    [roleId,userId,'moderator','global',null,'ACTIVE',now,null,now,now].map(sql).join(',') + ")")
+    [roleId,userId,'moderator','global',null,'ACTIVE',now,null,now,now].map(sqlNullable).join(',') + ")")
 
   const login = await post('/auth/login', { identity:email, credential:password, deviceId:'moderation-l6-ready-' + runId })
   if (login.status !== 200) throw new Error('login failed: HTTP ' + login.status)
