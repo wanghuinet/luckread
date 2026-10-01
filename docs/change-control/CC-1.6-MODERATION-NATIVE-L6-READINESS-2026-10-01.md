@@ -43,3 +43,16 @@ A successful readiness run proves only the authentication/authorization prerequi
 - The correction is limited to evidence tooling; no production Worker, D1 schema, Contract, route semantics, or topology was changed.
 - Backup before correction: `backup/pre-moderation-l6-header-fix-20261001`.
 - Status remains `NOT_GREEN` until the corrected workflow is actually executed and produces runtime evidence.
+
+
+## 2026-10-01 — Run 36800515287 fixture SQL root cause and correction
+
+- Run `36800515287` tested main head `5f4d2488b95f2d2f7512489399885703e82be710`.
+- Payload-native registration succeeded, and the response supplied synthetic user id `55`; failure occurred while the fixture assigned the canonical `moderator` role in D1-01.
+- The emitted INSERT incorrectly serialized JavaScript `null` through the generic SQL quoting helper, producing `scope_id='null'` and `valid_until='null'`.
+- Remote D1 rejected the row with its existing contract check: global scope requires `scope_id IS NULL` (Cloudflare D1 SQLITE constraint code 7500).
+- Cross-check against the generated role-assignment migration and existing AUTH-010 fixture confirms the canonical form is SQL `NULL`, not the string `'null'`.
+- Corrective commit: `a36774fe416327b21b16aaa48e9098c32533f2c8`; only `scripts/moderation-native-l6-readiness.mjs` changed.
+- Backup before correction: `backup/pre-moderation-l6-null-scope-fix-20261001`.
+- No production Worker, D1 schema, Contract, route behavior, or topology was changed.
+- The run did not reach login or W06 queue authorization, so L6 readiness remains `NOT_GREEN` pending execution of the corrected probe.
