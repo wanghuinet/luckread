@@ -1,0 +1,35 @@
+import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
+
+describe('Media upload access', () => {
+  it('requires authentication for creation and binds ownership server-side', () => {
+    const media = read('src/collections/Media.ts')
+
+    expect(media).toContain("create: authenticated")
+    expect(media).toContain("name: 'ownerUserId'")
+    expect(media).toContain("operation === 'create'")
+    expect(media).toContain('data.ownerUserId = String(req.user.id)')
+    expect(media).not.toContain("ownerUserId: req.body")
+  })
+
+  it('limits update and delete to the stored owner', () => {
+    const media = read('src/collections/Media.ts')
+
+    expect(media).toContain("update: ownsMedia")
+    expect(media).toContain("delete: ownsMedia")
+    expect(media).toContain("req.payload.findByID({ collection: 'media', id, depth: 0 })")
+    expect(media).toContain("String(media.ownerUserId ?? '') === String(req.user.id)")
+  })
+
+  it('keeps the existing R2-backed Payload media collection and upload path', () => {
+    const config = read('src/payload.config.ts')
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+
+    expect(config).toContain("r2Storage({")
+    expect(config).toContain("collections: { media: true }")
+    expect(publisher).toContain("authorizedFetch('/api/media'")
+  })
+})
