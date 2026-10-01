@@ -2393,24 +2393,64 @@ paths:
   /users/{userId}/followers:
     get:
       tags: [Users]
-      summary: Discovery draft for GET undefined
+      summary: List followers for a user within the applicable relationship-visibility scope.
+      security:
+        - bearerAuth: []
       operationId: getUsersUserIdFollowers
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/social-relationship-read-operation-policy.v1.json
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50 }
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Bounded follower relationship list.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SocialRelationshipListResponse' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /users/{userId}/following:
     get:
       tags: [Users]
-      summary: Discovery draft for GET undefined
+      summary: List users followed by a user within the applicable relationship-visibility scope.
+      security:
+        - bearerAuth: []
       operationId: getUsersUserIdFollowing
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/social-relationship-read-operation-policy.v1.json
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
+        - $ref: '#/components/parameters/Cursor'
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50 }
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: Bounded following relationship list.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SocialRelationshipListResponse' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
   /users/{userId}/profile:
     get:
@@ -2677,6 +2717,27 @@ components:
         username: { type: string }
         accountState: { $ref: '#/components/schemas/AccountState' }
         layer: { type: string, pattern: '^L[0-8]$' }
+    SocialRelationshipListItem:
+      type: object
+      required: [userId, createdAt]
+      additionalProperties: false
+      properties:
+        userId: { $ref: '#/components/schemas/ResourceId' }
+        createdAt: { type: string, format: date-time }
+    SocialRelationshipListResponse:
+      type: object
+      required: [items, nextCursor, hasMore, requestId]
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/SocialRelationshipListItem' }
+        nextCursor:
+          type: [string, 'null']
+          maxLength: 1024
+        hasMore: { type: boolean }
+        requestId: { $ref: '#/components/schemas/RequestId' }
     Content:
       type: object
       required: [id, state, version, etag]
