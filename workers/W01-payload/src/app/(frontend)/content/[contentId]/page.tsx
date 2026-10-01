@@ -155,7 +155,7 @@ export default function ContentDetailPage({
             ) : null}
             {content.mediaRefs
               ?.filter((url) => url !== content.coverRef)
-               .map((url, index) => (
+              .map((url, index) => (
                 <img alt={content.title + ' 配图 ' + (index + 1)} key={url} loading="lazy" src={url} />
               ))}
           </div>
