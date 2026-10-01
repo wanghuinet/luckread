@@ -27,7 +27,7 @@ on:
         description: Successful W06 deployment run ID that deployed source_sha
         required: true
         type: string
-        default: "REPLACE_WITH_SUCCESSFUL_W06_DEPLOY_RUN_ID"
+        default: "36809834389"
       confirm:
         description: Type RUN_MODERATION_E2E to permit controlled remote fixture/test mutations
         required: true
