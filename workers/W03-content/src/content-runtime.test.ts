@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, validateInput, validateListFilters } from './content-runtime.js'
-import { parseListLimit } from './index.js'
+import { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
   it('accepts the canonical lifecycle vocabulary and cursor round-trip', () => {
@@ -54,6 +54,14 @@ describe('W03 content contract core', () => {
     expect(() => parseListLimit('51')).toThrow()
     expect(() => parseListLimit('1.5')).toThrow()
     expect(() => parseListLimit('abc')).toThrow()
+  })
+
+  it('requires L3 or higher for creator content operations', () => {
+    expect(hasCreatorContentPermission('L3')).toBe(true)
+    expect(hasCreatorContentPermission('L8')).toBe(true)
+    expect(hasCreatorContentPermission('L2')).toBe(false)
+    expect(hasCreatorContentPermission('')).toBe(false)
+    expect(hasCreatorContentPermission('creator')).toBe(false)
   })
 
   it('validates creator content list filters', () => {
