@@ -22,5 +22,11 @@
       "database_id": "bda1d247-a371-4244-91ae-aef96034db7f",
       "migrations_dir": "migrations"
     }
+  ],
+  "services": [
+    {
+      "binding": "W03_CONTENT_MODERATION",
+      "service": "luckread-w03"
+    }
   ]
 }
