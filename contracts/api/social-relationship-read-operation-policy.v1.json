@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/social-relationship-read-operation-policy.v1.json",
+  "title": "LuckRead Social Relationship Read Operation Policy",
+  "version": "1.0.0",
+  "domain": "social",
+  "status": "CONTRACTED_PARTIAL",
+  "operations": [
+    {
+      "operationId": "getUsersUserIdFollowers",
+      "method": "GET",
+      "path": "/users/{userId}/followers",
+      "visibility": "authenticated_subject_or_visible_profile",
+      "capability": "followers_list",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": true,
+        "permission": null,
+        "scope": "relationship_subject_visibility"
+      },
+      "resource": {
+        "class": "BOUNDED_AUTHORITATIVE_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 50,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0,
+        "responseItemsMax": 50
+      },
+      "pagination": {
+        "style": "OPAQUE_CURSOR",
+        "pageSizeMax": 50,
+        "stableSort": ["createdAt DESC", "relationshipId DESC"],
+        "cursorFields": ["createdAt", "relationshipId"]
+      },
+      "cache": {
+        "mode": "NO_SHARED_CACHE_UNTIL_VISIBILITY_POLICY_IS_BOUND",
+        "shared": false
+      },
+      "retry": { "maxAttempts": 1, "clientRetrySafe": true },
+      "antiAbuse": {
+        "required": true,
+        "scopes": ["ip", "device", "account", "endpoint", "resource"]
+      },
+      "state": {
+        "required": ["subject_exists", "relationship_visibility_allows", "block_mute_policy_allows"]
+      },
+      "security": [
+        "subject_scope_server_derived",
+        "relationship_member_ids_server_derived",
+        "no_counter_authority",
+        "block_mute_policy",
+        "no_unbounded_expansion"
+      ]
+    },
+    {
+      "operationId": "getUsersUserIdFollowing",
+      "method": "GET",
+      "path": "/users/{userId}/following",
+      "visibility": "authenticated_subject_or_visible_profile",
+      "capability": "following_list",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": true,
+        "permission": null,
+        "scope": "relationship_subject_visibility"
+      },
+      "resource": {
+        "class": "BOUNDED_AUTHORITATIVE_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 50,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0,
+        "responseItemsMax": 50
+      },
+      "pagination": {
+        "style": "OPAQUE_CURSOR",
+        "pageSizeMax": 50,
+        "stableSort": ["createdAt DESC", "relationshipId DESC"],
+        "cursorFields": ["createdAt", "relationshipId"]
+      },
+      "cache": {
+        "mode": "NO_SHARED_CACHE_UNTIL_VISIBILITY_POLICY_IS_BOUND",
+        "shared": false
+      },
+      "retry": { "maxAttempts": 1, "clientRetrySafe": true },
+      "antiAbuse": {
+        "required": true,
+        "scopes": ["ip", "device", "account", "endpoint", "resource"]
+      },
+      "state": {
+        "required": ["subject_exists", "relationship_visibility_allows", "block_mute_policy_allows"]
+      },
+      "security": [
+        "subject_scope_server_derived",
+        "relationship_member_ids_server_derived",
+        "no_counter_authority",
+        "block_mute_policy",
+        "no_unbounded_expansion"
+      ]
+    }
+  ],
+  "evidence": {
+    "openapi": "CONTRACTED",
+    "dto": "CONTRACTED",
+    "entity": "CONTRACTED_NOT_VERIFIED",
+    "persistence": "CONTRACTED_NOT_VERIFIED",
+    "runtime": "MISSING",
+    "securityE2E": "MISSING",
+    "evidenceRegistry": "MISSING"
+  }
+}
