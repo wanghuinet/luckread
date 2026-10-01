@@ -612,6 +612,22 @@
           "status": "CONTRACTED_NOT_VERIFIED"
         },
         {
+          "fieldId": "ENT-SUBSCRIPTION-F-VERSION",
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": false,
+          "lifecycle": "mutable_concurrency",
+          "classification": "CONCURRENCY_VERSION",
+          "apiExposure": "SCOPED",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED",
+          "status": "CONTRACTED_NOT_VERIFIED"
+        },
+
+        {
           "fieldId": "ENT-SUBSCRIPTION-F-SUBSCRIBER-ID",
           "name": "subscriberId",
           "type": "text",
