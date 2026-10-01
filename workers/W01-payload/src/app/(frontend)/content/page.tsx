@@ -108,7 +108,7 @@ export default function ContentBrowsePage() {
         </>
       ) : null}
       {!loading && error ? (
-        <div className="content-browse-state">
+        <div className="content-browse-state" role="status">
           <p>{error}</p>
           <button className="button button-quiet" onClick={() => void load()} type="button">重新加载</button>
         </div>
