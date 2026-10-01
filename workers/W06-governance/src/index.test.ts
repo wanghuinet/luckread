@@ -151,6 +151,7 @@ describe('W06 runtime', () => {
       status: 'ok',
       auditPersistence: 'enabled',
       d1Binding: true,
+      moderationRuntime: 'enabled',
     })
   })
 })
