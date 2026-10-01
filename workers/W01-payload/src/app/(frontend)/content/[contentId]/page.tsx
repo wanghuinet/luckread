@@ -42,6 +42,7 @@ export default function ContentDetailPage({
 
   useEffect(() => {
     let cancelled = false
+    const controller = new AbortController()
     const timer = window.setTimeout((): void => {
       void (async () => {
         try {
@@ -49,6 +50,7 @@ export default function ContentDetailPage({
           const response = await fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`, {
             headers: { accept: 'application/json' },
             cache: 'no-store',
+            signal: controller.signal,
           })
           const data = await response.json().catch((): null => null)
           if (!response.ok || !data?.id || data.state !== 'PUBLISHED') {
@@ -59,14 +61,16 @@ export default function ContentDetailPage({
           setContent(resolved)
           if (resolved.bodyRef) {
             try {
-              const bodyResponse = await fetch(resolved.bodyRef, { cache: 'no-store' })
-              if (bodyResponse.ok) setBody(await bodyResponse.text())
+              const bodyResponse = await fetch(resolved.bodyRef, { cache: 'no-store', signal: controller.signal })
+              if (bodyResponse.ok && !cancelled) setBody(await bodyResponse.text())
             } catch {
               // Body media is optional; metadata/media should still render.
             }
           }
-        } catch {
-          if (!cancelled) setError('内容不存在，或暂时无法读取。')
+        } catch (cause) {
+          if (cancelled || controller.signal.aborted) return
+          if (cause instanceof DOMException && cause.name === 'AbortError') return
+          setError('内容不存在，或暂时无法读取。')
         } finally {
           if (!cancelled) setLoading(false)
         }
@@ -75,6 +79,7 @@ export default function ContentDetailPage({
 
     return () => {
       cancelled = true
+      controller.abort()
       window.clearTimeout(timer)
     }
   }, [params, retryKey])
