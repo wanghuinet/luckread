@@ -208,7 +208,7 @@
       "payloadNativeEvidenceRefs": [],
       "extensionEvidenceRefs": [],
       "blockers": [
-        "No concrete implementation evidence recorded."
+        "No concrete implementation evidence recorded; contract-only model."
       ],
       "status": "BLOCKED"
     },
@@ -222,7 +222,7 @@
       "payloadNativeEvidenceRefs": [],
       "extensionEvidenceRefs": [],
       "blockers": [
-        "No concrete implementation evidence recorded."
+        "No concrete implementation evidence recorded; contract-only model."
       ],
       "status": "BLOCKED"
     },
@@ -237,6 +237,20 @@
       "extensionEvidenceRefs": [],
       "blockers": [
         "No concrete implementation evidence recorded."
+      ],
+      "status": "BLOCKED"
+    },
+    {
+      "entityId": "ENT-MEMBERSHIP-PLAN",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "schemaEvidenceRefs": [],
+      "migrationEvidenceRefs": [],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "No concrete implementation evidence recorded; contract-only model."
       ],
       "status": "BLOCKED"
     }
