@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/v1/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
   "title": "Moderation Queue Foundation D1-03 Logical Persistence Contract",
   "version": "1.0.0",
-  "status": "CONTRACTED_NOT_VERIFIED",
+  "status": "CONTRACTED_AUTHORITY_ADMITTED",
   "entityIds": [
     "ENT-MODERATION-CASE",
     "ENT-MODERATION-DECISION"
@@ -260,6 +260,67 @@
         "ix_moderation_decisions_case_created (case_id, created_at)",
         "ix_moderation_decisions_policy (policy_version, created_at)"
       ]
+    },
+    "moderation_decision_idempotency": {
+      "purpose": "Operational idempotency record for decideModerationCase; transport metadata only, not a business entity.",
+      "primaryKey": "id",
+      "columns": {
+        "id": {
+          "type": "TEXT",
+          "required": true,
+          "unique": true
+        },
+        "reviewer_id": {
+          "type": "TEXT",
+          "required": true,
+          "indexed": true
+        },
+        "case_id": {
+          "type": "TEXT",
+          "required": true,
+          "indexed": true
+        },
+        "idempotency_key": {
+          "type": "TEXT",
+          "required": true
+        },
+        "request_hash": {
+          "type": "TEXT",
+          "required": true
+        },
+        "decision_id": {
+          "type": "TEXT",
+          "required": true,
+          "indexed": true
+        },
+        "response_status": {
+          "type": "INTEGER",
+          "required": true
+        },
+        "response_json": {
+          "type": "TEXT",
+          "required": true
+        },
+        "created_at": {
+          "type": "TEXT",
+          "required": true,
+          "indexed": true
+        },
+        "expires_at": {
+          "type": "TEXT",
+          "required": true,
+          "indexed": true
+        }
+      },
+      "constraints": [
+        "(reviewer_id, case_id, idempotency_key) is unique.",
+        "request_hash binds the complete admitted decision command; key reuse with a different hash is rejected.",
+        "This record contains no reviewer credentials, raw evidence or internal risk thresholds."
+      ],
+      "indexes": [
+        "uq_moderation_decision_idempotency UNIQUE (reviewer_id, case_id, idempotency_key)",
+        "ix_moderation_idem_expiry (expires_at)"
+      ]
     }
   },
   "mutationBudgets": {
@@ -277,10 +338,11 @@
   },
   "migrationPlan": {
     "migrationId": "MIG-MODERATION-QUEUE-FOUNDATION-D1-03-V1",
-    "status": "NOT_AUTHORIZED",
+    "status": "IMPLEMENTATION_ADMITTED_REMOTE_EXECUTION_PENDING",
     "targetTables": [
       "moderation_cases",
-      "moderation_decisions"
+      "moderation_decisions",
+      "moderation_decision_idempotency"
     ],
     "executionEvidenceRequired": [
       "schema/table evidence",
@@ -306,9 +368,9 @@
   ],
   "readiness": {
     "entity": "CONTRACTED_NOT_VERIFIED",
-    "persistence": "CONTRACTED_NOT_VERIFIED",
-    "migration": "NOT_STARTED",
-    "runtime": "BLOCKED",
+    "persistence": "IMPLEMENTATION_ADMITTED",
+    "migration": "SOURCE_READY_REMOTE_PENDING",
+    "runtime": "BLOCKED_BY_EVIDENCE",
     "evidence": "NOT_BOUND"
   }
 }
