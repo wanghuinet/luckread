@@ -1,0 +1,20 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luckread.com/contracts/v1/persistence/SOCIAL-003-reaction-persistence-contract.v1.json",
+  "title":"SOCIAL-003 Reaction Persistence Contract",
+  "version":"1.0.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "domainId":"D1-02",
+  "worker":"W05",
+  "table":"social_reactions",
+  "database":"D1-02",
+  "authoritativeEntity":"ENT-SOCIAL-REACTION",
+  "migrationStatus":"NOT_CREATED",
+  "columns":["reaction_id","actor_user_id","target_type","target_id","reaction_type","created_at"],
+  "uniqueConstraint":"UNIQUE(actor_user_id,target_type,target_id,reaction_type)",
+  "indexes":["INDEX(target_type,target_id,created_at DESC,reaction_id DESC)","INDEX(actor_user_id,target_type,target_id,reaction_type)"],
+  "writeRules":["Like uses atomic insert/upsert under the unique key.","Unlike uses atomic delete by actor + target + type.","No counter column is stored here.","No projection/cache row is authoritative."],
+  "readBudget":{"d1ReadMax":1,"d1WriteMax":1,"rpcMax":0},
+  "portability":"PostgreSQL-compatible logical schema",
+  "requiredEvidence":["migration","remote D1 schema","concurrency","runtime","reconciliation","security-E2E"]
+}
