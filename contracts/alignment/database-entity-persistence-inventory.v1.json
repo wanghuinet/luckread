@@ -228,6 +228,23 @@
         "contracts/entity/SOCIAL-003-like-relationship-contract.v1.json",
         "contracts/admission/SOCIAL-003-like-runtime-admission.v1.json"
       ]
+    },
+    {
+      "entityId": "ENT-SOCIAL-COMMENT",
+      "entityName": "SocialComment",
+      "domainId": "D1-02",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+      "adapter": "Cloudflare D1 (D1-02) / W05 DB binding",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+      "persistenceContractRef": "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/SOCIAL-004-comment-reply-contract.v1.json",
+        "contracts/entity/entity-field-contract-social-004-comment.v1.json",
+        "contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json"
+      ]
     }
   ],
   "rules": {
