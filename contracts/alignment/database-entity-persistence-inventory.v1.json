@@ -220,6 +220,42 @@
         "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json"
       ]
     }
+
+    ,
+    {
+      "entityId": "ENT-SOCIAL-REACTION",
+      "entityName": "SocialReaction",
+      "domainId": "D1-02",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "NOT_CREATED",
+      "adapter": "",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "persistenceContractRef": "contracts/persistence/SOCIAL-003-reaction-persistence-contract.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/SOCIAL-003-reaction-entity-contract.v1.json",
+        "contracts/persistence/SOCIAL-003-reaction-persistence-contract.v1.json"
+      ]
+    }
+
+    ,
+    {
+      "entityId": "ENT-SOCIAL-COMMENT",
+      "entityName": "SocialComment",
+      "domainId": "D1-02",
+      "entityStatus": "PROPOSED",
+      "implementationRef": "",
+      "persistenceStatus": "NOT_CREATED",
+      "adapter": "",
+      "migrationRefs": [],
+      "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
+      "persistenceContractRef": "contracts/persistence/SOCIAL-004-comment-persistence-contract.v1.json",
+      "evidenceRefs": [
+        "contracts/entity/SOCIAL-004-comment-entity-contract.v1.json",
+        "contracts/persistence/SOCIAL-004-comment-persistence-contract.v1.json"
+      ]
+    }
 ],
   "rules": {
     "noInference": true,
