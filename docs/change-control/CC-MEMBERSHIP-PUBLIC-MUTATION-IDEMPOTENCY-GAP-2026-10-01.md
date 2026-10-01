@@ -1,34 +1,44 @@
-# Change Control: Membership Public Mutation Idempotency Authority Gap — 2026-10-01
+# Change Control: Membership Public Mutation Idempotency Authority — 2026-10-01
 
-- Status: BLOCKED / AUTHORITY_DECISION_REQUIRED
-- Scope: `createSubscription` and `cancelSubscription` public mutation admission
-- Affected path: W01 → W07 → W02 / D1-01
+- Status: RESOLVED_FOR_BOUNDED_IMPLEMENTATION / NOT_GREEN
+- Scope: `createSubscription` and `cancelSubscription` public mutation implementation
+- Persistence owner: W02 / D1-01
+- Lifecycle owner: W07
+- Public boundary: W01
 
-## Finding
+## Resolution
 
-The public Membership contract requires Idempotency-Key semantics, including safe replay of the completed result and rejection of same-key/different-input reuse. The current bounded W07→W02 implementation validates the header and uses optimistic versioning, but does not yet persist a Membership-specific idempotency record.
+The canonical concurrency contract requires the idempotency record and protected business write to commit in the same transaction. Membership Subscription and Entitlement access state already have D1-01 as their authoritative persistence domain and W02 as the persistence boundary.
 
-The canonical D1 domain mapping assigns operational idempotency records to D1-03. W07 is not currently bound directly to D1-03, and introducing a new Worker/D1 binding solely for this gap would violate the frozen 12-Worker / 4-D1 topology.
+Therefore the smallest architecture-consistent solution is a **Membership-scoped idempotency record in D1-01**, committed atomically with the Subscription/Entitlement mutation. This is a domain-local replay-protection record, not the generic D1-03/W10 execution-idempotency authority.
 
-## Control decision
+No new Worker, D1 or cross-D1 transaction is introduced.
 
-1. Do not expose `createSubscription` or `cancelSubscription` as public success paths yet.
-2. Do not emulate idempotency with process memory, cache, or client-selected subscription state.
-3. Do not place operational idempotency rows into D1-01 Membership tables unless a canonical domain decision explicitly changes that ownership.
-4. The next admission step must identify an existing approved D1-03 operational-idempotency authority and an existing Worker/service path, or explicitly reconcile the ownership contract before implementation.
-5. Until then, the bounded W07 lifecycle kernel and W01 authenticated `getSubscription` read path remain valid implementation slices, but are not public mutation GREEN evidence.
+## Admitted semantics
 
-## Evidence / related authority
+- Same owner + operation + key + same request hash → return the previously committed response without repeating the business mutation.
+- Same owner + operation + key + different request hash → `422 IDEMPOTENCY_KEY_REUSE_CONFLICT`.
+- Concurrent same-key requests converge at the unique idempotency key and the Subscription version CAS; the losing transaction cannot commit a second state mutation.
+- Expired records may be reclaimed after their TTL.
+- The authoritative Subscription version remains the If-Match/CAS source; Idempotency-Key does not replace optimistic concurrency.
 
-- `docs/04-WORKER-MASTER-v1.0.md`
+## Scope controls
+
+1. W02 remains the only D1-01 write boundary.
+2. W07 remains the lifecycle decision owner.
+3. W01 never writes D1-01 directly.
+4. Payment-originated ACTIVE transitions remain separately blocked until a trusted provider authority is admitted.
+5. Public GREEN still requires controlled migration execution, runtime/security/concurrency E2E and Evidence Registry reconciliation.
+6. No generic idempotency service or new platform database is created.
+
+## Related authority
+
 - `docs/09-D1-DOMAIN-MASTER-v1.0.md`
 - `docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md`
-- `contracts/api/rc-04-06-share-subscription-entitlement.v1.json`
-- `contracts/api/interaction-operation-policy.v1.json`
-- `contracts/admission/W07-subscription-implementation-admission.v1.json`
+- `contracts/persistence/MEMBERSHIP-D1-01-subscription-entitlement-persistence.v1.json`
+- `workers/W02-identity/src/membership/access-state-persistence.ts`
+- `workers/W07-subscription-commerce/migrations/0001_membership_subscription_entitlement.sql`
 
-## STOP conditions
+## Result
 
-- No public Membership mutation route is promoted to GREEN without durable replay semantics.
-- No new D1 or Worker is created for idempotency.
-- No direct W01 membership D1 write is introduced.
+The previous “idempotency authority missing” blocker is resolved for the bounded Membership implementation. Runtime GREEN remains blocked by migration and evidence gates.
