@@ -225,6 +225,39 @@ a { color: inherit; }
   font-size: 12px;
   font-weight: 750;
 }
+.lr-preview-cover {
+  margin: 18px 0 0;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #eef3f8;
+}
+.lr-preview-cover img {
+  width: 100%;
+  max-height: 340px;
+  display: block;
+  object-fit: cover;
+}
+.lr-preview-media {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.lr-preview-media img,
+.lr-preview-media video {
+  width: 100%;
+  aspect-ratio: 1;
+  display: block;
+  object-fit: cover;
+  border: 1px solid #e3e9f1;
+  border-radius: 10px;
+  background: #101828;
+}
+.lr-preview-media > span {
+  grid-column: 1 / -1;
+  color: var(--lr-muted);
+  font-size: 10px;
+}
 .content-detail {
   width: min(960px, calc(100% - 36px));
   min-height: 100vh;
