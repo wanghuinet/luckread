@@ -118,7 +118,7 @@ const login = await post('/auth/login', {
 
 const accessToken = login.data?.accessToken
 if (login.status !== 200 || typeof accessToken !== 'string') {
-  throw new Error('native reviewer login failed: HTTP ' + login.status)
+  throw new Error('native reviewer login failed: HTTP ' + login.status + ' body=' + JSON.stringify(login.data))
 }
 if (login.data?.layer !== 'L6') {
   throw new Error('native reviewer layer mismatch: expected L6, got ' + String(login.data?.layer))
