@@ -45,3 +45,30 @@ For all other authoritative business state, calls must terminate at the owning W
 - Historical evidence is not rewritten to hide the path that existed when it was produced.
 - Planned, unrun, unverified, or unsubmitted work is not marked GREEN.
 - Mapping 0 closure remains independent from product feature delivery.
+
+
+## Boundary controls completed
+
+| Control | State |
+|---|---|
+| W01 ingress / terminal Worker boundary | COMPLETE — official Gate run 36819360570 |
+| D1-03 Worker owner partition | COMPLETE — official Gate run 36819667831 |
+| Worker D1 access Guard | IMPLEMENTED / OFFICIAL CURRENT-SHA RUN NOT OBSERVED |
+| AUTH-013 W04 projection/deindex evidence | NEXT — controlled workflow dispatch required |
+
+The Worker D1 access Guard remains intentionally unmarked GREEN until an Actions run against its finalized detector returns a terminal result.
+
+## Current evidence cursor
+
+The Mapping 0 authoritative cursor remains:
+`AUTH-013-LIFECYCLE-SIDE-EFFECT-COVERAGE-001`
+
+The next controlled external evidence is the existing W04 side-effect matrix workflow:
+`.github/workflows/auth-013-w04-side-effect-matrix-evidence.yml`
+
+It is pinned to the admitted W04 source/version and has `confirm=RUN` as the default workflow-dispatch input. This evidence requires Cloudflare credentials and deliberately does not redeploy W04.
+
+## Current main
+
+Latest main after the current boundary-control work:
+`4484de32df9b32e6648a881441b6cbc2facc1229`
