@@ -4565,3 +4565,13 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Backup before the correction: `backup/pre-moderation-e2e-cloudflare-env-20261001`.
 - The failed run produced no admissible final Security E2E evidence because 422, 428/412, remote evidence, and provenance steps were not reached; the artifact remains diagnostic only.
 - Status: `NOT_GREEN`, pending a new clean Security E2E run on the corrected workflow.
+
+## 2026-10-01 — Security E2E run 36811002497 eventual-convergence diagnosis
+
+- Run `36811002497` passed exact W01/W06 deployment verification, native L6 reviewer setup, queue/case visibility, APPROVED decision, W06 persistence, `IDEMPOTENT_REPLAY=PASS`, idempotency key-reuse `422`, and `PRECONDITION_428_412=PASS`.
+- The remote evidence step then failed because W03 content remained `PENDING_REVIEW/v1` while the W06 outbox remained `PENDING/attempts=0`. Decision, Case, Decision Idempotency and AuditEvent were persisted correctly.
+- The E2E workflow was checking W03 convergence immediately after the decision request, while CC-1.3 defines W06→W03 as post-commit asynchronous enforcement with scheduled outbox retry. The failed assertion therefore did not establish a W03 runtime defect by itself.
+- Main commit `d76acd36cd9707d948eb6118f29ee0315285a291` adds a bounded polling step (20 checks, 5 seconds apart) that waits for the durable W06 outbox to reach `DELIVERED` and W03 content to reach `APPROVED/v2` before capturing final remote evidence.
+- Backup before this change: `backup/pre-moderation-e2e-eventual-convergence-20261001`.
+- No production API, Worker topology, D1 topology, binding, schema, or Contract semantic was changed.
+- Status remains `NOT_GREEN` pending a clean E2E run proving eventual W03 convergence and final Decision + AuditEvent + Outbox evidence.
