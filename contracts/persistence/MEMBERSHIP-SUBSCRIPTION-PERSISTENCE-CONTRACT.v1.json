@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/persistence/MEMBERSHIP-SUBSCRIPTION-PERSISTENCE-CONTRACT.v1.json",
+  "title": "Membership / Subscription Persistence Contract",
+  "version": "1.0.0",
+  "status": "BLOCKED_CONTRACT_CONFLICT",
+  "authority": {
+    "domain": "MEMBERSHIP",
+    "worker": "W07",
+    "d1": "D1-01"
+  },
+  "entities": [
+    {
+      "entityId": "ENT-MEMBERSHIP-PLAN",
+      "table": "membership_plans",
+      "primaryKey": "plan_id + version",
+      "requiredFields": [
+        "planId",
+        "ownerType",
+        "ownerId",
+        "version",
+        "name",
+        "tier",
+        "billingInterval",
+        "status",
+        "visibility",
+        "createdAt",
+        "updatedAt"
+      ],
+      "constraints": [
+        "planId + version is unique",
+        "historical plan versions are immutable",
+        "owner scope is server-enforced"
+      ],
+      "indexes": [
+        "owner_id,status,created_at",
+        "plan_id,version"
+      ]
+    },
+    {
+      "entityId": "ENT-SUBSCRIPTION",
+      "table": "subscriptions",
+      "primaryKey": "subscription_id",
+      "requiredFields": [
+        "subscriptionId",
+        "subscriberId",
+        "planId",
+        "planVersion",
+        "status",
+        "startedAt",
+        "currentPeriodStart",
+        "currentPeriodEnd",
+        "cancelAt",
+        "createdAt",
+        "updatedAt"
+      ],
+      "constraints": [
+        "one current authoritative status per subscription",
+        "plan version is retained",
+        "payment/ledger facts are references only",
+        "business-scope uniqueness for duplicate active subscriptions is enforced atomically when required"
+      ],
+      "indexes": [
+        "subscriber_id,status,created_at",
+        "plan_id,status,created_at",
+        "current_period_end"
+      ],
+      "concurrency": "optimistic version check / compare-and-swap"
+    },
+    {
+      "entityId": "ENT-ENTITLEMENT-GRANT",
+      "table": "entitlement_grants",
+      "primaryKey": "entitlement_id",
+      "requiredFields": [
+        "entitlementId",
+        "subscriptionId",
+        "entitlementType",
+        "scopeType",
+        "scopeId",
+        "status",
+        "effectiveAt",
+        "expiresAt",
+        "sourcePlanVersion",
+        "createdAt",
+        "updatedAt"
+      ],
+      "constraints": [
+        "entitlement source subscription exists",
+        "source plan version is retained",
+        "duplicate active grants for the same subscription/type/scope are prevented atomically",
+        "financial amounts are never stored as membership authority"
+      ],
+      "indexes": [
+        "subscription_id,status",
+        "scope_type,scope_id,status",
+        "expires_at"
+      ],
+      "concurrency": "idempotent grant/revoke/expiry transition"
+    }
+  ],
+  "migration": {
+    "status": "NOT_CREATED",
+    "mustBeControlled": true,
+    "d1": "D1-01",
+    "noRuntimeExecutionClaim": true
+  },
+  "portability": {
+    "target": "PostgreSQL-compatible logical model",
+    "d1SpecificAuthority": "implementation adapter only"
+  },
+  "contractConflict": {
+    "blocking": true,
+    "sourceA": "contracts/entity/MEMBERSHIP-SUBSCRIPTION-FOUNDATION.v1.json",
+    "sourceB": "contracts/state-machines/subscription.json",
+    "detail": "Entity contract uses lowercase lifecycle states pending/active/grace/paused/canceled/expired; canonical state machine currently uses PENDING/ACTIVE/PAST_DUE/CANCELED/EXPIRED and does not define GRACE or PAUSED.",
+    "resolutionRequired": "Canonical state terminology and transition set must be reconciled before W07 implementation admission."
+  },
+  "nonGoals": [
+    "No new Worker.",
+    "No new D1 database.",
+    "No migration execution.",
+    "No payment or ledger authority duplication.",
+    "No runtime GREEN claim."
+  ]
+}
