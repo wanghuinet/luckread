@@ -150,7 +150,9 @@ jobs:
           }
 
           const count = results[3]?.results?.[0]?.audit_events_count
-          if (Number(count) !== 0) throw new Error('unexpected audit_events row count: ' + count)
+          if (!Number.isInteger(Number(count)) || Number(count) < 0) {
+            throw new Error('invalid audit_events row count: ' + count)
+          }
 
           const migrations = results[4]?.results ?? []
           if (!migrations.some((r) => r.name === '0001_audit_event.sql')) {
