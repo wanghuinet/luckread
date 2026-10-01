@@ -1133,8 +1133,8 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/social-relationship-read-operation-policy.v1.json"
     },
     {
       "operationId": "getUsersUserIdFollowing",
@@ -1146,8 +1146,8 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/social-relationship-read-operation-policy.v1.json"
     },
     {
       "operationId": "getUsersUserIdProfile",
