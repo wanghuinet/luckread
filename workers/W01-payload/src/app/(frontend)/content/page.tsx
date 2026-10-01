@@ -107,14 +107,12 @@ export default function ContentBrowsePage() {
         <>
           <section className="content-browse-grid" aria-label="公开内容列表">
             {page.items.map((item) => {
-              const cover = item.coverRef || item.mediaRefs?.[0]
+              const cover = item.coverRef
               return (
                 <Link className="content-feed-card" href={'/content/' + encodeURIComponent(item.id)} key={item.id}>
                   <div className="content-feed-cover">
                     {cover ? (
-                      item.contentType === 'video'
-                        ? <video aria-label={item.title} muted playsInline preload="metadata" src={cover} />
-                        : <img alt="" loading="lazy" src={cover} />
+                      <img alt={item.title ? item.title + '封面' : '内容封面'} loading="lazy" src={cover} />
                     ) : (
                       <span>{labels[item.contentType].toUpperCase()}</span>
                     )}
