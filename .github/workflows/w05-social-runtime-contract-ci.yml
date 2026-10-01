@@ -16,6 +16,8 @@ on:
       - 'contracts/entity/SOCIAL-004-comment-reply-contract.v1.json'
       - 'contracts/entity/entity-field-contract-social-004-comment.v1.json'
       - 'contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json'
+      - 'contracts/admission/SOCIAL-004-comment-runtime-admission.v1.json'
+      - 'docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-RUNTIME-ADMISSION-2026-10-01.md'
   push:
     branches: [main]
     paths:
@@ -33,6 +35,8 @@ on:
       - 'contracts/entity/SOCIAL-004-comment-reply-contract.v1.json'
       - 'contracts/entity/entity-field-contract-social-004-comment.v1.json'
       - 'contracts/persistence/SOCIAL-004-comment-d1-02-persistence.v1.json'
+      - 'contracts/admission/SOCIAL-004-comment-runtime-admission.v1.json'
+      - 'docs/change-control/CC-MAPPING-0-SOCIAL-004-COMMENT-RUNTIME-ADMISSION-2026-10-01.md'
 permissions:
   contents: read
 jobs:
