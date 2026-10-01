@@ -1307,7 +1307,9 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "social.follow"
+      ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
@@ -1381,7 +1383,9 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "social.follow"
+      ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
