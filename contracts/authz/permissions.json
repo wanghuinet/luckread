@@ -525,6 +525,30 @@
       "action": "update",
       "minLayer": "L1",
       "scope": "own"
+    },
+    {
+      "name": "subscription.pause",
+      "resource": "subscription",
+      "action": "pause",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "subscription.resume",
+      "resource": "subscription",
+      "action": "resume",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
+      "name": "subscription.change_plan",
+      "resource": "subscription",
+      "action": "change_plan",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
     }
   ],
   "x-forbidden-patterns": [
