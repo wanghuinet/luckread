@@ -156,9 +156,10 @@ const parseDecision = (value: unknown): {
     typeof body.effectiveAt !== 'string' ||
     (body.expiresAt !== null && body.expiresAt !== undefined && typeof body.expiresAt !== 'string')
   ) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
+  const expectedVersion = body.expectedVersion as number
   return {
-    decision: body.decision,
-    expectedVersion: body.expectedVersion,
+    decision: body.decision as 'APPROVED' | 'REJECTED',
+    expectedVersion,
     policyVersion: body.policyVersion,
     reasonCode: body.reasonCode,
     severity: body.severity,
