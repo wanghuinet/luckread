@@ -71,6 +71,8 @@ describe('Creator Center admin extension', () => {
     expect(contentBrowse).toContain('content-feed-card-skeleton')
     expect(contentBrowse).toContain('Array.from({ length: 6 }')
     expect(contentBrowse).toContain('aria-busy="true"')
+    expect(contentBrowse).toContain('role="status"')
+    expect(read('src/app/(frontend)/styles.css')).toContain('@media (prefers-reduced-motion: reduce)')
     expect(read('src/app/(frontend)/styles.css')).toContain('.content-feed-card-skeleton')
     expect(contentDetail).toContain("setActionMessage('无法复制链接，请从地址栏复制当前页面地址。')")
     expect(contentDetail).toContain('content-detail-action-status')
