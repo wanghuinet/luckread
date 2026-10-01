@@ -188,5 +188,5 @@
     "contracts/transport/W01-W05-social-follow-http-binding.v1.json"
   ],
   "transportContract": "contracts/transport/W01-W05-social-follow-http-binding.v1.json",
-  "notes": "Existing authority contracts are now explicitly bound for actor principal, account state, follow permission, target identity, block policy, anti-abuse admission and caller provenance. Only target followability and privacy/audience operational authority remain unresolved."
+  "notes": "Existing authority contracts are explicitly bound for actor principal, account state, follow permission, target identity, block policy, anti-abuse admission and caller provenance. Only target followability and privacy/audience operational authority remain unresolved."
 }
