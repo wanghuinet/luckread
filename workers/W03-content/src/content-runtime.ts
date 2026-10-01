@@ -85,7 +85,7 @@ export class ContentRuntimeError extends Error {
 }
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
-const EDITABLE_STATES = new Set<ContentState>(['DRAFT', 'REJECTED', 'PENDING_REVIEW'])
+const EDITABLE_STATES = new Set<ContentState>(['DRAFT', 'REJECTED', 'PENDING_REVIEW', 'RESTORED'])
 const ALL_STATES: readonly ContentState[] = [
   'DRAFT','PENDING_REVIEW','REJECTED','APPROVED','SCHEDULED',
   'PUBLISHED','UNPUBLISHED','ARCHIVED','DELETED','RESTORED',
@@ -682,6 +682,7 @@ export const canTransitionContentState = (
   if (from === 'UNPUBLISHED' && (to === 'PUBLISHED' || to === 'DRAFT')) return true
   if (from === 'ARCHIVED' && to === 'DRAFT') return true
   if (from === 'DELETED' && to === 'RESTORED') return true
+  if (from === 'RESTORED' && to === 'DRAFT') return true
   return false
 }
 
