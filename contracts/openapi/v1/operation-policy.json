@@ -801,7 +801,30 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+      "resource": {
+        "class": "CACHE_FIRST_BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 16,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0,
+        "responseItemsMax": 50
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      }
     },
     {
       "operationId": "getFeed",
@@ -997,7 +1020,30 @@
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+      "resource": {
+        "class": "CACHE_FIRST_BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 16,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0,
+        "responseItemsMax": 50
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      }
     },
     {
       "operationId": "getNotificationPreferences",
@@ -2092,7 +2138,29 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "resource": {
+        "class": "CACHE_FIRST_BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0,
+        "responseItemsMax": 1
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      }
     },
     {
       "operationId": "postGalleries",
@@ -2278,7 +2346,51 @@
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 1,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 4,
+        "d1WriteRowsMax": 2,
+        "rpcMax": 1,
+        "eventCountMax": 1
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "depthBounded": true
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "device",
+          "account",
+          "endpoint",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK",
+          "REVIEW"
+        ]
+      },
+      "security": [
+        "subscriber_server_derived",
+        "plan_version_pinned",
+        "payment_not_authority",
+        "organization_scope"
+      ]
     },
     {
       "operationId": "cancelSubscription",
@@ -2291,7 +2403,48 @@
       "auditRequired": true,
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 1,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 4,
+        "d1WriteRowsMax": 2,
+        "rpcMax": 1,
+        "eventCountMax": 1
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "depthBounded": true
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "device",
+          "account",
+          "endpoint",
+          "resource"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "security": [
+        "subscriber_server_derived",
+        "subscription_scope_server_derived",
+        "etag_compare_and_swap",
+        "payment_not_authority"
+      ]
     },
     {
       "operationId": "postNotificationsNotificationIdRead",
