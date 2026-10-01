@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+  "title": "LuckRead Subscription D1-01 Logical Persistence Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureIds": [
+    "MON-005",
+    "MON-006",
+    "MON-008"
+  ],
+  "entityId": "ENT-SUBSCRIPTION",
+  "entityFieldContract": "contracts/entity/entity-field-contract.v1.json#ENT-SUBSCRIPTION",
+  "sourceOfTruth": "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+  "authority": {
+    "domainId": "D1-01",
+    "primaryTask": "T16",
+    "primaryWorker": "W07",
+    "workerRuntimeBoundary": "W07 Subscription workflow with explicitly admitted D1-01 access transition; W02 remains D1-01 Identity/Account/Access authority owner.",
+    "databaseUuid": "2f80471e-3756-49f9-8db1-7707a433ad64"
+  },
+  "table": {
+    "name": "membership_subscriptions",
+    "purpose": "Authoritative durable Subscription lifecycle state for Membership/Subscription access.",
+    "primaryKey": "subscription_id",
+    "columns": [
+      {
+        "name": "subscription_id",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": true,
+        "fieldId": "ENT-SUBSCRIPTION-F-SUBSCRIPTION-ID"
+      },
+      {
+        "name": "subscriber_id",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-SUBSCRIBER-ID"
+      },
+      {
+        "name": "plan_id",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-PLAN-ID"
+      },
+      {
+        "name": "plan_version",
+        "type": "INTEGER",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-PLAN-VERSION"
+      },
+      {
+        "name": "creator_id",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-CREATOR-ID"
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-STATUS",
+        "stateMachineRef": "contracts/state-machines/subscription.json"
+      },
+      {
+        "name": "started_at",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-STARTED-AT"
+      },
+      {
+        "name": "current_period_start",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-CURRENT-PERIOD-START"
+      },
+      {
+        "name": "current_period_end",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-CURRENT-PERIOD-END"
+      },
+      {
+        "name": "cancel_at",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-CANCEL-AT"
+      },
+      {
+        "name": "entitlement_snapshot_ref",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-ENTITLEMENT-SNAPSHOT-REF"
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-CREATED-AT"
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-UPDATED-AT"
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_membership_subscriptions_subscriber_status_period",
+        "columns": [
+          "subscriber_id",
+          "status",
+          "current_period_end"
+        ]
+      },
+      {
+        "name": "ix_membership_subscriptions_plan_version",
+        "columns": [
+          "plan_id",
+          "plan_version"
+        ]
+      },
+      {
+        "name": "ix_membership_subscriptions_creator_status",
+        "columns": [
+          "creator_id",
+          "status"
+        ]
+      },
+      {
+        "name": "ix_membership_subscriptions_updated_at",
+        "columns": [
+          "updated_at"
+        ]
+      }
+    ]
+  },
+  "constraints": {
+    "subscriptionIdUnique": "subscription_id is the primary key and is never reused.",
+    "subscriberReference": "subscriber_id references authoritative ENT-USER by stable identifier only; no cross-D1 physical foreign key.",
+    "planVersionReference": "plan_id + plan_version identifies the immutable plan definition consumed by the subscription.",
+    "statusAuthority": "status is constrained by contracts/state-machines/subscription.json.",
+    "financialIsolation": "No payment, order, ledger, wallet or settlement facts are persisted as Subscription authority.",
+    "entitlementIsolation": "entitlement_snapshot_ref is a reference only; Entitlement remains its own authority.",
+    "privacy": "subscriber_id is not a public identifier and must be exposed only through authorized scoped APIs."
+  },
+  "concurrency": {
+    "required": true,
+    "apiBoundary": "If-Match / expected-version semantics from Membership API contract.",
+    "physicalVersionField": "NOT_SEPARATELY_CONTRACTED",
+    "decision": "The current Entity field contract has no standalone version field. A later admission must bind the HTTP concurrency token to an already-authoritative version source without inventing a duplicate lifecycle field.",
+    "status": "PENDING_BINDING"
+  },
+  "uniqueness": {
+    "activeSubscriptionKey": "NOT_YET_FIXED",
+    "reason": "Membership Data Contract requires prevention of duplicate active subscriptions where business policy requires it, but the authoritative policy does not yet define whether the business key is subscriber-only, subscriber+plan, creator scope, organization scope, or another combination.",
+    "rule": "No speculative unique constraint may be introduced until the applicable Membership policy/plan scope contract resolves the active-subscription uniqueness boundary.",
+    "status": "DECISION_REQUIRED"
+  },
+  "migration": {
+    "status": "NOT_CREATED",
+    "rule": "A physical migration requires a separate admitted migration contract, exact artifact hash, controlled target D1-01 execution and post-schema evidence."
+  },
+  "runtime": {
+    "w07Binding": "NOT_VERIFIED",
+    "d1Execution": "NOT_VERIFIED",
+    "subscriptionHandlers": "NOT_ADMITTED",
+    "evidenceRegistry": "NOT_VERIFIED"
+  },
+  "forbidden": [
+    "Add a second Subscription authority in D1-04.",
+    "Store payment-provider secrets or raw payment credentials.",
+    "Add an authoritative entitlement copy.",
+    "Add cross-D1 physical foreign keys.",
+    "Create a speculative active-subscription uniqueness constraint.",
+    "Introduce a standalone version field without a field-contract change.",
+    "Treat cache, projection or analytics data as Subscription authority.",
+    "Execute or claim migration success from this logical contract."
+  ],
+  "verificationRequirements": [
+    "exact D1-01 target UUID evidence",
+    "migration artifact hash",
+    "schema inspection proving all 13 columns and nullability",
+    "index inspection",
+    "no cross-D1 foreign-key evidence",
+    "W07 runtime binding evidence",
+    "optimistic-lock source binding evidence",
+    "active-subscription uniqueness policy decision",
+    "Subscription runtime positive/duplicate/cancel/pause/resume/change-plan evidence",
+    "Evidence Registry record tied to validating commit SHA"
+  ],
+  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted."
+}
