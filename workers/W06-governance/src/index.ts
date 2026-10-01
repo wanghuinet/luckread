@@ -1,9 +1,16 @@
 import { buildAccountStateChangedAuditEvent, type AccountStateChangedAuditInput } from './audit-event'
 import { persistAuditEvent } from './audit-event-persistence'
 import { consumeAccountStateChanged } from './auth-013-queue-consumer'
+import {
+  ModerationRuntimeError,
+  decideModerationCase,
+  getModerationCase,
+  listModerationQueue,
+} from './moderation-runtime'
 
 interface Env {
   D1_03: D1Database
+  W03_CONTENT_MODERATION: Fetcher
 }
 
 const json = (body: unknown, status = 200) =>
@@ -11,6 +18,7 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: {
       'cache-control': 'no-store',
+      'content-type': 'application/json; charset=utf-8',
     },
   })
 
@@ -20,16 +28,11 @@ const requestIdPattern = /^req_[A-Za-z0-9_-]{1,123}$/
 const traceIdPattern = /^[A-Za-z0-9._:-]{1,128}$/
 
 function parseAccountStateChangedInput(value: unknown): AccountStateChangedAuditInput {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('INVALID_AUDIT_EVENT')
-  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_AUDIT_EVENT')
 
   const input = value as Record<string, unknown>
   const actor = input.actor
-
-  if (!actor || typeof actor !== 'object' || Array.isArray(actor)) {
-    throw new Error('INVALID_AUDIT_EVENT')
-  }
+  if (!actor || typeof actor !== 'object' || Array.isArray(actor)) throw new Error('INVALID_AUDIT_EVENT')
 
   const actorRecord = actor as Record<string, unknown>
   if (
@@ -37,29 +40,15 @@ function parseAccountStateChangedInput(value: unknown): AccountStateChangedAudit
     !resourceIdPattern.test(actorRecord.actorId) ||
     typeof actorRecord.actorType !== 'string' ||
     !actorTypes.has(actorRecord.actorType)
-  ) {
+  ) throw new Error('INVALID_AUDIT_EVENT')
+
+  if (actorRecord.layer !== undefined && (typeof actorRecord.layer !== 'string' || !/^L[0-8]$/.test(actorRecord.layer))) {
     throw new Error('INVALID_AUDIT_EVENT')
   }
-
-  if (
-    actorRecord.layer !== undefined &&
-    (typeof actorRecord.layer !== 'string' || !/^L[0-8]$/.test(actorRecord.layer))
-  ) {
+  if (actorRecord.sessionId !== undefined && (typeof actorRecord.sessionId !== 'string' || !resourceIdPattern.test(actorRecord.sessionId))) {
     throw new Error('INVALID_AUDIT_EVENT')
   }
-
-  if (
-    actorRecord.sessionId !== undefined &&
-    (typeof actorRecord.sessionId !== 'string' || !resourceIdPattern.test(actorRecord.sessionId))
-  ) {
-    throw new Error('INVALID_AUDIT_EVENT')
-  }
-
-  if (
-    actorRecord.impersonatingActorId !== undefined &&
-    (typeof actorRecord.impersonatingActorId !== 'string' ||
-      !resourceIdPattern.test(actorRecord.impersonatingActorId))
-  ) {
+  if (actorRecord.impersonatingActorId !== undefined && (typeof actorRecord.impersonatingActorId !== 'string' || !resourceIdPattern.test(actorRecord.impersonatingActorId))) {
     throw new Error('INVALID_AUDIT_EVENT')
   }
 
@@ -73,9 +62,7 @@ function parseAccountStateChangedInput(value: unknown): AccountStateChangedAudit
     typeof input.occurredAt !== 'string' ||
     !Number.isInteger(input.beforeVersion) ||
     !Number.isInteger(input.afterVersion)
-  ) {
-    throw new Error('INVALID_AUDIT_EVENT')
-  }
+  ) throw new Error('INVALID_AUDIT_EVENT')
 
   if (
     input.requestId !== undefined &&
@@ -88,9 +75,7 @@ function parseAccountStateChangedInput(value: unknown): AccountStateChangedAudit
     input.userAgent !== undefined &&
     (typeof input.userAgent !== 'string' || input.userAgent.length > 1024) ||
     Number.isNaN(Date.parse(input.occurredAt as string))
-  ) {
-    throw new Error('INVALID_AUDIT_EVENT')
-  }
+  ) throw new Error('INVALID_AUDIT_EVENT')
 
   return {
     eventId: input.eventId,
@@ -101,9 +86,7 @@ function parseAccountStateChangedInput(value: unknown): AccountStateChangedAudit
       actorType: actorRecord.actorType as AccountStateChangedAuditInput['actor']['actorType'],
       ...(actorRecord.layer ? { layer: actorRecord.layer as AccountStateChangedAuditInput['actor']['layer'] } : {}),
       ...(actorRecord.sessionId ? { sessionId: actorRecord.sessionId } : {}),
-      ...(actorRecord.impersonatingActorId
-        ? { impersonatingActorId: actorRecord.impersonatingActorId }
-        : {}),
+      ...(actorRecord.impersonatingActorId ? { impersonatingActorId: actorRecord.impersonatingActorId } : {}),
     },
     userId: input.userId,
     beforeState: input.beforeState,
@@ -117,50 +100,141 @@ function parseAccountStateChangedInput(value: unknown): AccountStateChangedAudit
   }
 }
 
+const requireW01Transport = (request: Request): { userId: string; layer: string; correlationId: string; requestId: string } => {
+  if (
+    request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+    request.headers.get('X-LuckRead-Transport-Version') !== '1.0'
+  ) throw new ModerationRuntimeError('PERMISSION_DENIED', 403)
+
+  const userId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
+  const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
+  const correlationId = request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
+  const requestId = request.headers.get('X-LuckRead-Request-Id')?.trim() ?? ''
+  if (!userId || !layer || !correlationId || !requestId) throw new ModerationRuntimeError('UNAUTHENTICATED', 401)
+  return { userId, layer, correlationId, requestId }
+}
+
+const parseDecision = (value: unknown): {
+  decision: 'APPROVED' | 'REJECTED'
+  expectedVersion: number
+  policyVersion: string
+  reasonCode: string
+  severity: string
+  scope: string
+  effectiveAt: string
+  expiresAt: string | null
+} => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
+  const body = value as Record<string, unknown>
+  if (
+    (body.decision !== 'APPROVED' && body.decision !== 'REJECTED') ||
+    !Number.isInteger(body.expectedVersion) ||
+    typeof body.policyVersion !== 'string' ||
+    typeof body.reasonCode !== 'string' ||
+    typeof body.severity !== 'string' ||
+    typeof body.scope !== 'string' ||
+    typeof body.effectiveAt !== 'string' ||
+    (body.expiresAt !== null && body.expiresAt !== undefined && typeof body.expiresAt !== 'string')
+  ) throw new ModerationRuntimeError('VALIDATION_FAILED', 400)
+  return {
+    decision: body.decision,
+    expectedVersion: body.expectedVersion,
+    policyVersion: body.policyVersion,
+    reasonCode: body.reasonCode,
+    severity: body.severity,
+    scope: body.scope,
+    effectiveAt: body.effectiveAt,
+    expiresAt: body.expiresAt === undefined ? null : body.expiresAt as string | null,
+  }
+}
+
+const errorResponse = (error: unknown): Response => {
+  if (error instanceof ModerationRuntimeError) {
+    const code = error.code
+    const message =
+      code === 'UNAUTHENTICATED' ? 'Authentication required' :
+      code === 'PERMISSION_DENIED' ? 'Permission denied' :
+      code === 'NOT_FOUND' ? 'Moderation case not found' :
+      code === 'PRECONDITION_REQUIRED' ? 'If-Match and Idempotency-Key are required' :
+      code === 'PRECONDITION_FAILED' ? 'Moderation case has changed' :
+      code === 'INVALID_STATE' ? 'Invalid moderation case state' :
+      code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' ? 'Idempotency-Key cannot be reused with different input' :
+      code === 'SERVICE_UNAVAILABLE' ? 'Moderation service unavailable' :
+      'Invalid moderation request'
+    return json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, error.status)
+  }
+  return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Moderation service unavailable', details: {} }, requestId: crypto.randomUUID() }, 503)
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
 
     if (url.pathname === '/health' && request.method === 'GET') {
-      return json({
-        service: 'W06',
-        status: 'ok',
-        auditPersistence: 'enabled',
-        d1Binding: Boolean(env.D1_03),
-      })
+      return json({ service: 'W06', status: 'ok', auditPersistence: 'enabled', d1Binding: Boolean(env.D1_03), moderationRuntime: 'enabled' })
     }
 
-    if (
-      request.method === 'POST' &&
-      url.pathname === '/internal/audit-events/account-state-changed'
-    ) {
-      let input: AccountStateChangedAuditInput
-
+    if (request.method === 'GET' && url.pathname === '/admin/moderation/queue') {
       try {
-        input = parseAccountStateChangedInput(await request.json())
-      } catch {
-        return json({ error: 'INVALID_AUDIT_EVENT' }, 400)
+        const principal = requireW01Transport(request)
+        return json({
+          ...(await listModerationQueue(
+            env.D1_03,
+            principal.userId,
+            url.searchParams.get('cursor'),
+            url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : null,
+          )),
+          requestId: principal.requestId,
+        })
+      } catch (error) {
+        return errorResponse(error)
       }
+    }
 
+    const caseMatch = /^\/admin\/moderation\/cases\/([^/]+)$/.exec(url.pathname)
+    if (request.method === 'GET' && caseMatch) {
+      try {
+        const principal = requireW01Transport(request)
+        return json({
+          ...(await getModerationCase(env.D1_03, principal.userId, decodeURIComponent(caseMatch[1]))),
+          requestId: principal.requestId,
+        })
+      } catch (error) {
+        return errorResponse(error)
+      }
+    }
+
+    const decisionMatch = /^\/admin\/moderation\/cases\/([^/]+)\/decision$/.exec(url.pathname)
+    if (request.method === 'POST' && decisionMatch) {
+      try {
+        const principal = requireW01Transport(request)
+        const body = parseDecision(await request.json())
+        const result = await decideModerationCase(env.D1_03, env.W03_CONTENT_MODERATION, {
+          reviewerId: principal.userId,
+          reviewerLayer: principal.layer,
+          caseId: decodeURIComponent(decisionMatch[1]),
+          ifMatch: request.headers.get('If-Match'),
+          idempotencyKey: request.headers.get('Idempotency-Key'),
+          correlationId: principal.correlationId,
+          requestId: principal.requestId,
+          ...body,
+        })
+        return json(result, 200)
+      } catch (error) {
+        return errorResponse(error)
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/account-state-changed') {
+      let input: AccountStateChangedAuditInput
+      try { input = parseAccountStateChangedInput(await request.json()) }
+      catch { return json({ error: 'INVALID_AUDIT_EVENT' }, 400) }
       try {
         const event = buildAccountStateChangedAuditEvent(input)
         await persistAuditEvent(env.D1_03, event)
-        return json(
-          {
-            eventId: event.eventId,
-            action: event.action,
-            targetType: event.targetType,
-            targetId: event.targetId,
-          },
-          201,
-        )
+        return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId }, 201)
       } catch (error) {
-        if (error instanceof Error && error.message.startsWith('INVALID_AUDIT_EVENT:')) {
-          return json({ error: 'INVALID_AUDIT_EVENT' }, 400)
-        }
-        if (error instanceof Error && error.message === 'AUDIT_EVENT_PERSISTENCE_FAILED') {
-          return json({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' }, 503)
-        }
+        if (error instanceof Error && error.message.startsWith('INVALID_AUDIT_EVENT:')) return json({ error: 'INVALID_AUDIT_EVENT' }, 400)
         return json({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' }, 503)
       }
     }
