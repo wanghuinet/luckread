@@ -22,6 +22,7 @@
 13. The existing getSubscription public read path is implemented as W01→W07→W02, with authenticated L2 self scope; getEntitlements remains blocked by the pre-existing duplicate operationId conflict.
 14. The bounded public cancelSubscription path requires authenticated L2 scope, If-Match against the authoritative Subscription ETag, and Idempotency-Key; W01 supplies no lifecycle actor or entitlement authority.
 15. W07 performs an authoritative W02 read before transition and W02 applies expectedVersion CAS; successful reads expose ETag W/\"version\".
+16. Membership create/transition Idempotency-Key replay protection is stored in the existing D1-01 domain and committed in the same batch as the authoritative Subscription/Entitlement mutation; this is domain-local and does not create a generic W10/D1-03 idempotency authority.
 
 ## Gate
 
