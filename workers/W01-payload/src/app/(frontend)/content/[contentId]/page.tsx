@@ -36,6 +36,7 @@ export default function ContentDetailPage({
   const [body, setBody] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -91,11 +92,29 @@ export default function ContentDetailPage({
     )
   }
 
+  async function copyContentLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setError('无法复制链接，请从地址栏复制当前页面地址。')
+    }
+  }
+
   return (
     <main className="content-detail">
       <div className="content-detail-top">
-        <Link href="/">← 返回首页</Link>
-        <span>{typeLabels[content.contentType]} · 已发布</span>
+        <div className="content-detail-breadcrumbs">
+          <Link href="/content">← 返回发现</Link>
+          <Link href="/">首页</Link>
+        </div>
+        <div className="content-detail-actions">
+          <span>{typeLabels[content.contentType]} · 已发布</span>
+          <button className="content-detail-share" onClick={() => void copyContentLink()} type="button">
+            {copied ? '已复制' : '复制链接'}
+          </button>
+        </div>
       </div>
       <article className="content-detail-card">
         <header className="content-detail-header">
