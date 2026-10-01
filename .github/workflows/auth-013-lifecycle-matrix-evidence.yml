@@ -40,7 +40,7 @@ jobs:
           set -euo pipefail
           test "${{ inputs.source_sha }}" = "56908b2f49845428db7c36520d0d989e70256e33"
           test "${{ inputs.database_name }}" = "luckread"
-          test -f workers/W02-content/src/account/account-state-transition.ts
+          test -f workers/W02-identity/src/account/account-state-transition.ts
           test -f contracts/state-machines/account.json
           test -f contracts/events/identity-account-state-changed.v1.json
           test -z "$(git status --short)"
@@ -71,7 +71,7 @@ jobs:
           cat > .auth-013-lifecycle-harness.ts <<'EOF'
           // CI-only ephemeral harness. Synthetic User/session/journal rows are cleaned.
           // @ts-nocheck
-          import { applyAccountStateTransition } from './workers/W02-content/src/account/account-state-transition.ts'
+          import { applyAccountStateTransition } from './workers/W02-identity/src/account/account-state-transition.ts'
           const json = (body, status=200) => new Response(JSON.stringify(body, null, 2), {status,headers:{'content-type':'application/json'}})
           const transition = async (db, input) => {
             try { return {ok:true, result:await applyAccountStateTransition(db,input)} }

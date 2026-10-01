@@ -56,9 +56,9 @@ jobs:
           test "$INPUT_W02_SOURCE_SHA" = "$EXPECTED_W02_SOURCE_SHA"
           test "$INPUT_W02_VERSION_ID" = "$EXPECTED_W02_VERSION_ID"
           git merge-base --is-ancestor "$INPUT_W02_SOURCE_SHA" HEAD
-          test -f workers/W02-content/src/account/account-state-transition.ts
-          test -f workers/W02-content/src/account/publication-journal-publisher.ts
-          test -f workers/W02-content/wrangler.jsonc
+          test -f workers/W02-identity/src/account/account-state-transition.ts
+          test -f workers/W02-identity/src/account/publication-journal-publisher.ts
+          test -f workers/W02-identity/wrangler.jsonc
           test -f workers/W06-governance/src/auth-013-queue-consumer.ts
           echo "AUTH013_W02_DEPLOYED_SOURCE_ADMISSION=PASS"
           echo "AUTH013_W02_DEPLOYED_VERSION_ID=$INPUT_W02_VERSION_ID"
@@ -99,7 +99,7 @@ jobs:
           // traverse the already-deployed W02 publisher -> Queue -> W06 consumer
           // path. The immutable D1-03 AuditEvent is NOT deleted by this evidence run.
           // @ts-nocheck
-          import { applyAccountStateTransition } from './workers/W02-content/src/account/account-state-transition.ts'
+          import { applyAccountStateTransition } from './workers/W02-identity/src/account/account-state-transition.ts'
 
           const json = (body: unknown, status = 200) =>
             new Response(JSON.stringify(body, null, 2), {
