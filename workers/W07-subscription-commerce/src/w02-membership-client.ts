@@ -23,8 +23,53 @@ export type W02SubscriptionSnapshot = {
   cancelAt: string | null
 }
 
+const subscriptionStatuses = new Set<W02SubscriptionSnapshot['status']>([
+  'PENDING',
+  'ACTIVE',
+  'PAST_DUE',
+  'CANCELED',
+  'EXPIRED',
+])
+
+const validTimestamp = (value: unknown): value is string =>
+  typeof value === 'string' &&
+  value.length > 0 &&
+  value.length <= 128 &&
+  !Number.isNaN(Date.parse(value))
+
 export class W02MembershipClientError extends Error {
   constructor(readonly status: number, message: string) { super(message) }
+}
+
+export function parseW02MembershipSnapshot(
+  payload: unknown,
+  input: { subscriptionId: string; actorUserId: string },
+): W02SubscriptionSnapshot {
+  if (!payload || typeof payload !== 'object') {
+    throw new W02MembershipClientError(503, 'Invalid authoritative membership snapshot')
+  }
+
+  const snapshot = payload as Partial<W02SubscriptionSnapshot>
+  if (
+    snapshot.subscriptionId !== input.subscriptionId ||
+    snapshot.subscriberId !== input.actorUserId ||
+    typeof snapshot.planId !== 'string' ||
+    snapshot.planId.length === 0 ||
+    snapshot.planId.length > 128 ||
+    !Number.isSafeInteger(snapshot.planVersion) ||
+    snapshot.planVersion < 1 ||
+    typeof snapshot.status !== 'string' ||
+    !subscriptionStatuses.has(snapshot.status as W02SubscriptionSnapshot['status']) ||
+    !Number.isSafeInteger(snapshot.version) ||
+    snapshot.version < 1 ||
+    !validTimestamp(snapshot.currentPeriodStart) ||
+    !validTimestamp(snapshot.currentPeriodEnd) ||
+    (snapshot.cancelAt !== null && !validTimestamp(snapshot.cancelAt))
+  ) {
+    throw new W02MembershipClientError(503, 'Invalid authoritative membership snapshot')
+  }
+
+  return snapshot as W02SubscriptionSnapshot
 }
 
 async function getW02Service(): Promise<W02IdentityService> {
@@ -92,16 +137,9 @@ export async function readW02MembershipSubscription(input: {
     throw new W02MembershipClientError(response.status, 'Membership subscription read denied or unavailable')
   }
 
-  const payload = await response.json() as Partial<W02SubscriptionSnapshot>
-  if (
-    payload.subscriptionId !== input.subscriptionId ||
-    payload.subscriberId !== input.actorUserId ||
-    typeof payload.planId !== 'string' ||
-    !Number.isSafeInteger(payload.planVersion) ||
-    !Number.isSafeInteger(payload.version) ||
-    typeof payload.status !== 'string'
-  ) {
-    throw new W02MembershipClientError(503, 'Invalid authoritative membership snapshot')
-  }
-  return payload as W02SubscriptionSnapshot
+  const payload = await response.json()
+  return parseW02MembershipSnapshot(payload, {
+    subscriptionId: input.subscriptionId,
+    actorUserId: input.actorUserId,
+  })
 }
