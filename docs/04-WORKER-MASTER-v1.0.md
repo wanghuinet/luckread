@@ -69,8 +69,8 @@ W10 and W12 are execution/integration boundaries and therefore do not receive an
 
 1. Public API exposure does not create business-state ownership.
 2. W01 is not a universal database writer.
-3. W04 owns feed/discovery execution but does not create a Feed/Search/Recommendation authority D1.
-4. W01 is the public ingress boundary, not a universal business proxy. A public operation may enter through W01, but its authoritative business execution must terminate at the Worker named by the applicable transport contract. A Worker-to-Worker call must never route back through W01 merely to reach another Worker.
+3. W01 is the public ingress boundary, not a universal business proxy. A public operation may enter through W01, but its authoritative business execution must terminate at the Worker named by the applicable transport contract. A Worker-to-Worker call must never route back through W01 merely to reach another Worker.
+4. W04 owns feed/discovery execution but does not create a Feed/Search/Recommendation authority D1.
 5. W07 owns commerce and financial workflows; D1-04 is the financial authority.
 6. Subscription and access state remain authoritative in D1-01; payment and financial facts remain authoritative in D1-04.
 7. W10 executes asynchronous work but does not become a second owner of T25.
