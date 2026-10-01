@@ -44,3 +44,23 @@ CI must verify:
 4. no missing current Contract/Code evidence references caused by the rename.
 
 This change is structural only. It does not promote any previously blocked Mapping/Contract/Evidence gate.
+
+
+## Post-merge result
+
+Merged by PR #331 into `main` at:
+`2ecbbca631670dc75fe3b275689c1c09d4d6735b`
+
+Pre-merge CI evidence observed:
+- Worker Directory Drift Gate: success
+- W02 RoleAssignment Verification: success
+- W02 Session Runtime CI: success
+- W02 AUTH-003 Credential Lifecycle Runtime Evidence: success
+- W02 AUTH-003 Credential List Runtime Evidence: success
+- AUTH-013 W02 Publication Fanout CI: success
+- W03 Content Runtime CI: success
+- Moderation Runtime Source CI: success
+- Security Hardening Gate: success
+- Mapping 0 Structural Gate: success
+
+Contract Admission CI had not yet reached a terminal conclusion at the time of merge; this directory change therefore does not promote or alter any Mapping/Contract global gate.

@@ -10,7 +10,7 @@
 | D1 topology | 4/4 canonical |
 | Contract Tasks | 25/25 canonical |
 | Worker × D1 logical binding | 12/12 bound |
-| Physical Worker directory alignment | READY FOR CI / MERGE |
+| Physical Worker directory alignment | COMPLETE / MERGED |
 | Mapping 0 Freeze | BLOCKED |
 | Contract generation | BLOCKED |
 | Global implementation authorization | BLOCKED |
@@ -32,7 +32,7 @@ The canonical physical paths are:
 - W11 → `workers/W11-growth-campaign-analytics-operations`
 - W12 → `workers/W12-external-developer-integration`
 
-W02/W03 path alignment is being delivered by change control `CC-MAPPING-0-WORKER-PHYSICAL-DIRECTORY-CANONICALIZATION-2026-10-01`. CI/merge evidence is required before this row can be treated as complete on `main`.
+W02/W03 path alignment was merged in PR #331 at main commit `2ecbbca631670dc75fe3b275689c1c09d4d6735b`. The Worker Directory Drift Gate passed on the pre-merge branch, and the canonical physical directory set is now the main-branch source.
 
 ## Authority clarification
 
