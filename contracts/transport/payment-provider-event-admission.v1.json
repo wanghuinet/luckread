@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/payment-provider-event-admission.v1.json",
+  "title": "Payment Provider Event Admission Boundary",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PARTIAL",
+  "featureIds": [
+    "PAY-001",
+    "MON-004",
+    "MON-006"
+  ],
+  "authority": {
+    "providerFact": "External Payment Provider",
+    "commerceOutcome": "W07 Commerce/Payment",
+    "subscriptionLifecycle": "Membership",
+    "accessState": "D1-01 / W02",
+    "financialTruth": "D1-04 / Ledger"
+  },
+  "requiredEnvelope": {
+    "providerId": "required",
+    "providerEventId": "required immutable provider identifier",
+    "eventType": "required versioned provider event type",
+    "eventVersion": "required",
+    "occurredAt": "required provider timestamp",
+    "receivedAt": "required platform receipt timestamp",
+    "signature": "required verified provider signature evidence",
+    "signatureVersion": "required",
+    "correlationId": "required",
+    "idempotencyKey": "providerId:providerEventId",
+    "externalPaymentReference": "required when provider supplies one"
+  },
+  "admissionRules": [
+    "Signature verification MUST complete before any internal subscription or entitlement mutation.",
+    "The provider callback MUST NOT directly assert subscription ACTIVE, entitlement ACTIVE or ledger finality.",
+    "Duplicate providerEventId is an idempotent replay and MUST NOT create a second lifecycle transition.",
+    "Unknown provider event types are rejected and retained for reconciliation; they do not fail open.",
+    "Out-of-order provider events are applied only when the Commerce/Payment ordering rule proves they are newer than the authoritative payment outcome.",
+    "Refund, chargeback and reversal events MUST be able to initiate entitlement convergence.",
+    "Financial facts remain in D1-04/Ledger; access-state effects cross into D1-01 through an approved W07→W02 transition.",
+    "No provider-specific payload fields are exposed directly as public LuckRead API DTO fields."
+  ],
+  "runtimeBoundary": {
+    "publicEndpoint": "NONE",
+    "ingressOwner": "W07",
+    "persistenceOwner": "W07/D1-04 for payment facts; W02/D1-01 for access state",
+    "distributedTransactions": false,
+    "synchronousFanout": 0
+  },
+  "evidenceRequired": [
+    "provider signature verification evidence",
+    "duplicate event replay evidence",
+    "out-of-order event reconciliation evidence",
+    "payment success to subscription activation evidence",
+    "refund/chargeback to entitlement convergence evidence",
+    "D1-04 financial evidence",
+    "W07→W02 D1-01 transition evidence"
+  ]
+}
