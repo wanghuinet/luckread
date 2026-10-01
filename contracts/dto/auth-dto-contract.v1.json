@@ -213,6 +213,32 @@
         "ENT-USER"
       ],
       "status": "NO_BODY_DTO"
+    },
+    {
+      "featureId": "SOCIAL-002",
+      "operationId": "getUsersUserIdFollowers",
+      "requestDtoId": null,
+      "responseDtoId": "DTO-SOCIAL-FOLLOWERS-LIST-RESPONSE",
+      "requestSchemaRef": null,
+      "responseSchemaRef": "#/paths/~1users~1{userId}~1followers/get/responses/200/content/application~1json/schema",
+      "entityIds": [
+        "ENT-SOCIAL-FOLLOW",
+        "ENT-USER"
+      ],
+      "status": "CONTRACT_BOUND"
+    },
+    {
+      "featureId": "SOCIAL-002",
+      "operationId": "getUsersUserIdFollowing",
+      "requestDtoId": null,
+      "responseDtoId": "DTO-SOCIAL-FOLLOWING-LIST-RESPONSE",
+      "requestSchemaRef": null,
+      "responseSchemaRef": "#/paths/~1users~1{userId}~1following/get/responses/200/content/application~1json/schema",
+      "entityIds": [
+        "ENT-SOCIAL-FOLLOW",
+        "ENT-USER"
+      ],
+      "status": "CONTRACT_BOUND"
     }
   ],
   "bindingRules": {
