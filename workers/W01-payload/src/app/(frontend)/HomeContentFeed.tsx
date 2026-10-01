@@ -108,7 +108,7 @@ export default function HomeContentFeed() {
                   item.contentType === 'video' ? (
                     <video aria-label={item.title} muted playsInline preload="metadata" src={cover} />
                   ) : (
-                    <img alt="" loading="lazy" src={cover} />
+                    <img alt={item.title ? item.title + '封面' : '内容封面'} loading="lazy" src={cover} />
                   )
                 ) : (
                   <span>{item.contentType === 'post' ? 'POST' : 'LUCKREAD'}</span>
