@@ -47,7 +47,7 @@
   },
   "mutationRules": [
     "Subscription mutations use expectedVersion optimistic concurrency.",
-    "Entitlement mutations are idempotent and derive from trusted subscription/payment decisions.",
+    "Entitlement mutations are idempotent and derive from trusted subscription/payment decisions; cancellation/expiry revokes all active grants belonging to the transitioning subscription.",
     "Payment providers cannot write these tables directly.",
     "Membership cannot write ledger balance or transaction truth.",
     "Cancellation/expiry must converge entitlement access state.",
