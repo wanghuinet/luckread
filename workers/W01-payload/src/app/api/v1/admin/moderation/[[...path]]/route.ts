@@ -1,8 +1,8 @@
 import {
   callW06Moderation,
   W06ModerationClientError,
-} from '../../../../../moderation/w06-moderation-client.js'
-import { resolveCookieContentPrincipal } from '../../../../../content/w03-content-client.js'
+} from '../../../../../../moderation/w06-moderation-client.js'
+import { resolveCookieContentPrincipal } from '../../../../../../content/w03-content-client.js'
 
 const jsonError = (status: number, code: string, message: string) =>
   Response.json(
