@@ -22,7 +22,7 @@ describe('Media upload access', () => {
     expect(media).toContain("update: ownsMedia")
     expect(media).toContain("delete: ownsMedia")
     expect(media).toContain("req.payload.findByID({ collection: 'media', id, depth: 0 })")
-    expect(media).toContain("String(media.ownerUserId ?? '') === String(req.user.id)")
+    expect(media).toContain("String((media as unknown as { ownerUserId?: string | number | null }).ownerUserId ?? '') === String(req.user.id)")
     const migration = read('src/migrations/20261002_120000_media_owner.ts')
     expect(migration).toContain('ADD COLUMN `owner_user_id` text')
   })
