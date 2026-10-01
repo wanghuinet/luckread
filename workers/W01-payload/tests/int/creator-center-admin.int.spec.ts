@@ -69,6 +69,8 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("const CONTENT_MUTATED_EVENT = 'luckread:content-mutated'")
     expect(publisher).toContain('window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))')
     expect(publisher).toContain("type === 'video' && assets.length === 0")
+    expect(publisher).toContain('className="lr-asset-preview"')
+    expect(publisher).toContain('asset.mimeType.startsWith(\'video/\')')
 
 
     expect(updateRoute).toContain('export async function GET')
