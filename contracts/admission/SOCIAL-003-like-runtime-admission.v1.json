@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/admission/SOCIAL-003-like-runtime-admission.v1.json",
+  "title": "SOCIAL-003 Like Runtime Admission",
+  "version": "1.0.0",
+  "status": "BOUNDED_ADMISSION_NOT_GREEN",
+  "worker": "W05",
+  "task": "T11",
+  "authoritativeD1": "D1-02",
+  "operationIds": [
+    "like",
+    "unlike"
+  ],
+  "admitted": [
+    "trusted internal like/unlike runtime",
+    "D1-02 relationship schema",
+    "positive/negative/concurrency unit tests"
+  ],
+  "blocked": [
+    "public route success until resource-policy and anti-abuse authority bindings are evidenced",
+    "Evidence Registry PASS"
+  ],
+  "invariants": [
+    "actor server-derived",
+    "resource server-derived",
+    "block/mute policy enforced",
+    "counter non-authoritative",
+    "idempotency required"
+  ],
+  "runtimeBudget": {
+    "d1ReadMax": 1,
+    "d1WriteMax": 1,
+    "asyncFanoutMax": 1
+  }
+}
