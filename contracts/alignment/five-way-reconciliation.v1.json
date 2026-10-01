@@ -4432,7 +4432,11 @@
       "entityIds": [
         "ENT-SUBSCRIPTION"
       ],
-      "apiOperationIds": [],
+      "apiOperationIds": [
+        "cancelSubscription",
+        "pauseSubscription",
+        "resumeSubscription"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
@@ -4441,11 +4445,18 @@
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
-        "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md"
+        "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md",
+        "contracts/api/rc-04-06-share-subscription-entitlement.v1.json",
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/openapi/v1/operation-policy.json",
+        "contracts/authz/permissions.json",
+        "contracts/state-machines/subscription.json",
+        "docs/change-control/CC-SUBSCRIPTION-STATE-API-RECONCILIATION-2026-10-02.md"
       ],
       "blockers": [
         "Entity/Field contract binding is admitted.",
-        "API/DTO, physical persistence, authorization/security, runtime, tests and Evidence Registry provenance remain unverified."
+        "Canonical API/state/permission vocabulary is now reconciled.",
+        "Physical D1-01 persistence, runtime, cross-domain payment transition, tests and Evidence Registry provenance remain unverified."
       ]
     },
     {
