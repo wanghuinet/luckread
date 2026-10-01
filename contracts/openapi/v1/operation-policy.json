@@ -2336,6 +2336,81 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "getUsersUserIdFollow",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "social.follow"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "resource": {
+        "class": "CACHE_FIRST_BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 1,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0,
+        "responseItemsMax": 1
+      },
+      "pagination": {
+        "style": "NONE"
+      },
+      "cache": {
+        "mode": "PRIVATE_NO_SHARED_CACHE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "device",
+          "account",
+          "endpoint",
+          "resource"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "security": [
+        "actor_server_derived",
+        "target_server_derived",
+        "block_policy",
+        "privacy_scope"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "MISSING",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      },
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/SOCIAL-001-follow-status-read.v1.json"
     }
   ]
 }
