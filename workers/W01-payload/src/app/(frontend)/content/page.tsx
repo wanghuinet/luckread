@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type ContentType = 'article' | 'post' | 'video'
 type ContentItem = {
@@ -35,6 +35,7 @@ export default function ContentBrowsePage() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -44,6 +45,7 @@ export default function ContentBrowsePage() {
   }, [])
 
   async function load(cursor: string | null = null): Promise<void> {
+    const requestId = ++requestIdRef.current
     if (cursor) setLoadingMore(true)
     else setLoading(true)
     setError('')
@@ -61,6 +63,7 @@ export default function ContentBrowsePage() {
         throw new Error(data?.error?.message || '内容加载失败')
       }
 
+      if (requestId !== requestIdRef.current) return
       const next = data.data as ContentPage
       setPage((current) =>
         cursor
@@ -68,8 +71,10 @@ export default function ContentBrowsePage() {
           : next,
       )
     } catch (cause) {
+      if (requestId !== requestIdRef.current) return
       setError(cause instanceof Error ? cause.message : '内容加载失败')
     } finally {
+      if (requestId !== requestIdRef.current) return
       setLoading(false)
       setLoadingMore(false)
     }
