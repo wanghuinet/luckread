@@ -1191,6 +1191,73 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+  /memberships/subscriptions/{subscriptionId}/pause:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Pause a subscription
+      operationId: pauseSubscription
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '200': { description: Subscription paused. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /memberships/subscriptions/{subscriptionId}/resume:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Resume a paused subscription
+      operationId: resumeSubscription
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '200': { description: Subscription resumed. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /memberships/subscriptions/{subscriptionId}/change-plan:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Change the plan for a subscription
+      operationId: changeSubscriptionPlan
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [planId]
+              properties:
+                planId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '200': { description: Subscription plan changed. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
   /entitlements/{subjectId}:
     parameters:
       - name: subjectId
