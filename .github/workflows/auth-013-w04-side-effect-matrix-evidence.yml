@@ -187,8 +187,7 @@ jobs:
             derivedDestination:{type:"cloudflare_kv",physicalResource:"globe",namespaceId:"32f7e407128a43d59720d5d46736e084",authority:"NONE"},
             matrix:{deindex:["FROZEN","SUSPENDED","BANNED","DELETION_PENDING","DELETED"],reactivation:["RESTORED","REACTIVATED"],visible:["RESTRICTED","ACTIVE"],duplicateIdempotent:true,olderVersionRejected:true,nonResurrection:true,sourceAuthorityD101:true,projectionVersionTracksAccountStateVersion:true,boundedStaleWindow:true,syntheticCleanup:true}
           }
-          fs.writeFileSync('artifacts/mapping-0/auth-013-w04-side-effect/runtime-evidence.json',JSON.stringify(out,null,2)+'
-')
+          fs.writeFileSync('artifacts/mapping-0/auth-013-w04-side-effect/runtime-evidence.json',JSON.stringify(out,null,2)+'\\n')
           NODE
 
       - name: Verify synthetic KV cleanup
