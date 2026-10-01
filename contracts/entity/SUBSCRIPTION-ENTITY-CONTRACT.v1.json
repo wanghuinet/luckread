@@ -39,6 +39,22 @@
       "status": "CONTRACTED_NOT_VERIFIED"
     },
     {
+      "fieldId": "ENT-SUBSCRIPTION-F-VERSION",
+      "name": "version",
+      "type": "integer",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": false,
+      "lifecycle": "mutable_concurrency",
+      "classification": "CONCURRENCY_VERSION",
+      "apiExposure": "SCOPED",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+
+    {
       "fieldId": "ENT-SUBSCRIPTION-F-SUBSCRIBER-ID",
       "name": "subscriberId",
       "type": "text",
@@ -228,6 +244,7 @@
     "subscriberId is always bound to authoritative ENT-USER; the client cannot establish identity authority.",
     "planId + planVersion identifies the immutable plan definition used by the subscription.",
     "Exactly one authoritative current status exists for a subscription.",
+    "version starts at 1 and increments exactly once for each successful authoritative mutation.",
     "Historical lifecycle transitions remain auditable and replay-safe.",
     "Payment/order state is referenced, not duplicated as financial authority.",
     "Entitlement is derived from valid subscription state but remains the authoritative access decision state in D1-01.",
