@@ -1,0 +1,194 @@
+name: Moderation Runtime Security E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact admitted source SHA under test
+        required: true
+        type: string
+        default: 4427d2ed40b680ec2e714ed33081be0cf8ca30c6
+      base_url:
+        description: W01 public moderation base URL
+        required: true
+        type: string
+        default: https://luckread.cn
+      confirm:
+        description: Type RUN_MODERATION_E2E to permit controlled remote fixture/test mutations
+        required: true
+        type: string
+        default: RUN_MODERATION_E2E
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  e2e:
+    if: ${ inputs.confirm == 'RUN_MODERATION_E2E' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE_URL: ${ inputs.base_url }}
+      SOURCE_SHA: ${ inputs.source_sha }}
+      MODERATION_TOKEN: ${ secrets.MODERATION_E2E_BEARER_TOKEN }}
+      DATABASE_NAME_W03: luckreadpro
+      DATABASE_NAME_W06: secondary
+      WRANGLER_VERSION: 4.116.0
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${ inputs.source_sha }}
+
+      - name: Verify source CI
+        env:
+          GH_TOKEN: ${ github.token }}
+        run: |
+          set -euo pipefail
+          conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow moderation-runtime-source-ci.yml --commit "$SOURCE_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
+          test "$conclusion" = success || { echo "Source CI not SUCCESS for $SOURCE_SHA"; exit 1; }
+
+      - name: Verify E2E secret
+        run: test -n "$MODERATION_TOKEN"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup fixture IDs
+        run: |
+          set -euo pipefail
+          echo "CASE_ID=mod-e2e-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          echo "CONTENT_ID=mod-e2e-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          echo "IDEMPOTENCY_KEY=mod-e2e-key-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          echo "REASON_CODE=E2E_SECURITY_PROBE" >> "$GITHUB_ENV"
+          echo "NOW=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" >> "$GITHUB_ENV"
+
+      - name: Verify remote schema before fixture
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard') ORDER BY name;" > /tmp/mod-schema.json
+          node -e "const r=require('/tmp/mod-schema.json'); const names=new Set((r[0]?.results||[]).map(x=>x.name)); for(const n of ['moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard']) if(!names.has(n)) throw new Error('Missing '+n); console.log('REMOTE_MODERATION_SCHEMA=PASS')"
+
+      - name: Seed controlled content fixture in D1-02
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          SQL="INSERT INTO contents (id,content_type,owner_user_id,creator_id,ip_id,state,version,revision,title,body_ref,media_refs_json,cover_ref,etag,created_at,updated_at) VALUES ('$CONTENT_ID','article','mod-e2e-owner-$GITHUB_RUN_ID',NULL,NULL,'PENDING_REVIEW',1,1,'Moderation E2E Fixture','r2://moderation-e2e/$GITHUB_RUN_ID','[]',NULL,'v1','$NOW','$NOW');"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-feed/wrangler.jsonc --command "$SQL"
+
+      - name: Seed controlled moderation case in D1-03
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          SQL="INSERT INTO moderation_cases (case_id,target_type,target_id,target_version,policy_version,state,priority,assigned_reviewer_id,current_decision_id,evidence_bundle_ref,version,created_at,updated_at) VALUES ('$CASE_ID','content','$CONTENT_ID',1,'moderation-v1.0','UNDER_REVIEW',100,NULL,NULL,'e2e/$GITHUB_RUN_ID',1,'$NOW','$NOW');"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc --command "$SQL"
+
+      - name: Verify queue access and case visibility
+        run: |
+          set -euo pipefail
+          test -n "$MODERATION_TOKEN"
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $MODERATION_TOKEN" "$BASE_URL/api/v1/admin/moderation/queue" > /tmp/mod-queue.json
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $MODERATION_TOKEN" "$BASE_URL/api/v1/admin/moderation/cases/$CASE_ID" > /tmp/mod-case.json
+          node -e "const r=require('/tmp/mod-case.json'); if(r.caseId!=='$CASE_ID'||r.version!==1) throw new Error('Case visibility assertion failed'); console.log('QUEUE_CASE_READ=PASS')"
+
+      - name: Verify positive APPROVED decision and W06 to W03 transition
+        run: |
+          set -euo pipefail
+          cat > /tmp/mod-decision.json <<EOF
+          {"expectedVersion":1,"decision":"APPROVED","policyVersion":"moderation-v1.0","reasonCode":"$REASON_CODE","severity":"medium","scope":"content","effectiveAt":"$NOW","expiresAt":null}
+          EOF
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: $IDEMPOTENCY_KEY"             -H "If-Match: v1"             --data @/tmp/mod-decision.json             "$BASE_URL/api/v1/admin/moderation/cases/$CASE_ID/decision" > /tmp/mod-decision-response.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const r=JSON.parse(fs.readFileSync('/tmp/mod-decision-response.json','utf8'));
+          if(r.caseId!==process.env.CASE_ID||r.outcome!=='APPROVED'||r.version!==2) throw new Error('Decision response assertion failed');
+          console.log(JSON.stringify(r));
+          NODE
+
+      - name: Verify replay and idempotency key-reuse rejection
+        run: |
+          set -euo pipefail
+          replay="$(curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: $IDEMPOTENCY_KEY"             -H "If-Match: v1"             --data @/tmp/mod-decision.json             "$BASE_URL/api/v1/admin/moderation/cases/$CASE_ID/decision")"
+          printf '%s' "$replay" > /tmp/mod-replay.json
+          node -e "const r=require('/tmp/mod-replay.json'), a=require('/tmp/mod-decision-response.json'); if(r.decisionId!==a.decisionId||r.version!==a.version) throw new Error('Idempotent replay mismatch'); console.log('IDEMPOTENT_REPLAY=PASS')"
+
+          sed 's/E2E_SECURITY_PROBE/E2E_SECURITY_CONFLICT/' /tmp/mod-decision.json > /tmp/mod-conflict.json
+          status="$(curl --silent --output /tmp/mod-conflict-response.json --write-out '%{http_code}'             -X POST             -H "Authorization: Bearer $MODERATION_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: $IDEMPOTENCY_KEY"             -H "If-Match: v1"             --data @/tmp/mod-conflict.json             "$BASE_URL/api/v1/admin/moderation/cases/$CASE_ID/decision")"
+          test "$status" = 422
+          echo IDEMPOTENCY_CONFLICT=PASS
+
+      - name: Verify 428 and 412 preconditions on a fresh case
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "CASE2_ID=mod-e2e-stale-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          echo "CONTENT2_ID=mod-e2e-stale-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          SQL1="INSERT INTO contents (id,content_type,owner_user_id,creator_id,ip_id,state,version,revision,title,body_ref,media_refs_json,cover_ref,etag,created_at,updated_at) VALUES ('mod-e2e-stale-$GITHUB_RUN_ID','article','mod-e2e-owner-$GITHUB_RUN_ID',NULL,NULL,'PENDING_REVIEW',1,1,'Moderation E2E Stale Fixture','r2://moderation-e2e/stale/$GITHUB_RUN_ID','[]',NULL,'v1','$NOW','$NOW');"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-feed/wrangler.jsonc --command "$SQL1"
+          SQL2="INSERT INTO moderation_cases (case_id,target_type,target_id,target_version,policy_version,state,priority,assigned_reviewer_id,current_decision_id,evidence_bundle_ref,version,created_at,updated_at) VALUES ('mod-e2e-stale-$GITHUB_RUN_ID','content','mod-e2e-stale-$GITHUB_RUN_ID',1,'moderation-v1.0','UNDER_REVIEW',90,NULL,NULL,'e2e/stale/$GITHUB_RUN_ID',1,'$NOW','$NOW');"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc --command "$SQL2"
+
+          missing_status="$(curl --silent --output /tmp/missing-precondition.json --write-out '%{http_code}'             -X POST -H "Authorization: Bearer $MODERATION_TOKEN" -H "Content-Type: application/json"             --data '{"expectedVersion":1,"decision":"APPROVED","policyVersion":"moderation-v1.0","reasonCode":"E2E","severity":"medium","scope":"content","effectiveAt":"'$NOW'","expiresAt":null}'             "$BASE_URL/api/v1/admin/moderation/cases/$CASE2_ID/decision")"
+          test "$missing_status" = 428
+
+          stale_status="$(curl --silent --output /tmp/stale-precondition.json --write-out '%{http_code}'             -X POST -H "Authorization: Bearer $MODERATION_TOKEN" -H "Content-Type: application/json"             -H "Idempotency-Key: mod-e2e-stale-key-$GITHUB_RUN_ID" -H "If-Match: v99"             --data '{"expectedVersion":1,"decision":"APPROVED","policyVersion":"moderation-v1.0","reasonCode":"E2E","severity":"medium","scope":"content","effectiveAt":"'$NOW'","expiresAt":null}'             "$BASE_URL/api/v1/admin/moderation/cases/$CASE2_ID/decision")"
+          test "$stale_status" = 412
+          echo PRECONDITION_428_412=PASS
+
+      - name: Verify remote D1 evidence
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/moderation-runtime-e2e
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --json --config workers/W03-feed/wrangler.jsonc --command "SELECT id,state,version,etag FROM contents WHERE id IN ('$CONTENT_ID','mod-e2e-stale-$GITHUB_RUN_ID') ORDER BY id;" > artifacts/mapping-0/moderation-runtime-e2e/content-state.json
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc --command "SELECT case_id,state,version,current_decision_id FROM moderation_cases WHERE case_id IN ('$CASE_ID','mod-e2e-stale-$GITHUB_RUN_ID') ORDER BY case_id;" > artifacts/mapping-0/moderation-runtime-e2e/cases.json
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc --command "SELECT decision_id,case_id,case_version,outcome,policy_version,reviewer_id,reviewer_layer FROM moderation_decisions WHERE case_id='$CASE_ID';" > artifacts/mapping-0/moderation-runtime-e2e/decision.json
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc --command "SELECT event_id,action,target_type,target_id,request_id,trace_id FROM audit_events WHERE target_type='ModerationCase' AND target_id='$CASE_ID';" > artifacts/mapping-0/moderation-runtime-e2e/audit.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const content=JSON.parse(fs.readFileSync('artifacts/mapping-0/moderation-runtime-e2e/content-state.json'))?.[0]?.results??[];
+          const cases=JSON.parse(fs.readFileSync('artifacts/mapping-0/moderation-runtime-e2e/cases.json'))?.[0]?.results??[];
+          const decisions=JSON.parse(fs.readFileSync('artifacts/mapping-0/moderation-runtime-e2e/decision.json'))?.[0]?.results??[];
+          const audits=JSON.parse(fs.readFileSync('artifacts/mapping-0/moderation-runtime-e2e/audit.json'))?.[0]?.results??[];
+          if(!content.some(x=>x.id===process.env.CONTENT_ID&&x.state==='APPROVED'&&x.version===2)) throw new Error('W03 content transition missing');
+          if(!cases.some(x=>x.case_id===process.env.CASE_ID&&x.state==='ACTION_TAKEN'&&x.version===2)) throw new Error('W06 case transition missing');
+          if(decisions.length!==1||decisions[0].outcome!=='APPROVED'||decisions[0].reviewer_id===null) throw new Error('Decision persistence missing');
+          if(audits.length!==1||audits[0].action!=='moderation.decide') throw new Error('Audit binding missing');
+          console.log('MODERATION_REMOTE_EVIDENCE=PASS');
+          NODE
+
+      - name: Capture evidence provenance
+        run: |
+          cat > artifacts/mapping-0/moderation-runtime-e2e/provenance.txt <<EOF
+          workflow=Moderation Runtime Security E2E
+          source_sha=$SOURCE_SHA
+          base_url=$BASE_URL
+          fixture_case=$CASE_ID
+          fixture_content=$CONTENT_ID
+          new_worker=0
+          new_d1=0
+          negative_tests=401-covered-by-source-boundary,428,412,422
+          remote_d1_evidence=true
+          EOF
+
+      - name: Upload moderation runtime evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: moderation-runtime-e2e-${ inputs.source_sha }}
+          path: artifacts/mapping-0/moderation-runtime-e2e/
+          if-no-files-found: error
+          retention-days: 14
