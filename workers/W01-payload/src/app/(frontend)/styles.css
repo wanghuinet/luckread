@@ -298,6 +298,19 @@ a { color: inherit; }
   font-size: 11px;
   line-height: 1.4;
 }
+.content-detail-retry {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid rgba(205, 215, 228, .92);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--lr-ink);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.content-detail-retry:hover { border-color: #aebbd0; }
 .content-detail-top a {
   color: var(--lr-ink);
   text-decoration: none;
