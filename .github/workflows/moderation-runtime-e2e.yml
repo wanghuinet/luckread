@@ -90,11 +90,22 @@ jobs:
           W03_SOURCE_SHA: ${{ inputs.w03_source_sha }}
         run: |
           set -euo pipefail
-          w03_run_id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow w03-content-runtime-deploy.yml --status success --limit 20 --json databaseId,headSha --jq '.[] | select(.headSha == env.W03_SOURCE_SHA) | .databaseId' | head -n 1)"
-          test -n "$w03_run_id" || { echo "No successful W03 deployment found for $W03_SOURCE_SHA"; exit 1; }
+          expected_artifact="w03-content-deployment-$W03_SOURCE_SHA"
+          w03_run_id=""
+          while IFS= read -r candidate_run_id; do
+            test -n "$candidate_run_id" || continue
+            artifact_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate_run_id/artifacts?per_page=100" --jq '.artifacts[] | select(.name == env.EXPECTED_ARTIFACT and .expired == false) | .id' 2>/dev/null | head -n 1)" || true
+            if [ -n "$artifact_id" ]; then
+              w03_run_id="$candidate_run_id"
+              break
+            fi
+          done < <(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/w03-content-runtime-deploy.yml/runs?status=success&per_page=50" --jq '.workflow_runs[].id')
+          export EXPECTED_ARTIFACT="$expected_artifact"
+          test -n "$w03_run_id" || { echo "No successful W03 deployment evidence found for $W03_SOURCE_SHA"; exit 1; }
           rm -rf /tmp/w03-deployment-evidence
           mkdir -p /tmp/w03-deployment-evidence
-          gh run download "$w03_run_id" --repo "$GITHUB_REPOSITORY" --name "w03-content-deployment-$W03_SOURCE_SHA" --dir /tmp/w03-deployment-evidence
+          gh run download "$w03_run_id" --repo "$GITHUB_REPOSITORY" --name "$expected_artifact" --dir /tmp/w03-deployment-evidence
+          grep -Fx "run_id=$w03_run_id" /tmp/w03-deployment-evidence/w03-content-deploy-provenance.txt
           grep -Fx "source_sha=$W03_SOURCE_SHA" /tmp/w03-deployment-evidence/w03-content-deploy-provenance.txt
           grep -Fx "migration_execution=false" /tmp/w03-deployment-evidence/w03-content-deploy-provenance.txt
           echo "W03_DEPLOYMENT_EVIDENCE=PASS run_id=$w03_run_id source_sha=$W03_SOURCE_SHA"
