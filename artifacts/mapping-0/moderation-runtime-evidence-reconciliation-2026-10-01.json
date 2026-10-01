@@ -1,0 +1,53 @@
+{
+  "reconciliationId": "MODERATION-RUNTIME-EVIDENCE-RECONCILIATION-2026-10-01",
+  "status": "RUNTIME_E2E_EVIDENCE_RECONCILED",
+  "scope": "admitted moderation runtime slice only",
+  "testedRuntime": {
+    "w06": "158a5221d87ce74123338bcf1f5a4a174ec55e33",
+    "w03": "386669f9f20d018523ff390d61c54e79b956224a",
+    "w01": "825fc273dc7f64bd9413f0493c55c9017ab27268"
+  },
+  "deploymentRuns": {
+    "w01": 36804071530,
+    "w06": 36809834389,
+    "w03": 36811976477
+  },
+  "e2e": {
+    "runId": 36812935998,
+    "conclusion": "success",
+    "artifactId": 11139813551,
+    "artifactName": "moderation-runtime-e2e-158a5221d87ce74123338bcf1f5a4a174ec55e33"
+  },
+  "observed": {
+    "content": {
+      "state": "APPROVED",
+      "version": 2,
+      "etag": "W/\"2\""
+    },
+    "moderationCase": {
+      "state": "ACTION_TAKEN",
+      "version": 2
+    },
+    "decision": {
+      "outcome": "APPROVED",
+      "reviewerLayer": "L6"
+    },
+    "outbox": {
+      "status": "DELIVERED",
+      "attempts": 1
+    },
+    "auditEvent": {
+      "action": "moderation.decide",
+      "retained": true
+    }
+  },
+  "evidenceRegistryId": "EVD-SAFETY001-MODERATION-RUNTIME-E2E-001",
+  "globalRegistryStatus": "NOT_GREEN",
+  "topologyDelta": {
+    "workers": 0,
+    "d1": 0,
+    "queues": 0,
+    "directW06ToD102": false,
+    "distributedTransactions": 0
+  }
+}
