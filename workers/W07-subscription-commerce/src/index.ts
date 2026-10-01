@@ -28,6 +28,14 @@ export default {
       return new Response(null, { status: 404 })
     }
 
+    if (
+      request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+      request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+      !request.headers.get('X-LuckRead-Correlation-Id')
+    ) {
+      return json({ error: { code: 'UNTRUSTED_CALLER' } }, 403)
+    }
+
     let body: {
       to?: unknown
       actor?: unknown
