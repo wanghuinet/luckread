@@ -53,6 +53,17 @@ jobs:
           conclusion="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow moderation-runtime-source-ci.yml --commit "$SOURCE_SHA" --limit 1 --json conclusion --jq '.[0].conclusion // empty')"
           test "$conclusion" = success || { echo "Source CI not SUCCESS for $SOURCE_SHA"; exit 1; }
 
+      - name: Start W02 runtime error tail
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/mapping-0/moderation-runtime-e2e
+          nohup npx --yes "wrangler@${WRANGLER_VERSION}" tail luckread-w02 --format json --method POST --status error > artifacts/mapping-0/moderation-runtime-e2e/w02-runtime-tail.jsonl 2>&1 &
+          echo $! > /tmp/moderation-w02-tail.pid
+          sleep 3
+
       - name: Setup native L6 reviewer fixture
         env:
           AUTH_BASE_URL: https://api.luckread.cn
@@ -196,6 +207,15 @@ jobs:
           cat artifacts/mapping-0/moderation-runtime-e2e/w02-establish-binding-diagnostic.json || true
           cp w02-binding-diagnostic.log artifacts/mapping-0/moderation-runtime-e2e/w02-binding-diagnostic.log || true
           echo "W02_ESTABLISH_BINDING_DIAGNOSTIC_CURL_EXIT=$curl_exit"
+
+      - name: Stop W02 runtime error tail
+        if: always()
+        run: |
+          set +e
+          if [ -f /tmp/moderation-w02-tail.pid ]; then
+            kill "$(cat /tmp/moderation-w02-tail.pid)" >/dev/null 2>&1 || true
+            sleep 2
+          fi
 
       - name: Setup fixture IDs
         run: |
@@ -347,6 +367,7 @@ jobs:
           npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --yes --config workers/W01-payload/wrangler.jsonc --command "DELETE FROM auth_session_state WHERE user_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT) IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT) IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com') OR CAST(owner_subject_id AS TEXT) IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM auth_registration_envelopes WHERE idempotency_key LIKE 'MODERATION-E2E-%-register'; DELETE FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com';"
 
       - name: Upload moderation runtime evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: moderation-runtime-e2e-${{ inputs.source_sha  }}
