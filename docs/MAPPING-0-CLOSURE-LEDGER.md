@@ -4399,3 +4399,21 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - D1-03 migration evidence status: VERIFIED.
 - This does not promote Moderation runtime GREEN. Remaining sequence is coordinated W03/W06/W01 deployment evidence → Security E2E → decision/audit/outbox/W03 convergence evidence → Evidence Registry reconciliation.
 - Backup before this governance update: backup/pre-moderation-d1-evidence-final-20261001.
+
+
+## 2026-10-01 — Moderation Security E2E external credential gate
+
+- Current main head: `7d4eda1b75ebdddd474d7cb14aa0443b09707f56`.
+- Admitted runtime source under test: `81986b7510efb20a5dd44f9971ca40794989ddff`.
+- Source CI, D1-03 remote migration evidence, and coordinated W01/W03/W06 deployment evidence remain valid and are inherited; the latest main change is evidence-only.
+- Security E2E observations:
+  - Run `36797669090` — FAILED at `Verify E2E secret`.
+  - Run `36797792430` — FAILED at `Verify E2E secret`.
+  - Run `36797870423` — FAILED at `Verify E2E secret`.
+  - Run `36798890134` — FAILED at `Verify E2E secret`; all fixture, decision, replay, precondition, remote-D1, provenance and artifact steps were skipped.
+- The workflow currently requires repository secret `MODERATION_E2E_BEARER_TOKEN`. The connected GitHub interface does not expose repository-secret write/read APIs, so the credential cannot be provisioned through the connected action path.
+- Status: `BLOCKED_EXTERNAL`. No Security E2E PASS, remote decision/audit/outbox/W03 convergence evidence, Evidence Registry PASS, or Moderation Runtime GREEN is claimed.
+- Duplicate observations above are inherited as one external blocker; no further blind rerun is admitted until the repository secret is actually configured or the workflow is changed through an approved authenticated-runtime test path.
+- Backup created before this governance update: `backup/pre-moderation-e2e-secret-gate-20261001`.
+- Next admissible execution: Security E2E against the unchanged admitted source, with the workflow defaults already populated; then reconcile only the resulting remote evidence.
+
