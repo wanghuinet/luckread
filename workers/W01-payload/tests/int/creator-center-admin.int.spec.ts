@@ -197,6 +197,14 @@ describe('Creator Center admin extension', () => {
     expect(styles).toContain('.futureGrid')
   })
 
+  it('exposes login submission and error status', () => {
+    const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
+
+    expect(loginForm).toContain('<form className="lr-auth-form" onSubmit={submit} aria-busy={busy}>')
+    expect(loginForm).toContain('<div className="lr-error" role="alert" aria-live="assertive">{error}</div>')
+    expect(loginForm).toContain('<button aria-busy={busy} disabled={busy} type="submit">')
+  })
+
   it('keeps frontend and Admin on the same Payload cookie session lifecycle', () => {
     const login = read('src/app/auth/login/route.ts')
     const logout = read('src/app/auth/logout/route.ts')
