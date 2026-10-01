@@ -41,9 +41,9 @@ These are inventory evidence only. No operation is promoted to MATCH until a can
 
 **Status:** BLOCKED_NOT_GREEN
 
-**Evidence:** the social/community system contract states follower counts are derived state, while follow is authoritative.
+**Evidence:** `contracts/api/SOCIAL-002-followers-following-read.v1.json` binds the existing follower/following operations to the authoritative Follow relation. The contract defines cursor pagination, stable ordering, derived totalCount, no counter authority, and no new Worker/D1/Task.
 
-**Not evidence-bound:** canonical count/aggregate source; rebuildability contract; projection/cache authority; API/DTO; consistency window; concurrency under follow/unfollow; runtime/tests/evidence.
+**Not evidence-bound:** W05 runtime handler; privacy/block/abuse authority transport; remote D1 read evidence; count consistency runtime evidence; security E2E; Evidence Registry provenance.
 
 ### SOCIAL-003 — like/reaction
 
