@@ -132,20 +132,16 @@ export default {
       !statuses.has(body.from as SubscriptionStatus) ||
       typeof body.to !== 'string' ||
       !statuses.has(body.to as SubscriptionStatus) ||
-      typeof body.actor !== 'string' ||
-      !actors.has(body.actor as SubscriptionActor) ||
       typeof body.expectedVersion !== 'number' ||
       !Number.isSafeInteger(body.expectedVersion) ||
       typeof body.idempotencyKey !== 'string' ||
-      body.idempotencyKey !== request.headers.get('Idempotency-Key') ||
-      typeof body.entitlementAction !== 'string' ||
-      !['NONE','GRANT','REVOKE'].includes(body.entitlementAction)
+      body.idempotencyKey !== request.headers.get('Idempotency-Key')
     ) {
       return json({ error: { code: 'VALIDATION_FAILED' } }, 400)
     }
 
-    if (body.actor === 'payment') {
-      return json({ error: { code: 'PAYMENT_ACTOR_REQUIRES_TRUSTED_COMMERCE' } }, 403)
+    if (body.to === 'ACTIVE' || body.from !== 'ACTIVE' || body.to !== 'CANCELED') {
+      return json({ error: { code: 'TRANSITION_REQUIRES_TRUSTED_AUTHORITY' } }, 403)
     }
 
     const state = request.headers.get('X-LuckRead-Subscription-State') as SubscriptionStatus | null
@@ -156,15 +152,18 @@ export default {
     }
 
     try {
-      const local = transitionSubscription(
+      transitionSubscription(
         { status: state, version },
         {
           to: body.to as SubscriptionStatus,
-          actor: body.actor as SubscriptionActor,
+          actor: 'user',
           expectedVersion: body.expectedVersion,
           idempotencyKey: body.idempotencyKey,
         },
       )
+
+      const derivedEntitlementAction =
+        body.to === 'CANCELED' ? 'REVOKE' : 'NONE'
 
       const accessState = await callW02Membership({
         operation: 'transition',
@@ -175,9 +174,9 @@ export default {
           subscriptionId: body.subscriptionId,
           from: body.from,
           to: body.to,
-          actor: body.actor,
+          actor: 'user',
           expectedVersion: body.expectedVersion,
-          entitlementAction: body.entitlementAction,
+          entitlementAction: derivedEntitlementAction,
           entitlementId: typeof body.entitlementId === 'string' ? body.entitlementId : undefined,
           entitlementType: typeof body.entitlementType === 'string' ? body.entitlementType : undefined,
           scopeType: typeof body.scopeType === 'string' ? body.scopeType : undefined,
