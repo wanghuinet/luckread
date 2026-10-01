@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'workers/W07-subscription-commerce/**'
+      - 'workers/W02-identity/src/membership/**'
       - 'contracts/alignment/subscription-state-machine-reconciliation.v1.json'
       - 'contracts/entity/MEMBERSHIP-SUBSCRIPTION-ENTITLEMENT-field-contract.v1.json'
       - 'contracts/persistence/MEMBERSHIP-D1-01-subscription-entitlement-persistence.v1.json'
@@ -27,4 +28,4 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx vitest run workers/W07-subscription-commerce/src/subscription-state-machine.test.ts
+      - run: npx vitest run workers/W07-subscription-commerce/src/subscription-state-machine.test.ts workers/W02-identity/src/membership/access-state-transition.test.ts
