@@ -55,6 +55,8 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("'复制恢复链接'")
     expect(publisher).toContain('const stateLabel = draft?.state')
     expect(publisher).toContain("const reviewLocked = draft?.state === 'PENDING_REVIEW'")
+    expect(publisher).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
+    expect(publisher).toContain("router.replace('/login?returnTo=' + encodeURIComponent(returnTo))")
     expect(publisher).toContain('function startNewContent()')
     expect(publisher).toContain("setDraft(null)")
     expect(publisher).toContain('新建内容')
