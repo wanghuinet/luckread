@@ -21,13 +21,17 @@ export default {
       const body = await readBody(request)
       if (!body) return json({ error: { code: 'VALIDATION_FAILED' } }, 400)
 
+      if (body.resourceType !== 'content') {
+        return json({ error: { code: 'UNSUPPORTED_RESOURCE_TYPE' } }, 400)
+      }
+
       const trusted: TrustedLikeAdmission = {
         caller: request.headers.get('X-LuckRead-Caller') ?? '',
         transportVersion: request.headers.get('X-LuckRead-Transport-Version') ?? '',
         actorUserId: request.headers.get('X-LuckRead-Principal-User-Id') ?? '',
         correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
         idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
-        resourceType: body.resourceType === 'content' ? 'content' : 'content',
+        resourceType: 'content',
         resourceId: typeof body.resourceId === 'string' ? body.resourceId : '',
         actorAccountState: typeof body.actorAccountState === 'string' ? body.actorAccountState : '',
         resourceVisible: body.resourceVisible === true,
