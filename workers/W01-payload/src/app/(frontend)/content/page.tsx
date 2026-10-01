@@ -36,16 +36,25 @@ export default function ContentBrowsePage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
   const requestIdRef = useRef(0)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void load()
     }, 0)
-    return () => window.clearTimeout(timer)
+    return () => {
+      requestIdRef.current += 1
+      abortControllerRef.current?.abort()
+      abortControllerRef.current = null
+      window.clearTimeout(timer)
+    }
   }, [])
 
   async function load(cursor: string | null = null): Promise<void> {
     const requestId = ++requestIdRef.current
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
     if (cursor) setLoadingMore(true)
     else setLoading(true)
     setError('')
@@ -57,6 +66,7 @@ export default function ContentBrowsePage() {
       const response = await fetch('/api/v1/contents?' + params.toString(), {
         headers: { accept: 'application/json' },
         cache: 'no-store',
+        signal: controller.signal,
       })
       const data: ContentApiResponse = await response.json().catch((): null => null)
       if (!response.ok || !data?.data) {
@@ -71,12 +81,14 @@ export default function ContentBrowsePage() {
           : next,
       )
     } catch (cause) {
-      if (requestId !== requestIdRef.current) return
+      if (requestId !== requestIdRef.current || controller.signal.aborted) return
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
       setError(cause instanceof Error ? cause.message : '内容加载失败')
     } finally {
-      if (requestId !== requestIdRef.current) return
+      if (requestId !== requestIdRef.current || controller.signal.aborted) return
       setLoading(false)
       setLoadingMore(false)
+      if (abortControllerRef.current === controller) abortControllerRef.current = null
     }
   }
 
