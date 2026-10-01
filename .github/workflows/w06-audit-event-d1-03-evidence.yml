@@ -7,10 +7,12 @@ on:
         description: Exact source commit containing the admitted W06 AuditEvent migration
         required: true
         type: string
+        default: 81986b7510efb20a5dd44f9971ca40794989ddff
       database_name:
         description: Cloudflare D1-03 display name bound by W06 wrangler.jsonc
         required: true
         type: string
+        default: secondary
 
 permissions:
   contents: read
