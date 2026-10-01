@@ -1,0 +1,64 @@
+name: W05 Social D1-02 Like Controlled Migration
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Explicitly authorize the scoped SOCIAL-003 Like migration'
+        required: true
+        type: choice
+        options:
+          - APPLY_SOCIAL_003_LIKE_D1_02
+          - CANCEL
+        default: CANCEL
+permissions:
+  contents: read
+env:
+  EXPECTED_DB_UUID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  MIGRATION: workers/W05-social/migrations/0002_social_003_like.sql
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY_SOCIAL_003_LIKE_D1_02' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Verify exact source
+        run: |
+          set -euo pipefail
+          test -f "$MIGRATION"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          sha256sum "$MIGRATION"
+      - name: Verify admission
+        run: |
+          set -euo pipefail
+          jq -e '.status == "BOUNDED_ADMISSION_NOT_GREEN"' contracts/admission/SOCIAL-003-like-runtime-admission.v1.json >/dev/null
+          jq -e '.database.databaseId == "6c342634-97f6-4248-9f4a-85772af4f22c"' contracts/persistence/SOCIAL-003-like-d1-02-persistence.v1.json >/dev/null
+      - name: Install pinned Wrangler
+        run: npm install --no-save wrangler@4.116.0
+      - name: Execute scoped remote D1-02 migration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --file "$MIGRATION"
+      - name: Verify table and indexes
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name='social_like_relationships';"
+          npx wrangler d1 execute "$EXPECTED_DB_UUID" --remote --command "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('uq_social_like_actor_resource','ix_social_like_resource_created','ix_social_like_actor_created') ORDER BY name;"
+      - name: Capture provenance
+        run: |
+          mkdir -p artifacts/social
+          printf '%s\n' "{\"workflow\":\"W05 Social D1-02 Like Controlled Migration\",\"runId\":\"$GITHUB_RUN_ID\",\"sourceSha\":\"$GITHUB_SHA\",\"databaseUuid\":\"$EXPECTED_DB_UUID\",\"migration\":\"$MIGRATION\",\"confirmation\":\"${{ inputs.confirm }}\",\"executed\":true}" > artifacts/social/w05-social-003-like-migration-provenance.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: w05-social-003-like-migration-${{ github.sha }}
+          path: artifacts/social/w05-social-003-like-migration-provenance.json
