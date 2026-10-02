@@ -52,6 +52,20 @@ describe('W05 social query transport', () => {
     })
   })
 
+  it('reads like status for the authenticated actor', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/likes?targetType=content&targetId=content-1', {
+        method: 'GET',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
+      }),
+      { DB: dbFor([{ relationship_id: 'like-1' }]) },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { liked: true },
+    })
+  })
+
   it('unlikes with a 204 response', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
