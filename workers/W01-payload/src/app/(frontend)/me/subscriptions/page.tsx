@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
+import './subscriptions.css'
+
 type Subscription = {
   subscriptionId: string
   planId: string
