@@ -40,6 +40,11 @@ const initialState: AudienceState = {
 
 const PAGE_SIZE = 10
 
+function redirectToAdminLogin() {
+  const returnTo = window.location.pathname + window.location.search + window.location.hash
+  window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))
+}
+
 async function fetchCount(path: string, signal: AbortSignal): Promise<number> {
   const response = await fetch(path, {
     headers: { accept: 'application/json' },
@@ -48,6 +53,10 @@ async function fetchCount(path: string, signal: AbortSignal): Promise<number> {
     signal,
   })
   const data = await response.json().catch((): null => null) as { data?: { totalCount?: number } } | null
+  if (response.status === 401) {
+    redirectToAdminLogin()
+    throw new Error('AUTH_REQUIRED')
+  }
   if (!response.ok || typeof data?.data?.totalCount !== 'number') {
     throw new Error('AUDIENCE_LOAD_FAILED')
   }
@@ -73,6 +82,10 @@ async function fetchList(
     },
   )
   const data = await response.json().catch((): null => null) as FollowListResponse | null
+  if (response.status === 401) {
+    redirectToAdminLogin()
+    throw new Error('AUTH_REQUIRED')
+  }
   if (!response.ok || !data?.data || !Array.isArray(data.data.items)) {
     throw new Error('AUDIENCE_LIST_LOAD_FAILED')
   }
