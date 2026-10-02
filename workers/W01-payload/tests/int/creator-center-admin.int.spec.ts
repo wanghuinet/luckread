@@ -324,6 +324,7 @@ describe('Creator Center admin extension', () => {
     expect(page).toContain("'/change-plan'")
     expect(page).toContain("method: 'POST'")
     expect(page).toContain("'Idempotency-Key': 'change-plan:'")
+    expect(page).toContain("'Idempotency-Key': operation + ':' + item.subscriptionId + ':' + item.etag")
     expect(page).toContain("JSON.stringify({ planId: nextPlanId })")
     expect(page).toContain('更换方案')
     expect(page).toContain("transition(item, 'cancel')")
