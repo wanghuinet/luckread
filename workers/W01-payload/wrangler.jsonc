@@ -22,6 +22,10 @@
       "service": "luckread-w03"
     },
     {
+      "binding": "W05_SOCIAL",
+      "service": "luckread-w05"
+    },
+    {
       "binding": "W06_MODERATION",
       "service": "luckread-w06"
     }
