@@ -1,5 +1,9 @@
 import { callW06Moderation, W06ModerationClientError } from '../../../../moderation/w06-moderation-client.js'
-import { resolveCookieContentPrincipal } from '../../../../content/w03-content-client.js'
+import {
+  callW03Content,
+  resolveCookieContentPrincipal,
+  W03ContentClientError,
+} from '../../../../content/w03-content-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -47,6 +51,22 @@ export async function POST(request: Request): Promise<Response> {
       return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
     }
 
+    if (targetType === 'content') {
+      const targetResponse = await callW03Content({
+        request,
+        pathname: '/internal/content/contents/' + encodeURIComponent(targetId as string),
+        method: 'GET',
+        principal,
+      })
+      if (!targetResponse.ok) {
+        return errorResponse(targetResponse.status === 404 ? 404 : 503, targetResponse.status === 404 ? 'RESOURCE_NOT_FOUND' : 'SERVICE_UNAVAILABLE', targetResponse.status === 404 ? 'Reported content not found' : 'Content service unavailable')
+      }
+      const targetData = await targetResponse.json().catch((): null => null) as { id?: string; state?: string } | null
+      if (targetData?.id !== targetId || targetData.state !== 'PUBLISHED') {
+        return errorResponse(404, 'RESOURCE_NOT_FOUND', 'Reported content not found')
+      }
+    }
+
     return await callW06Moderation({
       request,
       pathname: '/reports',
@@ -61,6 +81,7 @@ export async function POST(request: Request): Promise<Response> {
       },
     })
   } catch (error) {
+    if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, error.message)
     if (error instanceof W06ModerationClientError) return errorResponse(error.status, error.code, error.message)
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Moderation service unavailable')
   }
