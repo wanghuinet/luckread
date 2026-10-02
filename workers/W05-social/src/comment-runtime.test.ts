@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { createComment, listComments, parseCommentLimit } from './comment-runtime.js'
+import { createComment, deleteComment, listComments, parseCommentLimit } from './comment-runtime.js'
 
 const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
   let firstIndex = 0
@@ -8,7 +8,7 @@ const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
     bind: vi.fn(() => ({
       first: vi.fn(async () => firstResults[firstIndex++] ?? null),
       all: vi.fn(async () => ({ results: allResults })),
-      run: vi.fn(async () => ({ success: true })),
+      run: vi.fn(async () => ({ success: true, meta: { changes: 1 } })),
     })),
   }))
   return { prepare } as unknown as D1Database
@@ -121,6 +121,49 @@ describe('comment runtime', () => {
       body: '不可见',
       idempotencyKey: 'idem-4',
     })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+  })
+
+  it('deletes an owned leaf comment', async () => {
+    const d = db([
+      {
+        id: 'c1',
+        author_user_id: 'user-1',
+        state: 'PUBLISHED',
+        has_replies: 0,
+      },
+    ])
+    await expect(deleteComment(d, 'user-1', 'c1')).resolves.toBeUndefined()
+    expect(d.prepare).toHaveBeenCalledTimes(2)
+  })
+
+  it('rejects deleting another user comment', async () => {
+    const d = db([
+      {
+        id: 'c1',
+        author_user_id: 'user-2',
+        state: 'PUBLISHED',
+        has_replies: 0,
+      },
+    ])
+    await expect(deleteComment(d, 'user-1', 'c1')).rejects.toMatchObject({
+      code: 'PERMISSION_DENIED',
+      status: 403,
+    })
+  })
+
+  it('rejects deleting comments that have replies', async () => {
+    const d = db([
+      {
+        id: 'c1',
+        author_user_id: 'user-1',
+        state: 'PUBLISHED',
+        has_replies: 1,
+      },
+    ])
+    await expect(deleteComment(d, 'user-1', 'c1')).rejects.toMatchObject({
+      code: 'COMMENT_HAS_REPLIES',
+      status: 409,
+    })
   })
 
   it('lists only bounded published comments with an opaque next cursor', async () => {
