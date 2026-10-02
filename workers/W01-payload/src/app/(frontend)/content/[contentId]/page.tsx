@@ -212,9 +212,12 @@ export default function ContentDetailPage({
         <div className="content-detail-actions">
           <span>{typeLabels[content.contentType]} · 已发布</span>
           {content.creatorId ? (
-            <button className="content-detail-follow" disabled={followBusy} onClick={() => void toggleFollow()} type="button">
-              {followBusy ? '处理中…' : following ? '已关注作者' : '关注作者'}
-            </button>
+            <>
+              <Link className="content-detail-follow" href={'/users/' + encodeURIComponent(content.creatorId)}>查看作者</Link>
+              <button className="content-detail-follow" disabled={followBusy} onClick={() => void toggleFollow()} type="button">
+                {followBusy ? '处理中…' : following ? '已关注作者' : '关注作者'}
+              </button>
+            </>
           ) : null}
           <button className="content-detail-like" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
             {likeBusy ? '处理中…' : liked ? '已点赞' : '点赞'}
