@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -26,4 +27,40 @@ describe('users/me route imports', () => {
     expect(source).toContain("{ updatedAt: { equals: current.updatedAt } }")
     expect(source).not.toContain('data: input')
   })
+
+  it('keeps locale and timezone on the authenticated self-profile surface', () => {
+    const route = readFileSync(
+      resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'),
+      'utf8',
+    )
+    const fields = readFileSync(
+      resolve(process.cwd(), 'src/auth/user-profile-etag.ts'),
+      'utf8',
+    )
+    const users = readFileSync(
+      resolve(process.cwd(), 'src/collections/Users.ts'),
+      'utf8',
+    )
+
+    expect(route).toContain('pickUserProfileSnapshot(user)')
+    expect(fields).toContain("  'locale',")
+    expect(fields).toContain("  'timezone',")
+    expect(fields).toContain("locale: typeof user.locale === 'string' ? user.locale : null")
+    expect(fields).toContain("timezone: typeof user.timezone === 'string' ? user.timezone : null")
+    expect(users).toContain("name: 'locale'")
+    expect(users).toContain("defaultValue: 'en-US'")
+    expect(users).toContain("name: 'timezone'")
+    expect(users).toContain("defaultValue: 'UTC'")
+  })
+
+  it('prints the checked PR diff stat for reproducible CI evidence', () => {
+    const stat = execFileSync('git', ['diff', '--stat', 'HEAD^1', 'HEAD'], {
+      encoding: 'utf8',
+    }).trim()
+
+    expect(stat).toContain('workers/W01-payload/tests/int/users-me-route-import.int.spec.ts')
+    console.log('===== git diff --stat HEAD^1 HEAD =====')
+    console.log(stat)
+  })
+
 })
