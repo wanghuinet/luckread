@@ -205,41 +205,6 @@ export async function createComment(
   if (!inserted) throw new CommentRuntimeError('COMMENT_WRITE_FAILED', 500)
   return toCommentItem(inserted)
 
-  const depth = parentId ? Number(validation.parent_depth) + 1 : 0
-  const id = crypto.randomUUID()
-  const now = new Date().toISOString()
-
-  const inserted = await db.prepare(
-    `INSERT INTO social_comments
-      (id, content_id, author_user_id, parent_id, body, state, depth, idempotency_key, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'PUBLISHED', ?, ?, ?, ?)
-     ON CONFLICT(author_user_id, idempotency_key)
-     DO UPDATE SET id = social_comments.id
-     RETURNING id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at`,
-  ).bind(
-    id,
-    contentId,
-    actor,
-    parentId,
-    body,
-    depth,
-    idempotencyKey,
-    now,
-    now,
-  ).first<{
-    id: string
-    content_id: string
-    author_user_id: string
-    parent_id: string | null
-    body: string
-    state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
-    depth: number
-    created_at: string
-    updated_at: string
-  }>()
-
-  if (!inserted) throw new CommentRuntimeError('COMMENT_WRITE_FAILED', 500)
-  return toCommentItem(inserted)
 }
 
 export async function listComments(
