@@ -44,6 +44,8 @@ describe('Media upload access', () => {
     expect(route).toContain("import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route'")
     expect(route).toContain("new URL('/api/media', request.url)")
     expect(route).toContain('request.clone()')
+    expect(route).toContain("slug: ['media']")
+    expect(route).toContain('PayloadRouteContext')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
