@@ -62,6 +62,18 @@ export default function ContentDetailPage({
           if (cancelled) return
           const resolved = data as Content
           setContent(resolved)
+          try {
+            const likeResponse = await fetch(
+              '/api/v1/interactions/likes?targetType=content&targetId=' + encodeURIComponent(resolved.id),
+              { credentials: 'include', headers: { accept: 'application/json' }, cache: 'no-store', signal: controller.signal },
+            )
+            const likeData = await likeResponse.json().catch((): null => null) as { data?: { liked?: boolean } } | null
+            if (!cancelled && likeResponse.ok && typeof likeData?.data?.liked === 'boolean') {
+              setLiked(likeData.data.liked)
+            }
+          } catch {
+            // Like state is optional; content remains readable when the status query fails.
+          }
           if (resolved.bodyRef) {
             try {
               const bodyResponse = await fetch(resolved.bodyRef, { cache: 'no-store', signal: controller.signal })
