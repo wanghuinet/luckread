@@ -273,7 +273,10 @@ describe('Creator Center admin extension', () => {
 
     expect(view).toContain("import CreatorAssetLibrary from './CreatorAssetLibrary'")
     expect(view).toContain('<CreatorAssetLibrary />')
-    expect(assets).toContain("fetch('/api/v1/media?limit=8&page=1'")
+    expect(assets).toContain("fetch('/api/v1/media?limit=8&page=' + String(page)")
+    expect(assets).toContain('pageNumber + 1')
+    expect(assets).toContain('totalPages')
+    expect(assets).toContain('加载更多素材')
     expect(assets).toContain("fetch('/api/v1/media', {")
     expect(assets).toContain("method: 'POST'")
     expect(assets).toContain("form.append('file', file)")
