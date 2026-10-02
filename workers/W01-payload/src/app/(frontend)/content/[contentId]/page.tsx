@@ -43,6 +43,8 @@ export default function ContentDetailPage({
   const [liked, setLiked] = useState(false)
   const [likeCount, setLikeCount] = useState<number | null>(null)
   const [likeBusy, setLikeBusy] = useState(false)
+  const [bookmarked, setBookmarked] = useState(false)
+  const [bookmarkBusy, setBookmarkBusy] = useState(false)
   const [viewerUserId, setViewerUserId] = useState<string | null>(null)
   const [following, setFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
@@ -93,6 +95,18 @@ export default function ContentDetailPage({
             }
           } catch {
             // Like state is optional; content remains readable when the status query fails.
+          }
+          try {
+            const bookmarkResponse = await fetch(
+              '/api/v1/interactions/bookmarks?targetType=content&targetId=' + encodeURIComponent(resolved.id),
+              { credentials: 'include', headers: { accept: 'application/json' }, cache: 'no-store', signal: controller.signal },
+            )
+            const bookmarkData = await bookmarkResponse.json().catch((): null => null) as { data?: { favorited?: boolean } } | null
+            if (!cancelled && bookmarkResponse.ok && typeof bookmarkData?.data?.favorited === 'boolean') {
+              setBookmarked(bookmarkData.data.favorited)
+            }
+          } catch {
+            // Favorite state is optional; content remains readable when the status query fails.
           }
           if (resolved.creatorId) {
             try {
@@ -188,6 +202,39 @@ export default function ContentDetailPage({
     }
   }
 
+  async function toggleBookmark() {
+    if (!content || bookmarkBusy) return
+    setBookmarkBusy(true)
+    setActionMessage('')
+    try {
+      const response = await fetch('/api/v1/interactions/bookmarks', {
+        method: bookmarked ? 'DELETE' : 'POST',
+        credentials: 'include',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json',
+          'Idempotency-Key': 'social-bookmark:' + crypto.randomUUID(),
+        },
+        body: JSON.stringify({ targetType: 'content', targetId: content.id }),
+      })
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+      if (!response.ok) {
+        const data = await response.json().catch((): null => null)
+        setActionMessage(data?.error?.message || '收藏操作失败，请稍后重试。')
+        return
+      }
+      setBookmarked((value) => !value)
+    } catch {
+      setActionMessage('网络异常，请稍后重试。')
+    } finally {
+      setBookmarkBusy(false)
+    }
+  }
+
   async function toggleFollow() {
     if (!content?.creatorId || followBusy) return
     setFollowBusy(true)
@@ -257,6 +304,9 @@ export default function ContentDetailPage({
           <button className="content-detail-like" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
             {likeBusy ? '处理中…' : liked ? '已点赞' : '点赞'}
             {likeCount === null ? '' : ' · ' + likeCount.toLocaleString('zh-CN')}
+          </button>
+          <button className="content-detail-like" disabled={bookmarkBusy} onClick={() => void toggleBookmark()} type="button">
+            {bookmarkBusy ? '处理中…' : bookmarked ? '已收藏' : '收藏'}
           </button>
           <button className="content-detail-share" onClick={() => void copyContentLink()} type="button">
             {copied ? '已复制' : '复制链接'}
