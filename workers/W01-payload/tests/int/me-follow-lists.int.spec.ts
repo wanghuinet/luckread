@@ -26,6 +26,15 @@ describe('personal social relationship pages', () => {
     expect(component).toContain("取消关注")
   })
 
+  it('cancels stale follow-list requests on refresh, pagination, and navigation', () => {
+    const component = read('src/app/(frontend)/me/MeFollowList.tsx')
+    expect(component).toContain('useRef<AbortController | null>(null)')
+    expect(component).toContain('const requestIdRef = useRef(0)')
+    expect(component).toContain('requestControllerRef.current?.abort()')
+    expect(component).toContain('signal: controller.signal')
+    expect(component).toContain('requestIdRef.current += 1')
+  })
+
   it('links the personal relationship pages from the account profile', () => {
     const profile = read('src/app/(frontend)/me/profile/page.tsx')
 
