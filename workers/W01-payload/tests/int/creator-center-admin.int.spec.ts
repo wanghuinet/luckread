@@ -135,6 +135,10 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("setDraft(null)")
     expect(publisher).toContain('新建内容')
 
+    expect(publisher).toContain('const controller = new AbortController()')
+    expect(publisher).toContain('signal: controller.signal')
+    expect(publisher).toContain("caught.name === 'AbortError'")
+    expect(publisher).toContain('controller.abort()')
     expect(publisher).toContain('disabled={busy || reviewLocked}')
     expect(publisher).toContain('<div className="lr-composer-card" aria-busy={busy}>')
 
