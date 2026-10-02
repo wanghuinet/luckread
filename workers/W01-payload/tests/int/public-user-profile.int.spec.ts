@@ -48,7 +48,10 @@ describe('public user profile', () => {
     expect(page).toContain("applySafetyAction('mute')")
     expect(page).toContain("'/api/v1/interactions/' + (action === 'block' ? 'blocks' : 'mutes')")
     expect(page).toContain("body: JSON.stringify({ targetUserId: profile.id })")
-    expect(page).toContain("'Idempotency-Key': 'social-' + action + ':' + crypto.randomUUID()")
+    expect(page).toContain("'Idempotency-Key': 'social-' + action + ':' + (active ? 'remove:' : 'set:') + crypto.randomUUID()")
+    expect(page).toContain("method: active ? 'DELETE' : 'POST'")
+    expect(page).toContain("action === 'block' ? 'blocks' : 'mutes'")
+
     expect(page).toContain('屏蔽作者')
     expect(page).toContain('静音作者')
     expect(page).toContain('viewerUserId !== profile.id')
