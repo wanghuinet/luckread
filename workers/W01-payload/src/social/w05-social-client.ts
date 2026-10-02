@@ -65,12 +65,16 @@ export async function callW05SocialPublic(input: {
       headers,
     }),
   )
+  const responseHeaders = new Headers({
+    'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
+  })
+  const etag = response.headers.get('etag')
+  if (etag) responseHeaders.set('etag', etag)
+
   return new Response(await response.arrayBuffer(), {
     status: response.status,
-    headers: {
-      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-    },
+    headers: responseHeaders,
   })
 }
 
@@ -92,6 +96,8 @@ export async function callW05Social(input: {
   if (input.body !== undefined) headers.set('content-type', 'application/json; charset=utf-8')
   const idempotencyKey = input.request.headers.get('Idempotency-Key')?.trim()
   if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey)
+  const ifMatch = input.request.headers.get('If-Match')?.trim()
+  if (ifMatch) headers.set('If-Match', ifMatch)
 
   const response = await service.fetch(
     new Request('https://luckread-w05.internal' + input.pathname, {
@@ -101,11 +107,15 @@ export async function callW05Social(input: {
     }),
   )
 
+  const responseHeaders = new Headers({
+    'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
+  })
+  const etag = response.headers.get('etag')
+  if (etag) responseHeaders.set('etag', etag)
+
   return new Response(await response.arrayBuffer(), {
     status: response.status,
-    headers: {
-      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-    },
+    headers: responseHeaders,
   })
 }
