@@ -32,7 +32,7 @@ describe('follow runtime', () => {
       target_user_id: 'u2',
       created_at: '2026-10-02T00:00:00.000Z',
     }
-    await expect(follow(db([{ blocked: 0, ...row }]), 'u1', 'u2')).resolves.toEqual(row)
+    await expect(follow(db([{ blocked: 0 }, row]), 'u1', 'u2')).resolves.toEqual(row)
   })
 
   it('is idempotent', async () => {
@@ -58,28 +58,6 @@ describe('follow runtime', () => {
       code: 'RELATIONSHIP_BLOCKED',
       status: 409,
     })
-  })
-
-  it('converges through one read and one write for a new relation', async () => {
-    const row = {
-      relationship_id: 'r2',
-      follower_user_id: 'u1',
-      target_user_id: 'u2',
-      created_at: '2026-10-02T00:00:00.000Z',
-    }
-    const d = db([{ blocked: 0 }], [])
-    // First D1 call returns no existing relation; second returns the authoritative UPSERT row.
-    d.prepare = vi.fn((sql: string) => {
-      const calls = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.length
-      return {
-        bind: vi.fn((...args: unknown[]) => ({
-          first: vi.fn(async () => calls === 0 ? { blocked: 0 } : row),
-          all: vi.fn(async () => ({ results: [] })),
-          run: vi.fn(async () => ({ sql, args })),
-        })),
-      }
-    }) as unknown as D1Database['prepare']
-    await expect(follow(d, 'u1', 'u2')).resolves.toEqual(row)
   })
 
   it('rejects self follow', async () => {
