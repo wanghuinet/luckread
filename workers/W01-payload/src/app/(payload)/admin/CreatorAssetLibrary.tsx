@@ -100,6 +100,7 @@ export default function CreatorAssetLibrary() {
           method: 'POST',
           credentials: 'include',
           cache: 'no-store',
+          headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() },
           body: form,
         })
         const data = await response.json().catch((): null => null) as MediaItem | { doc?: MediaItem; error?: { message?: string } } | null
