@@ -78,19 +78,19 @@ const subscriptionIdFromIdempotency = async (subscriberId: string, idempotencyKe
   return 'sub_' + hex
 }
 
-const toPublic = (row: SubscriptionRow) => ({
-  subscriptionId: row.subscription_id
-  subscriberId: row.subscriber_id
-  planId: row.plan_id
-  planVersion: row.plan_version
-  creatorId: row.creator_id
-  status: row.status
-  startedAt: row.started_at
-  currentPeriodStart: row.current_period_start
-  currentPeriodEnd: row.current_period_end
-  cancelAt: row.cancel_at
-  createdAt: row.created_at
-  updatedAt: row.updated_at
+const toPublic = (row: SubscriptionRow) => ({,
+  subscriptionId: row.subscription_id,
+  subscriberId: row.subscriber_id,
+  planId: row.plan_id,
+  planVersion: row.plan_version,
+  creatorId: row.creator_id,
+  status: row.status,
+  startedAt: row.started_at,
+  currentPeriodStart: row.current_period_start,
+  currentPeriodEnd: row.current_period_end,
+  cancelAt: row.cancel_at,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
   etag: etagForUpdatedAt(row.updated_at),
 })
 
