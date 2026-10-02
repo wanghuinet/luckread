@@ -265,5 +265,5 @@ export async function createReport(
   if (batch.some((item) => !item.success)) {
     throw new ReportRuntimeError('REPORT_WRITE_FAILED', 500)
   }
-  return result}
+  return result
 }
