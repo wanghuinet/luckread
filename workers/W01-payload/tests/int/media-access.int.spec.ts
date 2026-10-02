@@ -117,3 +117,19 @@ describe('Media upload access', () => {
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
+
+
+  it('exposes a stable playback resource using the existing media delivery URL', () => {
+    const route = read('src/app/api/v1/media/[mediaId]/playback/route.ts')
+
+    expect(route).toContain("import { GET as getMedia } from '../route'")
+    expect(route).toContain("status: 'READY'")
+    expect(route).toContain("MEDIA_NOT_DELIVERABLE")
+    expect(route).toContain('document.url')
+    expect(route).toContain('mimeType')
+    expect(route).toContain('filesize')
+    expect(route).not.toContain('R2Bucket')
+    expect(route).not.toContain('D1Database')
+    expect(route).not.toContain('signedUrl')
+    expect(route).not.toContain('presigned')
+  })
