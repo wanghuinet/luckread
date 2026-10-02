@@ -38,6 +38,8 @@ export default function ContentDetailPage({
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
+  const [liked, setLiked] = useState(false)
+  const [likeBusy, setLikeBusy] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
@@ -100,6 +102,35 @@ export default function ContentDetailPage({
     )
   }
 
+
+  async function toggleLike() {
+    if (!content || likeBusy) return
+    setLikeBusy(true)
+    setActionMessage('')
+    try {
+      const response = await fetch('/api/v1/interactions/likes', {
+        method: liked ? 'DELETE' : 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ targetType: 'content', targetId: content.id }),
+      })
+      if (response.status === 401) {
+        setActionMessage('请先登录后点赞。')
+        return
+      }
+      if (!response.ok) {
+        const data = await response.json().catch((): null => null)
+        setActionMessage(data?.error?.message || '点赞操作失败，请稍后重试。')
+        return
+      }
+      setLiked((value) => !value)
+    } catch {
+      setActionMessage('网络异常，请稍后重试。')
+    } finally {
+      setLikeBusy(false)
+    }
+  }
+
   async function copyContentLink() {
     try {
       await navigator.clipboard.writeText(window.location.href)
@@ -120,6 +151,9 @@ export default function ContentDetailPage({
         </div>
         <div className="content-detail-actions">
           <span>{typeLabels[content.contentType]} · 已发布</span>
+          <button className="content-detail-like" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
+            {likeBusy ? '处理中…' : liked ? '已点赞' : '点赞'}
+          </button>
           <button className="content-detail-share" onClick={() => void copyContentLink()} type="button">
             {copied ? '已复制' : '复制链接'}
           </button>
