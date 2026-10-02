@@ -143,6 +143,15 @@ export async function createComment(
 
   const validation = await db.prepare(
     `SELECT
+       (SELECT id FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_id,
+       (SELECT content_id FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_content_id,
+       (SELECT parent_id FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_parent_id,
+       (SELECT body FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_body,
+       (SELECT author_user_id FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_author_user_id,
+       (SELECT state FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_state,
+       (SELECT depth FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_depth,
+       (SELECT created_at FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_created_at,
+       (SELECT updated_at FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_updated_at,
        (SELECT state FROM contents WHERE id = ? LIMIT 1) AS content_state,
        (SELECT owner_user_id FROM contents WHERE id = ? LIMIT 1) AS content_owner_user_id,
        (SELECT content_id FROM social_comments WHERE id = ? LIMIT 1) AS parent_content_id,
@@ -165,6 +174,14 @@ export async function createComment(
            )
        ) AS blocked`,
   ).bind(
+    actor, idempotencyKey,
+    actor, idempotencyKey,
+    actor, idempotencyKey,
+    actor, idempotencyKey,
+    actor, idempotencyKey,
+    actor, idempotencyKey,
+    actor, idempotencyKey,
+    actor, idempotencyKey,
     contentId,
     contentId,
     parentId,
@@ -181,6 +198,15 @@ export async function createComment(
     parentId,
     actor,
   ).first<{
+    existing_id: string | null
+    existing_content_id: string | null
+    existing_parent_id: string | null
+    existing_body: string | null
+    existing_author_user_id: string | null
+    existing_state: 'PENDING' | 'PUBLISHED' | 'REJECTED' | null
+    existing_depth: number | null
+    existing_created_at: string | null
+    existing_updated_at: string | null
     content_state: string | null
     content_owner_user_id: string | null
     parent_content_id: string | null
@@ -190,6 +216,27 @@ export async function createComment(
     recent_count: number
     blocked: number
   }>()
+
+  if (validation?.existing_id) {
+    if (
+      validation.existing_content_id !== contentId ||
+      validation.existing_parent_id !== parentId ||
+      validation.existing_body !== body
+    ) {
+      throw new CommentRuntimeError('CONFLICT', 409)
+    }
+    return {
+      id: validation.existing_id,
+      contentId: validation.existing_content_id,
+      authorUserId: validation.existing_author_user_id ?? actor,
+      parentId: validation.existing_parent_id,
+      body: validation.existing_body,
+      state: validation.existing_state ?? 'PUBLISHED',
+      depth: Number(validation.existing_depth ?? 0),
+      createdAt: validation.existing_created_at ?? '',
+      updatedAt: validation.existing_updated_at ?? validation.existing_created_at ?? '',
+    }
+  }
 
   if (!validation || validation.content_state !== 'PUBLISHED') {
     throw new CommentRuntimeError('NOT_FOUND', 404)
