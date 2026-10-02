@@ -42,6 +42,19 @@ describe('public user profile', () => {
     expect(route).not.toContain('timezone: true')
   })
 
+  it('provides profile-level block and mute actions through the canonical interaction adapters', () => {
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    expect(page).toContain("applySafetyAction('block')")
+    expect(page).toContain("applySafetyAction('mute')")
+    expect(page).toContain("'/api/v1/interactions/' + (action === 'block' ? 'blocks' : 'mutes')")
+    expect(page).toContain("body: JSON.stringify({ targetUserId: profile.id })")
+    expect(page).toContain("'Idempotency-Key': 'social-' + action + ':' + crypto.randomUUID()")
+    expect(page).toContain('屏蔽作者')
+    expect(page).toContain('静音作者')
+    expect(page).toContain('viewerUserId !== profile.id')
+    expect(page).not.toContain('social_user_interactions')
+  })
+
   it('supports author follow state without creating a second social authority', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
     expect(page).toContain('/api/v1/social/follows/')
