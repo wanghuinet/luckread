@@ -24,6 +24,15 @@ describe('content comments UI', () => {
     expect(component).not.toContain('setComments((current) => [created, ...current])')
   })
 
+  it('connects each comment to the canonical like status and mutation APIs', () => {
+    const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
+    expect(component).toContain('/api/v1/interactions/likes?targetType=comment&targetId=')
+    expect(component).toContain('/api/v1/comments/')
+    expect(component).toContain('/likes')
+    expect(component).toContain("'Idempotency-Key': 'social-comment-like:' + crypto.randomUUID()")
+    expect(component).toContain('likedComments[comment.id]')
+  })
+
   it('uses the public comments read and authenticated create APIs', () => {
     const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
     expect(component).toContain('/api/v1/contents/')
