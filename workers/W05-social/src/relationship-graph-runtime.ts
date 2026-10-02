@@ -9,6 +9,8 @@ export type RelationshipGraph = {
   blocked: boolean
   blockedBy: boolean
   muted: boolean
+  relationshipId: string | null
+  createdAt: string | null
 }
 
 export class RelationshipGraphRuntimeError extends Error {
@@ -46,48 +48,71 @@ export async function getRelationshipGraph(
     }
   }
 
-  const rows = await db.prepare(
-    `SELECT relation_kind, relation_type
-       FROM (
-         SELECT 'follow_out' AS relation_kind, 'follow' AS relation_type
+  const row = await db.prepare(
+    `SELECT
+       EXISTS (
+         SELECT 1 FROM social_follow_relationships
+         WHERE follower_user_id = ? AND target_user_id = ?
+       ) AS following,
+       EXISTS (
+         SELECT 1 FROM social_follow_relationships
+         WHERE follower_user_id = ? AND target_user_id = ?
+       ) AS followed_by,
+       (
+         SELECT relationship_id
          FROM social_follow_relationships
          WHERE follower_user_id = ? AND target_user_id = ?
-         UNION ALL
-         SELECT 'follow_in' AS relation_kind, 'follow' AS relation_type
+         LIMIT 1
+       ) AS relationship_id,
+       (
+         SELECT created_at
          FROM social_follow_relationships
          WHERE follower_user_id = ? AND target_user_id = ?
-         UNION ALL
-         SELECT 'block_out' AS relation_kind, relation_type
-         FROM social_user_interactions
-         WHERE actor_user_id = ? AND target_user_id = ? AND relation_type = 'block'
-         UNION ALL
-         SELECT 'block_in' AS relation_kind, relation_type
-         FROM social_user_interactions
-         WHERE actor_user_id = ? AND target_user_id = ? AND relation_type = 'block'
-         UNION ALL
-         SELECT 'mute_out' AS relation_kind, relation_type
-         FROM social_user_interactions
-         WHERE actor_user_id = ? AND target_user_id = ? AND relation_type = 'mute'
-       )
-     ORDER BY relation_kind`,
+         LIMIT 1
+       ) AS created_at,
+       EXISTS (
+         SELECT 1 FROM social_user_interactions
+         WHERE relation_type = 'block'
+           AND actor_user_id = ? AND target_user_id = ?
+       ) AS blocked,
+       EXISTS (
+         SELECT 1 FROM social_user_interactions
+         WHERE relation_type = 'block'
+           AND actor_user_id = ? AND target_user_id = ?
+       ) AS blocked_by,
+       EXISTS (
+         SELECT 1 FROM social_user_interactions
+         WHERE relation_type = 'mute'
+           AND actor_user_id = ? AND target_user_id = ?
+       ) AS muted`,
   ).bind(
     viewer, target,
     target, viewer,
     viewer, target,
+    viewer, target,
+    viewer, target,
     target, viewer,
     viewer, target,
-  ).all<{ relation_kind: string; relation_type: string }>()
-
-  const present = new Set((rows.results ?? []).map((row) => row.relation_kind))
+  ).first<{
+    following: number
+    followed_by: number
+    relationship_id: string | null
+    created_at: string | null
+    blocked: number
+    blocked_by: number
+    muted: number
+  }>()
 
   return {
     viewerUserId: viewer,
     targetUserId: target,
-    following: present.has('follow_out'),
-    followedBy: present.has('follow_in'),
-    mutualFollow: present.has('follow_out') && present.has('follow_in'),
-    blocked: present.has('block_out'),
-    blockedBy: present.has('block_in'),
-    muted: present.has('mute_out'),
+    following: Boolean(row?.following),
+    followedBy: Boolean(row?.followed_by),
+    mutualFollow: Boolean(row?.following) && Boolean(row?.followed_by),
+    blocked: Boolean(row?.blocked),
+    blockedBy: Boolean(row?.blocked_by),
+    muted: Boolean(row?.muted),
+    relationshipId: row?.relationship_id ?? null,
+    createdAt: row?.created_at ?? null,
   }
 }
