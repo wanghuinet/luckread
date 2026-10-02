@@ -98,3 +98,22 @@ describe('Media upload access', () => {
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
+
+
+  it('lists only the authenticated creator media through the stable v1 collection path', () => {
+    const route = read('src/app/api/v1/media/route.ts')
+
+    expect(route).toContain("export async function GET(request: Request)")
+    expect(route).toContain("await payload.auth({ headers: request.headers, canSetHeaders: false })")
+    expect(route).toContain('readVerifiedPayloadTokenVersion(request)')
+    expect(route).toContain('validateSession({')
+    expect(route).toContain("collection: 'media'")
+    expect(route).toContain("ownerUserId: { equals: String(authenticated.user.id) }")
+    expect(route).toContain("sort: '-createdAt'")
+    expect(route).toContain('Math.min(Math.max(requestedLimit, 1), 50)')
+    expect(route).toContain('overrideAccess: false')
+    expect(route).toContain("status: 401")
+    expect(route).toContain("status: 503")
+    expect(route).not.toContain('D1Database')
+    expect(route).not.toContain('R2Bucket')
+  })
