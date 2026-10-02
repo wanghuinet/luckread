@@ -49,3 +49,15 @@ describe('Media upload access', () => {
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
+
+
+  it('exposes media metadata through the stable v1 resource path', () => {
+    const route = read('src/app/api/v1/media/[mediaId]/route.ts')
+
+    expect(route).toContain("import { GET as payloadMediaGet } from '../../../(payload)/api/[...slug]/route'")
+    expect(route).toContain("slug: ['media', mediaId]")
+    expect(route).toContain("new URL('/api/media/' + encodeURIComponent(mediaId), request.url)")
+    expect(route).toContain('request.clone()')
+    expect(route).not.toContain('D1Database')
+    expect(route).not.toContain('R2Bucket')
+  })
