@@ -23,6 +23,12 @@ describe('public user profile', () => {
     expect(list).toContain('cache: \'no-store\'')
   })
 
+  it('preserves the full return path when follow authentication expires', () => {
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    expect(page).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
+    expect(page).toContain("router.replace('/login?returnTo=' + encodeURIComponent(returnTo))")
+  })
+
   it('returns only the intentionally public user fields', () => {
     const route = read('src/app/api/v1/users/[userId]/route.ts')
     expect(route).toContain("collection: 'users'")
