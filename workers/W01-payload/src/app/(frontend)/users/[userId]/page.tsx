@@ -262,8 +262,12 @@ export default function PublicProfilePage({
         )}
 
         <div className="content-detail-actions" style={{ marginTop: 24 }}>
-          <span>{followers === null ? '—' : followers.toLocaleString('zh-CN')} 粉丝</span>
-          <span>{following === null ? '—' : following.toLocaleString('zh-CN')} 关注</span>
+          <Link href={'/users/' + encodeURIComponent(profile.id) + '/followers'}>
+            {followers === null ? '—' : followers.toLocaleString('zh-CN')} 粉丝
+          </Link>
+          <Link href={'/users/' + encodeURIComponent(profile.id) + '/following'}>
+            {following === null ? '—' : following.toLocaleString('zh-CN')} 关注
+          </Link>
           <button
             className="content-detail-follow"
             disabled={followBusy}
