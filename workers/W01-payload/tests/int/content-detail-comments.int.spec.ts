@@ -24,6 +24,15 @@ describe('content comments UI', () => {
     expect(component).not.toContain('setComments((current) => [created, ...current])')
   })
 
+  it('exposes author-only comment editing with an If-Match version guard', () => {
+    const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
+    expect(component).toContain("const [editingId, setEditingId] = useState<string | null>(null)")
+    expect(component).toContain("method: 'PATCH'")
+    expect(component).toContain("'If-Match': '"' + comment.updatedAt + '"'")
+    expect(component).toContain('comment.authorUserId === viewerUserId')
+    expect(component).toContain('保存修改')
+  })
+
   it('uses the public comments read and authenticated create APIs', () => {
     const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
     expect(component).toContain('/api/v1/contents/')
