@@ -1,7 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { assertNotBlocked, BlockPolicyError } from './block-policy.js'
-
 export class FollowRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
@@ -145,23 +143,66 @@ async function listFollowRelations(
 }
 
 export async function follow(db: D1Database, followerUserId: string, targetUserId: string): Promise<FollowRow> {
-  const follower=userId(followerUserId), target=userId(targetUserId)
-  if (follower===target) throw new FollowRuntimeError('SELF_FOLLOW_NOT_ALLOWED',409)
-  try {
-    await assertNotBlocked(db, follower, target)
-  } catch (error) {
-    if (error instanceof BlockPolicyError) {
-      throw new FollowRuntimeError(error.code, error.status)
-    }
-    throw error
+  const follower = userId(followerUserId)
+  const target = userId(targetUserId)
+  if (follower === target) throw new FollowRuntimeError('SELF_FOLLOW_NOT_ALLOWED', 409)
+
+  const state = await db.prepare(
+    `SELECT
+       EXISTS (
+         SELECT 1
+         FROM social_user_interactions
+         WHERE relation_type = 'block'
+           AND (
+             (actor_user_id = ? AND target_user_id = ?)
+             OR
+             (actor_user_id = ? AND target_user_id = ?)
+           )
+       ) AS blocked,
+       (
+         SELECT relationship_id, follower_user_id, target_user_id, created_at
+         FROM social_follow_relationships
+         WHERE follower_user_id = ? AND target_user_id = ?
+         LIMIT 1
+       ) AS existing_relationship`,
+  ).bind(follower, target, target, follower, follower, target).first<{
+    blocked: number
+    relationship_id?: string
+    follower_user_id?: string
+    target_user_id?: string
+    created_at?: string
+  }>()
+
+  if (Number(state?.blocked ?? 0) === 1) {
+    throw new FollowRuntimeError('RELATIONSHIP_BLOCKED', 409)
   }
-  const existing=await db.prepare('SELECT relationship_id, follower_user_id, target_user_id, created_at FROM social_follow_relationships WHERE follower_user_id = ? AND target_user_id = ? LIMIT 1').bind(follower,target).first<FollowRow>()
-  if (existing) return existing
-  const relationshipId=crypto.randomUUID(), createdAt=new Date().toISOString()
-  try { await db.prepare('INSERT INTO social_follow_relationships (relationship_id, follower_user_id, target_user_id, created_at) VALUES (?, ?, ?, ?)').bind(relationshipId,follower,target,createdAt).run() }
-  catch (e) { if (!(e instanceof Error) || !e.message.toLowerCase().includes('unique')) throw e }
-  const row=await db.prepare('SELECT relationship_id, follower_user_id, target_user_id, created_at FROM social_follow_relationships WHERE follower_user_id = ? AND target_user_id = ? LIMIT 1').bind(follower,target).first<FollowRow>()
-  if (!row) throw new FollowRuntimeError('FOLLOW_WRITE_FAILED',500)
+
+  if (
+    state?.relationship_id &&
+    state.follower_user_id &&
+    state.target_user_id &&
+    state.created_at
+  ) {
+    return {
+      relationship_id: state.relationship_id,
+      follower_user_id: state.follower_user_id,
+      target_user_id: state.target_user_id,
+      created_at: state.created_at,
+    }
+  }
+
+  const relationshipId = crypto.randomUUID()
+  const createdAt = new Date().toISOString()
+  const row = await db.prepare(
+    `INSERT INTO social_follow_relationships
+      (relationship_id, follower_user_id, target_user_id, created_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(follower_user_id, target_user_id)
+     DO UPDATE SET relationship_id = social_follow_relationships.relationship_id
+     RETURNING relationship_id, follower_user_id, target_user_id, created_at`,
+  ).bind(relationshipId, follower, target, createdAt).first<FollowRow>()
+
+  if (!row) throw new FollowRuntimeError('FOLLOW_WRITE_FAILED', 500)
   return row
 }
 
