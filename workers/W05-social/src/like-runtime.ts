@@ -79,18 +79,33 @@ export async function getLikeStatus(
   db: D1Database,
   actorUserId: string,
   target: LikeTarget,
-): Promise<{ liked: boolean }> {
+): Promise<{ liked: boolean; likeCount: number }> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
   const row = await db.prepare(
-    `SELECT il.relationship_id
+    `SELECT
+       EXISTS (
+         SELECT 1
+         FROM interaction_likes il
+         WHERE il.actor_user_id = ?
+           AND il.target_type = ?
+           AND il.target_id = c.id
+       ) AS liked,
+       (
+         SELECT COUNT(*)
+         FROM interaction_likes il_count
+         WHERE il_count.target_type = ?
+           AND il_count.target_id = c.id
+       ) AS like_count
        FROM contents c
-       LEFT JOIN interaction_likes il
-         ON il.actor_user_id = ? AND il.target_type = ? AND il.target_id = c.id
       WHERE c.id = ? AND c.state = 'PUBLISHED'
       LIMIT 1`,
-  ).bind(actor, targetType, targetId).first<{ relationship_id: string | null }>()
-  return { liked: Boolean(row?.relationship_id) }
+  ).bind(actor, targetType, targetType, targetId)
+    .first<{ liked: number; like_count: number }>()
+  return {
+    liked: Boolean(row?.liked),
+    likeCount: Math.max(0, Number(row?.like_count ?? 0)),
+  }
 }
 
 export async function unlike(

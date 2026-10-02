@@ -31,18 +31,15 @@ const db = (firstResults: unknown[] = []) => {
 describe('like runtime', () => {
   it('reads effective like status for the actor and target', async () => {
     const existing = {
-      relationship_id: 'like-existing',
-      actor_user_id: 'user-1',
-      target_type: 'content',
-      target_id: 'content-1',
-      created_at: '2026-10-02T12:00:00.000Z',
+      liked: 1,
+      like_count: 3,
     }
     const d = db([existing])
-    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toEqual({ liked: true })
-    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-2' })).resolves.toEqual({ liked: false })
+    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toEqual({ liked: true, likeCount: 3 })
+    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-2' })).resolves.toEqual({ liked: false, likeCount: 0 })
     expect(d.prepare).toHaveBeenCalledTimes(2)
     const unpublished = db([null])
-    await expect(getLikeStatus(unpublished, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toEqual({ liked: false })
+    await expect(getLikeStatus(unpublished, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toEqual({ liked: false, likeCount: 0 })
   })
 
 
