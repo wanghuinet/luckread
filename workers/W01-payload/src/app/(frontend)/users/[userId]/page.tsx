@@ -167,7 +167,10 @@ export default function PublicProfilePage({
       const response = await fetch('/api/v1/social/follows/' + encodeURIComponent(profile.id), {
         method: isFollowing ? 'DELETE' : 'POST',
         credentials: 'include',
-        headers: { accept: 'application/json' },
+        headers: {
+          accept: 'application/json',
+          'Idempotency-Key': 'social-follow:' + crypto.randomUUID(),
+        },
       })
 
       if (response.status === 401) {
