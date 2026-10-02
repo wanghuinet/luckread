@@ -35,6 +35,15 @@ describe('public content detail', () => {
     expect(page).toContain('收藏')
   })
 
+  it('surfaces normalized mention and hashtag tokens without creating a second taxonomy authority', () => {
+    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    expect(page).toContain("extractSocialTokens(body)")
+    expect(page).toContain('内容标签与提及')
+    expect(page).toContain('content-detail-social-token')
+    expect(page).not.toContain('hashtags/resolve')
+    expect(page).not.toContain('classification_edge')
+  })
+
   it('uses the share-token API to generate a copyable content share link', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain('/api/v1/content/' )
