@@ -191,6 +191,7 @@ describe('W03 content contract core', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
       id: 'content_public_123',
+      creatorId: 'user_123',
       state: 'PUBLISHED',
       title: 'Public article',
     })
