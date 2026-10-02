@@ -11,6 +11,7 @@ type RouteContext = { params: Promise<{ segments?: string[] }> }
 
 const resolveOperation = (method: string, segments: string[] | undefined): { pathname: string; body?: unknown } | Response | null => {
   const parts = segments ?? []
+  if (parts.length === 0 && method === 'GET') return { pathname: '/memberships/subscriptions' }
   if (parts.length === 0 && method === 'POST') return { pathname: '/memberships/subscriptions' }
   if (parts.length === 1 && method === 'GET') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) }
   if (parts.length === 2 && method === 'POST' && ['cancel', 'pause', 'resume'].includes(parts[1]!)) {
