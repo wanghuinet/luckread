@@ -44,6 +44,14 @@ describe('public content detail', () => {
     expect(comments).toContain('comment.depth < 3')
   })
 
+  it('redirects expired like and follow sessions back to login', () => {
+    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    expect(page).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
+    expect(page).toContain("window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(page).not.toContain("请先登录后点赞。")
+    expect(page).not.toContain("请先登录后关注作者。")
+  })
+
   it('connects the content detail page to the authenticated like API', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain("fetch('/api/v1/interactions/likes'")
