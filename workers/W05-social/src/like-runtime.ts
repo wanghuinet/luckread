@@ -1,4 +1,3 @@
-import { BlockPolicyError, assertNotBlocked } from './block-policy.js'
 /// <reference types="@cloudflare/workers-types" />
 
 export class LikeRuntimeError extends Error {
@@ -46,20 +45,31 @@ export async function like(
   const { targetType, targetId } = validateTarget(target)
 
   const targetRow = await db.prepare(
-    `SELECT id, state, owner_user_id FROM contents WHERE id = ? LIMIT 1`,
-  ).bind(targetId).first<{ id: string; state: string; owner_user_id: string }>()
+    `SELECT
+       c.id,
+       c.state,
+       c.owner_user_id,
+       EXISTS (
+         SELECT 1
+         FROM social_user_interactions block
+         WHERE block.relation_type = 'block'
+           AND (
+             (block.actor_user_id = ? AND block.target_user_id = c.owner_user_id)
+             OR
+             (block.actor_user_id = c.owner_user_id AND block.target_user_id = ?)
+           )
+       ) AS blocked
+       FROM contents c
+      WHERE c.id = ?
+      LIMIT 1`,
+  ).bind(actor, actor, targetId).first<{ id: string; state: string; owner_user_id: string; blocked: number }>()
 
   if (!targetRow || targetRow.state !== 'PUBLISHED') {
     throw new LikeRuntimeError('NOT_FOUND', 404)
   }
 
-  try {
-    await assertNotBlocked(db, actor, targetRow.owner_user_id)
-  } catch (error) {
-    if (error instanceof BlockPolicyError) {
-      throw new LikeRuntimeError(error.code, error.status)
-    }
-    throw error
+  if (Number(targetRow.blocked) === 1) {
+    throw new LikeRuntimeError('RELATIONSHIP_BLOCKED', 409)
   }
 
   const createdAt = new Date().toISOString()
