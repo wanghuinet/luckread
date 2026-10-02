@@ -79,6 +79,14 @@ export async function GET(request: Request): Promise<Response> {
  * handler; it does not introduce a second media authority or storage path.
  */
 export async function POST(request: Request): Promise<Response> {
+  const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+  if (!idempotencyKey || idempotencyKey.length > 256) {
+    return new Response(
+      JSON.stringify({ error: { code: 'PRECONDITION_REQUIRED', message: 'Idempotency-Key required' } }),
+      { status: 428, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } },
+    )
+  }
+
   const target = new URL('/api/media', request.url)
   const context: PayloadRouteContext = {
     params: Promise.resolve({ slug: ['media'] }),
