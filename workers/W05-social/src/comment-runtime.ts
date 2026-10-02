@@ -110,6 +110,7 @@ const validateCreateInput = (input: CommentCreateInput) => {
 
 const toCommentItem = (row: {
   id: string
+  content_id: string
   parent_id: string | null
   body: string
   state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
@@ -142,8 +143,9 @@ export async function createComment(
        (SELECT state FROM contents WHERE id = ? LIMIT 1) AS content_state,
        (SELECT content_id FROM social_comments WHERE id = ? LIMIT 1) AS parent_content_id,
        (SELECT state FROM social_comments WHERE id = ? LIMIT 1) AS parent_state,
-       (SELECT depth FROM social_comments WHERE id = ? LIMIT 1) AS parent_depth`,
-  ).bind(contentId, parentId, parentId, parentId).first<{
+       (SELECT depth FROM social_comments WHERE id = ? LIMIT 1) AS parent_depth,
+       (SELECT COUNT(*) FROM social_comments WHERE author_user_id = ? AND created_at > datetime('now', '-60 seconds')) AS recent_count`,
+  ).bind(contentId, parentId, parentId, parentId, actor).first<{
     content_state: string | null
     parent_content_id: string | null
     parent_state: string | null
