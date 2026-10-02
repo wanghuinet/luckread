@@ -1,6 +1,6 @@
 import {
   callW05Social,
-  resolveSocialPrincipal,
+  callW05SocialPublic,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
 
@@ -15,9 +15,6 @@ export async function GET(
   context: { params: Promise<{ userId: string }> },
 ): Promise<Response> {
   try {
-    const principal = await resolveSocialPrincipal(request)
-    if (principal instanceof Response) return principal
-
     const { userId } = await context.params
     if (!userId.trim()) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid user id')
 
@@ -29,11 +26,10 @@ export async function GET(
     if (limit) query.set('limit', limit)
 
     const suffix = query.toString() ? `?${query.toString()}` : ''
-    return await callW05Social({
+    return await callW05SocialPublic({
       request,
       pathname: `/internal/social/users/${encodeURIComponent(userId)}/followers${suffix}`,
       method: 'GET',
-      principal,
     })
   } catch (error) {
     if (error instanceof W05SocialClientError) {

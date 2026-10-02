@@ -159,9 +159,8 @@ export default {
         return json({ data: comment }, 201)
       }
 
-      const viewerUserId = requirePrincipal(request)
-
       if (url.pathname === '/internal/social/interactions/likes') {
+        const viewerUserId = requirePrincipal(request)
         if (request.method !== 'GET' && request.method !== 'POST' && request.method !== 'DELETE') {
           return new Response(null, { status: 405, headers: { Allow: 'GET, POST, DELETE' } })
         }
@@ -188,6 +187,7 @@ export default {
       if (!path) return new Response(null, { status: 404 })
 
       if (path.kind === 'follow') {
+        const viewerUserId = requirePrincipal(request)
         if (request.method === 'POST') {
           const row = await follow(env.DB, viewerUserId, path.userId)
           return json({
@@ -219,7 +219,9 @@ export default {
         })
       }
 
-      if (request.method !== 'GET') {
+      if (request.method === 'GET') {
+        requireTransport(request)
+      } else {
         return new Response(null, {
           status: 405,
           headers: { Allow: 'GET' },
