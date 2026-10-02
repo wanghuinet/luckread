@@ -31,6 +31,8 @@ export default function ContentComments({ contentId }: { contentId: string }) {
   const [submitting, setSubmitting] = useState(false)
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [message, setMessage] = useState('')
+  const [viewerUserId, setViewerUserId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadComments = useCallback(async (nextCursor: string | null = null) => {
     if (nextCursor) setLoadingMore(true)
@@ -59,11 +61,63 @@ export default function ContentComments({ contentId }: { contentId: string }) {
   }, [contentId])
 
   useEffect(() => {
+    void (async () => {
+      try {
+        const response = await fetch('/api/v1/users/me', {
+          credentials: 'include',
+          headers: { accept: 'application/json' },
+          cache: 'no-store',
+        })
+        const data = await response.json().catch((): null => null) as { id?: string } | null
+        if (response.ok && typeof data?.id === 'string') setViewerUserId(data.id)
+      } catch {
+        // Comment deletion stays optional when viewer identity is unavailable.
+      }
+    })()
+
     const timer = window.setTimeout(() => {
       void loadComments()
     }, 0)
     return () => window.clearTimeout(timer)
   }, [loadComments])
+
+  async function deleteComment(comment: CommentItem) {
+    if (deletingId || comment.authorUserId !== viewerUserId) return
+    setDeletingId(comment.id)
+    setMessage('')
+    try {
+      const response = await fetch(
+        '/api/v1/comments/' + encodeURIComponent(comment.id),
+        {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: {
+            accept: 'application/json',
+            'Idempotency-Key': 'social-comment-delete:' + crypto.randomUUID(),
+          },
+        },
+      )
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+      if (!response.ok) {
+        const data = await response.json().catch((): null => null)
+        setMessage(
+          data?.error?.code === 'COMMENT_HAS_REPLIES'
+            ? '该评论已有回复，暂不支持删除。'
+            : data?.error?.message || '评论删除失败，请稍后重试。',
+        )
+        return
+      }
+      setComments((current) => current.filter((item) => item.id !== comment.id))
+    } catch {
+      setMessage('网络异常，请稍后重试。')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   async function submitComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -157,6 +211,16 @@ export default function ContentComments({ contentId }: { contentId: string }) {
                 </time>
               </header>
               <p>{comment.body}</p>
+              {comment.authorUserId === viewerUserId ? (
+                <button
+                  className="content-comment-reply"
+                  disabled={deletingId === comment.id}
+                  onClick={() => void deleteComment(comment)}
+                  type="button"
+                >
+                  {deletingId === comment.id ? '删除中…' : '删除'}
+                </button>
+              ) : null}
               {comment.depth < 3 ? (
                 <button
                   className="content-comment-reply"
