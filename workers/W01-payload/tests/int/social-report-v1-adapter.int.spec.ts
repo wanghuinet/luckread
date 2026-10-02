@@ -24,9 +24,11 @@ describe('v1 report adapter', () => {
       resolve(process.cwd(), 'src/app/api/v1/reports/route.ts'),
       'utf8',
     )
-    for (const targetType of ['content', 'comment', 'creator', 'media', 'profile']) {
-      expect(route).toContain('targetType !== ' + JSON.stringify(targetType))
-    }
+    expect(route).toContain("targetType !== 'content'")
+    expect(route).toContain("targetType !== 'comment'")
+    expect(route).toContain("targetType !== 'creator'")
+    expect(route).toContain("targetType !== 'media'")
+    expect(route).toContain("targetType !== 'profile'")
     expect(route).toContain('targetId')
     expect(route).toContain('reasonCode')
     expect(route).toContain('evidenceRefs')
