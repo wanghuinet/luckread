@@ -219,7 +219,7 @@ export default function PublicProfilePage({
 
     try {
       const response = await fetch(
-        '/api/v1/interactions/' + (action === 'block' ? 'blocks/' : 'mutes/') + encodeURIComponent(profile.id),
+        '/api/v1/interactions/' + (action === 'block' ? 'blocks' : 'mutes'),
         {
           method: 'POST',
           credentials: 'include',
