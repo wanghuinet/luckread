@@ -10,6 +10,7 @@ import '../../(frontend)/publish/publish.css'
 import CreatorCenterAssistant from './CreatorCenterAssistant'
 import CreatorAudienceSummary from './CreatorAudienceSummary'
 import CreatorAssetLibrary from './CreatorAssetLibrary'
+import CreatorModerationQueue from './CreatorModerationQueue'
 import styles from './creator-center.module.css'
 
 type CreatorNavItem = {
@@ -302,6 +303,8 @@ export function CreatorCenter({
                   <CreatorAssetLibrary />
                 </article>
               </section>
+
+              <CreatorModerationQueue />
 
               <CreatorAudienceSummary userId={String(serverUser.id)} />
 
