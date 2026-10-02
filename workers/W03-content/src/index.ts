@@ -275,6 +275,7 @@ export default {
         )
         return json({
           id: content.id,
+          creatorId: content.creatorId,
           contentType: content.contentType,
           state: content.state,
           version: content.version,
