@@ -5,6 +5,24 @@ import { resolve } from 'node:path'
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
 describe('public user profile', () => {
+  it('exposes public follower and following list links on the author profile', () => {
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const followers = read('src/app/(frontend)/users/[userId]/followers/page.tsx')
+    const following = read('src/app/(frontend)/users/[userId]/following/page.tsx')
+    const list = read('src/app/(frontend)/users/[userId]/UserFollowList.tsx')
+
+    expect(page).toContain('/followers')
+    expect(page).toContain('/following')
+    expect(followers).toContain('<UserFollowList direction="followers" userId={userId} />')
+    expect(following).toContain('<UserFollowList direction="following" userId={userId} />')
+    expect(list).toContain('/api/v1/users/')
+    expect(list).toContain('limit: String(PAGE_SIZE)')
+    expect(list).toContain('nextCursor')
+    expect(list).toContain('加载更多')
+    expect(list).toContain("href={'/users/' + encodeURIComponent(item.userId)}")
+    expect(list).toContain('cache: \'no-store\'')
+  })
+
   it('returns only the intentionally public user fields', () => {
     const route = read('src/app/api/v1/users/[userId]/route.ts')
     expect(route).toContain("collection: 'users'")
