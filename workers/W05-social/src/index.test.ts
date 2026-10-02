@@ -26,6 +26,54 @@ const transportHeaders = {
 }
 
 describe('W05 social query transport', () => {
+  it('creates a share for published content', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/content/content-1/shares', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L2',
+          'Idempotency-Key': 'share-1',
+        },
+      }),
+      {
+        DB: dbFor([
+          { id: 'content-1', state: 'PUBLISHED' },
+          null,
+          { share_id: 'share-1', content_id: 'content-1', actor_user_id: 'viewer-1', created_at: '2026-10-02T00:00:00.000Z' },
+        ]),
+      },
+    )
+    expect(response.status).toBe(201)
+  })
+
+  it('resolves a share without a viewer principal', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/shares/share-1', {
+        method: 'GET',
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'share-resolve',
+        },
+      }),
+      { DB: dbFor([{ share_id: 'share-1', content_id: 'content-1', created_at: '2026-10-02T00:00:00.000Z', state: 'PUBLISHED' }]) },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ data: { contentId: 'content-1' } })
+  })
+
+  it('requires an idempotency key for share creation', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/content/content-1/shares', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
+      }),
+      { DB: dbFor([{ id: 'content-1', state: 'PUBLISHED' }]) },
+    )
+    expect(response.status).toBe(428)
+  })
+
   it('accepts an idempotent content favorite', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
