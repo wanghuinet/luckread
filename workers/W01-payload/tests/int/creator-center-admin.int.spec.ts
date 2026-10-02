@@ -274,6 +274,24 @@ describe('Creator Center admin extension', () => {
     expect(loginForm).toContain('<button aria-busy={busy} disabled={busy} type="submit">')
   })
 
+  it('exposes the user subscription page on the stable subscription API', () => {
+    const page = read('src/app/(frontend)/me/subscriptions/page.tsx')
+    const home = read('src/app/(frontend)/page.tsx')
+    const css = read('src/app/(frontend)/me/subscriptions/subscriptions.css')
+
+    expect(page).toContain("fetch('/api/v1/memberships/subscriptions?limit=20&page=1'")
+    expect(page).toContain("method: 'POST'")
+    expect(page).toContain("'If-Match': item.etag")
+    expect(page).toContain("transition(item, 'cancel')")
+    expect(page).toContain("transition(item, 'pause')")
+    expect(page).toContain("transition(item, 'resume')")
+    expect(page).toContain("statusLabel")
+    expect(page).not.toContain('entitlement')
+    expect(home).toContain('href="/me/subscriptions"')
+    expect(css).toContain('.my-subscriptions')
+    expect(css).toContain('.subscription-card')
+  })
+
   it('keeps frontend and Admin on the same Payload cookie session lifecycle', () => {
     const login = read('src/app/auth/login/route.ts')
     const refresh = read('src/app/auth/refresh/route.ts')
