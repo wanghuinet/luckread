@@ -1,15 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import styles from './creator-center.module.css'
 
 type CountValue = number | null
 
+type FollowListItem = {
+  relationshipId: string
+  userId: string
+  followedAt: string
+}
+
+type FollowListPage = {
+  items: FollowListItem[]
+  totalCount: number
+  nextCursor: string | null
+  hasMore: boolean
+}
+
 type FollowListResponse = {
-  data?: {
-    totalCount?: number
-  }
+  data?: FollowListPage
 }
 
 type AudienceState = {
@@ -18,11 +29,15 @@ type AudienceState = {
   error: boolean
 }
 
+type Direction = 'followers' | 'following'
+
 const initialState: AudienceState = {
   followers: null,
   following: null,
   error: false,
 }
+
+const PAGE_SIZE = 10
 
 async function fetchCount(path: string, signal: AbortSignal): Promise<number> {
   const response = await fetch(path, {
@@ -31,16 +46,48 @@ async function fetchCount(path: string, signal: AbortSignal): Promise<number> {
     cache: 'no-store',
     signal,
   })
-  const data = await response.json().catch((): null => null) as FollowListResponse | null
+  const data = await response.json().catch((): null => null) as { data?: { totalCount?: number } } | null
   if (!response.ok || typeof data?.data?.totalCount !== 'number') {
     throw new Error('AUDIENCE_LOAD_FAILED')
   }
   return Math.max(0, data.data.totalCount)
 }
 
+async function fetchList(
+  userId: string,
+  direction: Direction,
+  cursor: string | null,
+  signal: AbortSignal,
+): Promise<FollowListPage> {
+  const params = new URLSearchParams({ limit: String(PAGE_SIZE) })
+  if (cursor) params.set('cursor', cursor)
+
+  const response = await fetch(
+    '/api/v1/users/' + encodeURIComponent(userId) + '/' + direction + '?' + params.toString(),
+    {
+      headers: { accept: 'application/json' },
+      credentials: 'include',
+      cache: 'no-store',
+      signal,
+    },
+  )
+  const data = await response.json().catch((): null => null) as FollowListResponse | null
+  if (!response.ok || !data?.data || !Array.isArray(data.data.items)) {
+    throw new Error('AUDIENCE_LIST_LOAD_FAILED')
+  }
+  return data.data
+}
+
 export default function CreatorAudienceSummary({ userId }: { userId: string }) {
   const [state, setState] = useState<AudienceState>(initialState)
   const [reloadKey, setReloadKey] = useState(0)
+  const [direction, setDirection] = useState<Direction>('followers')
+  const [items, setItems] = useState<FollowListItem[]>([])
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
+  const [listLoading, setListLoading] = useState(true)
+  const [listError, setListError] = useState(false)
+  const listRequestId = useRef(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -66,15 +113,73 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
     }
   }, [userId, reloadKey])
 
+  useEffect(() => {
+    const controller = new AbortController()
+    const requestId = ++listRequestId.current
+    setItems([])
+    setNextCursor(null)
+    setHasMore(false)
+    setListLoading(true)
+    setListError(false)
+
+    void fetchList(userId, direction, null, controller.signal)
+      .then((page) => {
+        if (requestId !== listRequestId.current) return
+        setItems(page.items)
+        setNextCursor(page.nextCursor)
+        setHasMore(page.hasMore)
+      })
+      .catch((error: unknown) => {
+        if (requestId !== listRequestId.current || controller.signal.aborted) return
+        setListError(true)
+        console.error('Creator audience list failed', error)
+      })
+      .finally(() => {
+        if (requestId === listRequestId.current) setListLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [userId, direction, reloadKey])
+
+  async function loadMore() {
+    if (listLoading || !hasMore || !nextCursor) return
+    const controller = new AbortController()
+    const requestId = ++listRequestId.current
+    setListLoading(true)
+    setListError(false)
+
+    try {
+      const page = await fetchList(userId, direction, nextCursor, controller.signal)
+      if (requestId !== listRequestId.current) return
+      setItems((current) => [...current, ...page.items])
+      setNextCursor(page.nextCursor)
+      setHasMore(page.hasMore)
+    } catch (error) {
+      if (requestId !== listRequestId.current || controller.signal.aborted) return
+      setListError(true)
+      console.error('Creator audience list pagination failed', error)
+    } finally {
+      if (requestId === listRequestId.current) setListLoading(false)
+    }
+  }
+
   const formatCount = (value: CountValue) => value === null ? '—' : value.toLocaleString('zh-CN')
+  const formatFollowedAt = (value: string) => {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime())
+      ? value
+      : date.toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'short' })
+  }
+
+  const activeCount = direction === 'followers' ? state.followers : state.following
 
   return (
     <section className={styles.sectionBlock} id="audience">
       <div className={styles.sectionTitle}>
         <div>
           <span className={styles.eyebrow}>AUDIENCE</span>
-          <h2>粉丝关系</h2>
-          <p>直接读取现有 Social/W05 关系数据，查看当前账号的粉丝与关注规模。</p>
+          <h2>粉丝与关注</h2>
+          <p>直接读取现有 Social/W05 关系数据，查看当前账号规模并分页浏览关系。</p>
         </div>
         <button
           className={styles.secondaryButton + ' btn'}
@@ -109,6 +214,91 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
           <span>{state.error ? '关系数据暂时无法同步。' : '不复制关系数据，由 Social 作为唯一关系事实来源。'}</span>
         </article>
       </div>
+
+      <section className={styles.audiencePanel} aria-label="粉丝与关注列表">
+        <div className={styles.audienceTabs} role="tablist" aria-label="关系类型">
+          <button
+            aria-selected={direction === 'followers'}
+            className={direction === 'followers' ? styles.audienceTabActive : styles.audienceTab}
+            onClick={() => setDirection('followers')}
+            role="tab"
+            type="button"
+          >
+            粉丝 <span>{formatCount(state.followers)}</span>
+          </button>
+          <button
+            aria-selected={direction === 'following'}
+            className={direction === 'following' ? styles.audienceTabActive : styles.audienceTab}
+            onClick={() => setDirection('following')}
+            role="tab"
+            type="button"
+          >
+            关注 <span>{formatCount(state.following)}</span>
+          </button>
+        </div>
+
+        <div className={styles.audienceList} aria-busy={listLoading}>
+          <div className={styles.audienceListHeader}>
+            <strong>{direction === 'followers' ? '关注你的用户' : '你关注的用户'}</strong>
+            <span>当前 {formatCount(activeCount)} 个关系</span>
+          </div>
+
+          {listError ? (
+            <div className={styles.audienceState} role="alert">
+              <span>列表暂时无法加载。</span>
+              <button
+                className={styles.secondaryButton + ' btn'}
+                onClick={() => setReloadKey((value) => value + 1)}
+                type="button"
+              >
+                重试
+              </button>
+            </div>
+          ) : null}
+
+          {!listError && listLoading && items.length === 0 ? (
+            <p className={styles.audienceState} role="status">正在加载关系列表…</p>
+          ) : null}
+
+          {!listError && !listLoading && items.length === 0 ? (
+            <p className={styles.audienceState} role="status">
+              {direction === 'followers' ? '还没有粉丝。' : '还没有关注用户。'}
+            </p>
+          ) : null}
+
+          {items.length > 0 ? (
+            <div className={styles.audienceRows}>
+              {items.map((item) => (
+                <div className={styles.audienceRow} key={item.relationshipId}>
+                  <div className={styles.audienceIdentity}>
+                    <span className={styles.audienceAvatar}>
+                      <i className="fa-solid fa-user" aria-hidden="true" />
+                    </span>
+                    <div>
+                      <strong>{item.userId}</strong>
+                      <span>用户 ID</span>
+                    </div>
+                  </div>
+                  <time dateTime={item.followedAt}>关系建立于 {formatFollowedAt(item.followedAt)}</time>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {hasMore && nextCursor ? (
+            <div className={styles.audienceActions}>
+              <button
+                className={styles.secondaryButton + ' btn'}
+                disabled={listLoading}
+                onClick={() => void loadMore()}
+                type="button"
+              >
+                {listLoading ? '加载中…' : '加载更多'}
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </section>
     </section>
   )
 }
