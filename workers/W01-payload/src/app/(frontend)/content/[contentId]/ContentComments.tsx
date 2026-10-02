@@ -31,6 +31,8 @@ export default function ContentComments({ contentId }: { contentId: string }) {
   const [submitting, setSubmitting] = useState(false)
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [message, setMessage] = useState('')
+  const [likedComments, setLikedComments] = useState<Record<string, boolean>>({})
+  const [likingCommentId, setLikingCommentId] = useState<string | null>(null)
 
   const loadComments = useCallback(async (nextCursor: string | null = null) => {
     if (nextCursor) setLoadingMore(true)
@@ -64,6 +66,62 @@ export default function ContentComments({ contentId }: { contentId: string }) {
     }, 0)
     return () => window.clearTimeout(timer)
   }, [loadComments])
+
+  async function toggleCommentLike(comment: CommentItem) {
+    if (likingCommentId) return
+    setLikingCommentId(comment.id)
+    setMessage('')
+    try {
+      const statusResponse = await fetch(
+        '/api/v1/interactions/likes?targetType=comment&targetId=' + encodeURIComponent(comment.id),
+        {
+          credentials: 'include',
+          headers: { accept: 'application/json' },
+          cache: 'no-store',
+        },
+      )
+
+      if (statusResponse.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+
+      const statusData = await statusResponse.json().catch((): null => null) as { data?: { liked?: boolean } } | null
+      if (!statusResponse.ok || typeof statusData?.data?.liked !== 'boolean') {
+        setMessage(statusData?.data ? '评论点赞状态读取失败。' : '评论点赞失败，请稍后重试。')
+        return
+      }
+
+      const liked = statusData.data.liked
+      const method = liked ? 'DELETE' : 'POST'
+      const response = await fetch('/api/v1/comments/' + encodeURIComponent(comment.id) + '/likes', {
+        method,
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'Idempotency-Key': 'social-comment-like:' + crypto.randomUUID(),
+        },
+      })
+
+      const data = await response.json().catch((): null => null)
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+      if (!response.ok && response.status !== 204) {
+        setMessage(data?.error?.message || '评论点赞失败，请稍后重试。')
+        return
+      }
+
+      setLikedComments((current) => ({ ...current, [comment.id]: !liked }))
+    } catch {
+      setMessage('网络异常，请稍后重试。')
+    } finally {
+      setLikingCommentId(null)
+    }
+  }
 
   async function submitComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -157,6 +215,18 @@ export default function ContentComments({ contentId }: { contentId: string }) {
                 </time>
               </header>
               <p>{comment.body}</p>
+              <button
+                className="content-comment-reply"
+                disabled={likingCommentId === comment.id}
+                onClick={() => void toggleCommentLike(comment)}
+                type="button"
+              >
+                {likingCommentId === comment.id
+                  ? '处理中…'
+                  : likedComments[comment.id]
+                    ? '已赞'
+                    : '赞'}
+              </button>
               {comment.depth < 3 ? (
                 <button
                   className="content-comment-reply"
