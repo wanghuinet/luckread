@@ -26,7 +26,6 @@ describe('v1 comment adapters', () => {
   it('keeps parentId and body in the create request only', () => {
     expect(route).toContain('body: { body, parentId: parentId ?? null }')
   })
-})
 
   it('exposes conditional comment updates through the W05 adapter', () => {
     expect(updateRoute).toContain('resolveCookieSocialPrincipal')
@@ -36,3 +35,4 @@ describe('v1 comment adapters', () => {
     expect(updateRoute).toContain('/internal/social/comments/')
     expect(updateRoute).not.toContain('social_comments')
   })
+})
