@@ -11,6 +11,7 @@ describe('v1 block/mute adapters', () => {
       const route = readFileSync(resolve(process.cwd(), path), 'utf8')
       expect(route).toContain('resolveCookieSocialPrincipal')
       expect(route).toContain('callW05Social')
+      expect(route).toContain('assertSocialTargetUserExists')
       expect(route).toContain('Idempotency-Key')
       expect(route).not.toContain('getPayload(')
       expect(route).not.toContain('social_user_interactions')
