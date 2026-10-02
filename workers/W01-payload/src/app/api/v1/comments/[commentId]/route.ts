@@ -2,7 +2,7 @@ import {
   callW05Social,
   resolveCookieSocialPrincipal,
   W05SocialClientError,
-} from '../../../../../../social/w05-social-client.js'
+} from '../../../../../social/w05-social-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
