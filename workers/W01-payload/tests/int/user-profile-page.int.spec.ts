@@ -17,6 +17,7 @@ describe('user profile page', () => {
     expect(page).toContain('个人简介')
     expect(page).toContain('保存资料')
     expect(page).toContain("href=\"/admin/creator-center\"")
+    expect(page).toContain('href="/me/password"')
   })
 
   it('uses the existing authenticated logout API and returns to the public homepage', () => {
@@ -41,4 +42,22 @@ describe('user profile page', () => {
     expect(page).toContain('上传后仍需点击“保存资料”。')
   })
 
+})
+
+describe('password change page', () => {
+  it('uses the versioned password-change API and existing session lifecycle', () => {
+    const page = read('src/app/(frontend)/me/password/page.tsx')
+    expect(page).toContain("fetch('/api/v1/auth/password/change'")
+    expect(page).toContain("method: 'POST'")
+    expect(page).toContain("'Idempotency-Key'")
+    expect(page).toContain('crypto.randomUUID()')
+    expect(page).toContain("credentials: 'include'")
+    expect(page).toContain('currentPassword')
+    expect(page).toContain('newPassword')
+    expect(page).toContain('confirmPassword')
+    expect(page).toContain('MIN_PASSWORD_LENGTH = 15')
+    expect(page).toContain('MAX_PASSWORD_LENGTH = 128')
+    expect(page).toContain("response.status === 401")
+    expect(page).toContain("router.replace('/login?returnTo='")
+  })
 })
