@@ -12,8 +12,8 @@ describe('v1 follower relationship adapters', () => {
       'utf8',
     )
 
-    expect(route).toContain('resolveSocialPrincipal')
-    expect(route).toContain('callW05Social')
+    expect(route).toContain('callW05SocialPublic')
+    expect(route).not.toContain('resolveSocialPrincipal')
     expect(route).toContain('encodeURIComponent(userId)')
     expect(route).toContain('pathname: `/internal/social/users/${encodeURIComponent(userId)}/')
     expect(route).toContain(`/${pathPart}`)
