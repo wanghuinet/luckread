@@ -14,12 +14,27 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const principal = await resolveCookieSocialPrincipal(request)
     if (principal instanceof Response) return principal
+    const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+    if (!idempotencyKey || idempotencyKey.length > 256) {
+      return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
+    }
+    let body: unknown
+    try { body = await request.json() } catch {
+      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+    }
+    const targetUserId = (body as { targetUserId?: unknown }).targetUserId
+    if (typeof targetUserId !== 'string' || !targetUserId.trim()) {
+      return errorResponse(400, 'VALIDATION_FAILED', 'targetUserId is required')
+    }
     return await callW05Social({
       request,
       pathname: '/internal/social/interactions/blocks',
       method: 'POST',
       principal,
-      body: await request.json(),
+      body: { targetUserId },
     })
   } catch (error) {
     if (error instanceof W05SocialClientError) return errorResponse(error.status, error.code, error.message)
