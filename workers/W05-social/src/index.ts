@@ -34,6 +34,10 @@ const principal = (r: Request) => {
   return id
 }
 
+const decodePathPart = (value: string): string | null => {
+  try { return decodeURIComponent(value) } catch { return null }
+}
+
 const parsePath = (pathname: string) => {
   const parts = pathname.split('/').filter(Boolean)
   if (
@@ -42,7 +46,8 @@ const parsePath = (pathname: string) => {
     parts[1] === 'social' &&
     parts[2] === 'follows'
   ) {
-    return { kind: 'follow' as const, userId: decodeURIComponent(parts[3]) }
+    const userId = decodePathPart(parts[3])
+    return userId === null ? null : { kind: 'follow' as const, userId }
   }
 
   if (
@@ -52,9 +57,11 @@ const parsePath = (pathname: string) => {
     parts[2] === 'users' &&
     ['followers', 'following'].includes(parts[4])
   ) {
+    const userId = decodePathPart(parts[3])
+    if (userId === null) return null
     return {
       kind: parts[4] as 'followers' | 'following',
-      userId: decodeURIComponent(parts[3]),
+      userId,
     }
   }
 
