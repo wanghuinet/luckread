@@ -11,19 +11,37 @@ describe('creator audience integration', () => {
 
     expect(center).toContain("import CreatorAudienceSummary from './CreatorAudienceSummary'")
     expect(center).toContain('<CreatorAudienceSummary userId={String(serverUser.id)} />')
+    expect(center).toContain("{ label: '粉丝与关注', href: '#audience'")
+    expect(center).not.toContain("{ label: '粉丝与订阅', href: '#future-audience'")
     expect(summary).toContain('/api/v1/users/')
     expect(summary).toContain('/followers?limit=1')
     expect(summary).toContain('/following?limit=1')
+    expect(summary).toContain("limit: String(PAGE_SIZE)")
+    expect(summary).toContain('nextCursor')
+    expect(summary).toContain('加载更多')
+    expect(summary).toContain('用户 ID')
     expect(summary).toContain('credentials: \'include\'')
-    expect(summary).toContain('totalCount')
-    expect(summary).toContain('W05 Social')
   })
 
-  it('keeps audience reads independent from Payload storage', () => {
+  it('keeps audience reads on the canonical Social API', () => {
     const summary = read('src/app/(payload)/admin/CreatorAudienceSummary.tsx')
 
     expect(summary).not.toContain('getPayload(')
     expect(summary).not.toContain('social_follow_relationships')
     expect(summary).toContain('cache: \'no-store\'')
+    expect(summary).toContain('W05 Social')
+  })
+
+  it('covers responsive audience styling and accessible relationship tabs', () => {
+    const styles = read('src/app/(payload)/admin/creator-center.module.css')
+    const summary = read('src/app/(payload)/admin/CreatorAudienceSummary.tsx')
+
+    expect(styles).toContain('.audiencePanel')
+    expect(styles).toContain('.audienceRow')
+    expect(styles).toContain('@media (max-width:640px)')
+    expect(summary).toContain('role="tablist"')
+    expect(summary).toContain('role="tab"')
+    expect(summary).toContain('aria-selected={direction ===')
+    expect(summary).toContain('aria-busy={listLoading}')
   })
 })
