@@ -26,5 +26,8 @@ describe('public user profile', () => {
     expect(page).toContain('/following?limit=1')
     expect(page).toContain('credentials: \'include\'')
     expect(page).toContain('关注作者')
+    expect(page).toContain('/api/v1/contents?creatorId=')
+    expect(page).toContain('加载更多作品')
+    expect(page).toContain("href={'/content/' + encodeURIComponent(item.id)}")
   })
 })

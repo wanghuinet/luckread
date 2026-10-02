@@ -18,6 +18,28 @@ type CountResponse = {
   }
 }
 
+type PublicContent = {
+  id: string
+  contentType: 'article' | 'post' | 'video'
+  title: string
+  coverRef?: string | null
+  updatedAt?: string
+}
+
+type ContentListResponse = {
+  data?: {
+    items?: PublicContent[]
+    nextCursor?: string | null
+    hasMore?: boolean
+  }
+}
+
+const contentTypeLabels: Record<PublicContent['contentType'], string> = {
+  article: '文章',
+  post: '动态',
+  video: '视频',
+}
+
 export default function PublicProfilePage({
   params,
 }: {
@@ -29,6 +51,11 @@ export default function PublicProfilePage({
   const [following, setFollowing] = useState<number | null>(null)
   const [isFollowing, setIsFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
+  const [contents, setContents] = useState<PublicContent[]>([])
+  const [contentCursor, setContentCursor] = useState<string | null>(null)
+  const [contentHasMore, setContentHasMore] = useState(false)
+  const [contentLoading, setContentLoading] = useState(true)
+  const [contentError, setContentError] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -39,7 +66,7 @@ export default function PublicProfilePage({
     void (async () => {
       try {
         const { userId } = await params
-        const [profileResponse, followersResponse, followingResponse, followResponse] = await Promise.all([
+        const [profileResponse, followersResponse, followingResponse, followResponse, contentResponse] = await Promise.all([
           fetch('/api/v1/users/' + encodeURIComponent(userId), {
             headers: { accept: 'application/json' },
             cache: 'no-store',
@@ -62,6 +89,11 @@ export default function PublicProfilePage({
             cache: 'no-store',
             signal: controller.signal,
           }),
+          fetch('/api/v1/contents?creatorId=' + encodeURIComponent(userId) + '&limit=6', {
+            headers: { accept: 'application/json' },
+            cache: 'no-store',
+            signal: controller.signal,
+          }),
         ])
 
         const data = await profileResponse.json().catch((): null => null) as PublicProfile | { error?: { message?: string } } | null
@@ -75,10 +107,16 @@ export default function PublicProfilePage({
         const followerData = await followersResponse.json().catch((): null => null) as CountResponse | null
         const followingData = await followingResponse.json().catch((): null => null) as CountResponse | null
         const followData = await followResponse.json().catch((): null => null) as { data?: { following?: boolean } } | null
+        const contentData = await contentResponse.json().catch((): null => null) as ContentListResponse | null
         if (!cancelled) {
           setFollowers(typeof followerData?.data?.totalCount === 'number' ? followerData.data.totalCount : null)
           setFollowing(typeof followingData?.data?.totalCount === 'number' ? followingData.data.totalCount : null)
           setIsFollowing(followData?.data?.following === true)
+          const items = Array.isArray(contentData?.data?.items) ? contentData.data.items : []
+          setContents(items)
+          setContentCursor(typeof contentData?.data?.nextCursor === 'string' ? contentData.data.nextCursor : null)
+          setContentHasMore(contentData?.data?.hasMore === true)
+          setContentError(contentResponse.ok ? '' : '暂时无法加载作者作品。')
         }
       } catch (cause) {
         if (cancelled || controller.signal.aborted) return
@@ -93,6 +131,32 @@ export default function PublicProfilePage({
       controller.abort()
     }
   }, [params])
+
+  async function loadMoreContents() {
+    if (contentLoading || !contentHasMore || !contentCursor || !profile) return
+    setContentLoading(true)
+    setContentError('')
+    try {
+      const response = await fetch(
+        '/api/v1/contents?creatorId=' + encodeURIComponent(profile.id) + '&limit=6&cursor=' + encodeURIComponent(contentCursor),
+        {
+          headers: { accept: 'application/json' },
+          cache: 'no-store',
+        },
+      )
+      const data = await response.json().catch((): null => null) as ContentListResponse | null
+      if (!response.ok || !Array.isArray(data?.data?.items)) {
+        throw new Error('CONTENT_LIST_FAILED')
+      }
+      setContents((current) => [...current, ...data.data.items])
+      setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
+      setContentHasMore(data.data.hasMore === true)
+    } catch {
+      setContentError('暂时无法加载更多作品，请稍后重试。')
+    } finally {
+      setContentLoading(false)
+    }
+  }
 
   async function toggleFollow() {
     if (!profile || followBusy) return
@@ -197,6 +261,83 @@ export default function PublicProfilePage({
           {error ? <span className="content-detail-action-status" role="status">{error}</span> : null}
         </div>
       </article>
+
+      <section className="content-detail-card" aria-labelledby="author-content-title" style={{ marginTop: 20 }}>
+        <header className="content-detail-header">
+          <p className="eyebrow">PUBLISHED WORKS</p>
+          <h2 id="author-content-title" style={{ marginBottom: 0 }}>公开作品</h2>
+        </header>
+
+        {contentError ? <p className="content-detail-action-status" role="status">{contentError}</p> : null}
+        {contentLoading && contents.length === 0 ? (
+          <p className="content-detail-state" role="status">正在加载作品…</p>
+        ) : null}
+        {!contentLoading && contents.length === 0 && !contentError ? (
+          <p className="content-detail-muted">这个作者还没有公开作品。</p>
+        ) : null}
+
+        {contents.length > 0 ? (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {contents.map((item) => (
+              <Link
+                href={'/content/' + encodeURIComponent(item.id)}
+                key={item.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: item.coverRef ? '96px minmax(0, 1fr)' : '1fr',
+                  gap: 14,
+                  padding: 14,
+                  border: '1px solid #e4eaf1',
+                  borderRadius: 12,
+                  color: 'inherit',
+                  textDecoration: 'none',
+                  background: '#fff',
+                }}
+              >
+                {item.coverRef ? (
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 96,
+                      height: 72,
+                      display: 'block',
+                      borderRadius: 8,
+                      background: '#eef4ff',
+                      backgroundImage: 'linear-gradient(135deg, rgba(36,88,230,.12), rgba(36,88,230,.02))',
+                    }}
+                  />
+                ) : null}
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', color: '#617086', fontSize: 11, fontWeight: 700 }}>
+                    {contentTypeLabels[item.contentType]}
+                  </span>
+                  <strong style={{ display: 'block', marginTop: 5, overflow: 'hidden', fontSize: 15, textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.title}
+                  </strong>
+                  {item.updatedAt ? (
+                    <time dateTime={item.updatedAt} style={{ display: 'block', marginTop: 7, color: '#8a98ab', fontSize: 11 }}>
+                      更新于 {new Date(item.updatedAt).toLocaleString('zh-CN', { hour12: false })}
+                    </time>
+                  ) : null}
+                </span>
+              </Link>
+            ))}
+          </div>
+        ) : null}
+
+        {contentHasMore && contentCursor ? (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+            <button
+              className="content-detail-follow"
+              disabled={contentLoading}
+              onClick={() => void loadMoreContents()}
+              type="button"
+            >
+              {contentLoading ? '加载中…' : '加载更多作品'}
+            </button>
+          </div>
+        ) : null}
+      </section>
     </main>
   )
 }

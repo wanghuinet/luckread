@@ -194,9 +194,13 @@ export default {
       if (request.method === 'GET' && url.pathname === '/internal/content/contents') {
         const cursor = url.searchParams.get('cursor')
         const limitParam = url.searchParams.get('limit')
+        const creatorId = url.searchParams.get('creatorId')?.trim() || null
         const limit = parseListLimit(limitParam)
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
-        const page = await listContents(env.D1_02, cursor, limit)
+        if (creatorId && !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(creatorId)) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const page = await listContents(env.D1_02, cursor, limit, creatorId)
         return json({
           data: {
             items: page.items.map(item => ({
@@ -271,6 +275,7 @@ export default {
         )
         return json({
           id: content.id,
+          creatorId: content.creatorId,
           contentType: content.contentType,
           state: content.state,
           version: content.version,
@@ -288,6 +293,7 @@ export default {
         const content = await getContent(env.D1_02, path.id, principalUserId)
         return json({
           id: content.id,
+          creatorId: content.creatorId,
           contentType: content.contentType,
           state: content.state,
           version: content.version,

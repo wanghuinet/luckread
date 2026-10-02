@@ -147,6 +147,44 @@ describe('W03 content contract core', () => {
   })
 
 
+
+  it('filters public content by creator while keeping only published rows', async () => {
+    const preparedQueries: string[] = []
+    const row = {
+      id: 'creator_content_123',
+      content_type: 'article',
+      owner_user_id: 'user_123',
+      creator_id: 'user_123',
+      ip_id: null,
+      state: 'PUBLISHED',
+      version: 1,
+      revision: 1,
+      title: 'Creator article',
+      body_ref: 'https://cdn.example.com/body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-02T12:00:00.000Z',
+      updated_at: '2026-10-02T12:01:00.000Z',
+    }
+
+    const db = {
+      prepare(query: string) {
+        preparedQueries.push(query)
+        return {
+          bind: () => ({
+            all: async () => ({ results: [row] }),
+          }),
+        }
+      },
+    } as never
+
+    const page = await listContents(db, null, 6, 'user_123')
+
+    expect(page.items[0]?.creatorId).toBe('user_123')
+    expect(preparedQueries[0]).toContain("WHERE state = 'PUBLISHED' AND creator_id = ?")
+  })
+
   it('serves published content detail without a creator principal', async () => {
     const row = {
       id: 'content_public_123',
