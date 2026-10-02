@@ -247,7 +247,7 @@ describe('Creator Center admin extension', () => {
     expect(styles).toContain('.creatorLayout button:focus-visible')
     expect(moderation).toContain("fetch('/api/v1/admin/moderation/queue?limit=20'")
     expect(moderation).toContain("/api/v1/admin/moderation/cases/' + encodeURIComponent(item.caseId) + '/decision")
-    expect(moderation).toContain("'If-Match': 'W/"' + item.version + '"'")
+    expect(moderation).toContain(`'If-Match': 'W/"' + item.version + '"'`)
     expect(moderation).toContain("'Idempotency-Key': crypto.randomUUID()")
     expect(moderation).toContain("decision: outcome")
     expect(moderation).toContain("expectedVersion: item.version")
