@@ -215,7 +215,9 @@ export default {
       try {
         const principal = requireW01Transport(request)
         const permission = principal.layer
-        if (!/^L[0-8]$/.test(permission)) throw new ReportRuntimeError('PERMISSION_DENIED', 403)
+        if (!/^L[0-8]$/.test(permission) || Number(permission.slice(1)) < 2) {
+          throw new ReportRuntimeError('PERMISSION_DENIED', 403)
+        }
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         if (!idempotencyKey) throw new ReportRuntimeError('PRECONDITION_REQUIRED', 428)
         let body: unknown
