@@ -26,6 +26,116 @@ const transportHeaders = {
 }
 
 describe('W05 social query transport', () => {
+  it('creates an idempotent block relation for an active actor and existing target', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/blocks', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L2',
+          'Idempotency-Key': 'block-1',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ targetUserId: 'target-1' }),
+      }),
+      {
+        DB: dbFor([
+          { account_state: 'ACTIVE' },
+          { id: 'target-1' },
+          null,
+          {
+            relationship_id: 'block-1',
+            actor_user_id: 'viewer-1',
+            target_user_id: 'target-1',
+            relation_type: 'block',
+            created_at: '2026-10-02T00:00:00.000Z',
+            updated_at: '2026-10-02T00:00:00.000Z',
+          },
+        ]),
+      },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { relationshipId: 'block-1', relationType: 'block', targetUserId: 'target-1' },
+    })
+  })
+
+  it('creates mute independently from block', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/mutes', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L2',
+          'Idempotency-Key': 'mute-1',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ targetUserId: 'target-1' }),
+      }),
+      {
+        DB: dbFor([
+          { account_state: 'ACTIVE' },
+          { id: 'target-1' },
+          null,
+          {
+            relationship_id: 'mute-1',
+            actor_user_id: 'viewer-1',
+            target_user_id: 'target-1',
+            relation_type: 'mute',
+            created_at: '2026-10-02T00:00:00.000Z',
+            updated_at: '2026-10-02T00:00:00.000Z',
+          },
+        ]),
+      },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { relationshipId: 'mute-1', relationType: 'mute' },
+    })
+  })
+
+  it('rejects self block and missing idempotency safely', async () => {
+    const selfResponse = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/blocks', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'Idempotency-Key': 'block-self', 'content-type': 'application/json' },
+        body: JSON.stringify({ targetUserId: 'viewer-1' }),
+      }),
+      { DB: dbFor() },
+    )
+    expect(selfResponse.status).toBe(409)
+
+    const missingKey = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/mutes', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'content-type': 'application/json' },
+        body: JSON.stringify({ targetUserId: 'target-1' }),
+      }),
+      { DB: dbFor() },
+    )
+    expect(missingKey.status).toBe(428)
+  })
+
+  it('unblocks and unmutes with idempotent 204 responses', async () => {
+    const unblock = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/blocks/target-1', {
+        method: 'DELETE',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'Idempotency-Key': 'unblock-1' },
+      }),
+      { DB: dbFor([{ account_state: 'ACTIVE' }]) },
+    )
+    expect(unblock.status).toBe(204)
+
+    const unmute = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/mutes/target-1', {
+        method: 'DELETE',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'Idempotency-Key': 'unmute-1' },
+      }),
+      { DB: dbFor([{ account_state: 'ACTIVE' }]) },
+    )
+    expect(unmute.status).toBe(204)
+  })
+
   it('creates a share for published content', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/content/content-1/shares', {
