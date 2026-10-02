@@ -14,3 +14,11 @@ describe('public content detail', () => {
     expect(page).toContain('poster={index === 0 ? content.coverRef || undefined : undefined}')
   })
 })
+
+  it('connects the content detail page to the authenticated like API', () => {
+    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    expect(page).toContain("fetch('/api/v1/interactions/likes'")
+    expect(page).toContain("credentials: 'include'")
+    expect(page).toContain("targetType: 'content'")
+    expect(page).toContain("liked ? 'DELETE' : 'POST'")
+  })
