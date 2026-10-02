@@ -2,7 +2,7 @@ import {
   callW07Subscription,
   resolveCookieSubscriptionPrincipal,
   W07SubscriptionClientError,
-} from '../../../../../../../subscription/w07-subscription-client.js'
+} from '../../../../../../subscription/w07-subscription-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, { status, headers: { 'cache-control': 'no-store' } })
