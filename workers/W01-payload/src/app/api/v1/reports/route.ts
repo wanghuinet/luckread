@@ -4,6 +4,7 @@ import {
   resolveCookieContentPrincipal,
   W03ContentClientError,
 } from '../../../../content/w03-content-client.js'
+import { assertSocialTargetUserExists } from '../../../../social/w05-social-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -49,6 +50,23 @@ export async function POST(request: Request): Promise<Response> {
     const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     if (!idempotencyKey) {
       return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
+    }
+
+    if (targetType === 'creator' || targetType === 'profile') {
+      try {
+        await assertSocialTargetUserExists(targetId as string)
+      } catch (error) {
+        if (error instanceof W03ContentClientError) throw error
+        if (error instanceof Error && 'status' in error && 'code' in error) {
+          const clientError = error as { status: number; code: string; message: string }
+          return errorResponse(
+            clientError.status,
+            clientError.code === 'NOT_FOUND' ? 'RESOURCE_NOT_FOUND' : clientError.code,
+            clientError.message,
+          )
+        }
+        return errorResponse(503, 'SERVICE_UNAVAILABLE', 'User service unavailable')
+      }
     }
 
     if (targetType === 'content') {
