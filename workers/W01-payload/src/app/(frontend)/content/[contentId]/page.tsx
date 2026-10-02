@@ -47,6 +47,7 @@ export default function ContentDetailPage({
   const [bookmarked, setBookmarked] = useState(false)
   const [bookmarkBusy, setBookmarkBusy] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
+  const [reportBusy, setReportBusy] = useState(false)
   const [viewerUserId, setViewerUserId] = useState<string | null>(null)
   const [following, setFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
@@ -272,6 +273,43 @@ export default function ContentDetailPage({
     }
   }
 
+  async function submitReport() {
+    if (!content || reportBusy) return
+    const reasonCode = window.prompt('请输入举报原因（例如 SPAM、COPYRIGHT、ABUSE）', 'SPAM')?.trim()
+    if (!reasonCode) return
+
+    setReportBusy(true)
+    setActionMessage('')
+    try {
+      const response = await fetch('/api/v1/reports', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'report:content:' + content.id + ':' + crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          targetType: 'content',
+          targetId: content.id,
+          reasonCode,
+        }),
+      })
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+      const data = await response.json().catch((): null => null) as { data?: { status?: string } } | null
+      if (!response.ok || !data?.data) throw new Error('REPORT_FAILED')
+      setActionMessage(data.data.status === 'DEDUPLICATED' ? '举报已记录：你此前已举报过该内容。' : '举报已提交。')
+    } catch {
+      setActionMessage('举报提交失败，请稍后重试。')
+    } finally {
+      setReportBusy(false)
+    }
+  }
+
   async function copyContentLink() {
     if (shareBusy) return
     setShareBusy(true)
@@ -343,6 +381,11 @@ export default function ContentDetailPage({
           <button className="content-detail-share" disabled={shareBusy} onClick={() => void copyContentLink()} type="button">
             {shareBusy ? '生成中…' : copied ? '分享链接已复制' : '分享'}
           </button>
+          {viewerUserId && viewerUserId !== content.creatorId ? (
+            <button className="content-detail-share" disabled={reportBusy} onClick={() => void submitReport()} type="button">
+              {reportBusy ? '举报中…' : '举报'}
+            </button>
+          ) : null}
           {actionMessage ? <span className="content-detail-action-status" role="status">{actionMessage}</span> : null}
         </div>
       </div>
