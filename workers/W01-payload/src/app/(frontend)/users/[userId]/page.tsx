@@ -57,6 +57,7 @@ export default function PublicProfilePage({
   const [blockBusy, setBlockBusy] = useState(false)
   const [muted, setMuted] = useState(false)
   const [muteBusy, setMuteBusy] = useState(false)
+  const [reportBusy, setReportBusy] = useState(false)
   const [safetyMessage, setSafetyMessage] = useState('')
   const [contents, setContents] = useState<PublicContent[]>([])
   const [contentCursor, setContentCursor] = useState<string | null>(null)
@@ -224,6 +225,44 @@ export default function PublicProfilePage({
     }
   }
 
+  async function reportProfile() {
+    if (!profile || reportBusy) return
+    const reasonCode = window.prompt('请输入举报原因（例如 SPAM、ABUSE、IMPERSONATION）', 'ABUSE')?.trim()
+    if (!reasonCode) return
+
+    setReportBusy(true)
+    setSafetyMessage('')
+    try {
+      const response = await fetch('/api/v1/reports', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'report:profile:' + profile.id + ':' + crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          targetType: 'profile',
+          targetId: profile.id,
+          reasonCode,
+        }),
+      })
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        router.replace('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+      const data = await response.json().catch((): null => null) as { data?: { status?: string } } | null
+      if (!response.ok || !data?.data) throw new Error('REPORT_FAILED')
+      setSafetyMessage(data.data.status === 'DEDUPLICATED' ? '举报已记录：你此前已举报过该用户。' : '举报已提交。')
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
+      setSafetyMessage('举报提交失败，请稍后重试。')
+    } finally {
+      setReportBusy(false)
+    }
+  }
+
   async function applySafetyAction(action: 'block' | 'mute') {
     if (!profile) return
     const active = action === 'block' ? blocked : muted
@@ -386,6 +425,14 @@ export default function PublicProfilePage({
               type="button"
             >
               {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音作者'}
+            </button>
+            <button
+              className="content-detail-follow"
+              disabled={reportBusy}
+              onClick={() => void reportProfile()}
+              type="button"
+            >
+              {reportBusy ? '举报中…' : '举报用户'}
             </button>
             {safetyMessage ? <span className="content-detail-action-status" role="status">{safetyMessage}</span> : null}
           </div>
