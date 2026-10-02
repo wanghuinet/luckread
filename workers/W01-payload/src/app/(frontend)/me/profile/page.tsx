@@ -118,7 +118,7 @@ export default function ProfilePage() {
           <h1 style={{ margin: '8px 0 4px' }}>个人资料</h1>
           <p style={{ margin: 0, color: '#666' }}>更新你的公开创作者资料与地区设置。</p>
         </div>
-        <a href="/admin/creator-center">创作者中心</a>
+        <Link href="/admin/creator-center">创作者中心</Link>
       </div>
 
       {loading ? <p role="status">正在加载…</p> : null}
