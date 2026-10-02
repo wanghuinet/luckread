@@ -82,6 +82,44 @@ describe('W03 content contract core', () => {
     }
   })
 
+
+  it('filters public content by content type', async () => {
+    const preparedQueries: string[] = []
+    const row = {
+      id: 'content_video_123',
+      content_type: 'video',
+      owner_user_id: 'user_123',
+      creator_id: 'user_123',
+      ip_id: null,
+      state: 'PUBLISHED',
+      version: 1,
+      revision: 1,
+      title: 'Published video',
+      body_ref: 'https://cdn.example.com/body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-02T12:00:00.000Z',
+      updated_at: '2026-10-02T12:01:00.000Z',
+    }
+
+    const db = {
+      prepare(query: string) {
+        preparedQueries.push(query)
+        return {
+          bind: () => ({
+            all: async () => ({ results: [row] }),
+          }),
+        }
+      },
+    } as never
+
+    const page = await listContents(db, null, 20, null, 'video')
+
+    expect(page.items[0]?.contentType).toBe('video')
+    expect(preparedQueries[0]).toContain("WHERE state = 'PUBLISHED' AND content_type = ?")
+  })
+
   it('requires L3 or higher for creator content operations', () => {
     expect(hasCreatorContentPermission('L3')).toBe(true)
     expect(hasCreatorContentPermission('L8')).toBe(true)

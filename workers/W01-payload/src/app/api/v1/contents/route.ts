@@ -17,9 +17,11 @@ export async function GET(request: Request): Promise<Response> {
     const cursor = url.searchParams.get('cursor')
     const limit = url.searchParams.get('limit')
     const creatorId = url.searchParams.get('creatorId')
+    const contentType = url.searchParams.get('type')
     if (cursor) query.set('cursor', cursor)
     if (limit) query.set('limit', limit)
     if (creatorId) query.set('creatorId', creatorId)
+    if (contentType) query.set('type', contentType)
     const suffix = query.toString() ? `?${query.toString()}` : ''
 
     return await callW03Content({

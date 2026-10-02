@@ -436,9 +436,13 @@ export async function listContents(
   cursor: string | null,
   limit: number,
   creatorId: string | null = null,
+  contentType: ContentType | null = null,
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
   if (creatorId) assertResourceId(creatorId)
+  if (contentType && !['article', 'post', 'video'].includes(contentType)) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
 
   const decoded = cursor ? decodeCursor(cursor) : null
   const conditions = ["state = 'PUBLISHED'"]
@@ -447,6 +451,10 @@ export async function listContents(
   if (creatorId) {
     conditions.push('creator_id = ?')
     bindings.push(creatorId)
+  }
+  if (contentType) {
+    conditions.push('content_type = ?')
+    bindings.push(contentType)
   }
 
   if (decoded) {
