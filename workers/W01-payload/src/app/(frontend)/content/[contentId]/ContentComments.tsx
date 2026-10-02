@@ -5,7 +5,6 @@ import { FormEvent, useEffect, useState } from 'react'
 type CommentItem = {
   id: string
   contentId: string
-  authorUserId: string
   parentId: string | null
   body: string
   state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
@@ -137,7 +136,7 @@ export default function ContentComments({ contentId }: { contentId: string }) {
               style={{ marginInlineStart: Math.min(comment.depth, 3) * 24 }}
             >
               <header>
-                <strong>{comment.authorUserId}</strong>
+                <strong>读者</strong>
                 <time dateTime={comment.createdAt}>
                   {new Date(comment.createdAt).toLocaleString('zh-CN', { hour12: false })}
                 </time>
