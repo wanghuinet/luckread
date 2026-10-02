@@ -10,7 +10,7 @@ describe('versioned auth sessions adapter', () => {
     )
 
     expect(route).toContain(
-      "export { GET, DELETE } from '../../../../auth/sessions/[[...segments]]/route'",
+      "export { GET, DELETE } from '../../../../../auth/sessions/[[...segments]]/route'",
     )
     expect(route).not.toContain('getPayload(')
     expect(route).not.toContain('listSessions(')
