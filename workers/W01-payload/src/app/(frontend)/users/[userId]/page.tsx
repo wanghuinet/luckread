@@ -210,6 +210,7 @@ export default function PublicProfilePage({
 
   async function applySafetyAction(action: 'block' | 'mute') {
     if (!profile) return
+    const active = action === 'block' ? blocked : muted
     const busy = action === 'block' ? blockBusy : muteBusy
     if (busy) return
 
@@ -218,17 +219,18 @@ export default function PublicProfilePage({
     setSafetyMessage('')
 
     try {
+      const relationPath = action === 'block' ? 'blocks' : 'mutes'
       const response = await fetch(
-        '/api/v1/interactions/' + (action === 'block' ? 'blocks' : 'mutes'),
+        '/api/v1/interactions/' + relationPath + (active ? '/' + encodeURIComponent(profile.id) : ''),
         {
-          method: 'POST',
+          method: active ? 'DELETE' : 'POST',
           credentials: 'include',
           headers: {
             accept: 'application/json',
-            'content-type': 'application/json',
-            'Idempotency-Key': 'social-' + action + ':' + crypto.randomUUID(),
+            'Idempotency-Key': 'social-' + action + ':' + (active ? 'remove:' : 'set:') + crypto.randomUUID(),
+            ...(active ? {} : { 'content-type': 'application/json' }),
           },
-          body: JSON.stringify({ targetUserId: profile.id }),
+          ...(active ? {} : { body: JSON.stringify({ targetUserId: profile.id }) }),
         },
       )
 
@@ -241,15 +243,19 @@ export default function PublicProfilePage({
       if (!response.ok) throw new Error('SAFETY_ACTION_FAILED')
 
       if (action === 'block') {
-        setBlocked(true)
-        setSafetyMessage('已屏蔽该作者。')
+        setBlocked(!active)
+        setSafetyMessage(active ? '已取消屏蔽。' : '已屏蔽该作者。')
       } else {
-        setMuted(true)
-        setSafetyMessage('已静音该作者。')
+        setMuted(!active)
+        setSafetyMessage(active ? '已取消静音。' : '已静音该作者。')
       }
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
-      setSafetyMessage(action === 'block' ? '屏蔽操作失败，请稍后重试。' : '静音操作失败，请稍后重试。')
+      setSafetyMessage(
+        action === 'block'
+          ? (active ? '取消屏蔽失败，请稍后重试。' : '屏蔽操作失败，请稍后重试。')
+          : (active ? '取消静音失败，请稍后重试。' : '静音操作失败，请稍后重试。'),
+      )
     } finally {
       if (action === 'block') setBlockBusy(false)
       else setMuteBusy(false)
@@ -354,7 +360,7 @@ export default function PublicProfilePage({
               onClick={() => void applySafetyAction('block')}
               type="button"
             >
-              {blockBusy ? '屏蔽中…' : blocked ? '已屏蔽' : '屏蔽作者'}
+              {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽作者'}
             </button>
             <button
               className="content-detail-follow"
@@ -362,7 +368,7 @@ export default function PublicProfilePage({
               onClick={() => void applySafetyAction('mute')}
               type="button"
             >
-              {muteBusy ? '静音中…' : muted ? '已静音' : '静音作者'}
+              {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音作者'}
             </button>
             {safetyMessage ? <span className="content-detail-action-status" role="status">{safetyMessage}</span> : null}
           </div>
