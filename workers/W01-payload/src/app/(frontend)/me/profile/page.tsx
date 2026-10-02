@@ -266,12 +266,15 @@ export default function ProfilePage() {
           {error ? <p role="alert">{error}</p> : null}
           {message ? <p role="status">{message}</p> : null}
 
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button disabled={saving} type="submit">
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button disabled={saving || loggingOut} type="submit">
               {saving ? '保存中…' : '保存资料'}
             </button>
-            <button disabled={saving} onClick={() => router.push('/admin/creator-center')} type="button">
+            <button disabled={saving || loggingOut} onClick={() => router.push('/admin/creator-center')} type="button">
               返回创作者中心
+            </button>
+            <button disabled={saving || loggingOut} onClick={() => void logout()} type="button">
+              {loggingOut ? '正在退出…' : '退出登录'}
             </button>
           </div>
         </form>
