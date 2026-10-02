@@ -1,5 +1,6 @@
-import { assertNotBlocked, BlockPolicyError } from './block-policy.js'
 /// <reference types="@cloudflare/workers-types" />
+
+import { assertNotBlocked, BlockPolicyError } from './block-policy.js'
 
 export class FollowRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
