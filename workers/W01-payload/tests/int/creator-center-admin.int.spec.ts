@@ -308,7 +308,7 @@ describe('Creator Center admin extension', () => {
     const home = read('src/app/(frontend)/page.tsx')
     const css = read('src/app/(frontend)/me/subscriptions/subscriptions.css')
 
-    expect(page).toContain("fetch('/api/v1/memberships/subscriptions?limit=20&page=1'")
+    expect(page).toContain("'/api/v1/memberships/subscriptions?limit=20&page=' + String(page)")
     expect(page).toContain("method: 'POST'")
     expect(page).toContain("'If-Match': item.etag")
     expect(page).toContain("transition(item, 'cancel')")
