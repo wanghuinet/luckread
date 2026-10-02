@@ -1,3 +1,4 @@
+/// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import worker from './index.js'
 
