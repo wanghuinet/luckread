@@ -37,10 +37,10 @@ describe('like runtime', () => {
       target_id: 'content-1',
       created_at: '2026-10-02T12:00:00.000Z',
     }
-    const db = fakeDb([existing])
-    await expect(getLikeStatus(db, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toEqual({ liked: true })
-    await expect(getLikeStatus(db, 'user-1', { targetType: 'content', targetId: 'content-2' })).resolves.toEqual({ liked: false })
-    expect(db.prepare).toHaveBeenCalledTimes(2)
+    const d = db([existing])
+    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toEqual({ liked: true })
+    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-2' })).resolves.toEqual({ liked: false })
+    expect(d.prepare).toHaveBeenCalledTimes(2)
   })
 
 
