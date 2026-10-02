@@ -95,7 +95,8 @@ describe('follow runtime', () => {
         },
       ],
     }])
-    await expect(listFollowers(d, 'u9', null, 2)).resolves.toMatchObject({
+    const result = await listFollowers(d, 'u9', null, 2)
+    await expect(result).resolves.toMatchObject({
       items: [
         { relationshipId: 'r2', userId: 'u4', followedAt: '2026-10-02T00:01:00.000Z' },
         { relationshipId: 'r1', userId: 'u3', followedAt: '2026-10-02T00:00:00.000Z' },
@@ -103,7 +104,6 @@ describe('follow runtime', () => {
       totalCount: 3,
       hasMore: true,
     })
-    const result = await listFollowers(d, 'u9', null, 2)
     expect(result.nextCursor).toEqual(expect.any(String))
   })
 
