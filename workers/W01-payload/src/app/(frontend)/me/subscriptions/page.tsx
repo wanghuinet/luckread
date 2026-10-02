@@ -62,7 +62,8 @@ export default function MySubscriptionsPage() {
       })
       const data = await response.json().catch((): null => null) as ListResponse | null
       if (response.status === 401) {
-        window.location.assign('/login?returnTo=%2Fme%2Fsubscriptions')
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
       if (!response.ok || !data?.data?.docs) {
