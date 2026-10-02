@@ -111,6 +111,7 @@ describe('STAGE_1 public session management route', () => {
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({
+      currentSessionId: 'session-current',
       items: [
         {
           sessionId: 'session-current',
