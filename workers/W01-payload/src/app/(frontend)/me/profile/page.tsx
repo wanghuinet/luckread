@@ -177,6 +177,7 @@ export default function ProfilePage() {
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
           <Link href="/me/followers">我的粉丝</Link>
           <Link href="/me/following">我的关注</Link>
+          <Link href="/me/subscriptions">我的订阅</Link>
           <Link href="/me/sessions">登录设备</Link>
           <Link href="/me/password">修改密码</Link>
           <Link href="/admin/creator-center">创作者中心</Link>
