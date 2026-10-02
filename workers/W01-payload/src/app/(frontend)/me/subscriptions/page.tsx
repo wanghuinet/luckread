@@ -73,7 +73,10 @@ export default function MySubscriptionsPage() {
   }
 
   useEffect(() => {
-    void load()
+    const timer = window.setTimeout(() => {
+      void load()
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [])
 
   async function transition(item: Subscription, operation: 'cancel' | 'pause' | 'resume') {
