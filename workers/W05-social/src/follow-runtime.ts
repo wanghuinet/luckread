@@ -1,3 +1,4 @@
+import { assertNotBlocked, BlockPolicyError } from './block-policy.js'
 /// <reference types="@cloudflare/workers-types" />
 
 export class FollowRuntimeError extends Error {
@@ -29,22 +30,6 @@ export type FollowListPage = {
 const DEFAULT_LIMIT = 20
 const MAX_LIMIT = 50
 const MAX_CURSOR_LENGTH = 2048
-
-async function assertFollowAllowed(db: D1Database, followerUserId: string, targetUserId: string): Promise<void> {
-  const row = await db.prepare(
-    `SELECT 1 AS blocked
-       FROM social_user_interactions
-      WHERE relation_type = 'block'
-        AND (
-          (actor_user_id = ? AND target_user_id = ?)
-          OR
-          (actor_user_id = ? AND target_user_id = ?)
-        )
-      LIMIT 1`,
-  ).bind(followerUserId, targetUserId, targetUserId, followerUserId).first<{ blocked: number }>()
-
-  if (row) throw new FollowRuntimeError('RELATIONSHIP_BLOCKED', 409)
-}
 
 const userId = (v: string) => {
   const id = v.trim()
@@ -161,7 +146,14 @@ async function listFollowRelations(
 export async function follow(db: D1Database, followerUserId: string, targetUserId: string): Promise<FollowRow> {
   const follower=userId(followerUserId), target=userId(targetUserId)
   if (follower===target) throw new FollowRuntimeError('SELF_FOLLOW_NOT_ALLOWED',409)
-  await assertFollowAllowed(db, follower, target)
+  try {
+    await assertNotBlocked(db, follower, target)
+  } catch (error) {
+    if (error instanceof BlockPolicyError) {
+      throw new FollowRuntimeError(error.code, error.status)
+    }
+    throw error
+  }
   const existing=await db.prepare('SELECT relationship_id, follower_user_id, target_user_id, created_at FROM social_follow_relationships WHERE follower_user_id = ? AND target_user_id = ? LIMIT 1').bind(follower,target).first<FollowRow>()
   if (existing) return existing
   const relationshipId=crypto.randomUUID(), createdAt=new Date().toISOString()
