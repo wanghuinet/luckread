@@ -253,6 +253,17 @@ describe('Creator Center admin extension', () => {
     expect(assets).not.toContain('R2Bucket')
   })
 
+  it('lets creators update media alt text through the stable media API', () => {
+    const assets = read('src/app/(payload)/admin/CreatorAssetLibrary.tsx')
+
+    expect(assets).toContain("method: 'PATCH'")
+    expect(assets).toContain("'/api/v1/media/' + encodeURIComponent(String(item.id))")
+    expect(assets).toContain("JSON.stringify({ alt })")
+    expect(assets).toContain('maxLength={1000}')
+    expect(assets).toContain('编辑说明')
+    expect(assets).toContain('素材说明不能为空')
+  })
+
   it('exposes login submission and error status', () => {
     const registerForm = read('src/app/(frontend)/register/RegisterForm.tsx')
     const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
