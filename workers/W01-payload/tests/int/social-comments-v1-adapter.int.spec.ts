@@ -7,6 +7,10 @@ describe('v1 comment adapters', () => {
     resolve(process.cwd(), 'src/app/api/v1/contents/[contentId]/comments/route.ts'),
     'utf8',
   )
+  const updateRoute = readFileSync(
+    resolve(process.cwd(), 'src/app/api/v1/comments/[commentId]/route.ts'),
+    'utf8',
+  )
 
   it('routes public reads and authenticated creates through W05', () => {
     expect(route).toContain('callW05SocialPublic')
@@ -23,3 +27,12 @@ describe('v1 comment adapters', () => {
     expect(route).toContain('body: { body, parentId: parentId ?? null }')
   })
 })
+
+  it('exposes conditional comment updates through the W05 adapter', () => {
+    expect(updateRoute).toContain('resolveCookieSocialPrincipal')
+    expect(updateRoute).toContain('callW05Social')
+    expect(updateRoute).toContain("method: 'PATCH'")
+    expect(updateRoute).toContain("request.headers.get('If-Match')")
+    expect(updateRoute).toContain('/internal/social/comments/')
+    expect(updateRoute).not.toContain('social_comments')
+  })
