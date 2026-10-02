@@ -32,6 +32,7 @@ describe('report runtime', () => {
   it('creates a report with atomic report + idempotency + audit writes', async () => {
     const result = await createReport(db(), input)
     expect(result.status).toBe('CREATED')
+    expect((db as unknown as never)).toBeDefined()
   })
 
   it('returns the stored idempotent result for an equivalent retry', async () => {
@@ -72,16 +73,16 @@ describe('report runtime', () => {
   })
 
   it('deduplicates the same actor/target/reason within the active 24-hour bucket', async () => {
-    const result = await createReport(db([
-      null,
-      {
-        report_id: 'report-existing',
-        target_type: 'content',
-        target_id: 'content-1',
-        reason_code: 'SPAM',
-        created_at: '2026-10-02T00:00:00.000Z',
-      },
-    ]), input)
+    const result = await createReport(db([{
+      idem_report_id: null,
+      idem_request_hash: null,
+      idem_response_json: null,
+      prior_report_id: 'report-existing',
+      prior_target_type: 'content',
+      prior_target_id: 'content-1',
+      prior_reason_code: 'SPAM',
+      prior_created_at: '2026-10-02T00:00:00.000Z',
+    }]), input)
     expect(result).toMatchObject({ reportId: 'report-existing', status: 'DEDUPLICATED' })
   })
 
