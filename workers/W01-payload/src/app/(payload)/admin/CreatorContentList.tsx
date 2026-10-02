@@ -148,6 +148,30 @@ export default function CreatorContentList() {
     }
   }
 
+  async function deleteContent(item: Item) {
+    if (!window.confirm('确定要删除“' + item.title + '”吗？删除后内容会进入已删除状态。')) return
+
+    setActionId(item.id)
+    setError('')
+    try {
+      const response = await fetch(`/api/creator/contents/${encodeURIComponent(item.id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'If-Match': `W/"${item.version}"`,
+          'Idempotency-Key': crypto.randomUUID(),
+        },
+      })
+      const data = await response.json().catch((): null => null)
+      if (!response.ok) throw new Error(data?.error?.message || '删除失败')
+      await load()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '删除失败')
+    } finally {
+      setActionId(null)
+    }
+  }
   return (
     <section aria-busy={loading || actionId !== null} className={styles.contentManageSection}>
       <div className={styles.contentManageHeading}>
@@ -318,6 +342,17 @@ export default function CreatorContentList() {
                       type="button"
                     >
                       {actionId === item.id ? '处理中…' : '恢复为草稿'}
+                    </button>
+                  ) : null}
+                  {['DRAFT', 'PUBLISHED', 'UNPUBLISHED', 'ARCHIVED'].includes(item.state) ? (
+                    <button
+                      aria-busy={actionId === item.id}
+                      className={styles.dangerButton}
+                      disabled={actionId !== null}
+                      onClick={() => void deleteContent(item)}
+                      type="button"
+                    >
+                      {actionId === item.id ? '处理中…' : '删除'}
                     </button>
                   ) : null}
                 </div>

@@ -1,4 +1,4 @@
-import { DELETE as payloadMediaDelete, GET as payloadMediaGet, PATCH as payloadMediaPatch } from '../../../(payload)/api/[...slug]/route'
+import { DELETE as payloadMediaDelete, GET as payloadMediaGet, PATCH as payloadMediaPatch } from '../../../../(payload)/api/[...slug]/route'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaGet>[1]
 type PayloadPatchRouteContext = Parameters<typeof payloadMediaPatch>[1]

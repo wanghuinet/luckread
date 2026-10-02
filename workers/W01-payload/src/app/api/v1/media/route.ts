@@ -1,7 +1,7 @@
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
-import { POST as payloadMediaPost } from '../../(payload)/api/[...slug]/route'
+import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route'
 
 import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
 import { validateSession } from '@/auth/w02-session-client'

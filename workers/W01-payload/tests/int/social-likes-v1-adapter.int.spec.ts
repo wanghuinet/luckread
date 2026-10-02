@@ -11,8 +11,8 @@ describe('v1 like adapters', () => {
   it('uses the cookie-backed authenticated principal and W05 authority', () => {
     expect(route).toContain('resolveCookieSocialPrincipal')
     expect(route).toContain('callW05Social')
-    expect(route).toContain("pathname: '/internal/social/interactions/likes'")
-    expect(route).toContain('body: target')
+    expect(route).toContain("'/internal/social/interactions/likes'")
+    expect(route).toContain("body: method === 'GET' ? undefined : target")
     expect(route).not.toContain('getPayload(')
     expect(route).not.toContain('interaction_likes')
   })
