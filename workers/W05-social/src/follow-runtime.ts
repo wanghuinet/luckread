@@ -159,12 +159,14 @@ export async function follow(db: D1Database, followerUserId: string, targetUserI
              (actor_user_id = ? AND target_user_id = ?)
            )
        ) AS blocked,
-       (
-         SELECT relationship_id, follower_user_id, target_user_id, created_at
-         FROM social_follow_relationships
-         WHERE follower_user_id = ? AND target_user_id = ?
-         LIMIT 1
-       ) AS existing_relationship`,
+       r.relationship_id,
+       r.follower_user_id,
+       r.target_user_id,
+       r.created_at
+       FROM (SELECT 1) AS seed
+       LEFT JOIN social_follow_relationships AS r
+         ON r.follower_user_id = ? AND r.target_user_id = ?
+       LIMIT 1`,
   ).bind(follower, target, target, follower, follower, target).first<{
     blocked: number
     relationship_id?: string
