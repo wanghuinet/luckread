@@ -2,10 +2,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { getRelationshipGraph } from './relationship-graph-runtime.js'
 
-const db = (results: unknown[]) => ({
+const db = (result: unknown) => ({
   prepare: vi.fn(() => ({
     bind: vi.fn(() => ({
-      all: vi.fn(async () => ({ results })),
+      first: vi.fn(async () => result),
     })),
   })),
 }) as unknown as D1Database
@@ -13,10 +13,15 @@ const db = (results: unknown[]) => ({
 describe('relationship graph runtime', () => {
   it('derives mutual follow without creating another authoritative relation', async () => {
     const graph = await getRelationshipGraph(
-      db([
-        { relation_kind: 'follow_out', relation_type: 'follow' },
-        { relation_kind: 'follow_in', relation_type: 'follow' },
-      ]),
+      db({
+        following: 1,
+        followed_by: 1,
+        relationship_id: 'r1',
+        created_at: '2026-10-02T00:00:00.000Z',
+        blocked: 0,
+        blocked_by: 0,
+        muted: 0,
+      }),
       'viewer-1',
       'target-1',
     )
@@ -30,16 +35,22 @@ describe('relationship graph runtime', () => {
       blocked: false,
       blockedBy: false,
       muted: false,
+      relationshipId: 'r1',
+      createdAt: '2026-10-02T00:00:00.000Z',
     })
   })
 
   it('distinguishes inbound and outbound block/mute relations', async () => {
     const graph = await getRelationshipGraph(
-      db([
-        { relation_kind: 'block_in', relation_type: 'block' },
-        { relation_kind: 'mute_out', relation_type: 'mute' },
-        { relation_kind: 'follow_out', relation_type: 'follow' },
-      ]),
+      db({
+        following: 1,
+        followed_by: 0,
+        relationship_id: 'r2',
+        created_at: '2026-10-02T00:00:00.000Z',
+        blocked: 0,
+        blocked_by: 1,
+        muted: 1,
+      }),
       'viewer-1',
       'target-1',
     )
@@ -53,15 +64,17 @@ describe('relationship graph runtime', () => {
   })
 
   it('does not expose self as mutual or blocked relationship', async () => {
-    const graph = await getRelationshipGraph(db([]), 'same-user', 'same-user')
+    const graph = await getRelationshipGraph(db(null), 'same-user', 'same-user')
     expect(graph.mutualFollow).toBe(false)
     expect(graph.blocked).toBe(false)
     expect(graph.blockedBy).toBe(false)
     expect(graph.muted).toBe(false)
+    expect(graph.relationshipId).toBeNull()
+    expect(graph.createdAt).toBeNull()
   })
 
   it('rejects invalid identifiers', async () => {
-    await expect(getRelationshipGraph(db([]), ' ', 'target')).rejects.toMatchObject({
+    await expect(getRelationshipGraph(db(null), ' ', 'target')).rejects.toMatchObject({
       code: 'VALIDATION_FAILED',
       status: 400,
     })
