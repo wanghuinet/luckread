@@ -58,7 +58,7 @@ const hashRequest = async (input: {
 }
 
 const toBucket = (date: Date): string => {
-  const timestamp = Math.floor(date.getTime() / (DE​DUP_BUCKET_HOURS * 60 * 60 * 1000))
+  const timestamp = Math.floor(date.getTime() / (DEDUP_BUCKET_HOURS * 60 * 60 * 1000))
   return String(timestamp)
 }
 
