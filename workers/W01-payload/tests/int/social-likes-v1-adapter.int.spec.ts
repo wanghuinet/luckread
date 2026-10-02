@@ -17,8 +17,11 @@ describe('v1 like adapters', () => {
     expect(route).not.toContain('interaction_likes')
   })
 
-  it('exposes both idempotent mutation methods', () => {
+  it('exposes like status plus both idempotent mutation methods', () => {
+    expect(route).toContain("return forward(request, 'GET')")
     expect(route).toContain("return forward(request, 'POST')")
     expect(route).toContain("return forward(request, 'DELETE')")
+    expect(route).toContain('parseQueryTarget')
+    expect(route).toContain('/internal/social/interactions/likes?targetType=')
   })
 })
