@@ -110,7 +110,7 @@ async function listFollowRelations(
     ORDER BY created_at DESC, relationship_id DESC
     LIMIT ?`
   const parameters = cursor
-    ? [ownerId, cursor.createdAt, cursor.createdAt, cursor.relationshipId, ownerId, limit + 1]
+    ? [ownerId, ownerId, cursor.createdAt, cursor.createdAt, cursor.relationshipId, limit + 1]
     : [ownerId, ownerId, limit + 1]
   const result = await db.prepare(statement).bind(...parameters).all<{
     relationship_id: string
