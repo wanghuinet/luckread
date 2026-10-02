@@ -118,7 +118,19 @@ export default function PublicProfilePage({
         setProfile(data)
         const followerData = await followersResponse.json().catch((): null => null) as CountResponse | null
         const followingData = await followingResponse.json().catch((): null => null) as CountResponse | null
-        const followData = await followResponse.json().catch((): null => null) as { data?: { following?: boolean } } | null
+        const followData = await followResponse.json().catch((): null => null) as {
+          data?: {
+            following?: boolean
+            relationship?: {
+              following?: boolean
+              followedBy?: boolean
+              mutualFollow?: boolean
+              blocked?: boolean
+              blockedBy?: boolean
+              muted?: boolean
+            }
+          }
+        } | null
         const contentData = await contentResponse.json().catch((): null => null) as ContentListResponse | null
         const viewerData = await viewerResponse.json().catch((): null => null) as { id?: string } | null
         if (!cancelled) {
@@ -126,6 +138,8 @@ export default function PublicProfilePage({
           setFollowing(typeof followingData?.data?.totalCount === 'number' ? followingData.data.totalCount : null)
           setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)
           setIsFollowing(followData?.data?.following === true)
+          setBlocked(followData?.data?.relationship?.blocked === true)
+          setMuted(followData?.data?.relationship?.muted === true)
           const items = Array.isArray(contentData?.data?.items) ? contentData.data.items : []
           setContents(items)
           setContentCursor(typeof contentData?.data?.nextCursor === 'string' ? contentData.data.nextCursor : null)
