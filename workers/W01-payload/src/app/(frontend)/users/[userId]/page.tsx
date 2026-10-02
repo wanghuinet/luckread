@@ -51,6 +51,7 @@ export default function PublicProfilePage({
   const [following, setFollowing] = useState<number | null>(null)
   const [viewerUserId, setViewerUserId] = useState<string | null>(null)
   const [isFollowing, setIsFollowing] = useState(false)
+  const [mutualFollow, setMutualFollow] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
   const [blocked, setBlocked] = useState(false)
   const [blockBusy, setBlockBusy] = useState(false)
@@ -138,6 +139,7 @@ export default function PublicProfilePage({
           setFollowing(typeof followingData?.data?.totalCount === 'number' ? followingData.data.totalCount : null)
           setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)
           setIsFollowing(followData?.data?.following === true)
+          setMutualFollow(followData?.data?.relationship?.mutualFollow === true)
           setBlocked(followData?.data?.relationship?.blocked === true)
           setMuted(followData?.data?.relationship?.muted === true)
           const items = Array.isArray(contentData?.data?.items) ? contentData.data.items : []
@@ -351,6 +353,7 @@ export default function PublicProfilePage({
           <Link href={'/users/' + encodeURIComponent(profile.id) + '/following'}>
             {following === null ? '—' : following.toLocaleString('zh-CN')} 关注
           </Link>
+          {mutualFollow ? <span className="content-detail-relationship-badge">互相关注</span> : null}
           {viewerUserId === profile.id ? (
             <span className="content-detail-muted">这是你的主页</span>
           ) : (
