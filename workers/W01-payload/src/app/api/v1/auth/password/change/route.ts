@@ -1,1 +1,1 @@
-export { POST } from '../../../../auth/password/change/route'
+export { POST } from '../../../../../auth/password/change/route'
