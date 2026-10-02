@@ -27,7 +27,13 @@ const readJson = async <T>(request: Request): Promise<T> => {
 
 const parseSegments = (pathname: string): string[] => pathname.split('/').filter(Boolean).map((segment) => { try { return decodeURIComponent(segment) } catch { throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400) } })
 
-type Operation = { operation: 'create'; subscriptionId: null } | { operation: 'get' | 'cancel' | 'pause' | 'resume' | 'change-plan'; subscriptionId: string }
+type Operation =
+  | { operation: 'create'; subscriptionId: null }
+  | { operation: 'get'; subscriptionId: string }
+  | { operation: 'cancel'; subscriptionId: string }
+  | { operation: 'pause'; subscriptionId: string }
+  | { operation: 'resume'; subscriptionId: string }
+  | { operation: 'change-plan'; subscriptionId: string }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'POST') return { operation: 'create', subscriptionId: null }

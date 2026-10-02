@@ -130,7 +130,8 @@ export async function getSubscription(db: D1Database, subscriberId: string, subs
 }
 
 const transitionTargets: Record<'cancel' | 'pause' | 'resume', SubscriptionStatus[]> = { cancel: ['ACTIVE', 'PAST_DUE', 'PAUSED'], pause: ['ACTIVE'], resume: ['PAUSED'] }
-const nextState = (operation: 'cancel' | 'pause' | 'resume'): SubscriptionStatus => ({ cancel: 'CANCELED', pause: 'PAUSED', resume: 'ACTIVE' })[operation]
+const nextStates: Record<'cancel' | 'pause' | 'resume', SubscriptionStatus> = { cancel: 'CANCELED', pause: 'PAUSED', resume: 'ACTIVE' }
+const nextState = (operation: 'cancel' | 'pause' | 'resume'): SubscriptionStatus => nextStates[operation]
 
 export async function transitionSubscription(db: D1Database, subscriberId: string, subscriptionId: string, operation: 'cancel' | 'pause' | 'resume', ifMatch: string): Promise<ReturnType<typeof toPublic>> {
   const subscriber = validatePrincipal(subscriberId)
