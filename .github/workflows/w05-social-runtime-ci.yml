@@ -43,8 +43,10 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Install test dependencies from committed lockfile
+      - name: Install W01 test dependencies from committed lockfile
+        working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run W05 Social and W01 adapter tests
-        run: pnpm exec vitest run workers/W05-social/src/follow-runtime.test.ts workers/W05-social/src/index.test.ts workers/W01-payload/tests/int/social-followers-v1-adapter.int.spec.ts
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/index.test.ts tests/int/social-followers-v1-adapter.int.spec.ts
