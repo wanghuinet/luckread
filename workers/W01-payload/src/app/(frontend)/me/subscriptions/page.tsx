@@ -141,6 +141,7 @@ export default function MySubscriptionsPage() {
           headers: {
             accept: 'application/json',
             'If-Match': item.etag,
+            'Idempotency-Key': operation + ':' + item.subscriptionId + ':' + item.etag,
           },
         },
       )
