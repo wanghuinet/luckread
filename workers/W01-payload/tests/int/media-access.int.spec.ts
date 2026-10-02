@@ -61,3 +61,14 @@ describe('Media upload access', () => {
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
+
+
+  it('projects existing Payload/R2 media readiness without inventing a processing job', () => {
+    const route = read('src/app/api/v1/media/[mediaId]/route.ts')
+
+    expect(route).toContain("status: deliveryReady ? 'READY' : 'FAILED'")
+    expect(route).toContain('typeof document.url === \'string\'')
+    expect(route).toContain('does not claim transcoding has completed')
+    expect(route).not.toContain('processing-job')
+    expect(route).not.toContain('MediaProcessing')
+  })
