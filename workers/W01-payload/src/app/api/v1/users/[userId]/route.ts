@@ -2,14 +2,6 @@ import { getPayload } from 'payload'
 
 import config from '@payload-config'
 
-const publicSelect = {
-  id: true,
-  username: true,
-  displayName: true,
-  bio: true,
-  avatar: true,
-} as const
-
 export async function GET(
   _request: Request,
   context: { params: Promise<{ userId: string }> },
@@ -29,7 +21,6 @@ export async function GET(
       id: userId,
       depth: 0,
       overrideAccess: true,
-      select: publicSelect,
     })
 
     if (!user) {
