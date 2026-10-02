@@ -92,6 +92,40 @@ export default function ProfilePage() {
     }
   }
 
+  async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('头像必须是图片文件。')
+      return
+    }
+
+    setMessage('正在上传头像…')
+    setError('')
+    try {
+      const form = new FormData()
+      form.append('alt', file.name)
+      form.append('file', file)
+      const response = await fetch('/api/v1/media', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        body: form,
+      })
+      const data = await response.json().catch((): null => null) as { doc?: { url?: string }; url?: string; error?: { message?: string } } | null
+      const url = data?.doc?.url ?? data?.url
+      if (!response.ok || typeof url !== 'string' || !url) {
+        throw new Error(data?.error?.message || 'AVATAR_UPLOAD_FAILED')
+      }
+      setProfile((current) => current ? { ...current, avatar: url } : current)
+      setMessage('头像已上传，请保存资料以正式更新。')
+    } catch (cause) {
+      setMessage('')
+      setError(cause instanceof Error ? cause.message : '头像上传失败，请稍后重试。')
+    }
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!profile || !etag) return
@@ -164,6 +198,16 @@ export default function ProfilePage() {
               required
               style={{ display: 'block', width: '100%', marginTop: 6 }}
             />
+            <span style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8 }}>
+              <input
+                accept="image/*"
+                aria-label="上传头像图片"
+                disabled={saving || loggingOut}
+                onChange={uploadAvatar}
+                type="file"
+              />
+              <small>上传后仍需点击“保存资料”。</small>
+            </span>
           </label>
           <label>
             <span>显示名称</span>
