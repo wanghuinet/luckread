@@ -9,6 +9,7 @@ import PublishComposer from '../../(frontend)/publish/PublishComposer'
 import '../../(frontend)/publish/publish.css'
 import CreatorCenterAssistant from './CreatorCenterAssistant'
 import CreatorAudienceSummary from './CreatorAudienceSummary'
+import CreatorAssetLibrary from './CreatorAssetLibrary'
 import styles from './creator-center.module.css'
 
 type CreatorNavItem = {
@@ -298,14 +299,7 @@ export function CreatorCenter({
                     <span className={styles.toolState}>R2</span>
                   </div>
                   <p>复用现有 Payload Media + R2 能力，创作者可以集中维护图片、视频、封面等素材，再回到发布器使用。</p>
-                  <div className={styles.assetLinks}>
-                    <Link className={styles.primaryButton + ' btn'} href="/admin/collections/media">
-                      打开媒体库
-                    </Link>
-                    <Link className={styles.secondaryButton + ' btn'} href="/publish">
-                      回到发布
-                    </Link>
-                  </div>
+                  <CreatorAssetLibrary />
                 </article>
               </section>
 
