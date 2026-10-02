@@ -42,6 +42,7 @@ describe('Media upload access', () => {
     expect(config).toContain("r2Storage({")
     expect(config).toContain("collections: { media: true }")
     expect(publisher).toContain("authorizedFetch('/api/v1/media'")
+    expect(publisher).toContain("headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() }")
   })
 })
 
