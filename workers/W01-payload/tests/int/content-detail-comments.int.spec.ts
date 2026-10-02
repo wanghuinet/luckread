@@ -42,6 +42,14 @@ describe('content comments UI', () => {
     expect(component).toContain('保存修改')
   })
 
+  it('exposes author-only comment deletion with the canonical delete API', () => {
+    const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
+    expect(component).toContain("method: 'DELETE'")
+    expect(component).toContain('deleteComment(comment)')
+    expect(component).toContain("'Idempotency-Key': 'social-comment-delete:' + crypto.randomUUID()")
+    expect(component).toContain('该评论已有回复，暂不支持删除。')
+  })
+
   it('uses the public comments read and authenticated create APIs', () => {
     const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
     expect(component).toContain('/api/v1/contents/')
