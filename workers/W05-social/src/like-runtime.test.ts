@@ -99,8 +99,45 @@ describe('like runtime', () => {
     expect(d.prepare).toHaveBeenCalledTimes(1)
   })
 
+  it('creates a like on a published comment after validating its parent content', async () => {
+    const d = db([
+      { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_owner_user_id: 'user-3', blocked: 0 },
+      {
+        relationship_id: 'comment-like-1',
+        actor_user_id: 'user-1',
+        target_type: 'comment',
+        target_id: 'comment-1',
+        created_at: '2026-10-02T00:00:00.000Z',
+      },
+    ])
+    await expect(like(d, 'user-1', { targetType: 'comment', targetId: 'comment-1' })).resolves.toEqual({
+      relationshipId: 'comment-like-1',
+      actorUserId: 'user-1',
+      targetType: 'comment',
+      targetId: 'comment-1',
+      createdAt: '2026-10-02T00:00:00.000Z',
+    })
+    expect(d.prepare).toHaveBeenCalledTimes(2)
+  })
+
+  it('reads like status for a published comment', async () => {
+    const d = db([{ liked: 1, like_count: 4 }])
+    await expect(getLikeStatus(d, 'user-1', { targetType: 'comment', targetId: 'comment-1' })).resolves.toEqual({
+      liked: true,
+      likeCount: 4,
+    })
+  })
+
+  it('rejects likes on comments that are no longer public', async () => {
+    const d = db([{ id: 'comment-1', state: 'REJECTED', author_user_id: 'user-2', content_owner_user_id: 'user-3', blocked: 0 }])
+    await expect(like(d, 'user-1', { targetType: 'comment', targetId: 'comment-1' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
+    })
+  })
+
   it('rejects unsupported target types', async () => {
-    await expect(like(db(), 'user-1', { targetType: 'comment', targetId: 'comment-1' })).rejects.toMatchObject({
+    await expect(like(db(), 'user-1', { targetType: 'media', targetId: 'media-1' })).rejects.toMatchObject({
       code: 'VALIDATION_FAILED',
       status: 400,
     })
