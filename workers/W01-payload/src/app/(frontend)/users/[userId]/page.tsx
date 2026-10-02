@@ -312,11 +312,18 @@ export default function PublicProfilePage({
                       width: 96,
                       height: 72,
                       display: 'block',
+                      overflow: 'hidden',
                       borderRadius: 8,
                       background: '#eef4ff',
-                      backgroundImage: 'linear-gradient(135deg, rgba(36,88,230,.12), rgba(36,88,230,.02))',
                     }}
-                  />
+                  >
+                    <img
+                      alt=""
+                      loading="lazy"
+                      src={item.coverRef}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  </span>
                 ) : null}
                 <span style={{ minWidth: 0 }}>
                   <span style={{ display: 'block', color: '#617086', fontSize: 11, fontWeight: 700 }}>
