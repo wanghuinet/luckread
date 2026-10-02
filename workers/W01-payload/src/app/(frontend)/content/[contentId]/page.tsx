@@ -43,6 +43,7 @@ export default function ContentDetailPage({
   const [liked, setLiked] = useState(false)
   const [likeCount, setLikeCount] = useState<number | null>(null)
   const [likeBusy, setLikeBusy] = useState(false)
+  const [viewerUserId, setViewerUserId] = useState<string | null>(null)
   const [following, setFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
@@ -54,18 +55,28 @@ export default function ContentDetailPage({
       void (async () => {
         try {
           const { contentId } = await params
-          const response = await fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`, {
-            headers: { accept: 'application/json' },
-            cache: 'no-store',
-            signal: controller.signal,
-          })
+          const [response, viewerResponse] = await Promise.all([
+            fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`, {
+              headers: { accept: 'application/json' },
+              cache: 'no-store',
+              signal: controller.signal,
+            }),
+            fetch('/api/v1/users/me', {
+              credentials: 'include',
+              headers: { accept: 'application/json' },
+              cache: 'no-store',
+              signal: controller.signal,
+            }),
+          ])
           const data = await response.json().catch((): null => null)
+          const viewerData = await viewerResponse.json().catch((): null => null) as { id?: string } | null
           if (!response.ok || !data?.id || data.state !== 'PUBLISHED') {
             throw new Error('CONTENT_NOT_FOUND')
           }
           if (cancelled) return
           const resolved = data as Content
           setContent(resolved)
+          setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)
           try {
             const likeResponse = await fetch(
               '/api/v1/interactions/likes?targetType=content&targetId=' + encodeURIComponent(resolved.id),
@@ -234,9 +245,13 @@ export default function ContentDetailPage({
           {content.creatorId ? (
             <>
               <Link className="content-detail-follow" href={'/users/' + encodeURIComponent(content.creatorId)}>查看作者</Link>
-              <button className="content-detail-follow" disabled={followBusy} onClick={() => void toggleFollow()} type="button">
-                {followBusy ? '处理中…' : following ? '已关注作者' : '关注作者'}
-              </button>
+              {viewerUserId === content.creatorId ? (
+                <span className="content-detail-muted">这是你的作品</span>
+              ) : (
+                <button className="content-detail-follow" disabled={followBusy} onClick={() => void toggleFollow()} type="button">
+                  {followBusy ? '处理中…' : following ? '已关注作者' : '关注作者'}
+                </button>
+              )}
             </>
           ) : null}
           <button className="content-detail-like" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
