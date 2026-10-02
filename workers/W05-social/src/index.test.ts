@@ -9,7 +9,7 @@ const dbFor = (results: unknown[] = []) => {
     bind: vi.fn((...args: unknown[]) => ({
       first: vi.fn(async () => results[index++] ?? null),
       all: vi.fn(async () => ({ results })),
-      run: vi.fn(async () => ({ sql, args })),
+      run: vi.fn(async () => ({ sql, args, meta: { changes: 1 } })),
     })),
   }))
   return { prepare } as unknown as D1Database
@@ -517,6 +517,45 @@ describe('W05 social comment transport', () => {
       },
     )
     expect(response.status).toBe(200)
+  })
+
+  it('deletes an owned leaf comment through the internal transport', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
+        method: 'DELETE',
+        headers: {
+          ...commentHeaders,
+          'X-LuckRead-Principal-User-Id': 'viewer-1',
+          'X-LuckRead-Principal-Layer': 'L2',
+        },
+      }),
+      {
+        DB: dbFor([
+          {
+            id: 'comment-1',
+            author_user_id: 'viewer-1',
+            state: 'PUBLISHED',
+            has_replies: 0,
+          },
+        ]),
+      },
+    )
+    expect(response.status).toBe(204)
+  })
+
+  it('rejects non-DELETE comment item transport', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
+        method: 'GET',
+        headers: {
+          ...commentHeaders,
+          'X-LuckRead-Principal-User-Id': 'viewer-1',
+          'X-LuckRead-Principal-Layer': 'L2',
+        },
+      }),
+      { DB: dbFor([]) },
+    )
+    expect(response.status).toBe(405)
   })
 
   it('requires an authenticated principal for comment creation', async () => {
