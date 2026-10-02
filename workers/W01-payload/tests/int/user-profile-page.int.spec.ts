@@ -20,6 +20,15 @@ describe('user profile page', () => {
     expect(page).toContain('href="/me/password"')
   })
 
+
+  it('loads the viewer profile and hides self-follow on the public profile', () => {
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    expect(page).toContain("fetch('/api/v1/users/me'")
+    expect(page).toContain('setViewerUserId(typeof viewerData?.id === \'string\' ? viewerData.id : null)')
+    expect(page).toContain('viewerUserId === profile.id')
+    expect(page).toContain('这是你的主页')
+  })
+
   it('uses the existing authenticated logout API and returns to the public homepage', () => {
     const page = read('src/app/(frontend)/me/profile/page.tsx')
 
