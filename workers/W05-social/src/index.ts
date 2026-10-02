@@ -94,9 +94,6 @@ export default {
     try {
       const viewerUserId = principal(request)
       const url = new URL(request.url)
-      const path = parsePath(url.pathname)
-      if (!path) return new Response(null, { status: 404 })
-
       if (url.pathname === '/internal/social/interactions/likes') {
         if (request.method !== 'POST' && request.method !== 'DELETE') {
           return new Response(null, { status: 405, headers: { Allow: 'POST, DELETE' } })
@@ -110,6 +107,9 @@ export default {
         await unlike(env.DB, viewerUserId, target)
         return new Response(null, { status: 204 })
       }
+
+      const path = parsePath(url.pathname)
+      if (!path) return new Response(null, { status: 404 })
 
       if (path.kind === 'follow') {
         if (request.method === 'POST') {
