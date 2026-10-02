@@ -54,6 +54,12 @@ describe('public user profile', () => {
 
     expect(page).toContain('屏蔽作者')
     expect(page).toContain('静音作者')
+    expect(page).toContain("{blocked ? '取消屏蔽' : '屏蔽作者'}")
+    expect(page).toContain("{muted ? '取消静音' : '静音作者'}")
+    expect(page).toContain('disabled={blockBusy}')
+    expect(page).toContain('disabled={muteBusy}')
+    expect(page).not.toContain('disabled={blockBusy || blocked}')
+    expect(page).not.toContain('disabled={muteBusy || muted}')
     expect(page).toContain('viewerUserId !== profile.id')
     expect(page).not.toContain('social_user_interactions')
   })
