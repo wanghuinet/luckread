@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
 import styles from './creator-center.module.css'
@@ -275,8 +276,10 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
                       <i className="fa-solid fa-user" aria-hidden="true" />
                     </span>
                     <div>
-                      <strong>{item.userId}</strong>
-                      <span>用户 ID</span>
+                      <Link href={'/users/' + encodeURIComponent(item.userId)}>
+                        {item.userId}
+                      </Link>
+                      <span>用户 ID · 查看主页</span>
                     </div>
                   </div>
                   <time dateTime={item.followedAt}>关系建立于 {formatFollowedAt(item.followedAt)}</time>
