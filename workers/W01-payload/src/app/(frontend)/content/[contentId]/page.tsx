@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import ContentComments from './ContentComments'
-import { extractSocialTokens } from '../../../social/social-token-parser.js'
+import { extractSocialTokens } from '../../../../social/social-token-parser.js'
 import { useEffect, useMemo, useState } from 'react'
 
 type ContentType = 'article' | 'post' | 'video'
