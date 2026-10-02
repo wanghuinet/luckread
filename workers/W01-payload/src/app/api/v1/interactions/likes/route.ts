@@ -10,6 +10,16 @@ const errorResponse = (status: number, code: string, message: string) =>
     { status, headers: { 'cache-control': 'no-store' } },
   )
 
+const parseQueryTarget = (request: Request): { targetType: string; targetId: string } | Response => {
+  const url = new URL(request.url)
+  const targetType = url.searchParams.get('targetType')
+  const targetId = url.searchParams.get('targetId')
+  if (!targetType || !targetId) {
+    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid like target')
+  }
+  return { targetType, targetId }
+}
+
 const parseTarget = async (request: Request): Promise<{ targetType: string; targetId: string } | Response> => {
   try {
     const value = await request.json()
@@ -23,15 +33,18 @@ const parseTarget = async (request: Request): Promise<{ targetType: string; targ
   }
 }
 
-async function forward(request: Request, method: 'POST' | 'DELETE'): Promise<Response> {
+async function forward(request: Request, method: 'GET' | 'POST' | 'DELETE'): Promise<Response> {
   try {
     const principal = await resolveCookieSocialPrincipal(request)
     if (principal instanceof Response) return principal
-    const target = await parseTarget(request)
+    const target = method === 'GET' ? parseQueryTarget(request) : await parseTarget(request)
     if (target instanceof Response) return target
+    const pathname = method === 'GET'
+      ? '/internal/social/interactions/likes?targetType=' + encodeURIComponent(target.targetType) + '&targetId=' + encodeURIComponent(target.targetId)
+      : '/internal/social/interactions/likes'
     return await callW05Social({
       request,
-      pathname: '/internal/social/interactions/likes',
+      pathname,
       method,
       principal,
       body: target,
@@ -50,4 +63,8 @@ export async function POST(request: Request): Promise<Response> {
 
 export async function DELETE(request: Request): Promise<Response> {
   return forward(request, 'DELETE')
+}
+
+export async function GET(request: Request): Promise<Response> {
+  return forward(request, 'GET')
 }
