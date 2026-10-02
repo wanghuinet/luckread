@@ -1,0 +1,130 @@
+name: SOCIAL-005 Favorite D1-02 Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact 40-character source SHA containing the FAVORITE migration
+        required: true
+        type: string
+      confirm:
+        description: Type APPLY_SOCIAL_005_MIGRATION to permit remote D1 mutation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  EXPECTED_DB_NAME: luckreadpro
+  EXPECTED_WORKER: luckread-w05
+  EXPECTED_BINDING: DB
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY_SOCIAL_005_MIGRATION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Validate source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Verify exact source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify W05 binding and migration source
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          config = json.loads(Path('workers/W05-social/wrangler.jsonc').read_text())
+          assert config['name'] == 'luckread-w05'
+          bindings = config.get('d1_databases', [])
+          assert len(bindings) == 1
+          assert bindings[0]['binding'] == 'DB'
+          assert bindings[0]['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
+          assert bindings[0]['database_name'] == 'luckreadpro'
+          assert Path('workers/W05-social/migrations/20261002_004_social_005_favorite_v1.sql').is_file()
+          print('SOCIAL_005_BINDING_SOURCE=PASS')
+          PY
+
+      - name: Verify migration statically
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          sql = Path('workers/W05-social/migrations/20261002_004_social_005_favorite_v1.sql').read_text()
+          db.executescript(sql)
+          cols = db.execute('PRAGMA table_info("interaction_favorites")').fetchall()
+          expected = ['relationship_id','actor_user_id','target_type','target_id','created_at']
+          if [r[1] for r in cols] != expected:
+              raise SystemExit(f'unexpected columns: {[r[1] for r in cols]}')
+          indexes = {r[1]: r[2] for r in db.execute('PRAGMA index_list("interaction_favorites")').fetchall()}
+          if indexes.get('uq_interaction_favorite_actor_target') != 1:
+              raise SystemExit('unique actor/target constraint missing')
+          print('SOCIAL_005_MIGRATION_STATIC=PASS')
+          PY
+
+      - name: Capture remote preflight
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc             --command "SELECT name FROM sqlite_master WHERE type='table' AND name='interaction_favorites';"             > /tmp/social-005-favorite-table.json
+
+      - name: Apply SOCIAL-005 Favorite migration remotely
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
+
+      - name: Verify remote schema
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc             --command 'PRAGMA table_info("interaction_favorites");' > /tmp/social-005-favorite-schema.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc             --command 'PRAGMA index_list("interaction_favorites");' > /tmp/social-005-favorite-indexes.json
+          python - <<'PY'
+          import json
+          def rows(path):
+              data = json.load(open(path))
+              if isinstance(data, list):
+                  return [row for item in data for row in item.get('results', [])]
+              return data.get('results', [])
+          cols = rows('/tmp/social-005-favorite-schema.json')
+          indexes = rows('/tmp/social-005-favorite-indexes.json')
+          expected = ['relationship_id','actor_user_id','target_type','target_id','created_at']
+          if [row.get('name') for row in cols] != expected:
+              raise SystemExit('remote favorite schema mismatch')
+          if not any(row.get('name') == 'uq_interaction_favorite_actor_target' and int(row.get('unique', 0)) == 1 for row in indexes):
+              raise SystemExit('remote favorite uniqueness constraint missing')
+          print('SOCIAL_005_REMOTE_SCHEMA=PASS')
+          PY
