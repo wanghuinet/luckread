@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import ContentComments from './ContentComments'
-import { useEffect, useState } from 'react'
+import { extractSocialTokens } from '../../../social/social-token-parser.js'
+import { useEffect, useMemo, useState } from 'react'
 
 type ContentType = 'article' | 'post' | 'video'
 type Content = {
@@ -50,6 +51,7 @@ export default function ContentDetailPage({
   const [following, setFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
+  const socialTokens = useMemo(() => extractSocialTokens(body), [body])
 
   useEffect(() => {
     let cancelled = false
@@ -382,6 +384,16 @@ export default function ContentDetailPage({
                 <img alt={content.title + ' 配图 ' + (index + 1)} key={url} loading="lazy" src={url} />
               ))}
           </div>
+        ) : null}
+
+        {socialTokens.length > 0 ? (
+          <section aria-label="内容标签与提及" className="content-detail-social-tokens">
+            {socialTokens.map((token) => (
+              <span className="content-detail-social-token" key={token.kind + ':' + token.normalized}>
+                {token.value}
+              </span>
+            ))}
+          </section>
         ) : null}
 
         <div className="content-detail-body">
