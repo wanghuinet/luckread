@@ -32,6 +32,13 @@ describe('Creator Center admin extension', () => {
     expect(view).not.toContain('refreshToken')
   })
 
+  it('redirects moderation auth expiry to admin login', () => {
+    const moderation = read('src/app/(payload)/admin/CreatorModerationQueue.tsx')
+    expect(moderation).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
+    expect(moderation).toContain("window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(moderation).toContain('if (response.status === 401)')
+  })
+
   it('embeds the existing publisher with a scoped W03 content bridge', () => {
     const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
