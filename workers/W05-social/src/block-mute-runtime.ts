@@ -42,24 +42,6 @@ const validateTarget = (actorUserId: string, targetUserId: string): [string, str
   return [actor, target]
 }
 
-const ensureActorActive = async (db: D1Database, actorUserId: string): Promise<void> => {
-  const row = await db.prepare(
-    'SELECT account_state FROM users WHERE CAST(id AS TEXT) = ? LIMIT 1',
-  ).bind(actorUserId).first<{ account_state: string }>()
-
-  if (!row || row.account_state !== 'ACTIVE') {
-    throw new BlockMuteRuntimeError('PERMISSION_DENIED', 403)
-  }
-}
-
-const ensureTargetExists = async (db: D1Database, targetUserId: string): Promise<void> => {
-  const row = await db.prepare(
-    'SELECT id FROM users WHERE CAST(id AS TEXT) = ? LIMIT 1',
-  ).bind(targetUserId).first<{ id: unknown }>()
-
-  if (!row) throw new BlockMuteRuntimeError('NOT_FOUND', 404)
-}
-
 export async function getRelation(
   db: D1Database,
   actorUserId: string,
@@ -97,25 +79,24 @@ export async function setRelation(
   relationType: BlockMuteType,
 ): Promise<BlockMuteRecord> {
   const [actor, target] = validateTarget(actorUserId, targetUserId)
-  await ensureActorActive(db, actor)
-  await ensureTargetExists(db, target)
-
-  const existing = await getRelation(db, actor, target, relationType)
-  if (existing) return existing
-
   const relationshipId = crypto.randomUUID()
   const now = new Date().toISOString()
-  try {
-    await db.prepare(
-      'INSERT INTO social_user_interactions (relationship_id, actor_user_id, target_user_id, relation_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-    ).bind(relationshipId, actor, target, relationType, now, now).run()
-  } catch (error) {
-    if (!(error instanceof Error) || !error.message.toLowerCase().includes('unique')) throw error
-  }
 
   const row = await db.prepare(
-    'SELECT relationship_id, actor_user_id, target_user_id, relation_type, created_at, updated_at FROM social_user_interactions WHERE actor_user_id = ? AND target_user_id = ? AND relation_type = ? LIMIT 1',
-  ).bind(actor, target, relationType).first<{
+    `INSERT INTO social_user_interactions
+      (relationship_id, actor_user_id, target_user_id, relation_type, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(actor_user_id, target_user_id, relation_type)
+     DO UPDATE SET updated_at = social_user_interactions.updated_at
+     RETURNING relationship_id, actor_user_id, target_user_id, relation_type, created_at, updated_at`,
+  ).bind(
+    relationshipId,
+    actor,
+    target,
+    relationType,
+    now,
+    now,
+  ).first<{
     relationship_id: string
     actor_user_id: string
     target_user_id: string
