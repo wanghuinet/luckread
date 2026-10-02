@@ -21,7 +21,7 @@ type CommentPage = {
   hasMore: boolean
 }
 
-export default function ContentComments({ contentId }: { contentId: string }) {
+export default function ContentComments({ contentId, viewerUserId }: { contentId: string; viewerUserId: string | null }) {
   const [comments, setComments] = useState<CommentItem[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
@@ -33,7 +33,6 @@ export default function ContentComments({ contentId }: { contentId: string }) {
   const [message, setMessage] = useState('')
   const [likedComments, setLikedComments] = useState<Record<string, boolean>>({})
   const [likingCommentId, setLikingCommentId] = useState<string | null>(null)
-  const [viewerUserId, setViewerUserId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editBody, setEditBody] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
@@ -66,25 +65,13 @@ export default function ContentComments({ contentId }: { contentId: string }) {
   }, [contentId])
 
   useEffect(() => {
-    void (async () => {
-      try {
-        const response = await fetch('/api/v1/users/me', {
-          credentials: 'include',
-          headers: { accept: 'application/json' },
-          cache: 'no-store',
-        })
-        const data = await response.json().catch((): null => null) as { id?: string } | null
-        if (response.ok && typeof data?.id === 'string') setViewerUserId(data.id)
-      } catch {
-        // Editing and deletion remain optional when viewer identity is unavailable.
-      }
-    })()
-
     const timer = window.setTimeout(() => {
       void loadComments()
     }, 0)
     return () => window.clearTimeout(timer)
   }, [loadComments])
+
+
 
   async function toggleCommentLike(comment: CommentItem) {
     if (likingCommentId) return

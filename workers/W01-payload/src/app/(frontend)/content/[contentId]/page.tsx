@@ -449,7 +449,7 @@ export default function ContentDetailPage({
           )}
         </div>
       </article>
-      <ContentComments contentId={content.id} />
+      <ContentComments contentId={content.id} viewerUserId={viewerUserId} />
     </main>
   )
 }

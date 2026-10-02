@@ -15,7 +15,7 @@ describe('content comments UI', () => {
   it('renders the comment component from the content detail page', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain("import ContentComments from './ContentComments'")
-    expect(page).toContain('<ContentComments contentId={content.id} />')
+    expect(page).toContain('<ContentComments contentId={content.id} viewerUserId={viewerUserId} />')
   })
 
   it('keeps newly posted comments in the same chronological order as the public list', () => {
@@ -31,6 +31,12 @@ describe('content comments UI', () => {
     expect(component).toContain('/likes')
     expect(component).toContain("'Idempotency-Key': 'social-comment-like:' + crypto.randomUUID()")
     expect(component).toContain('likedComments[comment.id]')
+  })
+
+  it('reuses the content detail viewer identity instead of requesting /users/me again', () => {
+    const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
+    expect(component).toContain('viewerUserId: string | null')
+    expect(component).not.toContain("/api/v1/users/me")
   })
 
   it('exposes author-only comment editing with an If-Match version guard', () => {
