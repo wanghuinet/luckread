@@ -7,6 +7,10 @@ describe('v1 comment adapters', () => {
     resolve(process.cwd(), 'src/app/api/v1/contents/[contentId]/comments/route.ts'),
     'utf8',
   )
+  const deleteRoute = readFileSync(
+    resolve(process.cwd(), 'src/app/api/v1/comments/[commentId]/route.ts'),
+    'utf8',
+  )
 
   it('routes public reads and authenticated creates through W05', () => {
     expect(route).toContain('callW05SocialPublic')
@@ -23,3 +27,12 @@ describe('v1 comment adapters', () => {
     expect(route).toContain('body: { body, parentId: parentId ?? null }')
   })
 })
+
+
+  it('exposes authenticated comment deletion through the W05 adapter', () => {
+    expect(deleteRoute).toContain('resolveCookieSocialPrincipal')
+    expect(deleteRoute).toContain('callW05Social')
+    expect(deleteRoute).toContain("method: 'DELETE'")
+    expect(deleteRoute).toContain('/internal/social/comments/')
+    expect(deleteRoute).not.toContain('social_comments')
+  })
