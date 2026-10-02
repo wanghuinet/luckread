@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { FormEvent, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { FormEvent, Suspense, useState } from 'react'
 
 const MIN_PASSWORD_LENGTH = 15
 const MAX_PASSWORD_LENGTH = 128
@@ -11,18 +12,14 @@ function validLength(value: string): boolean {
   return length >= MIN_PASSWORD_LENGTH && length <= MAX_PASSWORD_LENGTH
 }
 
-export default function ResetPasswordPage() {
-  const [recoveryToken, setRecoveryToken] = useState('')
+function ResetPasswordForm() {
+  const searchParams = useSearchParams()
+  const [recoveryToken, setRecoveryToken] = useState(searchParams.get('token') || '')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-
-  useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get('token') || ''
-    setRecoveryToken(token)
-  }, [])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -138,5 +135,20 @@ export default function ResetPasswordPage() {
         </form>
       </section>
     </main>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <main className="lr-auth-shell">
+        <section className="lr-auth-card">
+          <div className="lr-brand">LuckRead</div>
+          <p className="lr-muted" role="status">正在加载密码重置…</p>
+        </section>
+      </main>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
   )
 }
