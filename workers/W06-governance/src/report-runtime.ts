@@ -39,7 +39,9 @@ const DEFAULT_POLICY_VERSION = 'report-v1'
 
 const resourceId = (value: string, code = 'VALIDATION_FAILED') => {
   const normalized = value.trim()
-  if (!normalized || normalized.length > MAX_ID) throw new ReportRuntimeError(code, code === 'UNAUTHENTICATED' ? 401 : 400)
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(normalized)) {
+    throw new ReportRuntimeError(code, code === 'UNAUTHENTICATED' ? 401 : 400)
+  }
   return normalized
 }
 
@@ -227,7 +229,7 @@ export async function createReport(
   ).bind(
     auditEventId,
     input.requestId,
-    input.correlationId,
+    null,
     JSON.stringify({ actorId: actorUserId, actorType: 'user' }),
     'moderation.report.created',
     'Report',
