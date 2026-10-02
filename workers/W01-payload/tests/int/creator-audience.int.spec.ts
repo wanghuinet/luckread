@@ -42,6 +42,6 @@ describe('creator audience integration', () => {
     expect(summary).toContain('role="tablist"')
     expect(summary).toContain('role="tab"')
     expect(summary).toContain('aria-selected={direction ===')
-    expect(summary).toContain('aria-busy={listLoading}')
+    expect(summary).toContain('aria-busy={currentListLoading || listBusy}')
   })
 })
