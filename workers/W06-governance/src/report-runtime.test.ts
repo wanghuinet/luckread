@@ -32,7 +32,6 @@ describe('report runtime', () => {
   it('creates a report with atomic report + idempotency + audit writes', async () => {
     const result = await createReport(db(), input)
     expect(result.status).toBe('CREATED')
-    expect((db as unknown as never)).toBeDefined()
   })
 
   it('returns the stored idempotent result for an equivalent retry', async () => {
