@@ -32,6 +32,7 @@ const labels: Record<ContentType | 'all', string> = {
 
 export default function ContentBrowsePage() {
   const [page, setPage] = useState<ContentPage>({ items: [], nextCursor: null, hasMore: false })
+  const [contentType, setContentType] = useState<ContentType | 'all'>('all')
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
@@ -48,7 +49,7 @@ export default function ContentBrowsePage() {
       abortControllerRef.current = null
       window.clearTimeout(timer)
     }
-  }, [])
+  }, [contentType])
 
   async function load(cursor: string | null = null): Promise<void> {
     const requestId = ++requestIdRef.current
@@ -62,6 +63,7 @@ export default function ContentBrowsePage() {
     try {
       const params = new URLSearchParams({ limit: '18' })
       if (cursor) params.set('cursor', cursor)
+      if (contentType !== 'all') params.set('type', contentType)
 
       const response = await fetch('/api/v1/contents?' + params.toString(), {
         headers: { accept: 'application/json' },
@@ -106,6 +108,20 @@ export default function ContentBrowsePage() {
         </div>
       </header>
 
+      <div className="content-browse-actions" role="tablist" aria-label="内容类型筛选">
+        {(Object.keys(labels) as Array<ContentType | 'all'>).map((type) => (
+          <button
+            aria-selected={contentType === type}
+            className={contentType === type ? 'button button-primary' : 'button button-quiet'}
+            onClick={() => setContentType(type)}
+            role="tab"
+            type="button"
+          >
+            {labels[type]}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <>
           <div className="content-browse-state">正在加载内容…</div>
@@ -132,7 +148,7 @@ export default function ContentBrowsePage() {
       ) : null}
       {!loading && !error && page.items.length === 0 ? (
         <div className="content-browse-state">
-          <p>还没有公开内容。</p>
+          <p>还没有公开{contentType === 'all' ? '内容' : labels[contentType]}。</p>
           <Link className="button button-primary" href="/publish">发布第一篇内容</Link>
         </div>
       ) : null}
