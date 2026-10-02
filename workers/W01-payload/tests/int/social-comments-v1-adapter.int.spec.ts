@@ -26,8 +26,6 @@ describe('v1 comment adapters', () => {
   it('keeps parentId and body in the create request only', () => {
     expect(route).toContain('body: { body, parentId: parentId ?? null }')
   })
-})
-
 
   it('exposes authenticated comment deletion through the W05 adapter', () => {
     expect(deleteRoute).toContain('resolveCookieSocialPrincipal')
@@ -36,3 +34,4 @@ describe('v1 comment adapters', () => {
     expect(deleteRoute).toContain('/internal/social/comments/')
     expect(deleteRoute).not.toContain('social_comments')
   })
+})
