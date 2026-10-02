@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type PublicProfile = {
@@ -66,6 +66,8 @@ export default function PublicProfilePage({
   const [contentError, setContentError] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const contentLoadControllerRef = useRef<AbortController | null>(null)
+  const contentLoadRequestIdRef = useRef(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -160,11 +162,19 @@ export default function PublicProfilePage({
     return () => {
       cancelled = true
       controller.abort()
+      contentLoadRequestIdRef.current += 1
+      contentLoadControllerRef.current?.abort()
+      contentLoadControllerRef.current = null
     }
   }, [params])
 
-  async function loadMoreContents() {
+
+  const loadMoreContents = useCallback(async () => {
     if (contentLoading || !contentHasMore || !contentCursor || !profile) return
+    const requestId = ++contentLoadRequestIdRef.current
+    contentLoadControllerRef.current?.abort()
+    const controller = new AbortController()
+    contentLoadControllerRef.current = controller
     setContentLoading(true)
     setContentError('')
     try {
@@ -173,21 +183,28 @@ export default function PublicProfilePage({
         {
           headers: { accept: 'application/json' },
           cache: 'no-store',
+          signal: controller.signal,
         },
       )
       const data = await response.json().catch((): null => null) as ContentListResponse | null
       if (!response.ok || !Array.isArray(data?.data?.items)) {
         throw new Error('CONTENT_LIST_FAILED')
       }
+      if (requestId !== contentLoadRequestIdRef.current) return
       setContents((current) => [...current, ...data.data.items])
       setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
       setContentHasMore(data.data.hasMore === true)
-    } catch {
+    } catch (cause) {
+      if (requestId !== contentLoadRequestIdRef.current || controller.signal.aborted) return
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
       setContentError('暂时无法加载更多作品，请稍后重试。')
     } finally {
-      setContentLoading(false)
+      if (requestId === contentLoadRequestIdRef.current) {
+        setContentLoading(false)
+        contentLoadControllerRef.current = null
+      }
     }
-  }
+  }, [contentCursor, contentHasMore, contentLoading, profile])
 
   async function toggleFollow() {
     if (!profile || followBusy) return
