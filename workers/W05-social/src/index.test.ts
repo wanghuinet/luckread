@@ -3,10 +3,13 @@ import { describe, expect, it, vi } from 'vitest'
 import worker from './index.js'
 
 
-const dbFor = (results: unknown[]) => {
-  const prepare = vi.fn(() => ({
-    bind: vi.fn(() => ({
+const dbFor = (results: unknown[] = []) => {
+  let index = 0
+  const prepare = vi.fn((sql: string) => ({
+    bind: vi.fn((...args: unknown[]) => ({
+      first: vi.fn(async () => results[index++] ?? null),
       all: vi.fn(async () => ({ results })),
+      run: vi.fn(async () => ({ sql, args })),
     })),
   }))
   return { prepare } as unknown as D1Database
