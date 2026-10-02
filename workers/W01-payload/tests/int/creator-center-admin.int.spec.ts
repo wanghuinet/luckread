@@ -306,6 +306,8 @@ describe('Creator Center admin extension', () => {
     const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
 
     expect(registerForm).toContain('<form aria-busy={status === \'submitting\'} className="registerForm" onSubmit={handleSubmit} noValidate>')
+    expect(registerForm).toContain("fetch('/api/v1/auth/register'")
+    expect(registerForm).not.toContain("fetch('/auth/register'")
     expect(loginForm).toContain('<form className="lr-auth-form" onSubmit={submit} aria-busy={busy}>')
     expect(loginForm).toContain('<div className="lr-error" role="alert" aria-live="assertive">{error}</div>')
     expect(loginForm).toContain('<button aria-busy={busy} disabled={busy} type="submit">')
