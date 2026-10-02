@@ -357,7 +357,6 @@ describe('Creator Center admin extension', () => {
     expect(page).toContain("window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))")
     expect(page).toContain("method: 'POST'")
     expect(page).toContain("'If-Match': item.etag")
-    expect(page).toContain("'/change-plan'")
     expect(page).toContain("item.creatorId ? '创作者订阅' : '会员订阅'")
     expect(page).not.toContain("window.prompt('请输入新的订阅方案 ID'")
     expect(page).toContain('方案变更将在正式方案目录接入后开放')
