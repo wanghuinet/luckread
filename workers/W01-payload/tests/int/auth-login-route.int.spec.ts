@@ -80,12 +80,15 @@ describe('AUTH-002 W01 login route', () => {
   })
 
   it('binds the native Payload session to W02 before issuing the public access token', async () => {
-    const payloadLogin = vi.fn().mockResolvedValue({
-      user: {
-        id: 'user-42',
-        email: 'USER42@EXAMPLE.COM',
-      },
-      exp: 1770000000,
+    const payloadLogin = vi.fn().mockImplementation(async ({ context }) => {
+      context.__luckreadNativeAuthToken = 'native-token-42'
+      return {
+        user: {
+          id: 'user-42',
+          email: 'USER42@EXAMPLE.COM',
+        },
+        exp: 1770000000,
+      }
     })
     const payloadAuth = vi.fn().mockResolvedValue({
       user: {
@@ -128,7 +131,7 @@ describe('AUTH-002 W01 login route', () => {
     expect(payloadLogin).toHaveBeenCalledWith({
       collection: 'users',
       context: expect.objectContaining({
-        __luckreadNativeAuthToken: expect.anything(),
+        __luckreadNativeAuthToken: 'native-token-42',
       }),
       data: {
         email: 'USER42@EXAMPLE.COM',
@@ -141,7 +144,7 @@ describe('AUTH-002 W01 login route', () => {
       canSetHeaders: false,
     })
     const authHeaders = payloadAuth.mock.calls[0][0].headers as Headers
-    expect(authHeaders.get('authorization')).toMatch(/^Bearer /)
+    expect(authHeaders.get('authorization')).toBe('Bearer native-token-42')
 
     expect(mocks.establishSession).toHaveBeenCalledWith({
       sessionId: 'native-sid-42',
@@ -168,12 +171,15 @@ describe('AUTH-002 W01 login route', () => {
   })
 
   it('maps authoritative W02 authentication denial to a stable 401 without minting access tokens', async () => {
-    const payloadLogin = vi.fn().mockResolvedValue({
-      user: {
-        id: 'user-42',
-        email: 'user42@example.com',
-      },
-      exp: 1770000000,
+    const payloadLogin = vi.fn().mockImplementation(async ({ context }) => {
+      context.__luckreadNativeAuthToken = 'native-token-42'
+      return {
+        user: {
+          id: 'user-42',
+          email: 'user42@example.com',
+        },
+        exp: 1770000000,
+      }
     })
     const payloadAuth = vi.fn().mockResolvedValue({
       user: {
