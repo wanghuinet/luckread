@@ -17,8 +17,6 @@ describe('share runtime', () => {
   it('creates a share token for published content', async () => {
     const d = db([
       { id: 'content-1', state: 'PUBLISHED' },
-      null,
-      undefined,
       {
         share_id: 'share-1',
         content_id: 'content-1',
@@ -93,5 +91,4 @@ describe('share runtime', () => {
       status: 428,
     })
   })
-
 })
