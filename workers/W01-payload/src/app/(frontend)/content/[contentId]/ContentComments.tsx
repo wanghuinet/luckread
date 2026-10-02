@@ -27,6 +27,7 @@ export default function ContentComments({ contentId }: { contentId: string }) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [body, setBody] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [message, setMessage] = useState('')
 
   const loadComments = useCallback(async (nextCursor: string | null = null) => {
@@ -79,7 +80,7 @@ export default function ContentComments({ contentId }: { contentId: string }) {
             'content-type': 'application/json',
             'Idempotency-Key': idempotencyKey,
           },
-          body: JSON.stringify({ body: body.trim() }),
+          body: JSON.stringify({ body: body.trim(), parentId: replyingTo }),
         },
       )
       const data = await response.json().catch((): null => null)
@@ -91,8 +92,10 @@ export default function ContentComments({ contentId }: { contentId: string }) {
         setMessage(data?.error?.message || '评论提交失败，请稍后重试。')
         return
       }
-      setComments((current) => [data.data as CommentItem, ...current])
+      const created = data.data as CommentItem
+      setComments((current) => [created, ...current])
       setBody('')
+      setReplyingTo(null)
     } catch {
       setMessage('网络异常，请稍后重试。')
     } finally {
@@ -112,12 +115,15 @@ export default function ContentComments({ contentId }: { contentId: string }) {
           id="content-comment-body"
           maxLength={10000}
           onChange={(event) => setBody(event.target.value)}
-          placeholder="写下你的看法…"
+          placeholder={replyingTo ? '写下你的回复…' : '写下你的看法…'}
           rows={4}
           value={body}
         />
         <div className="content-comment-form-actions">
           <span>{body.length}/10000</span>
+          {replyingTo ? (
+            <button disabled={submitting} onClick={() => { setReplyingTo(null); setBody('') }} type="button">取消回复</button>
+          ) : null}
           <button disabled={!body.trim() || submitting} type="submit">
             {submitting ? '提交中…' : '发表评论'}
           </button>
@@ -145,6 +151,19 @@ export default function ContentComments({ contentId }: { contentId: string }) {
                 </time>
               </header>
               <p>{comment.body}</p>
+              {comment.depth < 3 ? (
+                <button
+                  className="content-comment-reply"
+                  onClick={() => {
+                    setReplyingTo(comment.id)
+                    setBody('')
+                    setMessage('')
+                  }}
+                  type="button"
+                >
+                  回复
+                </button>
+              ) : null}
             </article>
           ))}
         </div>
