@@ -45,6 +45,7 @@ export default function ContentDetailPage({
   const [likeBusy, setLikeBusy] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
   const [bookmarkBusy, setBookmarkBusy] = useState(false)
+  const [shareBusy, setShareBusy] = useState(false)
   const [viewerUserId, setViewerUserId] = useState<string | null>(null)
   const [following, setFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
@@ -270,13 +271,42 @@ export default function ContentDetailPage({
   }
 
   async function copyContentLink() {
+    if (shareBusy) return
+    setShareBusy(true)
+    setActionMessage('')
     try {
-      await navigator.clipboard.writeText(window.location.href)
+      const response = await fetch(
+        '/api/v1/content/' + encodeURIComponent(content.id) + '/shares',
+        {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            'Idempotency-Key': 'social-share:' + crypto.randomUUID(),
+          },
+          body: JSON.stringify({ contentId: content.id }),
+        },
+      )
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+      const data = await response.json().catch((): null => null) as { data?: { shareId?: string } } | null
+      const shareId = data?.data?.shareId
+      if (!response.ok || typeof shareId !== 'string' || !shareId) {
+        setActionMessage('分享链接生成失败，请稍后重试。')
+        return
+      }
+      await navigator.clipboard.writeText(window.location.origin + '/s/' + encodeURIComponent(shareId))
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1800)
     } catch {
-      setActionMessage('无法复制链接，请从地址栏复制当前页面地址。')
-      window.setTimeout(() => setActionMessage(''), 2200)
+      setActionMessage('网络异常，暂时无法生成分享链接。')
+    } finally {
+      setShareBusy(false)
     }
   }
 
@@ -308,8 +338,8 @@ export default function ContentDetailPage({
           <button className="content-detail-like" disabled={bookmarkBusy} onClick={() => void toggleBookmark()} type="button">
             {bookmarkBusy ? '处理中…' : bookmarked ? '已收藏' : '收藏'}
           </button>
-          <button className="content-detail-share" onClick={() => void copyContentLink()} type="button">
-            {copied ? '已复制' : '复制链接'}
+          <button className="content-detail-share" disabled={shareBusy} onClick={() => void copyContentLink()} type="button">
+            {shareBusy ? '生成中…' : copied ? '分享链接已复制' : '分享'}
           </button>
           {actionMessage ? <span className="content-detail-action-status" role="status">{actionMessage}</span> : null}
         </div>
