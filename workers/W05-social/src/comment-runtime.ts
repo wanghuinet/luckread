@@ -142,16 +142,22 @@ export async function createComment(
   const { body, idempotencyKey, parentId } = validateCreateInput(input)
 
   const validation = await db.prepare(
-    `SELECT
-       (SELECT id FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_id,
-       (SELECT content_id FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_content_id,
-       (SELECT parent_id FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_parent_id,
-       (SELECT body FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_body,
-       (SELECT author_user_id FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_author_user_id,
-       (SELECT state FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_state,
-       (SELECT depth FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_depth,
-       (SELECT created_at FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_created_at,
-       (SELECT updated_at FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1) AS existing_updated_at,
+    `WITH existing_comment AS (
+       SELECT id, content_id, parent_id, body, author_user_id, state, depth, created_at, updated_at
+       FROM social_comments
+       WHERE author_user_id = ? AND idempotency_key = ?
+       LIMIT 1
+     )
+     SELECT
+       ec.id AS existing_id,
+       ec.content_id AS existing_content_id,
+       ec.parent_id AS existing_parent_id,
+       ec.body AS existing_body,
+       ec.author_user_id AS existing_author_user_id,
+       ec.state AS existing_state,
+       ec.depth AS existing_depth,
+       ec.created_at AS existing_created_at,
+       ec.updated_at AS existing_updated_at,
        (SELECT state FROM contents WHERE id = ? LIMIT 1) AS content_state,
        (SELECT owner_user_id FROM contents WHERE id = ? LIMIT 1) AS content_owner_user_id,
        (SELECT content_id FROM social_comments WHERE id = ? LIMIT 1) AS parent_content_id,
@@ -172,16 +178,12 @@ export async function createComment(
              OR
              (block.actor_user_id = (SELECT author_user_id FROM social_comments WHERE id = ? LIMIT 1) AND block.target_user_id = ?)
            )
-       ) AS blocked`,
+       ) AS blocked
+     FROM (SELECT 1) seed
+     LEFT JOIN existing_comment ec ON 1 = 1`,
   ).bind(
-    actor, idempotencyKey,
-    actor, idempotencyKey,
-    actor, idempotencyKey,
-    actor, idempotencyKey,
-    actor, idempotencyKey,
-    actor, idempotencyKey,
-    actor, idempotencyKey,
-    actor, idempotencyKey,
+    actor,
+    idempotencyKey,
     contentId,
     contentId,
     parentId,
@@ -227,10 +229,10 @@ export async function createComment(
     }
     return {
       id: validation.existing_id,
-      contentId: validation.existing_content_id,
+      contentId: validation.existing_content_id ?? contentId,
       authorUserId: validation.existing_author_user_id ?? actor,
       parentId: validation.existing_parent_id,
-      body: validation.existing_body,
+      body: validation.existing_body ?? body,
       state: validation.existing_state ?? 'PUBLISHED',
       depth: Number(validation.existing_depth ?? 0),
       createdAt: validation.existing_created_at ?? '',
