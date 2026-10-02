@@ -74,12 +74,11 @@ describe('public user profile', () => {
     expect(page).toContain('加载更多作品')
     expect(page).toContain("href={'/content/' + encodeURIComponent(item.id)}")
   })
-})
-
   it('renders existing work cover URLs as public thumbnails', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
     expect(page).toContain("src={item.coverRef}")
     expect(page).toContain("objectFit: 'cover'")
     expect(page).not.toContain("backgroundImage: 'linear-gradient(135deg")
   })
+})
 
