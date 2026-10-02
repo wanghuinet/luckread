@@ -25,6 +25,7 @@ describe('v1 subscription adapter', () => {
 
   it('exposes only the canonical subscription lifecycle paths', () => {
     expect(route).toContain("/memberships/subscriptions")
+    expect(route).toContain("parts.length === 0 && method === 'GET'")
     expect(route).toContain("['cancel', 'pause', 'resume']")
     expect(route).toContain("'change-plan'")
     expect(route).not.toContain('entitlement')
