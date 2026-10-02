@@ -365,6 +365,18 @@ a { color: inherit; }
   font-size: 11px;
   line-height: 1.4;
 }
+.content-detail-relationship-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid rgba(182, 213, 255, .95);
+  border-radius: 999px;
+  background: #f7fbff;
+  color: var(--lr-accent);
+  font-size: 10px;
+  font-weight: 800;
+}
 .content-detail-safety-actions {
   display: flex;
   align-items: center;
