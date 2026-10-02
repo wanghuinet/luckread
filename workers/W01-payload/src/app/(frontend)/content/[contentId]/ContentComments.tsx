@@ -87,7 +87,8 @@ export default function ContentComments({ contentId }: { contentId: string }) {
       )
       const data = await response.json().catch((): null => null)
       if (response.status === 401) {
-        setMessage('请先登录后发表评论。')
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
       if (!response.ok || !data?.data) {
