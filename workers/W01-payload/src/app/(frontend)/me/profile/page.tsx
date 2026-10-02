@@ -176,6 +176,7 @@ export default function ProfilePage() {
         </div>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
           <Link href="/me/sessions">登录设备</Link>
+          <Link href="/me/password">修改密码</Link>
           <Link href="/admin/creator-center">创作者中心</Link>
         </div>
       </div>
