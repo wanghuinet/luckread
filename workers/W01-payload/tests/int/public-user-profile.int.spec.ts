@@ -22,6 +22,7 @@ describe('public user profile', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
     expect(page).toContain('/api/v1/social/follows/')
     expect(page).toContain("method: isFollowing ? 'DELETE' : 'POST'")
+    expect(page).toContain("'Idempotency-Key': 'social-follow:' + crypto.randomUUID()")
     expect(page).toContain('/followers?limit=1')
     expect(page).toContain('/following?limit=1')
     expect(page).toContain('credentials: \'include\'')
