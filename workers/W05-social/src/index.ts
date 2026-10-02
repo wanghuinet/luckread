@@ -9,6 +9,7 @@ import {
 } from './favorite-runtime.js'
 import { ShareRuntimeError, createShare, resolveShare } from './share-runtime.js'
 import { BlockMuteRuntimeError, removeRelation, setRelation } from './block-mute-runtime.js'
+import { getRelationshipGraph } from './relationship-graph-runtime.js'
 import {
   FollowRuntimeError,
   follow,
@@ -321,7 +322,10 @@ export default {
 
         if (request.method === 'GET') {
           return json({
-            data: await getFollowStatus(env.DB, viewerUserId, path.userId),
+            data: {
+              ...(await getFollowStatus(env.DB, viewerUserId, path.userId)),
+              relationship: await getRelationshipGraph(env.DB, viewerUserId, path.userId),
+            },
             requestId: crypto.randomUUID(),
           })
         }
