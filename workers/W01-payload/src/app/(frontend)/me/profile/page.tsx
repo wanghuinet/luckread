@@ -111,6 +111,7 @@ export default function ProfilePage() {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
+        headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() },
         body: form,
       })
       const data = await response.json().catch((): null => null) as { doc?: { url?: string }; url?: string; error?: { message?: string } } | null
