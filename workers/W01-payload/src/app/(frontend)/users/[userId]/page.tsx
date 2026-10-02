@@ -49,6 +49,7 @@ export default function PublicProfilePage({
   const [profile, setProfile] = useState<PublicProfile | null>(null)
   const [followers, setFollowers] = useState<number | null>(null)
   const [following, setFollowing] = useState<number | null>(null)
+  const [viewerUserId, setViewerUserId] = useState<string | null>(null)
   const [isFollowing, setIsFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
   const [contents, setContents] = useState<PublicContent[]>([])
@@ -66,7 +67,7 @@ export default function PublicProfilePage({
     void (async () => {
       try {
         const { userId } = await params
-        const [profileResponse, followersResponse, followingResponse, followResponse, contentResponse] = await Promise.all([
+        const [profileResponse, followersResponse, followingResponse, followResponse, contentResponse, viewerResponse] = await Promise.all([
           fetch('/api/v1/users/' + encodeURIComponent(userId), {
             headers: { accept: 'application/json' },
             cache: 'no-store',
@@ -94,6 +95,12 @@ export default function PublicProfilePage({
             cache: 'no-store',
             signal: controller.signal,
           }),
+          fetch('/api/v1/users/me', {
+            credentials: 'include',
+            headers: { accept: 'application/json' },
+            cache: 'no-store',
+            signal: controller.signal,
+          }),
         ])
 
         const data = await profileResponse.json().catch((): null => null) as PublicProfile | { error?: { message?: string } } | null
@@ -108,9 +115,11 @@ export default function PublicProfilePage({
         const followingData = await followingResponse.json().catch((): null => null) as CountResponse | null
         const followData = await followResponse.json().catch((): null => null) as { data?: { following?: boolean } } | null
         const contentData = await contentResponse.json().catch((): null => null) as ContentListResponse | null
+        const viewerData = await viewerResponse.json().catch((): null => null) as { id?: string } | null
         if (!cancelled) {
           setFollowers(typeof followerData?.data?.totalCount === 'number' ? followerData.data.totalCount : null)
           setFollowing(typeof followingData?.data?.totalCount === 'number' ? followingData.data.totalCount : null)
+          setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)
           setIsFollowing(followData?.data?.following === true)
           const items = Array.isArray(contentData?.data?.items) ? contentData.data.items : []
           setContents(items)
@@ -269,14 +278,18 @@ export default function PublicProfilePage({
           <Link href={'/users/' + encodeURIComponent(profile.id) + '/following'}>
             {following === null ? '—' : following.toLocaleString('zh-CN')} 关注
           </Link>
-          <button
-            className="content-detail-follow"
-            disabled={followBusy}
-            onClick={() => void toggleFollow()}
-            type="button"
-          >
-            {followBusy ? '处理中…' : isFollowing ? '已关注' : '关注作者'}
-          </button>
+          {viewerUserId === profile.id ? (
+            <span className="content-detail-muted">这是你的主页</span>
+          ) : (
+            <button
+              className="content-detail-follow"
+              disabled={followBusy}
+              onClick={() => void toggleFollow()}
+              type="button"
+            >
+              {followBusy ? '处理中…' : isFollowing ? '已关注' : '关注作者'}
+            </button>
+          )}
           {error ? <span className="content-detail-action-status" role="status">{error}</span> : null}
         </div>
       </article>
