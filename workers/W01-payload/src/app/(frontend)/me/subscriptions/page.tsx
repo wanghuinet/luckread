@@ -111,6 +111,11 @@ export default function MySubscriptionsPage() {
           body: JSON.stringify({ planId: nextPlanId }),
         },
       )
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
       const data = await response.json().catch((): null => null) as ListResponse & { data?: Subscription } | null
       if (!response.ok || !data?.data?.subscriptionId) {
         throw new Error(data?.error?.message || '订阅方案更新失败')
@@ -145,6 +150,11 @@ export default function MySubscriptionsPage() {
           },
         },
       )
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
       const data = await response.json().catch((): null => null) as ListResponse & { data?: Subscription } | null
       if (!response.ok || !data?.data?.subscriptionId) {
         throw new Error(data?.error?.message || '订阅状态更新失败')

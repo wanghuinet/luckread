@@ -330,6 +330,8 @@ describe('Creator Center admin extension', () => {
     expect(page).toContain("transition(item, 'cancel')")
     expect(page).toContain("transition(item, 'pause')")
     expect(page).toContain("transition(item, 'resume')")
+    expect(page).toContain("if (response.status === 401)")
+    expect(page).toContain("window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))")
     expect(page).toContain("pageNumber + 1")
     expect(page).toContain("append ? [...current, ...data.data!.docs!] : data.data!.docs!")
     expect(page).toContain('hasNextPage')
