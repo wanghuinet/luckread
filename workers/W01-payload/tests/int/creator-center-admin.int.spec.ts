@@ -22,6 +22,13 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("router.replace(loginPath + '?returnTo=' + encodeURIComponent(returnTo))")
   })
 
+  it('redirects creator content management auth expiry to admin login', () => {
+    const contentList = read('src/app/(payload)/admin/CreatorContentList.tsx')
+    expect(contentList).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
+    expect(contentList).toContain("window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(contentList).toContain("if (response.status === 401)")
+  })
+
   it('uses the native Payload admin request principal instead of a second login/session system', () => {
     const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
 
