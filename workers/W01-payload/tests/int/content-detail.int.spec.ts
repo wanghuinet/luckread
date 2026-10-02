@@ -50,6 +50,7 @@ describe('public content detail', () => {
     expect(page).toContain("credentials: 'include'")
     expect(page).toContain("targetType: 'content'")
     expect(page).toContain("liked ? 'DELETE' : 'POST'")
+    expect(page).toContain("'Idempotency-Key': 'social-like:' + crypto.randomUUID()")
   })
 
 
