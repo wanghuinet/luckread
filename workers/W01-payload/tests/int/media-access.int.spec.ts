@@ -85,3 +85,16 @@ describe('Media upload access', () => {
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
+
+
+  it('exposes owner-authorized media metadata updates through the stable v1 resource path', () => {
+    const route = read('src/app/api/v1/media/[mediaId]/route.ts')
+
+    expect(route).toContain("PATCH as payloadMediaPatch")
+    expect(route).toContain('type PayloadPatchRouteContext = Parameters<typeof payloadMediaPatch>[1]')
+    expect(route).toContain("new URL('/api/media/' + encodeURIComponent(mediaId), request.url)")
+    expect(route).toContain("slug: ['media', mediaId]")
+    expect(route).toContain('return payloadMediaPatch')
+    expect(route).not.toContain('D1Database')
+    expect(route).not.toContain('R2Bucket')
+  })
