@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { changeSubscriptionPlan, createSubscription, etagForUpdatedAt, getSubscription, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 
 type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; run: () => Promise<{ meta: { changes: number } }> }
@@ -77,6 +77,15 @@ describe('subscription runtime', () => {
   it('fails stale If-Match without changing state', async () => {
     const db = fakeDb([baseRow()]); await expect(transitionSubscription(db, 'user_1', 'sub_existing', 'pause', '"lr-stale"')).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
   })
+
+  it('advances updatedAt when the clock equals the stored timestamp', async () => {
+    const db = fakeDb([baseRow()])
+    const stored = new Date('2026-10-02T12:00:00.000Z')
+    vi.setSystemTime(stored)
+    const before = await getSubscription(db, 'user_1', 'sub_existing')
+    const after = await transitionSubscription(db, 'user_1', 'sub_existing', 'pause', before.etag)
+    expect(Date.parse(after.updatedAt)).toBe(Date.parse(before.updatedAt) + 1)
+  })
   it('changes plan only for mutable lifecycle states', async () => {
     const db = fakeDb([baseRow()]); const before = await getSubscription(db, 'user_1', 'sub_existing'); const after = await changeSubscriptionPlan(db, 'user_1', 'sub_existing', 'plan_pro', before.etag)
     expect(after.planId).toBe('plan_pro'); expect(after.status).toBe('ACTIVE')
@@ -88,3 +97,5 @@ describe('subscription runtime', () => {
     const db = fakeDb([baseRow({ entitlement_snapshot_ref: 'internal-ref' })]); const result = await getSubscription(db, 'user_1', 'sub_existing'); expect(result).not.toHaveProperty('entitlementSnapshotRef')
   })
 })
+
+afterEach(() => vi.useRealTimers())
