@@ -15,6 +15,13 @@ describe('public content detail', () => {
   })
 })
 
+  it('hydrates like state from the authenticated status API', () => {
+    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    expect(page).toContain('/api/v1/interactions/likes?targetType=content&targetId=')
+    expect(page).toContain('likeData?.data?.liked')
+    expect(page).toContain('setLiked(likeData.data.liked)')
+  })
+
   it('connects the content detail page to the authenticated like API', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain("fetch('/api/v1/interactions/likes'")
