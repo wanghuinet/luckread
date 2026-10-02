@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 type Direction = 'followers' | 'following'
 
@@ -52,7 +52,7 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
 
-  async function loadProfile(signal?: AbortSignal): Promise<string> {
+  const loadProfile = useCallback(async (signal?: AbortSignal): Promise<string> => {
     const response = await fetch('/api/v1/users/me', {
       credentials: 'include',
       cache: 'no-store',
@@ -71,9 +71,14 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
     setDisplayName(data.displayName?.trim() || data.username?.trim() || '我的账号')
     setUserId(data.id)
     return data.id
-  }
+  }, [])
 
-  async function loadList(ownerId: string, cursor: string | null, append: boolean, signal?: AbortSignal) {
+  const loadList = useCallback(async (
+    ownerId: string,
+    cursor: string | null,
+    append: boolean,
+    signal?: AbortSignal,
+  ) => {
     const params = new URLSearchParams({ limit: String(PAGE_SIZE) })
     if (cursor) params.set('cursor', cursor)
 
@@ -95,9 +100,9 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
     setTotalCount(data.data.totalCount)
     setNextCursor(data.data.nextCursor)
     setHasMore(data.data.hasMore)
-  }
+  }, [direction])
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -109,12 +114,10 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [loadList, loadProfile, userId])
 
   useEffect(() => {
     const controller = new AbortController()
-    setLoading(true)
-    setError('')
 
     void (async () => {
       try {
@@ -129,7 +132,7 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
     })()
 
     return () => controller.abort()
-  }, [direction])
+  }, [direction, loadList, loadProfile])
 
   async function loadMore() {
     if (!userId || loadingMore || !hasMore || !nextCursor) return
