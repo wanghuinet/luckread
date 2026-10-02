@@ -88,6 +88,22 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
 
+      - name: Verify comment delete tombstone migration
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          base = Path('workers/W05-social/migrations/20261002_003_social_004_comments_v1.sql').read_text()
+          delete = Path('workers/W05-social/migrations/20261003_001_social_010_comment_delete_tombstone_v1.sql').read_text()
+          db.executescript(base)
+          db.executescript(delete)
+          states = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='social_comments'").fetchone()[0]
+          if 'AUTHOR_DELETED' not in states or 'DELETED' not in states:
+              raise SystemExit('comment delete tombstone state boundary missing')
+          print('SOCIAL_010_COMMENT_DELETE_TOMBSTONE_MIGRATION_STATIC=PASS')
+          PY
+
       - name: Verify block mute migration shape
         run: |
           python - <<'PY'
