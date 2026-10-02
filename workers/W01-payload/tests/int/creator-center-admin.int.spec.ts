@@ -227,6 +227,7 @@ describe('Creator Center admin extension', () => {
 
 
     expect(view).toContain('文章管理')
+    expect(view).toContain('<Link href="/me/profile">')
     expect(view).toContain('发布中心')
     expect(view).toContain('发布检测')
     expect(view).toContain('素材库')
