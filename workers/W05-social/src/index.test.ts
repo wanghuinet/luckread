@@ -341,6 +341,43 @@ describe('W05 social query transport', () => {
     expect(response.status).toBe(403)
   })
 
+  it('serves follow status and relationship from one relationship authority', async () => {
+    const response = await worker.fetch(
+      request('/internal/social/follows/target-1', transportHeaders),
+      {
+        DB: dbFor([{
+          following: 1,
+          followed_by: 1,
+          relationship_id: 'follow-1',
+          created_at: '2026-10-02T00:00:00.000Z',
+          blocked: 0,
+          blocked_by: 0,
+          muted: 0,
+        }]),
+      },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        following: true,
+        relationshipId: 'follow-1',
+        targetUserId: 'target-1',
+        createdAt: '2026-10-02T00:00:00.000Z',
+        relationship: {
+          following: true,
+          followedBy: true,
+          mutualFollow: true,
+          blocked: false,
+          blockedBy: false,
+          muted: false,
+          relationshipId: 'follow-1',
+          createdAt: '2026-10-02T00:00:00.000Z',
+        },
+      },
+    })
+  })
+
   it('serves followers without a principal for public reads', async () => {
     const publicTransportHeaders = {
       'X-LuckRead-Caller': 'W01',
