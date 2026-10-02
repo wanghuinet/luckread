@@ -64,6 +64,17 @@ describe('like runtime', () => {
     expect(d.prepare).toHaveBeenCalledTimes(2)
   })
 
+  it('rejects likes when the content owner has blocked the actor or is blocked by the actor', async () => {
+    const d = db([
+      { id: 'content-1', state: 'PUBLISHED', owner_user_id: 'user-2', blocked: 1 },
+    ])
+    await expect(like(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).rejects.toMatchObject({
+      code: 'RELATIONSHIP_BLOCKED',
+      status: 409,
+    })
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+  })
+
   it('is idempotent for an already-liked content item', async () => {
     const existing = {
       relationship_id: 'like-existing',
