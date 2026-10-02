@@ -277,7 +277,7 @@ describe('Creator Center admin extension', () => {
     expect(assets).toContain("fetch('/api/v1/media', {")
     expect(assets).toContain("method: 'POST'")
     expect(assets).toContain("form.append('file', file)")
-    expect(assets).toContain("accept="image/*,video/*"")
+    expect(assets).toContain('accept="image/*,video/*"')
     expect(assets).toContain('上传素材')
     expect(assets).toContain("method: 'DELETE'")
     expect(assets).toContain("'/api/v1/media/' + encodeURIComponent(String(id))")
