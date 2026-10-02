@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js'
-import { CommentRuntimeError, createComment, listComments, parseCommentLimit } from './comment-runtime.js'
+import { CommentRuntimeError, createComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
 import {
   FavoriteRuntimeError,
   favorite,
@@ -184,6 +184,56 @@ export default {
         }
 
         return new Response(null, { status: 405, headers: { Allow: 'POST, DELETE' } })
+      }
+
+      const commentIdParts = url.pathname.split('/').filter(Boolean)
+      if (
+        commentIdParts.length === 4 &&
+        commentIdParts[0] === 'internal' &&
+        commentIdParts[1] === 'social' &&
+        commentIdParts[2] === 'comments'
+      ) {
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const commentId = decodePathPart(commentIdParts[3])
+        if (commentId === null) throw new CommentRuntimeError('VALIDATION_FAILED', 400)
+
+        if (request.method !== 'PATCH') {
+          return new Response(null, { status: 405, headers: { Allow: 'PATCH' } })
+        }
+
+        const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
+        if (!ifMatch || ifMatch.length > 256) {
+          throw new CommentRuntimeError('PRECONDITION_REQUIRED', 428)
+        }
+
+        let body: unknown
+        try { body = await request.json() } catch {
+          throw new CommentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) {
+          throw new CommentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const bodyValue = (body as { body?: unknown }).body
+        if (typeof bodyValue !== 'string') {
+          throw new CommentRuntimeError('VALIDATION_FAILED', 400)
+        }
+
+        const result = await updateComment(env.DB, actorUserId, commentId, {
+          body: bodyValue,
+          ifMatch,
+        })
+        return Response.json(
+          { data: result.item, requestId: crypto.randomUUID() },
+          {
+            status: 200,
+            headers: {
+              'content-type': 'application/json; charset=utf-8',
+              'cache-control': 'no-store',
+              ETag: result.etag,
+            },
+          },
+        )
       }
 
       const commentContentId = parseCommentPath(url.pathname)
