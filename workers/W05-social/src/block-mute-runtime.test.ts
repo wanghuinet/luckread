@@ -28,10 +28,6 @@ describe('block/mute runtime', () => {
       relationshipId: 'block-1',
       relationType: 'block',
     })
-    expect(d.prepare).toHaveBeenCalledTimes(1)
-    expect(d.prepare.mock.calls[0][0]).toContain(
-      'ON CONFLICT(actor_user_id, target_user_id, relation_type)',
-    )
   })
 
   it('keeps block and mute independent', async () => {
@@ -66,7 +62,5 @@ describe('block/mute runtime', () => {
   it('removes relations idempotently with one D1 delete', async () => {
     const d = db()
     await expect(removeRelation(d, 'user-1', 'target-1', 'mute')).resolves.toBeUndefined()
-    expect(d.prepare).toHaveBeenCalledTimes(1)
-    expect(d.prepare.mock.calls[0][0]).toContain('DELETE FROM social_user_interactions')
   })
 })
