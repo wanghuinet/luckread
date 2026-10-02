@@ -169,9 +169,28 @@ export async function createComment(
     }
   }
 
-  const existing = await db.prepare(
-    'SELECT id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at FROM social_comments WHERE author_user_id = ? AND idempotency_key = ? LIMIT 1',
-  ).bind(actor, idempotencyKey).first<{
+  const depth = parentId ? Number(validation.parent_depth) + 1 : 0
+  const id = crypto.randomUUID()
+  const now = new Date().toISOString()
+
+  const inserted = await db.prepare(
+    `INSERT INTO social_comments
+      (id, content_id, author_user_id, parent_id, body, state, depth, idempotency_key, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 'PUBLISHED', ?, ?, ?, ?)
+     ON CONFLICT(author_user_id, idempotency_key)
+     DO UPDATE SET id = social_comments.id
+     RETURNING id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at`,
+  ).bind(
+    id,
+    contentId,
+    actor,
+    parentId,
+    body,
+    depth,
+    idempotencyKey,
+    now,
+    now,
+  ).first<{
     id: string
     content_id: string
     author_user_id: string
@@ -183,7 +202,8 @@ export async function createComment(
     updated_at: string
   }>()
 
-  if (existing) return toCommentItem(existing)
+  if (!inserted) throw new CommentRuntimeError('COMMENT_WRITE_FAILED', 500)
+  return toCommentItem(inserted)
 
   const depth = parentId ? Number(validation.parent_depth) + 1 : 0
   const id = crypto.randomUUID()
@@ -273,7 +293,7 @@ export async function listComments(
        FROM social_comments child
        JOIN public_comments parent ON parent.id = child.parent_id
        WHERE child.state = 'PUBLISHED'
-         AND child.depth <= 3
+         AND parent.depth < 3
      )
      SELECT
        c.id,
