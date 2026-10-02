@@ -33,6 +33,17 @@ describe('Media upload access', () => {
 
     expect(config).toContain("r2Storage({")
     expect(config).toContain("collections: { media: true }")
-    expect(publisher).toContain("authorizedFetch('/api/media'")
+    expect(publisher).toContain("authorizedFetch('/api/v1/media'")
   })
 })
+
+
+  it('exposes the existing Payload/R2 upload handler through the stable v1 media path', () => {
+    const route = read('src/app/api/v1/media/route.ts')
+
+    expect(route).toContain("import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route'")
+    expect(route).toContain("new URL('/api/media', request.url)")
+    expect(route).toContain('request.clone()')
+    expect(route).not.toContain('D1Database')
+    expect(route).not.toContain('R2Bucket')
+  })
