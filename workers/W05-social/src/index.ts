@@ -7,6 +7,7 @@ import {
   getFavoriteStatus,
   unfavorite,
 } from './favorite-runtime.js'
+import { ShareRuntimeError, createShare, resolveShare } from './share-runtime.js'
 import {
   FollowRuntimeError,
   follow,
@@ -117,6 +118,31 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url)
+
+      if (url.pathname.startsWith('/internal/social/shares/')) {
+        const parts = url.pathname.split('/').filter(Boolean)
+        if (parts.length !== 4 || parts[2] !== 'shares') return new Response(null, { status: 404 })
+        if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        requireTransport(request)
+        const shareId = decodePathPart(parts[3])
+        if (shareId === null) return new Response(null, { status: 400 })
+        return json({ data: await resolveShare(env.DB, shareId), requestId: crypto.randomUUID() })
+      }
+
+      if (url.pathname.startsWith('/internal/social/content/')) {
+        const parts = url.pathname.split('/').filter(Boolean)
+        if (parts.length !== 5 || parts[2] !== 'content' || parts[4] !== 'shares') return new Response(null, { status: 404 })
+        if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const contentId = decodePathPart(parts[3])
+        if (contentId === null) throw new ShareRuntimeError('VALIDATION_FAILED', 400)
+        const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        return json({
+          data: await createShare(env.DB, actorUserId, contentId, idempotencyKey),
+          requestId: crypto.randomUUID(),
+        }, 201)
+      }
 
       const commentContentId = parseCommentPath(url.pathname)
       if (commentContentId !== null) {
@@ -292,7 +318,8 @@ export default {
         error instanceof FollowRuntimeError ||
         error instanceof LikeRuntimeError ||
         error instanceof CommentRuntimeError ||
-        error instanceof FavoriteRuntimeError
+        error instanceof FavoriteRuntimeError ||
+        error instanceof ShareRuntimeError
       ) {
         return json({
           error: {
