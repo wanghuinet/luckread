@@ -49,6 +49,26 @@ describe('comment runtime', () => {
     expect(d.prepare).toHaveBeenCalledTimes(2)
   })
 
+  it('rejects comments when the actor is blocked by the content relationship', async () => {
+    const d = db([{
+      content_state: 'PUBLISHED',
+      content_owner_user_id: 'user-2',
+      parent_content_id: null,
+      parent_author_user_id: null,
+      parent_state: null,
+      parent_depth: null,
+      blocked: 1,
+      recent_count: 0,
+    }])
+    await expect(createComment(d, 'user-1', 'content-1', {
+      body: '被屏蔽后不能评论',
+      idempotencyKey: 'blocked-1',
+    })).rejects.toMatchObject({
+      code: 'RELATIONSHIP_BLOCKED',
+      status: 409,
+    })
+  })
+
   it('creates a nested comment only while the parent depth is below three', async () => {
     const d = db([
       {
