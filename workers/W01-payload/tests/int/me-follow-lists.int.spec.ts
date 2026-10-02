@@ -14,7 +14,7 @@ describe('personal social relationship pages', () => {
     expect(following).toContain('<MeFollowList direction="following" />')
     expect(component).toContain("fetch('/api/v1/users/me'")
     expect(component).toContain('/api/v1/users/')
-    expect(component).toContain('/' + ' + direction')
+    expect(component).toContain("'/' + direction")
     expect(component).toContain('nextCursor')
     expect(component).toContain('加载更多')
     expect(component).toContain("window.location.assign('/login?returnTo='")
