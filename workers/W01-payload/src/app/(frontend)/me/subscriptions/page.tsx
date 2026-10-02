@@ -206,6 +206,11 @@ export default function MySubscriptionsPage() {
                   <div>
                     <span className="subscription-plan">{item.planId}</span>
                     <h2>{item.creatorId ? '创作者订阅' : '会员订阅'}</h2>
+                    {item.creatorId ? (
+                      <Link href={'/users/' + encodeURIComponent(item.creatorId)} className="subscription-creator-link">
+                        查看创作者主页
+                      </Link>
+                    ) : null}
                   </div>
                   <span className={'subscription-status subscription-status-' + item.status.toLowerCase()}>
                     {statusLabel[item.status]}
