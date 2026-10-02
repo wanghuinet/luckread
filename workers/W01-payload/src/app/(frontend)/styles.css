@@ -365,6 +365,20 @@ a { color: inherit; }
   font-size: 11px;
   line-height: 1.4;
 }
+.content-detail-safety-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid rgba(223,231,240,.8);
+}
+.content-detail-safety-actions .content-detail-follow {
+  color: #59677a;
+  background: #fafbfc;
+  border-color: rgba(205,215,228,.9);
+}
 .content-detail-retry {
   min-height: 34px;
   padding: 0 11px;
