@@ -41,6 +41,7 @@ export default function ContentDetailPage({
   const [copied, setCopied] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
   const [liked, setLiked] = useState(false)
+  const [likeCount, setLikeCount] = useState<number | null>(null)
   const [likeBusy, setLikeBusy] = useState(false)
   const [following, setFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
@@ -73,6 +74,11 @@ export default function ContentDetailPage({
             const likeData = await likeResponse.json().catch((): null => null) as { data?: { liked?: boolean } } | null
             if (!cancelled && likeResponse.ok && typeof likeData?.data?.liked === 'boolean') {
               setLiked(likeData.data.liked)
+              setLikeCount(
+                typeof likeData?.data?.likeCount === 'number'
+                  ? Math.max(0, likeData.data.likeCount)
+                  : null,
+              )
             }
           } catch {
             // Like state is optional; content remains readable when the status query fails.
@@ -153,7 +159,12 @@ export default function ContentDetailPage({
         setActionMessage(data?.error?.message || '点赞操作失败，请稍后重试。')
         return
       }
-      setLiked((value) => !value)
+      const nextLiked = !liked
+      setLiked(nextLiked)
+      setLikeCount((count) => {
+        if (count === null) return count
+        return Math.max(0, count + (nextLiked ? 1 : -1))
+      })
     } catch {
       setActionMessage('网络异常，请稍后重试。')
     } finally {
@@ -221,6 +232,7 @@ export default function ContentDetailPage({
           ) : null}
           <button className="content-detail-like" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
             {likeBusy ? '处理中…' : liked ? '已点赞' : '点赞'}
+            {likeCount === null ? '' : ' · ' + likeCount.toLocaleString('zh-CN')}
           </button>
           <button className="content-detail-share" onClick={() => void copyContentLink()} type="button">
             {copied ? '已复制' : '复制链接'}
