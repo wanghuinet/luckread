@@ -194,7 +194,7 @@ export default {
       if (request.method === 'GET' && url.pathname === '/internal/content/contents') {
         const cursor = url.searchParams.get('cursor')
         const limitParam = url.searchParams.get('limit')
-        const limit = limitParam ? Number(limitParam) : 20
+        const limit = parseListLimit(limitParam)
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         const page = await listContents(env.D1_02, cursor, limit)
         return json({
@@ -283,9 +283,8 @@ export default {
       }
 
       if (request.method === 'GET' && path.id) {
-        // Public content detail is readable anonymously when the content is PUBLISHED.
-        // getContent already constrains non-published reads to the supplied owner id.
-        const principalUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        const principal = requiredCreatorPrincipal(request)
+        const principalUserId = principal.userId
         const content = await getContent(env.D1_02, path.id, principalUserId)
         return json({
           id: content.id,

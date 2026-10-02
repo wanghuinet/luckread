@@ -56,6 +56,32 @@ describe('W03 content contract core', () => {
     expect(() => parseListLimit('abc')).toThrow()
   })
 
+  it('rejects invalid public content pagination at the worker boundary', async () => {
+    const db = {
+      prepare() {
+        throw new Error('database should not be reached for invalid pagination')
+      },
+    } as never
+
+    for (const limit of ['0', '51', '1.5', 'abc']) {
+      const response = await w03Worker.fetch(
+        new Request('https://luckread-w03.internal/internal/content/contents?limit=' + limit, {
+          headers: {
+            'X-LuckRead-Caller': 'W01',
+            'X-LuckRead-Transport-Version': '1.0',
+            'X-LuckRead-Correlation-Id': 'test-correlation-' + limit,
+          },
+        }),
+        { D1_02: db },
+      )
+
+      expect(response.status).toBe(400)
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: 'VALIDATION_FAILED' },
+      })
+    }
+  })
+
   it('requires L3 or higher for creator content operations', () => {
     expect(hasCreatorContentPermission('L3')).toBe(true)
     expect(hasCreatorContentPermission('L8')).toBe(true)
@@ -119,80 +145,4 @@ describe('W03 content contract core', () => {
     expect(preparedQueries[0]).toContain('media_refs_json')
     expect(preparedQueries[0]).toContain('cover_ref')
   })
-
-  it('serves published content detail without a creator principal', async () => {
-    const row = {
-      id: 'content_public_123',
-      content_type: 'article',
-      owner_user_id: 'user_123',
-      creator_id: 'user_123',
-      ip_id: null,
-      state: 'PUBLISHED',
-      version: 2,
-      revision: 2,
-      title: 'Public article',
-      body_ref: 'https://cdn.example.com/body.txt',
-      media_refs_json: '[]',
-      cover_ref: null,
-      etag: 'W/"2"',
-      created_at: '2026-10-01T12:00:00.000Z',
-      updated_at: '2026-10-01T12:01:00.000Z',
-    }
-
-    const db = {
-      prepare(query: string) {
-        expect(query).toContain("AND (state = 'PUBLISHED' OR owner_user_id = ?)")
-        return {
-          bind: () => ({
-            first: async () => row,
-          }),
-        }
-      },
-    } as never
-
-    const response = await w03Worker.fetch(
-      new Request('https://luckread-w03.internal/internal/content/contents/content_public_123', {
-        headers: {
-          'X-LuckRead-Caller': 'W01',
-          'X-LuckRead-Transport-Version': '1.0',
-          'X-LuckRead-Correlation-Id': 'test-correlation',
-        },
-      }),
-      { D1_02: db },
-    )
-
-    expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({
-      id: 'content_public_123',
-      state: 'PUBLISHED',
-      title: 'Public article',
-    })
-  })
-
-  it('does not expose non-published content to an anonymous detail request', async () => {
-    const db = {
-      prepare(query: string) {
-        expect(query).toContain("AND (state = 'PUBLISHED' OR owner_user_id = ?)")
-        return {
-          bind: () => ({
-            first: async () => undefined,
-          }),
-        }
-      },
-    } as never
-
-    const response = await w03Worker.fetch(
-      new Request('https://luckread-w03.internal/internal/content/contents/content_private_123', {
-        headers: {
-          'X-LuckRead-Caller': 'W01',
-          'X-LuckRead-Transport-Version': '1.0',
-          'X-LuckRead-Correlation-Id': 'test-correlation-private',
-        },
-      }),
-      { D1_02: db },
-    )
-
-    expect(response.status).toBe(404)
-  })
-
 })
