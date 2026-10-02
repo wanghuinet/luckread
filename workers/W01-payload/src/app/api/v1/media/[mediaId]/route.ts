@@ -2,12 +2,46 @@ import { GET as payloadMediaGet } from '../../../(payload)/api/[...slug]/route'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaGet>[1]
 
+type MediaDocument = {
+  id?: string | number
+  url?: string | null
+  mimeType?: string | null
+  filesize?: number | null
+  width?: number | null
+  height?: number | null
+  [key: string]: unknown
+}
+
+const withDeliveryStatus = (body: unknown): unknown => {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return body
+
+  const envelope = body as Record<string, unknown>
+  const document =
+    envelope.doc && typeof envelope.doc === 'object' && !Array.isArray(envelope.doc)
+      ? envelope.doc as MediaDocument
+      : body as MediaDocument
+
+  const deliveryReady = typeof document.url === 'string' && document.url.trim().length > 0
+  const projected = {
+    ...document,
+    status: deliveryReady ? 'READY' : 'FAILED',
+  }
+
+  return envelope.doc && typeof envelope.doc === 'object' && !Array.isArray(envelope.doc)
+    ? { ...envelope, doc: projected }
+    : projected
+}
+
 /**
  * Stable v1 media metadata read entry.
  *
  * Payload Media remains the authoritative metadata/storage integration. This
  * adapter exposes the existing resource through the public v1 API namespace
  * without creating another media record or storage path.
+ *
+ * The status field is a delivery-state projection only: this 1.0 path has no
+ * separate media-processing worker, so READY means the existing Payload/R2
+ * asset has a usable URL. It does not claim transcoding has completed.
  */
 export async function GET(
   request: Request,
@@ -20,5 +54,23 @@ export async function GET(
   const payloadContext: PayloadRouteContext = {
     params: Promise.resolve({ slug: ['media', mediaId] }),
   }
-  return payloadMediaGet(new Request(target, request.clone()), payloadContext)
+
+  const response = await payloadMediaGet(new Request(target, request.clone()), payloadContext)
+  if (!response.ok) return response
+
+  let body: unknown
+  try {
+    body = await response.clone().json()
+  } catch {
+    return response
+  }
+
+  return new Response(JSON.stringify(withDeliveryStatus(body)), {
+    status: response.status,
+    headers: {
+      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      ...(response.headers.get('etag') ? { etag: response.headers.get('etag')! } : {}),
+    },
+  })
 }
