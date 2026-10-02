@@ -40,9 +40,6 @@ describe('W05 social query transport', () => {
       }),
       {
         DB: dbFor([
-          { account_state: 'ACTIVE' },
-          { id: 'target-1' },
-          null,
           {
             relationship_id: 'block-1',
             actor_user_id: 'viewer-1',
@@ -74,9 +71,6 @@ describe('W05 social query transport', () => {
       }),
       {
         DB: dbFor([
-          { account_state: 'ACTIVE' },
-          { id: 'target-1' },
-          null,
           {
             relationship_id: 'mute-1',
             actor_user_id: 'viewer-1',
@@ -122,7 +116,7 @@ describe('W05 social query transport', () => {
         method: 'DELETE',
         headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'Idempotency-Key': 'unblock-1' },
       }),
-      { DB: dbFor([{ account_state: 'ACTIVE' }]) },
+      { DB: dbFor() },
     )
     expect(unblock.status).toBe(204)
 
@@ -131,7 +125,7 @@ describe('W05 social query transport', () => {
         method: 'DELETE',
         headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'Idempotency-Key': 'unmute-1' },
       }),
-      { DB: dbFor([{ account_state: 'ACTIVE' }]) },
+      { DB: dbFor() },
     )
     expect(unmute.status).toBe(204)
   })
