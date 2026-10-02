@@ -30,12 +30,14 @@ export async function GET(
       )
     }
 
+    const publicUser = user as unknown as Record<string, unknown>
+
     return Response.json({
-      id: String(user.id ?? ''),
-      username: typeof user.username === 'string' ? user.username : '',
-      displayName: typeof user.displayName === 'string' ? user.displayName : null,
-      bio: typeof user.bio === 'string' ? user.bio : null,
-      avatar: typeof user.avatar === 'string' ? user.avatar : null,
+      id: String(publicUser.id ?? ''),
+      username: typeof publicUser.username === 'string' ? publicUser.username : '',
+      displayName: typeof publicUser.displayName === 'string' ? publicUser.displayName : null,
+      bio: typeof publicUser.bio === 'string' ? publicUser.bio : null,
+      avatar: typeof publicUser.avatar === 'string' ? publicUser.avatar : null,
     }, {
       headers: {
         'cache-control': 'public, max-age=30, stale-while-revalidate=120',
