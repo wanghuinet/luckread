@@ -27,6 +27,14 @@ describe('Media upload access', () => {
     expect(migration).toContain('ALTER TABLE \\`media\\` ADD COLUMN \\`owner_user_id\\` text;')
   })
 
+  it('enforces the 12-media limit across repeated uploads', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain('const remainingSlots = Math.max(0, 12 - assets.length)')
+    expect(publisher).toContain('selected.slice(0, remainingSlots)')
+    expect(publisher).toContain('最多添加 12 个媒体文件。')
+    expect(publisher).toContain('已达到 12 个媒体文件上限，其余文件未上传。')
+  })
+
   it('keeps the existing R2-backed Payload media collection and upload path', () => {
     const config = read('src/payload.config.ts')
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
