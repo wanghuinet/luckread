@@ -186,7 +186,10 @@ export default function ContentDetailPage({
         {
           method: following ? 'DELETE' : 'POST',
           credentials: 'include',
-          headers: { accept: 'application/json' },
+          headers: {
+            accept: 'application/json',
+            'Idempotency-Key': 'social-follow:' + crypto.randomUUID(),
+          },
         },
       )
       if (response.status === 401) {

@@ -32,6 +32,7 @@ describe('public content detail', () => {
     expect(page).toContain('followData?.data?.following')
     expect(page).toContain('setFollowing(followData.data.following)')
     expect(page).toContain("following ? 'DELETE' : 'POST'")
+    expect(page).toContain("'Idempotency-Key': 'social-follow:' + crypto.randomUUID()")
     expect(page).toContain('关注作者')
   })
 
