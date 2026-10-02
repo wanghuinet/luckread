@@ -52,14 +52,5 @@ describe('users/me route imports', () => {
     expect(users).toContain("defaultValue: 'UTC'")
   })
 
-  it('prints the checked PR diff stat for reproducible CI evidence', () => {
-    const stat = execFileSync('git', ['diff', '--stat', 'HEAD^1', 'HEAD'], {
-      encoding: 'utf8',
-    }).trim()
-
-    expect(stat).toContain('workers/W01-payload/tests/int/users-me-route-import.int.spec.ts')
-    console.log('===== git diff --stat HEAD^1 HEAD =====')
-    console.log(stat)
-  })
 
 })
