@@ -55,9 +55,8 @@ export default function CreatorModerationQueue() {
         return
       }
       if (response.status === 401) {
-        setLoaded(true)
-        setItems([])
-        setError('登录已失效，请重新登录。')
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
       if (!response.ok || !Array.isArray(data?.items)) {
@@ -110,6 +109,11 @@ export default function CreatorModerationQueue() {
         },
       )
       const data = await response.json().catch((): null => null) as DecisionResponse | null
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
       if (!response.ok || data?.outcome !== outcome) {
         throw new Error(data?.error?.message || '审核决定提交失败')
       }
