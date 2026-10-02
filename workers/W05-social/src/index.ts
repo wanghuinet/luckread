@@ -302,6 +302,10 @@ export default {
       if (path.kind === 'follow') {
         const viewerUserId = requirePrincipal(request)
         if (request.method === 'POST') {
+          const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+          if (!idempotencyKey || idempotencyKey.length > 256) {
+            throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
+          }
           const row = await follow(env.DB, viewerUserId, path.userId)
           return json({
             data: {
@@ -315,6 +319,10 @@ export default {
         }
 
         if (request.method === 'DELETE') {
+          const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+          if (!idempotencyKey || idempotencyKey.length > 256) {
+            throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
+          }
           await unfollow(env.DB, viewerUserId, path.userId)
           return new Response(null, { status: 204 })
         }
