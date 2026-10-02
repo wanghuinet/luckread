@@ -104,6 +104,18 @@ describe('Media upload access', () => {
     expect(route).not.toContain('R2Bucket')
   })
 
+  it('requires an idempotency key for stable media deletion', () => {
+    const route = read('src/app/api/v1/media/[mediaId]/route.ts')
+    const library = read('src/app/(payload)/admin/CreatorAssetLibrary.tsx')
+
+    expect(route).toContain("const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''")
+    expect(route).toContain("if (!idempotencyKey || idempotencyKey.length > 256)")
+    expect(route).toContain("status: 428")
+    expect(route).toContain("code: 'PRECONDITION_REQUIRED'")
+    expect(library).toContain("'Idempotency-Key': 'media-delete:' + crypto.randomUUID()")
+  })
+
+
 
   it('exposes owner-authorized media metadata updates through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')

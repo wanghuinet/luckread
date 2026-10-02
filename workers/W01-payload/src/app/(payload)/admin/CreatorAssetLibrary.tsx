@@ -168,7 +168,10 @@ export default function CreatorAssetLibrary() {
       const response = await fetch('/api/v1/media/' + encodeURIComponent(String(id)), {
         method: 'DELETE',
         credentials: 'include',
-        headers: { accept: 'application/json' },
+        headers: {
+          accept: 'application/json',
+          'Idempotency-Key': 'media-delete:' + crypto.randomUUID(),
+        },
       })
       if (response.status === 401) {
         redirectToAdminLogin()

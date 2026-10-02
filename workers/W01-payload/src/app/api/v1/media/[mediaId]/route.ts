@@ -82,6 +82,14 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ mediaId: string }> },
 ): Promise<Response> {
+  const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+  if (!idempotencyKey || idempotencyKey.length > 256) {
+    return new Response(
+      JSON.stringify({ error: { code: 'PRECONDITION_REQUIRED', message: 'Idempotency-Key required' } }),
+      { status: 428, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } },
+    )
+  }
+
   const { mediaId } = await context.params
   if (!mediaId?.trim()) return new Response(null, { status: 404 })
 
