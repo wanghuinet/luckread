@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 type ContentType = 'article' | 'post' | 'video'
 type Content = {
   id: string
+  creatorId?: string | null
   contentType: ContentType
   state: string
   title: string
@@ -41,6 +42,8 @@ export default function ContentDetailPage({
   const [actionMessage, setActionMessage] = useState('')
   const [liked, setLiked] = useState(false)
   const [likeBusy, setLikeBusy] = useState(false)
+  const [following, setFollowing] = useState(false)
+  const [followBusy, setFollowBusy] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
@@ -73,6 +76,20 @@ export default function ContentDetailPage({
             }
           } catch {
             // Like state is optional; content remains readable when the status query fails.
+          }
+          if (resolved.creatorId) {
+            try {
+              const followResponse = await fetch(
+                '/api/v1/social/follows/' + encodeURIComponent(resolved.creatorId),
+                { credentials: 'include', headers: { accept: 'application/json' }, cache: 'no-store', signal: controller.signal },
+              )
+              const followData = await followResponse.json().catch((): null => null) as { data?: { following?: boolean } } | null
+              if (!cancelled && followResponse.ok && typeof followData?.data?.following === 'boolean') {
+                setFollowing(followData.data.following)
+              }
+            } catch {
+              // Follow state is optional; content remains readable when the status query fails.
+            }
           }
           if (resolved.bodyRef) {
             try {
@@ -144,6 +161,36 @@ export default function ContentDetailPage({
     }
   }
 
+  async function toggleFollow() {
+    if (!content?.creatorId || followBusy) return
+    setFollowBusy(true)
+    setActionMessage('')
+    try {
+      const response = await fetch(
+        '/api/v1/social/follows/' + encodeURIComponent(content.creatorId),
+        {
+          method: following ? 'DELETE' : 'POST',
+          credentials: 'include',
+          headers: { accept: 'application/json' },
+        },
+      )
+      if (response.status === 401) {
+        setActionMessage('请先登录后关注作者。')
+        return
+      }
+      if (!response.ok) {
+        const data = await response.json().catch((): null => null)
+        setActionMessage(data?.error?.message || '关注操作失败，请稍后重试。')
+        return
+      }
+      setFollowing((value) => !value)
+    } catch {
+      setActionMessage('网络异常，请稍后重试。')
+    } finally {
+      setFollowBusy(false)
+    }
+  }
+
   async function copyContentLink() {
     try {
       await navigator.clipboard.writeText(window.location.href)
@@ -164,6 +211,11 @@ export default function ContentDetailPage({
         </div>
         <div className="content-detail-actions">
           <span>{typeLabels[content.contentType]} · 已发布</span>
+          {content.creatorId ? (
+            <button className="content-detail-follow" disabled={followBusy} onClick={() => void toggleFollow()} type="button">
+              {followBusy ? '处理中…' : following ? '已关注作者' : '关注作者'}
+            </button>
+          ) : null}
           <button className="content-detail-like" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
             {likeBusy ? '处理中…' : liked ? '已点赞' : '点赞'}
           </button>
