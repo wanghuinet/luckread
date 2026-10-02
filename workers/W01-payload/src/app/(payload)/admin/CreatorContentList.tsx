@@ -71,6 +71,11 @@ export default function CreatorContentList() {
         headers: { accept: 'application/json' },
       })
       const data = await response.json().catch((): null => null)
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
       if (!response.ok || !data?.data) {
         throw new Error(data?.error?.message || '内容列表加载失败')
       }
@@ -123,6 +128,11 @@ export default function CreatorContentList() {
       body: JSON.stringify({ to }),
     })
     const data = await response.json().catch((): null => null)
+    if (response.status === 401) {
+      const returnTo = window.location.pathname + window.location.search + window.location.hash
+      window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))
+      throw new Error('AUTH_REQUIRED')
+    }
     if (!response.ok) throw new Error(data?.error?.message || '内容状态更新失败')
     return data as { version?: unknown }
   }
@@ -206,6 +216,11 @@ export default function CreatorContentList() {
         },
       })
       const data = await response.json().catch((): null => null)
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
       if (!response.ok) throw new Error(data?.error?.message || '删除失败')
       await load()
     } catch (cause) {
