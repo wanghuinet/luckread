@@ -137,6 +137,7 @@ const toContent = (row: ContentRow): ContentRecord => ({
 
 export const publicContent = (content: ContentRecord) => ({
   id: content.id,
+  creatorId: content.creatorId,
   state: content.state,
   version: content.version,
   etag: content.etag,
