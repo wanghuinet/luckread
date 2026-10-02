@@ -8,6 +8,7 @@ import {
   unfavorite,
 } from './favorite-runtime.js'
 import { ShareRuntimeError, createShare, resolveShare } from './share-runtime.js'
+import { BlockMuteRuntimeError, removeRelation, setRelation } from './block-mute-runtime.js'
 import {
   FollowRuntimeError,
   follow,
@@ -142,6 +143,40 @@ export default {
           data: await createShare(env.DB, actorUserId, contentId, idempotencyKey),
           requestId: crypto.randomUUID(),
         }, 201)
+      }
+
+      const blockMuteMatch = url.pathname.match(/^\/internal\/social\/interactions\/(blocks|mutes)(?:\/([^/]+))?$/)
+      if (blockMuteMatch) {
+        const relationType = blockMuteMatch[1] === 'blocks' ? 'block' as const : 'mute' as const
+        const targetFromPath = blockMuteMatch[2] ? decodePathPart(blockMuteMatch[2]) : null
+        if (request.method === 'POST') {
+          if (targetFromPath !== null) return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+          const actorUserId = requirePrincipal(request)
+          requireInteractionLayer(request)
+          const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+          if (!idempotencyKey || idempotencyKey.length > 256) {
+            throw new BlockMuteRuntimeError('PRECONDITION_REQUIRED', 428)
+          }
+          const body = await parseJsonTarget(request)
+          const targetUserId = body.targetType === 'user' ? body.targetId : body.targetId
+          return json({
+            data: await setRelation(env.DB, actorUserId, targetUserId, relationType),
+            requestId: crypto.randomUUID(),
+          })
+        }
+
+        if (request.method === 'DELETE' && targetFromPath !== null) {
+          const actorUserId = requirePrincipal(request)
+          requireInteractionLayer(request)
+          const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+          if (!idempotencyKey || idempotencyKey.length > 256) {
+            throw new BlockMuteRuntimeError('PRECONDITION_REQUIRED', 428)
+          }
+          await removeRelation(env.DB, actorUserId, targetFromPath, relationType)
+          return new Response(null, { status: 204 })
+        }
+
+        return new Response(null, { status: 405, headers: { Allow: 'POST, DELETE' } })
       }
 
       const commentContentId = parseCommentPath(url.pathname)
@@ -319,7 +354,8 @@ export default {
         error instanceof LikeRuntimeError ||
         error instanceof CommentRuntimeError ||
         error instanceof FavoriteRuntimeError ||
-        error instanceof ShareRuntimeError
+        error instanceof ShareRuntimeError ||
+        error instanceof BlockMuteRuntimeError
       ) {
         return json({
           error: {
