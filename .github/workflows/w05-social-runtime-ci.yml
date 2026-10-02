@@ -7,6 +7,8 @@ on:
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/followers/**'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/following/**'
       - 'workers/W01-payload/src/social/**'
+      - 'workers/W01-payload/src/social/social-token-parser.ts'
+      - 'workers/W01-payload/src/social/social-token-parser.test.ts'
       - 'workers/W01-payload/tests/int/social-followers-v1-adapter.int.spec.ts'
       - 'package.json'
       - 'pnpm-lock.yaml'
