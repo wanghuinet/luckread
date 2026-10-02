@@ -59,6 +59,15 @@ describe('Media upload access', () => {
   })
 
 
+  it('requires an idempotency key for stable media creation', () => {
+    const route = read('src/app/api/v1/media/route.ts')
+
+    expect(route).toContain("const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''")
+    expect(route).toContain("if (!idempotencyKey || idempotencyKey.length > 256)")
+    expect(route).toContain("status: 428")
+    expect(route).toContain("code: 'PRECONDITION_REQUIRED'")
+  })
+
   it('exposes media metadata through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
