@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { changeSubscriptionPlan, createSubscription, etagForUpdatedAt, getSubscription, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
+import { changeSubscriptionPlan, createSubscription, etagForUpdatedAt, getSubscription, listSubscriptions, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 
-type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; run: () => Promise<{ meta: { changes: number } }> }
+type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; all: <T>() => Promise<{ results: T[] }>; run: () => Promise<{ meta: { changes: number } }> }
 
 function fakeDb(rows: SubscriptionRow[]): D1Database {
   const state = new Map(rows.map((row) => [row.subscription_id, { ...row }]))
@@ -17,6 +17,18 @@ function fakeDb(rows: SubscriptionRow[]): D1Database {
           }
           const row = state.get(String(values[0]))
           return row ? { ...row } as T : null
+        },
+        async all<T>() {
+          if (sql.includes('WHERE subscriber_id = ?')) {
+            const limit = Number(values[1])
+            const offset = Number(values[2])
+            const results = Array.from(state.values())
+              .filter((row) => row.subscriber_id === String(values[0]))
+              .sort((left, right) => right.created_at.localeCompare(left.created_at))
+              .slice(offset, offset + limit)
+            return { results: results.map((row) => ({ ...row })) as T[] }
+          }
+          return { results: [] as T[] }
         },
         async run() {
           if (sql.includes('INSERT INTO')) {
@@ -93,6 +105,20 @@ describe('subscription runtime', () => {
   it('rejects cancel from PENDING according to the state machine', async () => {
     const db = fakeDb([baseRow({ status: 'PENDING' })]); const before = await getSubscription(db, 'user_1', 'sub_existing'); await expect(transitionSubscription(db, 'user_1', 'sub_existing', 'cancel', before.etag)).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
   })
+  it('lists only the current subscriber records with bounded pagination', async () => {
+    const db = fakeDb([
+      baseRow({ subscription_id: 'sub_old', created_at: '2026-10-01T12:00:00.000Z', updated_at: '2026-10-01T12:00:00.000Z' }),
+      baseRow({ subscription_id: 'sub_new', created_at: '2026-10-02T13:00:00.000Z', updated_at: '2026-10-02T13:00:00.000Z' }),
+      baseRow({ subscription_id: 'sub_other', subscriber_id: 'user_2', created_at: '2026-10-03T12:00:00.000Z' }),
+    ])
+    const result = await listSubscriptions(db, 'user_1', 1, 1)
+    expect(result.docs).toHaveLength(1)
+    expect(result.docs[0]?.subscriptionId).toBe('sub_new')
+    expect(result.hasNextPage).toBe(true)
+    expect(result.limit).toBe(1)
+    expect(result.page).toBe(1)
+  })
+
   it('does not expose entitlementSnapshotRef', async () => {
     const db = fakeDb([baseRow({ entitlement_snapshot_ref: 'internal-ref' })]); const result = await getSubscription(db, 'user_1', 'sub_existing'); expect(result).not.toHaveProperty('entitlementSnapshotRef')
   })
