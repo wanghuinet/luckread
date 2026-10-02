@@ -86,7 +86,10 @@ export default function LoginForm() {
       <button aria-busy={busy} disabled={busy} type="submit">
         {busy ? '登录中…' : '登录'}
       </button>
-      <a className="lr-link" href="/register">还没有账号？立即注册</a>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+        <a className="lr-link" href="/forgot-password">忘记密码？</a>
+        <a className="lr-link" href="/register">还没有账号？立即注册</a>
+      </div>
     </form>
   )
 }
