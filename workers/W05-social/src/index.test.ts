@@ -341,6 +341,32 @@ describe('W05 social query transport', () => {
     expect(response.status).toBe(403)
   })
 
+  it('requires idempotency keys for follow mutations', async () => {
+    const post = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/follows/target-1', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L2',
+        },
+      }),
+      { DB: dbFor() },
+    )
+    expect(post.status).toBe(428)
+
+    const del = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/follows/target-1', {
+        method: 'DELETE',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L2',
+        },
+      }),
+      { DB: dbFor() },
+    )
+    expect(del.status).toBe(428)
+  })
+
   it('serves follow status and relationship from one relationship authority', async () => {
     const response = await worker.fetch(
       request('/internal/social/follows/target-1', transportHeaders),
