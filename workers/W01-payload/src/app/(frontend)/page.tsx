@@ -26,6 +26,7 @@ export default function HomePage() {
           <a className="nav-link" href="#about">关于 LuckRead</a>
         </nav>
         <div className="header-actions">
+          <Link className="header-login" href="/me/profile">我的资料</Link>
           <Link className="header-login" href="/me/subscriptions">我的订阅</Link>
           <Link className="header-login" href="/login">登录</Link>
           <Link className="header-creator" href="/publish">创作者中心</Link>

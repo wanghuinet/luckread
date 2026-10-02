@@ -17,3 +17,9 @@ describe('LuckRead homepage', () => {
     expect(styles).toContain('prefers-reduced-motion')
   })
 })
+
+
+  it('exposes the signed-in profile entry from the public header', async () => {
+    const page = await readFile('src/app/(frontend)/page.tsx', 'utf8')
+    expect(page).toContain('<Link className="header-login" href="/me/profile">我的资料</Link>')
+  })
