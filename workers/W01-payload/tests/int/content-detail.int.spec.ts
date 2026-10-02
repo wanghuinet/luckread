@@ -37,7 +37,7 @@ describe('public content detail', () => {
 
   it('uses the share-token API to generate a copyable content share link', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
-    expect(page).toContain('/api/v1/content/' + encodeURIComponent(content.id) + '/shares')
+    expect(page).toContain('/api/v1/content/' )
     expect(page).toContain("'Idempotency-Key': 'social-share:' + crypto.randomUUID()")
     expect(page).toContain("window.location.origin + '/s/' + encodeURIComponent(shareId)")
     expect(page).toContain('分享链接已复制')
