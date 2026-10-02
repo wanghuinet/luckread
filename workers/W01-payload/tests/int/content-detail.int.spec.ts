@@ -44,6 +44,18 @@ describe('public content detail', () => {
     expect(page).not.toContain('classification_edge')
   })
 
+  it('connects the content detail page to the canonical report API', () => {
+    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    expect(page).toContain("fetch('/api/v1/reports'")
+    expect(page).toContain("targetType: 'content'")
+    expect(page).toContain('targetId: content.id')
+    expect(page).toContain('reasonCode')
+    expect(page).toContain('reportBusy')
+    expect(page).toContain('举报')
+    expect(page).not.toContain('moderation_reports')
+    expect(page).not.toContain('audit_events')
+  })
+
   it('uses the share-token API to generate a copyable content share link', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain('/api/v1/content/' )
