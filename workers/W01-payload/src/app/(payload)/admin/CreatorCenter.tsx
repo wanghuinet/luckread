@@ -133,7 +133,7 @@ export function CreatorCenter({
           </div>
 
           <div className={styles.sidebarBottom}>
-            <Link href="/admin/account">
+            <Link href="/me/profile">
               <i className="fa-regular fa-user" aria-hidden="true" />
               <span>创作者资料</span>
             </Link>
