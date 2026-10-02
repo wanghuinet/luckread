@@ -35,12 +35,13 @@ describe('block/mute runtime', () => {
   it('allows block and mute to coexist as independent relations', async () => {
     const d = db([
       ...activeTarget,
-      { relationship_id: 'block-1', actor_user_id: 'user-1', target_user_id: 'target-1', relation_type: 'block', created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:00:00.000Z' },
+      null,
+      { relationship_id: 'mute-1', actor_user_id: 'user-1', target_user_id: 'target-1', relation_type: 'mute', created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:00:00.000Z' },
     ])
 
     await expect(setRelation(d, 'user-1', 'target-1', 'mute')).resolves.toMatchObject({
-      relationshipId: 'block-1',
-      relationType: 'block',
+      relationshipId: 'mute-1',
+      relationType: 'mute',
     })
   })
 
