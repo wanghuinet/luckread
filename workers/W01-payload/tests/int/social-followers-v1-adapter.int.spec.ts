@@ -15,7 +15,7 @@ describe('v1 follower relationship adapters', () => {
     expect(route).toContain('resolveSocialPrincipal')
     expect(route).toContain('callW05Social')
     expect(route).toContain('encodeURIComponent(userId)')
-    expect(route).toContain(`/internal/social/users/\\${encodeURIComponent(userId)}/\\${pathPart}`)
+    expect(route).toContain('/internal/social/users/${encodeURIComponent(userId)}/${pathPart}')
     expect(route).not.toContain('getPayload(')
     expect(route).not.toContain('social_follow_relationships')
   })
