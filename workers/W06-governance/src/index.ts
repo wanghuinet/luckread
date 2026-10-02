@@ -194,7 +194,6 @@ const errorResponse = (error: unknown, requestId?: string): Response => {
       code === 'INVALID_STATE' ? 'Invalid moderation case state' :
       code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' ? 'Idempotency-Key cannot be reused with different input' :
       code === 'REPORT_WRITE_FAILED' ? 'Report could not be created' :
-      code === 'PRECONDITION_REQUIRED' ? 'Idempotency-Key is required' :
       code === 'CONFLICT' ? 'Conflicting report request' :
       code === 'SERVICE_UNAVAILABLE' ? 'Moderation service unavailable' :
       'Invalid moderation request'
