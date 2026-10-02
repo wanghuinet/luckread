@@ -155,7 +155,8 @@ export default function ContentDetailPage({
         body: JSON.stringify({ targetType: 'content', targetId: content.id }),
       })
       if (response.status === 401) {
-        setActionMessage('请先登录后点赞。')
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
       if (!response.ok) {
@@ -193,7 +194,8 @@ export default function ContentDetailPage({
         },
       )
       if (response.status === 401) {
-        setActionMessage('请先登录后关注作者。')
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
       if (!response.ok) {
