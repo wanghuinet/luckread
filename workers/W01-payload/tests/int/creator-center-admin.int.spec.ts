@@ -176,6 +176,15 @@ describe('Creator Center admin extension', () => {
 
     expect(view).toContain("import CreatorContentList from './CreatorContentList'")
     expect(view).toContain('<CreatorContentList />')
+
+  it('redirects creator audience auth expiry to admin login', () => {
+    const audience = read('src/app/(payload)/admin/CreatorAudienceSummary.tsx')
+
+    expect(audience).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
+    expect(audience).toContain("window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(audience.match(/response\.status === 401/g)?.length).toBe(2)
+  })
+
     expect(list).toContain("/api/creator/contents?")
     expect(list).toContain("['DRAFT', 'REJECTED'].includes(item.state)")
     expect(list).toContain("item.state === 'PUBLISHED'")
