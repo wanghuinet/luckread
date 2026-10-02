@@ -7,7 +7,7 @@ on:
         description: Exact W07 source commit to deploy
         required: true
         type: string
-        default: e67720d3eff51813ef325c668da8db041ff45ede
+        default: 17cd618222ef7f5d1ea01e5237ea392448aac8bd
       confirm:
         description: Type DEPLOY_W07_SUBSCRIPTION to permit W07 deployment
         required: true
