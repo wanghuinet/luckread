@@ -277,7 +277,7 @@ describe('W05 social query transport', () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
         method: 'POST',
-        headers: { ...transportHeaders, 'content-type': 'application/json' },
+        headers: { ...transportHeaders, 'content-type': 'application/json', 'Idempotency-Key': 'like-delete-1' },
         body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
       }),
       {
@@ -311,6 +311,28 @@ describe('W05 social query transport', () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { liked: true },
     })
+  })
+
+  it('requires idempotency keys for like mutations', async () => {
+    const post = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'content-type': 'application/json' },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }),
+      { DB: dbFor() },
+    )
+    expect(post.status).toBe(428)
+
+    const del = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
+        method: 'DELETE',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'content-type': 'application/json' },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }),
+      { DB: dbFor() },
+    )
+    expect(del.status).toBe(428)
   })
 
   it('unlikes with a 204 response', async () => {
