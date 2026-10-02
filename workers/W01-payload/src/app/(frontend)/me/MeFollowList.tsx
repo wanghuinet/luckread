@@ -136,7 +136,7 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
   }, [direction, loadList, loadProfile])
 
   async function unfollow(targetUserId: string) {
-    if (!isFollowers || unfollowingId) return
+    if (isFollowers || unfollowingId) return
     setUnfollowingId(targetUserId)
     setError('')
     try {
