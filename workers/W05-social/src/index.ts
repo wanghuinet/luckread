@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js'
-import { CommentRuntimeError, createComment, listComments, parseCommentLimit } from './comment-runtime.js'
+import { CommentRuntimeError, createComment, deleteComment, listComments, parseCommentLimit } from './comment-runtime.js'
 import {
   FavoriteRuntimeError,
   favorite,
@@ -184,6 +184,24 @@ export default {
         }
 
         return new Response(null, { status: 405, headers: { Allow: 'POST, DELETE' } })
+      }
+
+      const commentIdParts = url.pathname.split('/').filter(Boolean)
+      if (
+        commentIdParts.length === 4 &&
+        commentIdParts[0] === 'internal' &&
+        commentIdParts[1] === 'social' &&
+        commentIdParts[2] === 'comments'
+      ) {
+        if (request.method !== 'DELETE') {
+          return new Response(null, { status: 405, headers: { Allow: 'DELETE' } })
+        }
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const commentId = decodePathPart(commentIdParts[3])
+        if (commentId === null) throw new CommentRuntimeError('VALIDATION_FAILED', 400)
+        await deleteComment(env.DB, actorUserId, commentId)
+        return new Response(null, { status: 204 })
       }
 
       const commentContentId = parseCommentPath(url.pathname)
