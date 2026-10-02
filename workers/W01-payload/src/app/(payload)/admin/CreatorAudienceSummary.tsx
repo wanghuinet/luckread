@@ -182,14 +182,22 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
           <h2>粉丝与关注</h2>
           <p>直接读取现有 Social/W05 关系数据，查看当前账号规模并分页浏览关系。</p>
         </div>
-        <button
-          className={styles.secondaryButton + ' btn'}
-          disabled={!state.error}
-          onClick={() => setReloadKey((value) => value + 1)}
-          type="button"
-        >
-          {state.error ? '重新加载' : '已同步'}
-        </button>
+        <div className={styles.sectionActions}>
+          <Link className={styles.secondaryButton + ' btn'} href="/me/followers">
+            查看我的粉丝
+          </Link>
+          <Link className={styles.secondaryButton + ' btn'} href="/me/following">
+            查看我的关注
+          </Link>
+          <button
+            className={styles.secondaryButton + ' btn'}
+            disabled={!state.error}
+            onClick={() => setReloadKey((value) => value + 1)}
+            type="button"
+          >
+            {state.error ? '重新加载' : '已同步'}
+          </button>
+        </div>
       </div>
 
       <div className={styles.futureGrid}>

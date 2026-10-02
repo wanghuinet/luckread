@@ -22,6 +22,10 @@ describe('creator audience integration', () => {
     expect(summary).toContain('用户 ID')
     expect(summary).toContain("href={'/users/' + encodeURIComponent(item.userId)}")
     expect(summary).toContain('查看主页')
+    expect(summary).toContain('href="/me/followers"')
+    expect(summary).toContain('查看我的粉丝')
+    expect(summary).toContain('href="/me/following"')
+    expect(summary).toContain('查看我的关注')
     expect(summary).toContain('credentials: \'include\'')
   })
 
