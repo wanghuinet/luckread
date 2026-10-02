@@ -41,6 +41,8 @@ describe('like runtime', () => {
     await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toEqual({ liked: true })
     await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-2' })).resolves.toEqual({ liked: false })
     expect(d.prepare).toHaveBeenCalledTimes(2)
+    const unpublished = db([null])
+    await expect(getLikeStatus(unpublished, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toEqual({ liked: false })
   })
 
 
