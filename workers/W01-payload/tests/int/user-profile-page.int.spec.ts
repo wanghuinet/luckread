@@ -47,6 +47,7 @@ describe('user profile page', () => {
     expect(page).toContain("method: 'POST'")
     expect(page).toContain("form.append('file', file)")
     expect(page).toContain("form.append('alt', file.name)")
+    expect(page).toContain("headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() }")
     expect(page).toContain("setProfile((current) => current ? { ...current, avatar: url } : current)")
     expect(page).toContain('上传后仍需点击“保存资料”。')
   })

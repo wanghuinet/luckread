@@ -42,6 +42,7 @@ describe('Media upload access', () => {
     expect(config).toContain("r2Storage({")
     expect(config).toContain("collections: { media: true }")
     expect(publisher).toContain("authorizedFetch('/api/v1/media'")
+    expect(publisher).toContain("headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() }")
   })
 })
 
@@ -58,6 +59,15 @@ describe('Media upload access', () => {
     expect(route).not.toContain('R2Bucket')
   })
 
+
+  it('requires an idempotency key for stable media creation', () => {
+    const route = read('src/app/api/v1/media/route.ts')
+
+    expect(route).toContain("const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''")
+    expect(route).toContain("if (!idempotencyKey || idempotencyKey.length > 256)")
+    expect(route).toContain("status: 428")
+    expect(route).toContain("code: 'PRECONDITION_REQUIRED'")
+  })
 
   it('exposes media metadata through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
