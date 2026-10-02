@@ -1,8 +1,5 @@
-import {
-  callW06Moderation,
-  resolveCookieModerationPrincipal,
-  W06ModerationClientError,
-} from '../../../../../moderation/w06-moderation-public-client.js'
+import { callW06Moderation, W06ModerationClientError } from '../../../../../moderation/w06-moderation-client.js'
+import { resolveCookieContentPrincipal } from '../../../../content/w03-content-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -23,7 +20,7 @@ const validateBody = async (request: Request): Promise<Record<string, unknown> |
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const principal = await resolveCookieModerationPrincipal(request)
+    const principal = await resolveCookieContentPrincipal(request)
     if (principal instanceof Response) return principal
 
     const body = await validateBody(request)
