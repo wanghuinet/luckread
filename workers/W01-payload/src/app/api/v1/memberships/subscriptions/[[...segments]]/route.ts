@@ -41,7 +41,10 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
     if (principal instanceof Response) return principal
     const body = request.method === 'POST' ? await parseBody(request) : undefined
     if (body instanceof Response) return body
-    return await callW07Subscription({ request, pathname: operation.pathname, method: request.method, principal, body })
+    const pathname = request.method === 'GET' && (params.segments ?? []).length === 0
+      ? operation.pathname + new URL(request.url).search
+      : operation.pathname
+    return await callW07Subscription({ request, pathname, method: request.method, principal, body })
   } catch (error) {
     if (error instanceof W07SubscriptionClientError) return errorResponse(error.status, error.code, error.message)
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Subscription service unavailable')
