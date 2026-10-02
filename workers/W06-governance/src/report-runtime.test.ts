@@ -35,9 +35,19 @@ describe('report runtime', () => {
   })
 
   it('returns the stored idempotent result for an equivalent retry', async () => {
+    const canonical = JSON.stringify({
+      targetType: input.targetType,
+      targetId: input.targetId,
+      reasonCode: input.reasonCode,
+      description: input.description,
+      evidenceRefs: input.evidenceRefs,
+    })
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
+    const requestHash = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('')
+
     const result = await createReport(db([{
       report_id: 'report-1',
-      request_hash: 'c',
+      request_hash: requestHash,
       response_json: JSON.stringify({
         reportId: 'report-1',
         targetType: 'content',
@@ -46,20 +56,10 @@ describe('report runtime', () => {
         status: 'CREATED',
         createdAt: '2026-10-02T00:00:00.000Z',
       }),
-    ]), input)
-    const cryptoHash = await (async () => {
-      const canonical = JSON.stringify({
-        targetType: input.targetType,
-        targetId: input.targetId,
-        reasonCode: input.reasonCode,
-        description: input.description,
-        evidenceRefs: input.evidenceRefs,
-      })
-      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
-      return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('')
-    })()
-    expect(cryptoHash).toBe('c')
+    }]), input)
+
     expect(result.reportId).toBe('report-1')
+    expect(result.status).toBe('CREATED')
   })
 
   it('rejects idempotency-key reuse with a different command', async () => {
