@@ -18,4 +18,16 @@ describe('user profile page', () => {
     expect(page).toContain('保存资料')
     expect(page).toContain("href=\"/admin/creator-center\"")
   })
+
+  it('uses the existing authenticated logout API and returns to the public homepage', () => {
+    const page = read('src/app/(frontend)/me/profile/page.tsx')
+
+    expect(page).toContain("fetch('/api/v1/auth/logout'")
+    expect(page).toContain("method: 'POST'")
+    expect(page).toContain("credentials: 'include'")
+    expect(page).toContain("response.status !== 401")
+    expect(page).toContain("window.location.assign('/')")
+    expect(page).toContain('退出登录')
+  })
+
 })

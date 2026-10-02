@@ -32,6 +32,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [loggingOut, setLoggingOut] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -68,6 +69,27 @@ export default function ProfilePage() {
 
   function updateField(field: keyof Profile, value: string) {
     setProfile((current) => current ? { ...current, [field]: value } : current)
+  }
+
+  async function logout() {
+    if (loggingOut) return
+    setLoggingOut(true)
+    setError('')
+    try {
+      const response = await fetch('/api/v1/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { accept: 'application/json' },
+      })
+      if (!response.ok && response.status !== 401) {
+        throw new Error('LOGOUT_FAILED')
+      }
+      window.location.assign('/')
+    } catch {
+      setError('退出登录失败，请稍后重试。')
+      setLoggingOut(false)
+    }
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
