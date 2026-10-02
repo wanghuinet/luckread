@@ -157,8 +157,15 @@ export default {
           if (!idempotencyKey || idempotencyKey.length > 256) {
             throw new BlockMuteRuntimeError('PRECONDITION_REQUIRED', 428)
           }
-          const body = await parseJsonTarget(request)
-          const targetUserId = body.targetType === 'user' ? body.targetId : body.targetId
+          let body: unknown
+          try { body = await request.json() } catch { throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400) }
+          if (!body || typeof body !== 'object' || Array.isArray(body)) {
+            throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
+          }
+          const targetUserId = (body as { targetUserId?: unknown }).targetUserId
+          if (typeof targetUserId !== 'string' || !targetUserId.trim()) {
+            throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
+          }
           return json({
             data: await setRelation(env.DB, actorUserId, targetUserId, relationType),
             requestId: crypto.randomUUID(),
