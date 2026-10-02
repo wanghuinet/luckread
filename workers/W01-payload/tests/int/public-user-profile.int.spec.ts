@@ -63,7 +63,7 @@ describe('public user profile', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
     expect(page).toContain("applySafetyAction('block')")
     expect(page).toContain("applySafetyAction('mute')")
-    expect(page).toContain("'/api/v1/interactions/' + (action === 'block' ? 'blocks' : 'mutes')")
+    expect(page).toContain("const relationPath = action === 'block' ? 'blocks' : 'mutes'")
     expect(page).toContain("body: JSON.stringify({ targetUserId: profile.id })")
     expect(page).toContain("'Idempotency-Key': 'social-' + action + ':' + (active ? 'remove:' : 'set:') + crypto.randomUUID()")
     expect(page).toContain("method: active ? 'DELETE' : 'POST'")
