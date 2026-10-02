@@ -64,6 +64,13 @@ const updatedAtFromEtag = (etag: string): string => {
 
 const nowIso = () => new Date().toISOString()
 
+const nextUpdatedAt = (previous: string): string => {
+  const previousMs = Date.parse(previous)
+  const nowMs = Date.now()
+  const nextMs = Number.isFinite(previousMs) ? Math.max(nowMs, previousMs + 1) : nowMs
+  return new Date(nextMs).toISOString()
+}
+
 const subscriptionIdFromIdempotency = async (subscriberId: string, idempotencyKey: string): Promise<string> => {
   const material = new TextEncoder().encode('subscription-create\\0' + subscriberId + '\\0' + idempotencyKey)
   const digest = await crypto.subtle.digest('SHA-256', material)
@@ -132,7 +139,7 @@ export async function transitionSubscription(db: D1Database, subscriberId: strin
   const row = await readSubscriptionRow(db, subscriptionId, subscriber)
   if (etagForUpdatedAt(row.updated_at) !== etag) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
   if (!transitionTargets[operation].includes(row.status)) throw new SubscriptionRuntimeError('INVALID_STATE', 409)
-  const updatedAt = nowIso()
+  const updatedAt = nextUpdatedAt(row.updated_at)
   const result = await db.prepare('UPDATE membership_subscriptions SET status = ?, cancel_at = ?, updated_at = ? WHERE subscription_id = ? AND subscriber_id = ? AND updated_at = ?')
     .bind(nextState(operation), operation === 'cancel' ? updatedAt : row.cancel_at, updatedAt, row.subscription_id, subscriber, expectedUpdatedAt).run()
   if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
@@ -150,7 +157,7 @@ export async function changeSubscriptionPlan(db: D1Database, subscriberId: strin
   if (etagForUpdatedAt(row.updated_at) !== etag) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
   if (!['ACTIVE', 'PAUSED', 'PAST_DUE'].includes(row.status)) throw new SubscriptionRuntimeError('INVALID_STATE', 409)
   if (row.plan_id === nextPlanId) return toPublic(row)
-  const updatedAt = nowIso()
+  const updatedAt = nextUpdatedAt(row.updated_at)
   const result = await db.prepare('UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, updated_at = ? WHERE subscription_id = ? AND subscriber_id = ? AND updated_at = ?')
     .bind(nextPlanId, 1, updatedAt, row.subscription_id, subscriber, expectedUpdatedAt).run()
   if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
