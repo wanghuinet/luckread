@@ -19,7 +19,10 @@ describe('public content detail', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain('/api/v1/interactions/likes?targetType=content&targetId=')
     expect(page).toContain('likeData?.data?.liked')
-    expect(page).toContain('setLiked(likeData.data.liked)')
+    expect(page).toContain('likeData?.data?.likeCount')
+    expect(page).toContain('setLikeCount(')
+    expect(page).toContain("toLocaleString('zh-CN')")
+
   })
 
   it('connects the content detail page to author follow state and mutations', () => {
