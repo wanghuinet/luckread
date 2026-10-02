@@ -1,0 +1,88 @@
+/// <reference types="@cloudflare/workers-types" />
+
+export class LikeRuntimeError extends Error {
+  constructor(readonly code: string, readonly status: number) { super(code) }
+}
+
+export type LikeTarget = {
+  targetType: string
+  targetId: string
+}
+
+export type LikeResult = {
+  relationshipId: string
+  actorUserId: string
+  targetType: 'content'
+  targetId: string
+  createdAt: string
+}
+
+const RESOURCE_ID_MAX = 128
+
+const validateTarget = (target: LikeTarget): { targetType: 'content'; targetId: string } => {
+  if (target.targetType !== 'content') throw new LikeRuntimeError('VALIDATION_FAILED', 400)
+  const targetId = target.targetId?.trim() ?? ''
+  if (!targetId || targetId.length > RESOURCE_ID_MAX) {
+    throw new LikeRuntimeError('VALIDATION_FAILED', 400)
+  }
+  return { targetType: 'content', targetId }
+}
+
+const validateActor = (actorUserId: string): string => {
+  const value = actorUserId.trim()
+  if (!value || value.length > RESOURCE_ID_MAX) {
+    throw new LikeRuntimeError('UNAUTHENTICATED', 401)
+  }
+  return value
+}
+
+export async function like(
+  db: D1Database,
+  actorUserId: string,
+  target: LikeTarget,
+): Promise<LikeResult> {
+  const actor = validateActor(actorUserId)
+  const { targetType, targetId } = validateTarget(target)
+
+  const targetRow = await db.prepare(
+    'SELECT id, state FROM contents WHERE id = ? LIMIT 1',
+  ).bind(targetId).first<{ id: string; state: string }>()
+
+  if (!targetRow || targetRow.state !== 'PUBLISHED') {
+    throw new LikeRuntimeError('NOT_FOUND', 404)
+  }
+
+  const createdAt = new Date().toISOString()
+  const relationshipId = crypto.randomUUID()
+  const row = await db.prepare(
+    `INSERT INTO interaction_likes
+      (relationship_id, actor_user_id, target_type, target_id, created_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(actor_user_id, target_type, target_id)
+     DO UPDATE SET relationship_id = interaction_likes.relationship_id
+     RETURNING relationship_id, actor_user_id, target_type, target_id, created_at`,
+  ).bind(relationshipId, actor, targetType, targetId, createdAt)
+    .first<{ relationship_id: string; actor_user_id: string; target_type: 'content'; target_id: string; created_at: string }>()
+
+  if (!row) throw new LikeRuntimeError('LIKE_WRITE_FAILED', 500)
+
+  return {
+    relationshipId: row.relationship_id,
+    actorUserId: row.actor_user_id,
+    targetType: row.target_type,
+    targetId: row.target_id,
+    createdAt: row.created_at,
+  }
+}
+
+export async function unlike(
+  db: D1Database,
+  actorUserId: string,
+  target: LikeTarget,
+): Promise<void> {
+  const actor = validateActor(actorUserId)
+  const { targetType, targetId } = validateTarget(target)
+  await db.prepare(
+    'DELETE FROM interaction_likes WHERE actor_user_id = ? AND target_type = ? AND target_id = ?',
+  ).bind(actor, targetType, targetId).run()
+}

@@ -2,10 +2,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import worker from './index.js'
 
-const dbFor = (results: unknown[]) => {
-  const prepare = vi.fn(() => ({
-    bind: vi.fn(() => ({
+
+const dbFor = (results: unknown[] = []) => {
+  let index = 0
+  const prepare = vi.fn((sql: string) => ({
+    bind: vi.fn((...args: unknown[]) => ({
+      first: vi.fn(async () => results[index++] ?? null),
       all: vi.fn(async () => ({ results })),
+      run: vi.fn(async () => ({ sql, args })),
     })),
   }))
   return { prepare } as unknown as D1Database
@@ -22,6 +26,60 @@ const transportHeaders = {
 }
 
 describe('W05 social query transport', () => {
+  it('accepts an idempotent content like', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }),
+      {
+        DB: dbFor([
+          { id: 'content-1', state: 'PUBLISHED' },
+          {
+            relationship_id: 'like-1',
+            actor_user_id: 'user-1',
+            target_type: 'content',
+            target_id: 'content-1',
+            created_at: '2026-10-02T00:00:00.000Z',
+          },
+        ]),
+      },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { relationshipId: 'like-1', targetId: 'content-1' },
+    })
+  })
+
+  it('unlikes with a 204 response', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
+        method: 'DELETE',
+        headers: { ...transportHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }),
+      { DB: dbFor() },
+    )
+    expect(response.status).toBe(204)
+  })
+
+  it('denies like without the minimum interaction permission layer', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L1',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }),
+      { DB: dbFor() },
+    )
+    expect(response.status).toBe(403)
+  })
+
   it('serves followers with relationship rows and total count', async () => {
     const env = {
       DB: dbFor([
