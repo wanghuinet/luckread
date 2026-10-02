@@ -96,6 +96,8 @@ export async function callW05Social(input: {
   if (input.body !== undefined) headers.set('content-type', 'application/json; charset=utf-8')
   const idempotencyKey = input.request.headers.get('Idempotency-Key')?.trim()
   if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey)
+  const ifMatch = input.request.headers.get('If-Match')?.trim()
+  if (ifMatch) headers.set('If-Match', ifMatch)
 
   const response = await service.fetch(
     new Request('https://luckread-w05.internal' + input.pathname, {
