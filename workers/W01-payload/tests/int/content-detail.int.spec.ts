@@ -25,6 +25,14 @@ describe('public content detail', () => {
 
   })
 
+  it('hides self-follow on the viewer's own content', () => {
+    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    expect(page).toContain("fetch('/api/v1/users/me'")
+    expect(page).toContain("setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)")
+    expect(page).toContain('viewerUserId === content.creatorId')
+    expect(page).toContain('这是你的作品')
+  })
+
   it('connects the content detail page to author follow state and mutations', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain('creatorId?: string | null')
