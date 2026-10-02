@@ -110,6 +110,23 @@ export default function CreatorContentList() {
     return () => window.removeEventListener('luckread:content-mutated', handleContentMutation)
   }, [load])
 
+  async function requestTransition(itemId: string, to: 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'RESTORED' | 'DRAFT', version: number) {
+    const response = await fetch(`/api/creator/contents/${encodeURIComponent(itemId)}/state`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'If-Match': `W/"${version}"`,
+        'Idempotency-Key': crypto.randomUUID(),
+      },
+      body: JSON.stringify({ to }),
+    })
+    const data = await response.json().catch((): null => null)
+    if (!response.ok) throw new Error(data?.error?.message || '内容状态更新失败')
+    return data as { version?: unknown }
+  }
+
   async function transition(item: Item, to: 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'RESTORED' | 'DRAFT') {
     const verb = to === 'UNPUBLISHED'
       ? '下线'
@@ -127,22 +144,47 @@ export default function CreatorContentList() {
     setActionId(item.id)
     setError('')
     try {
-      const response = await fetch(`/api/creator/contents/${encodeURIComponent(item.id)}/state`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          accept: 'application/json',
-          'content-type': 'application/json',
-          'If-Match': `W/"${item.version}"`,
-          'Idempotency-Key': crypto.randomUUID(),
-        },
-        body: JSON.stringify({ to }),
-      })
-      const data = await response.json().catch((): null => null)
-      if (!response.ok) throw new Error(data?.error?.message || `${verb}失败`)
+      await requestTransition(item.id, to, item.version)
       await load()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : `${verb}失败`)
+    } finally {
+      setActionId(null)
+    }
+  }
+
+  async function moveToDraftForEdit(item: Item) {
+    if (!window.confirm(`确定要把“${item.title}”转为草稿并进入编辑吗？`)) return
+
+    setActionId(item.id)
+    setError('')
+    try {
+      const result = await requestTransition(item.id, 'DRAFT', item.version)
+      const nextVersion = typeof result.version === 'number' ? result.version : item.version + 1
+      await load()
+      window.location.assign(`/publish?draft=${encodeURIComponent(item.id)}&version=${nextVersion}`)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '转为草稿失败')
+    } finally {
+      setActionId(null)
+    }
+  }
+
+  async function unpublishAndEdit(item: Item) {
+    if (!window.confirm(`“${item.title}”将先下线，再转为草稿进入编辑。继续吗？`)) return
+
+    setActionId(item.id)
+    setError('')
+    try {
+      const unpublished = await requestTransition(item.id, 'UNPUBLISHED', item.version)
+      const unpublishedVersion = typeof unpublished.version === 'number' ? unpublished.version : item.version + 1
+      const draft = await requestTransition(item.id, 'DRAFT', unpublishedVersion)
+      const draftVersion = typeof draft.version === 'number' ? draft.version : unpublishedVersion + 1
+      await load()
+      window.location.assign(`/publish?draft=${encodeURIComponent(item.id)}&version=${draftVersion}`)
+    } catch (cause) {
+      await load()
+      setError(cause instanceof Error ? cause.message : '下线并进入编辑失败；若内容已经下线，可从内容列表转为草稿后继续编辑。')
     } finally {
       setActionId(null)
     }
@@ -285,6 +327,15 @@ export default function CreatorContentList() {
                         aria-busy={actionId === item.id}
                         className={styles.secondaryButton}
                         disabled={actionId !== null}
+                        onClick={() => void unpublishAndEdit(item)}
+                        type="button"
+                      >
+                        {actionId === item.id ? '处理中…' : '下线并编辑'}
+                      </button>
+                      <button
+                        aria-busy={actionId === item.id}
+                        className={styles.secondaryButton}
+                        disabled={actionId !== null}
                         onClick={() => void transition(item, 'UNPUBLISHED')}
                         type="button"
                       >
@@ -302,14 +353,25 @@ export default function CreatorContentList() {
                     </>
                   ) : null}
                   {item.state === 'UNPUBLISHED' ? (
-                    <button
-                      className={styles.secondaryButton}
-                      disabled={actionId !== null}
-                      onClick={() => void transition(item, 'PUBLISHED')}
-                      type="button"
-                    >
-                      {actionId === item.id ? '处理中…' : '重新发布'}
-                    </button>
+                    <>
+                      <button
+                        aria-busy={actionId === item.id}
+                        className={styles.secondaryButton}
+                        disabled={actionId !== null}
+                        onClick={() => void moveToDraftForEdit(item)}
+                        type="button"
+                      >
+                        {actionId === item.id ? '处理中…' : '转为草稿编辑'}
+                      </button>
+                      <button
+                        className={styles.secondaryButton}
+                        disabled={actionId !== null}
+                        onClick={() => void transition(item, 'PUBLISHED')}
+                        type="button"
+                      >
+                        {actionId === item.id ? '处理中…' : '重新发布'}
+                      </button>
+                    </>
                   ) : null}
                   {item.state === 'ARCHIVED' ? (
                     <button
