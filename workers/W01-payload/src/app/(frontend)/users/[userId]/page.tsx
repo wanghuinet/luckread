@@ -66,7 +66,7 @@ export default function PublicProfilePage({
     void (async () => {
       try {
         const { userId } = await params
-        const [profileResponse, followersResponse, followingResponse, followResponse] = await Promise.all([
+        const [profileResponse, followersResponse, followingResponse, followResponse, contentResponse] = await Promise.all([
           fetch('/api/v1/users/' + encodeURIComponent(userId), {
             headers: { accept: 'application/json' },
             cache: 'no-store',
@@ -295,13 +295,16 @@ export default function PublicProfilePage({
                 }}
               >
                 {item.coverRef ? (
-                  <img
-                    alt=""
-                    height={72}
-                    loading="lazy"
-                    src={item.coverRef}
-                    style={{ width: 96, height: 72, objectFit: 'cover', borderRadius: 8 }}
-                    width={96}
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 96,
+                      height: 72,
+                      display: 'block',
+                      borderRadius: 8,
+                      background: '#eef4ff',
+                      backgroundImage: 'linear-gradient(135deg, rgba(36,88,230,.12), rgba(36,88,230,.02))',
+                    }}
                   />
                 ) : null}
                 <span style={{ minWidth: 0 }}>
