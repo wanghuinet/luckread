@@ -161,3 +161,38 @@ describe('W05 social query transport', () => {
     expect(response.status).toBe(405)
   })
 })
+
+
+describe('W05 social comment transport', () => {
+  const commentHeaders = {
+    'X-LuckRead-Caller': 'W01',
+    'X-LuckRead-Transport-Version': '1.0',
+    'X-LuckRead-Correlation-Id': 'comment-test',
+  }
+
+  it('serves public comments without a principal header', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/comments?limit=20', {
+        headers: commentHeaders,
+      }),
+      {
+        DB: dbFor([]),
+      },
+    )
+    expect(response.status).toBe(200)
+  })
+
+  it('requires an authenticated principal for comment creation', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/comments', {
+        method: 'POST',
+        headers: { ...commentHeaders, 'content-type': 'application/json', 'Idempotency-Key': 'comment-1' },
+        body: JSON.stringify({ body: '你好' }),
+      }),
+      {
+        DB: dbFor([]),
+      },
+    )
+    expect(response.status).toBe(401)
+  })
+})

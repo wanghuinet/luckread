@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { like, LikeRuntimeError, unlike } from './like-runtime.js'
+import { CommentRuntimeError, createComment, listComments, parseCommentLimit } from './comment-runtime.js'
 import {
   FollowRuntimeError,
   follow,
@@ -21,22 +22,25 @@ const json = (body: unknown, status = 200) =>
     },
   })
 
-const principal = (r: Request) => {
+const requireTransport = (request: Request): void => {
   if (
-    r.headers.get('X-LuckRead-Caller') !== 'W01' ||
-    r.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
-    !r.headers.get('X-LuckRead-Correlation-Id')?.trim()
+    request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+    request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+    !request.headers.get('X-LuckRead-Correlation-Id')?.trim()
   ) {
     throw new FollowRuntimeError('PERMISSION_DENIED', 403)
   }
+}
 
-  const id = r.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
+const requirePrincipal = (request: Request): string => {
+  requireTransport(request)
+  const id = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
   if (!id) throw new FollowRuntimeError('UNAUTHENTICATED', 401)
   return id
 }
 
-const requireLikePermission = (r: Request): void => {
-  const layer = r.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
+const requireInteractionLayer = (request: Request): void => {
+  const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
   if (!/^L[0-8]$/.test(layer) || Number(layer.slice(1)) < 2) {
     throw new LikeRuntimeError('PERMISSION_DENIED', 403)
   }
@@ -59,7 +63,7 @@ const decodePathPart = (value: string): string | null => {
   try { return decodeURIComponent(value) } catch { return null }
 }
 
-const parsePath = (pathname: string) => {
+const parseFollowPath = (pathname: string) => {
   const parts = pathname.split('/').filter(Boolean)
   if (
     parts.length === 4 &&
@@ -89,16 +93,79 @@ const parsePath = (pathname: string) => {
   return null
 }
 
+const parseCommentPath = (pathname: string): string | null => {
+  const parts = pathname.split('/').filter(Boolean)
+  if (
+    parts.length === 5 &&
+    parts[0] === 'internal' &&
+    parts[1] === 'social' &&
+    parts[2] === 'contents' &&
+    parts[4] === 'comments'
+  ) {
+    return decodePathPart(parts[3])
+  }
+  return null
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
-      const viewerUserId = principal(request)
       const url = new URL(request.url)
+
+      const commentContentId = parseCommentPath(url.pathname)
+      if (commentContentId !== null) {
+        if (request.method === 'GET') {
+          requireTransport(request)
+          const limit = parseCommentLimit(url.searchParams.get('limit'))
+          const cursor = url.searchParams.get('cursor')
+          if (cursor && cursor.length > 2048) {
+            throw new CommentRuntimeError('INVALID_CURSOR', 400)
+          }
+          const page = await listComments(env.DB, commentContentId, cursor, limit)
+          return json({ data: page, requestId: crypto.randomUUID() })
+        }
+
+        const viewerUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        if (request.method !== 'POST') {
+          return new Response(null, { status: 405, headers: { Allow: 'GET, POST' } })
+        }
+
+        const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        if (!idempotencyKey || idempotencyKey.length > 256) {
+          throw new CommentRuntimeError('PRECONDITION_REQUIRED', 428)
+        }
+
+        let body: unknown
+        try { body = await request.json() } catch { throw new CommentRuntimeError('VALIDATION_FAILED', 400) }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) {
+          throw new CommentRuntimeError('VALIDATION_FAILED', 400)
+        }
+
+        const bodyValue = (body as { body?: unknown }).body
+        const parentId = (body as { parentId?: unknown }).parentId
+        if (
+          typeof bodyValue !== 'string' ||
+          (parentId !== undefined && parentId !== null && typeof parentId !== 'string')
+        ) {
+          throw new CommentRuntimeError('VALIDATION_FAILED', 400)
+        }
+
+        const comment = await createComment(env.DB, viewerUserId, commentContentId, {
+          body: bodyValue,
+          parentId: parentId ?? null,
+          idempotencyKey,
+        })
+        return json({ data: comment }, 201)
+      }
+
+      const viewerUserId = requirePrincipal(request)
+
       if (url.pathname === '/internal/social/interactions/likes') {
         if (request.method !== 'POST' && request.method !== 'DELETE') {
           return new Response(null, { status: 405, headers: { Allow: 'POST, DELETE' } })
         }
-        requireLikePermission(request)
+        requireInteractionLayer(request)
         const target = await parseJsonTarget(request)
         if (request.method === 'POST') {
           const result = await like(env.DB, viewerUserId, target)
@@ -108,7 +175,7 @@ export default {
         return new Response(null, { status: 204 })
       }
 
-      const path = parsePath(url.pathname)
+      const path = parseFollowPath(url.pathname)
       if (!path) return new Response(null, { status: 404 })
 
       if (path.kind === 'follow') {
@@ -164,16 +231,20 @@ export default {
         data: page,
         requestId: crypto.randomUUID(),
       })
-    } catch (e) {
-      if (e instanceof FollowRuntimeError || e instanceof LikeRuntimeError) {
+    } catch (error) {
+      if (
+        error instanceof FollowRuntimeError ||
+        error instanceof LikeRuntimeError ||
+        error instanceof CommentRuntimeError
+      ) {
         return json({
           error: {
-            code: e.code,
-            message: e.code,
+            code: error.code,
+            message: error.code,
             details: {},
           },
           requestId: crypto.randomUUID(),
-        }, e.status)
+        }, error.status)
       }
 
       return json({

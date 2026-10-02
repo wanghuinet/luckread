@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import ContentComments from './ContentComments'
 import { useEffect, useState } from 'react'
 
 type ContentType = 'article' | 'post' | 'video'
@@ -210,6 +211,7 @@ export default function ContentDetailPage({
           )}
         </div>
       </article>
+      <ContentComments contentId={content.id} />
     </main>
   )
 }
