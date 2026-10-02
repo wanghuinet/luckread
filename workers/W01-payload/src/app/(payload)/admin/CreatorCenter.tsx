@@ -8,6 +8,7 @@ import CreatorContentList from './CreatorContentList'
 import PublishComposer from '../../(frontend)/publish/PublishComposer'
 import '../../(frontend)/publish/publish.css'
 import CreatorCenterAssistant from './CreatorCenterAssistant'
+import CreatorAudienceSummary from './CreatorAudienceSummary'
 import styles from './creator-center.module.css'
 
 type CreatorNavItem = {
@@ -307,6 +308,8 @@ export function CreatorCenter({
                   </div>
                 </article>
               </section>
+
+              <CreatorAudienceSummary userId={String(serverUser.id)} />
 
               <section className={styles.futureGrid} aria-label="后续创作者能力">
                 {futureNav.map((item) => (
