@@ -35,6 +35,14 @@ describe('public content detail', () => {
     expect(page).toContain('收藏')
   })
 
+  it('uses the share-token API to generate a copyable content share link', () => {
+    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    expect(page).toContain('/api/v1/content/' + encodeURIComponent(content.id) + '/shares')
+    expect(page).toContain("'Idempotency-Key': 'social-share:' + crypto.randomUUID()")
+    expect(page).toContain("window.location.origin + '/s/' + encodeURIComponent(shareId)")
+    expect(page).toContain('分享链接已复制')
+  })
+
   it('hides self-follow on the viewer own content', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain("fetch('/api/v1/users/me'")
