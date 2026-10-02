@@ -9,6 +9,9 @@ describe('v1 report adapter', () => {
       'utf8',
     )
     expect(route).toContain('callW06Moderation')
+    expect(route).toContain('callW03Content')
+    expect(route).toContain("targetType === 'content'")
+    expect(route).toContain("targetData?.state !== 'PUBLISHED'")
     expect(route).toContain("pathname: '/reports'")
     expect(route).toContain('resolveCookieContentPrincipal')
     expect(route).toContain('Idempotency-Key')
