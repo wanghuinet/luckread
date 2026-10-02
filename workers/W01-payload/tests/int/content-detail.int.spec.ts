@@ -32,6 +32,15 @@ describe('public content detail', () => {
     expect(page).toContain('关注作者')
   })
 
+  it('exposes reply controls using the existing parentId comment contract', () => {
+    const comments = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
+    expect(comments).toContain("const [replyingTo, setReplyingTo] = useState<string | null>(null)")
+    expect(comments).toContain('parentId: replyingTo')
+    expect(comments).toContain('回复')
+    expect(comments).toContain('取消回复')
+    expect(comments).toContain('comment.depth < 3')
+  })
+
   it('connects the content detail page to the authenticated like API', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain("fetch('/api/v1/interactions/likes'")
