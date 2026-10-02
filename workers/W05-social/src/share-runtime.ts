@@ -40,11 +40,11 @@ const validateIdempotencyKey = (value: string): string => {
 
 export async function createShare(
   db: D1Database,
-  actorUserId: string,
+  actorUserIdValue: string,
   contentIdValue: string,
   idempotencyKeyValue: string,
 ): Promise<ShareRecord> {
-  const actorUserId = validateActor(actorUserId)
+  const actorUserId = validateActor(actorUserIdValue)
   const contentId = validateId(contentIdValue)
   const idempotencyKey = validateIdempotencyKey(idempotencyKeyValue)
 
