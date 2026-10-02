@@ -11,7 +11,7 @@ describe('v1 report adapter', () => {
     expect(route).toContain('callW06Moderation')
     expect(route).toContain('callW03Content')
     expect(route).toContain("targetType === 'content'")
-    expect(route).toContain("targetData?.state !== 'PUBLISHED'")
+    expect(route).toContain("targetData?.id !== targetId || targetData.state !== 'PUBLISHED'")
     expect(route).toContain("pathname: '/reports'")
     expect(route).toContain('resolveCookieContentPrincipal')
     expect(route).toContain('Idempotency-Key')
@@ -24,9 +24,7 @@ describe('v1 report adapter', () => {
       resolve(process.cwd(), 'src/app/api/v1/reports/route.ts'),
       'utf8',
     )
-    for (const targetType of ['content', 'comment', 'creator', 'media', 'profile']) {
-      expect(route).toContain('targetType !== ' + JSON.stringify(targetType))
-    }
+    expect(route).toContain("(targetType !== 'content' && targetType !== 'comment' && targetType !== 'creator' && targetType !== 'media' && targetType !== 'profile')")
     expect(route).toContain('targetId')
     expect(route).toContain('reasonCode')
     expect(route).toContain('evidenceRefs')
