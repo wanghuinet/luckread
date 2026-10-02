@@ -220,13 +220,15 @@ export default function PublicProfilePage({
       <article className="content-detail-card" aria-labelledby="public-profile-title">
         <header className="content-detail-header">
           <div
-            aria-hidden="true"
+            aria-label={displayName + ' 头像'}
+            role="img"
             style={{
               width: 72,
               height: 72,
               display: 'grid',
               placeItems: 'center',
               marginBottom: 16,
+              overflow: 'hidden',
               borderRadius: '50%',
               background: '#eef4ff',
               color: '#2458e6',
@@ -234,7 +236,16 @@ export default function PublicProfilePage({
               fontWeight: 800,
             }}
           >
-            {initial}
+            {profile?.avatar ? (
+              <img
+                alt=""
+                height={72}
+                loading="eager"
+                src={profile.avatar}
+                style={{ width: 72, height: 72, objectFit: 'cover' }}
+                width={72}
+              />
+            ) : initial}
           </div>
           <p className="eyebrow">LUCKREAD CREATOR</p>
           <h1 id="public-profile-title">{displayName}</h1>
