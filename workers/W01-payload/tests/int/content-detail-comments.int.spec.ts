@@ -18,5 +18,7 @@ describe('content comments UI', () => {
     expect(component).toContain("method: 'POST'")
     expect(component).toContain("credentials: 'include'")
     expect(component).toContain("'Idempotency-Key': idempotencyKey")
+    expect(component).toContain("href={'/users/' + encodeURIComponent(comment.authorUserId)}")
+    expect(component).toContain('查看主页')
   })
 })

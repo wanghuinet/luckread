@@ -41,6 +41,7 @@ describe('comment runtime', () => {
     })).resolves.toMatchObject({
       id: 'c1',
       contentId: 'content-1',
+      authorUserId: 'user-1',
       parentId: null,
       state: 'PUBLISHED',
       depth: 0,
@@ -141,7 +142,9 @@ describe('comment runtime', () => {
     const page = await listComments(d, 'content-1', null, 2)
     expect(page.items).toHaveLength(2)
     expect(page.items[0].id).toBe('c1')
+    expect(page.items[0].authorUserId).toBe('user-1')
     expect(page.items[1].id).toBe('c2')
+    expect(page.items[1].authorUserId).toBe('user-2')
     expect(page.hasMore).toBe(true)
     expect(page.nextCursor).toEqual(expect.any(String))
   })
