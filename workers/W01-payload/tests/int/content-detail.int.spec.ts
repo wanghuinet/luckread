@@ -22,6 +22,16 @@ describe('public content detail', () => {
     expect(page).toContain('setLiked(likeData.data.liked)')
   })
 
+  it('connects the content detail page to author follow state and mutations', () => {
+    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    expect(page).toContain('creatorId?: string | null')
+    expect(page).toContain('/api/v1/social/follows/')
+    expect(page).toContain('followData?.data?.following')
+    expect(page).toContain('setFollowing(followData.data.following)')
+    expect(page).toContain("following ? 'DELETE' : 'POST'")
+    expect(page).toContain('关注作者')
+  })
+
   it('connects the content detail page to the authenticated like API', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain("fetch('/api/v1/interactions/likes'")
