@@ -231,7 +231,7 @@ describe('Creator Center admin extension', () => {
     expect(view).toContain('发布检测')
     expect(view).toContain('素材库')
     expect(view).toContain('数据中心')
-    expect(view).toContain('粉丝与订阅')
+    expect(view).toContain('粉丝与关注')
     expect(view).toContain('收益与权益')
     expect(view).toContain('快速创作')
     expect(view).toContain('写文章')

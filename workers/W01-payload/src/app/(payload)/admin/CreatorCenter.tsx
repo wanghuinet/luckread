@@ -27,11 +27,11 @@ const primaryNav: CreatorNavItem[] = [
   { label: '发布中心', href: '#publisher', section: '内容', icon: 'fa-pen-to-square' },
   { label: '发布检测', href: '#quality', section: '工具', icon: 'fa-shield-heart' },
   { label: '素材库', href: '#assets', section: '素材', icon: 'fa-photo-film' },
+  { label: '粉丝与关注', href: '#audience', section: '运营', icon: 'fa-users' },
 ]
 
 const futureNav: CreatorNavItem[] = [
   { label: '数据中心', href: '#future-data', hint: '待接入', icon: 'fa-chart-line' },
-  { label: '粉丝与订阅', href: '#future-audience', hint: '待接入', icon: 'fa-users' },
   { label: '收益与权益', href: '#future-earnings', hint: '待接入', icon: 'fa-wallet' },
 ]
 
