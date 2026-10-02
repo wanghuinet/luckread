@@ -25,7 +25,7 @@ describe('public content detail', () => {
 
   })
 
-  it('hides self-follow on the viewer's own content', () => {
+  it('hides self-follow on the viewer own content', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain("fetch('/api/v1/users/me'")
     expect(page).toContain("setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)")
