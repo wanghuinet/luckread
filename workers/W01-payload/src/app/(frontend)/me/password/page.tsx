@@ -58,7 +58,8 @@ export default function PasswordChangePage() {
       })
 
       if (response.status === 401) {
-        router.replace('/login?returnTo=' + encodeURIComponent(window.location.pathname))
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        router.replace('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
 

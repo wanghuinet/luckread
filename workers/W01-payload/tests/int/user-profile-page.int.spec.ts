@@ -58,6 +58,8 @@ describe('password change page', () => {
     expect(page).toContain('MIN_PASSWORD_LENGTH = 15')
     expect(page).toContain('MAX_PASSWORD_LENGTH = 128')
     expect(page).toContain("response.status === 401")
+    expect(page).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
+    expect(page).toContain("router.replace('/login?returnTo=' + encodeURIComponent(returnTo))")
     expect(page).toContain("router.replace('/login?returnTo='")
   })
 })
