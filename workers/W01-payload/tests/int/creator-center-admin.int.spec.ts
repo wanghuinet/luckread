@@ -214,6 +214,8 @@ describe('Creator Center admin extension', () => {
     const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
     const assistant = read('src/app/(payload)/admin/CreatorCenterAssistant.tsx')
     const styles = read('src/app/(payload)/admin/creator-center.module.css')
+    const moderation = read('src/app/(payload)/admin/CreatorModerationQueue.tsx')
+
 
     expect(view).toContain('文章管理')
     expect(view).toContain('发布中心')
@@ -243,6 +245,15 @@ describe('Creator Center admin extension', () => {
     expect(styles).toContain('.futureGrid')
     expect(styles).toContain('.creatorLayout a:focus-visible')
     expect(styles).toContain('.creatorLayout button:focus-visible')
+    expect(moderation).toContain("fetch('/api/v1/admin/moderation/queue?limit=20'")
+    expect(moderation).toContain("/api/v1/admin/moderation/cases/' + encodeURIComponent(item.caseId) + '/decision")
+    expect(moderation).toContain("'If-Match': 'W/"' + item.version + '"'")
+    expect(moderation).toContain("'Idempotency-Key': crypto.randomUUID()")
+    expect(moderation).toContain("decision: outcome")
+    expect(moderation).toContain("expectedVersion: item.version")
+    expect(moderation).toContain("outcome === 'REJECTED' ? 'BLOCK' : 'INFO'")
+    expect(view).toContain('<CreatorModerationQueue />')
+
     expect(styles).toContain('.creatorLayout select:focus-visible')
   })
 
