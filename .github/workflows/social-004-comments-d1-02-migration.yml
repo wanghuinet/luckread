@@ -1,0 +1,112 @@
+name: SOCIAL-004 Comments D1-02 Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact 40-character source SHA containing the Comments migration
+        required: true
+        type: string
+      confirm:
+        description: Type APPLY_SOCIAL_004_MIGRATION to permit remote D1 mutation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  EXPECTED_DB_NAME: luckreadpro
+  EXPECTED_WORKER: luckread-w05
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY_SOCIAL_004_MIGRATION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Verify exact source
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify W05 D1-02 binding
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          config = json.loads(Path('workers/W05-social/wrangler.jsonc').read_text())
+          assert config['name'] == 'luckread-w05'
+          bindings = config['d1_databases']
+          assert len(bindings) == 1
+          assert bindings[0]['binding'] == 'DB'
+          assert bindings[0]['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
+          assert bindings[0]['database_name'] == 'luckreadpro'
+          print('SOCIAL_004_BINDING=PASS')
+          PY
+
+      - name: Verify migration statically
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          sql = Path('workers/W05-social/migrations/20261002_003_social_004_comments_v1.sql').read_text()
+          db.executescript(sql)
+          cols = db.execute('PRAGMA table_info("social_comments")').fetchall()
+          expected = ['id','content_id','author_user_id','parent_id','body','state','depth','idempotency_key','created_at','updated_at']
+          if [r[1] for r in cols] != expected:
+              raise SystemExit('unexpected comment migration schema')
+          indexes = db.execute('PRAGMA index_list("social_comments")').fetchall()
+          if not any(r[2] == 1 for r in indexes):
+              raise SystemExit('unique comment idempotency constraint missing')
+          print('SOCIAL_004_MIGRATION_STATIC=PASS')
+          PY
+
+      - name: Apply Comments migration remotely
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
+
+      - name: Verify remote Comments schema
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc             --command 'PRAGMA table_info("social_comments");' > /tmp/social-004-comments-schema.json
+          python - <<'PY'
+          import json
+          data = json.load(open('/tmp/social-004-comments-schema.json'))
+          rows = data if isinstance(data, list) else data.get('results', [])
+          if isinstance(rows, list) and rows and isinstance(rows[0], dict) and 'results' in rows[0]:
+              rows = [r for item in rows for r in item.get('results', [])]
+          names = [r.get('name') for r in rows]
+          expected = ['id','content_id','author_user_id','parent_id','body','state','depth','idempotency_key','created_at','updated_at']
+          if names != expected:
+              raise SystemExit(f'remote comment schema mismatch: {names}')
+          print('SOCIAL_004_REMOTE_SCHEMA=PASS')
+          PY
