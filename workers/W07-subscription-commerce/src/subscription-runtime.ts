@@ -78,7 +78,7 @@ const subscriptionIdFromIdempotency = async (subscriberId: string, idempotencyKe
   return 'sub_' + hex
 }
 
-const toPublic = (row: SubscriptionRow) => ({,
+const toPublic = (row: SubscriptionRow) => ({
   subscriptionId: row.subscription_id,
   subscriberId: row.subscriber_id,
   planId: row.plan_id,
