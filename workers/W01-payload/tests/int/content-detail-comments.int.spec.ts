@@ -18,6 +18,12 @@ describe('content comments UI', () => {
     expect(page).toContain('<ContentComments contentId={content.id} />')
   })
 
+  it('keeps newly posted comments in the same chronological order as the public list', () => {
+    const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
+    expect(component).toContain('setComments((current) => [...current, created])')
+    expect(component).not.toContain('setComments((current) => [created, ...current])')
+  })
+
   it('uses the public comments read and authenticated create APIs', () => {
     const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
     expect(component).toContain('/api/v1/contents/')
