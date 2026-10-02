@@ -27,6 +27,14 @@ describe('v1 comment adapters', () => {
     expect(route).toContain('body: { body, parentId: parentId ?? null }')
   })
 
+  it('exposes authenticated comment deletion through the W05 adapter', () => {
+    expect(updateRoute).toContain('resolveCookieSocialPrincipal')
+    expect(updateRoute).toContain('callW05Social')
+    expect(updateRoute).toContain("method: 'DELETE'")
+    expect(updateRoute).toContain('/internal/social/comments/')
+    expect(updateRoute).not.toContain('social_comments')
+  })
+
   it('exposes conditional comment updates through the W05 adapter', () => {
     expect(updateRoute).toContain('resolveCookieSocialPrincipal')
     expect(updateRoute).toContain('callW05Social')

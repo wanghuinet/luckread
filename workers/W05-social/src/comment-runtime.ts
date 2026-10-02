@@ -272,6 +272,56 @@ export type CommentUpdateInput = {
   ifMatch: string
 }
 
+export async function deleteComment(
+  db: D1Database,
+  actorUserIdValue: string,
+  commentIdValue: string,
+): Promise<void> {
+  const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
+  const commentId = validateId(commentIdValue)
+
+  const row = await db.prepare(
+    `SELECT
+       c.id,
+       c.author_user_id,
+       c.state,
+       EXISTS (
+         SELECT 1
+         FROM social_comments child
+         WHERE child.parent_id = c.id
+       ) AS has_replies
+     FROM social_comments c
+     JOIN contents content ON content.id = c.content_id
+     WHERE c.id = ?
+       AND content.state = 'PUBLISHED'
+     LIMIT 1`,
+  ).bind(commentId).first<{
+    id: string
+    author_user_id: string
+    state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
+    has_replies: number
+  }>()
+
+  if (!row) throw new CommentRuntimeError('NOT_FOUND', 404)
+  if (row.author_user_id !== actorUserId) {
+    throw new CommentRuntimeError('PERMISSION_DENIED', 403)
+  }
+  if (row.state !== 'PUBLISHED') {
+    throw new CommentRuntimeError('INVALID_STATE', 409)
+  }
+  if (Number(row.has_replies) === 1) {
+    throw new CommentRuntimeError('COMMENT_HAS_REPLIES', 409)
+  }
+
+  const result = await db.prepare(
+    "DELETE FROM social_comments WHERE id = ? AND author_user_id = ? AND state = 'PUBLISHED'",
+  ).bind(commentId, actorUserId).run()
+
+  if (Number(result.meta?.changes ?? 0) !== 1) {
+    throw new CommentRuntimeError('COMMENT_DELETE_FAILED', 500)
+  }
+}
+
 export async function updateComment(
   db: D1Database,
   actorUserIdValue: string,
