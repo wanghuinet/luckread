@@ -26,6 +26,101 @@ const transportHeaders = {
 }
 
 describe('W05 social query transport', () => {
+  it('accepts an idempotent content favorite', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L2',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'favorite-1',
+        },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }),
+      {
+        DB: dbFor([
+          { id: 'content-1', state: 'PUBLISHED' },
+          {
+            relationship_id: 'favorite-1',
+            actor_user_id: 'viewer-1',
+            target_type: 'content',
+            target_id: 'content-1',
+            created_at: '2026-10-02T00:00:00.000Z',
+          },
+        ]),
+      },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { relationshipId: 'favorite-1', targetId: 'content-1' },
+    })
+  })
+
+  it('reads favorite status for the authenticated actor', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks?targetType=content&targetId=content-1', {
+        method: 'GET',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
+      }),
+      { DB: dbFor([{ favorited: 1 }]) },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { favorited: true },
+    })
+  })
+
+  it('requires an idempotency key for favorite mutations', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L2',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }),
+      { DB: dbFor() },
+    )
+    expect(response.status).toBe(428)
+  })
+
+  it('unfavorites with a 204 response', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
+        method: 'DELETE',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L2',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'favorite-delete-1',
+        },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }),
+      { DB: dbFor() },
+    )
+    expect(response.status).toBe(204)
+  })
+
+  it('denies favorites below the minimum interaction permission layer', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L1',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'favorite-2',
+        },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }),
+      { DB: dbFor() },
+    )
+    expect(response.status).toBe(403)
+  })
+
   it('accepts an idempotent content like', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
