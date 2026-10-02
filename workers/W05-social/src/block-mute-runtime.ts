@@ -124,7 +124,6 @@ export async function removeRelation(
   relationType: BlockMuteType,
 ): Promise<void> {
   const [actor, target] = validateTarget(actorUserId, targetUserId)
-  await ensureActorActive(db, actor)
   await db.prepare(
     'DELETE FROM social_user_interactions WHERE actor_user_id = ? AND target_user_id = ? AND relation_type = ?',
   ).bind(actor, target, relationType).run()
