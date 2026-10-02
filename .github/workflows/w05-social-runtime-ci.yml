@@ -51,6 +51,12 @@ on:
       - 'workers/W01-payload/tests/int/social-bookmarks-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/tests/int/social-shares-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/tests/int/social-shares-landing.int.spec.ts'
+      - 'workers/W01-payload/src/app/api/v1/interactions/blocks/**'
+      - 'workers/W01-payload/src/app/api/v1/interactions/mutes/**'
+      - 'workers/W01-payload/src/app/(frontend)/users/[userId]/page.tsx'
+      - 'workers/W01-payload/src/app/(frontend)/styles.css'
+      - 'workers/W01-payload/tests/int/public-user-profile.int.spec.ts'
+      - 'workers/W01-payload/tests/int/social-block-mute-v1-adapter.int.spec.ts'
       - '.github/workflows/w05-social-runtime-ci.yml'
 
 permissions:
