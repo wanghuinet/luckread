@@ -9,6 +9,7 @@ type MediaItem = {
   filename?: string | null
   mimeType?: string | null
   filesize?: number | null
+  alt?: string | null
 }
 
 type MediaListResponse = {
@@ -22,6 +23,8 @@ export default function CreatorAssetLibrary() {
   const [totalDocs, setTotalDocs] = useState(0)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
+  const [editingId, setEditingId] = useState<string | number | null>(null)
+  const [editingAlt, setEditingAlt] = useState('')
   const [error, setError] = useState('')
 
   async function load() {
@@ -51,6 +54,41 @@ export default function CreatorAssetLibrary() {
   useEffect(() => {
     void load()
   }, [])
+
+  async function saveAlt(item: MediaItem) {
+    const alt = editingAlt.trim()
+    if (!alt) {
+      setError('素材说明不能为空')
+      return
+    }
+    setError('')
+    setMessage('')
+    try {
+      const response = await fetch('/api/v1/media/' + encodeURIComponent(String(item.id)), {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ alt }),
+      })
+      const data = await response.json().catch((): null => null) as MediaItem | { error?: { message?: string } } | null
+      if (!response.ok) {
+        throw new Error(data && 'error' in data ? data.error?.message || '素材更新失败' : '素材更新失败')
+      }
+      const updated = data as MediaItem
+      setItems((current) => current.map((currentItem) =>
+        String(currentItem.id) === String(item.id)
+          ? { ...currentItem, alt: typeof updated.alt === 'string' ? updated.alt : alt }
+          : currentItem,
+      ))
+      setEditingId(null)
+      setMessage('素材说明已更新。')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '素材更新失败')
+    }
+  }
 
   async function remove(id: string | number) {
     if (!window.confirm('确定删除这个素材吗？已被内容引用的地址可能随之失效。')) return
@@ -114,6 +152,28 @@ export default function CreatorAssetLibrary() {
                 </div>
                 <div style={{ display: 'grid', gap: 5, padding: 11 }}>
                   <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.filename || '未命名素材'}</strong>
+                  {editingId === item.id ? (
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      <input
+                        aria-label="素材说明"
+                        maxLength={1000}
+                        onChange={(event) => setEditingAlt(event.target.value)}
+                        value={editingAlt}
+                      />
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button className="primaryButton btn" onClick={() => void saveAlt(item)} type="button">保存</button>
+                        <button className="secondaryButton btn" onClick={() => { setEditingId(null); setError('') }} type="button">取消</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className="secondaryButton btn"
+                      onClick={() => { setEditingId(item.id); setEditingAlt(item.alt || '') }}
+                      type="button"
+                    >
+                      编辑说明
+                    </button>
+                  )}
                   <span style={{ color: 'var(--lr-text-3)', fontSize: 10 }}>{mimeType || '媒体'} {formatSize(item.filesize) ? ' · ' + formatSize(item.filesize) : ''}</span>
                   <button className="secondaryButton btn" onClick={() => void remove(item.id)} type="button">删除</button>
                 </div>
