@@ -5,6 +5,13 @@ import { resolve } from 'node:path'
 describe('content comments UI', () => {
   const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
+  it('redirects expired comment submission sessions back to login', () => {
+    const comments = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
+    expect(comments).toContain("if (response.status === 401)")
+    expect(comments).toContain("window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(comments).not.toContain("请先登录后发表评论。")
+  })
+
   it('renders the comment component from the content detail page', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain("import ContentComments from './ContentComments'")
