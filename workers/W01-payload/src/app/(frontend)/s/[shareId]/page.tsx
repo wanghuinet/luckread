@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -52,7 +53,7 @@ export default function ShareLandingPage({
         <>
           <h1>分享链接无法打开</h1>
           <p>{error}</p>
-          <a href="/content">去发现内容</a>
+          <Link href="/content">去发现内容</Link>
         </>
       ) : (
         <p role="status">正在打开分享内容…</p>
