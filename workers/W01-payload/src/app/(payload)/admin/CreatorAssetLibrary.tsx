@@ -19,6 +19,11 @@ type MediaListResponse = {
   totalPages?: number
 }
 
+function redirectToAdminLogin() {
+  const returnTo = window.location.pathname + window.location.search + window.location.hash
+  window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))
+}
+
 export default function CreatorAssetLibrary() {
   const [items, setItems] = useState<MediaItem[]>([])
   const [totalDocs, setTotalDocs] = useState(0)
@@ -42,6 +47,10 @@ export default function CreatorAssetLibrary() {
         headers: { accept: 'application/json' },
       })
       const data = await response.json().catch((): null => null) as MediaListResponse | { error?: { message?: string } } | null
+      if (response.status === 401) {
+        redirectToAdminLogin()
+        return
+      }
       if (!response.ok) {
         throw new Error(data && 'error' in data ? data.error?.message || '素材读取失败' : '素材读取失败')
       }
@@ -94,6 +103,10 @@ export default function CreatorAssetLibrary() {
           body: form,
         })
         const data = await response.json().catch((): null => null) as MediaItem | { doc?: MediaItem; error?: { message?: string } } | null
+        if (response.status === 401) {
+          redirectToAdminLogin()
+          return
+        }
         if (!response.ok) {
           throw new Error(data && 'error' in data ? data.error?.message || '素材上传失败' : '素材上传失败')
         }
@@ -126,6 +139,10 @@ export default function CreatorAssetLibrary() {
         body: JSON.stringify({ alt }),
       })
       const data = await response.json().catch((): null => null) as MediaItem | { error?: { message?: string } } | null
+      if (response.status === 401) {
+        redirectToAdminLogin()
+        return
+      }
       if (!response.ok) {
         throw new Error(data && 'error' in data ? data.error?.message || '素材更新失败' : '素材更新失败')
       }
@@ -152,6 +169,10 @@ export default function CreatorAssetLibrary() {
         credentials: 'include',
         headers: { accept: 'application/json' },
       })
+      if (response.status === 401) {
+        redirectToAdminLogin()
+        return
+      }
       if (!response.ok) {
         const data = await response.json().catch((): null => null) as { error?: { message?: string } } | null
         throw new Error(data?.error?.message || '素材删除失败')
