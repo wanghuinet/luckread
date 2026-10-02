@@ -22,6 +22,7 @@ describe('personal social relationship pages', () => {
     expect(component).toContain("href={'/users/' + encodeURIComponent(item.userId)}")
     expect(component).toContain("method: 'DELETE'")
     expect(component).toContain("'Idempotency-Key': 'social-unfollow:' + crypto.randomUUID()")
+    expect(component).toContain('if (isFollowers || unfollowingId) return')
     expect(component).toContain("取消关注")
   })
 
