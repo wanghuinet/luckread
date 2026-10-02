@@ -56,6 +56,7 @@ export default {
       if (!operation) return new Response(null, { status: 404 })
       const principal = requirePrincipal(request)
       requireLayer(request)
+      if (isMutationOperation(operation.operation)) validateIdempotencyKey(request.headers.get('Idempotency-Key'))
 
       if (operation.operation === 'create') {
         const idempotencyKey = validateIdempotencyKey(request.headers.get('Idempotency-Key'))
