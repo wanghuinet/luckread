@@ -46,12 +46,16 @@ export default function MySubscriptionsPage() {
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [message, setMessage] = useState('')
+  const [pageNumber, setPageNumber] = useState(1)
+  const [hasNextPage, setHasNextPage] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
 
-  async function load() {
-    setLoading(true)
+  async function load(page = 1, append = false) {
+    if (append) setLoadingMore(true)
+    else setLoading(true)
     setError('')
     try {
-      const response = await fetch('/api/v1/memberships/subscriptions?limit=20&page=1', {
+      const response = await fetch('/api/v1/memberships/subscriptions?limit=20&page=' + String(page), {
         credentials: 'include',
         cache: 'no-store',
         headers: { accept: 'application/json' },
@@ -64,11 +68,14 @@ export default function MySubscriptionsPage() {
       if (!response.ok || !data?.data?.docs) {
         throw new Error(data?.error?.message || '订阅读取失败')
       }
-      setItems(data.data.docs)
+      setItems((current) => append ? [...current, ...data.data!.docs!] : data.data!.docs!)
+      setPageNumber(data.data.page ?? page)
+      setHasNextPage(data.data.hasNextPage === true)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '订阅读取失败')
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }
 
@@ -123,7 +130,7 @@ export default function MySubscriptionsPage() {
         <div className="my-subscriptions-actions">
           <Link href="/content">发现内容</Link>
           <Link href="/">返回首页</Link>
-          <button disabled={loading} onClick={() => void load()} type="button">{loading ? '刷新中…' : '刷新'}</button>
+          <button disabled={loading || loadingMore} onClick={() => void load()} type="button">{loading ? '刷新中…' : '刷新'}</button>
         </div>
       </header>
 
@@ -174,6 +181,17 @@ export default function MySubscriptionsPage() {
               </article>
             )
           })}
+          {hasNextPage ? (
+            <div className="subscription-pagination">
+              <button
+                disabled={loadingMore}
+                onClick={() => void load(pageNumber + 1, true)}
+                type="button"
+              >
+                {loadingMore ? '加载中…' : '加载更多订阅'}
+              </button>
+            </div>
+          ) : null}
         </section>
       )}
 
