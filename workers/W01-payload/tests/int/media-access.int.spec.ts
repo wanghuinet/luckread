@@ -72,3 +72,16 @@ describe('Media upload access', () => {
     expect(route).not.toContain('processing-job')
     expect(route).not.toContain('MediaProcessing')
   })
+
+
+  it('exposes owner-authorized media deletion through the stable v1 resource path', () => {
+    const route = read('src/app/api/v1/media/[mediaId]/route.ts')
+
+    expect(route).toContain("DELETE as payloadMediaDelete")
+    expect(route).toContain('type PayloadDeleteRouteContext = Parameters<typeof payloadMediaDelete>[1]')
+    expect(route).toContain("new URL('/api/media/' + encodeURIComponent(mediaId), request.url)")
+    expect(route).toContain("slug: ['media', mediaId]")
+    expect(route).toContain('return payloadMediaDelete')
+    expect(route).not.toContain('D1Database')
+    expect(route).not.toContain('R2Bucket')
+  })
