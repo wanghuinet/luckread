@@ -283,8 +283,9 @@ export default {
       }
 
       if (request.method === 'GET' && path.id) {
-        const principal = requiredCreatorPrincipal(request)
-        const principalUserId = principal.userId
+        // Public content detail is readable anonymously when the content is PUBLISHED.
+        // getContent already constrains non-published reads to the supplied owner id.
+        const principalUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
         const content = await getContent(env.D1_02, path.id, principalUserId)
         return json({
           id: content.id,
