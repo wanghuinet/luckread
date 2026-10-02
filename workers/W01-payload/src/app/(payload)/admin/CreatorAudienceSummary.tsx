@@ -85,8 +85,9 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
   const [items, setItems] = useState<FollowListItem[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
-  const [listLoading, setListLoading] = useState(true)
-  const [listError, setListError] = useState(false)
+  const [listBusy, setListBusy] = useState(false)
+  const [loadedListKey, setLoadedListKey] = useState<string | null>(null)
+  const [listErrorKey, setListErrorKey] = useState<string | null>(null)
   const listRequestId = useRef(0)
 
   useEffect(() => {
@@ -113,14 +114,11 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
     }
   }, [userId, reloadKey])
 
+  const listKey = userId + ':' + direction + ':' + reloadKey
+
   useEffect(() => {
     const controller = new AbortController()
     const requestId = ++listRequestId.current
-    setItems([])
-    setNextCursor(null)
-    setHasMore(false)
-    setListLoading(true)
-    setListError(false)
 
     void fetchList(userId, direction, null, controller.signal)
       .then((page) => {
@@ -128,25 +126,23 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
         setItems(page.items)
         setNextCursor(page.nextCursor)
         setHasMore(page.hasMore)
+        setLoadedListKey(listKey)
+        setListErrorKey(null)
       })
       .catch((error: unknown) => {
         if (requestId !== listRequestId.current || controller.signal.aborted) return
-        setListError(true)
+        setListErrorKey(listKey)
         console.error('Creator audience list failed', error)
-      })
-      .finally(() => {
-        if (requestId === listRequestId.current) setListLoading(false)
       })
 
     return () => controller.abort()
-  }, [userId, direction, reloadKey])
+  }, [userId, direction, reloadKey, listKey])
 
   async function loadMore() {
-    if (listLoading || !hasMore || !nextCursor) return
+    if (listBusy || loadedListKey !== listKey || !hasMore || !nextCursor) return
     const controller = new AbortController()
     const requestId = ++listRequestId.current
-    setListLoading(true)
-    setListError(false)
+    setListBusy(true)
 
     try {
       const page = await fetchList(userId, direction, nextCursor, controller.signal)
@@ -154,12 +150,13 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
       setItems((current) => [...current, ...page.items])
       setNextCursor(page.nextCursor)
       setHasMore(page.hasMore)
+      setListErrorKey(null)
     } catch (error) {
       if (requestId !== listRequestId.current || controller.signal.aborted) return
-      setListError(true)
+      setListErrorKey(listKey)
       console.error('Creator audience list pagination failed', error)
     } finally {
-      if (requestId === listRequestId.current) setListLoading(false)
+      if (requestId === listRequestId.current) setListBusy(false)
     }
   }
 
@@ -172,6 +169,9 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
   }
 
   const activeCount = direction === 'followers' ? state.followers : state.following
+  const currentListLoaded = loadedListKey === listKey
+  const currentListError = listErrorKey === listKey
+  const currentListLoading = !currentListLoaded && !currentListError
 
   return (
     <section className={styles.sectionBlock} id="audience">
@@ -237,13 +237,13 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
           </button>
         </div>
 
-        <div className={styles.audienceList} aria-busy={listLoading}>
+        <div className={styles.audienceList} aria-busy={currentListLoading || listBusy}>
           <div className={styles.audienceListHeader}>
             <strong>{direction === 'followers' ? '关注你的用户' : '你关注的用户'}</strong>
             <span>当前 {formatCount(activeCount)} 个关系</span>
           </div>
 
-          {listError ? (
+          {currentListError ? (
             <div className={styles.audienceState} role="alert">
               <span>列表暂时无法加载。</span>
               <button
@@ -256,11 +256,11 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
             </div>
           ) : null}
 
-          {!listError && listLoading && items.length === 0 ? (
+          {!currentListError && currentListLoading ? (
             <p className={styles.audienceState} role="status">正在加载关系列表…</p>
           ) : null}
 
-          {!listError && !listLoading && items.length === 0 ? (
+          {!currentListError && currentListLoaded && items.length === 0 ? (
             <p className={styles.audienceState} role="status">
               {direction === 'followers' ? '还没有粉丝。' : '还没有关注用户。'}
             </p>
@@ -285,15 +285,15 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
             </div>
           ) : null}
 
-          {hasMore && nextCursor ? (
+          {currentListLoaded && hasMore && nextCursor ? (
             <div className={styles.audienceActions}>
               <button
                 className={styles.secondaryButton + ' btn'}
-                disabled={listLoading}
+                disabled={listBusy}
                 onClick={() => void loadMore()}
                 type="button"
               >
-                {listLoading ? '加载中…' : '加载更多'}
+                {listBusy ? '加载中…' : '加载更多'}
               </button>
             </div>
           ) : null}
