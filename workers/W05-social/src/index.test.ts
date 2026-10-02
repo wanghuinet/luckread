@@ -559,6 +559,69 @@ describe('W05 social comment transport', () => {
     expect(response.status).toBe(200)
   })
 
+  it('updates an owned comment with a conditional version', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
+        method: 'PATCH',
+        headers: {
+          ...commentHeaders,
+          'X-LuckRead-Principal-User-Id': 'viewer-1',
+          'X-LuckRead-Principal-Layer': 'L2',
+          'If-Match': '"2026-10-02T00:01:00.000Z"',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ body: '修改后的评论' }),
+      }),
+      {
+        DB: dbFor([
+          {
+            id: 'comment-1',
+            content_id: 'content-1',
+            author_user_id: 'viewer-1',
+            parent_id: null,
+            body: '原评论',
+            state: 'PUBLISHED',
+            depth: 0,
+            created_at: '2026-10-02T00:00:00.000Z',
+            updated_at: '2026-10-02T00:01:00.000Z',
+            content_state: 'PUBLISHED',
+          },
+          {
+            id: 'comment-1',
+            content_id: 'content-1',
+            author_user_id: 'viewer-1',
+            parent_id: null,
+            body: '修改后的评论',
+            state: 'PUBLISHED',
+            depth: 0,
+            created_at: '2026-10-02T00:00:00.000Z',
+            updated_at: '2026-10-02T00:02:00.000Z',
+          },
+        ]),
+      },
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('etag')).toBe('"2026-10-02T00:02:00.000Z"')
+  })
+
+  it('requires If-Match for comment updates', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
+        method: 'PATCH',
+        headers: {
+          ...commentHeaders,
+          'X-LuckRead-Principal-User-Id': 'viewer-1',
+          'X-LuckRead-Principal-Layer': 'L2',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ body: '没有版本的修改' }),
+      }),
+      { DB: dbFor([]) },
+    )
+    expect(response.status).toBe(428)
+  })
+
   it('requires an authenticated principal for comment creation', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/comments', {

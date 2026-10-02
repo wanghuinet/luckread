@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { createComment, listComments, parseCommentLimit } from './comment-runtime.js'
+import { createComment, listComments, parseCommentLimit, updateComment } from './comment-runtime.js'
 
 const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
   let firstIndex = 0
@@ -121,6 +121,100 @@ describe('comment runtime', () => {
       body: '不可见',
       idempotencyKey: 'idem-4',
     })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+  })
+
+  it('updates an owned published comment with the matching version', async () => {
+    const d = db([
+      {
+        id: 'c1',
+        content_id: 'content-1',
+        author_user_id: 'user-1',
+        parent_id: null,
+        body: '修改前',
+        state: 'PUBLISHED',
+        depth: 0,
+        created_at: '2026-10-02T00:00:00.000Z',
+        updated_at: '2026-10-02T00:01:00.000Z',
+        content_state: 'PUBLISHED',
+      },
+      {
+        id: 'c1',
+        content_id: 'content-1',
+        author_user_id: 'user-1',
+        parent_id: null,
+        body: '修改后',
+        state: 'PUBLISHED',
+        depth: 0,
+        created_at: '2026-10-02T00:00:00.000Z',
+        updated_at: '2026-10-02T00:02:00.000Z',
+      },
+    ])
+
+    await expect(updateComment(d, 'user-1', 'c1', {
+      body: '修改后',
+      ifMatch: '"2026-10-02T00:01:00.000Z"',
+    })).resolves.toMatchObject({
+      item: { id: 'c1', body: '修改后' },
+      etag: '"2026-10-02T00:02:00.000Z"',
+    })
+    expect(d.prepare).toHaveBeenCalledTimes(2)
+  })
+
+  it('rejects an update from another author', async () => {
+    const d = db([{
+      id: 'c1',
+      content_id: 'content-1',
+      author_user_id: 'user-2',
+      body: '原文',
+      state: 'PUBLISHED',
+      depth: 0,
+      parent_id: null,
+      created_at: '2026-10-02T00:00:00.000Z',
+      updated_at: '2026-10-02T00:01:00.000Z',
+      content_state: 'PUBLISHED',
+    }])
+
+    await expect(updateComment(d, 'user-1', 'c1', {
+      body: '越权修改',
+      ifMatch: '"2026-10-02T00:01:00.000Z"',
+    })).rejects.toMatchObject({
+      code: 'PERMISSION_DENIED',
+      status: 403,
+    })
+  })
+
+  it('rejects stale comment versions', async () => {
+    const d = db([{
+      id: 'c1',
+      content_id: 'content-1',
+      author_user_id: 'user-1',
+      body: '原文',
+      state: 'PUBLISHED',
+      depth: 0,
+      parent_id: null,
+      created_at: '2026-10-02T00:00:00.000Z',
+      updated_at: '2026-10-02T00:02:00.000Z',
+      content_state: 'PUBLISHED',
+    }])
+
+    await expect(updateComment(d, 'user-1', 'c1', {
+      body: '旧版本修改',
+      ifMatch: '"2026-10-02T00:01:00.000Z"',
+    })).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      status: 412,
+    })
+  })
+
+  it('requires a valid If-Match header value', async () => {
+    const d = db()
+    await expect(updateComment(d, 'user-1', 'c1', {
+      body: '修改',
+      ifMatch: '',
+    })).rejects.toMatchObject({
+      code: 'PRECONDITION_REQUIRED',
+      status: 428,
+    })
   })
 
   it('lists only bounded published comments with an opaque next cursor', async () => {
