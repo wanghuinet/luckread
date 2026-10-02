@@ -539,3 +539,16 @@ a { color: inherit; }
   .content-browse-top h1 { font-size: 48px; }
   .content-browse-grid { grid-template-columns: 1fr; }
 }
+
+
+.content-comment-reply {
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--lr-accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.content-comment-reply:hover { text-decoration: underline; }
