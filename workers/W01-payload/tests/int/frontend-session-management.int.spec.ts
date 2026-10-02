@@ -28,6 +28,12 @@ describe('frontend session management', () => {
     expect(page).toContain('退出设备')
   })
 
+  it('preserves the full return path when the session list expires', () => {
+    const page = read('src/app/(frontend)/me/sessions/page.tsx')
+    expect(page).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
+    expect(page).toContain("router.replace('/login?returnTo=' + encodeURIComponent(returnTo))")
+  })
+
   it('links the profile security entry to the session management page', () => {
     const profile = read('src/app/(frontend)/me/profile/page.tsx')
     expect(profile).toContain('<Link href="/me/sessions">登录设备</Link>')
