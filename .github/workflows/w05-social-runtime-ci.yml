@@ -1,0 +1,50 @@
+name: W05 Social Runtime CI
+
+on:
+  pull_request:
+    paths:
+      - 'workers/W05-social/**'
+      - 'workers/W01-payload/src/app/api/v1/users/[userId]/followers/**'
+      - 'workers/W01-payload/src/app/api/v1/users/[userId]/following/**'
+      - 'workers/W01-payload/src/social/**'
+      - 'workers/W01-payload/tests/int/social-followers-v1-adapter.int.spec.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/w05-social-runtime-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'workers/W05-social/**'
+      - 'workers/W01-payload/src/app/api/v1/users/[userId]/followers/**'
+      - 'workers/W01-payload/src/app/api/v1/users/[userId]/following/**'
+      - 'workers/W01-payload/src/social/**'
+      - 'workers/W01-payload/tests/int/social-followers-v1-adapter.int.spec.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/w05-social-runtime-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  social-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install test dependencies from committed lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Run W05 Social and W01 adapter tests
+        run: pnpm exec vitest run workers/W05-social/src/follow-runtime.test.ts workers/W05-social/src/index.test.ts workers/W01-payload/tests/int/social-followers-v1-adapter.int.spec.ts
