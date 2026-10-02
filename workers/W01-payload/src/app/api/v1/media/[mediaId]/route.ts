@@ -1,4 +1,4 @@
-import { GET as payloadMediaGet } from '../../../(payload)/api/[...slug]/route'
+import { DELETE as payloadMediaDelete, GET as payloadMediaGet } from '../../../(payload)/api/[...slug]/route'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaGet>[1]
 
@@ -73,4 +73,21 @@ export async function GET(
       ...(response.headers.get('etag') ? { etag: response.headers.get('etag')! } : {}),
     },
   })
+}
+
+type PayloadDeleteRouteContext = Parameters<typeof payloadMediaDelete>[1]
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ mediaId: string }> },
+): Promise<Response> {
+  const { mediaId } = await context.params
+  if (!mediaId?.trim()) return new Response(null, { status: 404 })
+
+  const target = new URL('/api/media/' + encodeURIComponent(mediaId), request.url)
+  const payloadContext: PayloadDeleteRouteContext = {
+    params: Promise.resolve({ slug: ['media', mediaId] }),
+  }
+
+  return payloadMediaDelete(new Request(target, request.clone()), payloadContext)
 }
