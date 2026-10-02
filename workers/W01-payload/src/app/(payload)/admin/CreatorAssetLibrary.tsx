@@ -15,6 +15,7 @@ type MediaItem = {
 type MediaListResponse = {
   docs?: MediaItem[]
   totalDocs?: number
+  page?: number
   totalPages?: number
 }
 
@@ -26,12 +27,16 @@ export default function CreatorAssetLibrary() {
   const [editingId, setEditingId] = useState<string | number | null>(null)
   const [editingAlt, setEditingAlt] = useState('')
   const [error, setError] = useState('')
+  const [pageNumber, setPageNumber] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [loadingMore, setLoadingMore] = useState(false)
 
-  async function load() {
-    setLoading(true)
+  async function load(page = 1, append = false) {
+    if (append) setLoadingMore(true)
+    else setLoading(true)
     setError('')
     try {
-      const response = await fetch('/api/v1/media?limit=8&page=1', {
+      const response = await fetch('/api/v1/media?limit=8&page=' + String(page), {
         credentials: 'include',
         cache: 'no-store',
         headers: { accept: 'application/json' },
@@ -40,15 +45,26 @@ export default function CreatorAssetLibrary() {
       if (!response.ok) {
         throw new Error(data && 'error' in data ? data.error?.message || '素材读取失败' : '素材读取失败')
       }
-      setItems(Array.isArray((data as MediaListResponse)?.docs) ? (data as MediaListResponse).docs! : [])
+      const nextItems = Array.isArray((data as MediaListResponse)?.docs)
+        ? (data as MediaListResponse).docs!
+        : []
+      setItems((current) => append ? [...current, ...nextItems] : nextItems)
       setTotalDocs(typeof (data as MediaListResponse)?.totalDocs === 'number' ? (data as MediaListResponse).totalDocs! : 0)
+      setPageNumber(typeof (data as MediaListResponse)?.page === 'number' ? (data as MediaListResponse).page! : page)
+      setTotalPages(typeof (data as MediaListResponse)?.totalPages === 'number' ? (data as MediaListResponse).totalPages! : 1)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '素材读取失败')
       setItems([])
       setTotalDocs(0)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
+  }
+
+  async function loadMore() {
+    if (loadingMore || pageNumber >= totalPages) return
+    await load(pageNumber + 1, true)
   }
 
   useEffect(() => {
@@ -169,7 +185,7 @@ export default function CreatorAssetLibrary() {
           />
         </label>
         <Link className="secondaryButton btn" href="/publish">上传并发布</Link>
-        <button className="secondaryButton btn" disabled={loading} onClick={() => void load()} type="button">
+        <button className="secondaryButton btn" disabled={loading || loadingMore} onClick={() => void load()} type="button">
           {loading ? '加载中…' : '刷新'}
         </button>
       </div>
@@ -229,8 +245,21 @@ export default function CreatorAssetLibrary() {
         </div>
       )}
 
+      {items.length > 0 && pageNumber < totalPages ? (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 18 }}>
+          <button
+            className="secondaryButton btn"
+            disabled={loadingMore}
+            onClick={() => void loadMore()}
+            type="button"
+          >
+            {loadingMore ? '加载中…' : '加载更多素材'}
+          </button>
+        </div>
+      ) : null}
+
       <p style={{ color: 'var(--lr-text-3)', fontSize: 10, marginTop: 12 }}>
-        最近 {Math.min(items.length, 8)} 个 / 共 {totalDocs} 个素材
+        已显示 {items.length} 个 / 共 {totalDocs} 个素材
       </p>
     </div>
   )
