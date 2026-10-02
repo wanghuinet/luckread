@@ -25,6 +25,16 @@ describe('public content detail', () => {
 
   })
 
+  it('hydrates favorite state from the authenticated status API', () => {
+    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    expect(page).toContain('/api/v1/interactions/bookmarks?targetType=content&targetId=')
+    expect(page).toContain('bookmarkData?.data?.favorited')
+    expect(page).toContain('setBookmarked(bookmarkData.data.favorited)')
+    expect(page).toContain("bookmarked ? 'DELETE' : 'POST'")
+    expect(page).toContain("'Idempotency-Key': 'social-bookmark:' + crypto.randomUUID()")
+    expect(page).toContain('收藏')
+  })
+
   it('hides self-follow on the viewer own content', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain("fetch('/api/v1/users/me'")
