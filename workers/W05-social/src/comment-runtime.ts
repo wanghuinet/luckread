@@ -13,7 +13,6 @@ export type CommentCreateInput = {
 export type CommentItem = {
   id: string
   contentId: string
-  authorUserId: string
   parentId: string | null
   body: string
   state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
@@ -111,8 +110,6 @@ const validateCreateInput = (input: CommentCreateInput) => {
 
 const toCommentItem = (row: {
   id: string
-  content_id: string
-  author_user_id: string
   parent_id: string | null
   body: string
   state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
@@ -122,7 +119,6 @@ const toCommentItem = (row: {
 }): CommentItem => ({
   id: row.id,
   contentId: row.content_id,
-  authorUserId: row.author_user_id,
   parentId: row.parent_id,
   body: row.body,
   state: row.state,
@@ -152,10 +148,15 @@ export async function createComment(
     parent_content_id: string | null
     parent_state: string | null
     parent_depth: number | null
+    recent_count: number
   }>()
 
   if (!validation || validation.content_state !== 'PUBLISHED') {
     throw new CommentRuntimeError('NOT_FOUND', 404)
+  }
+
+  if (Number(validation.recent_count) >= 10) {
+    throw new CommentRuntimeError('RATE_LIMITED', 429)
   }
 
   if (parentId) {
@@ -193,7 +194,6 @@ export async function createComment(
   ).first<{
     id: string
     content_id: string
-    author_user_id: string
     parent_id: string | null
     body: string
     state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
