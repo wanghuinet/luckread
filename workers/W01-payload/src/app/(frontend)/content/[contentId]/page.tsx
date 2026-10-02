@@ -71,7 +71,7 @@ export default function ContentDetailPage({
               '/api/v1/interactions/likes?targetType=content&targetId=' + encodeURIComponent(resolved.id),
               { credentials: 'include', headers: { accept: 'application/json' }, cache: 'no-store', signal: controller.signal },
             )
-            const likeData = await likeResponse.json().catch((): null => null) as { data?: { liked?: boolean } } | null
+            const likeData = await likeResponse.json().catch((): null => null) as { data?: { liked?: boolean; likeCount?: number } } | null
             if (!cancelled && likeResponse.ok && typeof likeData?.data?.liked === 'boolean') {
               setLiked(likeData.data.liked)
               setLikeCount(
