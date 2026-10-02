@@ -49,6 +49,60 @@ describe('comment runtime', () => {
     expect(d.prepare).toHaveBeenCalledTimes(2)
   })
 
+  it('returns the existing comment for an idempotent retry before rate-limit checks', async () => {
+    const d = db([{
+      existing_id: 'c-existing',
+      existing_content_id: 'content-1',
+      existing_parent_id: null,
+      existing_body: '已经发表',
+      existing_author_user_id: 'user-1',
+      existing_state: 'PUBLISHED',
+      existing_depth: 0,
+      existing_created_at: '2026-10-02T00:00:00.000Z',
+      existing_updated_at: '2026-10-02T00:00:00.000Z',
+      content_state: 'DRAFT',
+      recent_count: 99,
+      blocked: 1,
+    }])
+
+    await expect(createComment(d, 'user-1', 'content-1', {
+      body: '已经发表',
+      idempotencyKey: 'same-key',
+    })).resolves.toMatchObject({
+      id: 'c-existing',
+      contentId: 'content-1',
+      authorUserId: 'user-1',
+      state: 'PUBLISHED',
+    })
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects an idempotency key reused with a different comment payload', async () => {
+    const d = db([{
+      existing_id: 'c-existing',
+      existing_content_id: 'content-1',
+      existing_parent_id: null,
+      existing_body: '原始评论',
+      existing_author_user_id: 'user-1',
+      existing_state: 'PUBLISHED',
+      existing_depth: 0,
+      existing_created_at: '2026-10-02T00:00:00.000Z',
+      existing_updated_at: '2026-10-02T00:00:00.000Z',
+      content_state: 'PUBLISHED',
+      recent_count: 0,
+      blocked: 0,
+    }])
+
+    await expect(createComment(d, 'user-1', 'content-1', {
+      body: '不同评论',
+      idempotencyKey: 'same-key',
+    })).rejects.toMatchObject({
+      code: 'CONFLICT',
+      status: 409,
+    })
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects comments when the actor is blocked by the content relationship', async () => {
     const d = db([{
       content_state: 'PUBLISHED',
