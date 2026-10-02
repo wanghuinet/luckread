@@ -9,8 +9,7 @@ import {
 } from './favorite-runtime.js'
 import { ShareRuntimeError, createShare, resolveShare } from './share-runtime.js'
 import { BlockMuteRuntimeError, removeRelation, setRelation } from './block-mute-runtime.js'
-import { getRelationshipGraph } from './relationship-graph-runtime.js'
-import {
+import { getRelationshipGraph } from './relationship-graph-runtime.js'\nimport {
   FollowRuntimeError,
   follow,
   getFollowStatus,
@@ -366,7 +365,8 @@ export default {
         error instanceof CommentRuntimeError ||
         error instanceof FavoriteRuntimeError ||
         error instanceof ShareRuntimeError ||
-        error instanceof BlockMuteRuntimeError
+        error instanceof BlockMuteRuntimeError ||
+        error instanceof RelationshipGraphRuntimeError
       ) {
         return json({
           error: {
