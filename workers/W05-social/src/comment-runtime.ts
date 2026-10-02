@@ -144,20 +144,59 @@ export async function createComment(
   const validation = await db.prepare(
     `SELECT
        (SELECT state FROM contents WHERE id = ? LIMIT 1) AS content_state,
+       (SELECT owner_user_id FROM contents WHERE id = ? LIMIT 1) AS content_owner_user_id,
        (SELECT content_id FROM social_comments WHERE id = ? LIMIT 1) AS parent_content_id,
+       (SELECT author_user_id FROM social_comments WHERE id = ? LIMIT 1) AS parent_author_user_id,
        (SELECT state FROM social_comments WHERE id = ? LIMIT 1) AS parent_state,
        (SELECT depth FROM social_comments WHERE id = ? LIMIT 1) AS parent_depth,
-       (SELECT COUNT(*) FROM social_comments WHERE author_user_id = ? AND created_at > datetime('now', '-60 seconds')) AS recent_count`,
-  ).bind(contentId, parentId, parentId, parentId, actor).first<{
+       (SELECT COUNT(*) FROM social_comments WHERE author_user_id = ? AND created_at > datetime('now', '-60 seconds')) AS recent_count,
+       EXISTS (
+         SELECT 1
+         FROM social_user_interactions block
+         WHERE block.relation_type = 'block'
+           AND (
+             (block.actor_user_id = ? AND block.target_user_id = (SELECT owner_user_id FROM contents WHERE id = ? LIMIT 1))
+             OR
+             (block.actor_user_id = (SELECT owner_user_id FROM contents WHERE id = ? LIMIT 1) AND block.target_user_id = ?)
+             OR
+             (block.actor_user_id = ? AND block.target_user_id = (SELECT author_user_id FROM social_comments WHERE id = ? LIMIT 1))
+             OR
+             (block.actor_user_id = (SELECT author_user_id FROM social_comments WHERE id = ? LIMIT 1) AND block.target_user_id = ?)
+           )
+       ) AS blocked`,
+  ).bind(
+    contentId,
+    contentId,
+    parentId,
+    parentId,
+    parentId,
+    parentId,
+    actor,
+    actor,
+    contentId,
+    contentId,
+    actor,
+    actor,
+    parentId,
+    parentId,
+    actor,
+  ).first<{
     content_state: string | null
+    content_owner_user_id: string | null
     parent_content_id: string | null
+    parent_author_user_id: string | null
     parent_state: string | null
     parent_depth: number | null
     recent_count: number
+    blocked: number
   }>()
 
   if (!validation || validation.content_state !== 'PUBLISHED') {
     throw new CommentRuntimeError('NOT_FOUND', 404)
+  }
+
+  if (Number(validation.blocked) === 1) {
+    throw new CommentRuntimeError('RELATIONSHIP_BLOCKED', 409)
   }
 
   if (Number(validation.recent_count) >= 10) {
