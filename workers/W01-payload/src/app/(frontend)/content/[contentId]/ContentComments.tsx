@@ -31,11 +31,14 @@ export default function ContentComments({ contentId }: { contentId: string }) {
   const [submitting, setSubmitting] = useState(false)
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [message, setMessage] = useState('')
+  const activeControllerRef = useRef<AbortController | null>(null)
 
   const loadComments = useCallback(async (nextCursor: string | null = null) => {
     if (nextCursor) setLoadingMore(true)
     else setLoading(true)
+    activeControllerRef.current?.abort()
     const controller = new AbortController()
+    activeControllerRef.current = controller
     try {
       const params = new URLSearchParams({ limit: '20' })
       if (nextCursor) params.set('cursor', nextCursor)
@@ -47,16 +50,21 @@ export default function ContentComments({ contentId }: { contentId: string }) {
       if (!response.ok || !data?.data) {
         throw new Error(data?.error?.message || '评论加载失败')
       }
+      if (activeControllerRef.current !== controller) return
       const page = data.data as CommentPage
       setComments((current) => nextCursor ? [...current, ...page.items] : page.items)
       setCursor(page.nextCursor)
       setHasMore(page.hasMore)
     } catch (error) {
       if (controller.signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) return
+      if (activeControllerRef.current !== controller) return
       setMessage(error instanceof Error ? error.message : '评论加载失败')
     } finally {
-      setLoading(false)
-      setLoadingMore(false)
+      if (activeControllerRef.current === controller) {
+        activeControllerRef.current = null
+        setLoading(false)
+        setLoadingMore(false)
+      }
     }
   }, [contentId])
 
@@ -69,6 +77,8 @@ export default function ContentComments({ contentId }: { contentId: string }) {
     return () => {
       disposed = true
       window.clearTimeout(timer)
+      activeControllerRef.current?.abort()
+      activeControllerRef.current = null
     }
   }, [loadComments])
 
