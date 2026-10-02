@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FormEvent, useEffect, useState } from 'react'
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react'
 
 type Profile = {
   id: string
@@ -92,7 +92,7 @@ export default function ProfilePage() {
     }
   }
 
-  async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
+  async function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
@@ -198,16 +198,6 @@ export default function ProfilePage() {
               required
               style={{ display: 'block', width: '100%', marginTop: 6 }}
             />
-            <span style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8 }}>
-              <input
-                accept="image/*"
-                aria-label="上传头像图片"
-                disabled={saving || loggingOut}
-                onChange={uploadAvatar}
-                type="file"
-              />
-              <small>上传后仍需点击“保存资料”。</small>
-            </span>
           </label>
           <label>
             <span>显示名称</span>
@@ -237,6 +227,16 @@ export default function ProfilePage() {
               maxLength={2048}
               style={{ display: 'block', width: '100%', marginTop: 6 }}
             />
+            <span style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8 }}>
+              <input
+                accept="image/*"
+                aria-label="上传头像图片"
+                disabled={saving || loggingOut}
+                onChange={uploadAvatar}
+                type="file"
+              />
+              <small>上传后仍需点击“保存资料”。</small>
+            </span>
           </label>
           <div style={{ display: 'grid', gap: 18, gridTemplateColumns: '1fr 1fr' }}>
             <label>
