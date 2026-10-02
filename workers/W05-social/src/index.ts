@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import { like, LikeRuntimeError, unlike } from './like-runtime.js'
 import {
   FollowRuntimeError,
   follow,
@@ -32,6 +33,26 @@ const principal = (r: Request) => {
   const id = r.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
   if (!id) throw new FollowRuntimeError('UNAUTHENTICATED', 401)
   return id
+}
+
+const requireLikePermission = (r: Request): void => {
+  const layer = r.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
+  if (!/^L[0-8]$/.test(layer) || Number(layer.slice(1)) < 2) {
+    throw new LikeRuntimeError('PERMISSION_DENIED', 403)
+  }
+}
+
+const parseJsonTarget = async (request: Request) => {
+  try {
+    const value = await request.json()
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid')
+    const targetType = (value as { targetType?: unknown }).targetType
+    const targetId = (value as { targetId?: unknown }).targetId
+    if (typeof targetType !== 'string' || typeof targetId !== 'string') throw new Error('invalid')
+    return { targetType, targetId }
+  } catch {
+    throw new LikeRuntimeError('VALIDATION_FAILED', 400)
+  }
 }
 
 const decodePathPart = (value: string): string | null => {
@@ -75,6 +96,20 @@ export default {
       const url = new URL(request.url)
       const path = parsePath(url.pathname)
       if (!path) return new Response(null, { status: 404 })
+
+      if (url.pathname === '/internal/social/interactions/likes') {
+        if (request.method !== 'POST' && request.method !== 'DELETE') {
+          return new Response(null, { status: 405, headers: { Allow: 'POST, DELETE' } })
+        }
+        requireLikePermission(request)
+        const target = await parseJsonTarget(request)
+        if (request.method === 'POST') {
+          const result = await like(env.DB, viewerUserId, target)
+          return json({ data: result, requestId: crypto.randomUUID() }, 200)
+        }
+        await unlike(env.DB, viewerUserId, target)
+        return new Response(null, { status: 204 })
+      }
 
       if (path.kind === 'follow') {
         if (request.method === 'POST') {
