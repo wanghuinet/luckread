@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { ChangeEvent, useEffect, useState } from 'react'
 
 type MediaItem = {
   id: string | number
@@ -57,6 +57,39 @@ export default function CreatorAssetLibrary() {
     }, 0)
     return () => window.clearTimeout(timer)
   }, [])
+
+  async function uploadFiles(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []).slice(0, 8)
+    event.target.value = ''
+    if (!files.length) return
+
+    setError('')
+    setMessage('正在上传素材…')
+    try {
+      let uploaded = 0
+      for (const file of files) {
+        const form = new FormData()
+        form.append('alt', file.name)
+        form.append('file', file)
+        const response = await fetch('/api/v1/media', {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          body: form,
+        })
+        const data = await response.json().catch((): null => null) as MediaItem | { doc?: MediaItem; error?: { message?: string } } | null
+        if (!response.ok) {
+          throw new Error(data && 'error' in data ? data.error?.message || '素材上传失败' : '素材上传失败')
+        }
+        uploaded += 1
+      }
+      setMessage('已上传 ' + uploaded + ' 个素材。')
+      await load()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '素材上传失败')
+      await load()
+    }
+  }
 
   async function saveAlt(item: MediaItem) {
     const alt = editingAlt.trim()
@@ -125,7 +158,17 @@ export default function CreatorAssetLibrary() {
     <div>
       <div className="assetLinks">
         <Link className="secondaryButton btn" href="/admin/collections/media">打开完整媒体库</Link>
-        <Link className="primaryButton btn" href="/publish">上传并发布</Link>
+        <label className="primaryButton btn">
+          上传素材
+          <input
+            accept="image/*,video/*"
+            hidden
+            multiple
+            onChange={uploadFiles}
+            type="file"
+          />
+        </label>
+        <Link className="secondaryButton btn" href="/publish">上传并发布</Link>
         <button className="secondaryButton btn" disabled={loading} onClick={() => void load()} type="button">
           {loading ? '加载中…' : '刷新'}
         </button>
