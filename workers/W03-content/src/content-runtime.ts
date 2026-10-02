@@ -435,27 +435,33 @@ export async function listContents(
   db: ContentD1,
   cursor: string | null,
   limit: number,
+  creatorId: string | null = null,
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
+  if (creatorId) assertResourceId(creatorId)
+
   const decoded = cursor ? decodeCursor(cursor) : null
-  const rows = decoded
-    ? await db.prepare(
-        `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
-                title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
-           FROM contents
-          WHERE state = 'PUBLISHED'
-            AND (updated_at < ? OR (updated_at = ? AND id < ?))
-          ORDER BY updated_at DESC, id DESC
-          LIMIT ?`,
-      ).bind(decoded.updatedAt, decoded.updatedAt, decoded.id, pageSize + 1).all<ContentRow>()
-    : await db.prepare(
-        `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
-                title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
-           FROM contents
-          WHERE state = 'PUBLISHED'
-          ORDER BY updated_at DESC, id DESC
-          LIMIT ?`,
-      ).bind(pageSize + 1).all<ContentRow>()
+  const conditions = ["state = 'PUBLISHED'"]
+  const bindings: unknown[] = []
+
+  if (creatorId) {
+    conditions.push('creator_id = ?')
+    bindings.push(creatorId)
+  }
+
+  if (decoded) {
+    conditions.push('(updated_at < ? OR (updated_at = ? AND id < ?))')
+    bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
+  }
+
+  const rows = await db.prepare(
+    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
+            title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
+       FROM contents
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY updated_at DESC, id DESC
+      LIMIT ?`,
+  ).bind(...bindings, pageSize + 1).all<ContentRow>()
 
   const hasMore = rows.results.length > pageSize
   const page = rows.results.slice(0, pageSize).map(toContent)
