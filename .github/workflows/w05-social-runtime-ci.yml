@@ -13,6 +13,10 @@ on:
       - 'workers/W01-payload/src/app/api/v1/interactions/likes/**'
       - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/page.tsx'
       - 'workers/W01-payload/tests/int/content-detail.int.spec.ts'
+      - 'workers/W01-payload/src/app/api/v1/contents/[contentId]/comments/**'
+      - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/ContentComments.tsx'
+      - 'workers/W01-payload/tests/int/social-comments-v1-adapter.int.spec.ts'
+      - 'workers/W01-payload/tests/int/content-detail-comments.int.spec.ts'
       - '.github/workflows/w05-social-runtime-ci.yml'
   push:
     branches:
@@ -55,7 +59,7 @@ jobs:
 
       - name: Run W05 Social and W01 adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/index.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/index.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
 
       - name: Verify like migration shape
         run: |
@@ -72,4 +76,23 @@ jobs:
           if indexes.get('uq_interaction_like_actor_target') != 1:
               raise SystemExit('like uniqueness boundary missing')
           print('SOCIAL_003_LIKE_MIGRATION_STATIC=PASS')
+          PY
+
+
+      - name: Verify comment migration shape
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          sql = Path('workers/W05-social/migrations/20261002_003_social_004_comments_v1.sql').read_text()
+          db.executescript(sql)
+          cols = db.execute('PRAGMA table_info("social_comments")').fetchall()
+          expected = ['id','content_id','author_user_id','parent_id','body','state','depth','idempotency_key','created_at','updated_at']
+          if [r[1] for r in cols] != expected:
+              raise SystemExit('unexpected comment schema')
+          indexes = {r[1]: r[2] for r in db.execute('PRAGMA index_list("social_comments")').fetchall()}
+          if indexes.get('sqlite_autoindex_social_comments_1') != 1:
+              raise SystemExit('comment idempotency uniqueness boundary missing')
+          print('SOCIAL_004_COMMENT_MIGRATION_STATIC=PASS')
           PY
