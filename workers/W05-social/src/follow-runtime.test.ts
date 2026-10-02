@@ -32,7 +32,7 @@ describe('follow runtime', () => {
       target_user_id: 'u2',
       created_at: '2026-10-02T00:00:00.000Z',
     }
-    await expect(follow(db([null, row]), 'u1', 'u2')).resolves.toEqual(row)
+    await expect(follow(db([null, null, row]), 'u1', 'u2')).resolves.toEqual(row)
   })
 
   it('is idempotent', async () => {
@@ -42,9 +42,22 @@ describe('follow runtime', () => {
       target_user_id: 'u2',
       created_at: '2026-10-02T00:00:00.000Z',
     }
-    const d = db([row])
+    const d = db([null, row])
     await expect(follow(d, 'u1', 'u2')).resolves.toEqual(row)
-    expect(d.prepare).toHaveBeenCalledTimes(1)
+    expect(d.prepare).toHaveBeenCalledTimes(2)
+  })
+
+  it('rejects follow when either side has an active block', async () => {
+    await expect(
+      follow(
+        db([{ blocked: 1 }]),
+        'u1',
+        'u2',
+      ),
+    ).rejects.toMatchObject({
+      code: 'RELATIONSHIP_BLOCKED',
+      status: 409,
+    })
   })
 
   it('rejects self follow', async () => {
