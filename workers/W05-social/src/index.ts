@@ -288,6 +288,10 @@ export default {
           const result = await getLikeStatus(env.DB, viewerUserId, target)
           return json({ data: result, requestId: crypto.randomUUID() }, 200)
         }
+        const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        if (!idempotencyKey || idempotencyKey.length > 256) {
+          throw new LikeRuntimeError('PRECONDITION_REQUIRED', 428)
+        }
         if (request.method === 'POST') {
           const result = await like(env.DB, viewerUserId, target)
           return json({ data: result, requestId: crypto.randomUUID() }, 200)
