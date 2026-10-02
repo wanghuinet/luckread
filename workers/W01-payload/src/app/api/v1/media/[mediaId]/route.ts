@@ -1,6 +1,7 @@
-import { DELETE as payloadMediaDelete, GET as payloadMediaGet } from '../../../(payload)/api/[...slug]/route'
+import { DELETE as payloadMediaDelete, GET as payloadMediaGet, PATCH as payloadMediaPatch } from '../../../(payload)/api/[...slug]/route'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaGet>[1]
+type PayloadPatchRouteContext = Parameters<typeof payloadMediaPatch>[1]
 
 type MediaDocument = {
   id?: string | number
@@ -90,4 +91,20 @@ export async function DELETE(
   }
 
   return payloadMediaDelete(new Request(target, request.clone()), payloadContext)
+}
+
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ mediaId: string }> },
+): Promise<Response> {
+  const { mediaId } = await context.params
+  if (!mediaId?.trim()) return new Response(null, { status: 404 })
+
+  const target = new URL('/api/media/' + encodeURIComponent(mediaId), request.url)
+  const payloadContext: PayloadPatchRouteContext = {
+    params: Promise.resolve({ slug: ['media', mediaId] }),
+  }
+
+  return payloadMediaPatch(new Request(target, request.clone()), payloadContext)
 }
