@@ -373,7 +373,7 @@ export default function PublicProfilePage({
           <div className="content-detail-safety-actions" aria-label="关系控制">
             <button
               className="content-detail-follow"
-              disabled={blockBusy || blocked}
+              disabled={blockBusy}
               onClick={() => void applySafetyAction('block')}
               type="button"
             >
@@ -381,7 +381,7 @@ export default function PublicProfilePage({
             </button>
             <button
               className="content-detail-follow"
-              disabled={muteBusy || muted}
+              disabled={muteBusy}
               onClick={() => void applySafetyAction('mute')}
               type="button"
             >
