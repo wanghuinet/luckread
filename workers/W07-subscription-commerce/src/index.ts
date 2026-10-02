@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { changeSubscriptionPlan, createSubscription, getSubscription, SubscriptionRuntimeError, transitionSubscription, validateIfMatch, validateIdempotencyKey, validatePrincipal } from './subscription-runtime.js'
+import { changeSubscriptionPlan, createSubscription, getSubscription, listSubscriptions, SubscriptionRuntimeError, transitionSubscription, validateIfMatch, validateIdempotencyKey, validatePrincipal } from './subscription-runtime.js'
 
 interface Env { D1_01: D1Database }
 
@@ -29,6 +29,7 @@ const parseSegments = (pathname: string): string[] => pathname.split('/').filter
 
 type Operation =
   | { operation: 'create'; subscriptionId: null }
+  | { operation: 'list'; subscriptionId: null }
   | { operation: 'get'; subscriptionId: string }
   | { operation: 'cancel'; subscriptionId: string }
   | { operation: 'pause'; subscriptionId: string }
@@ -40,6 +41,7 @@ const mutationOperations: readonly MutationOperation[] = ['cancel', 'pause', 're
 const isMutationOperation = (value: string): value is MutationOperation => mutationOperations.includes(value as MutationOperation)
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
+  if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'POST') return { operation: 'create', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
   if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'POST' && isMutationOperation(segments[3])) return { operation: segments[3], subscriptionId: segments[2] }
@@ -61,6 +63,16 @@ export default {
         if (typeof body.planId !== 'string') throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         const result = await createSubscription(env.D1_01, principal, { planId: body.planId, idempotencyKey })
         return json({ data: result, requestId: crypto.randomUUID() }, 201, result.etag)
+      }
+      if (operation.operation === 'list') {
+        const url = new URL(request.url)
+        const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)
+        const requestedPage = Number.parseInt(url.searchParams.get('page') ?? '1', 10)
+        if ((url.searchParams.has('limit') && !Number.isFinite(requestedLimit)) || (url.searchParams.has('page') && !Number.isFinite(requestedPage))) {
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await listSubscriptions(env.D1_01, principal, requestedLimit, requestedPage)
+        return json({ data: result, requestId: crypto.randomUUID() })
       }
       if (operation.operation === 'get') {
         const result = await getSubscription(env.D1_01, principal, operation.subscriptionId)
