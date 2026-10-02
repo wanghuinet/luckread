@@ -1,7 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { persistAuditEvent } from './audit-event-persistence'
-
 export type ReportTargetType = 'content' | 'comment' | 'creator' | 'media' | 'profile'
 
 export type ReportCreateInput = {
