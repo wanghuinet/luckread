@@ -48,3 +48,10 @@ describe('public content detail', () => {
     expect(page).toContain("targetType: 'content'")
     expect(page).toContain("liked ? 'DELETE' : 'POST'")
   })
+
+
+it('links published content to the public author profile when creatorId is present', () => {
+  const page = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/content/[contentId]/page.tsx'), 'utf8')
+  expect(page).toContain("href={'/users/' + encodeURIComponent(content.creatorId)}")
+  expect(page).toContain('查看作者')
+})
