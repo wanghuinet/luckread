@@ -94,6 +94,19 @@ describe('W05 social query transport', () => {
     expect(response.status).toBe(403)
   })
 
+  it('serves followers without a principal for public reads', async () => {
+    const publicTransportHeaders = {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Correlation-Id': 'public-follow-test',
+    }
+    const response = await worker.fetch(
+      request('/internal/social/users/creator-1/followers?limit=20', publicTransportHeaders),
+      { DB: dbFor([]) },
+    )
+    expect(response.status).toBe(200)
+  })
+
   it('serves followers with relationship rows and total count', async () => {
     const env = {
       DB: dbFor([
