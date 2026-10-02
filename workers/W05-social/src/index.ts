@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
-import { like, LikeRuntimeError, unlike } from './like-runtime.js'
+import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js'
 import { CommentRuntimeError, createComment, listComments, parseCommentLimit } from './comment-runtime.js'
 import {
   FollowRuntimeError,
@@ -162,11 +162,20 @@ export default {
       const viewerUserId = requirePrincipal(request)
 
       if (url.pathname === '/internal/social/interactions/likes') {
-        if (request.method !== 'POST' && request.method !== 'DELETE') {
-          return new Response(null, { status: 405, headers: { Allow: 'POST, DELETE' } })
+        if (request.method !== 'GET' && request.method !== 'POST' && request.method !== 'DELETE') {
+          return new Response(null, { status: 405, headers: { Allow: 'GET, POST, DELETE' } })
         }
         requireInteractionLayer(request)
-        const target = await parseJsonTarget(request)
+        const target = request.method === 'GET'
+          ? {
+              targetType: url.searchParams.get('targetType') ?? '',
+              targetId: url.searchParams.get('targetId') ?? '',
+            }
+          : await parseJsonTarget(request)
+        if (request.method === 'GET') {
+          const result = await getLikeStatus(env.DB, viewerUserId, target)
+          return json({ data: result, requestId: crypto.randomUUID() }, 200)
+        }
         if (request.method === 'POST') {
           const result = await like(env.DB, viewerUserId, target)
           return json({ data: result, requestId: crypto.randomUUID() }, 200)

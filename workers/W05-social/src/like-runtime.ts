@@ -75,6 +75,24 @@ export async function like(
   }
 }
 
+export async function getLikeStatus(
+  db: D1Database,
+  actorUserId: string,
+  target: LikeTarget,
+): Promise<{ liked: boolean }> {
+  const actor = validateActor(actorUserId)
+  const { targetType, targetId } = validateTarget(target)
+  const row = await db.prepare(
+    `SELECT il.relationship_id
+       FROM contents c
+       LEFT JOIN interaction_likes il
+         ON il.actor_user_id = ? AND il.target_type = ? AND il.target_id = c.id
+      WHERE c.id = ? AND c.state = 'PUBLISHED'
+      LIMIT 1`,
+  ).bind(actor, targetType, targetId).first<{ relationship_id: string | null }>()
+  return { liked: Boolean(row?.relationship_id) }
+}
+
 export async function unlike(
   db: D1Database,
   actorUserId: string,

@@ -1,6 +1,21 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { like, unlike } from './like-runtime.js'
+import { getLikeStatus, like, unlike } from './like-runtime.js'
+
+const db = (firstResults: unknown[] = []) => {
+  let firstIndex = 0
+  const prepare = vi.fn((sql: string) => ({
+    bind: vi.fn((...args: unknown[]) => ({
+      first: vi.fn(async () => firstResults[firstIndex++] ?? null),
+      run: vi.fn(async () => ({ sql, args })),
+    })),
+  }))
+  return { prepare } as unknown as D1Database
+}
+
+/// <reference types="@cloudflare/workers-types" />
+import { describe, expect, it, vi } from 'vitest'
+import { getLikeStatus, like, unlike } from './like-runtime.js'
 
 const db = (firstResults: unknown[] = []) => {
   let firstIndex = 0
@@ -14,6 +29,23 @@ const db = (firstResults: unknown[] = []) => {
 }
 
 describe('like runtime', () => {
+  it('reads effective like status for the actor and target', async () => {
+    const existing = {
+      relationship_id: 'like-existing',
+      actor_user_id: 'user-1',
+      target_type: 'content',
+      target_id: 'content-1',
+      created_at: '2026-10-02T12:00:00.000Z',
+    }
+    const d = db([existing])
+    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toEqual({ liked: true })
+    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-2' })).resolves.toEqual({ liked: false })
+    expect(d.prepare).toHaveBeenCalledTimes(2)
+    const unpublished = db([null])
+    await expect(getLikeStatus(unpublished, 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toEqual({ liked: false })
+  })
+
+
   it('creates a content like after verifying published visibility', async () => {
     const d = db([
       { id: 'content-1', state: 'PUBLISHED' },
