@@ -106,13 +106,17 @@ export async function GET(
   const limit = rawLimit === null ? undefined : Number(rawLimit)
 
   try {
-    return json(await listSessions({
+    const result = await listSessions({
       userId: subject.userId,
       currentSessionId: subject.sessionId,
       tokenVersion: subject.tokenVersion,
       cursor,
       limit,
-    }))
+    })
+    return json({
+      ...result,
+      currentSessionId: subject.sessionId,
+    })
   } catch (error) {
     return mapW02Error(error)
   }
