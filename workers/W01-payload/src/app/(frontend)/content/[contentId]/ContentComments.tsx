@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useState } from 'react'
 
 type CommentItem = {
   id: string
@@ -29,7 +29,7 @@ export default function ContentComments({ contentId }: { contentId: string }) {
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
 
-  async function loadComments(nextCursor: string | null = null) {
+  const loadComments = useCallback(async (nextCursor: string | null = null) => {
     if (nextCursor) setLoadingMore(true)
     else setLoading(true)
     try {
@@ -53,11 +53,11 @@ export default function ContentComments({ contentId }: { contentId: string }) {
       setLoading(false)
       setLoadingMore(false)
     }
-  }
+  }, [contentId])
 
   useEffect(() => {
     void loadComments()
-  }, [contentId])
+  }, [loadComments])
 
   async function submitComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
