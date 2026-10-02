@@ -105,45 +105,75 @@ export async function createReport(
   const dedupBucket = toBucket(now)
   const policyVersion = (input.policyVersion?.trim() || DEFAULT_POLICY_VERSION)
 
-  const existingIdempotency = await db.prepare(
-    'SELECT report_id, request_hash, response_json FROM moderation_report_idempotency WHERE actor_user_id = ? AND idempotency_key = ? LIMIT 1',
-  ).bind(actorUserId, idempotencyKey).first<{
-    report_id: string
-    request_hash: string
-    response_json: string
+  const existing = await db.prepare(
+    `WITH idem AS (
+       SELECT report_id, request_hash, response_json
+       FROM moderation_report_idempotency
+       WHERE actor_user_id = ? AND idempotency_key = ?
+       LIMIT 1
+     ),
+     prior AS (
+       SELECT report_id, target_type, target_id, reason_code, created_at
+       FROM moderation_reports
+       WHERE actor_user_id = ?
+         AND target_type = ?
+         AND target_id = ?
+         AND reason_code = ?
+         AND dedup_bucket = ?
+       LIMIT 1
+     )
+     SELECT
+       idem.report_id AS idem_report_id,
+       idem.request_hash AS idem_request_hash,
+       idem.response_json AS idem_response_json,
+       prior.report_id AS prior_report_id,
+       prior.target_type AS prior_target_type,
+       prior.target_id AS prior_target_id,
+       prior.reason_code AS prior_reason_code,
+       prior.created_at AS prior_created_at
+     FROM (SELECT 1) root
+     LEFT JOIN idem ON 1 = 1
+     LEFT JOIN prior ON 1 = 1`,
+  ).bind(
+    actorUserId,
+    idempotencyKey,
+    actorUserId,
+    input.targetType,
+    targetId,
+    reasonCode,
+    dedupBucket,
+  ).first<{
+    idem_report_id: string | null
+    idem_request_hash: string | null
+    idem_response_json: string | null
+    prior_report_id: string | null
+    prior_target_type: ReportTargetType | null
+    prior_target_id: string | null
+    prior_reason_code: string | null
+    prior_created_at: string | null
   }>()
 
-  if (existingIdempotency) {
-    if (existingIdempotency.request_hash !== requestHash) {
+  if (existing?.idem_report_id) {
+    if (existing.idem_request_hash !== requestHash) {
       throw new ReportRuntimeError('CONFLICT', 409)
     }
-    return JSON.parse(existingIdempotency.response_json) as ReportResult
+    if (!existing.idem_response_json) throw new ReportRuntimeError('REPORT_WRITE_FAILED', 500)
+    return JSON.parse(existing.idem_response_json) as ReportResult
   }
 
-  const existingReport = await db.prepare(
-    'SELECT report_id, target_type, target_id, reason_code, created_at FROM moderation_reports WHERE actor_user_id = ? AND target_type = ? AND target_id = ? AND reason_code = ? AND dedup_bucket = ? LIMIT 1',
-  ).bind(actorUserId, input.targetType, targetId, reasonCode, dedupBucket).first<{
-    report_id: string
-    target_type: ReportTargetType
-    target_id: string
-    reason_code: string
-    created_at: string
-  }>()
-
-  if (existingReport) {
+  if (existing?.prior_report_id && existing.prior_target_type && existing.prior_target_id && existing.prior_reason_code && existing.prior_created_at) {
     const result: ReportResult = {
-      reportId: existingReport.report_id,
-      targetType: existingReport.target_type,
-      targetId: existingReport.target_id,
-      reasonCode: existingReport.reason_code,
+      reportId: existing.prior_report_id,
+      targetType: existing.prior_target_type,
+      targetId: existing.prior_target_id,
+      reasonCode: existing.prior_reason_code,
       status: 'DEDUPLICATED',
-      createdAt: existingReport.created_at,
+      createdAt: existing.prior_created_at,
     }
-    const idemId = crypto.randomUUID()
     await db.prepare(
       'INSERT OR IGNORE INTO moderation_report_idempotency (id, actor_user_id, idempotency_key, request_hash, report_id, response_status, response_json, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     ).bind(
-      idemId,
+      crypto.randomUUID(),
       actorUserId,
       idempotencyKey,
       requestHash,
@@ -156,7 +186,12 @@ export async function createReport(
     return result
   }
 
-  const reportId = crypto.randomUUID()
+  const reportIdentity = [actorUserId, input.targetType, targetId, reasonCode, dedupBucket].join('|')
+  const reportDigest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(reportIdentity))
+  const reportId = 'report_' + Array.from(new Uint8Array(reportDigest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+
   const result: ReportResult = {
     reportId,
     targetType: input.targetType,
@@ -168,7 +203,7 @@ export async function createReport(
   const auditEventId = crypto.randomUUID()
 
   const reportStatement = db.prepare(
-    'INSERT INTO moderation_reports (report_id, actor_user_id, target_type, target_id, reason_code, description, evidence_refs_json, policy_version, dedup_bucket, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT OR IGNORE INTO moderation_reports (report_id, actor_user_id, target_type, target_id, reason_code, description, evidence_refs_json, policy_version, dedup_bucket, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
   ).bind(
     reportId,
     actorUserId,
@@ -182,25 +217,13 @@ export async function createReport(
     createdAt,
   )
 
-  const idempotencyStatement = db.prepare(
-    'INSERT INTO moderation_report_idempotency (id, actor_user_id, idempotency_key, request_hash, report_id, response_status, response_json, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-  ).bind(
-    crypto.randomUUID(),
-    actorUserId,
-    idempotencyKey,
-    requestHash,
-    reportId,
-    201,
-    JSON.stringify(result),
-    createdAt,
-    expiresAt,
-  )
-
   const auditStatement = db.prepare(
     `INSERT INTO audit_events (
        event_id, request_id, trace_id, actor_json, action, target_type, target_id,
        before_json, after_json, reason, ip, user_agent, occurred_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     )
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+     WHERE changes() = 1`,
   ).bind(
     auditEventId,
     input.requestId,
@@ -224,33 +247,23 @@ export async function createReport(
     createdAt,
   )
 
-  try {
-    const batch = await db.batch([reportStatement, idempotencyStatement, auditStatement])
-    if (batch.some((result) => !result.success)) {
-      throw new ReportRuntimeError('REPORT_WRITE_FAILED', 500)
-    }
-    return result
-  } catch (error) {
-    if (error instanceof ReportRuntimeError) throw error
-    const raced = await db.prepare(
-      'SELECT report_id, target_type, target_id, reason_code, created_at FROM moderation_reports WHERE actor_user_id = ? AND target_type = ? AND target_id = ? AND reason_code = ? AND dedup_bucket = ? LIMIT 1',
-    ).bind(actorUserId, input.targetType, targetId, reasonCode, dedupBucket).first<{
-      report_id: string
-      target_type: ReportTargetType
-      target_id: string
-      reason_code: string
-      created_at: string
-    }>()
-    if (raced) {
-      return {
-        reportId: raced.report_id,
-        targetType: raced.target_type,
-        targetId: raced.target_id,
-        reasonCode: raced.reason_code,
-        status: 'DEDUPLICATED',
-        createdAt: raced.created_at,
-      }
-    }
-    throw error
+  const idempotencyStatement = db.prepare(
+    'INSERT OR IGNORE INTO moderation_report_idempotency (id, actor_user_id, idempotency_key, request_hash, report_id, response_status, response_json, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  ).bind(
+    crypto.randomUUID(),
+    actorUserId,
+    idempotencyKey,
+    requestHash,
+    reportId,
+    201,
+    JSON.stringify(result),
+    createdAt,
+    expiresAt,
+  )
+
+  const batch = await db.batch([reportStatement, auditStatement, idempotencyStatement])
+  if (batch.some((item) => !item.success)) {
+    throw new ReportRuntimeError('REPORT_WRITE_FAILED', 500)
   }
+  return result}
 }
