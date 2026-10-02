@@ -35,12 +35,13 @@ export default function ContentComments({ contentId }: { contentId: string }) {
   const loadComments = useCallback(async (nextCursor: string | null = null) => {
     if (nextCursor) setLoadingMore(true)
     else setLoading(true)
+    const controller = new AbortController()
     try {
       const params = new URLSearchParams({ limit: '20' })
       if (nextCursor) params.set('cursor', nextCursor)
       const response = await fetch(
         '/api/v1/contents/' + encodeURIComponent(contentId) + '/comments?' + params.toString(),
-        { headers: { accept: 'application/json' }, cache: 'no-store' },
+        { headers: { accept: 'application/json' }, cache: 'no-store', signal: controller.signal },
       )
       const data = await response.json().catch((): null => null)
       if (!response.ok || !data?.data) {
@@ -51,6 +52,7 @@ export default function ContentComments({ contentId }: { contentId: string }) {
       setCursor(page.nextCursor)
       setHasMore(page.hasMore)
     } catch (error) {
+      if (controller.signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) return
       setMessage(error instanceof Error ? error.message : '评论加载失败')
     } finally {
       setLoading(false)
@@ -59,10 +61,15 @@ export default function ContentComments({ contentId }: { contentId: string }) {
   }, [contentId])
 
   useEffect(() => {
+    let disposed = false
     const timer = window.setTimeout(() => {
+      if (disposed) return
       void loadComments()
     }, 0)
-    return () => window.clearTimeout(timer)
+    return () => {
+      disposed = true
+      window.clearTimeout(timer)
+    }
   }, [loadComments])
 
   async function submitComment(event: FormEvent<HTMLFormElement>) {
