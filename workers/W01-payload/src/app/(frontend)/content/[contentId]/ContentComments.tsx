@@ -96,7 +96,7 @@ export default function ContentComments({ contentId }: { contentId: string }) {
         return
       }
       const created = data.data as CommentItem
-      setComments((current) => [created, ...current])
+      setComments((current) => [...current, created])
       setBody('')
       setReplyingTo(null)
     } catch {
