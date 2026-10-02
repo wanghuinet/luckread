@@ -36,7 +36,6 @@ export default function CreatorModerationQueue() {
   const [actionId, setActionId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [reasons, setReasons] = useState<Record<string, string>>({})
   const [decisionReason, setDecisionReason] = useState<Record<string, string>>({})
 
   async function loadQueue() {
