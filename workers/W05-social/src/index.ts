@@ -165,7 +165,7 @@ export default {
         requestId: crypto.randomUUID(),
       })
     } catch (e) {
-      if (e instanceof FollowRuntimeError) {
+      if (e instanceof FollowRuntimeError || e instanceof LikeRuntimeError) {
         return json({
           error: {
             code: e.code,
