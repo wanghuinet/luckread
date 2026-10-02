@@ -141,7 +141,11 @@ export default function PublishComposer({
     const form = new FormData()
     form.append('alt', file.name)
     form.append('file', file)
-    const response = await authorizedFetch('/api/v1/media', { method: 'POST', body: form })
+    const response = await authorizedFetch('/api/v1/media', {
+      method: 'POST',
+      body: form,
+      headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() },
+    })
     const data = await response.json().catch((): null => null)
     const doc = data?.doc ?? data
     if (!response.ok || !doc?.id || !doc?.url) {
