@@ -47,7 +47,7 @@ async function forward(request: Request, method: 'GET' | 'POST' | 'DELETE'): Pro
       pathname,
       method,
       principal,
-      body: target,
+      body: method === 'GET' ? undefined : target,
     })
   } catch (error) {
     if (error instanceof W05SocialClientError) {
