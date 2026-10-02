@@ -11,11 +11,13 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'workers/W01-payload/src/app/api/v1/interactions/likes/**'
+      - 'workers/W01-payload/src/app/api/v1/interactions/bookmarks/**'
       - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/page.tsx'
       - 'workers/W01-payload/tests/int/content-detail.int.spec.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/[contentId]/comments/**'
       - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/ContentComments.tsx'
       - 'workers/W01-payload/tests/int/social-comments-v1-adapter.int.spec.ts'
+      - 'workers/W01-payload/tests/int/social-bookmarks-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/tests/int/content-detail-comments.int.spec.ts'
       - '.github/workflows/w05-social-runtime-ci.yml'
   push:
@@ -30,8 +32,10 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'workers/W01-payload/src/app/api/v1/interactions/likes/**'
+      - 'workers/W01-payload/src/app/api/v1/interactions/bookmarks/**'
       - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/page.tsx'
       - 'workers/W01-payload/tests/int/content-detail.int.spec.ts'
+      - 'workers/W01-payload/tests/int/social-bookmarks-v1-adapter.int.spec.ts'
       - '.github/workflows/w05-social-runtime-ci.yml'
 
 permissions:
@@ -59,7 +63,25 @@ jobs:
 
       - name: Run W05 Social and W01 adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/index.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/index.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
+
+      - name: Verify favorite migration shape
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          sql = Path('workers/W05-social/migrations/20261002_004_social_005_favorite_v1.sql').read_text()
+          db.executescript(sql)
+          cols = db.execute('PRAGMA table_info("interaction_favorites")').fetchall()
+          if [r[1] for r in cols] != ['relationship_id','actor_user_id','target_type','target_id','created_at']:
+              raise SystemExit('unexpected favorite schema')
+          indexes = {r[1]: r[2] for r in db.execute('PRAGMA index_list("interaction_favorites")').fetchall()}
+          if indexes.get('uq_interaction_favorite_actor_target') != 1:
+              raise SystemExit('favorite uniqueness boundary missing')
+          print('SOCIAL_005_FAVORITE_MIGRATION_STATIC=PASS')
+          PY
+
 
       - name: Verify like migration shape
         run: |
