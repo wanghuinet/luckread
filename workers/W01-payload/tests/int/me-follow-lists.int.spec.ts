@@ -20,6 +20,9 @@ describe('personal social relationship pages', () => {
     expect(component).toContain("window.location.assign('/login?returnTo='")
     expect(component).toContain("credentials: 'include'")
     expect(component).toContain("href={'/users/' + encodeURIComponent(item.userId)}")
+    expect(component).toContain("method: 'DELETE'")
+    expect(component).toContain("'Idempotency-Key': 'social-unfollow:' + crypto.randomUUID()")
+    expect(component).toContain("取消关注")
   })
 
   it('links the personal relationship pages from the account profile', () => {
