@@ -129,6 +129,33 @@ export async function getSubscription(db: D1Database, subscriberId: string, subs
   return toPublic(await readSubscriptionRow(db, subscriptionId, validatePrincipal(subscriberId)))
 }
 
+export async function listSubscriptions(
+  db: D1Database,
+  subscriberId: string,
+  limit = 20,
+  page = 1,
+): Promise<{
+  docs: ReturnType<typeof toPublic>[]
+  limit: number
+  page: number
+  hasNextPage: boolean
+}> {
+  const subscriber = validatePrincipal(subscriberId)
+  const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), 50) : 20
+  const safePage = Number.isFinite(page) ? Math.min(Math.max(Math.trunc(page), 1), 10000) : 1
+  const offset = (safePage - 1) * safeLimit
+  const rows = await db.prepare(
+    'SELECT * FROM membership_subscriptions WHERE subscriber_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+  ).bind(subscriber, safeLimit + 1, offset).all<SubscriptionRow>()
+  const docs = (rows.results ?? []).slice(0, safeLimit).map(toPublic)
+  return {
+    docs,
+    limit: safeLimit,
+    page: safePage,
+    hasNextPage: (rows.results ?? []).length > safeLimit,
+  }
+}
+
 const transitionTargets: Record<'cancel' | 'pause' | 'resume', SubscriptionStatus[]> = { cancel: ['ACTIVE', 'PAST_DUE', 'PAUSED'], pause: ['ACTIVE'], resume: ['PAUSED'] }
 const nextStates: Record<'cancel' | 'pause' | 'resume', SubscriptionStatus> = { cancel: 'CANCELED', pause: 'PAUSED', resume: 'ACTIVE' }
 const nextState = (operation: 'cancel' | 'pause' | 'resume'): SubscriptionStatus => nextStates[operation]
