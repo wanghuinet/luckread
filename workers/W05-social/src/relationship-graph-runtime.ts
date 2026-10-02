@@ -45,6 +45,8 @@ export async function getRelationshipGraph(
       blocked: false,
       blockedBy: false,
       muted: false,
+      relationshipId: null,
+      createdAt: null,
     }
   }
 
