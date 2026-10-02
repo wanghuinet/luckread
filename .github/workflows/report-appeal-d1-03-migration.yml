@@ -1,0 +1,104 @@
+name: Report Appeal D1-03 Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact 40-character source SHA containing the report migration
+        required: true
+        type: string
+      confirm:
+        description: Type APPLY_REPORT_APPEAL_MIGRATION to permit remote D1 mutation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  EXPECTED_DB_ID: bda1d247-a371-4244-91ae-aef96034db7f
+  EXPECTED_DB_NAME: secondary
+  EXPECTED_WORKER: luckread-w06
+  EXPECTED_BINDING: D1_03
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY_REPORT_APPEAL_MIGRATION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+      - name: Verify source and W06 binding
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_sha }}"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          config = json.loads(Path('workers/W06-governance/wrangler.jsonc').read_text())
+          assert config['name'] == 'luckread-w06'
+          db = next(x for x in config['d1_databases'] if x['binding'] == 'D1_03')
+          assert db['database_id'] == 'bda1d247-a371-4244-91ae-aef96034db7f'
+          assert db['database_name'] == 'secondary'
+          assert Path('workers/W06-governance/migrations/0003_moderation_report_v1.sql').is_file()
+          print('REPORT_APPEAL_BINDING_SOURCE=PASS')
+          PY
+      - name: Validate migration locally
+        run: |
+          set -euo pipefail
+          sqlite3 /tmp/luckread-report.sqlite < workers/W06-governance/migrations/0001_audit_event.sql
+          sqlite3 /tmp/luckread-report.sqlite < workers/W06-governance/migrations/0002_moderation_queue_foundation.sql
+          sqlite3 /tmp/luckread-report.sqlite < workers/W06-governance/migrations/0003_moderation_report_v1.sql
+          sqlite3 -json /tmp/luckread-report.sqlite 'PRAGMA table_info("moderation_reports");' > /tmp/reports-schema.json
+          sqlite3 -json /tmp/luckread-report.sqlite 'PRAGMA table_info("moderation_report_idempotency");' > /tmp/report-idem-schema.json
+          python - <<'PY'
+          import json
+          def names(path): return [r['name'] for r in json.load(open(path))]
+          assert names('/tmp/reports-schema.json') == [
+              'report_id','actor_user_id','target_type','target_id','reason_code',
+              'description','evidence_refs_json','policy_version','dedup_bucket','created_at'
+          ]
+          assert names('/tmp/report-idem-schema.json') == [
+              'id','actor_user_id','idempotency_key','request_hash','report_id',
+              'response_status','response_json','created_at','expires_at'
+          ]
+          print('REPORT_APPEAL_MIGRATION_STATIC=PASS')
+          PY
+      - name: Apply report migration remotely
+        working-directory: workers/W06-governance
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
+      - name: Verify remote schema
+        working-directory: workers/W06-governance
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc             --command 'PRAGMA table_info("moderation_reports");' > /tmp/remote-report.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc             --command 'PRAGMA table_info("moderation_report_idempotency");' > /tmp/remote-report-idem.json
+          python - <<'PY'
+          import json
+          def rows(path):
+              x = json.load(open(path))
+              return [row for item in x for row in item.get('results', [])]
+          assert [r['name'] for r in rows('/tmp/remote-report.json')] == [
+              'report_id','actor_user_id','target_type','target_id','reason_code',
+              'description','evidence_refs_json','policy_version','dedup_bucket','created_at'
+          ]
+          assert [r['name'] for r in rows('/tmp/remote-report-idem.json')] == [
+              'id','actor_user_id','idempotency_key','request_hash','report_id',
+              'response_status','response_json','created_at','expires_at'
+          ]
+          print('REPORT_APPEAL_REMOTE_SCHEMA=PASS')
+          PY
