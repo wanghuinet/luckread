@@ -24,6 +24,14 @@ describe('content comments UI', () => {
     expect(component).not.toContain('setComments((current) => [created, ...current])')
   })
 
+  it('cancels stale comment list requests when a newer load starts or the component unmounts', () => {
+    const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
+    expect(component).toContain('useRef<AbortController | null>(null)')
+    expect(component).toContain('activeControllerRef.current?.abort()')
+    expect(component).toContain('signal: controller.signal')
+    expect(component).toContain('activeControllerRef.current = null')
+  })
+
   it('uses the public comments read and authenticated create APIs', () => {
     const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
     expect(component).toContain('/api/v1/contents/')
