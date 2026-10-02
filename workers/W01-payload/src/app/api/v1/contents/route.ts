@@ -16,8 +16,10 @@ export async function GET(request: Request): Promise<Response> {
     const query = new URLSearchParams()
     const cursor = url.searchParams.get('cursor')
     const limit = url.searchParams.get('limit')
+    const creatorId = url.searchParams.get('creatorId')
     if (cursor) query.set('cursor', cursor)
     if (limit) query.set('limit', limit)
+    if (creatorId) query.set('creatorId', creatorId)
     const suffix = query.toString() ? `?${query.toString()}` : ''
 
     return await callW03Content({
