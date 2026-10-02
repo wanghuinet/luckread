@@ -12,5 +12,7 @@ describe('share landing page', () => {
     expect(page).toContain('data.data.contentId')
     expect(page).toContain("router.replace('/content/' + encodeURIComponent(data.data.contentId))")
     expect(page).toContain('cache: \'no-store\'')
+    expect(page).toContain("import Link from 'next/link'")
+    expect(page).toContain('<Link href="/content">去发现内容</Link>')
   })
 })
