@@ -313,6 +313,46 @@ describe('W05 social query transport', () => {
     })
   })
 
+  it('accepts a comment like through the shared interaction transport', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'content-type': 'application/json' },
+        body: JSON.stringify({ targetType: 'comment', targetId: 'comment-1' }),
+      }),
+      {
+        DB: dbFor([
+          { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'author-1', content_owner_user_id: 'owner-1', blocked: 0 },
+          {
+            relationship_id: 'comment-like-1',
+            actor_user_id: 'viewer-1',
+            target_type: 'comment',
+            target_id: 'comment-1',
+            created_at: '2026-10-02T00:00:00.000Z',
+          },
+        ]),
+      },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { relationshipId: 'comment-like-1', targetType: 'comment', targetId: 'comment-1' },
+    })
+  })
+
+  it('reads comment like status through the shared interaction transport', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/likes?targetType=comment&targetId=comment-1', {
+        method: 'GET',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
+      }),
+      { DB: dbFor([{ liked: 1, like_count: 2 }]) },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { liked: true, likeCount: 2 },
+    })
+  })
+
   it('unlikes with a 204 response', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/likes', {
