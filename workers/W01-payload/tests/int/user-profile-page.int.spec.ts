@@ -30,4 +30,15 @@ describe('user profile page', () => {
     expect(page).toContain('退出登录')
   })
 
+  it('uploads avatars through the existing authenticated media API and waits for profile save', () => {
+    const page = read('src/app/(frontend)/me/profile/page.tsx')
+
+    expect(page).toContain("fetch('/api/v1/media'")
+    expect(page).toContain("method: 'POST'")
+    expect(page).toContain("form.append('file', file)")
+    expect(page).toContain("form.append('alt', file.name)")
+    expect(page).toContain("setProfile((current) => current ? { ...current, avatar: url } : current)")
+    expect(page).toContain('上传后仍需点击“保存资料”。')
+  })
+
 })
