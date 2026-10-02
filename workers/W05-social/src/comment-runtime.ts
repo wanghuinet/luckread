@@ -252,6 +252,110 @@ export async function createComment(
 
 }
 
+const MAX_IF_MATCH = 256
+
+const parseIfMatch = (value: string): string => {
+  const normalized = value.trim()
+  if (!normalized || normalized.length > MAX_IF_MATCH) {
+    throw new CommentRuntimeError('PRECONDITION_REQUIRED', 428)
+  }
+  if (!/^"[^"]{1,240}"$/.test(normalized)) {
+    throw new CommentRuntimeError('PRECONDITION_REQUIRED', 428)
+  }
+  return normalized.slice(1, -1)
+}
+
+const commentEtag = (updatedAt: string): string => '"' + updatedAt + '"'
+
+export type CommentUpdateInput = {
+  body: string
+  ifMatch: string
+}
+
+export async function updateComment(
+  db: D1Database,
+  actorUserIdValue: string,
+  commentIdValue: string,
+  input: CommentUpdateInput,
+): Promise<{ item: CommentItem; etag: string }> {
+  const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
+  const commentId = validateId(commentIdValue)
+  const body = input.body.trim()
+  const expectedUpdatedAt = parseIfMatch(input.ifMatch)
+
+  if (!body || body.length > MAX_BODY) {
+    throw new CommentRuntimeError('VALIDATION_FAILED', 400)
+  }
+
+  const current = await db.prepare(
+    `SELECT
+       c.id,
+       c.content_id,
+       c.author_user_id,
+       c.parent_id,
+       c.body,
+       c.state,
+       c.depth,
+       c.created_at,
+       c.updated_at,
+       content.state AS content_state
+     FROM social_comments c
+     JOIN contents content ON content.id = c.content_id
+     WHERE c.id = ?
+     LIMIT 1`,
+  ).bind(commentId).first<{
+    id: string
+    content_id: string
+    author_user_id: string
+    parent_id: string | null
+    body: string
+    state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
+    depth: number
+    created_at: string
+    updated_at: string
+    content_state: string
+  }>()
+
+  if (!current || current.content_state !== 'PUBLISHED') {
+    throw new CommentRuntimeError('NOT_FOUND', 404)
+  }
+  if (current.author_user_id !== actorUserId) {
+    throw new CommentRuntimeError('PERMISSION_DENIED', 403)
+  }
+  if (current.state !== 'PUBLISHED') {
+    throw new CommentRuntimeError('INVALID_STATE', 409)
+  }
+
+  if (current.updated_at !== expectedUpdatedAt) {
+    throw new CommentRuntimeError('PRECONDITION_FAILED', 412)
+  }
+
+  const now = new Date().toISOString()
+  const updated = await db.prepare(
+    `UPDATE social_comments
+     SET body = ?, updated_at = ?
+     WHERE id = ?
+       AND author_user_id = ?
+       AND state = 'PUBLISHED'
+       AND updated_at = ?
+     RETURNING id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at`,
+  ).bind(body, now, commentId, actorUserId, expectedUpdatedAt).first<{
+    id: string
+    content_id: string
+    author_user_id: string
+    parent_id: string | null
+    body: string
+    state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
+    depth: number
+    created_at: string
+    updated_at: string
+  }>()
+
+  if (!updated) throw new CommentRuntimeError('PRECONDITION_FAILED', 412)
+
+  return { item: toCommentItem(updated), etag: commentEtag(updated.updated_at) }
+}
+
 export async function listComments(
   db: D1Database,
   contentIdValue: string,
