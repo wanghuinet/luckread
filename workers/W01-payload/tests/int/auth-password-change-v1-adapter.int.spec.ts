@@ -9,7 +9,7 @@ describe('versioned auth password change adapter', () => {
       'utf8',
     )
 
-    expect(route).toContain("export { POST } from '../../../../auth/password/change/route'")
+    expect(route).toContain("export { POST } from '../../../../../auth/password/change/route'")
     expect(route).not.toContain('getPayload(')
     expect(route).not.toContain('payload.update(')
     expect(route).not.toContain('assertPasswordPolicy(')
