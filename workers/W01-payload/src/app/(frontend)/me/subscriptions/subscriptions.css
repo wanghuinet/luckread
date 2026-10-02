@@ -1,0 +1,56 @@
+.my-subscriptions {
+  min-height: 100vh;
+  padding: 52px 6vw 80px;
+  background: #f7f8fa;
+  color: #101828;
+}
+.my-subscriptions-header {
+  display:flex; justify-content:space-between; gap:28px; align-items:flex-end;
+  max-width:980px; margin:0 auto 28px;
+}
+.my-subscriptions-header p { margin:0 0 7px; font-size:11px; font-weight:800; letter-spacing:.12em; }
+.my-subscriptions-header h1 { margin:0; font-size:42px; letter-spacing:-.04em; }
+.my-subscriptions-header span { display:block; margin-top:9px; color:#667085; font-size:13px; line-height:1.6; }
+.my-subscriptions-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.my-subscriptions-actions a,
+.my-subscriptions-actions button,
+.subscription-actions button {
+  border:1px solid #d0d5dd; border-radius:10px; background:#fff; color:#344054;
+  padding:9px 12px; font-size:12px; text-decoration:none; cursor:pointer;
+}
+.subscription-list { display:grid; gap:12px; max-width:980px; margin:0 auto; }
+.subscription-card {
+  padding:20px; border:1px solid #eaecf0; border-radius:16px; background:#fff;
+  box-shadow:0 5px 20px rgba(16,24,40,.05);
+}
+.subscription-card-top { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
+.subscription-plan { color:#667085; font-size:11px; font-weight:700; }
+.subscription-card h2 { margin:5px 0 0; font-size:19px; }
+.subscription-status { padding:5px 9px; border-radius:999px; background:#f2f4f7; color:#475467; font-size:10px; font-weight:800; }
+.subscription-status-active { background:#ecfdf3; color:#027a48; }
+.subscription-status-paused { background:#fffaeb; color:#b54708; }
+.subscription-status-past_due { background:#fef3f2; color:#b42318; }
+.subscription-meta {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px;
+  margin-top:18px; padding-top:16px; border-top:1px solid #f2f4f7;
+}
+.subscription-meta div { display:grid; gap:4px; min-width:0; }
+.subscription-meta small { color:#98a2b3; font-size:10px; }
+.subscription-meta strong { overflow-wrap:anywhere; font-size:12px; }
+.subscription-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:17px; }
+.subscription-actions .danger { color:#b42318; }
+.subscription-empty {
+  display:grid; gap:10px; place-items:start; max-width:980px; margin:0 auto;
+  padding:42px 24px; border:1px dashed #d0d5dd; border-radius:16px; background:#fff; color:#667085;
+}
+.subscription-empty strong { color:#101828; font-size:20px; }
+.subscription-empty a { color:#175cd3; font-size:12px; font-weight:700; text-decoration:none; }
+.subscription-message,.subscription-error,.subscription-note { max-width:980px; margin:0 auto 14px; font-size:12px; }
+.subscription-message { color:#027a48; }
+.subscription-error { color:#b42318; }
+.subscription-note { margin-top:14px; color:#98a2b3; }
+@media (max-width:700px) {
+  .my-subscriptions { padding:32px 18px 60px; }
+  .my-subscriptions-header { display:grid; }
+  .my-subscriptions-header h1 { font-size:34px; }
+}
