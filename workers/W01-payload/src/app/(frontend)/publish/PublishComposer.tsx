@@ -157,14 +157,19 @@ export default function PublishComposer({
 
   async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(event.target.files ?? [])
-    if (!selected.length) return
+    const remainingSlots = Math.max(0, 12 - assets.length)
+    if (!selected.length || remainingSlots === 0) {
+      setError(remainingSlots === 0 ? '最多添加 12 个媒体文件。' : '')
+      return
+    }
     setError('')
     setMessage('正在上传媒体…')
     try {
       const uploaded: UploadedAsset[] = []
-      for (const file of selected.slice(0, 12)) uploaded.push(await uploadFile(file))
+      for (const file of selected.slice(0, remainingSlots)) uploaded.push(await uploadFile(file))
       setAssets((current) => [...current, ...uploaded])
       setMessage(`已上传 ${uploaded.length} 个媒体文件`)
+      if (selected.length > remainingSlots) setError('已达到 12 个媒体文件上限，其余文件未上传。')
     } catch {
       setError('媒体上传失败，请检查文件后重试。')
       setMessage('')
