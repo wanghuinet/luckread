@@ -238,6 +238,21 @@ describe('Creator Center admin extension', () => {
     expect(styles).toContain('.creatorLayout select:focus-visible')
   })
 
+  it('uses the stable v1 creator media library instead of a second media authority', () => {
+    const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const assets = read('src/app/(payload)/admin/CreatorAssetLibrary.tsx')
+
+    expect(view).toContain("import CreatorAssetLibrary from './CreatorAssetLibrary'")
+    expect(view).toContain('<CreatorAssetLibrary />')
+    expect(assets).toContain("fetch('/api/v1/media?limit=8&page=1'")
+    expect(assets).toContain("method: 'DELETE'")
+    expect(assets).toContain("'/api/v1/media/' + encodeURIComponent(String(id))")
+    expect(assets).toContain("credentials: 'include'")
+    expect(assets).toContain('mimeType.startsWith(\'video/\')')
+    expect(assets).not.toContain('D1Database')
+    expect(assets).not.toContain('R2Bucket')
+  })
+
   it('exposes login submission and error status', () => {
     const registerForm = read('src/app/(frontend)/register/RegisterForm.tsx')
     const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
