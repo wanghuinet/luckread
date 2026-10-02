@@ -14,6 +14,8 @@ on:
       - 'pnpm-lock.yaml'
       - 'workers/W01-payload/src/app/api/v1/interactions/likes/**'
       - 'workers/W01-payload/src/app/api/v1/interactions/bookmarks/**'
+      - 'workers/W01-payload/src/app/api/v1/interactions/blocks/**'
+      - 'workers/W01-payload/src/app/api/v1/interactions/mutes/**'
       - 'workers/W01-payload/src/app/api/v1/content/**/shares/**'
       - 'workers/W01-payload/src/app/api/v1/shares/**'
       - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/page.tsx'
@@ -22,6 +24,7 @@ on:
       - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/ContentComments.tsx'
       - 'workers/W01-payload/tests/int/social-comments-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/tests/int/social-bookmarks-v1-adapter.int.spec.ts'
+      - 'workers/W01-payload/tests/int/social-block-mute-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/tests/int/social-shares-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/tests/int/social-shares-landing.int.spec.ts'
       - 'workers/W01-payload/tests/int/content-detail-comments.int.spec.ts'
@@ -73,7 +76,26 @@ jobs:
 
       - name: Run W05 Social and W01 adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/index.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
+
+      - name: Verify block mute migration shape
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          sql = Path('workers/W05-social/migrations/20261002_006_social_009_block_mute_v1.sql').read_text()
+          db.executescript(sql)
+          cols = db.execute('PRAGMA table_info("social_user_interactions")').fetchall()
+          expected = ['relationship_id','actor_user_id','target_user_id','relation_type','created_at','updated_at']
+          if [r[1] for r in cols] != expected:
+              raise SystemExit('unexpected block/mute schema')
+          indexes = {r[1]: r[2] for r in db.execute('PRAGMA index_list("social_user_interactions")').fetchall()}
+          if indexes.get('sqlite_autoindex_social_user_interactions_1') != 1:
+              raise SystemExit('block/mute uniqueness boundary missing')
+          print('SOCIAL_009_BLOCK_MUTE_MIGRATION_STATIC=PASS')
+          PY
+
 
       - name: Verify share migration shape
         run: |
