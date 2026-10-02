@@ -13,7 +13,6 @@ import { getRelationshipGraph } from './relationship-graph-runtime.js'
 import {
   FollowRuntimeError,
   follow,
-  getFollowStatus,
   listFollowers,
   listFollowing,
   parseFollowListLimit,
@@ -321,10 +320,14 @@ export default {
         }
 
         if (request.method === 'GET') {
+          const relationship = await getRelationshipGraph(env.DB, viewerUserId, path.userId)
           return json({
             data: {
-              ...(await getFollowStatus(env.DB, viewerUserId, path.userId)),
-              relationship: await getRelationshipGraph(env.DB, viewerUserId, path.userId),
+              following: relationship.following,
+              relationshipId: relationship.relationshipId,
+              targetUserId: path.userId,
+              createdAt: relationship.createdAt,
+              relationship,
             },
             requestId: crypto.randomUUID(),
           })
