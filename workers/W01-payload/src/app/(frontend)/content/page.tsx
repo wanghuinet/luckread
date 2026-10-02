@@ -111,6 +111,7 @@ export default function ContentBrowsePage() {
       <div className="content-browse-actions" role="tablist" aria-label="内容类型筛选">
         {(Object.keys(labels) as Array<ContentType | 'all'>).map((type) => (
           <button
+            key={type}
             aria-selected={contentType === type}
             className={contentType === type ? 'button button-primary' : 'button button-quiet'}
             onClick={() => setContentType(type)}
