@@ -1,10 +1,12 @@
 'use client'
 
+import Link from 'next/link'
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 
 type CommentItem = {
   id: string
   contentId: string
+  authorUserId: string
   parentId: string | null
   body: string
   state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
@@ -146,6 +148,9 @@ export default function ContentComments({ contentId }: { contentId: string }) {
             >
               <header>
                 <strong>读者</strong>
+                <Link href={'/users/' + encodeURIComponent(comment.authorUserId)}>
+                  查看主页
+                </Link>
                 <time dateTime={comment.createdAt}>
                   {new Date(comment.createdAt).toLocaleString('zh-CN', { hour12: false })}
                 </time>
