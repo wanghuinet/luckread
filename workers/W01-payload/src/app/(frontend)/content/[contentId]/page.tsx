@@ -147,7 +147,11 @@ export default function ContentDetailPage({
       const response = await fetch('/api/v1/interactions/likes', {
         method: liked ? 'DELETE' : 'POST',
         credentials: 'include',
-        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json',
+          'Idempotency-Key': 'social-like:' + crypto.randomUUID(),
+        },
         body: JSON.stringify({ targetType: 'content', targetId: content.id }),
       })
       if (response.status === 401) {
