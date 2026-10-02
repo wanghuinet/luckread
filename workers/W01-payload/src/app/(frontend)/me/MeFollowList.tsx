@@ -50,6 +50,7 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [unfollowingId, setUnfollowingId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const loadProfile = useCallback(async (signal?: AbortSignal): Promise<string> => {
@@ -133,6 +134,41 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
 
     return () => controller.abort()
   }, [direction, loadList, loadProfile])
+
+  async function unfollow(targetUserId: string) {
+    if (!isFollowers || unfollowingId) return
+    setUnfollowingId(targetUserId)
+    setError('')
+    try {
+      const response = await fetch(
+        '/api/v1/social/follows/' + encodeURIComponent(targetUserId),
+        {
+          method: 'DELETE',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            accept: 'application/json',
+            'Idempotency-Key': 'social-unfollow:' + crypto.randomUUID(),
+          },
+        },
+      )
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+      if (!response.ok && response.status !== 204) {
+        const data = await response.json().catch((): null => null) as FollowListResponse | null
+        throw new Error(data?.error?.message || '取消关注失败')
+      }
+      setItems((current) => current.filter((item) => item.userId !== targetUserId))
+      setTotalCount((count) => count === null ? count : Math.max(0, count - 1))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '取消关注失败')
+    } finally {
+      setUnfollowingId(null)
+    }
+  }
 
   async function loadMore() {
     if (!userId || loadingMore || !hasMore || !nextCursor) return
@@ -224,9 +260,20 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
                   </div>
                 </div>
               </div>
-              <Link href={'/users/' + encodeURIComponent(item.userId)} style={{ whiteSpace: 'nowrap' }}>
-                查看主页
-              </Link>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <Link href={'/users/' + encodeURIComponent(item.userId)} style={{ whiteSpace: 'nowrap' }}>
+                  查看主页
+                </Link>
+                {!isFollowers ? (
+                  <button
+                    disabled={unfollowingId === item.userId}
+                    onClick={() => void unfollow(item.userId)}
+                    type="button"
+                  >
+                    {unfollowingId === item.userId ? '处理中…' : '取消关注'}
+                  </button>
+                ) : null}
+              </div>
             </article>
           ))}
 
