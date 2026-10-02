@@ -1,5 +1,7 @@
 import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route'
 
+type PayloadRouteContext = Parameters<typeof payloadMediaPost>[1]
+
 /**
  * Stable v1 upload entry for clients.
  *
@@ -9,5 +11,8 @@ import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route
  */
 export async function POST(request: Request): Promise<Response> {
   const target = new URL('/api/media', request.url)
-  return payloadMediaPost(new Request(target, request.clone()))
+  const context: PayloadRouteContext = {
+    params: Promise.resolve({ slug: ['media'] }),
+  }
+  return payloadMediaPost(new Request(target, request.clone()), context)
 }
