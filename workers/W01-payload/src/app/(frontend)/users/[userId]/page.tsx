@@ -52,6 +52,11 @@ export default function PublicProfilePage({
   const [viewerUserId, setViewerUserId] = useState<string | null>(null)
   const [isFollowing, setIsFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
+  const [blocked, setBlocked] = useState(false)
+  const [blockBusy, setBlockBusy] = useState(false)
+  const [muted, setMuted] = useState(false)
+  const [muteBusy, setMuteBusy] = useState(false)
+  const [safetyMessage, setSafetyMessage] = useState('')
   const [contents, setContents] = useState<PublicContent[]>([])
   const [contentCursor, setContentCursor] = useState<string | null>(null)
   const [contentHasMore, setContentHasMore] = useState(false)
@@ -203,6 +208,54 @@ export default function PublicProfilePage({
     }
   }
 
+  async function applySafetyAction(action: 'block' | 'mute') {
+    if (!profile) return
+    const busy = action === 'block' ? blockBusy : muteBusy
+    if (busy) return
+
+    if (action === 'block') setBlockBusy(true)
+    else setMuteBusy(true)
+    setSafetyMessage('')
+
+    try {
+      const response = await fetch(
+        '/api/v1/interactions/' + (action === 'block' ? 'blocks/' : 'mutes/') + encodeURIComponent(profile.id),
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            'Idempotency-Key': 'social-' + action + ':' + crypto.randomUUID(),
+          },
+          body: JSON.stringify({ targetUserId: profile.id }),
+        },
+      )
+
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        router.replace('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+
+      if (!response.ok) throw new Error('SAFETY_ACTION_FAILED')
+
+      if (action === 'block') {
+        setBlocked(true)
+        setSafetyMessage('已屏蔽该作者。')
+      } else {
+        setMuted(true)
+        setSafetyMessage('已静音该作者。')
+      }
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
+      setSafetyMessage(action === 'block' ? '屏蔽操作失败，请稍后重试。' : '静音操作失败，请稍后重试。')
+    } finally {
+      if (action === 'block') setBlockBusy(false)
+      else setMuteBusy(false)
+    }
+  }
+
   if (loading) {
     return <main className="content-detail" aria-busy="true"><p className="content-detail-state" role="status">正在加载作者资料…</p></main>
   }
@@ -292,6 +345,28 @@ export default function PublicProfilePage({
           )}
           {error ? <span className="content-detail-action-status" role="status">{error}</span> : null}
         </div>
+
+        {viewerUserId !== profile.id ? (
+          <div className="content-detail-safety-actions" aria-label="关系控制">
+            <button
+              className="content-detail-follow"
+              disabled={blockBusy || blocked}
+              onClick={() => void applySafetyAction('block')}
+              type="button"
+            >
+              {blockBusy ? '屏蔽中…' : blocked ? '已屏蔽' : '屏蔽作者'}
+            </button>
+            <button
+              className="content-detail-follow"
+              disabled={muteBusy || muted}
+              onClick={() => void applySafetyAction('mute')}
+              type="button"
+            >
+              {muteBusy ? '静音中…' : muted ? '已静音' : '静音作者'}
+            </button>
+            {safetyMessage ? <span className="content-detail-action-status" role="status">{safetyMessage}</span> : null}
+          </div>
+        ) : null}
       </article>
 
       <section className="content-detail-card" aria-labelledby="author-content-title" style={{ marginTop: 20 }}>
