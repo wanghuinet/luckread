@@ -9,6 +9,7 @@ import {
   getModerationCase,
   listModerationQueue,
 } from './moderation-runtime'
+import { createReport, ReportRuntimeError } from './report-runtime'
 
 interface Env {
   D1_03: D1Database
@@ -170,6 +171,18 @@ const parseDecision = (value: unknown): {
 }
 
 const errorResponse = (error: unknown, requestId?: string): Response => {
+  if (error instanceof ReportRuntimeError) {
+    const message =
+      error.code === 'UNAUTHENTICATED' ? 'Authentication required' :
+      error.code === 'PERMISSION_DENIED' ? 'Permission denied' :
+      error.code === 'NOT_FOUND' ? 'Reported resource not found' :
+      error.code === 'PRECONDITION_REQUIRED' ? 'Idempotency-Key is required' :
+      error.code === 'CONFLICT' ? 'Conflicting report request' :
+      error.code === 'RATE_LIMITED' ? 'Too many reports' :
+      error.code === 'REPORT_WRITE_FAILED' ? 'Report could not be created' :
+      'Invalid report request'
+    return json({ error: { code: error.code, message, details: {} }, requestId: requestId ?? crypto.randomUUID() }, error.status)
+  }
   if (error instanceof ModerationRuntimeError) {
     const code = error.code
     const message =
@@ -180,6 +193,9 @@ const errorResponse = (error: unknown, requestId?: string): Response => {
       code === 'PRECONDITION_FAILED' ? 'Moderation case has changed' :
       code === 'INVALID_STATE' ? 'Invalid moderation case state' :
       code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' ? 'Idempotency-Key cannot be reused with different input' :
+      code === 'REPORT_WRITE_FAILED' ? 'Report could not be created' :
+      code === 'PRECONDITION_REQUIRED' ? 'Idempotency-Key is required' :
+      code === 'CONFLICT' ? 'Conflicting report request' :
       code === 'SERVICE_UNAVAILABLE' ? 'Moderation service unavailable' :
       'Invalid moderation request'
     return json({ error: { code, message, details: {} }, requestId: requestId ?? crypto.randomUUID() }, error.status)
@@ -193,6 +209,46 @@ export default {
 
     if (url.pathname === '/health' && request.method === 'GET') {
       return json({ service: 'W06', status: 'ok', auditPersistence: 'enabled', d1Binding: Boolean(env.D1_03), moderationRuntime: 'enabled' })
+    }
+
+    if (request.method === 'POST' && url.pathname === '/reports') {
+      try {
+        const principal = requireW01Transport(request)
+        const permission = principal.layer
+        if (!/^L[0-8]$/.test(permission)) throw new ReportRuntimeError('PERMISSION_DENIED', 403)
+        const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        if (!idempotencyKey) throw new ReportRuntimeError('PRECONDITION_REQUIRED', 428)
+        let body: unknown
+        try { body = await request.json() } catch { throw new ReportRuntimeError('VALIDATION_FAILED', 400) }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new ReportRuntimeError('VALIDATION_FAILED', 400)
+        const input = body as Record<string, unknown>
+        const targetType = input.targetType
+        const targetId = input.targetId
+        const reasonCode = input.reasonCode
+        const description = input.description
+        const evidenceRefs = input.evidenceRefs
+        if (
+          (targetType !== 'content' && targetType !== 'comment' && targetType !== 'creator' && targetType !== 'media' && targetType !== 'profile') ||
+          typeof targetId !== 'string' ||
+          typeof reasonCode !== 'string' ||
+          (description !== undefined && typeof description !== 'string') ||
+          (evidenceRefs !== undefined && (!Array.isArray(evidenceRefs) || evidenceRefs.some((value) => typeof value !== 'string')))
+        ) throw new ReportRuntimeError('VALIDATION_FAILED', 400)
+        const result = await createReport(env.D1_03, {
+          actorUserId: principal.userId,
+          targetType,
+          targetId,
+          reasonCode,
+          ...(description !== undefined ? { description } : {}),
+          ...(evidenceRefs !== undefined ? { evidenceRefs: evidenceRefs as string[] } : {}),
+          idempotencyKey,
+          requestId: principal.requestId,
+          correlationId: principal.correlationId,
+        })
+        return json({ data: result, requestId: principal.requestId }, 201)
+      } catch (error) {
+        return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim())
+      }
     }
 
     if (request.method === 'GET' && url.pathname === '/admin/moderation/queue') {
