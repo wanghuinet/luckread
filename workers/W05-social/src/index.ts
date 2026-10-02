@@ -2,6 +2,12 @@
 import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js'
 import { CommentRuntimeError, createComment, listComments, parseCommentLimit } from './comment-runtime.js'
 import {
+  FavoriteRuntimeError,
+  favorite,
+  getFavoriteStatus,
+  unfavorite,
+} from './favorite-runtime.js'
+import {
   FollowRuntimeError,
   follow,
   getFollowStatus,
@@ -159,6 +165,45 @@ export default {
         return json({ data: comment }, 201)
       }
 
+      if (url.pathname === '/internal/social/interactions/bookmarks') {
+        const viewerUserId = requirePrincipal(request)
+        if (request.method !== 'GET' && request.method !== 'POST' && request.method !== 'DELETE') {
+          return new Response(null, { status: 405, headers: { Allow: 'GET, POST, DELETE' } })
+        }
+        requireInteractionLayer(request)
+
+        const target = request.method === 'GET'
+          ? {
+              targetType: url.searchParams.get('targetType') ?? '',
+              targetId: url.searchParams.get('targetId') ?? '',
+            }
+          : await parseJsonTarget(request)
+
+        if (request.method !== 'GET') {
+          const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+          if (!idempotencyKey || idempotencyKey.length > 256) {
+            throw new FavoriteRuntimeError('PRECONDITION_REQUIRED', 428)
+          }
+        }
+
+        if (request.method === 'GET') {
+          return json({
+            data: await getFavoriteStatus(env.DB, viewerUserId, target),
+            requestId: crypto.randomUUID(),
+          })
+        }
+
+        if (request.method === 'POST') {
+          return json({
+            data: await favorite(env.DB, viewerUserId, target),
+            requestId: crypto.randomUUID(),
+          })
+        }
+
+        await unfavorite(env.DB, viewerUserId, target)
+        return new Response(null, { status: 204 })
+      }
+
       if (url.pathname === '/internal/social/interactions/likes') {
         const viewerUserId = requirePrincipal(request)
         if (request.method !== 'GET' && request.method !== 'POST' && request.method !== 'DELETE') {
@@ -246,7 +291,8 @@ export default {
       if (
         error instanceof FollowRuntimeError ||
         error instanceof LikeRuntimeError ||
-        error instanceof CommentRuntimeError
+        error instanceof CommentRuntimeError ||
+        error instanceof FavoriteRuntimeError
       ) {
         return json({
           error: {
