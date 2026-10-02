@@ -87,51 +87,6 @@ export default function MySubscriptionsPage() {
     return () => window.clearTimeout(timer)
   }, [])
 
-  async function changePlan(item: Subscription) {
-    if (!['ACTIVE', 'PAST_DUE', 'PAUSED'].includes(item.status)) return
-    const nextPlanId = window.prompt('请输入新的订阅方案 ID', item.planId)?.trim()
-    if (!nextPlanId || nextPlanId === item.planId) return
-
-    setBusyId(item.subscriptionId)
-    setError('')
-    setMessage('')
-
-    try {
-      const response = await fetch(
-        '/api/v1/memberships/subscriptions/' + encodeURIComponent(item.subscriptionId) + '/change-plan',
-        {
-          method: 'POST',
-          credentials: 'include',
-          cache: 'no-store',
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            'If-Match': item.etag,
-            'Idempotency-Key': 'change-plan:' + item.subscriptionId + ':' + nextPlanId + ':' + item.etag,
-          },
-          body: JSON.stringify({ planId: nextPlanId }),
-        },
-      )
-      if (response.status === 401) {
-        const returnTo = window.location.pathname + window.location.search + window.location.hash
-        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
-        return
-      }
-      const data = await response.json().catch((): null => null) as ListResponse & { data?: Subscription } | null
-      if (!response.ok || !data?.data?.subscriptionId) {
-        throw new Error(data?.error?.message || '订阅方案更新失败')
-      }
-      setItems((current) => current.map((currentItem) =>
-        currentItem.subscriptionId === item.subscriptionId ? data.data! : currentItem,
-      ))
-      setMessage('订阅方案已更新。')
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '订阅方案更新失败')
-    } finally {
-      setBusyId(null)
-    }
-  }
-
   async function transition(item: Subscription, operation: 'cancel' | 'pause' | 'resume') {
     if (operation === 'cancel' && !window.confirm('确定取消这个订阅吗？')) return
     setBusyId(item.subscriptionId)
@@ -177,7 +132,7 @@ export default function MySubscriptionsPage() {
         <div>
           <p>LUCKREAD · MEMBERSHIP</p>
           <h1>我的订阅</h1>
-          <span>查看当前账号的订阅状态与周期。权益和支付状态仍由各自权威域负责。</span>
+          <span>查看当前账号的订阅状态与周期。权益和支付状态仍由各自权威域负责；方案变更将在正式方案目录接入后开放。</span>
         </div>
         <div className="my-subscriptions-actions">
           <Link href="/content">发现内容</Link>
@@ -227,9 +182,6 @@ export default function MySubscriptionsPage() {
                 <div className="subscription-actions">
                   {['ACTIVE', 'PAST_DUE'].includes(item.status) ? (
                     <button disabled={busy} onClick={() => void transition(item, 'pause')} type="button">{busy ? '处理中…' : '暂停订阅'}</button>
-                  ) : null}
-                  {['ACTIVE', 'PAST_DUE', 'PAUSED'].includes(item.status) ? (
-                    <button disabled={busy} onClick={() => void changePlan(item)} type="button">{busy ? '处理中…' : '更换方案'}</button>
                   ) : null}
                   {item.status === 'PAUSED' ? (
                     <button disabled={busy} onClick={() => void transition(item, 'resume')} type="button">{busy ? '处理中…' : '恢复订阅'}</button>
