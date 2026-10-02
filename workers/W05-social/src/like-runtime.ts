@@ -1,3 +1,4 @@
+import { BlockPolicyError, assertNotBlocked } from './block-policy.js'
 /// <reference types="@cloudflare/workers-types" />
 
 export class LikeRuntimeError extends Error {
@@ -45,11 +46,20 @@ export async function like(
   const { targetType, targetId } = validateTarget(target)
 
   const targetRow = await db.prepare(
-    'SELECT id, state FROM contents WHERE id = ? LIMIT 1',
-  ).bind(targetId).first<{ id: string; state: string }>()
+    `SELECT id, state, owner_user_id FROM contents WHERE id = ? LIMIT 1`,
+  ).bind(targetId).first<{ id: string; state: string; owner_user_id: string }>()
 
   if (!targetRow || targetRow.state !== 'PUBLISHED') {
     throw new LikeRuntimeError('NOT_FOUND', 404)
+  }
+
+  try {
+    await assertNotBlocked(db, actor, targetRow.owner_user_id)
+  } catch (error) {
+    if (error instanceof BlockPolicyError) {
+      throw new LikeRuntimeError(error.code, error.status)
+    }
+    throw error
   }
 
   const createdAt = new Date().toISOString()
