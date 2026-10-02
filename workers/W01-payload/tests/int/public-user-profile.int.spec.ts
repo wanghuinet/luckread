@@ -42,6 +42,23 @@ describe('public user profile', () => {
     expect(route).not.toContain('timezone: true')
   })
 
+  it('provides profile reporting through the canonical report adapter', () => {
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const route = read('src/app/api/v1/reports/route.ts')
+    const socialClient = read('src/social/w05-social-client.ts')
+
+    expect(page).toContain("reportProfile()")
+    expect(page).toContain("targetType: 'profile'")
+    expect(page).toContain("targetId: profile.id")
+    expect(page).toContain("'Idempotency-Key': 'report:profile:' + profile.id + ':' + crypto.randomUUID()")
+    expect(page).toContain('举报用户')
+    expect(page).toContain('router.replace(\'/login?returnTo=\' + encodeURIComponent(returnTo))')
+    expect(route).toContain("targetType === 'creator' || targetType === 'profile'")
+    expect(route).toContain('assertSocialTargetUserExists')
+    expect(socialClient).toContain('collection: \'users\'')
+    expect(socialClient).toContain('overrideAccess: true')
+  })
+
   it('provides profile-level block and mute actions through the canonical interaction adapters', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
     expect(page).toContain("applySafetyAction('block')")
