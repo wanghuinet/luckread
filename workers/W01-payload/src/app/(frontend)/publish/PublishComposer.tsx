@@ -312,11 +312,8 @@ export default function PublishComposer({
       const code = caught instanceof Error ? caught.message : ''
       setError(code === 'AUTH_REQUIRED' ? '登录已失效，请重新登录。' : '草稿保存失败，请稍后重试。')
       if (code === 'AUTH_REQUIRED') {
-        if (window.location.pathname.startsWith('/admin/')) {
-          router.replace(`/login?returnTo=${encodeURIComponent(window.location.pathname)}`)
-        } else {
-          router.replace('/login')
-        }
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        router.replace(`/login?returnTo=${encodeURIComponent(returnTo)}`)
       }
     } finally {
       setBusy(false)
@@ -360,7 +357,9 @@ export default function PublishComposer({
       const code = caught instanceof Error ? caught.message : ''
       setError(code === 'AUTH_REQUIRED' ? '登录已失效，请重新登录。' : '放弃草稿失败，请稍后重试。')
       if (code === 'AUTH_REQUIRED') {
-        router.replace(window.location.pathname.startsWith('/admin/') ? '/admin/login' : '/login')
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        const loginPath = window.location.pathname.startsWith('/admin/') ? '/admin/login' : '/login'
+        router.replace(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
       }
     } finally {
       setBusy(false)
@@ -402,7 +401,9 @@ export default function PublishComposer({
       const code = caught instanceof Error ? caught.message : ''
       setError(code === 'AUTH_REQUIRED' ? '登录已失效，请重新登录。' : code || '提交失败，请稍后重试。')
       if (code === 'AUTH_REQUIRED') {
-        router.replace(window.location.pathname.startsWith('/admin/') ? '/admin/login' : '/login')
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        const loginPath = window.location.pathname.startsWith('/admin/') ? '/admin/login' : '/login'
+        router.replace(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
       }
     } finally {
       setBusy(false)

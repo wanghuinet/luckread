@@ -14,6 +14,14 @@ describe('Creator Center admin extension', () => {
     expect(config).toContain("actions: ['/app/(payload)/admin/CreatorCenterAction#CreatorCenterAction']")
   })
 
+  it('preserves the full publish return path when authentication expires', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain('const returnTo = window.location.pathname + window.location.search + window.location.hash')
+    expect(publisher).toContain("router.replace(\`/login?returnTo=\${encodeURIComponent(returnTo)}\`)")
+    expect(publisher).toContain("const loginPath = window.location.pathname.startsWith('/admin/') ? '/admin/login' : '/login'")
+    expect(publisher).toContain("router.replace(loginPath + '?returnTo=' + encodeURIComponent(returnTo))")
+  })
+
   it('uses the native Payload admin request principal instead of a second login/session system', () => {
     const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
 
