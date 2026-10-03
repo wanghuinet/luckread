@@ -174,3 +174,13 @@ it('guards creator media listing before Payload authentication', () => {
   expect(route).toContain('TrafficLimitError')
   expect(route).toContain('rateLimitResponse(request)')
 })
+
+it('guards media detail reads before the Payload route', () => {
+  const route = read('src/app/api/v1/media/[mediaId]/route.ts')
+  const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
+  const payloadIndex = route.indexOf('await payloadMediaGet(')
+  expect(guardIndex).toBeGreaterThanOrEqual(0)
+  expect(payloadIndex).toBeGreaterThanOrEqual(0)
+  expect(guardIndex).toBeLessThan(payloadIndex)
+  expect(route).toContain('TrafficLimitError')
+})
