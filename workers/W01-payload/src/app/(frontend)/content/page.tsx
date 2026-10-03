@@ -3,6 +3,9 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
+import PublicLanguageToggle from '../i18n/PublicLanguageToggle'
+import { getPublicCopy, readPublicLocaleCookie, type PublicLocale } from '../i18n/public-locale'
+
 type ContentType = 'article' | 'post' | 'video'
 type ContentItem = {
   id: string
@@ -23,14 +26,15 @@ type ContentApiResponse = {
   error?: { message?: string } | null
 }
 
-const labels: Record<ContentType | 'all', string> = {
-  all: '全部',
-  article: '文章',
-  post: '动态',
-  video: '视频',
-}
-
 export default function ContentBrowsePage() {
+  const [locale] = useState<PublicLocale>(() => readPublicLocaleCookie())
+  const copy = getPublicCopy(locale)
+  const labels: Record<ContentType | 'all', string> = {
+    all: copy.content.tabs.all,
+    article: copy.content.tabs.article,
+    post: copy.content.tabs.post,
+    video: copy.content.tabs.video,
+  }
   const [page, setPage] = useState<ContentPage>({ items: [], nextCursor: null, hasMore: false })
   const [contentType, setContentType] = useState<ContentType | 'all'>('all')
   const [loading, setLoading] = useState(true)
@@ -72,7 +76,7 @@ export default function ContentBrowsePage() {
       })
       const data: ContentApiResponse = await response.json().catch((): null => null)
       if (!response.ok || !data?.data) {
-        throw new Error(data?.error?.message || '内容加载失败')
+        throw new Error(data?.error?.message || copy.content.error)
       }
 
       if (requestId !== requestIdRef.current) return
@@ -98,17 +102,18 @@ export default function ContentBrowsePage() {
     <main className="content-browse">
       <header className="content-browse-top">
         <div>
-          <p className="eyebrow">EXPLORE LUCKREAD</p>
-          <h1>发现内容</h1>
-          <p>从文章、动态到视频，浏览已经通过发布流程并公开展示的内容。</p>
+          <p className="eyebrow">{copy.content.eyebrow}</p>
+          <h1>{copy.content.title}</h1>
+          <p>{copy.content.description}</p>
         </div>
         <div className="content-browse-actions">
-          <Link className="button button-quiet" href="/">返回首页</Link>
-          <Link className="button button-primary" href="/publish">开始创作 ↗</Link>
+          <Link className="button button-quiet" href="/">{copy.common.backHome}</Link>
+          <Link className="button button-primary" href="/publish">{copy.common.startCreating} ↗</Link>
+          <PublicLanguageToggle locale={locale} />
         </div>
       </header>
 
-      <div className="content-browse-actions" role="tablist" aria-label="内容类型筛选">
+      <div className="content-browse-actions" role="tablist" aria-label={copy.content.typeAria}>
         {(Object.keys(labels) as Array<ContentType | 'all'>).map((type) => (
           <button
             key={type}
@@ -125,8 +130,8 @@ export default function ContentBrowsePage() {
 
       {loading ? (
         <>
-          <div className="content-browse-state">正在加载内容…</div>
-          <section className="content-browse-grid" aria-label="正在加载公开内容" aria-busy="true">
+          <div className="content-browse-state">{copy.content.loading}</div>
+          <section className="content-browse-grid" aria-label={copy.content.loadingAria} aria-busy="true">
             {Array.from({ length: 6 }, (_, index) => (
               <div className="content-feed-card content-feed-card-skeleton" key={index} aria-hidden="true">
                 <div className="content-feed-cover content-feed-skeleton-block" />
@@ -144,26 +149,30 @@ export default function ContentBrowsePage() {
       {!loading && error ? (
         <div className="content-browse-state" role="status">
           <p>{error}</p>
-          <button className="button button-quiet" onClick={() => void load()} type="button">重新加载</button>
+          <button className="button button-quiet" onClick={() => void load()} type="button">{copy.content.retry}</button>
         </div>
       ) : null}
       {!loading && !error && page.items.length === 0 ? (
         <div className="content-browse-state">
-          <p>还没有公开{contentType === 'all' ? '内容' : labels[contentType]}。</p>
-          <Link className="button button-primary" href="/publish">发布第一篇内容</Link>
+          <p>{locale === 'tw'
+              ? (contentType === 'all' ? '目前還沒有公開內容。' : '目前還沒有公開' + labels[contentType] + '。')
+              : locale === 'en'
+                ? (contentType === 'all' ? 'No public content yet.' : 'No public ' + labels[contentType].toLowerCase() + ' yet.')
+                : (contentType === 'all' ? '还没有公开内容。' : '还没有公开' + labels[contentType] + '。')}</p>
+          <Link className="button button-primary" href="/publish">{copy.content.firstPublish}</Link>
         </div>
       ) : null}
 
       {!loading && !error && page.items.length > 0 ? (
         <>
-          <section className="content-browse-grid" aria-label="公开内容列表">
+          <section className="content-browse-grid" aria-label={locale === 'en' ? 'Public content list' : locale === 'tw' ? '公開內容列表' : '公开内容列表'}>
             {page.items.map((item) => {
               const cover = item.coverRef
               return (
                 <Link className="content-feed-card" href={'/content/' + encodeURIComponent(item.id)} key={item.id}>
                   <div className="content-feed-cover">
                     {cover ? (
-                      <img alt={item.title ? item.title + '封面' : '内容封面'} loading="lazy" src={cover} />
+                      <img alt={item.title ? item.title + copy.content.cover : copy.content.cover} loading="lazy" src={cover} />
                     ) : (
                       <span>{labels[item.contentType].toUpperCase()}</span>
                     )}
@@ -171,7 +180,7 @@ export default function ContentBrowsePage() {
                   <div className="content-feed-body">
                     <div className="content-feed-meta">
                       <span>{labels[item.contentType]}</span>
-                      <span>已发布</span>
+                      <span>{copy.content.published}</span>
                     </div>
                     <h2>{item.title}</h2>
                     {item.updatedAt ? (
@@ -179,7 +188,7 @@ export default function ContentBrowsePage() {
                         {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
                       </time>
                     ) : null}
-                    <span className="content-feed-open">打开内容 ↗</span>
+                    <span className="content-feed-open">{copy.content.open}</span>
                   </div>
                 </Link>
               )
@@ -194,7 +203,7 @@ export default function ContentBrowsePage() {
                 onClick={() => void load(page.nextCursor)}
                 type="button"
               >
-                {loadingMore ? '加载中…' : '加载更多'}
+                {loadingMore ? copy.content.loading : copy.content.more}
               </button>
             </div>
           ) : null}
