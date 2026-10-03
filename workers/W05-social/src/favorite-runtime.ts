@@ -69,13 +69,6 @@ export async function favorite(
 
   const relationshipId = crypto.randomUUID()
   const createdAt = new Date().toISOString()
-  const cacheKey = favoriteStatusKey(actor, targetId)
-  const cached = favoriteStatusCache.get(cacheKey)
-  if (cached) {
-    if (cached.expiresAt > Date.now()) return { ...cached.value }
-    favoriteStatusCache.delete(cacheKey)
-  }
-
   const row = await db.prepare(
     `INSERT INTO interaction_favorites
       (relationship_id, actor_user_id, target_type, target_id, created_at)
@@ -120,6 +113,12 @@ export async function getFavoriteStatus(
 ): Promise<{ favorited: boolean }> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
+  const cacheKey = favoriteStatusKey(actor, targetId)
+  const cached = favoriteStatusCache.get(cacheKey)
+  if (cached) {
+    if (cached.expiresAt > Date.now()) return { ...cached.value }
+    favoriteStatusCache.delete(cacheKey)
+  }
 
   const row = await db.prepare(
     `SELECT EXISTS (
@@ -154,3 +153,6 @@ export async function unfavorite(
   ).bind(actor, targetType, targetId).run()
   favoriteStatusCache.delete(favoriteStatusKey(actor, targetId))
 }
+
+
+export const clearFavoriteStatusCacheForTests = (): void => favoriteStatusCache.clear()
