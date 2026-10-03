@@ -50,6 +50,7 @@ export default function ContentDetailPage({
   const [reportBusy, setReportBusy] = useState(false)
   const [viewerUserId, setViewerUserId] = useState<string | null>(null)
   const [following, setFollowing] = useState(false)
+  const [followRestricted, setFollowRestricted] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
   const socialTokens = useMemo(() => extractSocialTokens(body), [body])
@@ -118,9 +119,17 @@ export default function ContentDetailPage({
                 '/api/v1/social/follows/' + encodeURIComponent(resolved.creatorId),
                 { credentials: 'include', headers: { accept: 'application/json' }, cache: 'no-store', signal: controller.signal },
               )
-              const followData = await followResponse.json().catch((): null => null) as { data?: { following?: boolean } } | null
-              if (!cancelled && followResponse.ok && typeof followData?.data?.following === 'boolean') {
-                setFollowing(followData.data.following)
+              const followData = await followResponse.json().catch((): null => null) as {
+                data?: {
+                  following?: boolean
+                  relationship?: { blocked?: boolean; blockedBy?: boolean }
+                }
+              } | null
+              if (!cancelled && followResponse.ok) {
+                const blocked = Boolean(followData?.data?.relationship?.blocked)
+                const blockedBy = Boolean(followData?.data?.relationship?.blockedBy)
+                setFollowRestricted(blocked || blockedBy)
+                setFollowing(!blocked && !blockedBy && followData?.data?.following === true)
               }
             } catch {
               // Follow state is optional; content remains readable when the status query fails.
@@ -364,6 +373,8 @@ export default function ContentDetailPage({
               <Link className="content-detail-follow" href={'/users/' + encodeURIComponent(content.creatorId)}>查看作者</Link>
               {viewerUserId === content.creatorId ? (
                 <span className="content-detail-muted">这是你的作品</span>
+              ) : followRestricted ? (
+                <span className="content-detail-muted">当前关系受屏蔽规则限制。</span>
               ) : (
                 <button className="content-detail-follow" disabled={followBusy} onClick={() => void toggleFollow()} type="button">
                   {followBusy ? '处理中…' : following ? '已关注作者' : '关注作者'}
