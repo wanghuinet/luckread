@@ -1,4 +1,4 @@
-import type { Access } from 'payload'
+import type { PayloadRequest } from 'payload'
 
 import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
 import { resolveAuthenticatedPrincipal } from '@/auth/w02-session-client'
@@ -8,12 +8,15 @@ type PayloadAdminUser = {
   _sid?: string
 } | null
 
-export const payloadAdminOnly: Access = async ({ req }) => {
+export const payloadAdminOnly = async ({ req }: { req: PayloadRequest }): Promise<boolean> => {
   try {
     const user = req.user as unknown as PayloadAdminUser
     if (!user?.id || typeof user._sid !== 'string' || user._sid.length === 0) return false
 
-    const tokenVersion = readVerifiedPayloadTokenVersion(req)
+    const request = new Request('https://luckread-w01.internal/admin', {
+      headers: req.headers,
+    })
+    const tokenVersion = readVerifiedPayloadTokenVersion(request)
     if (tokenVersion === null) return false
 
     const principal = await resolveAuthenticatedPrincipal({
