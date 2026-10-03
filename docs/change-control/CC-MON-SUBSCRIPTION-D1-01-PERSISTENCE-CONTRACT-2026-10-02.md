@@ -27,11 +27,11 @@ Logical table:
 
 `membership_subscriptions`
 
-It binds the existing 13 `ENT-SUBSCRIPTION` fields to D1-01 and defines query indexes without creating a physical migration.
+It binds the existing `ENT-SUBSCRIPTION` fields plus the authoritative concurrency `version` field to D1-01 and defines query indexes without creating a physical migration.
 
 ## Deliberately unresolved
 
-1. Optimistic concurrency: the current entity field contract has no standalone version field, so the exact If-Match/version source is still pending.
+1. Optimistic concurrency: `ENT-SUBSCRIPTION-F-VERSION` is now the authoritative If-Match/expectedVersion CAS source; ETag remains representation metadata.
 2. Active-subscription uniqueness: the existing Membership Data Contract requires duplicate prevention where policy requires it, but does not define the authoritative business key. No speculative unique constraint is introduced.
 
 ## Non-actions
