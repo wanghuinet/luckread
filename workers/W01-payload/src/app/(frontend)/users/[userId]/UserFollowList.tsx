@@ -68,8 +68,13 @@ export default function UserFollowList({
     return { controller, generation: requestGenerationRef.current }
   }, [])
 
-  const isCurrentRequest = (controller: AbortController, generation: number): boolean =>
-    activeRequestRef.current === controller && requestGenerationRef.current === generation && !controller.signal.aborted
+  const isCurrentRequest = useCallback(
+    (controller: AbortController, generation: number): boolean =>
+      activeRequestRef.current === controller &&
+      requestGenerationRef.current === generation &&
+      !controller.signal.aborted,
+    [],
+  )
 
   const load = useCallback(async (cursor: string | null = null) => {
     const { controller, generation } = beginRequest()
@@ -110,7 +115,7 @@ export default function UserFollowList({
         setLoadingMore(false)
       }
     }
-  }, [beginRequest, direction, userId])
+  }, [beginRequest, direction, isCurrentRequest, userId])
 
   useEffect(() => {
     const { controller, generation } = beginRequest()
@@ -158,7 +163,7 @@ export default function UserFollowList({
     return () => {
       if (activeRequestRef.current === controller) controller.abort()
     }
-  }, [beginRequest, direction, userId])
+  }, [beginRequest, isCurrentRequest, direction, userId])
 
   const displayName = profile?.displayName?.trim() || profile?.username || 'LuckRead 用户'
   const initial = displayName.slice(0, 1).toUpperCase()
