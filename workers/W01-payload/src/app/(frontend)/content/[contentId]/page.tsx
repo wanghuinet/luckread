@@ -5,6 +5,9 @@ import ContentComments from './ContentComments'
 import { extractSocialTokens } from '../../../../social/social-token-parser.js'
 import { useEffect, useMemo, useState } from 'react'
 
+import PublicLanguageToggle from '../../i18n/PublicLanguageToggle'
+import { getPublicCopy, readPublicLocaleCookie, type PublicLocale } from '../../i18n/public-locale'
+
 type ContentType = 'article' | 'post' | 'video'
 type Content = {
   id: string
@@ -18,12 +21,6 @@ type Content = {
   updatedAt?: string
 }
 
-const typeLabels: Record<ContentType, string> = {
-  article: '文章',
-  post: '动态',
-  video: '视频',
-}
-
 const splitBodyIntoParagraphs = (value: string): string[] =>
   value
     .split(/\n\s*\n/)
@@ -35,6 +32,15 @@ export default function ContentDetailPage({
 }: {
   params: Promise<{ contentId: string }>
 }) {
+  const [locale] = useState<PublicLocale>(() => readPublicLocaleCookie())
+  const copy = getPublicCopy(locale)
+  const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
+  const typeLabels: Record<ContentType, string> = {
+    article: copy.content.tabs.article,
+    post: copy.content.tabs.post,
+    video: copy.content.tabs.video,
+  }
+
   const [content, setContent] = useState<Content | null>(null)
   const [body, setBody] = useState('')
   const [loading, setLoading] = useState(true)
@@ -80,7 +86,7 @@ export default function ContentDetailPage({
           const data = await response.json().catch((): null => null)
           const viewerData = await viewerResponse.json().catch((): null => null) as { id?: string } | null
           if (!response.ok || !data?.id || data.state !== 'PUBLISHED') {
-            throw new Error('CONTENT_NOT_FOUND')
+            throw new Error(copy.detail.notFound)
           }
           if (cancelled) return
           const resolved = data as Content
@@ -149,7 +155,7 @@ export default function ContentDetailPage({
         } catch (cause) {
           if (cancelled || controller.signal.aborted) return
           if (cause instanceof DOMException && cause.name === 'AbortError') return
-          setError('内容不存在，或暂时无法读取。')
+          setError(copy.detail.notFound)
         } finally {
           if (!cancelled) setLoading(false)
         }
@@ -164,16 +170,16 @@ export default function ContentDetailPage({
   }, [params, retryKey])
 
   if (loading) {
-    return <main aria-busy={loading} className="content-detail"><p className="content-detail-state" role="status">正在加载内容…</p></main>
+    return <main aria-busy={loading} className="content-detail"><p className="content-detail-state" role="status">{copy.detail.loading}</p></main>
   }
 
   if (error || !content) {
     return (
       <main className="content-detail">
         <div className="content-detail-state">
-          <p>{error || '内容不存在。'}</p>
-          <button className="content-detail-retry" onClick={() => { setError(''); setLoading(true); setContent(null); setBody(''); setRetryKey((value) => value + 1) }} type="button">重新加载</button>
-          <Link href="/">返回首页</Link>
+          <p>{error || copy.detail.notFound}</p>
+          <button className="content-detail-retry" onClick={() => { setError(''); setLoading(true); setContent(null); setBody(''); setRetryKey((value) => value + 1) }} type="button">{copy.detail.retry}</button>
+          <Link href="/">{copy.common.backHome}</Link>
         </div>
       </main>
     )
@@ -202,7 +208,7 @@ export default function ContentDetailPage({
       }
       if (!response.ok) {
         const data = await response.json().catch((): null => null)
-        setActionMessage(data?.error?.message || '点赞操作失败，请稍后重试。')
+        setActionMessage(data?.error?.message || copy.detail.networkError)
         return
       }
       const nextLiked = !liked
@@ -212,7 +218,7 @@ export default function ContentDetailPage({
         return Math.max(0, count + (nextLiked ? 1 : -1))
       })
     } catch {
-      setActionMessage('网络异常，请稍后重试。')
+      setActionMessage(copy.detail.networkError)
     } finally {
       setLikeBusy(false)
     }
@@ -240,7 +246,7 @@ export default function ContentDetailPage({
       }
       if (!response.ok) {
         const data = await response.json().catch((): null => null)
-        setActionMessage(data?.error?.message || '收藏操作失败，请稍后重试。')
+        setActionMessage(data?.error?.message || copy.detail.networkError)
         return
       }
       setBookmarked((value) => !value)
@@ -274,7 +280,7 @@ export default function ContentDetailPage({
       }
       if (!response.ok) {
         const data = await response.json().catch((): null => null)
-        setActionMessage(data?.error?.message || '关注操作失败，请稍后重试。')
+        setActionMessage(data?.error?.message || copy.detail.networkError)
         return
       }
       setFollowing((value) => !value)
@@ -287,7 +293,14 @@ export default function ContentDetailPage({
 
   async function submitReport() {
     if (!content || reportBusy) return
-    const reasonCode = window.prompt('请输入举报原因（例如 SPAM、COPYRIGHT、ABUSE）', 'SPAM')?.trim()
+    const reasonCode = window.prompt(
+      locale === 'en'
+        ? 'Enter a report reason (for example SPAM, COPYRIGHT, ABUSE)'
+        : locale === 'tw'
+          ? '請輸入檢舉原因（例如 SPAM、COPYRIGHT、ABUSE）'
+          : '请输入举报原因（例如 SPAM、COPYRIGHT、ABUSE）',
+      'SPAM',
+    )?.trim()
     if (!reasonCode) return
 
     setReportBusy(true)
@@ -314,9 +327,13 @@ export default function ContentDetailPage({
       }
       const data = await response.json().catch((): null => null) as { data?: { status?: string } } | null
       if (!response.ok || !data?.data) throw new Error('REPORT_FAILED')
-      setActionMessage(data.data.status === 'DEDUPLICATED' ? '举报已记录：你此前已举报过该内容。' : '举报已提交。')
+      setActionMessage(
+        data.data.status === 'DEDUPLICATED'
+          ? (locale === 'en' ? 'Report recorded: you have already reported this content.' : locale === 'tw' ? '檢舉已記錄：你先前已檢舉過此內容。' : '举报已记录：你此前已举报过该内容。')
+          : (locale === 'en' ? 'Report submitted.' : locale === 'tw' ? '檢舉已提交。' : '举报已提交。'),
+      )
     } catch {
-      setActionMessage('举报提交失败，请稍后重试。')
+      setActionMessage(locale === 'en' ? 'Could not submit the report. Please try again.' : locale === 'tw' ? '檢舉提交失敗，請稍後再試。' : '举报提交失败，请稍后重试。')
     } finally {
       setReportBusy(false)
     }
@@ -349,7 +366,7 @@ export default function ContentDetailPage({
       const data = await response.json().catch((): null => null) as { data?: { shareId?: string } } | null
       const shareId = data?.data?.shareId
       if (!response.ok || typeof shareId !== 'string' || !shareId) {
-        setActionMessage('分享链接生成失败，请稍后重试。')
+        setActionMessage(copy.detail.linkError)
         return
       }
       const shareUrl = window.location.origin + '/s/' + encodeURIComponent(shareId)
@@ -357,7 +374,7 @@ export default function ContentDetailPage({
       if (typeof navigator.share === 'function') {
         try {
           await navigator.share({ title: content.title, url: shareUrl })
-          setActionMessage('已打开系统分享面板。')
+          setActionMessage(copy.detail.shareOpened)
           return
         } catch (shareError) {
           if (shareError instanceof DOMException && shareError.name === 'AbortError') return
@@ -369,7 +386,7 @@ export default function ContentDetailPage({
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1800)
     } catch {
-      setActionMessage('网络异常，暂时无法生成分享链接。')
+      setActionMessage(locale === 'en' ? 'Network error. Could not generate a share link.' : locale === 'tw' ? '網路異常，暫時無法產生分享連結。' : '网络异常，暂时无法生成分享链接。')
     } finally {
       setShareBusy(false)
     }
@@ -379,40 +396,40 @@ export default function ContentDetailPage({
     <main className="content-detail">
       <div className="content-detail-top">
         <div className="content-detail-breadcrumbs">
-          <Link href="/content">← 返回发现</Link>
-          <Link href="/">首页</Link>
+          <Link href="/content">{copy.detail.backDiscover}</Link>
+          <Link href="/">{copy.common.home}</Link>
         </div>
         <div className="content-detail-actions">
-          <span>{typeLabels[content.contentType]} · 已发布</span>
+          <span>{typeLabels[content.contentType]} · {copy.detail.published}</span>
           {content.creatorId ? (
             <>
-              <Link className="content-detail-follow" href={'/users/' + encodeURIComponent(content.creatorId)}>查看作者</Link>
+              <Link className="content-detail-follow" href={'/users/' + encodeURIComponent(content.creatorId)}>{copy.detail.author}</Link>
               {viewerUserId === content.creatorId ? (
-                <span className="content-detail-muted">这是你的作品</span>
+                <span className="content-detail-muted">{copy.detail.own}</span>
               ) : followRestricted ? (
-                <span className="content-detail-muted">当前关系受屏蔽规则限制。</span>
+                <span className="content-detail-muted">{copy.detail.restricted}</span>
               ) : (
                 <button className="content-detail-follow" disabled={followBusy} onClick={() => void toggleFollow()} type="button">
-                  {followBusy ? '处理中…' : following ? '已关注作者' : '关注作者'}
+                  {followBusy ? copy.comments.processing : following ? copy.detail.following : copy.detail.follow}
                 </button>
               )}
             </>
           ) : null}
           {!interactionRestricted ? (
             <button className="content-detail-like" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
-              {likeBusy ? '处理中…' : liked ? '已点赞' : '点赞'}
+              {likeBusy ? copy.comments.processing : liked ? copy.detail.liked : copy.detail.like}
               {likeCount === null ? '' : ' · ' + likeCount.toLocaleString('zh-CN')}
             </button>
           ) : null}
           <button className="content-detail-like" disabled={bookmarkBusy} onClick={() => void toggleBookmark()} type="button">
-            {bookmarkBusy ? '处理中…' : bookmarked ? '已收藏' : '收藏'}
+            {bookmarkBusy ? copy.comments.processing : bookmarked ? copy.detail.favorited : copy.detail.favorite}
           </button>
           <button className="content-detail-share" disabled={shareBusy} onClick={() => void copyContentLink()} type="button">
-            {shareBusy ? '生成中…' : copied ? '分享链接已复制' : '分享'}
+            {shareBusy ? copy.detail.generating : copied ? copy.detail.copied : copy.detail.share}
           </button>
           {viewerUserId && viewerUserId !== content.creatorId ? (
             <button className="content-detail-share" disabled={reportBusy} onClick={() => void submitReport()} type="button">
-              {reportBusy ? '举报中…' : '举报'}
+              {reportBusy ? copy.detail.reporting : copy.detail.report}
             </button>
           ) : null}
           {actionMessage ? <span className="content-detail-action-status" role="status">{actionMessage}</span> : null}
@@ -420,11 +437,12 @@ export default function ContentDetailPage({
       </div>
       <article className="content-detail-card">
         <header className="content-detail-header">
+          <div className="content-detail-language"><PublicLanguageToggle locale={locale} /></div>
           <p className="eyebrow">LUCKREAD CONTENT</p>
           <h1>{content.title}</h1>
           {content.updatedAt ? (
             <time dateTime={content.updatedAt}>
-              更新于 {new Date(content.updatedAt).toLocaleString('zh-CN', { hour12: false })}
+              {copy.detail.updatedAt} {new Date(content.updatedAt).toLocaleString(dateLocale, { hour12: false })}
             </time>
           ) : null}
         </header>
@@ -433,7 +451,7 @@ export default function ContentDetailPage({
           <div className="content-detail-media content-detail-video-gallery">
             {content.mediaRefs.map((url, index) => (
               <video
-                aria-label={content.title + ' 视频 ' + (index + 1)}
+                aria-label={content.title + ' ' + copy.detail.video + ' ' + (index + 1)}
                 controls
                 key={url}
                 playsInline
@@ -448,18 +466,18 @@ export default function ContentDetailPage({
         {content.contentType !== 'video' && (content.coverRef || content.mediaRefs?.length) ? (
           <div className="content-detail-media">
             {content.coverRef ? (
-              <img alt={content.title + ' 封面'} loading="eager" src={content.coverRef} />
+              <img alt={content.title + ' ' + copy.detail.cover} loading="eager" src={content.coverRef} />
             ) : null}
             {content.mediaRefs
               ?.filter((url) => url !== content.coverRef)
               .map((url, index) => (
-                <img alt={content.title + ' 配图 ' + (index + 1)} key={url} loading="lazy" src={url} />
+                <img alt={content.title + ' ' + copy.detail.image + ' ' + (index + 1)} key={url} loading="lazy" src={url} />
               ))}
           </div>
         ) : null}
 
         {socialTokens.length > 0 ? (
-          <section aria-label="内容标签与提及" className="content-detail-social-tokens">
+          <section aria-label={copy.detail.tagAria} className="content-detail-social-tokens">
             {socialTokens.map((token) => (
               <span className="content-detail-social-token" key={token.kind + ':' + token.normalized}>
                 {token.value}
@@ -474,7 +492,7 @@ export default function ContentDetailPage({
               <p className="content-detail-paragraph" key={index}>{paragraph}</p>
             ))
           ) : (
-            <p className="content-detail-muted">正文内容正在准备中。</p>
+            <p className="content-detail-muted">{copy.detail.bodyPreparing}</p>
           )}
         </div>
       </article>
@@ -482,6 +500,7 @@ export default function ContentDetailPage({
         contentId={content.id}
         viewerUserId={viewerUserId}
         interactionRestricted={interactionRestricted}
+        locale={locale}
       />
     </main>
   )
