@@ -21,6 +21,17 @@ const resolveOperation = (method: string, segments: string[] | undefined): { pat
   return null
 }
 
+const requireHeader = (request: Request, name: 'Idempotency-Key' | 'If-Match'): Response | null => {
+  const value = request.headers.get(name)?.trim() ?? ''
+  if (!value || value.length > 256) {
+    return errorResponse(428, 'PRECONDITION_REQUIRED', name + ' required')
+  }
+  if (name === 'If-Match' && value === '*') {
+    return errorResponse(412, 'PRECONDITION_FAILED', 'If-Match precondition failed')
+  }
+  return null
+}
+
 const parseBody = async (request: Request): Promise<unknown | Response> => {
   try {
     const body = await request.json()
@@ -39,6 +50,17 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
     if (operation instanceof Response) return operation
     const principal = await resolveCookieSubscriptionPrincipal(request)
     if (principal instanceof Response) return principal
+
+    if (request.method === 'POST') {
+      const idempotencyError = requireHeader(request, 'Idempotency-Key')
+      if (idempotencyError) return idempotencyError
+      const segments = params.segments ?? []
+      if (segments.length === 2) {
+        const ifMatchError = requireHeader(request, 'If-Match')
+        if (ifMatchError) return ifMatchError
+      }
+    }
+
     const body = request.method === 'POST' ? await parseBody(request) : undefined
     if (body instanceof Response) return body
     const pathname = request.method === 'GET' && (params.segments ?? []).length === 0
