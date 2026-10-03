@@ -44,7 +44,7 @@ export async function createShare(
   contentIdValue: string,
   idempotencyKeyValue: string,
 ): Promise<ShareRecord> {
-  const actorUserId = validateActor(actorUserId)
+  const actor = validateActor(actorUserId)
   const contentId = validateId(contentIdValue)
   const idempotencyKey = validateIdempotencyKey(idempotencyKeyValue)
 
@@ -58,7 +58,7 @@ export async function createShare(
 
   const existing = await db.prepare(
     'SELECT share_id, content_id, actor_user_id, created_at FROM social_share_links WHERE actor_user_id = ? AND idempotency_key = ? LIMIT 1',
-  ).bind(actorUserId, idempotencyKey).first<{
+  ).bind(actor, idempotencyKey).first<{
     share_id: string
     content_id: string
     actor_user_id: string
@@ -87,7 +87,7 @@ export async function createShare(
            FROM contents content
           WHERE content.id = ?
             AND content.state = 'PUBLISHED'`,
-    ).bind(shareId, actorUserId, idempotencyKey, createdAt, contentId).run()
+    ).bind(shareId, actor, idempotencyKey, createdAt, contentId).run()
 
     if (Number(inserted.meta?.changes ?? 0) !== 1) {
       throw new ShareRuntimeError('NOT_FOUND', 404)
@@ -100,7 +100,7 @@ export async function createShare(
 
   const row = await db.prepare(
     'SELECT share_id, content_id, actor_user_id, created_at FROM social_share_links WHERE actor_user_id = ? AND idempotency_key = ? LIMIT 1',
-  ).bind(actorUserId, idempotencyKey).first<{
+  ).bind(actor, idempotencyKey).first<{
     share_id: string
     content_id: string
     actor_user_id: string
