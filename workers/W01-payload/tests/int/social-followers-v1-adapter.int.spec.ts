@@ -22,7 +22,7 @@ describe('v1 follower relationship adapters', () => {
   })
 
   it('cancels stale follow-list requests and ignores aborted completions', () => {
-    const view = read('src/app/(frontend)/users/[userId]/UserFollowList.tsx')
+    const view = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/users/[userId]/UserFollowList.tsx'), 'utf8')
     expect(view).toContain('activeRequestRef')
     expect(view).toContain('requestGenerationRef')
     expect(view).toContain('activeRequestRef.current?.abort()')
