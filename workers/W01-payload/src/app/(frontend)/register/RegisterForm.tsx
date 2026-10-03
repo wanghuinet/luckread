@@ -156,15 +156,19 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
               </label>
 
               <label className="registerField">
-                <span>用户名</span>
+                <span>用户名（注册时确定）</span>
                 <input
                   autoComplete="username"
+                  maxLength={128}
                   name="username"
                   onChange={(event) => setUsername(event.target.value)}
-                  placeholder="你的公开用户名"
+                  placeholder="例如 zhangsan"
+                  required
+                  spellCheck={false}
                   type="text"
                   value={username}
                 />
+                <small>用户名会用于你的公开主页地址：luckread.com/@你的用户名</small>
               </label>
 
               <label className="registerField">
