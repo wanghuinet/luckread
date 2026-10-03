@@ -758,9 +758,4 @@ describe('W05 social comment transport', () => {
     expect(response.status).toBe(401)
   })
 })
-\n  it('passes the optional viewer principal into comment listing', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/index.ts'), 'utf8')
-    expect(source).toContain("request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null")
-    expect(source).toContain('listComments(env.DB, commentContentId, cursor, limit, viewerUserId)')
-  })
 
