@@ -60,7 +60,9 @@ const sanitizePayloadLoginMessage = (error: unknown) => {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  let body: { identity?: unknown; credential?: unknown; deviceId?: unknown }
+  import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
+
+let body: { identity?: unknown; credential?: unknown; deviceId?: unknown }
 
   try {
     body = (await request.json()) as { identity?: unknown; credential?: unknown; deviceId?: unknown }
