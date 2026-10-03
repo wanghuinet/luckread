@@ -25,7 +25,7 @@ describe('user profile page', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
     expect(page).toContain("fetch('/api/v1/users/me'")
     expect(page).toContain('setViewerUserId(typeof viewerData?.id === \'string\' ? viewerData.id : null)')
-    expect(page).toContain('viewerUserId === profile.id')
+    expect(page).toContain('viewerUserId === profile?.id')
     expect(page).toContain('这是你的主页')
   })
 
