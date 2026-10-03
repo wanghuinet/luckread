@@ -150,8 +150,8 @@ export default function PublicProfilePage({
         const viewerData = await viewerResponse.json().catch((): null => null) as { id?: string } | null
 
         if (!cancelled) {
-          setFollowers(typeof followerData?.data?.totalCount === 'number' ? followerData.data.totalCount : null)
-          setFollowing(typeof followingData?.data?.totalCount === 'number' ? followingData.data.totalCount : null)
+          setFollowers(typeof followerData?.data?.totalCount === 'number' ? followerData.data.totalCount : 0)
+          setFollowing(typeof followingData?.data?.totalCount === 'number' ? followingData.data.totalCount : 0)
           setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)
           setIsFollowing(followData?.data?.following === true)
           setMutualFollow(followData?.data?.relationship?.mutualFollow === true)
@@ -604,7 +604,6 @@ export default function PublicProfilePage({
         <section className="creator-profile-works" id="works" aria-labelledby="creator-profile-works-title">
           <header className="creator-profile-section-heading">
             <div>
-              <p className="creator-profile-eyebrow">PUBLIC WORKS</p>
               <h2 id="creator-profile-works-title">{filterLabels[filter]}</h2>
             </div>
             {contentHasMore && contentCursor ? (
