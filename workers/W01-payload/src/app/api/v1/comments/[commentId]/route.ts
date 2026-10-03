@@ -68,6 +68,11 @@ export async function DELETE(
     const principal = await resolveCookieSocialPrincipal(request)
     if (principal instanceof Response) return principal
 
+    const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+    if (!idempotencyKey || idempotencyKey.length > 256) {
+      return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+    }
+
     return await callW05Social({
       request,
       pathname: '/internal/social/comments/' + encodeURIComponent(commentId),
