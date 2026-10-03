@@ -28,7 +28,9 @@ const errorResponse = (status: number, code: string, message: string) =>
   )
 
 export async function POST(request: Request): Promise<Response> {
-  let body: { refreshToken?: unknown; deviceId?: unknown }
+  import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
+
+let body: { refreshToken?: unknown; deviceId?: unknown }
 
   try {
     body = (await request.json()) as { refreshToken?: unknown; deviceId?: unknown }
