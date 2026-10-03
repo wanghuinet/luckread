@@ -25,7 +25,7 @@ describe('Creator Center admin extension', () => {
   it('redirects creator content management auth expiry to admin login', () => {
     const contentList = read('src/app/(payload)/admin/CreatorContentList.tsx')
     expect(contentList).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
-    expect(contentList).toContain("window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(contentList).toContain("window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))")
     expect(contentList).toContain("if (response.status === 401)")
   })
 
@@ -52,7 +52,7 @@ describe('Creator Center admin extension', () => {
     const audience = read('src/app/(payload)/admin/CreatorAudienceSummary.tsx')
 
     expect(audience).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
-    expect(audience).toContain("window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(audience).toContain("window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))")
     expect(audience.match(/response\.status === 401/g)?.length).toBe(2)
   })
 
@@ -343,7 +343,7 @@ describe('Creator Center admin extension', () => {
     expect(assets).toContain("'/api/v1/media/' + encodeURIComponent(String(id))")
     expect(assets).toContain("credentials: 'include'")
     expect(assets).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
-    expect(assets).toContain("window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(assets).toContain("window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))")
     expect(assets.match(/response\.status === 401/g)?.length).toBe(4)
     expect(assets).toContain('mimeType.startsWith(\'video/\')')
     expect(assets).not.toContain('D1Database')
