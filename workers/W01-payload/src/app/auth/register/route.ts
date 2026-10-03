@@ -164,6 +164,13 @@ const validatePolicy = (now: Date) => {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  try {
+    const clientIp = request.headers.get('cf-connecting-ip')?.trim() || 'unknown'
+    await enforceAuthRateLimit(request, 'AUTH_REGISTER_LIMITER', ['ip:' + clientIp])
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
+  }
   import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 
 const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
