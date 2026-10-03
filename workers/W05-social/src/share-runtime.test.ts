@@ -28,6 +28,36 @@ describe('share runtime', () => {
     expect(result).toMatchObject({ shareId: 'share-1', contentId: 'content-1', actorUserId: 'user-1' })
   })
 
+  it('keeps share creation atomically bound to published content', async () => {
+    const d = db([
+      { id: 'content-1', state: 'PUBLISHED' },
+      null,
+      null,
+      null,
+    ])
+
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    const originalRun = vi.fn(async () => ({ success: true, meta: { changes: 0 } }))
+    prepare.mockImplementationOnce((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => ({ id: 'content-1', state: 'PUBLISHED' })),
+      })),
+    })).mockImplementationOnce((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => null),
+      })),
+    })).mockImplementationOnce((sql: string) => ({
+      bind: vi.fn(() => ({ run: originalRun })),
+    }))
+
+    await expect(createShare(d, 'user-1', 'content-1', 'race-key')).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
+    })
+    expect(String(prepare.mock.calls[2]?.[0])).toContain("content.state = 'PUBLISHED'")
+    expect(String(prepare.mock.calls[2]?.[0])).toContain('FROM contents content')
+  })
+
   it('is idempotent for the same actor and key', async () => {
     const d = db([
       { id: 'content-1', state: 'PUBLISHED' },
