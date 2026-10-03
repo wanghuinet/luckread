@@ -97,7 +97,11 @@ export const cachedPublicGet = async (
           headers: new Headers(response.headers),
         })
         cacheResponse.headers.set('Cache-Control', `public, max-age=0, s-maxage=${Math.max(1, Math.floor(ttlSeconds))}`)
-        await cache.put(key, cacheResponse)
+        try {
+          await cache.put(key, cacheResponse)
+        } catch {
+          // Cache failure must not turn a successful authoritative read into a 503.
+        }
       }
       return response
     })()
