@@ -143,7 +143,7 @@ export function CreatorStudio({
 
           <Link className={styles.sidebarPublishButton} href="#publisher">
             <i className="fa-solid fa-plus" aria-hidden="true" />
-            发布内容
+            {nav.labels.publish}
           </Link>
 
           <div className={styles.sidebarGroup}>
@@ -174,7 +174,7 @@ export function CreatorStudio({
           <div className={styles.sidebarFooter}>
             <Link href="https://luckread.com/">
               <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden="true" />
-              <span>查看 LuckRead 主站</span>
+              <span>{locale === 'en-US' ? 'Open LuckRead main site' : '查看 LuckRead 主站'}</span>
             </Link>
             <span className={styles.sidebarVersion}>Creator Studio · 1.0</span>
           </div>
