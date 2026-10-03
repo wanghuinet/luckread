@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 
+import { getPublicCopy, readPublicLocaleCookie, type PublicLocale } from '../../i18n/public-locale'
+
 type CommentItem = {
   id: string
   contentId: string
@@ -25,11 +27,15 @@ export default function ContentComments({
   contentId,
   viewerUserId,
   interactionRestricted = false,
+  locale = readPublicLocaleCookie(),
 }: {
   contentId: string
   viewerUserId: string | null
   interactionRestricted?: boolean
+  locale?: PublicLocale
 }) {
+  const copy = getPublicCopy(locale)
+  const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
   const [comments, setComments] = useState<CommentItem[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
@@ -68,7 +74,7 @@ export default function ContentComments({
       )
       const data = await response.json().catch((): null => null)
       if (!response.ok || !data?.data) {
-        throw new Error(data?.error?.message || '评论加载失败')
+        throw new Error(data?.error?.message || copy.comments.loadError)
       }
       const page = data.data as CommentPage
       if (requestId !== commentsRequestIdRef.current) return
@@ -78,7 +84,7 @@ export default function ContentComments({
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
       if (requestId !== commentsRequestIdRef.current) return
-      setMessage(error instanceof Error ? error.message : '评论加载失败')
+      setMessage(error instanceof Error ? error.message : copy.comments.loadError)
     } finally {
       if (requestId !== commentsRequestIdRef.current) return
       commentsRequestRef.current = null
@@ -123,7 +129,7 @@ export default function ContentComments({
 
       const statusData = await statusResponse.json().catch((): null => null) as { data?: { liked?: boolean } } | null
       if (!statusResponse.ok || typeof statusData?.data?.liked !== 'boolean') {
-        setMessage(statusData?.data ? '评论点赞状态读取失败。' : '评论点赞失败，请稍后重试。')
+        setMessage(statusData?.data ? (locale === 'en' ? 'Could not read comment like status.' : locale === 'tw' ? '留言按讚狀態讀取失敗。' : '评论点赞状态读取失败。') : copy.comments.likeError)
         return
       }
 
@@ -145,13 +151,13 @@ export default function ContentComments({
         return
       }
       if (!response.ok && response.status !== 204) {
-        setMessage(data?.error?.message || '评论点赞失败，请稍后重试。')
+        setMessage(data?.error?.message || copy.comments.likeError)
         return
       }
 
       setLikedComments((current) => ({ ...current, [comment.id]: !liked }))
     } catch {
-      setMessage('网络异常，请稍后重试。')
+      setMessage(copy.comments.networkError)
     } finally {
       setLikingCommentId(null)
     }
@@ -182,14 +188,14 @@ export default function ContentComments({
         const data = await response.json().catch((): null => null)
         setMessage(
           data?.error?.code === 'COMMENT_HAS_REPLIES'
-            ? '该评论已有回复，暂不支持删除。'
-            : data?.error?.message || '评论删除失败，请稍后重试。',
+            ? copy.comments.tooManyReplies
+            : data?.error?.message || copy.comments.deleteError,
         )
         return
       }
       setComments((current) => current.filter((item) => item.id !== comment.id))
     } catch {
-      setMessage('网络异常，请稍后重试。')
+      setMessage(copy.comments.networkError)
     } finally {
       setDeletingId(null)
     }
@@ -221,11 +227,11 @@ export default function ContentComments({
         return
       }
       if (response.status === 412) {
-        setMessage('评论已经被修改，请刷新后再编辑。')
+        setMessage(copy.comments.conflict)
         return
       }
       if (!response.ok || !data?.data) {
-        setMessage(data?.error?.message || '评论修改失败，请稍后重试。')
+        setMessage(data?.error?.message || copy.comments.updateError)
         return
       }
       const updated = data.data as CommentItem
@@ -233,7 +239,7 @@ export default function ContentComments({
       setEditingId(null)
       setEditBody('')
     } catch {
-      setMessage('网络异常，请稍后重试。')
+      setMessage(copy.comments.networkError)
     } finally {
       setSavingEdit(false)
     }
@@ -266,7 +272,7 @@ export default function ContentComments({
         return
       }
       if (!response.ok || !data?.data) {
-        setMessage(data?.error?.message || '评论提交失败，请稍后重试。')
+        setMessage(data?.error?.message || copy.comments.submitError)
         return
       }
       const created = data.data as CommentItem
@@ -274,7 +280,7 @@ export default function ContentComments({
       setBody('')
       setReplyingTo(null)
     } catch {
-      setMessage('网络异常，请稍后重试。')
+      setMessage(copy.comments.networkError)
     } finally {
       setSubmitting(false)
     }
@@ -283,40 +289,40 @@ export default function ContentComments({
   return (
     <section className="content-comments" aria-labelledby="content-comments-heading">
       <div className="content-comments-heading">
-        <h2 id="content-comments-heading">评论</h2>
+        <h2 id="content-comments-heading">{copy.comments.title}</h2>
       </div>
 
       {!interactionRestricted ? (
         <form className="content-comment-form" onSubmit={submitComment}>
-        <label htmlFor="content-comment-body">发表评论</label>
+        <label htmlFor="content-comment-body">{copy.comments.formLabel}</label>
         <textarea
           id="content-comment-body"
           maxLength={10000}
           onChange={(event) => setBody(event.target.value)}
-          placeholder={replyingTo ? '写下你的回复…' : '写下你的看法…'}
+          placeholder={replyingTo ? copy.comments.replyPlaceholder : copy.comments.commentPlaceholder}
           rows={4}
           value={body}
         />
         <div className="content-comment-form-actions">
           <span>{body.length}/10000</span>
           {replyingTo ? (
-            <button disabled={submitting} onClick={() => { setReplyingTo(null); setBody('') }} type="button">取消回复</button>
+            <button disabled={submitting} onClick={() => { setReplyingTo(null); setBody('') }} type="button">{copy.comments.cancelReply}</button>
           ) : null}
           <button disabled={!body.trim() || submitting} type="submit">
-            {submitting ? '提交中…' : '发表评论'}
+            {submitting ? copy.comments.submitting : copy.comments.submit}
           </button>
           </div>
         </form>
       ) : (
-        <p className="content-comment-message" role="status">当前关系受屏蔽规则限制，暂不可发表评论或互动。</p>
+        <p className="content-comment-message" role="status">{copy.comments.restricted}</p>
       )}
 
       {message ? <p className="content-comment-message" role="status">{message}</p> : null}
 
       {loading ? (
-        <p className="content-comment-state" role="status">正在加载评论…</p>
+        <p className="content-comment-state" role="status">{copy.comments.loading}</p>
       ) : comments.length === 0 ? (
-        <p className="content-comment-state">还没有评论，来发表第一条吧。</p>
+        <p className="content-comment-state">{copy.comments.empty}</p>
       ) : (
         <div className="content-comment-list">
           {comments.map((comment) => (
@@ -326,17 +332,17 @@ export default function ContentComments({
               style={{ marginInlineStart: Math.min(comment.depth, 3) * 24 }}
             >
               <header>
-                <strong>读者</strong>
+                <strong>{copy.comments.reader}</strong>
                 <Link href={'/users/' + encodeURIComponent(comment.authorUserId)}>
-                  查看主页
+                  {copy.comments.profile}
                 </Link>
                 <time dateTime={comment.createdAt}>
-                  {new Date(comment.createdAt).toLocaleString('zh-CN', { hour12: false })}
+                  {new Date(comment.createdAt).toLocaleString(dateLocale, { hour12: false })}
                 </time>
               </header>
               {editingId === comment.id ? (
                 <div className="content-comment-form">
-                  <label htmlFor={'content-comment-edit-' + comment.id}>编辑评论</label>
+                  <label htmlFor={'content-comment-edit-' + comment.id}>{locale === 'en' ? 'Edit comment' : locale === 'tw' ? '編輯留言' : '编辑评论'}</label>
                   <textarea
                     id={'content-comment-edit-' + comment.id}
                     maxLength={10000}
@@ -354,14 +360,14 @@ export default function ContentComments({
                       }}
                       type="button"
                     >
-                      取消
+                      {copy.comments.cancel}
                     </button>
                     <button
                       disabled={!editBody.trim() || savingEdit}
                       onClick={() => void updateComment(comment)}
                       type="button"
                     >
-                      {savingEdit ? '保存中…' : '保存修改'}
+                      {savingEdit ? copy.comments.saving : copy.comments.save}
                     </button>
                   </div>
                 </div>
@@ -376,10 +382,10 @@ export default function ContentComments({
                       type="button"
                     >
                       {likingCommentId === comment.id
-                        ? '处理中…'
+                        ? copy.comments.processing
                         : likedComments[comment.id]
-                          ? '已赞'
-                          : '赞'}
+                          ? copy.comments.liked
+                          : copy.comments.like}
                     </button>
                   ) : null}
                   {comment.authorUserId === viewerUserId ? (
@@ -393,7 +399,7 @@ export default function ContentComments({
                       }}
                       type="button"
                     >
-                      编辑
+                      {copy.comments.edit}
                     </button>
                   ) : null}
                   {comment.authorUserId === viewerUserId ? (
@@ -403,7 +409,7 @@ export default function ContentComments({
                       onClick={() => void deleteComment(comment)}
                       type="button"
                     >
-                      {deletingId === comment.id ? '删除中…' : '删除'}
+                      {deletingId === comment.id ? copy.comments.deleting : copy.comments.delete}
                     </button>
                   ) : null}
                   {!interactionRestricted && comment.depth < 3 ? (
@@ -416,7 +422,7 @@ export default function ContentComments({
                       }}
                       type="button"
                     >
-                      回复
+                      {copy.comments.reply}
                     </button>
                   ) : null}
                 </>
@@ -433,7 +439,7 @@ export default function ContentComments({
           onClick={() => void loadComments(cursor)}
           type="button"
         >
-          {loadingMore ? '加载中…' : '加载更多评论'}
+          {loadingMore ? copy.content.loading : copy.comments.more}
         </button>
       ) : null}
     </section>
