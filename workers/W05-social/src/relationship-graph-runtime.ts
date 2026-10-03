@@ -151,3 +151,6 @@ export const invalidateRelationshipGraph = async (viewerUserId: string, targetUs
   relationshipGraphCache.delete(relationshipGraphKey(viewer, target))
   relationshipGraphCache.delete(relationshipGraphKey(target, viewer))
 }
+
+
+export const clearRelationshipGraphCacheForTests = (): void => relationshipGraphCache.clear()
