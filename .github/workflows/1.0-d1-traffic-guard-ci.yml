@@ -14,6 +14,11 @@ on:
       - 'workers/W01-payload/src/app/auth/login/route.ts'
       - 'workers/W01-payload/src/app/auth/refresh/route.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
+      - 'workers/W01-payload/src/app/api/v1/users/[userId]/route.ts'
+      - 'workers/W01-payload/src/app/api/v1/users/[userId]/followers/route.ts'
+      - 'workers/W01-payload/src/app/api/v1/users/[userId]/following/route.ts'
+      - 'workers/W01-payload/src/app/api/v1/contents/[contentId]/comments/route.ts'
+      - 'workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts'
       - 'workers/W01-payload/src/content/w03-content-client.ts'
       - 'workers/W01-payload/src/social/w05-social-client.ts'
       - 'workers/W01-payload/wrangler.jsonc'
@@ -84,6 +89,15 @@ jobs:
           if (!listRoute.includes('cachedPublicGet')) throw new Error('public content list is not cache-first')
           if (!detailRoute.includes('cachedPublicGet')) throw new Error('public content detail is not cache-first')
           if (!detailRoute.includes('invalidatePublicContentDetail')) throw new Error('content cache invalidation missing')
+          for (const [path, marker] of [
+            ['workers/W01-payload/src/app/api/v1/users/[userId]/route.ts', 'cachedPublicGet'],
+            ['workers/W01-payload/src/app/api/v1/users/[userId]/followers/route.ts', 'cachedPublicGet'],
+            ['workers/W01-payload/src/app/api/v1/users/[userId]/following/route.ts', 'cachedPublicGet'],
+            ['workers/W01-payload/src/app/api/v1/contents/[contentId]/comments/route.ts', 'cachedPublicGet'],
+            ['workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts', 'cachedPublicGet']
+          ]) {
+            if (!fs.readFileSync(path, 'utf8').includes(marker)) throw new Error(path + ' is not cache-first')
+          }
           console.log('D1_TRAFFIC_GUARD_STATIC=PASS')
           NODE
       - name: Run traffic guard tests
