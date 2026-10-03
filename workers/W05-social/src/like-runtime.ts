@@ -147,12 +147,22 @@ export async function getLikeStatus(
              FROM interaction_likes il_count
              WHERE il_count.target_type = ?
                AND il_count.target_id = c.id
-           ) AS like_count
+           ) AS like_count,
+           EXISTS (
+             SELECT 1
+             FROM social_user_interactions block
+             WHERE block.relation_type = 'block'
+               AND (
+                 (block.actor_user_id = ? AND block.target_user_id = c.owner_user_id)
+                 OR
+                 (block.actor_user_id = c.owner_user_id AND block.target_user_id = ?)
+               )
+           ) AS blocked
            FROM contents c
           WHERE c.id = ? AND c.state = 'PUBLISHED'
           LIMIT 1`,
-      ).bind(actor, targetType, targetType, targetId)
-        .first<{ liked: number; like_count: number }>()
+      ).bind(actor, targetType, targetType, actor, actor, targetId)
+        .first<{ liked: number; like_count: number; blocked: number }>()
     : await db.prepare(
         `SELECT
            EXISTS (
@@ -167,18 +177,38 @@ export async function getLikeStatus(
              FROM interaction_likes il_count
              WHERE il_count.target_type = ?
                AND il_count.target_id = c.id
-           ) AS like_count
+           ) AS like_count,
+           EXISTS (
+             SELECT 1
+             FROM social_user_interactions block
+             WHERE block.relation_type = 'block'
+               AND (
+                 (block.actor_user_id = ? AND block.target_user_id = c.author_user_id)
+                 OR
+                 (block.actor_user_id = c.author_user_id AND block.target_user_id = ?)
+                 OR
+                 (block.actor_user_id = ? AND block.target_user_id = content.owner_user_id)
+                 OR
+                 (block.actor_user_id = content.owner_user_id AND block.target_user_id = ?)
+               )
+           ) AS blocked
            FROM social_comments c
           JOIN contents content ON content.id = c.content_id
           WHERE c.id = ?
             AND c.state = 'PUBLISHED'
             AND content.state = 'PUBLISHED'
           LIMIT 1`,
-      ).bind(actor, targetType, targetType, targetId)
-        .first<{ liked: number; like_count: number }>()
+      ).bind(actor, targetType, targetType, actor, actor, actor, actor, targetId)
+        .first<{ liked: number; like_count: number; blocked: number }>()
+
+  if (!row) return { liked: false, likeCount: 0 }
+  if (Number(row.blocked) === 1) {
+    throw new LikeRuntimeError('RELATIONSHIP_BLOCKED', 409)
+  }
+
   return {
-    liked: Boolean(row?.liked),
-    likeCount: Math.max(0, Number(row?.like_count ?? 0)),
+    liked: Boolean(row.liked),
+    likeCount: Math.max(0, Number(row.like_count ?? 0)),
   }
 }
 
