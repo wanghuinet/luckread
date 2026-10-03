@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -19,7 +20,7 @@ describe('LuckRead H5 blue design system', () => {
     expect(styles).toContain('.my-subscriptions')
     expect(styles).toContain('.lr-publish-shell')
 
-    expect(login).toContain('#2563eb')
+    expect(login).toContain('rgba(37, 99, 235, 0.16)')
     expect(register).toContain('#2563eb')
     expect(publish).toContain('#2563eb')
     expect(subscriptions).toContain('#175cd3')

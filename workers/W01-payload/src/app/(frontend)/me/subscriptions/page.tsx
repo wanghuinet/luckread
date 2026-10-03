@@ -13,14 +13,15 @@ type Subscription = {
   currentPeriodStart: string
   currentPeriodEnd: string
   cancelAt?: string | null
+  version: number
   etag: string
 }
 
 type ListResponse = {
   data?: {
-    docs?: Subscription[]
-    hasNextPage?: boolean
-    page?: number
+    items?: Subscription[]
+    nextCursor?: string | null
+    hasMore?: boolean
     limit?: number
   }
   error?: { code?: string; message?: string }
@@ -46,16 +47,18 @@ export default function MySubscriptionsPage() {
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [message, setMessage] = useState('')
-  const [pageNumber, setPageNumber] = useState(1)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasNextPage, setHasNextPage] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  async function load(page = 1, append = false) {
+  async function load(cursor: string | null = null, append = false) {
     if (append) setLoadingMore(true)
     else setLoading(true)
     setError('')
     try {
-      const response = await fetch('/api/v1/memberships/subscriptions?limit=20&page=' + String(page), {
+      const query = new URLSearchParams({ limit: '20' })
+      if (cursor) query.set('cursor', cursor)
+      const response = await fetch('/api/v1/memberships/subscriptions?' + query.toString(), {
         credentials: 'include',
         cache: 'no-store',
         headers: { accept: 'application/json' },
@@ -66,12 +69,12 @@ export default function MySubscriptionsPage() {
         window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
         return
       }
-      if (!response.ok || !data?.data?.docs) {
+      if (!response.ok || !Array.isArray(data?.data?.items)) {
         throw new Error(data?.error?.message || '订阅读取失败')
       }
-      setItems((current) => append ? [...current, ...data.data!.docs!] : data.data!.docs!)
-      setPageNumber(data.data.page ?? page)
-      setHasNextPage(data.data.hasNextPage === true)
+      setItems((current) => append ? [...current, ...data.data!.items!] : data.data!.items!)
+      setNextCursor(data.data.nextCursor ?? null)
+      setHasNextPage(data.data.hasMore === true)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '订阅读取失败')
     } finally {
@@ -197,7 +200,7 @@ export default function MySubscriptionsPage() {
             <div className="subscription-pagination">
               <button
                 disabled={loadingMore}
-                onClick={() => void load(pageNumber + 1, true)}
+                onClick={() => void load(nextCursor, true)}
                 type="button"
               >
                 {loadingMore ? '加载中…' : '加载更多订阅'}

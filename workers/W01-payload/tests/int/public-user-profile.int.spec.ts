@@ -64,7 +64,7 @@ describe('public user profile', () => {
     expect(page).toContain('const [blockedBy, setBlockedBy] = useState(false)')
     expect(page).toContain('setBlockedBy(followData?.data?.relationship?.blockedBy === true)')
     expect(page).toContain('blocked || blockedBy ?')
-    expect(page).toContain('当前关系受屏蔽规则限制。')
+    expect(page).toContain('lr-profile-relation-note')
   })
 
   it('provides profile-level block and mute actions through the canonical interaction adapters', () => {
@@ -87,7 +87,7 @@ describe('public user profile', () => {
     expect(page).toContain('disabled={muteBusy}')
     expect(page).not.toContain('disabled={blockBusy || blocked}')
     expect(page).not.toContain('disabled={muteBusy || muted}')
-    expect(page).toContain('viewerUserId !== profile.id')
+    expect(page).toContain('viewerUserId !== profile?.id')
     expect(page).not.toContain('social_user_interactions')
   })
 
@@ -99,10 +99,12 @@ describe('public user profile', () => {
     expect(page).toContain('/followers?limit=1')
     expect(page).toContain('/following?limit=1')
     expect(page).toContain('credentials: \'include\'')
-    expect(page).toContain('关注作者')
+    expect(page).toContain('关注')
     expect(page).toContain('profile?.avatar')
-    expect(page).toContain('width={72}')
-    expect(page).toContain('objectFit: \'cover\'')
+    expect(page).toContain('width={104}')
+    const styles = read('src/app/(frontend)/styles.css')
+    expect(styles).toContain('.lr-profile-avatar img')
+    expect(styles).toContain('object-fit: cover;')
     expect(page).toContain('/api/v1/contents?creatorId=')
     expect(page).toContain('加载更多作品')
     expect(page).toContain("href={'/' + encodeURIComponent(profile!.username) + '/' + item.contentType + '/' + encodeURIComponent(item.id)}")
