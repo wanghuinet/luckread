@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
-import { describe, expect, it, vi } from 'vitest'
-import { favorite, getFavoriteStatus, unfavorite } from './favorite-runtime.js'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { clearFavoriteStatusCacheForTests, favorite, getFavoriteStatus, unfavorite } from './favorite-runtime.js'
 
 const db = (firstResults: unknown[] = []) => {
   let firstIndex = 0
@@ -14,6 +14,7 @@ const db = (firstResults: unknown[] = []) => {
 }
 
 describe('favorite runtime', () => {
+  beforeEach(() => clearFavoriteStatusCacheForTests())
   it('creates a content favorite after verifying published visibility', async () => {
     const d = db([
       { id: 'content-1', state: 'PUBLISHED' },
