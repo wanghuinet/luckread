@@ -81,6 +81,46 @@ describe('public response cache', () => {
     expect(response.headers.get('X-LuckRead-Cache')).toBe('MISS')
   })
 
+  it('reuses bounded memory fallback after an edge cache write failure', async () => {
+    cache.match.mockResolvedValue(undefined)
+    cache.put.mockRejectedValueOnce(new Error('CACHE_WRITE_FAILED'))
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+    const request = new Request('https://luckread.cn/api/v1/contents?cursor=fallback')
+
+    const first = await cachedPublicGet(request, 'content-list', loader, 30)
+    expect(first.status).toBe(200)
+
+    const second = await cachedPublicGet(request.clone(), 'content-list', loader, 30)
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(second.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    await expect(second.json()).resolves.toEqual({ data: 'origin' })
+  })
+
+  it('uses the memory fallback when Cache API reads fail', async () => {
+    cache.match.mockResolvedValue(undefined)
+    cache.put.mockRejectedValueOnce(new Error('CACHE_WRITE_FAILED'))
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+    const request = new Request('https://luckread.cn/api/v1/contents?cursor=read-fallback')
+
+    await cachedPublicGet(request, 'content-list', loader, 30)
+    cache.match.mockRejectedValueOnce(new Error('CACHE_READ_FAILED'))
+    const response = await cachedPublicGet(request.clone(), 'content-list', loader, 30)
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    await expect(response.json()).resolves.toEqual({ data: 'origin' })
+  })
+
   it('bounds concurrent cache-miss origin work', async () => {
     cache.match.mockResolvedValue(undefined)
     cache.put.mockResolvedValue(undefined)
