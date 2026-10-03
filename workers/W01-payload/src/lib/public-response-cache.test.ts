@@ -39,13 +39,14 @@ describe('public response cache', () => {
     cache.put.mockResolvedValue(undefined)
     Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
 
-    let resolveLoader: ((response: Response) => void) | null = null
-    const loader = vi.fn(() => new Promise<Response>((resolve) => { resolveLoader = resolve }))
+    let releaseLoader: ((response: Response) => void) | null = null
+    const loader = vi.fn(() => new Promise<Response>((resolve) => { releaseLoader = resolve }))
 
     const request = new Request('https://luckread.cn/api/v1/contents?cursor=c1')
     const a = cachedPublicGet(request, 'content-list', loader, 30)
+    await Promise.resolve()
     const b = cachedPublicGet(request.clone(), 'content-list', loader, 30)
-    resolveLoader?.(new Response(JSON.stringify({ data: 'origin' }), {
+    releaseLoader?.(new Response(JSON.stringify({ data: 'origin' }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
     }))
