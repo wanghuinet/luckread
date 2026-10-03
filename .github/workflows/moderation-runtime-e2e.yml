@@ -12,7 +12,7 @@ on:
         description: W01 public moderation base URL
         required: true
         type: string
-        default: https://luckread.cn
+        default: https://luckread.com
       w03_source_sha:
         description: Exact W03 content runtime source required for moderation enforcement
         required: true
@@ -116,7 +116,7 @@ jobs:
 
       - name: Setup native L6 reviewer fixture
         env:
-          AUTH_BASE_URL: https://api.luckread.cn
+          AUTH_BASE_URL: https://api.luckread.com
           DATABASE_NAME_W01: luckread
           WRANGLER_VERSION: 4.116.0
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
