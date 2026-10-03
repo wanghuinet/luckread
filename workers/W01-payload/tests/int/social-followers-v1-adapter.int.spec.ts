@@ -20,4 +20,15 @@ describe('v1 follower relationship adapters', () => {
     expect(route).not.toContain('getPayload(')
     expect(route).not.toContain('social_follow_relationships')
   })
+
+  it('cancels stale follow-list requests and ignores aborted completions', () => {
+    const view = read('src/app/(frontend)/users/[userId]/UserFollowList.tsx')
+    expect(view).toContain('activeRequestRef')
+    expect(view).toContain('requestGenerationRef')
+    expect(view).toContain('activeRequestRef.current?.abort()')
+    expect(view).toContain('signal: controller.signal')
+    expect(view).toContain("cause.name === 'AbortError'")
+    expect(view).toContain('if (!isCurrentRequest(controller, generation)) return')
+  })
+
 })
