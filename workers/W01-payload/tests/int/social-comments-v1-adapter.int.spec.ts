@@ -15,6 +15,8 @@ describe('v1 comment adapters', () => {
   it('routes public reads and authenticated creates through W05', () => {
     expect(route).toContain('callW05SocialPublic')
     expect(route).toContain('resolveCookieSocialPrincipal')
+    expect(route).toContain('resolveOptionalCookieSocialPrincipal')
+    expect(route).toContain('principal: viewer')
     expect(route).toContain('callW05Social')
     expect(route).toContain('/internal/social/contents/')
     expect(route).toContain('/comments')

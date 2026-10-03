@@ -31,6 +31,16 @@ export async function resolveCookieSocialPrincipal(request: Request): Promise<Co
   return resolveCookieContentPrincipal(request)
 }
 
+export async function resolveOptionalCookieSocialPrincipal(
+  request: Request,
+): Promise<ContentPrincipal | Response | null> {
+  if (!request.headers.get('Authorization') && !request.headers.get('cookie')) return null
+
+  const principal = await resolveCookieSocialPrincipal(request)
+  if (principal instanceof Response && principal.status === 401) return null
+  return principal
+}
+
 export async function assertSocialTargetUserExists(targetUserId: string): Promise<void> {
   const normalized = targetUserId.trim()
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(normalized)) {
@@ -51,6 +61,7 @@ export async function callW05SocialPublic(input: {
   request: Request
   pathname: string
   method: string
+  principal?: ContentPrincipal | null
 }): Promise<Response> {
   const service = await getW05Service()
   const headers = new Headers({
@@ -59,6 +70,10 @@ export async function callW05SocialPublic(input: {
     'X-LuckRead-Correlation-Id':
       input.request.headers.get('X-LuckRead-Correlation-Id')?.trim() || crypto.randomUUID(),
   })
+  if (input.principal?.userId) {
+    headers.set('X-LuckRead-Principal-User-Id', input.principal.userId)
+  }
+
   const response = await service.fetch(
     new Request('https://luckread-w05.internal' + input.pathname, {
       method: input.method,

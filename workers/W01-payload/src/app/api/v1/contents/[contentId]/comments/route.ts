@@ -2,6 +2,7 @@ import {
   callW05Social,
   callW05SocialPublic,
   resolveCookieSocialPrincipal,
+  resolveOptionalCookieSocialPrincipal,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
 
@@ -33,10 +34,14 @@ export async function GET(
     if (limit) query.set('limit', limit)
     const suffix = query.toString() ? '?' + query.toString() : ''
 
+    const viewer = await resolveOptionalCookieSocialPrincipal(request)
+    if (viewer instanceof Response) return viewer
+
     return await callW05SocialPublic({
       request,
       pathname: '/internal/social/contents/' + encodeURIComponent(contentId) + '/comments' + suffix,
       method: 'GET',
+      principal: viewer,
     })
   } catch (error) {
     if (error instanceof W05SocialClientError) {

@@ -492,17 +492,61 @@ export async function listComments(
   contentIdValue: string,
   cursorValue: string | null,
   limit: number,
+  viewerUserIdValue: string | null = null,
 ): Promise<CommentPage> {
   const contentId = validateId(contentIdValue)
   const cursor = decodeCursor(cursorValue)
+  const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue, 'UNAUTHENTICATED') : null
 
   const whereCursor = cursor
     ? 'AND (c.created_at > ? OR (c.created_at = ? AND c.id > ?))'
     : ''
 
+  const visibilitySql = viewerUserId
+    ? `AND NOT EXISTS (
+         SELECT 1
+           FROM social_user_interactions block
+          WHERE block.relation_type = 'block'
+            AND (
+              (block.actor_user_id = ? AND block.target_user_id = c.author_user_id)
+              OR
+              (block.actor_user_id = c.author_user_id AND block.target_user_id = ?)
+            )
+       )
+       AND NOT EXISTS (
+         SELECT 1
+           FROM social_user_interactions mute
+          WHERE mute.relation_type = 'mute'
+            AND mute.actor_user_id = ?
+            AND mute.target_user_id = c.author_user_id
+       )`
+    : ''
+  const childVisibilitySql = viewerUserId
+    ? `AND NOT EXISTS (
+         SELECT 1
+           FROM social_user_interactions block
+          WHERE block.relation_type = 'block'
+            AND (
+              (block.actor_user_id = ? AND block.target_user_id = child.author_user_id)
+              OR
+              (block.actor_user_id = child.author_user_id AND block.target_user_id = ?)
+            )
+       )
+       AND NOT EXISTS (
+         SELECT 1
+           FROM social_user_interactions mute
+          WHERE mute.relation_type = 'mute'
+            AND mute.actor_user_id = ?
+            AND mute.target_user_id = child.author_user_id
+       )`
+    : ''
   const params = cursor
-    ? [contentId, contentId, cursor.createdAt, cursor.createdAt, cursor.id, limit + 1]
-    : [contentId, contentId, limit + 1]
+    ? viewerUserId
+      ? [contentId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, contentId, cursor.createdAt, cursor.createdAt, cursor.id, limit + 1]
+      : [contentId, contentId, cursor.createdAt, cursor.createdAt, cursor.id, limit + 1]
+    : viewerUserId
+      ? [contentId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, contentId, limit + 1]
+      : [contentId, contentId, limit + 1]
 
   const result = await db.prepare(
     `WITH RECURSIVE public_comments AS (
@@ -522,6 +566,7 @@ export async function listComments(
          AND content.state = 'PUBLISHED'
          AND c.state = 'PUBLISHED'
          AND c.parent_id IS NULL
+         ${visibilitySql}
 
        UNION ALL
 
@@ -539,6 +584,7 @@ export async function listComments(
        JOIN public_comments parent ON parent.id = child.parent_id
        WHERE child.state = 'PUBLISHED'
          AND parent.depth < 3
+         ${childVisibilitySql}
      )
      SELECT
        c.id,
