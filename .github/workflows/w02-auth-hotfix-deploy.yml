@@ -49,8 +49,8 @@ jobs:
       - name: Smoke page
         run: |
           set -euo pipefail
-          code="$(curl -L -sS -o /tmp/login-page -w '%{http_code}' https://mp.luckread.cn/login)"
-          echo "https://mp.luckread.cn/login -> $code"
+          code="$(curl -L -sS -o /tmp/login-page -w '%{http_code}' https://mp.luckread.com/login)"
+          echo "https://mp.luckread.com/login -> $code"
           test "$code" = 200
 
       - name: Write provenance
