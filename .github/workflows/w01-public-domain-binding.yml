@@ -29,7 +29,7 @@ jobs:
           attach() {
             local hostname="$1"
             local response existing_service attach_response
-            local zoneName="${hostname#*.}"
+            local zone_name="${hostname#*.}"
 
             response="$(curl --fail-with-body --silent --show-error \
               --get "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
@@ -54,8 +54,8 @@ jobs:
               -X PUT \
               -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
               -H "Content-Type: application/json" \
-              --data "$(jq -cn --arg hostname "${hostname}" --arg service "${WORKER_NAME}" \
-                '{hostname:$hostname,service:$service,zone_name:zoneName}')")"
+              --data "$(jq -cn --arg hostname "${hostname}" --arg service "${WORKER_NAME}" --arg zone_name "${zone_name}" \
+                '{hostname:$hostname,service:$service,zone_name:$zone_name}')")"
 
             printf '%s' "${attach_response}" | jq -e '.success == true and .result.hostname == $hostname and .result.service == $service' \
               --arg hostname "${hostname}" --arg service "${WORKER_NAME}" >/dev/null

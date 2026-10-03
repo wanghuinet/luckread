@@ -329,7 +329,7 @@ describe('Creator Center admin extension', () => {
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const assets = read('src/app/(payload)/v1beta/CreatorAssetLibrary.tsx')
 
-    expect(view).toContain("import CreatorAssetLibrary from '../../(payload)/admin/CreatorAssetLibrary'")
+    expect(view).toContain("import CreatorAssetLibrary from '../../(payload)/v1beta/CreatorAssetLibrary'")
     expect(view).toContain('<CreatorAssetLibrary adminMode={adminMode} loginPath={adminMode ? \'/admin/login\' : \'/login\'} />')
     expect(assets).toContain("fetch('/api/v1/media?limit=8&page=' + String(page)")
     expect(assets).toContain('pageNumber + 1')
