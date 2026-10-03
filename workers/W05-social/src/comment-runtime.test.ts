@@ -455,6 +455,35 @@ describe('comment runtime', () => {
     expect(page.nextCursor).toEqual(expect.any(String))
   })
 
+  it('applies the viewer Block and Mute policy to comment roots and replies', async () => {
+    const d = db([], [{
+      results: [{
+        id: 'c1',
+        content_id: 'content-1',
+        author_user_id: 'user-2',
+        parent_id: null,
+        body: '公开评论',
+        state: 'PUBLISHED',
+        depth: 0,
+        created_at: '2026-10-03T00:00:00.000Z',
+        updated_at: '2026-10-03T00:00:00.000Z',
+      }],
+    }])
+
+    await expect(listComments(d, 'content-1', null, 20, 'viewer-1')).resolves.toMatchObject({
+      items: [{ id: 'c1' }],
+    })
+
+    const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
+    expect(sql).toContain("block.relation_type = 'block'")
+    expect(sql).toContain("mute.relation_type = 'mute'")
+    expect(sql).toContain('block.actor_user_id = ? AND block.target_user_id = c.author_user_id')
+    expect(sql).toContain('block.actor_user_id = c.author_user_id AND block.target_user_id = ?')
+    expect(sql).toContain('mute.actor_user_id = ?')
+    expect(sql).toContain('mute.target_user_id = c.author_user_id')
+    expect(sql).toContain("child.author_user_id")
+  })
+
   it('validates comment page limits', () => {
     expect(parseCommentLimit(null)).toBe(20)
     expect(parseCommentLimit('50')).toBe(50)
