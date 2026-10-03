@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type PublicProfile = {
@@ -67,6 +67,8 @@ export default function PublicProfilePage({
   const [contentError, setContentError] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const contentRequestRef = useRef<AbortController | null>(null)
+  const contentRequestIdRef = useRef(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -162,11 +164,16 @@ export default function PublicProfilePage({
     return () => {
       cancelled = true
       controller.abort()
+      contentRequestRef.current?.abort()
     }
   }, [params])
 
   async function loadMoreContents() {
     if (contentLoading || !contentHasMore || !contentCursor || !profile) return
+    contentRequestRef.current?.abort()
+    const controller = new AbortController()
+    contentRequestRef.current = controller
+    const requestId = ++contentRequestIdRef.current
     setContentLoading(true)
     setContentError('')
     try {
@@ -175,19 +182,23 @@ export default function PublicProfilePage({
         {
           headers: { accept: 'application/json' },
           cache: 'no-store',
+          signal: controller.signal,
         },
       )
       const data = await response.json().catch((): null => null) as ContentListResponse | null
       if (!response.ok || !Array.isArray(data?.data?.items)) {
         throw new Error('CONTENT_LIST_FAILED')
       }
+      if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return
       setContents((current) => [...current, ...data.data.items])
       setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
       setContentHasMore(data.data.hasMore === true)
-    } catch {
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
+      if (requestId !== contentRequestIdRef.current) return
       setContentError('暂时无法加载更多作品，请稍后重试。')
     } finally {
-      setContentLoading(false)
+      if (requestId === contentRequestIdRef.current) setContentLoading(false)
     }
   }
 
