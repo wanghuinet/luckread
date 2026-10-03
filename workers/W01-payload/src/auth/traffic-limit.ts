@@ -79,3 +79,26 @@ export async function enforcePublicReadRateLimit(request: Request): Promise<void
   const result = await limiter.limit({ key: 'public-read:ip:' + clientIp })
   if (!result.success) throw new TrafficLimitError()
 }
+
+
+export async function enforceW01WriteRateLimit(request: Request): Promise<void> {
+  let env: Record<string, unknown>
+  try {
+    const context = await getCloudflareContext({ async: true })
+    env = context.env as unknown as Record<string, unknown>
+  } catch {
+    return
+  }
+
+  const globalLimiter = env.W01_WRITE_ORIGIN_GLOBAL_LIMITER as RateLimitBinding | undefined
+  if (globalLimiter) {
+    const result = await globalLimiter.limit({ key: 'w01-write:origin' })
+    if (!result.success) throw new TrafficLimitError()
+  }
+
+  const limiter = env.W01_WRITE_LIMITER as RateLimitBinding | undefined
+  if (!limiter) throw new Error('RATE_LIMIT_BINDING_UNAVAILABLE:W01_WRITE_LIMITER')
+  const clientIp = request.headers.get('cf-connecting-ip')?.trim() || 'unknown'
+  const result = await limiter.limit({ key: 'w01-write:ip:' + clientIp })
+  if (!result.success) throw new TrafficLimitError()
+}
