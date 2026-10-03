@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.cn/contracts/v1/resource-budget/1.0-d1-traffic-guard.v1.json",
+  "title": "LuckRead 1.0 D1 Traffic Guard Contract",
+  "version": "1.0.0",
+  "status": "IMPLEMENTATION_SLICE",
+  "purpose": "Keep 1.0 public traffic from linearly coupling to authoritative D1 usage and shed abusive bursts before D1 access.",
+  "sources": [
+    "docs/00-PROJECT-BLUEPRINT-v1.4.md",
+    "docs/170-RATE-LIMIT-QUOTA-TRAFFIC-SHAPING-CONTRACT-v1.0.md",
+    "contracts/api/content-operation-policy.v1.json",
+    "contracts/api/feed-operation-policy.v1.json",
+    "contracts/api/interaction-operation-policy.v1.json"
+  ],
+  "invariants": {
+    "publicReadNormalD1Max": 0,
+    "publicReadCacheMissD1Max": 1,
+    "publicReadD1WriteMax": 0,
+    "simpleAuthoritativeMutationD1WriteTransactionMax": 1,
+    "synchronousDerivedProjectionWrites": 0,
+    "synchronousEventFanoutMax": 0,
+    "cacheMissSingleFlight": true,
+    "privateResponsesNeverSharedCached": true,
+    "highFrequencyDerivedWork": "QUEUE_OR_AGGREGATION_BEFORE_BATCH_PERSISTENCE",
+    "d1Authority": "PRIMARY_ONLY_FOR_AUTHORITATIVE_WRITES"
+  },
+  "edgeCache": {
+    "contentListTtlSeconds": 30,
+    "contentDetailTtlSeconds": 30,
+    "anonymousOnly": true,
+    "singleFlight": true,
+    "cacheKeyVersionRequired": true,
+    "staleWhileRevalidate": "DEFERRED_TO_ZONE_CACHE_RULES; Workers Cache API path does not implement it"
+  },
+  "rateLimits": {
+    "content": {
+      "publicReadPerKeyPerMinute": 300,
+      "mutationPerKeyPerMinute": 60
+    },
+    "social": {
+      "readPerKeyPerMinute": 300,
+      "mutationPerKeyPerMinute": 60
+    },
+    "auth": {
+      "registerPerIpPerMinute": 10,
+      "loginPerIpPerMinute": 30,
+      "refreshPerIpPerMinute": 120
+    },
+    "response": {
+      "status": 429,
+      "retryAfterSeconds": 60,
+      "stableCode": "RATE_LIMITED"
+    },
+    "deploymentRequirement": "Every production Worker named by this contract MUST have its corresponding Rate Limiting bindings declared; missing bindings may be tolerated only by unit-test doubles."
+  },
+  "operationBudgets": {
+    "content.listContents": {
+      "d1ReadMax": 1,
+      "d1WriteMax": 0
+    },
+    "content.getContent": {
+      "d1ReadMax": 1,
+      "d1WriteMax": 0
+    },
+    "content.createContent": {
+      "d1ReadMax": 1,
+      "d1WriteTransactionMax": 1
+    },
+    "content.updateContent": {
+      "d1ReadMax": 1,
+      "d1WriteTransactionMax": 1
+    },
+    "interaction.unlike": {
+      "d1ReadMax": 0,
+      "d1WriteTransactionMax": 1
+    },
+    "interaction.unfollow": {
+      "d1ReadMax": 0,
+      "d1WriteTransactionMax": 1
+    }
+  },
+  "asyncIngestion": {
+    "authoritativeRelations": "synchronous local D1 transaction only when required by correctness",
+    "counters": "derived; asynchronous",
+    "feedProjection": "asynchronous",
+    "analytics": "asynchronous",
+    "notificationFanout": "asynchronous",
+    "retry": "bounded_and_idempotent",
+    "backpressure": "required"
+  },
+  "acceptance": {
+    "rateLimitRejectsBeforeD1": "required",
+    "cacheHitAvoidsOriginD1": "required",
+    "anonymousPublicContentReadUsesCache": "required",
+    "mutationInvalidatesAffectedPublicCache": "required",
+    "noSyncProjectionWriteAmplification": "required",
+    "noNPlus1PublicRead": "required"
+  },
+  "nonGoals": [
+    "No fifth D1",
+    "No new Worker",
+    "No D1 proxy or database gateway",
+    "No read/write split by creating additional D1 domains",
+    "No asynchronous conversion of authoritative content/account mutations that would weaken correctness"
+  ]
+}
