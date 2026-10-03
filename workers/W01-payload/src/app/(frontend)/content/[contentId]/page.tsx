@@ -351,7 +351,20 @@ export default function ContentDetailPage({
         setActionMessage('分享链接生成失败，请稍后重试。')
         return
       }
-      await navigator.clipboard.writeText(window.location.origin + '/s/' + encodeURIComponent(shareId))
+      const shareUrl = window.location.origin + '/s/' + encodeURIComponent(shareId)
+
+      if (typeof navigator.share === 'function') {
+        try {
+          await navigator.share({ title: content.title, url: shareUrl })
+          setActionMessage('已打开系统分享面板。')
+          return
+        } catch (shareError) {
+          if (shareError instanceof DOMException && shareError.name === 'AbortError') return
+          // Native sharing may be unavailable or blocked; fall back to clipboard.
+        }
+      }
+
+      await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1800)
     } catch {

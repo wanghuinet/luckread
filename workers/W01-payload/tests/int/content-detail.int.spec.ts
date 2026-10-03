@@ -61,6 +61,10 @@ describe('public content detail', () => {
     expect(page).toContain('/api/v1/content/' )
     expect(page).toContain("'Idempotency-Key': 'social-share:' + crypto.randomUUID()")
     expect(page).toContain("window.location.origin + '/s/' + encodeURIComponent(shareId)")
+    expect(page).toContain("typeof navigator.share === 'function'")
+    expect(page).toContain("await navigator.share({ title: content.title, url: shareUrl })")
+    expect(page).toContain("shareError.name === 'AbortError'")
+    expect(page).toContain('await navigator.clipboard.writeText(shareUrl)')
     expect(page).toContain('分享链接已复制')
   })
 
