@@ -401,6 +401,7 @@ export default {
         }
 
         if (request.method === 'GET') {
+          requireInteractionLayer(request)
           const relationship = await getRelationshipGraph(env.DB, viewerUserId, path.userId)
           return json({
             data: {
