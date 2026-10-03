@@ -69,7 +69,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration"
-          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT CASE WHEN EXISTS (SELECT 1 FROM sqlite_master WHERE type = ''table'' AND name = ''membership_subscriptions'') THEN (SELECT COUNT(*) FROM membership_subscriptions) ELSE 0 END AS subscription_count;' > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/preflight-count.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command "SELECT CASE WHEN EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'membership_subscriptions') THEN (SELECT COUNT(*) FROM membership_subscriptions) ELSE 0 END AS subscription_count;" > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/preflight-count.json"
           npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("membership_subscriptions");' > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/preflight-schema.json"
           node - <<'NODE'
           const fs = require('node:fs');
