@@ -10,7 +10,7 @@ describe('LuckRead homepage', () => {
 
     expect(page).toContain('让好内容被看见')
     expect(page).toContain('发现 · 创作 · 连接')
-    expect(page).toContain('href="/publish"')
+    expect(page).toContain("const CREATOR_CENTER_URL = 'https://mp.luckread.cn/'")
     expect(page).toContain('立即创作')
     expect(styles).toContain('.home-shell')
     expect(styles).toContain('.hero')

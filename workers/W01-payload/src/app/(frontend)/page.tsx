@@ -1,8 +1,14 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import React from 'react'
 
 import HomeContentFeed from './HomeContentFeed'
 import './styles.css'
+
+const CREATOR_CENTER_URL = 'https://mp.luckread.cn/'
+
+export const dynamic = 'force-dynamic'
 
 const highlights = [
   { index: '01', eyebrow: '发现', title: '从日常阅读，到更广阔的世界', body: '汇聚图文、视频与深度内容，让每一次停留都有值得带走的东西。' },
@@ -11,7 +17,14 @@ const highlights = [
 ]
 const categories = ['图文', '视频', '动态', '专栏', '创作者']
 
-export default function HomePage() {
+export default async function HomePage() {
+  const requestHeaders = await headers()
+  const host = (requestHeaders.get('host') || '').split(':')[0].toLowerCase()
+
+  if (host === 'mp.luckread.cn') {
+    redirect('/admin/creator-center')
+  }
+
   return (
     <div className="home-shell">
       <header className="site-header">
@@ -29,7 +42,7 @@ export default function HomePage() {
           <Link className="header-login" href="/me/profile">我的资料</Link>
           <Link className="header-login" href="/me/subscriptions">我的订阅</Link>
           <Link className="header-login" href="/login">登录</Link>
-          <Link className="header-creator" href="/publish">创作者中心</Link>
+          <Link className="header-creator" href={CREATOR_CENTER_URL}>创作者中心</Link>
         </div>
       </header>
 
@@ -44,7 +57,7 @@ export default function HomePage() {
               在这里，阅读获得启发，表达创造价值，人与人因内容相遇。
             </p>
             <div className="hero-actions">
-              <Link className="button button-primary" href="/publish">立即创作<span aria-hidden="true">↗</span></Link>
+              <Link className="button button-primary" href={CREATOR_CENTER_URL}>立即创作<span aria-hidden="true">↗</span></Link>
               <Link className="button button-quiet" href="/content">探索内容</Link>
             </div>
           </div>
@@ -102,7 +115,7 @@ export default function HomePage() {
           </div>
           <div className="creator-banner-side">
             <p>从一篇文章、一条动态到一段视频，LuckRead 为创作者准备了轻量、清晰、可持续的发布入口。</p>
-            <Link className="button button-light" href="/publish">进入创作者中心<span aria-hidden="true">↗</span></Link>
+            <Link className="button button-light" href={CREATOR_CENTER_URL}>进入创作者中心<span aria-hidden="true">↗</span></Link>
           </div>
         </section>
       </main>

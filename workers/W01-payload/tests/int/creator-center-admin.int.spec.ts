@@ -283,13 +283,13 @@ describe('Creator Center admin extension', () => {
     const moderation = read('src/app/(payload)/admin/CreatorModerationQueue.tsx')
 
 
-    expect(view).toContain('文章管理')
+    expect(view).toContain('内容管理')
     expect(view).toContain('发布中心')
-    expect(view).toContain('发布检测')
+    expect(view).toContain('审核与发布')
     expect(view).toContain('素材库')
     expect(view).toContain('数据中心')
     expect(view).toContain('粉丝与关注')
-    expect(view).toContain('收益与权益')
+    expect(view).toContain('收益中心')
     expect(view).toContain('快速创作')
     expect(view).toContain('写文章')
     expect(view).toContain('发动态')
