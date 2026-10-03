@@ -236,8 +236,7 @@ export default {
         )
       }
 
-      const commentIdParts = url.pathname.split('/').filter(Boolean)
-      if (
+            if (
         commentIdParts.length === 4 &&
         commentIdParts[0] === 'internal' &&
         commentIdParts[1] === 'social' &&
