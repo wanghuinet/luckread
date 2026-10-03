@@ -27,8 +27,12 @@ type ContentApiResponse = {
 }
 
 export default function ContentBrowsePage() {
-  const [locale] = useState<PublicLocale>(() => readPublicLocaleCookie())
+  const [locale, setLocale] = useState<PublicLocale>('zh')
   const copy = getPublicCopy(locale)
+
+  useEffect(() => {
+    setLocale(readPublicLocaleCookie())
+  }, [])
   const labels: Record<ContentType | 'all', string> = {
     all: copy.content.tabs.all,
     article: copy.content.tabs.article,
