@@ -474,7 +474,7 @@ export default function PublicProfilePage({
           <div style={{ display: 'grid', gap: 12 }}>
             {contents.map((item) => (
               <Link
-                href={'/content/' + encodeURIComponent(item.id)}
+                href={'/' + encodeURIComponent(profile!.username) + '/' + item.contentType + '/' + encodeURIComponent(item.id)}
                 key={item.id}
                 style={{
                   display: 'grid',
