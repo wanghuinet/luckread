@@ -47,7 +47,7 @@ export const validateIdempotencyKey = (value: string | null): string => {
 
 export const parseBoundedPositiveInt = (value: string | null, fallback: number, max: number): number => {
   if (value === null) return fallback
-  if (!/^[1-9]\\d*$/.test(value)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  if (!/^[1-9]\d*$/.test(value)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   const parsed = Number(value)
   if (!Number.isSafeInteger(parsed) || parsed > max) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   return parsed
