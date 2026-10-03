@@ -29,6 +29,24 @@ describe('like runtime', () => {
   })
 
 
+  it('hides content like status when either actor or owner is blocked', async () => {
+    const d = db([{ liked: 1, like_count: 9, blocked: 1 }])
+    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).rejects.toMatchObject({
+      code: 'RELATIONSHIP_BLOCKED',
+      status: 409,
+    })
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+  })
+
+  it('hides comment like status when a comment-side relationship is blocked', async () => {
+    const d = db([{ liked: 1, like_count: 4, blocked: 1 }])
+    await expect(getLikeStatus(d, 'user-1', { targetType: 'comment', targetId: 'comment-1' })).rejects.toMatchObject({
+      code: 'RELATIONSHIP_BLOCKED',
+      status: 409,
+    })
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+  })
+
   it('creates a content like after verifying published visibility', async () => {
     const d = db([
       { id: 'content-1', state: 'PUBLISHED' },
