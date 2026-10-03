@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 
 type CommentItem = {
   id: string
@@ -45,8 +45,14 @@ export default function ContentComments({
   const [editBody, setEditBody] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const commentsRequestRef = useRef<AbortController | null>(null)
+  const commentsRequestIdRef = useRef(0)
 
   const loadComments = useCallback(async (nextCursor: string | null = null) => {
+    commentsRequestRef.current?.abort()
+    const requestId = ++commentsRequestIdRef.current
+    const controller = new AbortController()
+    commentsRequestRef.current = controller
     if (nextCursor) setLoadingMore(true)
     else setLoading(true)
     try {
@@ -54,19 +60,28 @@ export default function ContentComments({
       if (nextCursor) params.set('cursor', nextCursor)
       const response = await fetch(
         '/api/v1/contents/' + encodeURIComponent(contentId) + '/comments?' + params.toString(),
-        { headers: { accept: 'application/json' }, cache: 'no-store' },
+        {
+          headers: { accept: 'application/json' },
+          cache: 'no-store',
+          signal: controller.signal,
+        },
       )
       const data = await response.json().catch((): null => null)
       if (!response.ok || !data?.data) {
         throw new Error(data?.error?.message || '评论加载失败')
       }
       const page = data.data as CommentPage
+      if (requestId !== commentsRequestIdRef.current) return
       setComments((current) => nextCursor ? [...current, ...page.items] : page.items)
       setCursor(page.nextCursor)
       setHasMore(page.hasMore)
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      if (requestId !== commentsRequestIdRef.current) return
       setMessage(error instanceof Error ? error.message : '评论加载失败')
     } finally {
+      if (requestId !== commentsRequestIdRef.current) return
+      commentsRequestRef.current = null
       setLoading(false)
       setLoadingMore(false)
     }
@@ -76,7 +91,12 @@ export default function ContentComments({
     const timer = window.setTimeout(() => {
       void loadComments()
     }, 0)
-    return () => window.clearTimeout(timer)
+    return () => {
+      window.clearTimeout(timer)
+      commentsRequestRef.current?.abort()
+      commentsRequestRef.current = null
+      commentsRequestIdRef.current += 1
+    }
   }, [loadComments])
 
 
