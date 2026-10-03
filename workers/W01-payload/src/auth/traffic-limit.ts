@@ -15,8 +15,13 @@ export async function enforceAuthRateLimit(
   bindingName: 'AUTH_REGISTER_LIMITER' | 'AUTH_LOGIN_LIMITER' | 'AUTH_REFRESH_LIMITER',
   keyParts: string[],
 ): Promise<void> {
-  const context = await getCloudflareContext({ async: true })
-  const env = context.env as unknown as Record<string, unknown>
+  let env: Record<string, unknown>
+  try {
+    const context = await getCloudflareContext({ async: true })
+    env = context.env as unknown as Record<string, unknown>
+  } catch {
+    return
+  }
   const limiter = env[bindingName] as RateLimitBinding | undefined
   if (!limiter) return
 
