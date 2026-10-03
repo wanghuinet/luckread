@@ -1,0 +1,75 @@
+{
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "promotion": "NOT_GREEN",
+  "migrationId": "MIG-MON-SUBSCRIPTION-VERSION-V1",
+  "featureIds": [
+    "MON-005",
+    "MON-006",
+    "MON-008"
+  ],
+  "purpose": "Stage the authoritative Subscription concurrency version field on D1-01 without rewriting the existing 0001 migration.",
+  "authority": {
+    "worker": "W07",
+    "domain": "D1-01",
+    "entity": "ENT-SUBSCRIPTION",
+    "persistenceContract": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json"
+  },
+  "target": {
+    "physicalDatabaseUuid": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "physicalDatabaseName": "luckread",
+    "physicalTable": "membership_subscriptions"
+  },
+  "migrationFile": "workers/W07-subscription-commerce/migrations/0002_subscription_version.sql",
+  "migrationArtifactSha256": "ce1673415eec33c110e01bff201394ae0ed7ac73970ec840379fdaf24590ad8a",
+  "change": {
+    "fieldId": "ENT-SUBSCRIPTION-F-VERSION",
+    "column": "version",
+    "dbType": "INTEGER",
+    "finalNullable": false,
+    "defaultValue": 1,
+    "minimum": 1,
+    "semantics": "Version starts at 1 and increments exactly once after each successful authoritative Subscription mutation."
+  },
+  "guard": {
+    "mode": "FAIL_CLOSED_ZERO_ROW_TARGET",
+    "guardTable": "subscription_version_migration_guard_20261003",
+    "actionOnNonEmptyTarget": "ABORT"
+  },
+  "stagedPlan": [
+    "Verify exact W07 D1-01 binding.",
+    "Verify migration source SHA-256.",
+    "Preflight membership_subscriptions row count and verify version is absent.",
+    "Abort for any existing Subscription rows.",
+    "Apply pending D1 migrations in order.",
+    "Verify the 14-column schema, version NOT NULL/default/check semantics, indexes and zero physical foreign keys.",
+    "Capture migration provenance and evidence."
+  ],
+  "gates": {
+    "remoteMutation": "NOT_EXECUTED",
+    "preflight": "PENDING",
+    "postSchemaVerification": "PENDING",
+    "evidenceRegistry": "PENDING"
+  },
+  "forbiddenInference": [
+    "Never assign version=1 to a non-empty existing Subscription population.",
+    "Never rewrite or renumber 0001_membership_subscriptions.",
+    "Never introduce active-subscription uniqueness in this migration.",
+    "Never treat ETag as the concurrency authority."
+  ],
+  "evidenceRequirements": [
+    "exact migration SHA-256",
+    "exact source commit SHA",
+    "exact D1-01 UUID",
+    "preflight count=0",
+    "version column absent before migration",
+    "remote migration ledger",
+    "post-schema 14 columns",
+    "version NOT NULL/default/minimum verification",
+    "index inspection",
+    "physical foreign-key count=0",
+    "Evidence Registry record"
+  ],
+  "nonEmptyTargetPolicy": "MUST_ABORT_AND_REMAIN_NOT_GREEN",
+  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until controlled remote execution and post-migration evidence are captured."
+}
