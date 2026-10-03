@@ -96,7 +96,7 @@ describe('public creator profile', () => {
     expect(page).toContain("params.set('type', filter)")
     expect(page).toContain('loadMoreContents')
     expect(page).toContain('cursor: contentCursor')
-    expect(page).toContain("const [filter, setFilter] = useState<ProfileFilter>('all')")
+    expect(page).toContain("const [filter, setFilter] = useState<ProfileFilter>('post')")
     expect(cache).toContain("'content-list': ['creatorId', 'cursor', 'limit', 'type']")
   })
 
