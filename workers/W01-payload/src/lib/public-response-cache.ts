@@ -76,9 +76,15 @@ export const cachedPublicGet = async (
   return withCacheHeader(response.clone(), 'MISS')
 }
 
-export const invalidatePublicContentDetail = async (request: Request, contentId: string): Promise<void> => {
+export const invalidatePublicRoute = async (request: Request, namespace: string, pathname: string): Promise<void> => {
   const url = new URL(request.url)
-  url.pathname = `/api/v1/contents/${encodeURIComponent(contentId)}`
+  url.pathname = pathname
   url.search = ''
-  await caches.default.delete(publicCacheKey(new Request(url.toString()), 'content-detail'))
+  await caches.default.delete(publicCacheKey(new Request(url.toString()), namespace))
 }
+
+export const invalidatePublicContentDetail = async (request: Request, contentId: string): Promise<void> =>
+  invalidatePublicRoute(request, 'content-detail', `/api/v1/contents/${encodeURIComponent(contentId)}`)
+
+export const invalidatePublicUserProfile = async (request: Request, userId: string): Promise<void> =>
+  invalidatePublicRoute(request, 'user-profile', `/api/v1/users/${encodeURIComponent(userId)}`)
