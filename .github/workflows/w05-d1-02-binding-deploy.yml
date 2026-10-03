@@ -52,6 +52,18 @@ jobs:
           jq -e --arg worker "$EXPECTED_WORKER" '.name == $worker' workers/W05-social/wrangler.jsonc >/dev/null
           jq -e --arg db "$EXPECTED_DB_UUID"             '.d1_databases | length == 1 and .[0].binding == "DB" and .[0].database_id == $db'             workers/W05-social/wrangler.jsonc >/dev/null
 
+      - name: Verify W05 traffic guard bindings
+        working-directory: workers/W05-social
+        run: |
+          node - <<'NODE'
+          const fs=require('fs')
+          const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'))
+          const required=['SOCIAL_ORIGIN_GLOBAL_LIMITER','SOCIAL_READ_LIMITER','SOCIAL_WRITE_LIMITER']
+          const names=new Set((c.ratelimits||[]).map(x=>x.name))
+          for(const name of required) if(!names.has(name)) throw new Error('missing rate limiter: '+name)
+          console.log(JSON.stringify({rateLimitBindings:[...names].sort()}))
+          NODE
+
       - name: Deploy W05 with D1-02 binding
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
