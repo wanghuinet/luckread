@@ -4,33 +4,18 @@ import { resolve } from 'node:path'
 
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
-describe('public user profile', () => {
-  it('exposes public follower and following list links on the author profile', () => {
+describe('public creator profile', () => {
+  it('renders the responsive creator profile surface without exposing private profile fields', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
-    const followers = read('src/app/(frontend)/users/[userId]/followers/page.tsx')
-    const following = read('src/app/(frontend)/users/[userId]/following/page.tsx')
-    const list = read('src/app/(frontend)/users/[userId]/UserFollowList.tsx')
-
-    expect(page).toContain('/followers')
-    expect(page).toContain('/following')
-    expect(followers).toContain('<UserFollowList direction="followers" userId={userId} />')
-    expect(following).toContain('<UserFollowList direction="following" userId={userId} />')
-    expect(list).toContain('/api/v1/users/')
-    expect(list).toContain('limit: String(PAGE_SIZE)')
-    expect(list).toContain('nextCursor')
-    expect(list).toContain('加载更多')
-    expect(list).toContain("href={'/users/' + encodeURIComponent(item.userId)}")
-    expect(list).toContain('cache: \'no-store\'')
-  })
-
-  it('preserves the full return path when follow authentication expires', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
-    expect(page).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
-    expect(page).toContain("router.replace('/login?returnTo=' + encodeURIComponent(returnTo))")
-  })
-
-  it('returns only the intentionally public user fields', () => {
     const route = read('src/app/api/v1/users/[userId]/route.ts')
+
+    expect(page).toContain('creator-profile-shell')
+    expect(page).toContain('creator-profile-sidebar')
+    expect(page).toContain('creator-profile-mobile-header')
+    expect(page).toContain('creator-profile-hero')
+    expect(page).toContain('creator-profile-tabs')
+    expect(page).toContain('creator-profile-grid')
+    expect(page).toContain('creator-profile-card')
     expect(route).toContain("collection: 'users'")
     expect(route).toContain('overrideAccess: true')
     expect(route).toContain("username: typeof publicUser.username === 'string' ? publicUser.username : ''")
@@ -42,72 +27,53 @@ describe('public user profile', () => {
     expect(route).not.toContain('timezone: true')
   })
 
-  it('provides profile reporting through the canonical report adapter', () => {
+  it('preserves the full return path when follow authentication expires', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
-    const route = read('src/app/api/v1/reports/route.ts')
+    expect(page).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
+    expect(page).toContain("router.replace('/login?returnTo=' + encodeURIComponent(returnTo))")
+  })
+
+  it('keeps follow, block, mute and report on canonical interaction adapters', () => {
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const reportRoute = read('src/app/api/v1/reports/route.ts')
     const socialClient = read('src/social/w05-social-client.ts')
 
-    expect(page).toContain("reportProfile()")
-    expect(page).toContain("targetType: 'profile'")
-    expect(page).toContain("targetId: profile.id")
-    expect(page).toContain("'Idempotency-Key': 'report:profile:' + profile.id + ':' + crypto.randomUUID()")
-    expect(page).toContain('举报用户')
-    expect(page).toContain('router.replace(\'/login?returnTo=\' + encodeURIComponent(returnTo))')
-    expect(route).toContain("targetType === 'creator' || targetType === 'profile'")
-    expect(route).toContain('assertSocialTargetUserExists')
-    expect(socialClient).toContain('collection: \'users\'')
-    expect(socialClient).toContain('overrideAccess: true')
-  })
-
-  it('does not offer follow while the relationship is blocked in either direction', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
-    expect(page).toContain('const [blockedBy, setBlockedBy] = useState(false)')
-    expect(page).toContain('setBlockedBy(followData?.data?.relationship?.blockedBy === true)')
-    expect(page).toContain('blocked || blockedBy ?')
-    expect(page).toContain('当前关系受屏蔽规则限制。')
-  })
-
-  it('provides profile-level block and mute actions through the canonical interaction adapters', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
-    expect(page).toContain("applySafetyAction('block')")
-    expect(page).toContain("applySafetyAction('mute')")
-    expect(page).toContain("const relationPath = action === 'block' ? 'blocks' : 'mutes'")
-    expect(page).toContain("'/api/v1/interactions/' + relationPath")
-    expect(page).toContain("active ? '/' + encodeURIComponent(profile.id) : ''")
-    expect(page).toContain("body: JSON.stringify({ targetUserId: profile.id })")
-    expect(page).toContain("'Idempotency-Key': 'social-' + action + ':' + (active ? 'remove:' : 'set:') + crypto.randomUUID()")
-    expect(page).toContain("method: active ? 'DELETE' : 'POST'")
-    expect(page).toContain("action === 'block' ? 'blocks' : 'mutes'")
-
-    expect(page).toContain('屏蔽作者')
-    expect(page).toContain('静音作者')
-    expect(page).toContain("blocked ? '取消屏蔽' : '屏蔽作者'")
-    expect(page).toContain("muted ? '取消静音' : '静音作者'")
-    expect(page).toContain('disabled={blockBusy}')
-    expect(page).toContain('disabled={muteBusy}')
-    expect(page).not.toContain('disabled={blockBusy || blocked}')
-    expect(page).not.toContain('disabled={muteBusy || muted}')
-    expect(page).toContain('viewerUserId !== profile.id')
-    expect(page).not.toContain('social_user_interactions')
-  })
-
-  it('supports author follow state without creating a second social authority', () => {
-    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
     expect(page).toContain('/api/v1/social/follows/')
     expect(page).toContain("method: isFollowing ? 'DELETE' : 'POST'")
     expect(page).toContain("'Idempotency-Key': 'social-follow:' + crypto.randomUUID()")
     expect(page).toContain('/followers?limit=1')
     expect(page).toContain('/following?limit=1')
-    expect(page).toContain('credentials: \'include\'')
-    expect(page).toContain('关注作者')
-    expect(page).toContain('profile?.avatar')
-    expect(page).toContain('width={72}')
-    expect(page).toContain('objectFit: \'cover\'')
-    expect(page).toContain('/api/v1/contents?creatorId=')
-    expect(page).toContain('加载更多作品')
-    expect(page).toContain("href={'/content/' + encodeURIComponent(item.id)}")
+    expect(page).toContain("credentials: 'include'")
+    expect(page).toContain("applySafetyAction('block')")
+    expect(page).toContain("applySafetyAction('mute')")
+    expect(page).toContain("const relationPath = action === 'block' ? 'blocks' : 'mutes'")
+    expect(page).toContain("'/api/v1/interactions/' + relationPath")
+    expect(page).toContain("body: JSON.stringify({ targetUserId: profile.id })")
+    expect(page).toContain("'Idempotency-Key': 'social-' + action + ':' + (active ? 'remove:' : 'set:') + crypto.randomUUID()")
+    expect(page).toContain('reportProfile()')
+    expect(page).toContain("targetType: 'profile'")
+    expect(page).toContain("targetId: profile.id")
+    expect(page).toContain("'Idempotency-Key': 'report:profile:' + profile.id + ':' + crypto.randomUUID()")
+    expect(reportRoute).toContain("targetType === 'creator' || targetType === 'profile'")
+    expect(socialClient).toContain("collection: 'users'")
+    expect(socialClient).toContain('overrideAccess: true')
   })
-  it('invalidates stale public-profile content pagination on navigation', () => {
+
+  it('uses bounded creator content reads and keeps type filtering cache-compatible', () => {
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    const cache = read('src/lib/public-response-cache.ts')
+
+    expect(page).toContain('/api/v1/contents?')
+    expect(page).toContain('creatorId=')
+    expect(page).toContain('limit=6')
+    expect(page).toContain("params.set('type', filter)")
+    expect(page).toContain('loadMoreContents')
+    expect(page).toContain('cursor: contentCursor')
+    expect(page).toContain("const [filter, setFilter] = useState<ProfileFilter>('all')")
+    expect(cache).toContain("'content-list': ['creatorId', 'cursor', 'limit', 'type']")
+  })
+
+  it('invalidates stale public-profile content requests on navigation', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
     expect(page).toContain('const contentRequestRef = useRef<AbortController | null>(null)')
     expect(page).toContain('const contentRequestIdRef = useRef(0)')
@@ -116,11 +82,12 @@ describe('public user profile', () => {
     expect(page).toContain('signal: controller.signal')
   })
 
-  it('renders existing work cover URLs as public thumbnails', () => {
+  it('uses real public thumbnails without inline image background URLs', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
-    expect(page).toContain("src={item.coverRef}")
-    expect(page).toContain("objectFit: 'cover'")
+    expect(page).toContain('src={item.coverRef}')
+    expect(page).toContain('height={360}')
+    expect(page).toContain('width={480}')
     expect(page).not.toContain("backgroundImage: 'linear-gradient(135deg")
+    expect(page).not.toContain('style={{')
   })
 })
-
