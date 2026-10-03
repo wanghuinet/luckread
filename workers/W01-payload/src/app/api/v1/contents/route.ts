@@ -40,6 +40,14 @@ export async function POST(request: Request): Promise<Response> {
     const principal = await resolveCookieContentPrincipal(request)
     if (principal instanceof Response) return principal
 
+    const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+    if (!idempotencyKey || idempotencyKey.length > 256) {
+      return Response.json(
+        { error: { code: 'PRECONDITION_REQUIRED', message: 'Idempotency-Key required', details: {} }, requestId: crypto.randomUUID() },
+        { status: 428 },
+      )
+    }
+
     let body: unknown
     try {
       body = await request.json()
