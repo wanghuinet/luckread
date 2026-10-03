@@ -59,6 +59,12 @@
       "contentRequestsPerLocationPerMinute": 10000,
       "socialRequestsPerLocationPerMinute": 10000,
       "appliedBeforeD1": true
+    },
+    "w01PublicRead": {
+      "perIpPerMinute": 300,
+      "perLocationPerMinute": 10000,
+      "appliesBeforePayloadD1": true,
+      "anonymousFallbackKey": "cf-connecting-ip"
     }
   },
   "operationBudgets": {
