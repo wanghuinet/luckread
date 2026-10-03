@@ -31,7 +31,9 @@ describe('personal social relationship pages', () => {
     expect(component).toContain('useRef<AbortController | null>(null)')
     expect(component).toContain('const requestIdRef = useRef(0)')
     expect(component).toContain('requestControllerRef.current?.abort()')
-    expect(component).toContain('signal: controller.signal')
+    expect(component).toContain('await loadProfile(controller.signal)')
+    expect(component).toContain('await loadList(ownerId, null, false, controller.signal)')
+    expect(component).toContain('await loadList(userId, nextCursor, true, controller.signal)')
     expect(component).toContain('requestIdRef.current += 1')
   })
 
