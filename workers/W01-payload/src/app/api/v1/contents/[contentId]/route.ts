@@ -3,7 +3,7 @@ import { cachedPublicGet, invalidatePublicContentDetail } from '../../../../../l
 import {
   callW03Content,
   resolveContentPrincipal,
-  resolveOptionalContentPrincipal,
+  resolveOptionalCookieContentPrincipal,
   W03ContentClientError,
 } from '../../../../../content/w03-content-client.js'
 
@@ -35,9 +35,9 @@ export async function GET(
 ): Promise<Response> {
   try {
     const { contentId } = await context.params
-    const principal = await resolveOptionalContentPrincipal(request)
+    const principal = await resolveOptionalCookieContentPrincipal(request)
     if (principal instanceof Response) return principal
-    if (!request.headers.get('Authorization') && !request.headers.get('cookie')) {
+    if (!principal) {
       return await cachedPublicGet(
         request,
         'content-detail',
