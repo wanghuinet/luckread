@@ -69,7 +69,7 @@ export const cachedPublicGet = async (
     })()
     inflight.set(keyString, pending)
     if (inflight.size > MAX_INFLIGHT) inflight.delete(inflight.keys().next().value as string)
-    void pending.finally(() => inflight.delete(keyString))
+    void pending.then(() => inflight.delete(keyString), () => inflight.delete(keyString))
   }
 
   const response = await pending
