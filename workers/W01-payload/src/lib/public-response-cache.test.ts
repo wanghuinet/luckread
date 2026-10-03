@@ -58,6 +58,29 @@ describe('public response cache', () => {
     expect(second.headers.get('X-LuckRead-Cache')).toBe('MISS')
   })
 
+  it('bounds concurrent cache-miss origin work', async () => {
+    cache.match.mockResolvedValue(undefined)
+    cache.put.mockResolvedValue(undefined)
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    let active = 0
+    let peak = 0
+    const loader = vi.fn(async () => {
+      active += 1
+      peak = Math.max(peak, active)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      active -= 1
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+    await Promise.all(Array.from({ length: 24 }, (_, i) => cachedPublicGet(
+      new Request('https://luckread.cn/api/v1/contents?cursor=' + i),
+      'content-list',
+      loader,
+      30,
+    )))
+    expect(peak).toBeLessThanOrEqual(16)
+  })
+
   it('keeps language out of non-localized cache keys', () => {
     const a = publicCacheKey(new Request('https://luckread.cn/api/v1/users/u1', { headers: { 'accept-language': 'en-US' } }), 'user-profile')
     const b = publicCacheKey(new Request('https://luckread.cn/api/v1/users/u1', { headers: { 'accept-language': 'zh-CN' } }), 'user-profile')
