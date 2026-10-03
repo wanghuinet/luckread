@@ -107,6 +107,22 @@ describe('follow runtime', () => {
     })
   })
 
+  it('hides follow status when either side is blocked', async () => {
+    const d = db([{
+      relationship_id: 'r-blocked',
+      created_at: '2026-10-02T00:00:00.000Z',
+      blocked: 1,
+    }])
+    await expect(getFollowStatus(d, 'u1', 'u2')).resolves.toEqual({
+      following: false,
+      relationshipId: null,
+      createdAt: null,
+    })
+    const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
+    expect(sql).toContain("block.relation_type = 'block'")
+    expect(sql).toContain('block.actor_user_id = ? AND block.target_user_id = ?')
+  })
+
   it('lists followers with a bounded total count and opaque next cursor', async () => {
     const d = db([], [{
       results: [
