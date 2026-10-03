@@ -1530,3 +1530,41 @@
   .topbarActions { gap: 8px; }
   .topbarLink { padding-inline: 6px; }
 }
+
+
+.languageSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 34px;
+  padding: 2px;
+  border: 1px solid var(--lr-line);
+  border-radius: 999px;
+  background: var(--lr-surface-soft);
+}
+.languageSwitchButton {
+  min-width: 42px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lr-text-3);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+.languageSwitchButtonActive {
+  color: var(--lr-text);
+  background: var(--lr-surface);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+.languageSwitchButton:focus-visible {
+  outline: 2px solid var(--lr-brand);
+  outline-offset: 2px;
+}
+@media (max-width: 720px) {
+  .languageSwitchButton { min-width: 38px; padding-inline: 6px; }
+}
