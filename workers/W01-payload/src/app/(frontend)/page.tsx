@@ -32,24 +32,29 @@ export default async function HomePage() {
     const request = new Request('https://mp.luckread.com/', {
       headers: requestHeaders,
     })
+    const hasAuthCredential =
+      Boolean(request.headers.get('authorization')?.trim()) ||
+      Boolean(request.headers.get('cookie')?.trim())
 
     let authenticatedUser: {
       id?: string | number
       _sid?: string
     } | null = null
 
-    try {
-      const payload = await getPayload({ config })
-      const authResult = await payload.auth({
-        headers: request.headers,
-        canSetHeaders: false,
-      })
-      authenticatedUser = authResult.user as unknown as {
-        id?: string | number
-        _sid?: string
-      } | null
-    } catch {
-      authenticatedUser = null
+    if (hasAuthCredential) {
+      try {
+        const payload = await getPayload({ config })
+        const authResult = await payload.auth({
+          headers: request.headers,
+          canSetHeaders: false,
+        })
+        authenticatedUser = authResult.user as unknown as {
+          id?: string | number
+          _sid?: string
+        } | null
+      } catch {
+        authenticatedUser = null
+      }
     }
 
     if (authenticatedUser?.id && typeof authenticatedUser._sid === 'string' && authenticatedUser._sid) {
