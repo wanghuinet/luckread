@@ -41,6 +41,13 @@ describe('traffic limits', () => {
     expect(calls).toEqual(['AUTH_LOGIN_LIMITER:origin', 'AUTH_LOGIN_LIMITER:ip:127.0.0.1'])
   })
 
+  it('fails closed when the actor limiter binding is absent', async () => {
+    contextMock.mockResolvedValue({ env: { AUTH_ORIGIN_GLOBAL_LIMITER: { limit: vi.fn(async () => ({ success: true })) } } } as never)
+    await expect(
+      enforceAuthRateLimit(new Request('https://luckread.cn/auth/login'), 'AUTH_LOGIN_LIMITER', ['ip:127.0.0.1']),
+    ).rejects.toThrow('RATE_LIMIT_BINDING_UNAVAILABLE:AUTH_LOGIN_LIMITER')
+  })
+
   it('rejects auth traffic when the origin breaker is exhausted', async () => {
     const globalLimiter = { limit: vi.fn(async () => ({ success: false })) }
     const actorLimiter = { limit: vi.fn(async () => ({ success: true })) }
