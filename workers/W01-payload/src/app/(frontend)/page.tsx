@@ -8,6 +8,8 @@ import './styles.css'
 
 const CREATOR_CENTER_URL = 'https://mp.luckread.cn/'
 
+export const dynamic = 'force-dynamic'
+
 const highlights = [
   { index: '01', eyebrow: '发现', title: '从日常阅读，到更广阔的世界', body: '汇聚图文、视频与深度内容，让每一次停留都有值得带走的东西。' },
   { index: '02', eyebrow: '创作', title: '让每一种表达，都有被看见的机会', body: '一个创作者中心，覆盖文章、动态与视频发布，轻装上阵，持续创作。' },
