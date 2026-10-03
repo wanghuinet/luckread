@@ -131,6 +131,15 @@ describe('comment runtime', () => {
     expect(d.prepare).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps author deletion idempotent for an existing tombstone', async () => {
+    const d = db([
+      { id: 'c1', author_user_id: 'user-1', state: 'AUTHOR_DELETED', has_replies: 0 },
+    ])
+
+    await expect(deleteComment(d, 'user-1', 'c1')).resolves.toBeUndefined()
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects deleting another user comment', async () => {
     const d = db([
       { id: 'c1', author_user_id: 'user-2', state: 'PUBLISHED', has_replies: 0 },

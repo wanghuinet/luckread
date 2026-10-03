@@ -298,7 +298,7 @@ export async function deleteComment(
   ).bind(commentId).first<{
     id: string
     author_user_id: string
-    state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
+    state: 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'AUTHOR_DELETED'
     has_replies: number
   }>()
 
@@ -306,6 +306,7 @@ export async function deleteComment(
   if (row.author_user_id !== actorUserId) {
     throw new CommentRuntimeError('PERMISSION_DENIED', 403)
   }
+  if (row.state === 'AUTHOR_DELETED') return
   if (row.state !== 'PUBLISHED') {
     throw new CommentRuntimeError('INVALID_STATE', 409)
   }
@@ -313,9 +314,10 @@ export async function deleteComment(
     throw new CommentRuntimeError('COMMENT_HAS_REPLIES', 409)
   }
 
+  const now = new Date().toISOString()
   const result = await db.prepare(
-    "DELETE FROM social_comments WHERE id = ? AND author_user_id = ? AND state = 'PUBLISHED'",
-  ).bind(commentId, actorUserId).run()
+    "UPDATE social_comments SET state = 'AUTHOR_DELETED', updated_at = ? WHERE id = ? AND author_user_id = ? AND state = 'PUBLISHED'",
+  ).bind(now, commentId, actorUserId).run()
 
   if (Number(result.meta?.changes ?? 0) !== 1) {
     throw new CommentRuntimeError('COMMENT_DELETE_FAILED', 500)
