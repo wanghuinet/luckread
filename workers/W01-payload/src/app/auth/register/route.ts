@@ -164,7 +164,9 @@ const validatePolicy = (now: Date) => {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+  import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
+
+const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   if (!idempotencyKey || idempotencyKey.length > 255) return errorResponse(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key is required')
 
   let body: unknown
