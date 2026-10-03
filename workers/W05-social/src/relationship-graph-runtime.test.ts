@@ -100,7 +100,29 @@ describe('relationship graph runtime', () => {
     expect(graph.createdAt).toBeNull()
   })
 
-  it('rejects invalid identifiers', async () => {
+  
+  it('serves repeated relationship reads from the private cache', async () => {
+    const first = db({
+      following: 1,
+      followed_by: 0,
+      relationship_id: 'cache-r1',
+      created_at: '2026-10-02T00:00:00.000Z',
+      blocked: 0,
+      blocked_by: 0,
+      muted: 0,
+    })
+    await expect(
+      getRelationshipGraph(first, 'cache-user', 'cache-target'),
+    ).resolves.toMatchObject({ following: true, relationshipId: 'cache-r1' })
+    const secondPrepare = vi.fn(() => { throw new Error('D1_SHOULD_NOT_BE_READ') })
+    const second = { prepare: secondPrepare } as unknown as D1Database
+    await expect(
+      getRelationshipGraph(second, 'cache-user', 'cache-target'),
+    ).resolves.toMatchObject({ following: true, relationshipId: 'cache-r1' })
+    expect(secondPrepare).not.toHaveBeenCalled()
+  })
+
+it('rejects invalid identifiers', async () => {
     await expect(getRelationshipGraph(db(null), ' ', 'target')).rejects.toMatchObject({
       code: 'VALIDATION_FAILED',
       status: 400,
