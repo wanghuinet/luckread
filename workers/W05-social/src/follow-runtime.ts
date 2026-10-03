@@ -261,9 +261,38 @@ export async function unfollow(db: D1Database, followerUserId: string, targetUse
 }
 
 export async function getFollowStatus(db: D1Database, followerUserId: string, targetUserId: string) {
-  const follower=userId(followerUserId), target=userId(targetUserId)
-  const row=await db.prepare('SELECT relationship_id, created_at FROM social_follow_relationships WHERE follower_user_id = ? AND target_user_id = ? LIMIT 1').bind(follower,target).first<{relationship_id:string;created_at:string}>()
-  return { following:Boolean(row), relationshipId:row?.relationship_id ?? null, createdAt:row?.created_at ?? null }
+  const follower = userId(followerUserId)
+  const target = userId(targetUserId)
+  const row = await db.prepare(
+    `SELECT
+       r.relationship_id,
+       r.created_at,
+       EXISTS (
+         SELECT 1
+         FROM social_user_interactions block
+         WHERE block.relation_type = 'block'
+           AND (
+             (block.actor_user_id = ? AND block.target_user_id = ?)
+             OR
+             (block.actor_user_id = ? AND block.target_user_id = ?)
+           )
+       ) AS blocked
+       FROM social_follow_relationships r
+       WHERE r.follower_user_id = ? AND r.target_user_id = ?
+       LIMIT 1`,
+  ).bind(follower, target, target, follower, follower, target).first<{
+    relationship_id: string
+    created_at: string
+    blocked: number
+  }>()
+  if (Number(row?.blocked ?? 0) === 1) {
+    return { following: false, relationshipId: null, createdAt: null }
+  }
+  return {
+    following: Boolean(row),
+    relationshipId: row?.relationship_id ?? null,
+    createdAt: row?.created_at ?? null,
+  }
 }
 
 export async function listFollowers(
