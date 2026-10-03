@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function CreatorCenterPage() {
   const requestHeaders = await headers()
-  const request = new Request('https://mp.luckread.cn/creator-center', {
+  const request = new Request('https://mp.luckread.com/creator-center', {
     headers: requestHeaders,
   })
   const payload = await getPayload({ config })

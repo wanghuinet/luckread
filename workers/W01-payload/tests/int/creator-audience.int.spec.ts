@@ -7,9 +7,9 @@ const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relat
 describe('creator audience integration', () => {
   it('mounts the live follower/following summary inside Creator Center', () => {
     const center = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
-    const summary = read('src/app/(payload)/admin/CreatorAudienceSummary.tsx')
+    const summary = read('src/app/(payload)/v1beta/CreatorAudienceSummary.tsx')
 
-    expect(center).toContain("import CreatorAudienceSummary from '../../(payload)/admin/CreatorAudienceSummary'")
+    expect(center).toContain("import CreatorAudienceSummary from '../../(payload)/v1beta/CreatorAudienceSummary'")
     expect(center).toContain('<CreatorAudienceSummary userId={String(userId)} loginPath={adminMode ? \'/admin/login\' : \'/login\'} />')
     expect(center).toContain("{ label: '粉丝与关注', href: '#audience'")
     expect(center).not.toContain("{ label: '粉丝与订阅', href: '#future-audience'")
@@ -30,7 +30,7 @@ describe('creator audience integration', () => {
   })
 
   it('keeps audience reads on the canonical Social API', () => {
-    const summary = read('src/app/(payload)/admin/CreatorAudienceSummary.tsx')
+    const summary = read('src/app/(payload)/v1beta/CreatorAudienceSummary.tsx')
 
     expect(summary).not.toContain('getPayload(')
     expect(summary).not.toContain('social_follow_relationships')
@@ -39,8 +39,8 @@ describe('creator audience integration', () => {
   })
 
   it('covers responsive audience styling and accessible relationship tabs', () => {
-    const styles = read('src/app/(payload)/admin/creator-center.module.css')
-    const summary = read('src/app/(payload)/admin/CreatorAudienceSummary.tsx')
+    const styles = read('src/app/(payload)/v1beta/creator-center.module.css')
+    const summary = read('src/app/(payload)/v1beta/CreatorAudienceSummary.tsx')
 
     expect(styles).toContain('.audiencePanel')
     expect(styles).toContain('.audienceRow')

@@ -4,38 +4,35 @@ import { resolve } from 'node:path'
 
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
-describe('mp.luckread.cn creator home routing', () => {
-  it('routes only the mp hostname to the existing authenticated creator center', () => {
+describe('mp creator entry routing', () => {
+  it('does not redirect an unauthenticated mp entry to the creator backend', () => {
     const page = read('src/app/(frontend)/page.tsx')
     const creator = read('src/app/(frontend)/creator-center/page.tsx')
 
-    expect(page).toContain("import { headers } from 'next/headers'")
-    expect(page).toContain("import { redirect } from 'next/navigation'")
-    expect(page).toContain("const requestHeaders = await headers()")
-    expect(page).toContain("const host = (requestHeaders.get('host') || '').split(':')[0].toLowerCase()")
-    expect(page).toContain("if (host === 'mp.luckread.cn')")
+    expect(page).toContain("const CREATOR_CENTER_URL = 'https://mp.luckread.com/'")
+    expect(page).toContain("const CREATOR_CENTER_HOSTS = new Set(['mp.luckread.com', 'mp.luckread.cn'])")
+    expect(page).toContain('if (CREATOR_CENTER_HOSTS.has(host))')
+    expect(page).toContain('await payload.auth(')
+    expect(page).toContain('readVerifiedPayloadTokenVersion(request)')
+    expect(page).toContain('validateSession({')
+    expect(page).toContain("if (active) {")
     expect(page).toContain("redirect('/creator-center')")
-    expect(creator).toContain("const request = new Request('https://mp.luckread.cn/creator-center'")
-    expect(creator).toContain('readVerifiedPayloadTokenVersion(request)')
+    expect(page).not.toContain("if (host === 'mp.luckread.com') {\n    redirect('/creator-center')")
+    expect(creator).toContain("new Request('https://mp.luckread.com/creator-center'")
     expect(creator).toContain('validateSession({')
-    expect(creator).toContain('<CreatorStudio displayName={displayName} userId={String(user.id)} />')
-    expect(creator).not.toContain('/admin/login')
-    expect(page).toContain("export const dynamic = 'force-dynamic'")
+    expect(creator).toContain("redirect('/login?returnTo=%2Fcreator-center')")
   })
 
-  it('keeps the public site separate and sends creator CTAs to the mp domain', () => {
-    const page = read('src/app/(frontend)/page.tsx')
-    const creatorCenter = read('src/app/(payload)/admin/CreatorCenter.tsx')
-    const creator = read('src/app/(frontend)/creator-center/page.tsx')
-    const creatorStudio = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
+  it('keeps creator studio outside the Payload Admin registration', () => {
+    const config = read('src/payload.config.ts')
+    const studio = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
 
-    expect(page).toContain("const CREATOR_CENTER_URL = 'https://mp.luckread.cn/'")
-    expect(page).toContain('href={CREATOR_CENTER_URL}')
-    expect(page).toContain('LuckRead 是面向新一代创作者与读者的内容平台')
-    expect(creatorStudio).toContain('href="https://luckread.cn/"')
-    expect(creator).toContain("redirect('/login?returnTo=%2Fcreator-center')")
-    expect(creator).toContain('validateSession({')
-    expect(creatorCenter).toContain("CreatorStudio")
-    expect(creatorStudio).toContain("href=\"/me/profile\"")
+    expect(config).not.toContain('CreatorCenterAction')
+    expect(config).not.toContain('creatorCenter:')
+    expect(studio).toContain("import CreatorContentList from '../../(payload)/v1beta/CreatorContentList'")
+    expect(studio).toContain("import CreatorCenterAssistant from '../../(payload)/v1beta/CreatorCenterAssistant'")
+    expect(studio).toContain("import CreatorAudienceSummary from '../../(payload)/v1beta/CreatorAudienceSummary'")
+    expect(studio).toContain("import CreatorAssetLibrary from '../../(payload)/v1beta/CreatorAssetLibrary'")
+    expect(studio).toContain("import CreatorModerationQueue from '../../(payload)/v1beta/CreatorModerationQueue'")
   })
 })

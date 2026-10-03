@@ -62,6 +62,10 @@
     {
       "pattern": "mp.luckread.cn",
       "custom_domain": true
+    },
+    {
+      "pattern": "mp.luckread.com",
+      "custom_domain": true
     }
   ],
   "r2_buckets": [

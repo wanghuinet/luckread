@@ -1,14 +1,14 @@
 import Link from 'next/link'
 import React from 'react'
 
-import CreatorContentList from '../../(payload)/admin/CreatorContentList'
-import CreatorCenterAssistant from '../../(payload)/admin/CreatorCenterAssistant'
-import CreatorAudienceSummary from '../../(payload)/admin/CreatorAudienceSummary'
-import CreatorAssetLibrary from '../../(payload)/admin/CreatorAssetLibrary'
-import CreatorModerationQueue from '../../(payload)/admin/CreatorModerationQueue'
+import CreatorContentList from '../../(payload)/v1beta/CreatorContentList'
+import CreatorCenterAssistant from '../../(payload)/v1beta/CreatorCenterAssistant'
+import CreatorAudienceSummary from '../../(payload)/v1beta/CreatorAudienceSummary'
+import CreatorAssetLibrary from '../../(payload)/v1beta/CreatorAssetLibrary'
+import CreatorModerationQueue from '../../(payload)/v1beta/CreatorModerationQueue'
 import PublishComposer from '../publish/PublishComposer'
 import '../publish/publish.css'
-import styles from '../../(payload)/admin/creator-center.module.css'
+import styles from '../../(payload)/v1beta/creator-center.module.css'
 
 type CreatorNavItem = {
   label: string

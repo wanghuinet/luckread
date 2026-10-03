@@ -1,12 +1,19 @@
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { getPayload } from 'payload'
 import React from 'react'
+
+import config from '@payload-config'
+
+import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
+import { validateSession } from '@/auth/w02-session-client'
 
 import HomeContentFeed from './HomeContentFeed'
 import './styles.css'
 
-const CREATOR_CENTER_URL = 'https://mp.luckread.cn/'
+const CREATOR_CENTER_URL = 'https://mp.luckread.com/'
+const CREATOR_CENTER_HOSTS = new Set(['mp.luckread.com', 'mp.luckread.cn'])
 
 export const dynamic = 'force-dynamic'
 
@@ -21,8 +28,44 @@ export default async function HomePage() {
   const requestHeaders = await headers()
   const host = (requestHeaders.get('host') || '').split(':')[0].toLowerCase()
 
-  if (host === 'mp.luckread.cn') {
-    redirect('/creator-center')
+  if (CREATOR_CENTER_HOSTS.has(host)) {
+    const request = new Request('https://mp.luckread.com/', {
+      headers: requestHeaders,
+    })
+
+    let authenticatedUser: {
+      id?: string | number
+      _sid?: string
+    } | null = null
+
+    try {
+      const payload = await getPayload({ config })
+      const authResult = await payload.auth({
+        headers: request.headers,
+        canSetHeaders: false,
+      })
+      authenticatedUser = authResult.user as unknown as {
+        id?: string | number
+        _sid?: string
+      } | null
+    } catch {
+      authenticatedUser = null
+    }
+
+    if (authenticatedUser?.id && typeof authenticatedUser._sid === 'string' && authenticatedUser._sid) {
+      const tokenVersion = readVerifiedPayloadTokenVersion(request)
+      if (tokenVersion !== null) {
+        const active = await validateSession({
+          sessionId: authenticatedUser._sid,
+          userId: String(authenticatedUser.id),
+          tokenVersion,
+        }).catch(() => false)
+
+        if (active) {
+          redirect('/creator-center')
+        }
+      }
+    }
   }
 
   return (
