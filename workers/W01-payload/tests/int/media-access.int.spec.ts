@@ -163,3 +163,14 @@ describe('Media upload access', () => {
     expect(route).not.toContain('signedUrl')
     expect(route).not.toContain('presigned')
   })
+
+it('guards creator media listing before Payload authentication', () => {
+  const route = read('src/app/api/v1/media/route.ts')
+  const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
+  const authIndex = route.indexOf('const authenticated = await authenticate(request)')
+  expect(guardIndex).toBeGreaterThanOrEqual(0)
+  expect(authIndex).toBeGreaterThanOrEqual(0)
+  expect(guardIndex).toBeLessThan(authIndex)
+  expect(route).toContain('TrafficLimitError')
+  expect(route).toContain('rateLimitResponse(request)')
+})
