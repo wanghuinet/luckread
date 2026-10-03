@@ -40,9 +40,17 @@ export async function POST(request: Request): Promise<Response> {
     if (
       (targetType !== 'content' && targetType !== 'comment' && targetType !== 'creator' && targetType !== 'media' && targetType !== 'profile') ||
       typeof targetId !== 'string' ||
+      !targetId.trim() ||
+      targetId.length > 128 ||
       typeof reasonCode !== 'string' ||
-      (description !== undefined && typeof description !== 'string') ||
-      (evidenceRefs !== undefined && (!Array.isArray(evidenceRefs) || evidenceRefs.some((value) => typeof value !== 'string')))
+      !reasonCode.trim() ||
+      reasonCode.length > 128 ||
+      (description !== undefined && (typeof description !== 'string' || description.length > 4000)) ||
+      (evidenceRefs !== undefined && (
+        !Array.isArray(evidenceRefs) ||
+        evidenceRefs.length > 20 ||
+        evidenceRefs.some((value) => typeof value !== 'string' || value.length > 512)
+      ))
     ) {
       return errorResponse(400, 'VALIDATION_FAILED', 'Invalid report payload')
     }
