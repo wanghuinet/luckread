@@ -63,6 +63,32 @@ describe('relationship graph runtime', () => {
     expect(graph.muted).toBe(true)
   })
 
+  it('hides follow relationship details when either side has blocked the other', async () => {
+    const graph = await getRelationshipGraph(
+      db({
+        following: 1,
+        followed_by: 1,
+        relationship_id: 'r-blocked',
+        created_at: '2026-10-02T00:00:00.000Z',
+        blocked: 1,
+        blocked_by: 0,
+        muted: 0,
+      }),
+      'viewer-1',
+      'target-1',
+    )
+
+    expect(graph).toMatchObject({
+      following: false,
+      followedBy: false,
+      mutualFollow: false,
+      blocked: true,
+      blockedBy: false,
+      relationshipId: null,
+      createdAt: null,
+    })
+  })
+
   it('does not expose self as mutual or blocked relationship', async () => {
     const graph = await getRelationshipGraph(db(null), 'same-user', 'same-user')
     expect(graph.mutualFollow).toBe(false)
