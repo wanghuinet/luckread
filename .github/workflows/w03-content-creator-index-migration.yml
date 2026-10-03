@@ -27,13 +27,13 @@ env:
 
 jobs:
   migrate:
-    if: ${ inputs.confirm == 'APPLY_W03_CREATOR_INDEX' }
+    if: ${{ inputs.confirm == 'APPLY_W03_CREATOR_INDEX' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Validate source SHA
         env:
-          SOURCE_SHA: ${ inputs.source_sha }
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
           printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
@@ -41,12 +41,12 @@ jobs:
       - name: Checkout exact source
         uses: actions/checkout@v4
         with:
-          ref: ${ inputs.source_sha }
+          ref: ${{ inputs.source_sha }}
           fetch-depth: 1
 
       - name: Verify exact source SHA
         env:
-          SOURCE_SHA: ${ inputs.source_sha }
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
 
       - name: Setup Node 24
@@ -88,8 +88,8 @@ jobs:
       - name: Capture remote preflight
         working-directory: workers/W03-content
         env:
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
@@ -99,16 +99,16 @@ jobs:
       - name: Apply W03 migration remotely
         working-directory: workers/W03-content
         env:
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
 
       - name: Verify remote index
         working-directory: workers/W03-content
         env:
-          CLOUDFLARE_API_TOKEN: ${ secrets.CLOUDFLARE_API_TOKEN }
-          CLOUDFLARE_ACCOUNT_ID: ${ secrets.CLOUDFLARE_ACCOUNT_ID }
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
@@ -136,7 +136,7 @@ jobs:
           cat > artifacts/mapping-0/w03-creator-index/provenance.txt <<EOF
           workflow=W03 Content Creator Pagination Index Migration
           run_id=$GITHUB_RUN_ID
-          source_sha=${ inputs.source_sha }
+          source_sha=${{ inputs.source_sha }}
           worker=$EXPECTED_WORKER
           d1_binding=$EXPECTED_BINDING
           database_id=$EXPECTED_DB_ID
@@ -150,7 +150,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: w03-creator-index-$${ github.run_id }
+          name: w03-creator-index-${{ github.run_id }}
           path: artifacts/mapping-0/w03-creator-index/
           if-no-files-found: error
           retention-days: 30
