@@ -24,3 +24,13 @@ it('guards viewer profile reads before authentication', () => {
   expect(authIndex).toBeGreaterThanOrEqual(0)
   expect(guardIndex).toBeLessThan(authIndex)
 })
+
+
+it('guards self-profile mutations before Payload authentication', () => {
+  const route = readFileSync(resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'), 'utf8')
+  const guardIndex = route.indexOf('await enforceW01WriteRateLimit(request)')
+  const authIndex = route.indexOf('const authenticated = await authenticate(request)')
+  expect(guardIndex).toBeGreaterThanOrEqual(0)
+  expect(authIndex).toBeGreaterThanOrEqual(0)
+  expect(guardIndex).toBeLessThan(authIndex)
+})
