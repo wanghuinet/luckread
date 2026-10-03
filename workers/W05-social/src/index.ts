@@ -25,6 +25,7 @@ interface Env {
   DB: D1Database
   SOCIAL_READ_LIMITER?: RateLimitBinding
   SOCIAL_WRITE_LIMITER?: RateLimitBinding
+  SOCIAL_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
 }
 
 const getRateKey = (request: Request): string => {
@@ -37,10 +38,15 @@ const getRateKey = (request: Request): string => {
 }
 
 const enforceRateLimit = async (request: Request, env: Env, operation: string): Promise<void> => {
-  const limiter = request.method === 'GET' ? env.SOCIAL_READ_LIMITER : env.SOCIAL_WRITE_LIMITER
-  if (!limiter) return
-  const result = await limiter.limit({ key: operation + ':' + getRateKey(request) })
-  if (!result.success) throw new FollowRuntimeError('RATE_LIMITED', 429)
+  const actorLimiter = request.method === 'GET' ? env.SOCIAL_READ_LIMITER : env.SOCIAL_WRITE_LIMITER
+  if (env.SOCIAL_ORIGIN_GLOBAL_LIMITER) {
+    const globalResult = await env.SOCIAL_ORIGIN_GLOBAL_LIMITER.limit({ key: 'origin:' + operation })
+    if (!globalResult.success) throw new FollowRuntimeError('RATE_LIMITED', 429)
+  }
+  if (actorLimiter) {
+    const result = await actorLimiter.limit({ key: operation + ':' + getRateKey(request) })
+    if (!result.success) throw new FollowRuntimeError('RATE_LIMITED', 429)
+  }
 }
 
 const json = (body: unknown, status = 200) => {
