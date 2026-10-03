@@ -1,3 +1,5 @@
+import { cachedPublicGet } from '../../../../../lib/public-response-cache.js'
+
 import {
   callW03Content,
   resolveCookieContentPrincipal,
@@ -24,11 +26,16 @@ export async function GET(request: Request): Promise<Response> {
     if (contentType) query.set('type', contentType)
     const suffix = query.toString() ? `?${query.toString()}` : ''
 
-    return await callW03Content({
+    return await cachedPublicGet(
       request,
-      pathname: `/internal/content/contents${suffix}`,
-      method: 'GET',
-    })
+      'content-list',
+      () => callW03Content({
+        request,
+        pathname: `/internal/content/contents${suffix}`,
+        method: 'GET',
+      }),
+      30,
+    )
   } catch (error) {
     if (error instanceof W03ContentClientError) return unavailable(error)
     return unavailable(new W03ContentClientError(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable'))
