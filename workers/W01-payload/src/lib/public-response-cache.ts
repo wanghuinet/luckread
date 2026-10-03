@@ -2,8 +2,31 @@ const CACHE_VERSION = 'lr-public-v1-20261003'
 const inflight = new Map<string, Promise<Response>>()
 const MAX_INFLIGHT = 128
 const MAX_ORIGIN_CONCURRENCY = 16
+const MAX_MEMORY_ENTRIES = 64
 let originInFlight = 0
 const originWaiters: Array<() => void> = []
+const memoryFallback = new Map<string, { response: Response; expiresAt: number }>()
+
+const readMemoryFallback = (keyString: string): Response | null => {
+  const entry = memoryFallback.get(keyString)
+  if (!entry) return null
+  if (entry.expiresAt <= Date.now()) {
+    memoryFallback.delete(keyString)
+    return null
+  }
+  return entry.response.clone()
+}
+
+const rememberMemoryFallback = (keyString: string, response: Response, ttlSeconds: number): void => {
+  if (memoryFallback.size >= MAX_MEMORY_ENTRIES && !memoryFallback.has(keyString)) {
+    const oldestKey = memoryFallback.keys().next().value
+    if (oldestKey) memoryFallback.delete(oldestKey)
+  }
+  memoryFallback.set(keyString, {
+    response: response.clone(),
+    expiresAt: Date.now() + Math.max(1, Math.floor(ttlSeconds)) * 1000,
+  })
+}
 
 const withOriginSlot = async <T>(loader: () => Promise<T>): Promise<T> => {
   if (originInFlight >= MAX_ORIGIN_CONCURRENCY) {
@@ -76,10 +99,18 @@ export const cachedPublicGet = async (
 ): Promise<Response> => {
   const key = publicCacheKey(request, namespace)
   const cache = (globalThis.caches as unknown as { default: Cache }).default
-  const hit = await cache.match(key)
-  if (hit) return withCacheHeader(hit, 'HIT')
-
   const keyString = key.url
+
+  try {
+    const hit = await cache.match(key)
+    if (hit) return withCacheHeader(hit, 'HIT')
+  } catch {
+    const memoryHit = readMemoryFallback(keyString)
+    if (memoryHit) return withCacheHeader(memoryHit, 'HIT')
+  }
+
+  const memoryHit = readMemoryFallback(keyString)
+  if (memoryHit) return withCacheHeader(memoryHit, 'HIT')
   let pending = inflight.get(keyString)
   if (!pending && inflight.size >= MAX_INFLIGHT) {
     return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Public cache origin is at capacity' } }), {
@@ -99,8 +130,12 @@ export const cachedPublicGet = async (
         cacheResponse.headers.set('Cache-Control', `public, max-age=0, s-maxage=${Math.max(1, Math.floor(ttlSeconds))}`)
         try {
           await cache.put(key, cacheResponse)
+          memoryFallback.delete(keyString)
         } catch {
           // Cache failure must not turn a successful authoritative read into a 503.
+          // Keep a bounded, TTL-limited per-isolate response so repeated reads do not
+          // immediately re-enter the authoritative path while edge storage recovers.
+          rememberMemoryFallback(keyString, response, ttlSeconds)
         }
       }
       return response
@@ -117,6 +152,7 @@ export const invalidatePublicRoute = async (request: Request, namespace: string,
   const url = new URL(request.url)
   url.pathname = pathname
   url.search = ''
+  memoryFallback.delete(publicCacheKey(new Request(url.toString()), namespace).url)
   await ((globalThis.caches as unknown as { default: Cache }).default).delete(publicCacheKey(new Request(url.toString()), namespace))
 }
 
