@@ -207,8 +207,8 @@ describe('Creator Center admin extension', () => {
     const route = read('src/app/(payload)/api/creator/contents/route.ts')
     const client = read('src/content/w03-content-client.ts')
 
-    expect(view).toContain("import CreatorContentList from './CreatorContentList'")
-    expect(view).toContain('<CreatorContentList />')
+    expect(view).toContain("import CreatorContentList from '../../(payload)/admin/CreatorContentList'")
+    expect(view).toContain('<CreatorContentList loginPath={adminMode ? \'/admin/login\' : \'/login\'} />')
 
     expect(list).toContain("/api/creator/contents?")
     expect(list).toContain("['DRAFT', 'REJECTED'].includes(item.state)")
@@ -318,7 +318,7 @@ describe('Creator Center admin extension', () => {
     expect(moderation).toContain("decision: outcome")
     expect(moderation).toContain("expectedVersion: item.version")
     expect(moderation).toContain("outcome === 'REJECTED' ? 'BLOCK' : 'INFO'")
-    expect(view).toContain('<CreatorModerationQueue />')
+    expect(view).toContain('{adminMode ? <CreatorModerationQueue /> : null}')
 
     expect(styles).toContain('.creatorLayout select:focus-visible')
   })
@@ -327,8 +327,8 @@ describe('Creator Center admin extension', () => {
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const assets = read('src/app/(payload)/admin/CreatorAssetLibrary.tsx')
 
-    expect(view).toContain("import CreatorAssetLibrary from './CreatorAssetLibrary'")
-    expect(view).toContain('<CreatorAssetLibrary />')
+    expect(view).toContain("import CreatorAssetLibrary from '../../(payload)/admin/CreatorAssetLibrary'")
+    expect(view).toContain('<CreatorAssetLibrary adminMode={adminMode} loginPath={adminMode ? \'/admin/login\' : \'/login\'} />')
     expect(assets).toContain("fetch('/api/v1/media?limit=8&page=' + String(page)")
     expect(assets).toContain('pageNumber + 1')
     expect(assets).toContain('totalPages')
