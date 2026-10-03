@@ -197,6 +197,52 @@ describe('comment runtime', () => {
     expect(prepare.mock.calls[1]?.[0]).toContain('parent.depth < 3')
   })
 
+  it('rechecks the Block policy in the final comment insert', async () => {
+    const d = db([
+      {
+        content_state: 'PUBLISHED',
+        content_owner_user_id: 'user-2',
+        parent_content_id: null,
+        parent_author_user_id: null,
+        parent_state: null,
+        parent_depth: null,
+        blocked: 0,
+        recent_count: 0,
+      },
+    ])
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    prepare.mockImplementationOnce(() => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => ({
+          content_state: 'PUBLISHED',
+          content_owner_user_id: 'user-2',
+          parent_content_id: null,
+          parent_author_user_id: null,
+          parent_state: null,
+          parent_depth: null,
+          blocked: 0,
+          recent_count: 0,
+        })),
+      })),
+    })).mockImplementationOnce(() => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => null),
+      })),
+    }))
+
+    await expect(createComment(d, 'user-1', 'content-1', {
+      body: '并发屏蔽期间的评论',
+      idempotencyKey: 'block-race-1',
+    })).rejects.toMatchObject({
+      code: 'COMMENT_WRITE_FAILED',
+      status: 500,
+    })
+
+    expect(prepare.mock.calls[1]?.[0]).toContain("block.relation_type = 'block'")
+    expect(prepare.mock.calls[1]?.[0]).toContain('block.actor_user_id = ? AND block.target_user_id = content.owner_user_id')
+    expect(prepare.mock.calls[1]?.[0]).toContain('block.actor_user_id = content.owner_user_id AND block.target_user_id = ?')
+  })
+
   it('creates a nested comment only while the parent depth is below three', async () => {
     const d = db([
       {
