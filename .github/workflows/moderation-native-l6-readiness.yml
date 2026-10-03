@@ -8,7 +8,7 @@ on:
         description: W01 public moderation base URL
         required: true
         type: string
-        default: https://luckread.cn
+        default: https://luckread.com
       confirm:
         description: Type RUN_MODERATION_L6_READY
         required: true
@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 15
     env:
       MODERATION_BASE_URL: ${{ inputs.base_url }}
-      AUTH_BASE_URL: https://api.luckread.cn
+      AUTH_BASE_URL: https://api.luckread.com
       DATABASE_NAME_W01: luckread
       WRANGLER_VERSION: 4.116.0
     steps:
