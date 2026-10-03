@@ -59,6 +59,18 @@ describe('content comments UI', () => {
     expect(component).toContain('该评论已有回复，暂不支持删除。')
   })
 
+  it('cancels stale comment list requests before applying responses', () => {
+    const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
+    expect(component).toContain('useRef, useState')
+    expect(component).toContain('commentsRequestRef')
+    expect(component).toContain('commentsRequestIdRef')
+    expect(component).toContain('commentsRequestRef.current?.abort()')
+    expect(component).toContain('const controller = new AbortController()')
+    expect(component).toContain('signal: controller.signal')
+    expect(component).toContain("error.name === 'AbortError'")
+    expect(component).toContain('if (requestId !== commentsRequestIdRef.current) return')
+  })
+
   it('uses the public comments read and authenticated create APIs', () => {
     const component = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
     expect(component).toContain('/api/v1/contents/')
