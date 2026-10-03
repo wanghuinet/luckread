@@ -75,7 +75,7 @@ jobs:
             if (contract.invariants[key] !== value) throw new Error(key + ' mismatch')
           }
           for (const [path, bindings] of [
-            ['workers/W01-payload/wrangler.jsonc', ['AUTH_LOGIN_LIMITER', 'AUTH_REGISTER_LIMITER', 'AUTH_REFRESH_LIMITER']],
+            ['workers/W01-payload/wrangler.jsonc', ['AUTH_ORIGIN_GLOBAL_LIMITER', 'AUTH_LOGIN_LIMITER', 'AUTH_REGISTER_LIMITER', 'AUTH_REFRESH_LIMITER']],
             ['workers/W03-content/wrangler.jsonc', ['CONTENT_PUBLIC_READ_LIMITER', 'CONTENT_MUTATION_LIMITER', 'CONTENT_ORIGIN_GLOBAL_LIMITER']],
             ['workers/W05-social/wrangler.jsonc', ['SOCIAL_READ_LIMITER', 'SOCIAL_WRITE_LIMITER', 'SOCIAL_ORIGIN_GLOBAL_LIMITER']]
           ]) {
