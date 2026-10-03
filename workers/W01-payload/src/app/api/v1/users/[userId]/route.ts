@@ -1,7 +1,7 @@
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
-import { cachedPublicGet } from '../../../../../../lib/public-response-cache.js'
+import { cachedPublicGet } from '../../../../../lib/public-response-cache.js'
 
 export async function GET(
   _request: Request,
