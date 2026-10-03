@@ -1,4 +1,4 @@
-import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
+import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 import { DELETE as payloadMediaDelete, GET as payloadMediaGet, PATCH as payloadMediaPatch } from '../../../../(payload)/api/[...slug]/route'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaGet>[1]
@@ -62,6 +62,16 @@ export async function GET(
   const { mediaId } = await context.params
   if (!mediaId?.trim()) return new Response(null, { status: 404 })
 
+  try {
+    await enforceW01WriteRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
+      status: 503,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    })
+  }
+
   const target = new URL('/api/media/' + encodeURIComponent(mediaId), request.url)
   const payloadContext: PayloadRouteContext = {
     params: Promise.resolve({ slug: ['media', mediaId] }),
@@ -119,6 +129,16 @@ export async function PATCH(
 ): Promise<Response> {
   const { mediaId } = await context.params
   if (!mediaId?.trim()) return new Response(null, { status: 404 })
+
+  try {
+    await enforceW01WriteRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
+      status: 503,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    })
+  }
 
   const target = new URL('/api/media/' + encodeURIComponent(mediaId), request.url)
   const payloadContext: PayloadPatchRouteContext = {
