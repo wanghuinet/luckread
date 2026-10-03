@@ -423,6 +423,14 @@ export async function deleteComment(
   ).bind(now, commentId, actorUserId).run()
 
   if (Number(result.meta?.changes ?? 0) !== 1) {
+    const afterConflict = await db.prepare(
+      `SELECT state
+         FROM social_comments
+        WHERE id = ?
+          AND author_user_id = ?
+        LIMIT 1`,
+    ).bind(commentId, actorUserId).first<{ state: 'PUBLISHED' | 'AUTHOR_DELETED' | 'PENDING' | 'REJECTED' }>()
+    if (afterConflict?.state === 'AUTHOR_DELETED') return
     throw new CommentRuntimeError('COMMENT_HAS_REPLIES', 409)
   }
 }
