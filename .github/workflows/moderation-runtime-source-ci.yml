@@ -85,7 +85,7 @@ jobs:
         run: pnpm exec tsc --noEmit --project tsconfig.json --pretty false
 
       - name: Run W06 moderation tests
-        run: npx vitest@3.2.4 run workers/W06-governance/src/moderation-runtime.test.ts
+        run: npx vitest@3.2.4 run workers/W06-governance/src/moderation-runtime.test.ts workers/W06-governance/src/d1-traffic-guard.test.ts
 
       - name: Validate migration locally
         working-directory: workers/W06-governance
