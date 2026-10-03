@@ -7,6 +7,21 @@ import {
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, { status })
 
+const requireStatePreconditions = (request: Request): Response | null => {
+  const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+  const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
+  if (!idempotencyKey || idempotencyKey.length > 256) {
+    return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+  }
+  if (!ifMatch || ifMatch.length > 256) {
+    return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
+  }
+  if (ifMatch === '*') {
+    return errorResponse(412, 'PRECONDITION_FAILED', 'If-Match precondition failed')
+  }
+  return null
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ contentId: string }> },
@@ -15,6 +30,8 @@ export async function POST(
     const { contentId } = await context.params
     const principal = await resolveContentPrincipal(request)
     if (principal instanceof Response) return principal
+    const preconditionError = requireStatePreconditions(request)
+    if (preconditionError) return preconditionError
     return await callW03Content({
       request,
       pathname: `/internal/content/contents/${encodeURIComponent(contentId)}/state`,
