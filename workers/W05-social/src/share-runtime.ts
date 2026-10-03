@@ -81,9 +81,17 @@ export async function createShare(
   const createdAt = new Date().toISOString()
 
   try {
-    await db.prepare(
-      'INSERT INTO social_share_links (share_id, content_id, actor_user_id, idempotency_key, created_at) VALUES (?, ?, ?, ?, ?)',
-    ).bind(shareId, contentId, actorUserId, idempotencyKey, createdAt).run()
+    const inserted = await db.prepare(
+      `INSERT INTO social_share_links (share_id, content_id, actor_user_id, idempotency_key, created_at)
+         SELECT ?, content.id, ?, ?, ?
+           FROM contents content
+          WHERE content.id = ?
+            AND content.state = 'PUBLISHED'`,
+    ).bind(shareId, actorUserId, idempotencyKey, createdAt, contentId).run()
+
+    if (Number(inserted.meta?.changes ?? 0) !== 1) {
+      throw new ShareRuntimeError('NOT_FOUND', 404)
+    }
   } catch (error) {
     if (!(error instanceof Error) || !error.message.toLowerCase().includes('unique')) {
       throw error
