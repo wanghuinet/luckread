@@ -466,8 +466,70 @@ export default function PublicProfilePage({
             <div className="creator-profile-identity">
               <h1 id="creator-profile-title">{name}</h1>
               <p className="creator-profile-handle">@{profile?.username}</p>
-              {profile?.bio ? <p className="creator-profile-bio">{profile.bio}</p> : null}
+              {<p className={'creator-profile-bio' + (profile?.bio?.trim() ? '' : ' is-placeholder')}>{profile?.bio?.trim() ? profile.bio : '尚无个人简介'}</p>}
             </div>
+
+            {viewerUserId !== profile.id ? (
+              <div className="creator-profile-circle-actions" aria-label="快捷操作">
+                <button
+                  className="creator-profile-circle-button"
+                  type="button"
+                  aria-label="私信"
+                  onClick={() => setSafetyMessage('私信功能将在消息中心接通后启用。')}
+                >
+                  <span aria-hidden="true">✉</span>
+                </button>
+                <div className="creator-profile-overflow">
+                  <button
+                    className="creator-profile-circle-button"
+                    type="button"
+                    aria-label="更多操作"
+                    aria-expanded={actionsOpen}
+                    aria-haspopup="menu"
+                    onClick={() => setActionsOpen((open) => !open)}
+                  >
+                    <span aria-hidden="true">•••</span>
+                  </button>
+                  {actionsOpen ? (
+                    <div className="creator-profile-overflow-menu" role="menu" aria-label="更多操作">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={muteBusy}
+                        onClick={() => {
+                          setActionsOpen(false)
+                          void applySafetyAction('mute')
+                        }}
+                      >
+                        {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音'}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={blockBusy}
+                        onClick={() => {
+                          setActionsOpen(false)
+                          void applySafetyAction('block')
+                        }}
+                      >
+                        {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽'}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={reportBusy}
+                        onClick={() => {
+                          setActionsOpen(false)
+                          void reportProfile()
+                        }}
+                      >
+                        {reportBusy ? '举报中…' : '举报'}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
 
             <div className="creator-profile-actions">
               {viewerUserId !== profile.id && !blocked && !blockedBy ? (
@@ -487,67 +549,6 @@ export default function PublicProfilePage({
               >
                 订阅
               </button>
-              {viewerUserId !== profile.id ? (
-                <>
-                  <button
-                    className="creator-profile-circle-button"
-                    type="button"
-                    aria-label="私信"
-                    onClick={() => setSafetyMessage('私信功能将在消息中心接通后启用。')}
-                  >
-                    <span aria-hidden="true">✉</span>
-                  </button>
-                  <div className="creator-profile-overflow">
-                    <button
-                      className="creator-profile-circle-button"
-                      type="button"
-                      aria-label="更多操作"
-                      aria-expanded={actionsOpen}
-                      aria-haspopup="menu"
-                      onClick={() => setActionsOpen((open) => !open)}
-                    >
-                      <span aria-hidden="true">•••</span>
-                    </button>
-                    {actionsOpen ? (
-                      <div className="creator-profile-overflow-menu" role="menu" aria-label="更多操作">
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={muteBusy}
-                          onClick={() => {
-                            setActionsOpen(false)
-                            void applySafetyAction('mute')
-                          }}
-                        >
-                          {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音'}
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={blockBusy}
-                          onClick={() => {
-                            setActionsOpen(false)
-                            void applySafetyAction('block')
-                          }}
-                        >
-                          {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽'}
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={reportBusy}
-                          onClick={() => {
-                            setActionsOpen(false)
-                            void reportProfile()
-                          }}
-                        >
-                          {reportBusy ? '举报中…' : '举报'}
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                </>
-              ) : null}
               {mutualFollow ? <span className="creator-profile-badge">互相关注</span> : null}
             </div>
           </div>
