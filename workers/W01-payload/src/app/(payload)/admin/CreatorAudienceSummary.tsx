@@ -40,12 +40,12 @@ const initialState: AudienceState = {
 
 const PAGE_SIZE = 10
 
-function redirectToAdminLogin() {
+function redirectToLogin(loginPath: '/admin/login' | '/login') {
   const returnTo = window.location.pathname + window.location.search + window.location.hash
-  window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))
+  window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
 }
 
-async function fetchCount(path: string, signal: AbortSignal): Promise<number> {
+async function fetchCount(path: string, signal: AbortSignal, loginPath: '/admin/login' | '/login'): Promise<number> {
   const response = await fetch(path, {
     headers: { accept: 'application/json' },
     credentials: 'include',
@@ -54,7 +54,7 @@ async function fetchCount(path: string, signal: AbortSignal): Promise<number> {
   })
   const data = await response.json().catch((): null => null) as { data?: { totalCount?: number } } | null
   if (response.status === 401) {
-    redirectToAdminLogin()
+    redirectToLogin(loginPath)
     throw new Error('AUTH_REQUIRED')
   }
   if (!response.ok || typeof data?.data?.totalCount !== 'number') {
@@ -68,6 +68,7 @@ async function fetchList(
   direction: Direction,
   cursor: string | null,
   signal: AbortSignal,
+  loginPath: '/admin/login' | '/login',
 ): Promise<FollowListPage> {
   const params = new URLSearchParams({ limit: String(PAGE_SIZE) })
   if (cursor) params.set('cursor', cursor)
@@ -83,7 +84,7 @@ async function fetchList(
   )
   const data = await response.json().catch((): null => null) as FollowListResponse | null
   if (response.status === 401) {
-    redirectToAdminLogin()
+    redirectToLogin(loginPath)
     throw new Error('AUTH_REQUIRED')
   }
   if (!response.ok || !data?.data || !Array.isArray(data.data.items)) {
@@ -92,7 +93,7 @@ async function fetchList(
   return data.data
 }
 
-export default function CreatorAudienceSummary({ userId }: { userId: string }) {
+export default function CreatorAudienceSummary({ userId, loginPath = '/admin/login' }: { userId: string; loginPath?: '/admin/login' | '/login' }) {
   const [state, setState] = useState<AudienceState>(initialState)
   const [reloadKey, setReloadKey] = useState(0)
   const [direction, setDirection] = useState<Direction>('followers')
@@ -109,8 +110,8 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
     let cancelled = false
 
     void Promise.all([
-      fetchCount('/api/v1/users/' + encodeURIComponent(userId) + '/followers?limit=1', controller.signal),
-      fetchCount('/api/v1/users/' + encodeURIComponent(userId) + '/following?limit=1', controller.signal),
+      fetchCount('/api/v1/users/' + encodeURIComponent(userId) + '/followers?limit=1', controller.signal, loginPath),
+      fetchCount('/api/v1/users/' + encodeURIComponent(userId) + '/following?limit=1', controller.signal, loginPath),
     ])
       .then(([followers, following]) => {
         if (cancelled) return
@@ -134,7 +135,7 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
     const controller = new AbortController()
     const requestId = ++listRequestId.current
 
-    void fetchList(userId, direction, null, controller.signal)
+    void fetchList(userId, direction, null, controller.signal, loginPath)
       .then((page) => {
         if (requestId !== listRequestId.current) return
         setItems(page.items)
@@ -159,7 +160,7 @@ export default function CreatorAudienceSummary({ userId }: { userId: string }) {
     setListBusy(true)
 
     try {
-      const page = await fetchList(userId, direction, nextCursor, controller.signal)
+      const page = await fetchList(userId, direction, nextCursor, controller.signal, loginPath)
       if (requestId !== listRequestId.current) return
       setItems((current) => [...current, ...page.items])
       setNextCursor(page.nextCursor)
