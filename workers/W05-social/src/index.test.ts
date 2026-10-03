@@ -439,7 +439,10 @@ describe('W05 social query transport', () => {
 
   it('serves follow status and relationship from one relationship authority', async () => {
     const response = await worker.fetch(
-      request('/internal/social/follows/target-1', transportHeaders),
+      request('/internal/social/follows/target-1', {
+        ...transportHeaders,
+        'X-LuckRead-Principal-Layer': 'L2',
+      }),
       {
         DB: dbFor([{
           following: 1,
@@ -472,6 +475,17 @@ describe('W05 social query transport', () => {
         },
       },
     })
+  })
+
+  it('denies follow status below the minimum interaction permission layer', async () => {
+    const response = await worker.fetch(
+      request('/internal/social/follows/target-1', {
+        ...transportHeaders,
+        'X-LuckRead-Principal-Layer': 'L1',
+      }),
+      { DB: dbFor() },
+    )
+    expect(response.status).toBe(403)
   })
 
   it('serves followers without a principal for public reads', async () => {
