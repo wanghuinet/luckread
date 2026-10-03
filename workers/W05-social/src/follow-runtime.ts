@@ -109,27 +109,19 @@ async function listFollowRelations(
           (block.actor_user_id = ${itemColumn} AND block.target_user_id = ?)
         )
     )`
-  const countSql = `(SELECT COUNT(*)
-    FROM social_follow_relationships rel_count
-    WHERE rel_count.${relationColumn} = ?
-      AND ${blockPredicate.replaceAll(`${itemColumn}`, `rel_count.${itemColumn}`)}
-  )`
   const where = cursor
     ? `WHERE ${relationColumn} = ?
        AND (created_at < ? OR (created_at = ? AND relationship_id < ?))
        AND ${blockPredicate}`
     : `WHERE ${relationColumn} = ?
        AND ${blockPredicate}`
-  const statement = `SELECT relationship_id, ${itemColumn} AS user_id, created_at AS followed_at, ${countSql} AS total_count
+  const statement = `SELECT relationship_id, ${itemColumn} AS user_id, created_at AS followed_at
     FROM social_follow_relationships
     ${where}
     ORDER BY created_at DESC, relationship_id DESC
     LIMIT ?`
   const parameters = cursor
     ? [
-        ownerId,
-        ownerId,
-        ownerId,
         ownerId,
         cursor.createdAt,
         cursor.createdAt,
@@ -138,17 +130,29 @@ async function listFollowRelations(
         ownerId,
         limit + 1,
       ]
-    : [ownerId, ownerId, ownerId, ownerId, ownerId, ownerId, limit + 1]
+    : [ownerId, ownerId, ownerId, limit + 1]
+
   const result = await db.prepare(statement).bind(...parameters).all<{
     relationship_id: string
     user_id: string
     followed_at: string
-    total_count: number
   }>()
   const rows = result.results ?? []
   const hasMore = rows.length > limit
   const visibleRows = hasMore ? rows.slice(0, limit) : rows
-  const totalCount = Number(visibleRows[0]?.total_count ?? 0)
+
+  // COUNT is deliberately a separate aggregate query. Embedding COUNT(*) as a
+  // correlated subquery in the page SELECT can re-scan the same relationship
+  // index for every returned row, multiplying D1 rows-read on hot accounts.
+  const countStatement = `SELECT COUNT(*) AS total_count
+    FROM social_follow_relationships rel_count
+    WHERE rel_count.${relationColumn} = ?
+      AND ${blockPredicate.replaceAll(`${itemColumn}`, `rel_count.${itemColumn}`)}`
+  const countResult = await db.prepare(countStatement)
+    .bind(ownerId, ownerId, ownerId)
+    .first<{ total_count: number }>()
+  const totalCount = Number(countResult?.total_count ?? 0)
+
   const last = visibleRows.at(-1)
   return {
     items: visibleRows.map(row => ({
