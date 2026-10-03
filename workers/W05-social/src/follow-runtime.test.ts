@@ -60,6 +60,28 @@ describe('follow runtime', () => {
     })
   })
 
+  it('binds the final follow write to the active block predicate', async () => {
+    const d = db([{ blocked: 0 }])
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    prepare.mockImplementationOnce(() => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => ({ blocked: 0 })),
+      })),
+    })).mockImplementationOnce((sql: string) => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => null),
+      })),
+    }))
+
+    await expect(follow(d, 'u1', 'u2')).rejects.toMatchObject({
+      code: 'RELATIONSHIP_BLOCKED',
+      status: 409,
+    })
+    expect(String(prepare.mock.calls[1]?.[0])).toContain("block.relation_type = 'block'")
+    expect(String(prepare.mock.calls[1]?.[0])).toContain('INSERT INTO social_follow_relationships')
+    expect(String(prepare.mock.calls[1]?.[0])).toContain('NOT EXISTS')
+  })
+
   it('rejects self follow', async () => {
     await expect(follow(db(), 'u1', 'u1')).rejects.toMatchObject({
       code: 'SELF_FOLLOW_NOT_ALLOWED',
