@@ -1,0 +1,134 @@
+name: Cloudflare luckread.cn to luckread.com redirect
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/luckread-cn-to-com-redirect.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Configure Cloudflare 301 redirect
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ZONE_NAME: luckread.cn
+          SOURCE_HOST: luckread.cn
+          TARGET_HOST: luckread.com
+          RULE_REF: luckread-cn-to-com
+        run: |
+          set -euo pipefail
+
+          test -n "${CLOUDFLARE_API_TOKEN}"
+
+          api() {
+            curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              "$@"
+          }
+
+          zone_response="$(api --get "https://api.cloudflare.com/client/v4/zones" \
+            --data-urlencode "name=${ZONE_NAME}" \
+            --data-urlencode "status=active" \
+            --data-urlencode "per_page=10")"
+
+          zone_id="$(printf '%s' "${zone_response}" | jq -r '.result[0].id // empty')"
+          test -n "${zone_id}" || {
+            echo "Cloudflare zone not found: ${ZONE_NAME}"
+            exit 1
+          }
+
+          rule_json="$(jq -cn \
+            --arg ref "${RULE_REF}" \
+            --arg source "${SOURCE_HOST}" \
+            --arg target "${TARGET_HOST}" \
+            '{
+              ref: $ref,
+              expression: ("http.host eq \"" + $source + "\""),
+              description: "Permanent canonical redirect from luckread.cn to luckread.com",
+              action: "redirect",
+              action_parameters: {
+                from_value: {
+                  target_url: {
+                    expression: ("concat(\"https://\", \"" + $target + "\", http.request.uri.path)")
+                  },
+                  status_code: 301,
+                  preserve_query_string: true
+                }
+              }
+            }')"
+
+          endpoint="https://api.cloudflare.com/client/v4/zones/${zone_id}/rulesets/phases/http_request_dynamic_redirect/entrypoint"
+          current="$(api --request GET "${endpoint}" || true)"
+
+          if printf '%s' "${current}" | jq -e '.success == true and .result.id != null' >/dev/null 2>&1; then
+            ruleset_id="$(printf '%s' "${current}" | jq -r '.result.id')"
+            existing_id="$(printf '%s' "${current}" | jq -r --arg ref "${RULE_REF}" '.result.rules[]? | select(.ref == $ref) | .id' | head -n 1)"
+
+            if [ -n "${existing_id}" ]; then
+              current_rule="$(printf '%s' "${current}" | jq -c --arg id "${existing_id}" '.result.rules[] | select(.id == $id)')"
+              expected_rule="$(printf '%s' "${rule_json}" | jq -c '.')"
+              current_rule_normalized="$(printf '%s' "${current_rule}" | jq -c 'del(.id,.version,.last_updated)')"
+
+              if [ "${current_rule_normalized}" != "${expected_rule}" ]; then
+                api --request PATCH "${endpoint%/phases/*}/rulesets/${ruleset_id}/rules/${existing_id}" \
+                  --data "${rule_json}" >/dev/null
+                echo "UPDATED_REDIRECT_RULE ${RULE_REF}"
+              else
+                echo "REDIRECT_RULE_ALREADY_CORRECT ${RULE_REF}"
+              fi
+            else
+              api --request POST "https://api.cloudflare.com/client/v4/zones/${zone_id}/rulesets/${ruleset_id}/rules" \
+                --data "${rule_json}" >/dev/null
+              echo "CREATED_REDIRECT_RULE ${RULE_REF}"
+            fi
+          else
+            api --request POST "https://api.cloudflare.com/client/v4/zones/${zone_id}/rulesets" \
+              --data "$(jq -cn --argjson rule "${rule_json}" '{
+                name: "LuckRead canonical domain redirects",
+                kind: "zone",
+                phase: "http_request_dynamic_redirect",
+                rules: [$rule]
+              }')" >/dev/null
+            echo "CREATED_REDIRECT_RULESET ${RULE_REF}"
+          fi
+
+          verified="$(api --request GET "${endpoint}")"
+          printf '%s' "${verified}" | jq -e --arg ref "${RULE_REF}" \
+            '.success == true
+             and ([.result.rules[]? | select(.ref == $ref and .action == "redirect")] | length) == 1
+             and ([.result.rules[]? | select(.ref == $ref and .action_parameters.from_value.status_code == 301)] | length) == 1
+             and ([.result.rules[]? | select(.ref == $ref and .action_parameters.from_value.preserve_query_string == true)] | length) == 1
+             and ([.result.rules[]? | select(.ref == $ref and .expression == "(http.host eq \"luckread.cn\")")] | length) == 1
+            ' >/dev/null
+
+          echo "CLOUDFLARE_REDIRECT_RULE=PASS"
+
+          headers="$(mktemp)"
+          curl --fail-with-body --silent --show-error --max-time 30 \
+            -D "${headers}" -o /dev/null "https://${SOURCE_HOST}/__luckread_redirect_probe?from=cn&check=301"
+
+          status="$(awk 'NR==1 {print $2}' "${headers}")"
+          location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/^location:[[:space:]]*/, ""); print; exit}' "${headers}" | tr -d '\\r')"
+
+          test "${status}" = "301" || {
+            echo "Expected HTTP 301 from https://${SOURCE_HOST}, got ${status}"
+            cat "${headers}"
+            exit 1
+          }
+
+          test "${location}" = "https://${TARGET_HOST}/__luckread_redirect_probe?from=cn&check=301" || {
+            echo "Unexpected Location: ${location}"
+            cat "${headers}"
+            exit 1
+          }
+
+          echo "CLOUDFLARE_HTTP_301=PASS"
