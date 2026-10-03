@@ -1,6 +1,22 @@
 const CACHE_VERSION = 'lr-public-v1-20261003'
 const inflight = new Map<string, Promise<Response>>()
 const MAX_INFLIGHT = 128
+const MAX_ORIGIN_CONCURRENCY = 16
+let originInFlight = 0
+const originWaiters: Array<() => void> = []
+
+const withOriginSlot = async <T>(loader: () => Promise<T>): Promise<T> => {
+  if (originInFlight >= MAX_ORIGIN_CONCURRENCY) {
+    await new Promise<void>((resolve) => originWaiters.push(resolve))
+  }
+  originInFlight += 1
+  try {
+    return await loader()
+  } finally {
+    originInFlight -= 1
+    originWaiters.shift()?.()
+  }
+}
 
 const normalizeLanguage = (request: Request): string => {
   const value = request.headers.get('accept-language')?.split(',')[0]?.trim().toLowerCase()
@@ -56,7 +72,7 @@ export const cachedPublicGet = async (
   let pending = inflight.get(keyString)
   if (!pending) {
     pending = (async () => {
-      const response = await loader()
+      const response = await withOriginSlot(loader)
       if (cacheable(response)) {
         const cacheResponse = new Response(response.body ? response.clone().body : null, {
           status: response.status,
