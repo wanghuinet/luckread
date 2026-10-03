@@ -134,3 +134,14 @@ it('links published content to the public author profile when creatorId is prese
   expect(page).toContain("href={'/users/' + encodeURIComponent(content.creatorId)}")
   expect(page).toContain('查看作者')
 })
+
+it('cancels stale public profile content pagination requests', () => {
+  const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+  expect(page).toContain('contentRequestRef')
+  expect(page).toContain('contentRequestIdRef')
+  expect(page).toContain('contentRequestRef.current?.abort()')
+  expect(page).toContain('const controller = new AbortController()')
+  expect(page).toContain('signal: controller.signal')
+  expect(page).toContain("cause.name === 'AbortError'")
+  expect(page).toContain('if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return')
+})
