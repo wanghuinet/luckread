@@ -105,16 +105,20 @@ export async function getRelationshipGraph(
     muted: number
   }>()
 
+  const blocked = Boolean(row?.blocked)
+  const blockedBy = Boolean(row?.blocked_by)
+  const relationshipVisible = !blocked && !blockedBy
+
   return {
     viewerUserId: viewer,
     targetUserId: target,
-    following: Boolean(row?.following),
-    followedBy: Boolean(row?.followed_by),
-    mutualFollow: Boolean(row?.following) && Boolean(row?.followed_by),
-    blocked: Boolean(row?.blocked),
-    blockedBy: Boolean(row?.blocked_by),
+    following: relationshipVisible && Boolean(row?.following),
+    followedBy: relationshipVisible && Boolean(row?.followed_by),
+    mutualFollow: relationshipVisible && Boolean(row?.following) && Boolean(row?.followed_by),
+    blocked,
+    blockedBy,
     muted: Boolean(row?.muted),
-    relationshipId: row?.relationship_id ?? null,
-    createdAt: row?.created_at ?? null,
+    relationshipId: relationshipVisible ? row?.relationship_id ?? null : null,
+    createdAt: relationshipVisible ? row?.created_at ?? null : null,
   }
 }
