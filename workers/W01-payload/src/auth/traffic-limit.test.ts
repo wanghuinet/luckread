@@ -33,7 +33,7 @@ describe('traffic limits', () => {
 
     await expect(
       enforceAuthRateLimit(
-        new Request('https://luckread.cn/auth/login'),
+        new Request('https://luckread.com/auth/login'),
         'AUTH_LOGIN_LIMITER',
         ['ip:127.0.0.1'],
       ),
@@ -45,7 +45,7 @@ describe('traffic limits', () => {
   it('fails closed when the actor limiter binding is absent', async () => {
     contextMock.mockResolvedValue({ env: { AUTH_ORIGIN_GLOBAL_LIMITER: { limit: vi.fn(async () => ({ success: true })) } } } as never)
     await expect(
-      enforceAuthRateLimit(new Request('https://luckread.cn/auth/login'), 'AUTH_LOGIN_LIMITER', ['ip:127.0.0.1']),
+      enforceAuthRateLimit(new Request('https://luckread.com/auth/login'), 'AUTH_LOGIN_LIMITER', ['ip:127.0.0.1']),
     ).rejects.toThrow('RATE_LIMIT_BINDING_UNAVAILABLE:AUTH_LOGIN_LIMITER')
   })
 
@@ -60,7 +60,7 @@ describe('traffic limits', () => {
     } as never)
 
     await expect(
-      enforceAuthRateLimit(new Request('https://luckread.cn/auth/login'), 'AUTH_LOGIN_LIMITER', ['ip:127.0.0.1']),
+      enforceAuthRateLimit(new Request('https://luckread.com/auth/login'), 'AUTH_LOGIN_LIMITER', ['ip:127.0.0.1']),
     ).rejects.toBeInstanceOf(TrafficLimitError)
     expect(actorLimiter.limit).not.toHaveBeenCalled()
   })
@@ -78,7 +78,7 @@ describe('traffic limits', () => {
 
     await expect(
       enforcePublicReadRateLimit(
-        new Request('https://luckread.cn/api/v1/users/u1', { headers: { 'cf-connecting-ip': '203.0.113.10' } }),
+        new Request('https://luckread.com/api/v1/users/u1', { headers: { 'cf-connecting-ip': '203.0.113.10' } }),
       ),
     ).resolves.toBeUndefined()
 
@@ -86,7 +86,7 @@ describe('traffic limits', () => {
   })
 
   it('returns stable 429 semantics', async () => {
-    const response = rateLimitResponse(new Request('https://luckread.cn/auth/login'))
+    const response = rateLimitResponse(new Request('https://luckread.com/auth/login'))
     expect(response.status).toBe(429)
     expect(response.headers.get('retry-after')).toBe('60')
     await expect(response.json()).resolves.toMatchObject({
@@ -107,7 +107,7 @@ describe('traffic limits', () => {
 
     await expect(
       enforceW01WriteRateLimit(
-        new Request('https://luckread.cn/api/v1/media', { headers: { 'cf-connecting-ip': '203.0.113.11' } }),
+        new Request('https://luckread.com/api/v1/media', { headers: { 'cf-connecting-ip': '203.0.113.11' } }),
       ),
     ).resolves.toBeUndefined()
 
@@ -125,7 +125,7 @@ describe('traffic limits', () => {
     } as never)
 
     await expect(
-      enforceW01WriteRateLimit(new Request('https://luckread.cn/api/v1/media')),
+      enforceW01WriteRateLimit(new Request('https://luckread.com/api/v1/media')),
     ).rejects.toBeInstanceOf(TrafficLimitError)
     expect(writeLimiter.limit).not.toHaveBeenCalled()
   })
