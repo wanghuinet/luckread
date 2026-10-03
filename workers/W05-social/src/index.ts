@@ -19,7 +19,29 @@ import {
   unfollow,
 } from './follow-runtime.js'
 
-interface Env { DB: D1Database }
+type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
+
+interface Env {
+  DB: D1Database
+  SOCIAL_READ_LIMITER?: RateLimitBinding
+  SOCIAL_WRITE_LIMITER?: RateLimitBinding
+}
+
+const getRateKey = (request: Request): string => {
+  const supplied = request.headers.get('X-LuckRead-Rate-Key')?.trim()
+  if (supplied) return supplied
+  const principal = request.headers.get('X-LuckRead-Principal-User-Id')?.trim()
+  if (principal) return 'user:' + principal
+  const clientIp = request.headers.get('X-LuckRead-Client-IP')?.trim()
+  return clientIp ? 'ip:' + clientIp : 'transport:W01'
+}
+
+const enforceRateLimit = async (request: Request, env: Env, operation: string): Promise<void> => {
+  const limiter = request.method === 'GET' ? env.SOCIAL_READ_LIMITER : env.SOCIAL_WRITE_LIMITER
+  if (!limiter) return
+  const result = await limiter.limit({ key: operation + ':' + getRateKey(request) })
+  if (!result.success) throw new FollowRuntimeError('RATE_LIMITED', 429)
+}
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, {
@@ -119,6 +141,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url)
+      await enforceRateLimit(request, env, request.method === 'GET' ? 'read:' + url.pathname.split('/').slice(0, 4).join('/') : 'write:' + url.pathname.split('/').slice(0, 4).join('/'))
 
       if (url.pathname.startsWith('/internal/social/shares/')) {
         const parts = url.pathname.split('/').filter(Boolean)
