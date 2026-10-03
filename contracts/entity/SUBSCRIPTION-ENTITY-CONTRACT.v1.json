@@ -260,10 +260,6 @@
     "otherTerminology": "The capability contract uses startAt; the data contract uses startedAt. The entity canonical field is startedAt with startAt retained as a semantic alias, not a second persisted field."
   },
   "persistence": {
-    "status": "NOT_BOUND",
-    "note": "Physical D1-01 table/column binding, migration, Worker execution binding and runtime evidence are intentionally deferred until the state-machine/API reconciliation and global implementation gate admit them."
-  },
-  "persistence": {
     "status": "CONTRACTED_NOT_VERIFIED",
     "persistenceContract": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
     "note": "Logical D1-01 table/column binding is now defined. Migration execution, W07 runtime binding, concurrency version source and active-subscription uniqueness policy remain unverified or pending decision."
