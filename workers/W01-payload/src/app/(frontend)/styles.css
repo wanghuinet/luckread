@@ -1028,3 +1028,17 @@ main[style*="max-width"] a { color: var(--lr-blue-700); }
   .lr-auth-card { padding: 24px 20px; border-radius: 18px; }
   main[style*="max-width"] { margin-top: 24px !important; margin-bottom: 40px !important; }
 }
+
+main[style*="max-width"] {
+  border: 1px solid var(--lr-h5-line);
+  border-radius: 20px;
+  background: rgba(255,255,255,.94);
+  box-shadow: var(--lr-h5-shadow);
+}
+main[style*="max-width"] header a,
+main[style*="max-width"] a {
+  color: var(--lr-blue-700);
+}
+main[style*="max-width"] p[style*="#666"] {
+  color: var(--lr-h5-muted) !important;
+}
