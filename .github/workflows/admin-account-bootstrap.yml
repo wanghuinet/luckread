@@ -59,8 +59,16 @@ jobs:
           const rows = JSON.parse(fs.readFileSync('/tmp/admin-user-preflight.json','utf8'))?.[0]?.results ?? []
           if (rows.length !== 1) throw new Error('user id 1 must exist exactly once')
           const user = rows[0]
-          if (user.account_state !== 'ACTIVE') throw new Error('user id 1 is not ACTIVE; refusing implicit account-state mutation')
-          console.log(JSON.stringify({id:user.id,email:user.email,username:user.username,account_state:user.account_state,account_state_version:user.account_state_version}))
+          console.log(JSON.stringify({
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            account_state: user.account_state,
+            account_state_version: user.account_state_version,
+          }))
+          if (user.account_state !== 'ACTIVE') {
+            throw new Error('user id 1 is not ACTIVE; inspect the emitted account_state and follow the canonical account-state transition before bootstrap')
+          }
           NODE
 
       - name: Validate username uniqueness
