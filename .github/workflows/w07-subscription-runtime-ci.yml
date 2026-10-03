@@ -47,11 +47,13 @@ jobs:
           import sqlite3
           from pathlib import Path
           db = sqlite3.connect(':memory:')
-          sql = Path('workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql').read_text()
-          db.executescript(sql)
+          sql1 = Path('workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql').read_text()
+          sql2 = Path('workers/W07-subscription-commerce/migrations/0002_subscription_version.sql').read_text()
+          db.executescript(sql1)
+          db.executescript(sql2)
           cols = db.execute('PRAGMA table_info("membership_subscriptions")').fetchall()
           expected = [
-            ('subscription_id','TEXT',1,1),('subscriber_id','TEXT',1,0),('plan_id','TEXT',1,0),('plan_version','INTEGER',1,0),
+            ('subscription_id','TEXT',1,1),('subscriber_id','TEXT',1,0),('version','INTEGER',1,0),('plan_id','TEXT',1,0),('plan_version','INTEGER',1,0),
             ('creator_id','TEXT',0,0),('status','TEXT',1,0),('started_at','TEXT',1,0),('current_period_start','TEXT',1,0),
             ('current_period_end','TEXT',1,0),('cancel_at','TEXT',0,0),('entitlement_snapshot_ref','TEXT',0,0),
             ('created_at','TEXT',1,0),('updated_at','TEXT',1,0),
@@ -62,5 +64,5 @@ jobs:
           for name in ('ix_membership_subscriptions_subscriber_status_period','ix_membership_subscriptions_plan_version','ix_membership_subscriptions_creator_status','ix_membership_subscriptions_updated_at'):
             if name not in names: raise SystemExit(f'missing index: {name}')
           if db.execute('PRAGMA foreign_key_list("membership_subscriptions")').fetchall(): raise SystemExit('physical foreign key is forbidden')
-          print('SUBSCRIPTION_D1_01_MIGRATION_STATIC=PASS')
+          print('SUBSCRIPTION_D1_01_MIGRATION_STATIC=PASS_14_COLUMNS')
           PY
