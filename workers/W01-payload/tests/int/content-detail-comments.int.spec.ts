@@ -48,7 +48,7 @@ describe('content comments UI', () => {
     expect(component).toContain(`'If-Match': '"' + comment.updatedAt + '"'`)
     expect(component).toContain("'Idempotency-Key': 'social-comment-update:' + crypto.randomUUID()")
     expect(component).toContain('comment.authorUserId === viewerUserId')
-    expect(component).toContain('保存修改')
+    expect(component).toContain('copy.comments.save')
   })
 
   it('exposes author-only comment deletion with the canonical delete API', () => {
@@ -56,7 +56,7 @@ describe('content comments UI', () => {
     expect(component).toContain("method: 'DELETE'")
     expect(component).toContain('deleteComment(comment)')
     expect(component).toContain("'Idempotency-Key': 'social-comment-delete:' + crypto.randomUUID()")
-    expect(component).toContain('该评论已有回复，暂不支持删除。')
+    expect(component).toContain('copy.comments.tooManyReplies')
   })
 
   it('cancels stale comment list requests before applying responses', () => {
@@ -79,6 +79,6 @@ describe('content comments UI', () => {
     expect(component).toContain("credentials: 'include'")
     expect(component).toContain("'Idempotency-Key': idempotencyKey")
     expect(component).toContain("href={'/users/' + encodeURIComponent(comment.authorUserId)}")
-    expect(component).toContain('查看主页')
+    expect(component).toContain('copy.comments.profile')
   })
 })
