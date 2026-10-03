@@ -46,6 +46,18 @@ jobs:
         run: |
           node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8')); const b=(c.services||[]).find(x=>x.binding==='W02_AUTH'); if(!b || b.service!=='luckread-w02') throw new Error('W02_AUTH binding mismatch'); console.log(JSON.stringify(b));"
 
+      - name: Verify W01 traffic guard bindings
+        working-directory: workers/W01-payload
+        run: |
+          node - <<'NODE'
+          const fs=require('fs')
+          const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'))
+          const required=['PUBLIC_ORIGIN_GLOBAL_LIMITER','PUBLIC_READ_LIMITER','AUTH_ORIGIN_GLOBAL_LIMITER','AUTH_REGISTER_LIMITER','AUTH_LOGIN_LIMITER','AUTH_REFRESH_LIMITER']
+          const names=new Set((c.ratelimits||[]).map(x=>x.name))
+          for(const name of required) if(!names.has(name)) throw new Error('missing rate limiter: '+name)
+          console.log(JSON.stringify({rateLimitBindings:[...names].sort()}))
+          NODE
+
       - name: Ensure W01 PAYLOAD_SECRET runtime secret
         working-directory: workers/W01-payload
         env:
