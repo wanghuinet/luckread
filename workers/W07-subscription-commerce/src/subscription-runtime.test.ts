@@ -90,7 +90,7 @@ describe('subscription runtime', () => {
     expect(parseBoundedPositiveInt('10000', 1, 10000)).toBe(10000)
   })
   it('enforces idempotency at the W07 transport boundary for every mutation operation', () => {
-    const index = readFileSync(resolve(process.cwd(), 'src/index.ts'), 'utf8')
+    const index = readFileSync(new URL('./index.ts', import.meta.url), 'utf8')
     expect(index).toContain("if (isMutationOperation(operation.operation)) validateIdempotencyKey(request.headers.get('Idempotency-Key'))")
     expect(index).toContain("const mutationOperations: readonly MutationOperation[] = ['cancel', 'pause', 'resume', 'change-plan']")
   })
