@@ -222,27 +222,43 @@ async function preparePositiveAuthSubject(user, label) {
      FROM role_assignments
      WHERE CAST(subject_id AS TEXT)=${sqlString(user.userId)}`,
   )
-  if (assignments.length !== 0) {
-    throw new Error(`preparePositiveAuthSubject(${label}) synthetic user already has role assignments`)
+  const canonicalAssignments = assignments.filter(
+    (assignment) =>
+      String(assignment?.role_id ?? '') === 'user' &&
+      String(assignment?.scope_type ?? '') === 'global' &&
+      String(assignment?.status ?? '') === 'ACTIVE',
+  )
+  const unexpectedAssignments = assignments.filter((assignment) => !canonicalAssignments.includes(assignment))
+  if (canonicalAssignments.length > 1 || unexpectedAssignments.length > 0) {
+    throw new Error(
+      `preparePositiveAuthSubject(${label}) synthetic user has unexpected role assignments: ${assignments.length}`,
+    )
   }
 
-  d1Json(
-    `INSERT INTO role_assignments
-      (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at)
-     VALUES (
-       ${sqlString(roleAssignmentId)},
-       ${sqlString(user.userId)},
-       'user',
-       'global',
-       NULL,
-       'ACTIVE',
-       ${sqlString(now)},
-       NULL,
-       ${sqlString(now)},
-       ${sqlString(now)}
-     )`,
-  )
-  context.roleAssignments.push(roleAssignmentId)
+  const roleAssignmentCreated = canonicalAssignments.length === 0
+  const effectiveRoleAssignmentId = roleAssignmentCreated
+    ? roleAssignmentId
+    : String(canonicalAssignments[0].id)
+
+  if (roleAssignmentCreated) {
+    d1Json(
+      `INSERT INTO role_assignments
+        (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at)
+       VALUES (
+         ${sqlString(roleAssignmentId)},
+         ${sqlString(user.userId)},
+         'user',
+         'global',
+         NULL,
+         'ACTIVE',
+         ${sqlString(now)},
+         NULL,
+         ${sqlString(now)},
+         ${sqlString(now)}
+       )`,
+    )
+    context.roleAssignments.push(roleAssignmentId)
+  }
 
   const after = d1Rows(
     `SELECT id,email,account_state,account_state_version
@@ -261,6 +277,7 @@ async function preparePositiveAuthSubject(user, label) {
     throw new Error(`preparePositiveAuthSubject(${label}) account state was not activated`)
   }
   if (
+    String(assignment?.id ?? '') !== effectiveRoleAssignmentId ||
     String(assignment?.subject_id ?? '') !== user.userId ||
     String(assignment?.role_id ?? '') !== 'user' ||
     String(assignment?.scope_type ?? '') !== 'global' ||
@@ -285,6 +302,7 @@ async function preparePositiveAuthSubject(user, label) {
       accountStateVersion: Number(after.account_state_version ?? 0),
     },
     roleAssignment: {
+      mode: roleAssignmentCreated ? 'CREATED_BY_EVIDENCE_HARNESS' : 'REUSED_CANONICAL_PAYLOAD_ASSIGNMENT',
       id: String(assignment.id),
       subjectId: String(assignment.subject_id),
       roleId: String(assignment.role_id),
@@ -295,7 +313,7 @@ async function preparePositiveAuthSubject(user, label) {
     testedCommitSha: TESTED_COMMIT_SHA,
   })
 
-  return { roleAssignmentId, accountState: String(after.account_state) }
+  return { roleAssignmentId: effectiveRoleAssignmentId, accountState: String(after.account_state) }
 }
 
 async function login(user, deviceId) {
