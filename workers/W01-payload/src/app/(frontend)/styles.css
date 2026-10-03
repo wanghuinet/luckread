@@ -772,3 +772,64 @@ a { color: inherit; }
   .mp-entry-header-tools { gap: 8px; }
   .mp-entry-domain { display: none; }
 }
+
+
+/* Public frontend language switch. Locale is UI state; routes and content IDs stay unchanged. */
+.public-language-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 34px;
+  padding: 2px;
+  border: 1px solid #e4e7ec;
+  border-radius: 999px;
+  background: #f8fafc;
+}
+
+.public-language-button {
+  min-width: 42px;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #667085;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.public-language-button:hover {
+  color: #1d2939;
+}
+
+.public-language-button.active {
+  color: #101828;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(16, 24, 40, .09);
+}
+
+.public-language-button:focus-visible {
+  outline: 2px solid #475467;
+  outline-offset: 2px;
+}
+
+.public-language-button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.content-detail-language {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 760px) {
+  .public-language-switch { min-height: 32px; }
+  .public-language-button { min-width: 36px; padding-inline: 7px; font-size: 10px; }
+  .content-detail-language { margin-bottom: 6px; }
+}
