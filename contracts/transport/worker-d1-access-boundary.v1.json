@@ -19,7 +19,7 @@
     "W04": { "allowedDomains": [] },
     "W05": { "allowedDomains": ["D1-02", "D1-03"] },
     "W06": { "allowedDomains": ["D1-03"] },
-    "W07": { "allowedDomains": ["D1-04"] },
+    "W07": { "allowedDomains": ["D1-01", "D1-04"] },
     "W08": { "allowedDomains": ["D1-01"] },
     "W09": { "allowedDomains": ["D1-03"] },
     "W10": { "allowedDomains": ["D1-03"] },
