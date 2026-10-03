@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 
 import { etagForUserProfile, normalizeEtag, pickUserProfileSnapshot, PROFILE_MUTABLE_FIELDS } from '@/auth/user-profile-etag'
+import { invalidatePublicUserProfile } from '@/lib/public-response-cache'
 import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
 import { validateSession } from '@/auth/w02-session-client'
 
@@ -169,5 +170,6 @@ export async function PATCH(request: Request): Promise<Response> {
     return errorResponse(412, 'PRECONDITION_FAILED', 'Profile changed before update')
   }
 
+  await invalidatePublicUserProfile(request, String(authenticated.user.id))
   return profileResponse(updated as Record<string, unknown>)
 }
