@@ -1,4 +1,4 @@
-import { cachedPublicGet } from '../../../../../lib/public-response-cache.js'
+import { cachedPublicGet } from '../../../../lib/public-response-cache.js'
 
 import {
   callW03Content,
