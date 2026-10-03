@@ -30,6 +30,17 @@ describe('v1 content adapter', () => {
     expect(route).toContain("'PRECONDITION_FAILED'")
   })
 
+  it('enforces Idempotency-Key on content creation', () => {
+    const createRoute = readFileSync(
+      resolve(process.cwd(), 'src/app/api/v1/contents/route.ts'),
+      'utf8',
+    )
+    expect(createRoute).toContain("request.headers.get('Idempotency-Key')?.trim() ?? ''")
+    expect(createRoute).toContain('idempotencyKey.length > 256')
+    expect(createRoute).toContain("'PRECONDITION_REQUIRED'")
+    expect(createRoute).toContain('status: 428')
+  })
+
   it('keeps public GET without mutation preconditions', () => {
     expect(route).toContain("method: 'GET'")
     expect(route).toContain('resolveOptionalContentPrincipal')
