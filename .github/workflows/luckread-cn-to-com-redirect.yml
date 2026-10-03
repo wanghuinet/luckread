@@ -75,10 +75,17 @@ jobs:
 
             if [ -n "${existing_id}" ]; then
               current_rule="$(printf '%s' "${current}" | jq -c --arg id "${existing_id}" '.result.rules[] | select(.id == $id)')"
-              expected_rule="$(printf '%s' "${rule_json}" | jq -c '.')"
-              current_rule_normalized="$(printf '%s' "${current_rule}" | jq -c 'del(.id,.version,.last_updated)')"
+              correct="$(printf '%s' "${current_rule}" | jq -r --arg ref "${RULE_REF}" '
+                (.ref == $ref)
+                and (.action == "redirect")
+                and (.expression == "(http.host eq \"luckread.cn\")")
+                and (.description == "Permanent canonical redirect from luckread.cn to luckread.com")
+                and (.action_parameters.from_value.status_code == 301)
+                and (.action_parameters.from_value.preserve_query_string == true)
+                and (.action_parameters.from_value.target_url.expression == "concat(\"https://\", \"luckread.com\", http.request.uri.path)")
+                ')"
 
-              if [ "${current_rule_normalized}" != "${expected_rule}" ]; then
+              if [ "${correct}" != "true" ]; then
                 api --request PATCH "${endpoint%/phases/*}/rulesets/${ruleset_id}/rules/${existing_id}" \
                   --data "${rule_json}" >/dev/null
                 echo "UPDATED_REDIRECT_RULE ${RULE_REF}"
@@ -117,7 +124,7 @@ jobs:
             -D "${headers}" -o /dev/null "https://${SOURCE_HOST}/__luckread_redirect_probe?from=cn&check=301"
 
           status="$(awk 'NR==1 {print $2}' "${headers}")"
-          location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/^location:[[:space:]]*/, ""); print; exit}' "${headers}" | tr -d '\\r')"
+          location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/^location:[[:space:]]*/, ""); print; exit}' "${headers}" | tr -d '\r')"
 
           test "${status}" = "301" || {
             echo "Expected HTTP 301 from https://${SOURCE_HOST}, got ${status}"
