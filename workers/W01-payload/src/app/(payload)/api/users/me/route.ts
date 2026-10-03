@@ -1,5 +1,7 @@
 import { getPayload } from 'payload'
 
+import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
+
 import config from '@payload-config'
 
 import { etagForUserProfile, normalizeEtag, pickUserProfileSnapshot, PROFILE_MUTABLE_FIELDS } from '@/auth/user-profile-etag'
@@ -81,6 +83,13 @@ async function authenticate(request: Request) {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  try {
+    await enforcePublicReadRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile service unavailable')
+  }
+
   const authenticated = await authenticate(request)
   if (!authenticated) return unauthorized()
 
