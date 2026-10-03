@@ -23,6 +23,7 @@ interface Env {
   D1_02: D1Database
   CONTENT_PUBLIC_READ_LIMITER?: RateLimitBinding
   CONTENT_MUTATION_LIMITER?: RateLimitBinding
+  CONTENT_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
 }
 
 const getRateKey = (request: Request): string => {
@@ -34,10 +35,17 @@ const getRateKey = (request: Request): string => {
   return clientIp ? 'ip:' + clientIp : 'transport:W01'
 }
 
-const enforceRateLimit = async (request: Request, limiter: RateLimitBinding | undefined, operation: string): Promise<void> => {
-  if (!limiter) return
-  const result = await limiter.limit({ key: operation + ':' + getRateKey(request) })
-  if (!result.success) throw new ContentRuntimeError('RATE_LIMITED', 429)
+const enforceRateLimits = async (request: Request, env: Env, operation: string): Promise<void> => {
+  const actorLimiter = operation === 'read' ? env.CONTENT_PUBLIC_READ_LIMITER : env.CONTENT_MUTATION_LIMITER
+  const globalLimiter = env.CONTENT_ORIGIN_GLOBAL_LIMITER
+  if (globalLimiter) {
+    const globalResult = await globalLimiter.limit({ key: 'origin:' + operation })
+    if (!globalResult.success) throw new ContentRuntimeError('RATE_LIMITED', 429)
+  }
+  if (actorLimiter) {
+    const actorResult = await actorLimiter.limit({ key: operation + ':' + getRateKey(request) })
+    if (!actorResult.success) throw new ContentRuntimeError('RATE_LIMITED', 429)
+  }
 }
 
 const json = (body: unknown, status = 200) =>
@@ -133,11 +141,7 @@ export default {
     try {
       const url = new URL(request.url)
       const isRead = request.method === 'GET'
-      await enforceRateLimit(
-        request,
-        isRead ? env.CONTENT_PUBLIC_READ_LIMITER : env.CONTENT_MUTATION_LIMITER,
-        isRead ? 'read' : 'write',
-      )
+      await enforceRateLimits(request, env, isRead ? 'read' : 'write')
       const isModerationTransition =
         request.method === 'POST' &&
         /^\/internal\/content\/contents\/[^/]+\/state$/.test(url.pathname) &&
