@@ -14,7 +14,7 @@ import HomeContentFeed from './HomeContentFeed'
 import './styles.css'
 
 const CREATOR_CENTER_URL = 'https://mp.luckread.com/'
-const CREATOR_CENTER_HOSTS = new Set(['mp.luckread.com', 'mp.luckread.com'])
+const CREATOR_CENTER_HOSTS = new Set(['mp.luckread.com'])
 
 export const dynamic = 'force-dynamic'
 
