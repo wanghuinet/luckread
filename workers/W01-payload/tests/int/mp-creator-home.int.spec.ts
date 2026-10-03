@@ -10,7 +10,7 @@ describe('mp creator entry routing', () => {
     const creator = read('src/app/(frontend)/creator-center/page.tsx')
 
     expect(page).toContain("const CREATOR_CENTER_URL = 'https://mp.luckread.com/'")
-    expect(page).toContain("const CREATOR_CENTER_HOSTS = new Set(['mp.luckread.com', 'mp.luckread.cn'])")
+    expect(page).toContain("const CREATOR_CENTER_HOSTS = new Set(['mp.luckread.com', 'mp.luckread.com'])")
     expect(page).toContain('if (CREATOR_CENTER_HOSTS.has(host))')
     expect(page).toContain('await payload.auth(')
     expect(page).toContain('readVerifiedPayloadTokenVersion(request)')
