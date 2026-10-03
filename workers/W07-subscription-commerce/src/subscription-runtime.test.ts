@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { changeSubscriptionPlan, createSubscription, etagForUpdatedAt, getSubscription, listSubscriptions, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
+import { changeSubscriptionPlan, createSubscription, decodeSubscriptionCursor, encodeSubscriptionCursor, etagForUpdatedAt, getSubscription, listSubscriptions, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 
 type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; all: <T>() => Promise<{ results: T[] }>; run: () => Promise<{ meta: { changes: number } }> }
 
@@ -22,13 +22,24 @@ function fakeDb(rows: SubscriptionRow[]): D1Database {
         },
         async all<T>() {
           if (sql.includes('WHERE subscriber_id = ?')) {
-            const limit = Number(values[1])
-            const offset = Number(values[2])
-            const results = Array.from(state.values())
-              .filter((row) => row.subscriber_id === String(values[0]))
-              .sort((left, right) => right.created_at.localeCompare(left.created_at))
-              .slice(offset, offset + limit)
-            return { results: results.map((row) => ({ ...row })) as T[] }
+            const subscriberId = String(values[0])
+            const hasCursor = sql.includes('created_at < ? OR (created_at = ? AND subscription_id < ?)')
+            const limit = Number(values[hasCursor ? 4 : 1])
+            let results = Array.from(state.values())
+              .filter((row) => row.subscriber_id === subscriberId)
+              .sort((left, right) =>
+                right.created_at.localeCompare(left.created_at) ||
+                right.subscription_id.localeCompare(left.subscription_id),
+              )
+            if (hasCursor) {
+              const cursorCreatedAt = String(values[1])
+              const cursorId = String(values[3])
+              results = results.filter((row) =>
+                row.created_at < cursorCreatedAt ||
+                (row.created_at === cursorCreatedAt && row.subscription_id < cursorId),
+              )
+            }
+            return { results: results.slice(0, limit).map((row) => ({ ...row })) as T[] }
           }
           return { results: [] as T[] }
         },
@@ -129,18 +140,34 @@ describe('subscription runtime', () => {
   it('rejects cancel from PENDING according to the state machine', async () => {
     const db = fakeDb([baseRow({ status: 'PENDING' })]); const before = await getSubscription(db, 'user_1', 'sub_existing'); await expect(transitionSubscription(db, 'user_1', 'sub_existing', 'cancel', before.etag)).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
   })
-  it('lists only the current subscriber records with bounded pagination', async () => {
+  it('lists only the current subscriber records with stable cursor pagination', async () => {
     const db = fakeDb([
       baseRow({ subscription_id: 'sub_old', created_at: '2026-10-01T12:00:00.000Z', updated_at: '2026-10-01T12:00:00.000Z' }),
       baseRow({ subscription_id: 'sub_new', created_at: '2026-10-02T13:00:00.000Z', updated_at: '2026-10-02T13:00:00.000Z' }),
       baseRow({ subscription_id: 'sub_other', subscriber_id: 'user_2', created_at: '2026-10-03T12:00:00.000Z' }),
     ])
-    const result = await listSubscriptions(db, 'user_1', 1, 1)
-    expect(result.docs).toHaveLength(1)
-    expect(result.docs[0]?.subscriptionId).toBe('sub_new')
-    expect(result.hasNextPage).toBe(true)
-    expect(result.limit).toBe(1)
-    expect(result.page).toBe(1)
+    const first = await listSubscriptions(db, 'user_1', null, 1)
+    expect(first.docs).toHaveLength(1)
+    expect(first.docs[0]?.subscriptionId).toBe('sub_new')
+    expect(first.hasNextPage).toBe(true)
+    expect(first.limit).toBe(1)
+    expect(first.nextCursor).toBeTruthy()
+
+    const second = await listSubscriptions(db, 'user_1', first.nextCursor, 1)
+    expect(second.docs).toHaveLength(1)
+    expect(second.docs[0]?.subscriptionId).toBe('sub_old')
+    expect(second.hasNextPage).toBe(false)
+    expect(second.nextCursor).toBeNull()
+
+    const decoded = decodeSubscriptionCursor(first.nextCursor!)
+    expect(decoded).toEqual({ createdAt: first.docs[0]!.createdAt, id: first.docs[0]!.subscriptionId })
+    expect(decodeSubscriptionCursor(encodeSubscriptionCursor(decoded))).toEqual(decoded)
+  })
+
+  it('rejects malformed subscription cursors', () => {
+    expect(() => decodeSubscriptionCursor('not-a-valid-cursor')).toThrowError(
+      expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }),
+    )
   })
 
   it('does not expose entitlementSnapshotRef', async () => {
