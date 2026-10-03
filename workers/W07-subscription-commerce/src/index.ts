@@ -67,11 +67,16 @@ export default {
       }
       if (operation.operation === 'list') {
         const url = new URL(request.url)
-        const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)
-        const requestedPage = Number.parseInt(url.searchParams.get('page') ?? '1', 10)
-        if ((url.searchParams.has('limit') && !Number.isFinite(requestedLimit)) || (url.searchParams.has('page') && !Number.isFinite(requestedPage))) {
-          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        const parseBoundedPositiveInt = (name: string, fallback: number, max: number): number => {
+          const value = url.searchParams.get(name)
+          if (value === null) return fallback
+          if (!/^[1-9]\\d*$/.test(value)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+          const parsed = Number(value)
+          if (!Number.isSafeInteger(parsed) || parsed > max) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+          return parsed
         }
+        const requestedLimit = parseBoundedPositiveInt('limit', 20, 50)
+        const requestedPage = parseBoundedPositiveInt('page', 1, 10000)
         const result = await listSubscriptions(env.D1_01, principal, requestedLimit, requestedPage)
         return json({ data: result, requestId: crypto.randomUUID() })
       }
