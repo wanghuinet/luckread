@@ -4,6 +4,23 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-08-15",
   "workers_dev": false,
+  "ratelimits": [
+    {
+      "name": "GOVERNANCE_ORIGIN_GLOBAL_LIMITER",
+      "namespace_id": "2026100316",
+      "simple": { "limit": 3000, "period": 60 }
+    },
+    {
+      "name": "GOVERNANCE_READ_LIMITER",
+      "namespace_id": "2026100317",
+      "simple": { "limit": 120, "period": 60 }
+    },
+    {
+      "name": "GOVERNANCE_WRITE_LIMITER",
+      "namespace_id": "2026100318",
+      "simple": { "limit": 30, "period": 60 }
+    }
+  ],
   "queues": {
     "consumers": [
       {
