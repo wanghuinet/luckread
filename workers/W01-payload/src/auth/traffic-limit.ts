@@ -56,3 +56,26 @@ export const rateLimitResponse = (request: Request): Response =>
       },
     },
   )
+
+
+export async function enforcePublicReadRateLimit(request: Request): Promise<void> {
+  let env: Record<string, unknown>
+  try {
+    const context = await getCloudflareContext({ async: true })
+    env = context.env as unknown as Record<string, unknown>
+  } catch {
+    return
+  }
+
+  const globalLimiter = env.PUBLIC_ORIGIN_GLOBAL_LIMITER as RateLimitBinding | undefined
+  if (globalLimiter) {
+    const result = await globalLimiter.limit({ key: 'public-read:origin' })
+    if (!result.success) throw new TrafficLimitError()
+  }
+
+  const limiter = env.PUBLIC_READ_LIMITER as RateLimitBinding | undefined
+  if (!limiter) return
+  const clientIp = request.headers.get('cf-connecting-ip')?.trim() || 'unknown'
+  const result = await limiter.limit({ key: 'public-read:ip:' + clientIp })
+  if (!result.success) throw new TrafficLimitError()
+}
