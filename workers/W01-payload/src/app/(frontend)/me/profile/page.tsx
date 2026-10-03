@@ -181,7 +181,7 @@ export default function ProfilePage() {
           <Link href="/me/subscriptions">我的订阅</Link>
           <Link href="/me/sessions">登录设备</Link>
           <Link href="/me/password">修改密码</Link>
-          <Link href="/admin/creator-center">创作者中心</Link>
+          <Link href="/creator-center">创作者中心</Link>
         </div>
       </div>
 
@@ -271,7 +271,7 @@ export default function ProfilePage() {
             <button disabled={saving || loggingOut} type="submit">
               {saving ? '保存中…' : '保存资料'}
             </button>
-            <button disabled={saving || loggingOut} onClick={() => router.push('/admin/creator-center')} type="button">
+            <button disabled={saving || loggingOut} onClick={() => router.push('/creator-center')} type="button">
               返回创作者中心
             </button>
             <button disabled={saving || loggingOut} onClick={() => void logout()} type="button">
