@@ -105,7 +105,7 @@ export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/ad
         })
         const data = await response.json().catch((): null => null) as MediaItem | { doc?: MediaItem; error?: { message?: string } } | null
         if (response.status === 401) {
-          redirectToAdminLogin()
+          redirectToLogin(loginPath)
           return
         }
         if (!response.ok) {
@@ -141,7 +141,7 @@ export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/ad
       })
       const data = await response.json().catch((): null => null) as MediaItem | { error?: { message?: string } } | null
       if (response.status === 401) {
-        redirectToAdminLogin()
+        redirectToLogin(loginPath)
         return
       }
       if (!response.ok) {
@@ -174,7 +174,7 @@ export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/ad
         },
       })
       if (response.status === 401) {
-        redirectToAdminLogin()
+        redirectToLogin(loginPath)
         return
       }
       if (!response.ok) {
