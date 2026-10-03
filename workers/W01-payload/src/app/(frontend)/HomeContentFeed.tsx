@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
+import { getPublicCopy, type PublicLocale } from './i18n/public-locale'
+
 type ContentType = 'article' | 'post' | 'video'
 
 type ContentItem = {
@@ -14,17 +16,18 @@ type ContentItem = {
   updatedAt?: string
 }
 
-const typeLabels: Record<ContentType, string> = {
-  article: '文章',
-  post: '动态',
-  video: '视频',
-}
-
 type Page = {
   items: ContentItem[]
 }
 
-export default function HomeContentFeed() {
+export default function HomeContentFeed({ locale = 'zh' }: { locale?: PublicLocale }) {
+  const copy = getPublicCopy(locale)
+  const typeLabels: Record<ContentType, string> = {
+    article: copy.content.tabs.article,
+    post: copy.content.tabs.post,
+    video: copy.content.tabs.video,
+  }
+
   const [items, setItems] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -86,15 +89,15 @@ export default function HomeContentFeed() {
     <section className="content-feed" id="content-feed" aria-labelledby="content-feed-title" aria-busy={loading}>
       <div className="content-feed-heading">
         <div>
-          <p className="eyebrow">Latest from LuckRead</p>
-          <h2 id="content-feed-title">正在发生的内容</h2>
+          <p className="eyebrow">{copy.home.feedEyebrow}</p>
+          <h2 id="content-feed-title">{copy.home.feedTitle}</h2>
         </div>
-        <Link className="content-feed-all" href="/content">查看全部 ↗</Link>
+        <Link className="content-feed-all" href="/content">{copy.home.feedAll}</Link>
       </div>
       {error && !loading ? (
         <div className="content-feed-error" role="status">
-          <p>内容暂时无法加载。</p>
-          <button className="button button-quiet" onClick={retry} type="button">重新加载</button>
+          <p>{copy.content.error}</p>
+          <button className="button button-quiet" onClick={retry} type="button">{copy.content.retry}</button>
         </div>
       ) : null}
       <div className="content-feed-grid">
@@ -119,7 +122,7 @@ export default function HomeContentFeed() {
                   item.contentType === 'video' ? (
                     <video aria-label={item.title} muted playsInline preload="metadata" src={cover} />
                   ) : (
-                    <img alt={item.title ? item.title + '封面' : '内容封面'} loading="lazy" src={cover} />
+                    <img alt={item.title ? item.title + copy.content.cover : copy.content.cover} loading="lazy" src={cover} />
                   )
                 ) : (
                   <span>{item.contentType === 'post' ? 'POST' : 'LUCKREAD'}</span>
@@ -128,10 +131,10 @@ export default function HomeContentFeed() {
               <div className="content-feed-body">
                 <div className="content-feed-meta">
                   <span>{typeLabels[item.contentType]}</span>
-                  <span>已发布</span>
+                  <span>{copy.content.published}</span>
                 </div>
                 <h3>{item.title}</h3>
-                <span className="content-feed-open">阅读内容 ↗</span>
+                <span className="content-feed-open">{locale === 'en' ? 'Read content ↗' : locale === 'tw' ? '閱讀內容 ↗' : '阅读内容 ↗'}</span>
               </div>
             </Link>
           )
