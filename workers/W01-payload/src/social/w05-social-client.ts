@@ -72,6 +72,13 @@ export async function callW05SocialPublic(input: {
   })
   if (input.principal?.userId) {
     headers.set('X-LuckRead-Principal-User-Id', input.principal.userId)
+    headers.set('X-LuckRead-Rate-Key', 'user:' + input.principal.userId)
+  } else {
+    const clientIp = input.request.headers.get('cf-connecting-ip')?.trim()
+    if (clientIp) {
+      headers.set('X-LuckRead-Client-IP', clientIp)
+      headers.set('X-LuckRead-Rate-Key', 'ip:' + clientIp)
+    }
   }
 
   const response = await service.fetch(
