@@ -23,6 +23,7 @@ const transportHeaders = {
   'X-LuckRead-Transport-Version': '1.0',
   'X-LuckRead-Correlation-Id': 'test-correlation',
   'X-LuckRead-Principal-User-Id': 'viewer-1',
+  'X-LuckRead-Principal-Layer': 'L2',
 }
 
 describe('W05 social query transport', () => {
