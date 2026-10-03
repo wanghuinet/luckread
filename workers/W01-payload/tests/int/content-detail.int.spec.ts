@@ -102,6 +102,16 @@ describe('public content detail', () => {
     expect(page).not.toContain("请先登录后关注作者。")
   })
 
+  it('passes Block restriction into the comment interaction UI', () => {
+    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const comments = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
+    expect(page).toContain('interactionRestricted={interactionRestricted}')
+    expect(comments).toContain('interactionRestricted = false')
+    expect(comments).toContain('当前关系受屏蔽规则限制，暂不可发表评论或互动。')
+    expect(comments).toContain('{!interactionRestricted ? (')
+    expect(comments).toContain('{!interactionRestricted && comment.depth < 3 ? (')
+  })
+
   it('hides like when the content relationship is blocked', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain('interactionRestricted')
