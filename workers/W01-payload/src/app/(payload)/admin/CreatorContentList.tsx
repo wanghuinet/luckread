@@ -97,12 +97,13 @@ export default function CreatorContentList() {
       )
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
-      if (requestId !== requestIdRef.current) return
+      if (requestId !== requestIdRef.current || controller.signal.aborted) return
       setError(cause instanceof Error ? cause.message : '内容列表加载失败')
     } finally {
-      if (requestId !== requestIdRef.current) return
+      if (requestId !== requestIdRef.current || controller.signal.aborted) return
       setLoading(false)
       setLoadingMore(false)
+      if (activeRequestRef.current === controller) activeRequestRef.current = null
     }
   }, [status, type])
 
@@ -110,7 +111,12 @@ export default function CreatorContentList() {
     const timer = window.setTimeout((): void => {
       void load()
     }, 0)
-    return () => window.clearTimeout(timer)
+    return () => {
+      requestIdRef.current += 1
+      activeRequestRef.current?.abort()
+      activeRequestRef.current = null
+      window.clearTimeout(timer)
+    }
   }, [load])
 
   useEffect(() => {
