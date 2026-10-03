@@ -44,6 +44,7 @@ describe('content comments UI', () => {
     expect(component).toContain("const [editingId, setEditingId] = useState<string | null>(null)")
     expect(component).toContain("method: 'PATCH'")
     expect(component).toContain(`'If-Match': '"' + comment.updatedAt + '"'`)
+    expect(component).toContain("'Idempotency-Key': 'social-comment-update:' + crypto.randomUUID()")
     expect(component).toContain('comment.authorUserId === viewerUserId')
     expect(component).toContain('保存修改')
   })
