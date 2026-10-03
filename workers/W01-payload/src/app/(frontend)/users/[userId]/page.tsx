@@ -236,7 +236,7 @@ export default function PublicProfilePage({
         limit: '6',
         cursor: contentCursor,
       })
-      if (filter !== 'all') params.set('type', filter)
+      params.set('type', filter)
 
       const response = await fetch('/api/v1/contents?' + params.toString(), {
         headers: { accept: 'application/json' },
