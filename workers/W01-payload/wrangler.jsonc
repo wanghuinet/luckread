@@ -42,6 +42,23 @@
       "remote": true
     }
   ],
+  "ratelimits": [
+    {
+      "name": "AUTH_REGISTER_LIMITER",
+      "namespace_id": "2026100305",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      "name": "AUTH_LOGIN_LIMITER",
+      "namespace_id": "2026100306",
+      "simple": { "limit": 30, "period": 60 }
+    },
+    {
+      "name": "AUTH_REFRESH_LIMITER",
+      "namespace_id": "2026100307",
+      "simple": { "limit": 120, "period": 60 }
+    }
+  ],
   "routes": [
     {
       "pattern": "luckread.cn",
