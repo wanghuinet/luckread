@@ -760,3 +760,15 @@ a { color: inherit; }
   .mp-entry-dashboard { padding: 18px; }
   .mp-entry-create-row, .mp-entry-stat-row { grid-template-columns: 1fr; }
 }
+
+
+.mp-entry-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.mp-entry-header-tools .languageSwitch { flex: 0 0 auto; }
+@media (max-width: 720px) {
+  .mp-entry-header-tools { gap: 8px; }
+  .mp-entry-domain { display: none; }
+}
