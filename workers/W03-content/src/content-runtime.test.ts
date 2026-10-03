@@ -149,7 +149,7 @@ describe('W03 content contract core', () => {
 
   it('keeps the D1 batch fail-closed CAS guard on every content mutation', () => {
     const runtime = readFileSync(
-      resolve(process.cwd(), 'src/content-runtime.ts'),
+      resolve(process.cwd(), 'workers/W03-content/src/content-runtime.ts'),
       'utf8',
     )
 
@@ -171,7 +171,7 @@ describe('W03 content contract core', () => {
     expect(runtime).toContain('INSERT OR REPLACE INTO content_txn_guard')
     expect(runtime).toContain('VALUES (1, changes())')
     expect(runtime).toContain("successful INTEGER NOT NULL CHECK (successful = 1)")
-    expect(readFileSync(resolve(process.cwd(), 'migrations/0001_content_core.sql'), 'utf8')).toContain(
+    expect(readFileSync(resolve(process.cwd(), 'workers/W03-content/migrations/0001_content_core.sql'), 'utf8')).toContain(
       'CREATE TABLE content_txn_guard',
     )
   })
