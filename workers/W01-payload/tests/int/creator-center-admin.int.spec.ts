@@ -39,6 +39,15 @@ describe('Creator Center admin extension', () => {
     expect(list).toContain('if (requestId !== requestIdRef.current) return')
   })
 
+  it('cancels stale creator content list requests during refresh and navigation', () => {
+    const contentList = read('src/app/(payload)/admin/CreatorContentList.tsx')
+    expect(contentList).toContain('const activeRequestRef = useRef<AbortController | null>(null)')
+    expect(contentList).toContain('activeRequestRef.current?.abort()')
+    expect(contentList).toContain('signal: controller.signal')
+    expect(contentList).toContain('requestIdRef.current += 1')
+    expect(contentList).toContain('controller.signal.aborted')
+  })
+
   it('redirects creator audience auth expiry to admin login', () => {
     const audience = read('src/app/(payload)/admin/CreatorAudienceSummary.tsx')
 
