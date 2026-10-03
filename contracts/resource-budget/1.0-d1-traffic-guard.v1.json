@@ -109,7 +109,8 @@
     "mutationInvalidatesAffectedPublicCache": "required",
     "noSyncProjectionWriteAmplification": "required",
     "noNPlus1PublicRead": "required",
-    "globalOriginBurstIsShedBeforeD1": "required"
+    "globalOriginBurstIsShedBeforeD1": "required",
+    "cacheMissConcurrencyBounded": "required"
   },
   "nonGoals": [
     "No fifth D1",
@@ -117,5 +118,8 @@
     "No D1 proxy or database gateway",
     "No read/write split by creating additional D1 domains",
     "No asynchronous conversion of authoritative content/account mutations that would weaken correctness"
-  ]
+  ],
+  "cache": {
+    "originMissConcurrencyMaxPerIsolate": 16
+  }
 }
