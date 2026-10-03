@@ -29,6 +29,7 @@ jobs:
           attach() {
             local hostname="$1"
             local response existing_service attach_response
+            local zoneName="${hostname#*.}"
 
             response="$(curl --fail-with-body --silent --show-error \
               --get "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
@@ -54,7 +55,7 @@ jobs:
               -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
               -H "Content-Type: application/json" \
               --data "$(jq -cn --arg hostname "${hostname}" --arg service "${WORKER_NAME}" \
-                '{hostname:$hostname,service:$service,zone_name:"luckread.cn"}')")"
+                '{hostname:$hostname,service:$service,zone_name:zoneName}')")"
 
             printf '%s' "${attach_response}" | jq -e '.success == true and .result.hostname == $hostname and .result.service == $service' \
               --arg hostname "${hostname}" --arg service "${WORKER_NAME}" >/dev/null
@@ -67,6 +68,7 @@ jobs:
           attach "www.luckread.cn"
           attach "sso.luckread.cn"
           attach "mp.luckread.cn"
+          attach "mp.luckread.com"
 
       - name: Verify W01 public domains
         env:
@@ -86,6 +88,7 @@ jobs:
             and ([.result[] | select(.hostname == "www.luckread.cn" and .service == "luckread-w01-payload")] | length) == 1
             and ([.result[] | select(.hostname == "sso.luckread.cn" and .service == "luckread-w01-payload")] | length) == 1
             and ([.result[] | select(.hostname == "mp.luckread.cn" and .service == "luckread-w01-payload")] | length) == 1
+            and ([.result[] | select(.hostname == "mp.luckread.com" and .service == "luckread-w01-payload")] | length) == 1
           ' >/dev/null
 
-          printf '%s' "${response}" | jq '[.result[] | select((.hostname == "luckread.cn" or .hostname == "api.luckread.cn" or .hostname == "www.luckread.cn" or .hostname == "sso.luckread.cn" or .hostname == "mp.luckread.cn")) | {hostname,service,zone_name,id,cert_id}]'
+          printf '%s' "${response}" | jq '[.result[] | select((.hostname == "luckread.cn" or .hostname == "api.luckread.cn" or .hostname == "www.luckread.cn" or .hostname == "sso.luckread.cn" or .hostname == "mp.luckread.cn" or .hostname == "mp.luckread.com")) | {hostname,service,zone_name,id,cert_id}]'

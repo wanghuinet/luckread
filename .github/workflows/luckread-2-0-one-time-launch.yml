@@ -118,14 +118,18 @@ jobs:
             https://mp.luckread.cn/login
             https://mp.luckread.cn/publish
             https://mp.luckread.cn/creator-center
-            https://mp.luckread.cn/admin/creator-center
+            https://mp.luckread.com/register
+            https://mp.luckread.com/login
+            https://mp.luckread.com/publish
+            https://mp.luckread.com/creator-center
+            https://mp.luckread.com/admin
             https://api.luckread.cn/api/v1/contents
           )
           for url in "${urls[@]}"; do
             code="$(curl -L -sS -o /tmp/luckread-smoke -w '%{http_code}' "$url")"
             echo "$url -> $code"
             case "$url" in
-              */register|*/login|*/publish|*/creator-center|*/admin/creator-center) test "$code" -ge 200 && test "$code" -lt 500 ;;
+              */register|*/login|*/publish|*/creator-center|*/admin) test "$code" -ge 200 && test "$code" -lt 500 ;;
               */contents) test "$code" = 200 ;;
             esac
           done

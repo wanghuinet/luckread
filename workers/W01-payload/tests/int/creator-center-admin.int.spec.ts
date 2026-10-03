@@ -5,13 +5,15 @@ import { resolve } from 'node:path'
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
 describe('Creator Center admin extension', () => {
-  it('registers as a separate Payload Admin root view without replacing native views', () => {
+  it('keeps Payload /admin bound to the native Users admin gate', () => {
     const config = read('src/payload.config.ts')
+    const users = read('src/collections/Users.ts')
 
-    expect(config).toContain('creatorCenter: {')
-    expect(config).toContain("Component: '/app/(payload)/admin/CreatorCenter#CreatorCenter'")
-    expect(config).toContain("path: '/creator-center'")
-    expect(config).toContain("actions: ['/app/(payload)/admin/CreatorCenterAction#CreatorCenterAction']")
+    expect(config).toContain('user: Users.slug')
+    expect(config).not.toContain('CreatorCenterAction')
+    expect(config).not.toContain('creatorCenter:')
+    expect(users).toContain("import { payloadAdminOnly } from '@/auth/payload-admin-access'")
+    expect(users).toContain('admin: payloadAdminOnly')
   })
 
   it('preserves the full publish return path when authentication expires', () => {
@@ -23,14 +25,14 @@ describe('Creator Center admin extension', () => {
   })
 
   it('redirects creator content management auth expiry to admin login', () => {
-    const contentList = read('src/app/(payload)/admin/CreatorContentList.tsx')
+    const contentList = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     expect(contentList).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
     expect(contentList).toContain("window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))")
     expect(contentList).toContain("if (response.status === 401)")
   })
 
   it('cancels stale creator content list requests', () => {
-    const list = read('src/app/(payload)/admin/CreatorContentList.tsx')
+    const list = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     expect(list).toContain('const activeRequestRef = useRef<AbortController | null>(null)')
     expect(list).toContain('activeRequestRef.current?.abort()')
     expect(list).toContain('const controller = new AbortController()')
@@ -40,7 +42,7 @@ describe('Creator Center admin extension', () => {
   })
 
   it('cancels stale creator content list requests during refresh and navigation', () => {
-    const contentList = read('src/app/(payload)/admin/CreatorContentList.tsx')
+    const contentList = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     expect(contentList).toContain('const activeRequestRef = useRef<AbortController | null>(null)')
     expect(contentList).toContain('activeRequestRef.current?.abort()')
     expect(contentList).toContain('signal: controller.signal')
@@ -49,7 +51,7 @@ describe('Creator Center admin extension', () => {
   })
 
   it('redirects creator audience auth expiry to admin login', () => {
-    const audience = read('src/app/(payload)/admin/CreatorAudienceSummary.tsx')
+    const audience = read('src/app/(payload)/v1beta/CreatorAudienceSummary.tsx')
 
     expect(audience).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
     expect(audience).toContain("window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))")
@@ -57,7 +59,7 @@ describe('Creator Center admin extension', () => {
   })
 
   it('uses the native Payload admin request principal instead of a second login/session system', () => {
-    const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const view = read('src/app/(payload)/v1beta/CreatorCenter.tsx')
 
     expect(view).toContain('AdminViewServerProps')
     expect(view).toContain('initPageResult.req.user')
@@ -67,7 +69,7 @@ describe('Creator Center admin extension', () => {
   })
 
   it('redirects moderation auth expiry to admin login', () => {
-    const moderation = read('src/app/(payload)/admin/CreatorModerationQueue.tsx')
+    const moderation = read('src/app/(payload)/v1beta/CreatorModerationQueue.tsx')
     expect(moderation).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
     expect(moderation).toContain("window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))")
     expect(moderation).toContain('if (response.status === 401)')
@@ -203,7 +205,7 @@ describe('Creator Center admin extension', () => {
 
   it('exposes the creator-owned content management read slice', () => {
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
-    const list = read('src/app/(payload)/admin/CreatorContentList.tsx')
+    const list = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     const route = read('src/app/(payload)/api/creator/contents/route.ts')
     const client = read('src/content/w03-content-client.ts')
 
@@ -278,9 +280,9 @@ describe('Creator Center admin extension', () => {
 
   it('organizes the creator center around creator-first workflows', () => {
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
-    const assistant = read('src/app/(payload)/admin/CreatorCenterAssistant.tsx')
-    const styles = read('src/app/(payload)/admin/creator-center.module.css')
-    const moderation = read('src/app/(payload)/admin/CreatorModerationQueue.tsx')
+    const assistant = read('src/app/(payload)/v1beta/CreatorCenterAssistant.tsx')
+    const styles = read('src/app/(payload)/v1beta/creator-center.module.css')
+    const moderation = read('src/app/(payload)/v1beta/CreatorModerationQueue.tsx')
 
 
     expect(view).toContain('内容管理')
@@ -325,7 +327,7 @@ describe('Creator Center admin extension', () => {
 
   it('uses the stable v1 creator media library instead of a second media authority', () => {
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
-    const assets = read('src/app/(payload)/admin/CreatorAssetLibrary.tsx')
+    const assets = read('src/app/(payload)/v1beta/CreatorAssetLibrary.tsx')
 
     expect(view).toContain("import CreatorAssetLibrary from '../../(payload)/admin/CreatorAssetLibrary'")
     expect(view).toContain('<CreatorAssetLibrary adminMode={adminMode} loginPath={adminMode ? \'/admin/login\' : \'/login\'} />')
@@ -351,7 +353,7 @@ describe('Creator Center admin extension', () => {
   })
 
   it('lets creators update media alt text through the stable media API', () => {
-    const assets = read('src/app/(payload)/admin/CreatorAssetLibrary.tsx')
+    const assets = read('src/app/(payload)/v1beta/CreatorAssetLibrary.tsx')
 
     expect(assets).toContain("method: 'PATCH'")
     expect(assets).toContain("'/api/v1/media/' + encodeURIComponent(String(item.id))")
@@ -431,11 +433,14 @@ describe('Creator Center admin extension', () => {
     expect(loginForm).not.toContain("sessionStorage.setItem('luckread.layer'")
   })
 
-  it('keeps the existing native admin import map entries', () => {
+  it('keeps only native Payload import-map entries after moving creator UI to v1beta', () => {
     const importMap = read('src/app/(payload)/admin/importMap.js')
 
     expect(importMap).toContain('@payloadcms/storage-r2/client')
-    expect(importMap).toContain('/app/(payload)/admin/CreatorCenter#CreatorCenter')
-    expect(importMap).toContain('/app/(payload)/admin/CreatorCenterAction#CreatorCenterAction')
+    expect(importMap).toContain('@payloadcms/ui/rsc#CollectionCards')
+    expect(importMap).not.toContain('CreatorCenterAction')
+    expect(importMap).not.toContain('/app/(payload)/admin/CreatorCenter')
+    expect(importMap).not.toContain('/app/(payload)/v1beta/CreatorCenter')
   })
+
 })

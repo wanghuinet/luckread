@@ -1,5 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
+import { payloadAdminOnly } from '@/auth/payload-admin-access'
+
 export const Users: CollectionConfig = {
   slug: 'users',
   admin: {
@@ -31,6 +33,7 @@ export const Users: CollectionConfig = {
   // are defined at the canonical API boundary.
   access: {
     create: () => true,
+    admin: payloadAdminOnly,
   },
   fields: [
     {
