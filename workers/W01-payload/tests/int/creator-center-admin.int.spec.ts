@@ -380,7 +380,7 @@ describe('Creator Center admin extension', () => {
     const home = read('src/app/(frontend)/page.tsx')
     const css = read('src/app/(frontend)/me/subscriptions/subscriptions.css')
 
-    expect(page).toContain("'/api/v1/memberships/subscriptions?limit=20&page=' + String(page)")
+    expect(page).toContain("new URLSearchParams({ limit: '20' })")
     expect(page).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
     expect(page).toContain("window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))")
     expect(page).toContain("method: 'POST'")
@@ -399,7 +399,7 @@ describe('Creator Center admin extension', () => {
     expect(page).toContain("window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))")
     expect(page).toContain("pageNumber + 1")
     expect(page).toContain("append ? [...current, ...data.data!.docs!] : data.data!.docs!")
-    expect(page).toContain('hasNextPage')
+    expect(page).toContain('nextCursor')
     expect(page).toContain('加载更多订阅')
     expect(page).toContain("statusLabel")
     expect(page).not.toContain('entitlement')

@@ -92,9 +92,10 @@ export default {
       }
       if (operation.operation === 'list') {
         const url = new URL(request.url)
+        if (url.searchParams.has('page')) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
-        const requestedPage = parseBoundedPositiveInt(url.searchParams.get('page'), 1, 10000)
-        const result = await listSubscriptions(env.D1_01, principal, requestedLimit, requestedPage)
+        const requestedCursor = url.searchParams.get('cursor')
+        const result = await listSubscriptions(env.D1_01, principal, requestedCursor, requestedLimit)
         return json({ data: result, requestId: crypto.randomUUID() })
       }
       if (operation.operation === 'get') {
