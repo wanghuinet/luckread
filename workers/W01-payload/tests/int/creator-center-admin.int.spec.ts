@@ -74,7 +74,7 @@ describe('Creator Center admin extension', () => {
   })
 
   it('embeds the existing publisher with a scoped W03 content bridge', () => {
-    const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     const contentDetail = read('src/app/(frontend)/content/[contentId]/page.tsx')
     const homeFeed = read('src/app/(frontend)/HomeContentFeed.tsx')
@@ -202,7 +202,7 @@ describe('Creator Center admin extension', () => {
   })
 
   it('exposes the creator-owned content management read slice', () => {
-    const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const list = read('src/app/(payload)/admin/CreatorContentList.tsx')
     const route = read('src/app/(payload)/api/creator/contents/route.ts')
     const client = read('src/content/w03-content-client.ts')
@@ -277,7 +277,7 @@ describe('Creator Center admin extension', () => {
   })
 
   it('organizes the creator center around creator-first workflows', () => {
-    const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const assistant = read('src/app/(payload)/admin/CreatorCenterAssistant.tsx')
     const styles = read('src/app/(payload)/admin/creator-center.module.css')
     const moderation = read('src/app/(payload)/admin/CreatorModerationQueue.tsx')
@@ -324,7 +324,7 @@ describe('Creator Center admin extension', () => {
   })
 
   it('uses the stable v1 creator media library instead of a second media authority', () => {
-    const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const assets = read('src/app/(payload)/admin/CreatorAssetLibrary.tsx')
 
     expect(view).toContain("import CreatorAssetLibrary from './CreatorAssetLibrary'")
