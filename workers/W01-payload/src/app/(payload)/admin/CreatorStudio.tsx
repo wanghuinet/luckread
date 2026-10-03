@@ -45,45 +45,6 @@ const systemNav: CreatorNavItem[] = [
   { label: '账号设置', href: '/me/profile', icon: 'fa-gear' },
 ]
 
-export function CreatorCenter({
-  initPageResult,
-  params,
-  searchParams,
-  user,
-}: AdminViewServerProps) {
-  const serverUser = initPageResult.req.user
-
-  if (!serverUser) {
-    return (
-      <Gutter>
-        <section className={styles.authRequired}>
-          <span className={styles.eyebrow}>LuckRead Creator Studio</span>
-          <h1>登录后进入创作者中心</h1>
-          <p>使用现有 LuckRead 账号即可进入，不创建第二套创作者登录。</p>
-          <Link className={styles.primaryButton} href="/admin/login">
-            <i className="fa-solid fa-arrow-right-to-bracket" aria-hidden="true" />
-            返回登录
-          </Link>
-        </section>
-      </Gutter>
-    )
-  }
-
-  const viewUser = user as unknown as {
-    displayName?: unknown
-    username?: unknown
-    email?: unknown
-  }
-
-  const displayName =
-    typeof viewUser.displayName === 'string' && viewUser.displayName.trim()
-      ? viewUser.displayName
-      : typeof viewUser.username === 'string' && viewUser.username.trim()
-        ? viewUser.username
-        : typeof viewUser.email === 'string' && viewUser.email.trim()
-          ? viewUser.email
-          : '创作者'
-
 export function CreatorStudio({
   displayName,
   userId,
@@ -91,7 +52,7 @@ export function CreatorStudio({
   displayName: string
   userId: string
 }) {
-const renderNav = (items: CreatorNavItem[]) => (
+  const renderNav = (items: CreatorNavItem[]) => (
     <div className={styles.sidebarNavList}>
       {items.map((item) => {
         const disabled = Boolean(item.hint)
@@ -113,7 +74,7 @@ const renderNav = (items: CreatorNavItem[]) => (
   )
 
   return (
-<div className={styles.creatorLayout + ' ' + styles.studioLayout}>
+    <div className={styles.creatorLayout + ' ' + styles.studioLayout}>
         <aside className={styles.sidebar} aria-label="LuckRead 创作者中心导航">
           <div className={styles.sidebarBrand}>
             <span className={styles.brandMark}>LR</span>
@@ -201,8 +162,7 @@ const renderNav = (items: CreatorNavItem[]) => (
             </div>
           </header>
 
-          <Gutter>
-            <div className={styles.studioShell}>
+          <div className={styles.studioShell}>
               <section id="overview" className={styles.dashboardWelcome}>
                 <div>
                   <span className={styles.dashboardKicker}>CREATOR DASHBOARD</span>
@@ -352,11 +312,10 @@ const renderNav = (items: CreatorNavItem[]) => (
                   <Link href="https://luckread.cn/">回到主站</Link>
                 </div>
               </footer>
-            </div>
-          </Gutter>
+          </div>
         </main>
 
         <CreatorCenterAssistant />
-      </div
+      </div>
   )
 }
