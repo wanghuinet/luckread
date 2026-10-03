@@ -28,6 +28,13 @@ const errorResponse = (status: number, code: string, message: string) =>
   )
 
 export async function POST(request: Request): Promise<Response> {
+  try {
+    const clientIp = request.headers.get('cf-connecting-ip')?.trim() || 'unknown'
+    await enforceAuthRateLimit(request, 'AUTH_REFRESH_LIMITER', ['ip:' + clientIp])
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
+  }
   import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 
 let body: { refreshToken?: unknown; deviceId?: unknown }
