@@ -4,7 +4,7 @@ import { Gutter } from '@payloadcms/ui'
 import Link from 'next/link'
 import React from 'react'
 
-import { CreatorStudio } from './CreatorStudio'
+import { CreatorStudio } from '../../(frontend)/creator-center/CreatorStudio'
 import styles from './creator-center.module.css'
 
 type CreatorNavItem = {
@@ -92,7 +92,7 @@ export function CreatorCenter({
       user={user}
       visibleEntities={initPageResult.visibleEntities}
     >
-      <CreatorStudio displayName={displayName} userId={String(serverUser.id)} />
+      <CreatorStudio adminMode displayName={displayName} userId={String(serverUser.id)} />
     </DefaultTemplate>
   )
 }
