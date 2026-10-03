@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 
-const base = String(process.env.MODERATION_BASE_URL || 'https://luckread.cn').replace(/\/$/, '')
-const authBase = String(process.env.AUTH_BASE_URL || 'https://api.luckread.cn').replace(/\/$/, '')
+const base = String(process.env.MODERATION_BASE_URL || 'https://luckread.com').replace(/\/$/, '')
+const authBase = String(process.env.AUTH_BASE_URL || 'https://api.luckread.com').replace(/\/$/, '')
 const database = process.env.DATABASE_NAME_W01 || 'luckread'
 const config = 'workers/W01-payload/wrangler.jsonc'
 const runId = String(process.env.GITHUB_RUN_ID || Date.now())
