@@ -833,3 +833,198 @@ a { color: inherit; }
   .public-language-button { min-width: 36px; padding-inline: 7px; font-size: 10px; }
   .content-detail-language { margin-bottom: 6px; }
 }
+
+
+/* --------------------------------------------------------------------------
+ * LuckRead Blue H5 design system
+ * Shared visual language for public/mobile web surfaces.
+ * -------------------------------------------------------------------------- */
+:root {
+  --lr-blue-50: #eff6ff;
+  --lr-blue-100: #dbeafe;
+  --lr-blue-200: #bfdbfe;
+  --lr-blue-400: #60a5fa;
+  --lr-blue-500: #3b82f6;
+  --lr-blue-600: #2563eb;
+  --lr-blue-700: #1d4ed8;
+  --lr-blue-800: #1e40af;
+  --lr-blue-900: #1e3a8a;
+  --lr-h5-bg: #f5f9ff;
+  --lr-h5-surface: #ffffff;
+  --lr-h5-text: #102a56;
+  --lr-h5-muted: #5c7191;
+  --lr-h5-line: #dce8f8;
+  --lr-h5-shadow: 0 12px 36px rgba(30, 64, 175, .08);
+}
+
+html, body {
+  background: var(--lr-h5-bg);
+}
+
+body {
+  color: var(--lr-h5-text);
+}
+
+/* Shared authentication / recovery surfaces */
+.lr-auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(37, 99, 235, .16), transparent 30%),
+    radial-gradient(circle at 88% 92%, rgba(96, 165, 250, .13), transparent 32%),
+    linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+  color: var(--lr-h5-text);
+}
+.lr-auth-card {
+  width: min(440px, 100%);
+  padding: 32px;
+  border: 1px solid var(--lr-h5-line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 24px 64px rgba(30, 64, 175, .12);
+}
+.lr-brand {
+  color: var(--lr-blue-700);
+  font-weight: 850;
+  letter-spacing: -.03em;
+  font-size: 20px;
+}
+.lr-auth-card h1 {
+  margin: 20px 0 8px;
+  color: var(--lr-h5-text);
+  font-size: 32px;
+  letter-spacing: -.04em;
+}
+.lr-muted { color: var(--lr-h5-muted); }
+.lr-auth-form { display: grid; gap: 16px; }
+.lr-auth-form label { color: #29476f; }
+.lr-auth-form input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 14px;
+  border: 1px solid #cbdcf2;
+  border-radius: 11px;
+  background: #fff;
+  color: var(--lr-h5-text);
+  font-size: 15px;
+  outline: none;
+}
+.lr-auth-form input:focus {
+  border-color: var(--lr-blue-500);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, .12);
+}
+.lr-auth-form button,
+.lr-auth-shell button {
+  border: 0;
+  border-radius: 11px;
+  padding: 13px 16px;
+  background: linear-gradient(135deg, var(--lr-blue-700), var(--lr-blue-600));
+  color: #fff;
+  font-size: 15px;
+  font-weight: 750;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, .18);
+}
+.lr-auth-form button:hover:not(:disabled),
+.lr-auth-shell button:hover:not(:disabled) { background: var(--lr-blue-700); }
+.lr-auth-form button:disabled,
+.lr-auth-shell button:disabled { opacity: .55; cursor: wait; }
+.lr-link { color: var(--lr-blue-700); text-align: center; font-size: 14px; text-decoration: none; }
+.lr-link:hover { text-decoration: underline; }
+.lr-error { color: #b42318; background: #fff5f4; border: 1px solid #fecdca; border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+
+/* Inline-styled account/security pages still inherit the same blue surface. */
+main[style*="max-width"] {
+  color: var(--lr-h5-text);
+}
+main[style*="max-width"] h1 { color: var(--lr-h5-text) !important; }
+main[style*="max-width"] p[style*="color: '#666'"] { color: var(--lr-h5-muted) !important; }
+main[style*="max-width"] label { color: #29476f; }
+main[style*="max-width"] input,
+main[style*="max-width"] textarea,
+main[style*="max-width"] select {
+  border-color: #cbdcf2 !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  color: var(--lr-h5-text) !important;
+}
+main[style*="max-width"] input:focus,
+main[style*="max-width"] textarea:focus,
+main[style*="max-width"] select:focus {
+  border-color: var(--lr-blue-500) !important;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, .11);
+  outline: none;
+}
+main[style*="max-width"] button {
+  border: 1px solid var(--lr-blue-200);
+  border-radius: 10px;
+  background: var(--lr-blue-600);
+  color: #fff;
+  padding: 9px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+main[style*="max-width"] button:hover:not(:disabled) { background: var(--lr-blue-700); }
+main[style*="max-width"] a { color: var(--lr-blue-700); }
+
+/* Discovery / social content surfaces */
+.content-browse,
+.content-detail {
+  color: var(--lr-h5-text);
+  background: linear-gradient(180deg, #f8fbff 0%, var(--lr-h5-bg) 100%);
+}
+.content-feed-card,
+.content-detail-card,
+.content-comments,
+.content-comment-item {
+  border-color: var(--lr-h5-line) !important;
+  box-shadow: var(--lr-h5-shadow);
+}
+.content-feed-meta span,
+.content-feed-open,
+.content-browse .eyebrow,
+.content-detail .eyebrow { color: var(--lr-blue-600); }
+.content-browse-actions .button-primary,
+.content-detail button {
+  border-color: var(--lr-blue-600);
+}
+
+/* Creator and publishing blue consistency */
+.lr-publish-shell {
+  background:
+    radial-gradient(circle at 86% 6%, rgba(59, 130, 246, .10), transparent 22rem),
+    var(--lr-h5-bg);
+  color: var(--lr-h5-text);
+}
+.lr-publish-shell .lr-wordmark { color: var(--lr-h5-text); }
+.lr-publish-shell .lr-publish-layout h1 { color: var(--lr-h5-text); }
+.lr-publish-shell .lr-type-tabs button.active { color: var(--lr-blue-700); }
+.lr-publish-shell .lr-field input:focus,
+.lr-publish-shell .lr-field textarea:focus,
+.lr-publish-shell .lr-field select:focus { border-color: var(--lr-blue-400); }
+
+/* Subscription / account cards */
+.my-subscriptions {
+  background:
+    radial-gradient(circle at 86% 6%, rgba(59, 130, 246, .11), transparent 22rem),
+    var(--lr-h5-bg) !important;
+  color: var(--lr-h5-text) !important;
+}
+.my-subscriptions-header h1 { color: var(--lr-h5-text); }
+.my-subscriptions-actions a,
+.my-subscriptions-actions button,
+.subscription-actions button {
+  border-color: var(--lr-h5-line) !important;
+}
+.subscription-card { border-color: var(--lr-h5-line) !important; box-shadow: var(--lr-h5-shadow); }
+.subscription-status-active { background: var(--lr-blue-50) !important; color: var(--lr-blue-700) !important; }
+.subscription-empty { border-color: var(--lr-blue-200) !important; box-shadow: var(--lr-h5-shadow); }
+.subscription-empty a { color: var(--lr-blue-700) !important; }
+
+@media (max-width: 640px) {
+  .lr-auth-shell { padding: 16px; }
+  .lr-auth-card { padding: 24px 20px; border-radius: 18px; }
+  main[style*="max-width"] { margin-top: 24px !important; margin-bottom: 40px !important; }
+}
