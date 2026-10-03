@@ -144,13 +144,13 @@ Future commerce paths such as gift membership or other paid products can consume
 
 The design borrows mechanisms, not brand visuals or proprietary implementation.
 
-OnlyFans-style creator pages demonstrate the useful pattern of creator identity, external social links and a clear subscription CTA. citeturn128734image2
+OnlyFans-style creator pages demonstrate the useful pattern of creator identity, external social links and a clear subscription CTA. (mechanism reference: public profile + social links + subscription CTA)
 
-PineDrama currently combines vertical short dramas with discovery, follows, comments and watchlists, showing how content discovery and creator relationship can coexist in one consumption loop. citeturn925668search0
+PineDrama currently combines vertical short dramas with discovery, follows, comments and watchlists, showing how content discovery and creator relationship can coexist in one consumption loop. (mechanism reference: vertical short drama + discovery + follow + comments + watchlist)
 
-NetShort currently uses a mixture of free-start content, coins and VIP/subscription access, with VIP benefits including ad-free viewing, supported offline downloads and selected episode access. citeturn776679search1turn128734search6
+NetShort currently uses a mixture of free-start content, coins and VIP/subscription access, with VIP benefits including ad-free viewing, supported offline downloads and selected episode access. (mechanism reference: free-start + coins/VIP + offline/ad-free/exclusive access)
 
-DramaBox currently exposes membership purchases alongside other paid offers and combines them with recommendations and saved content flows. citeturn776679search0
+DramaBox currently exposes membership purchases alongside other paid offers and combines them with recommendations and saved content flows. (mechanism reference: membership + paid offers + recommendations/saved content)
 
 LuckRead should therefore support a unified loop:
 
