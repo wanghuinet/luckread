@@ -170,10 +170,12 @@ describe('W03 content contract core', () => {
 
     expect(runtime).toContain('INSERT OR REPLACE INTO content_txn_guard')
     expect(runtime).toContain('VALUES (1, changes())')
-    expect(runtime).toContain("successful INTEGER NOT NULL CHECK (successful = 1)")
-    expect(readFileSync(resolve(process.cwd(), 'workers/W03-content/migrations/0001_content_core.sql'), 'utf8')).toContain(
-      'CREATE TABLE content_txn_guard',
+    const migration = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/migrations/0001_content_core.sql'),
+      'utf8',
     )
+    expect(migration).toContain('CREATE TABLE content_txn_guard')
+    expect(migration).toContain('successful INTEGER NOT NULL CHECK (successful = 1)')
   })
 
   it('returns media references from the public listing query', async () => {
