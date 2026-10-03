@@ -26,7 +26,12 @@ export const normalizePublicLocale = (value: string | undefined | null): PublicL
 export const readPublicLocaleCookie = (): PublicLocale => {
   if (typeof document === 'undefined') return 'zh'
   const match = document.cookie.match(/(?:^|; )luckread-ui-locale=([^;]*)/)
-  return normalizePublicLocale(match ? decodeURIComponent(match[1]) : null)
+  if (!match) return 'zh'
+  try {
+    return normalizePublicLocale(decodeURIComponent(match[1]))
+  } catch {
+    return 'zh'
+  }
 }
 
 type Copy = {
