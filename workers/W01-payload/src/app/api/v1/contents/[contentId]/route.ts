@@ -1,3 +1,4 @@
+import { withPublicEdgeCache } from '../../../../../cache/edge-cache.js'
 import {
   callW03Content,
   resolveContentPrincipal,
@@ -35,12 +36,20 @@ export async function GET(
     const { contentId } = await context.params
     const principal = await resolveOptionalContentPrincipal(request)
     if (principal instanceof Response) return principal
-    return await callW03Content({
+
+    const load = () => callW03Content({
       request,
       pathname: contentPath(contentId),
       method: 'GET',
       principal: principal ?? undefined,
     })
+
+    return principal
+      ? await load()
+      : await withPublicEdgeCache(request, load, {
+          ttlSeconds: 30,
+          staleWhileRevalidateSeconds: 120,
+        })
   } catch (error) {
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
