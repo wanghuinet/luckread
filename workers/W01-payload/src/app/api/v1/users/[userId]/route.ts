@@ -1,6 +1,7 @@
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
+import { enforcePublicReadRateLimit, TrafficLimitError, rateLimitResponse } from '../../../../auth/traffic-limit.js'
 import { cachedPublicGet } from '../../../../../lib/public-response-cache.js'
 
 export async function GET(
@@ -8,6 +9,7 @@ export async function GET(
   context: { params: Promise<{ userId: string }> },
 ): Promise<Response> {
   try {
+    await enforcePublicReadRateLimit(_request)
     const { userId } = await context.params
     if (!userId || userId.length > 128) {
       return Response.json(
@@ -50,7 +52,8 @@ export async function GET(
       },
       30,
     )
-  } catch {
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(_request)
     return Response.json(
       { error: { code: 'SERVICE_UNAVAILABLE', message: 'Profile service unavailable', details: {} }, requestId: crypto.randomUUID() },
       { status: 503, headers: { 'cache-control': 'no-store' } },
