@@ -23,7 +23,7 @@ describe('public response cache', () => {
 
     const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
     const response = await cachedPublicGet(
-      new Request('https://luckread.cn/api/v1/contents'),
+      new Request('https://luckread.com/api/v1/contents'),
       'content-list',
       loader,
       30,
@@ -42,7 +42,7 @@ describe('public response cache', () => {
     let releaseLoader: ((response: Response) => void) | null = null
     const loader = vi.fn(() => new Promise<Response>((resolve) => { releaseLoader = resolve }))
 
-    const request = new Request('https://luckread.cn/api/v1/contents?cursor=c1')
+    const request = new Request('https://luckread.com/api/v1/contents?cursor=c1')
     const a = cachedPublicGet(request, 'content-list', loader, 30)
     await vi.waitFor(() => expect(loader).toHaveBeenCalledTimes(1))
     const b = cachedPublicGet(request.clone(), 'content-list', loader, 30)
@@ -69,7 +69,7 @@ describe('public response cache', () => {
     }))
 
     const response = await cachedPublicGet(
-      new Request('https://luckread.cn/api/v1/contents'),
+      new Request('https://luckread.com/api/v1/contents'),
       'content-list',
       loader,
       30,
@@ -90,7 +90,7 @@ describe('public response cache', () => {
       status: 200,
       headers: { 'content-type': 'application/json' },
     }))
-    const request = new Request('https://luckread.cn/api/v1/contents?cursor=fallback')
+    const request = new Request('https://luckread.com/api/v1/contents?cursor=fallback')
 
     const first = await cachedPublicGet(request, 'content-list', loader, 30)
     expect(first.status).toBe(200)
@@ -110,7 +110,7 @@ describe('public response cache', () => {
       status: 200,
       headers: { 'content-type': 'application/json' },
     }))
-    const request = new Request('https://luckread.cn/api/v1/contents?cursor=read-fallback')
+    const request = new Request('https://luckread.com/api/v1/contents?cursor=read-fallback')
 
     await cachedPublicGet(request, 'content-list', loader, 30)
     cache.match.mockRejectedValueOnce(new Error('CACHE_READ_FAILED'))
@@ -136,7 +136,7 @@ describe('public response cache', () => {
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } })
     })
     await Promise.all(Array.from({ length: 24 }, (_, i) => cachedPublicGet(
-      new Request('https://luckread.cn/api/v1/contents?cursor=' + i),
+      new Request('https://luckread.com/api/v1/contents?cursor=' + i),
       'content-list',
       loader,
       30,
@@ -145,24 +145,24 @@ describe('public response cache', () => {
   })
 
   it('keeps language out of non-localized cache keys', () => {
-    const a = publicCacheKey(new Request('https://luckread.cn/api/v1/users/u1', { headers: { 'accept-language': 'en-US' } }), 'user-profile')
-    const b = publicCacheKey(new Request('https://luckread.cn/api/v1/users/u1', { headers: { 'accept-language': 'zh-CN' } }), 'user-profile')
+    const a = publicCacheKey(new Request('https://luckread.com/api/v1/users/u1', { headers: { 'accept-language': 'en-US' } }), 'user-profile')
+    const b = publicCacheKey(new Request('https://luckread.com/api/v1/users/u1', { headers: { 'accept-language': 'zh-CN' } }), 'user-profile')
     expect(a.url).toBe(b.url)
   })
 
   it('ignores unknown query parameters for contracted public cache keys', () => {
-    const a = publicCacheKey(new Request('https://luckread.cn/api/v1/contents/1?foo=a'), 'content-detail')
-    const b = publicCacheKey(new Request('https://luckread.cn/api/v1/contents/1?foo=b'), 'content-detail')
+    const a = publicCacheKey(new Request('https://luckread.com/api/v1/contents/1?foo=a'), 'content-detail')
+    const b = publicCacheKey(new Request('https://luckread.com/api/v1/contents/1?foo=b'), 'content-detail')
     expect(a.url).toBe(b.url)
 
-    const c = publicCacheKey(new Request('https://luckread.cn/api/v1/contents?limit=20&foo=a'), 'content-list')
-    const d = publicCacheKey(new Request('https://luckread.cn/api/v1/contents?limit=20&foo=b'), 'content-list')
+    const c = publicCacheKey(new Request('https://luckread.com/api/v1/contents?limit=20&foo=a'), 'content-list')
+    const d = publicCacheKey(new Request('https://luckread.com/api/v1/contents?limit=20&foo=b'), 'content-list')
     expect(c.url).toBe(d.url)
   })
 
   it('normalizes cache keys deterministically', () => {
-    const a = publicCacheKey(new Request('https://luckread.cn/api/v1/contents?type=article&limit=20'), 'content-list')
-    const b = publicCacheKey(new Request('https://luckread.cn/api/v1/contents?limit=20&type=article'), 'content-list')
+    const a = publicCacheKey(new Request('https://luckread.com/api/v1/contents?type=article&limit=20'), 'content-list')
+    const b = publicCacheKey(new Request('https://luckread.com/api/v1/contents?limit=20&type=article'), 'content-list')
     expect(a.url).toBe(b.url)
   })
 })
