@@ -58,6 +58,29 @@ describe('public response cache', () => {
     expect(second.headers.get('X-LuckRead-Cache')).toBe('MISS')
   })
 
+  it('returns the successful origin response when cache storage rejects writes', async () => {
+    cache.match.mockResolvedValue(undefined)
+    cache.put.mockRejectedValueOnce(new Error('CACHE_WRITE_FAILED'))
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+
+    const response = await cachedPublicGet(
+      new Request('https://luckread.cn/api/v1/contents'),
+      'content-list',
+      loader,
+      30,
+    )
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ data: 'origin' })
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('MISS')
+  })
+
   it('bounds concurrent cache-miss origin work', async () => {
     cache.match.mockResolvedValue(undefined)
     cache.put.mockResolvedValue(undefined)
