@@ -67,8 +67,6 @@ export default function PublicProfilePage({
   const [contentError, setContentError] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<'all' | 'article' | 'post' | 'video'>('all')
-  const [shareMessage, setShareMessage] = useState('')
   const contentRequestRef = useRef<AbortController | null>(null)
   const contentRequestIdRef = useRef(0)
 
@@ -334,32 +332,6 @@ export default function PublicProfilePage({
     }
   }
 
-
-  async function shareProfile() {
-    if (!profile) return
-    setShareMessage('')
-    const shareUrl = window.location.href
-    try {
-      if (typeof navigator.share === 'function') {
-        await navigator.share({
-          title: profile.displayName?.trim() || profile.username,
-          text: profile.bio?.trim() || 'LuckRead 个人主页',
-          url: shareUrl,
-        })
-        return
-      }
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareUrl)
-        setShareMessage('主页链接已复制。')
-        return
-      }
-      setShareMessage('当前浏览器不支持直接复制链接。')
-    } catch (cause) {
-      if (cause instanceof DOMException && cause.name === 'AbortError') return
-      setShareMessage('分享暂时不可用，请复制地址栏链接。')
-    }
-  }
-
   if (loading) {
     return <main className="content-detail" aria-busy="true"><p className="content-detail-state" role="status">正在加载作者资料…</p></main>
   }
@@ -377,312 +349,196 @@ export default function PublicProfilePage({
 
   const displayName = profile?.displayName?.trim() || profile?.username || 'LuckRead 用户'
   const initial = displayName.slice(0, 1).toUpperCase()
-  const visibleContents = activeTab === 'all'
-    ? contents
-    : contents.filter((item) => item.contentType === activeTab)
-
-  const tabEmptyCopy: Record<typeof activeTab, string> = {
-    all: '这个主页还没有公开作品，等第一篇内容发布后，这里会成为你的作品橱窗。',
-    article: '还没有公开文章。',
-    post: '还没有公开动态。',
-    video: '还没有公开视频。',
-  }
 
   return (
-    <main className="lr-profile-page">
-      <div className="lr-profile-topbar">
-        <Link href="/content" className="lr-profile-back">← 发现</Link>
-        <div className="lr-profile-topbar-actions">
-          <Link href="/" className="lr-profile-topbar-link">首页</Link>
-          {viewerUserId === profile?.id ? <Link href="/me/profile" className="lr-profile-topbar-link">个人设置</Link> : null}
+    <main className="content-detail">
+      <div className="content-detail-top">
+        <div className="content-detail-breadcrumbs">
+          <Link href="/content">← 返回发现</Link>
+          <Link href="/">首页</Link>
         </div>
       </div>
 
-      <section className="lr-profile-hero" aria-labelledby="public-profile-title">
-        <div className="lr-profile-cover" aria-hidden="true">
-          <div className="lr-profile-cover-orb lr-profile-cover-orb-one" />
-          <div className="lr-profile-cover-orb lr-profile-cover-orb-two" />
-          <div className="lr-profile-cover-grid" />
-          <span className="lr-profile-cover-label">LUCKREAD · PERSONAL SPACE</span>
+      <article className="content-detail-card" aria-labelledby="public-profile-title">
+        <header className="content-detail-header">
+          <div
+            aria-label={displayName + ' 头像'}
+            role="img"
+            style={{
+              width: 72,
+              height: 72,
+              display: 'grid',
+              placeItems: 'center',
+              marginBottom: 16,
+              overflow: 'hidden',
+              borderRadius: '50%',
+              background: '#eef4ff',
+              color: '#2458e6',
+              fontSize: 28,
+              fontWeight: 800,
+            }}
+          >
+            {profile?.avatar ? (
+              <img
+                alt=""
+                height={72}
+                loading="eager"
+                src={profile.avatar}
+                style={{ width: 72, height: 72, objectFit: 'cover' }}
+                width={72}
+              />
+            ) : initial}
+          </div>
+          <p className="eyebrow">LUCKREAD CREATOR</p>
+          <h1 id="public-profile-title">{displayName}</h1>
+          <p style={{ margin: '6px 0 0', color: '#617086' }}>@{profile?.username}</p>
+        </header>
+
+        {profile?.bio ? (
+          <p style={{ margin: 0, color: '#334155', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{profile.bio}</p>
+        ) : (
+          <p className="content-detail-muted">这个用户还没有填写个人简介。</p>
+        )}
+
+        <div className="content-detail-actions" style={{ marginTop: 24 }}>
+          <Link href={'/users/' + encodeURIComponent(profile.id) + '/followers'}>
+            {followers === null ? '—' : followers.toLocaleString('zh-CN')} 粉丝
+          </Link>
+          <Link href={'/users/' + encodeURIComponent(profile.id) + '/following'}>
+            {following === null ? '—' : following.toLocaleString('zh-CN')} 关注
+          </Link>
+          {mutualFollow ? <span className="content-detail-relationship-badge">互相关注</span> : null}
+          {viewerUserId === profile.id ? (
+            <span className="content-detail-muted">这是你的主页</span>
+          ) : blocked || blockedBy ? (
+            <span className="content-detail-muted" role="status">当前关系受屏蔽规则限制。</span>
+          ) : (
+            <button
+              className="content-detail-follow"
+              disabled={followBusy}
+              onClick={() => void toggleFollow()}
+              type="button"
+            >
+              {followBusy ? '处理中…' : isFollowing ? '已关注' : '关注作者'}
+            </button>
+          )}
+          {error ? <span className="content-detail-action-status" role="status">{error}</span> : null}
         </div>
 
-        <div className="lr-profile-hero-body">
-          <div className="lr-profile-identity-row">
-            <div className="lr-profile-avatar-wrap">
-              <div
-                className="lr-profile-avatar"
-                aria-label={displayName + ' 头像'}
-                role="img"
-              >
-                {profile?.avatar ? (
-                  <img alt="" height={104} loading="eager" src={profile.avatar} width={104} />
-                ) : (
-                  initial
-                )}
-              </div>
-            </div>
-
-            <div className="lr-profile-identity-copy">
-              <div className="lr-profile-kicker-row">
-                <span className="lr-profile-kicker">个人主页</span>
-                <span className="lr-profile-status">公开</span>
-              </div>
-              <h1 id="public-profile-title">{displayName}</h1>
-              <p className="lr-profile-handle">@{profile?.username}</p>
-              <p className={profile?.bio ? "lr-profile-bio" : "lr-profile-bio lr-profile-bio-muted"}>
-                {profile?.bio || '还没有填写个人简介，先让主页替你说第一句话。'}
-              </p>
-            </div>
-
-            <div className="lr-profile-actions">
-              {viewerUserId === profile?.id ? (
-                <Link href="/me/profile" className="lr-profile-action lr-profile-action-primary">编辑资料</Link>
-              ) : blocked || blockedBy ? (
-                <span className="lr-profile-relation-note">当前关系受屏蔽规则限制</span>
-              ) : (
-                <button
-                  className="lr-profile-action lr-profile-action-primary"
-                  disabled={followBusy}
-                  onClick={() => void toggleFollow()}
-                  type="button"
-                >
-                  {followBusy ? '处理中…' : isFollowing ? '已关注' : '关注'}
-                </button>
-              )}
-
-              <button
-                className="lr-profile-action lr-profile-action-premium"
-                disabled
-                title="付费订阅将在 2.0 开放"
-                type="button"
-              >
-                <span>会员订阅</span>
-                <small>2.0</small>
-              </button>
-
-              <button className="lr-profile-action lr-profile-action-secondary" onClick={() => void shareProfile()} type="button">
-                分享主页
-              </button>
-            </div>
-          </div>
-
-          <div className="lr-profile-statbar" aria-label="主页数据">
-            <Link href={'/users/' + encodeURIComponent(profile!.id) + '/followers'} className="lr-profile-stat">
-              <strong>{followers === null ? '—' : followers.toLocaleString('zh-CN')}</strong>
-              <span>粉丝</span>
-            </Link>
-            <Link href={'/users/' + encodeURIComponent(profile!.id) + '/following'} className="lr-profile-stat">
-              <strong>{following === null ? '—' : following.toLocaleString('zh-CN')}</strong>
-              <span>关注</span>
-            </Link>
-            <div className="lr-profile-stat">
-              <strong>{contentHasMore ? String(contents.length) + '+' : contents.length}</strong>
-              <span>公开作品</span>
-            </div>
-            <div className="lr-profile-stat lr-profile-stat-future">
-              <strong>—</strong>
-              <span>会员 · 2.0</span>
-            </div>
-          </div>
-
-          {shareMessage ? <p className="lr-profile-share-message" role="status">{shareMessage}</p> : null}
-        </div>
-      </section>
-
-      <div className="lr-profile-layout">
-        <section className="lr-profile-main-card" aria-labelledby="profile-content-title">
-          <header className="lr-profile-section-head">
-            <div>
-              <p className="lr-profile-eyebrow">CREATOR COLLECTION</p>
-              <h2 id="profile-content-title">内容空间</h2>
-            </div>
-            <span className="lr-profile-section-meta">1.0 已开放 · 2.0 已预留</span>
-          </header>
-
-          <div className="lr-profile-tabs" role="tablist" aria-label="主页内容分类">
+        {viewerUserId !== profile.id ? (
+          <div className="content-detail-safety-actions" aria-label="关系控制">
             <button
-              aria-selected={activeTab === 'all'}
-              className={activeTab === 'all' ? 'lr-profile-tab active' : 'lr-profile-tab'}
-              onClick={() => setActiveTab('all')}
-              role="tab"
+              className="content-detail-follow"
+              disabled={blockBusy}
+              onClick={() => void applySafetyAction('block')}
               type="button"
             >
-              全部
-            </button>
-            <button
-              aria-selected={activeTab === 'article'}
-              className={activeTab === 'article' ? 'lr-profile-tab active' : 'lr-profile-tab'}
-              onClick={() => setActiveTab('article')}
-              role="tab"
-              type="button"
-            >
-              文章
-            </button>
-            <button
-              aria-selected={activeTab === 'post'}
-              className={activeTab === 'post' ? 'lr-profile-tab active' : 'lr-profile-tab'}
-              onClick={() => setActiveTab('post')}
-              role="tab"
-              type="button"
-            >
-              动态
-            </button>
-            <button
-              aria-selected={activeTab === 'video'}
-              className={activeTab === 'video' ? 'lr-profile-tab active' : 'lr-profile-tab'}
-              onClick={() => setActiveTab('video')}
-              role="tab"
-              type="button"
-            >
-              视频
-            </button>
-            <button className="lr-profile-tab lr-profile-tab-future" disabled type="button">
-              漫剧 <span>2.0</span>
-            </button>
-            <button className="lr-profile-tab lr-profile-tab-future" disabled type="button">
-              会员 <span>2.0</span>
-            </button>
-          </div>
-
-          {contentError ? <div className="lr-profile-inline-error" role="status">{contentError}</div> : null}
-
-          {contentLoading && visibleContents.length === 0 ? (
-            <div className="lr-profile-content-loading" role="status">
-              <span className="lr-profile-skeleton lr-profile-skeleton-cover" />
-              <span className="lr-profile-skeleton lr-profile-skeleton-line" />
-              <span className="lr-profile-skeleton lr-profile-skeleton-line short" />
-            </div>
-          ) : null}
-
-          {!contentLoading && visibleContents.length === 0 && !contentError ? (
-            <div className="lr-profile-empty">
-              <div className="lr-profile-empty-icon" aria-hidden="true">✦</div>
-              <h3>{activeTab === 'all' ? '正在构建你的内容空间' : tabEmptyCopy[activeTab]}</h3>
-              <p>{tabEmptyCopy[activeTab]}</p>
-              {viewerUserId === profile?.id ? (
-                <Link className="lr-profile-empty-action" href="/publish">发布第一篇内容</Link>
-              ) : (
-                <span className="lr-profile-empty-note">新内容发布后会自动出现在这里。</span>
-              )}
-            </div>
-          ) : null}
-
-          {visibleContents.length > 0 ? (
-            <div className="lr-profile-work-grid">
-              {visibleContents.map((item) => (
-                <Link
-                  className="lr-profile-work-card"
-                  href={'/' + encodeURIComponent(profile!.username) + '/' + item.contentType + '/' + encodeURIComponent(item.id)}
-                  key={item.id}
-                >
-                  <div className={item.coverRef ? 'lr-profile-work-cover has-image' : 'lr-profile-work-cover'}>
-                    {item.coverRef ? <img alt="" loading="lazy" src={item.coverRef} /> : <span>{contentTypeLabels[item.contentType]}</span>}
-                  </div>
-                  <div className="lr-profile-work-body">
-                    <span className="lr-profile-work-type">{contentTypeLabels[item.contentType]}</span>
-                    <strong>{item.title}</strong>
-                    {item.updatedAt ? (
-                      <time dateTime={item.updatedAt}>
-                        {new Date(item.updatedAt).toLocaleString('zh-CN', { hour12: false })}
-                      </time>
-                    ) : null}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : null}
-
-          {contentHasMore && contentCursor ? (
-            <div className="lr-profile-load-more">
-              <button
-                className="lr-profile-load-button"
-                disabled={contentLoading}
-                onClick={() => void loadMoreContents()}
-                type="button"
-              >
-                {contentLoading ? '加载中…' : '加载更多作品'}
-              </button>
-            </div>
-          ) : null}
-        </section>
-
-        <aside className="lr-profile-side">
-          <section className="lr-profile-premium-card" id="membership">
-            <div className="lr-profile-premium-card-top">
-              <span className="lr-profile-eyebrow">MEMBERSHIP · 2.0</span>
-              <span className="lr-profile-pill">预留</span>
-            </div>
-            <h2>支持你喜欢的创作者</h2>
-            <p>未来可在这里承载月度会员、专属文章、会员动态、独家视频与会员权益。</p>
-            <div className="lr-profile-premium-preview">
-              <div>
-                <small>MEMBER ACCESS</small>
-                <strong>Exclusive Space</strong>
-              </div>
-              <span>LOCKED</span>
-            </div>
-            <button className="lr-profile-side-cta" disabled type="button">订阅功能将在 2.0 开放</button>
-          </section>
-
-          <section className="lr-profile-drama-card" id="drama">
-            <div className="lr-profile-drama-art" aria-hidden="true">
-              <span>DRAMA</span>
-              <strong>COMING<br />SOON</strong>
-            </div>
-            <div className="lr-profile-drama-copy">
-              <p className="lr-profile-eyebrow">MICRO DRAMA · 2.0</p>
-              <h2>漫剧专区</h2>
-              <p>预留剧集封面、集数、进度、VIP 解锁和连续追剧入口，1.0 不提前实现业务。</p>
-            </div>
-          </section>
-
-          <section className="lr-profile-service-card">
-            <div className="lr-profile-service-row">
-              <div>
-                <strong>动态</strong>
-                <span>社交表达 · 已预留</span>
-              </div>
-              <span>1.0</span>
-            </div>
-            <div className="lr-profile-service-row">
-              <div>
-                <strong>视频</strong>
-                <span>视频内容 · 已预留</span>
-              </div>
-              <span>1.0</span>
-            </div>
-            <div className="lr-profile-service-row muted">
-              <div>
-                <strong>付费内容</strong>
-                <span>会员 / 漫剧 / 专属空间</span>
-              </div>
-              <span>2.0</span>
-            </div>
-          </section>
-        </aside>
-      </div>
-
-      {viewerUserId !== profile?.id ? (
-        <section className="lr-profile-safety-card" aria-label="安全与关系设置">
-          <div>
-            <p className="lr-profile-eyebrow">SAFETY</p>
-            <strong>关系与安全</strong>
-            <span>屏蔽、静音和举报不会进入内容业务链。</span>
-          </div>
-          <div className="lr-profile-safety-actions">
-            <button className="lr-profile-safety-button" disabled={blockBusy} onClick={() => void applySafetyAction('block')} type="button">
               {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽作者'}
             </button>
-            <button className="lr-profile-safety-button" disabled={muteBusy} onClick={() => void applySafetyAction('mute')} type="button">
+            <button
+              className="content-detail-follow"
+              disabled={muteBusy}
+              onClick={() => void applySafetyAction('mute')}
+              type="button"
+            >
               {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音作者'}
             </button>
-            <button className="lr-profile-safety-button" disabled={reportBusy} onClick={() => void reportProfile()} type="button">
+            <button
+              className="content-detail-follow"
+              disabled={reportBusy}
+              onClick={() => void reportProfile()}
+              type="button"
+            >
               {reportBusy ? '举报中…' : '举报用户'}
             </button>
-            {safetyMessage ? <span className="lr-profile-safety-message" role="status">{safetyMessage}</span> : null}
+            {safetyMessage ? <span className="content-detail-action-status" role="status">{safetyMessage}</span> : null}
           </div>
-        </section>
-      ) : null}
+        ) : null}
+      </article>
+
+      <section className="content-detail-card" aria-labelledby="author-content-title" style={{ marginTop: 20 }}>
+        <header className="content-detail-header">
+          <p className="eyebrow">PUBLISHED WORKS</p>
+          <h2 id="author-content-title" style={{ marginBottom: 0 }}>公开作品</h2>
+        </header>
+
+        {contentError ? <p className="content-detail-action-status" role="status">{contentError}</p> : null}
+        {contentLoading && contents.length === 0 ? (
+          <p className="content-detail-state" role="status">正在加载作品…</p>
+        ) : null}
+        {!contentLoading && contents.length === 0 && !contentError ? (
+          <p className="content-detail-muted">这个作者还没有公开作品。</p>
+        ) : null}
+
+        {contents.length > 0 ? (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {contents.map((item) => (
+              <Link
+                href={'/' + encodeURIComponent(profile!.username) + '/' + item.contentType + '/' + encodeURIComponent(item.id)}
+                key={item.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: item.coverRef ? '96px minmax(0, 1fr)' : '1fr',
+                  gap: 14,
+                  padding: 14,
+                  border: '1px solid #e4eaf1',
+                  borderRadius: 12,
+                  color: 'inherit',
+                  textDecoration: 'none',
+                  background: '#fff',
+                }}
+              >
+                {item.coverRef ? (
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 96,
+                      height: 72,
+                      display: 'block',
+                      overflow: 'hidden',
+                      borderRadius: 8,
+                      background: '#eef4ff',
+                    }}
+                  >
+                    <img
+                      alt=""
+                      loading="lazy"
+                      src={item.coverRef}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  </span>
+                ) : null}
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', color: '#617086', fontSize: 11, fontWeight: 700 }}>
+                    {contentTypeLabels[item.contentType]}
+                  </span>
+                  <strong style={{ display: 'block', marginTop: 5, overflow: 'hidden', fontSize: 15, textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.title}
+                  </strong>
+                  {item.updatedAt ? (
+                    <time dateTime={item.updatedAt} style={{ display: 'block', marginTop: 7, color: '#8a98ab', fontSize: 11 }}>
+                      更新于 {new Date(item.updatedAt).toLocaleString('zh-CN', { hour12: false })}
+                    </time>
+                  ) : null}
+                </span>
+              </Link>
+            ))}
+          </div>
+        ) : null}
+
+        {contentHasMore && contentCursor ? (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+            <button
+              className="content-detail-follow"
+              disabled={contentLoading}
+              onClick={() => void loadMoreContents()}
+              type="button"
+            >
+              {contentLoading ? '加载中…' : '加载更多作品'}
+            </button>
+          </div>
+        ) : null}
+      </section>
     </main>
   )
 }
