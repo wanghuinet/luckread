@@ -5,7 +5,7 @@ import { resolve } from 'node:path'
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
 describe('mp creator entry routing', () => {
-  it('does not redirect an unauthenticated mp entry to the creator backend', () => {
+  it('uses the creator studio as the authenticated mp homepage without redirecting unauthenticated visitors', () => {
     const page = read('src/app/(frontend)/page.tsx')
     const creator = read('src/app/(frontend)/creator-center/page.tsx')
 
@@ -16,7 +16,9 @@ describe('mp creator entry routing', () => {
     expect(page).toContain('readVerifiedPayloadTokenVersion(request)')
     expect(page).toContain('validateSession({')
     expect(page).toContain("if (active) {")
-    expect(page).toContain("redirect('/creator-center')")
+    expect(page).toContain("return <CreatorStudio displayName={displayName} userId={String(authenticatedUser.id)} />")
+    expect(page).toContain('className="mp-entry-shell"')
+    expect(page).not.toContain("redirect('/creator-center')")
     expect(page).not.toContain("if (host === 'mp.luckread.com') {\n    redirect('/creator-center')")
     expect(creator).toContain("new Request('https://mp.luckread.com/creator-center'")
     expect(creator).toContain('validateSession({')
