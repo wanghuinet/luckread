@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config, { AUTH001_USER_CAPTURE_CONTEXT } from '@payload-config'
 import priv004DevPolicy from '../../../../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'
 import priv004ProdPolicy from '../../../../../../artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json'
+import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 
 const SCOPE = 'ACCOUNT_REGISTRATION'
 const ENDPOINT = 'authRegister'
@@ -171,11 +172,9 @@ export async function POST(request: Request): Promise<Response> {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
-  import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 
 const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   if (!idempotencyKey || idempotencyKey.length > 255) return errorResponse(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key is required')
-
   let body: unknown
   try { body = await request.json() } catch { return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body') }
   if (!isRecord(body) || !isRecord(body.consent)) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid registration request')
