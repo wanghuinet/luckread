@@ -297,6 +297,36 @@ describe('comment runtime', () => {
     })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
   })
 
+  it('treats a concurrent deletion that already reached the tombstone as idempotent success', async () => {
+    const d = db([
+      { id: 'c1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
+      { state: 'AUTHOR_DELETED' },
+    ])
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    prepare.mockImplementationOnce(() => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => ({
+          id: 'c1',
+          author_user_id: 'user-1',
+          state: 'PUBLISHED',
+          content_state: 'PUBLISHED',
+          has_replies: 0,
+        })),
+      })),
+    })).mockImplementationOnce(() => ({
+      bind: vi.fn(() => ({
+        run: vi.fn(async () => ({ success: true, meta: { changes: 0 } })),
+      })),
+    })).mockImplementationOnce(() => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => ({ state: 'AUTHOR_DELETED' })),
+      })),
+    }))
+
+    await expect(deleteComment(d, 'user-1', 'c1')).resolves.toBeUndefined()
+    expect(prepare).toHaveBeenCalledTimes(3)
+  })
+
   it('keeps comment deletion atomic against a concurrent reply', async () => {
     const d = db([
       { id: 'c1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
