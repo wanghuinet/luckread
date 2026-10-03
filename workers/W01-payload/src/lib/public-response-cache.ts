@@ -75,7 +75,7 @@ export const cachedPublicGet = async (
   ttlSeconds: number,
 ): Promise<Response> => {
   const key = publicCacheKey(request, namespace)
-  const cache = caches.default
+  const cache = (globalThis.caches as unknown as { default: Cache }).default
   const hit = await cache.match(key)
   if (hit) return withCacheHeader(hit, 'HIT')
 
@@ -117,7 +117,7 @@ export const invalidatePublicRoute = async (request: Request, namespace: string,
   const url = new URL(request.url)
   url.pathname = pathname
   url.search = ''
-  await caches.default.delete(publicCacheKey(new Request(url.toString()), namespace))
+  await ((globalThis.caches as unknown as { default: Cache }).default).delete(publicCacheKey(new Request(url.toString()), namespace))
 }
 
 export const invalidatePublicContentDetail = async (request: Request, contentId: string): Promise<void> =>
