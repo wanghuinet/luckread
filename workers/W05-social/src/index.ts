@@ -9,7 +9,7 @@ import {
 } from './favorite-runtime.js'
 import { ShareRuntimeError, createShare, resolveShare } from './share-runtime.js'
 import { BlockMuteRuntimeError, removeRelation, setRelation } from './block-mute-runtime.js'
-import { getRelationshipGraph } from './relationship-graph-runtime.js'
+import { getRelationshipGraph, invalidateRelationshipGraph } from './relationship-graph-runtime.js'
 import {
   FollowRuntimeError,
   follow,
@@ -195,8 +195,10 @@ export default {
           if (typeof targetUserId !== 'string' || !targetUserId.trim()) {
             throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
           }
+          const relation = await setRelation(env.DB, actorUserId, targetUserId, relationType)
+          await invalidateRelationshipGraph(actorUserId, targetUserId)
           return json({
-            data: await setRelation(env.DB, actorUserId, targetUserId, relationType),
+            data: relation,
             requestId: crypto.randomUUID(),
           })
         }
@@ -209,6 +211,7 @@ export default {
             throw new BlockMuteRuntimeError('PRECONDITION_REQUIRED', 428)
           }
           await removeRelation(env.DB, actorUserId, targetFromPath, relationType)
+          await invalidateRelationshipGraph(actorUserId, targetFromPath)
           return new Response(null, { status: 204 })
         }
 
@@ -415,6 +418,7 @@ export default {
             throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
           }
           const row = await follow(env.DB, viewerUserId, path.userId)
+          await invalidateRelationshipGraph(viewerUserId, path.userId)
           return json({
             data: {
               following: true,
@@ -433,6 +437,7 @@ export default {
             throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
           }
           await unfollow(env.DB, viewerUserId, path.userId)
+          await invalidateRelationshipGraph(viewerUserId, path.userId)
           return new Response(null, { status: 204 })
         }
 
