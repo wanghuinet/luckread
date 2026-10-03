@@ -86,29 +86,25 @@
   ],
   "routes": [
     {
-      "pattern": "luckread.cn",
+      "pattern": "luckread.com",
       "custom_domain": true
     },
     {
-      "pattern": "api.luckread.cn",
+      "pattern": "api.luckread.com",
       "custom_domain": true
     },
     {
-      "pattern": "www.luckread.cn",
+      "pattern": "www.luckread.com",
       "custom_domain": true
     },
     {
-      "pattern": "sso.luckread.cn",
-      "custom_domain": true
-    },
-    {
-      "pattern": "mp.luckread.cn",
+      "pattern": "sso.luckread.com",
       "custom_domain": true
     },
     {
       "pattern": "mp.luckread.com",
       "custom_domain": true
-    }
+    },
   ],
   "r2_buckets": [
     {
