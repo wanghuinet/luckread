@@ -44,7 +44,7 @@ const filterLabels: Record<ProfileFilter, string> = {
 
 const contentTypeLabels: Record<PublicContent['contentType'], string> = {
   article: '文章',
-  post: '动态',
+  post: '笔记',
   video: '视频',
 }
 
@@ -600,7 +600,7 @@ export default function PublicProfilePage({
           ))}
         </nav>
 
-        <section className="creator-profile-works" id="works" aria-labelledby="creator-profile-works-title">
+        <section className="creator-profile-works" id="works" aria-label="作者内容">
           <header className="creator-profile-section-heading">
             <div aria-hidden="true" />
             {contentHasMore && contentCursor ? (
@@ -612,7 +612,7 @@ export default function PublicProfilePage({
 
           {contentError ? <p className="creator-profile-message" role="status">{contentError}</p> : null}
           {contentLoading && contents.length === 0 ? (
-            <div className="creator-profile-empty"><p role="status">正在加载作品…</p></div>
+            <div className="creator-profile-empty"><p role="status">暂无作品</p></div>
           ) : null}
           {!contentLoading && visibleContents.length === 0 && !contentError ? (
             <div className="creator-profile-empty">
