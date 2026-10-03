@@ -439,13 +439,12 @@ export default function PublicProfilePage({
       <header className="creator-profile-mobile-header">
         <Link className="creator-profile-mobile-icon" href="/content" aria-label="返回发现">←</Link>
         <strong>{name}</strong>
-        <button className="creator-profile-mobile-icon" type="button" onClick={() => void shareProfile()} aria-label="分享主页">↗</button>
+        <span aria-hidden="true" />
       </header>
 
       <main className="creator-profile-page">
         <div className="creator-profile-toolbar">
           <Link href="/content">← 返回发现</Link>
-          <button type="button" onClick={() => void shareProfile()}>分享</button>
         </div>
 
         <section className="creator-profile-hero" aria-labelledby="creator-profile-title">
@@ -469,8 +468,8 @@ export default function PublicProfilePage({
               {<p className={'creator-profile-bio' + (profile?.bio?.trim() ? '' : ' is-placeholder')}>{profile?.bio?.trim() ? profile.bio : '尚无个人简介'}</p>}
             </div>
 
-            {viewerUserId !== profile.id ? (
-              <div className="creator-profile-circle-actions" aria-label="快捷操作">
+            <div className="creator-profile-circle-actions" aria-label="快捷操作">
+              {viewerUserId !== profile.id ? (
                 <button
                   className="creator-profile-circle-button"
                   type="button"
@@ -479,6 +478,7 @@ export default function PublicProfilePage({
                 >
                   <span aria-hidden="true">✉</span>
                 </button>
+              ) : null}
                 <div className="creator-profile-overflow">
                   <button
                     className="creator-profile-circle-button"
@@ -495,7 +495,19 @@ export default function PublicProfilePage({
                       <button
                         type="button"
                         role="menuitem"
-                        disabled={muteBusy}
+                        onClick={() => {
+                          setActionsOpen(false)
+                          void shareProfile()
+                        }}
+                      >
+                        分享
+                      </button>
+                      {viewerUserId !== profile.id ? (
+                        <>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            disabled={muteBusy}
                         onClick={() => {
                           setActionsOpen(false)
                           void applySafetyAction('mute')
@@ -514,22 +526,23 @@ export default function PublicProfilePage({
                       >
                         {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽'}
                       </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        disabled={reportBusy}
-                        onClick={() => {
-                          setActionsOpen(false)
-                          void reportProfile()
-                        }}
-                      >
-                        {reportBusy ? '举报中…' : '举报'}
-                      </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            disabled={reportBusy}
+                            onClick={() => {
+                              setActionsOpen(false)
+                              void reportProfile()
+                            }}
+                          >
+                            {reportBusy ? '举报中…' : '举报'}
+                          </button>
+                        </>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
               </div>
-            ) : null}
 
             <div className="creator-profile-actions">
               {viewerUserId !== profile.id && !blocked && !blockedBy ? (
