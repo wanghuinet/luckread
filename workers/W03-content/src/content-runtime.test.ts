@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
@@ -143,6 +145,37 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('DELETED', 'RESTORED', 'CREATOR', true)).toBe(true)
     expect(canTransitionContentState('RESTORED', 'DRAFT', 'CREATOR', true)).toBe(true)
     expect(canTransitionContentState('RESTORED', 'PENDING_REVIEW', 'CREATOR', true)).toBe(false)
+  })
+
+  it('keeps the D1 batch fail-closed CAS guard on every content mutation', () => {
+    const runtime = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/src/content-runtime.ts'),
+      'utf8',
+    )
+
+    for (const functionName of [
+      'createContent',
+      'updateContent',
+      'deleteContent',
+      'transitionContentState',
+      'applyModerationContentTransition',
+    ]) {
+      const start = runtime.indexOf('export async function ' + functionName)
+      expect(start).toBeGreaterThanOrEqual(0)
+      const end = runtime.indexOf('\nexport ', start + 10)
+      const section = runtime.slice(start, end >= 0 ? end : runtime.length)
+      expect(section).toContain('await batchMutation(db, [')
+      expect(section).toContain('atomicGuard(db)')
+    }
+
+    expect(runtime).toContain('INSERT OR REPLACE INTO content_txn_guard')
+    expect(runtime).toContain('VALUES (1, changes())')
+    const migration = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/migrations/0001_content_core.sql'),
+      'utf8',
+    )
+    expect(migration).toContain('CREATE TABLE content_txn_guard')
+    expect(migration).toContain('successful INTEGER NOT NULL CHECK (successful = 1)')
   })
 
   it('returns media references from the public listing query', async () => {
