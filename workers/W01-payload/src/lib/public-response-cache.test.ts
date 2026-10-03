@@ -87,6 +87,16 @@ describe('public response cache', () => {
     expect(a.url).toBe(b.url)
   })
 
+  it('ignores unknown query parameters for contracted public cache keys', () => {
+    const a = publicCacheKey(new Request('https://luckread.cn/api/v1/contents/1?foo=a'), 'content-detail')
+    const b = publicCacheKey(new Request('https://luckread.cn/api/v1/contents/1?foo=b'), 'content-detail')
+    expect(a.url).toBe(b.url)
+
+    const c = publicCacheKey(new Request('https://luckread.cn/api/v1/contents?limit=20&foo=a'), 'content-list')
+    const d = publicCacheKey(new Request('https://luckread.cn/api/v1/contents?limit=20&foo=b'), 'content-list')
+    expect(c.url).toBe(d.url)
+  })
+
   it('normalizes cache keys deterministically', () => {
     const a = publicCacheKey(new Request('https://luckread.cn/api/v1/contents?type=article&limit=20'), 'content-list')
     const b = publicCacheKey(new Request('https://luckread.cn/api/v1/contents?limit=20&type=article'), 'content-list')
