@@ -7,12 +7,12 @@ on:
         description: Exact main commit deployed for article/video publishing
         required: true
         type: string
-        default: 13c51931519bab7f1e824c856dafc2915f0fcb3d
+        default: 54aada2e0122c26c9297cbacb3e0cfe92121352c
       launch_run_id:
         description: Successful production launch run to bind this E2E to
         required: true
         type: string
-        default: "37116708028"
+        default: "37119717455"
       content_api_base_url:
         description: W01 public content API base URL
         required: true
