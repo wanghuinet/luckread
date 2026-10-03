@@ -17,8 +17,35 @@ import {
 } from './content-runtime.js'
 import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
 
+type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
+
 interface Env {
   D1_02: D1Database
+  CONTENT_PUBLIC_READ_LIMITER?: RateLimitBinding
+  CONTENT_MUTATION_LIMITER?: RateLimitBinding
+  CONTENT_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
+}
+
+const getRateKey = (request: Request): string => {
+  const supplied = request.headers.get('X-LuckRead-Rate-Key')?.trim()
+  if (supplied) return supplied
+  const principal = request.headers.get('X-LuckRead-Principal-User-Id')?.trim()
+  if (principal) return 'user:' + principal
+  const clientIp = request.headers.get('X-LuckRead-Client-IP')?.trim()
+  return clientIp ? 'ip:' + clientIp : 'transport:W01'
+}
+
+const enforceRateLimits = async (request: Request, env: Env, operation: string): Promise<void> => {
+  const actorLimiter = operation === 'read' ? env.CONTENT_PUBLIC_READ_LIMITER : env.CONTENT_MUTATION_LIMITER
+  const globalLimiter = env.CONTENT_ORIGIN_GLOBAL_LIMITER
+  if (globalLimiter) {
+    const globalResult = await globalLimiter.limit({ key: 'origin:' + operation })
+    if (!globalResult.success) throw new ContentRuntimeError('RATE_LIMITED', 429)
+  }
+  if (actorLimiter) {
+    const actorResult = await actorLimiter.limit({ key: operation + ':' + getRateKey(request) })
+    if (!actorResult.success) throw new ContentRuntimeError('RATE_LIMITED', 429)
+  }
 }
 
 const json = (body: unknown, status = 200) =>
@@ -113,6 +140,8 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url)
+      const isRead = request.method === 'GET'
+      await enforceRateLimits(request, env, isRead ? 'read' : 'write')
       const isModerationTransition =
         request.method === 'POST' &&
         /^\/internal\/content\/contents\/[^/]+\/state$/.test(url.pathname) &&

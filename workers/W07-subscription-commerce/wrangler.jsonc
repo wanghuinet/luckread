@@ -4,6 +4,23 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-09-30",
   "workers_dev": false,
+  "ratelimits": [
+    {
+      "name": "SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER",
+      "namespace_id": "2026100313",
+      "simple": { "limit": 3000, "period": 60 }
+    },
+    {
+      "name": "SUBSCRIPTION_READ_LIMITER",
+      "namespace_id": "2026100314",
+      "simple": { "limit": 120, "period": 60 }
+    },
+    {
+      "name": "SUBSCRIPTION_WRITE_LIMITER",
+      "namespace_id": "2026100315",
+      "simple": { "limit": 30, "period": 60 }
+    }
+  ],
   "d1_databases": [
     {
       "binding": "D1_01",

@@ -1,0 +1,157 @@
+name: W03 Content Creator Pagination Index Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact 40-character source SHA containing migration 0003
+        required: false
+        default: ""
+        type: string
+      confirm:
+        description: Type APPLY_W03_CREATOR_INDEX to permit remote D1 mutation
+        required: true
+        default: APPLY_W03_CREATOR_INDEX
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  EXPECTED_DB_NAME: luckreadpro
+  EXPECTED_WORKER: luckread-w03
+  EXPECTED_BINDING: D1_02
+  MIGRATION_FILE: workers/W03-content/migrations/0003_creator_list_pagination_index.sql
+  INDEX_NAME: contents_owner_updated_at_id_idx
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY_W03_CREATOR_INDEX' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Verify exact source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify W03 binding and migration source
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          config = json.loads(Path('workers/W03-content/wrangler.jsonc').read_text())
+          assert config['name'] == 'luckread-w03'
+          d1 = [x for x in config.get('d1_databases', []) if x.get('binding') == 'D1_02']
+          assert len(d1) == 1
+          assert d1[0]['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
+          assert Path('workers/W03-content/migrations/0003_creator_list_pagination_index.sql').is_file()
+          sql = Path('workers/W03-content/migrations/0003_creator_list_pagination_index.sql').read_text()
+          assert 'contents_owner_updated_at_id_idx' in sql
+          print('W03_CREATOR_INDEX_SOURCE=PASS')
+          PY
+
+      - name: Verify migration statically
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          schema = Path('workers/W03-content/migrations/0001_content_core.sql').read_text()
+          db.executescript(schema)
+          db.executescript(Path('workers/W03-content/migrations/0003_creator_list_pagination_index.sql').read_text())
+          row = db.execute("SELECT name, sql FROM sqlite_master WHERE type='index' AND name='contents_owner_updated_at_id_idx'").fetchone()
+          assert row and 'owner_user_id' in row[1] and 'updated_at' in row[1] and 'id' in row[1]
+          print('W03_CREATOR_INDEX_STATIC=PASS')
+          PY
+
+      - name: Capture remote preflight
+        working-directory: workers/W03-content
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+            --command "SELECT name, sql FROM sqlite_master WHERE type='index' AND name='$INDEX_NAME';" > /tmp/w03-index-preflight.json
+          cat /tmp/w03-index-preflight.json
+
+      - name: Apply W03 migration remotely
+        working-directory: workers/W03-content
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
+
+      - name: Verify remote index
+        working-directory: workers/W03-content
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+            --command "SELECT name, sql FROM sqlite_master WHERE type='index' AND name='$INDEX_NAME';" > /tmp/w03-index-postflight.json
+          python - <<'PY'
+          import json
+          rows = []
+          root = json.load(open('/tmp/w03-index-postflight.json'))
+          def walk(v):
+              if isinstance(v, list):
+                  for x in v: walk(x)
+              elif isinstance(v, dict):
+                  if isinstance(v.get('results'), list): rows.extend(v['results'])
+                  for x in v.values(): walk(x)
+          walk(root)
+          if not any(r.get('name') == 'contents_owner_updated_at_id_idx' for r in rows if isinstance(r, dict)):
+              raise SystemExit('W03 creator pagination index missing after migration')
+          print('W03_CREATOR_INDEX_REMOTE=PASS')
+          PY
+
+      - name: Capture migration provenance
+        if: always()
+        run: |
+          mkdir -p artifacts/mapping-0/w03-creator-index
+          cat > artifacts/mapping-0/w03-creator-index/provenance.txt <<EOF
+          workflow=W03 Content Creator Pagination Index Migration
+          run_id=$GITHUB_RUN_ID
+          source_sha=${{ inputs.source_sha || github.sha }}
+          worker=$EXPECTED_WORKER
+          d1_binding=$EXPECTED_BINDING
+          database_id=$EXPECTED_DB_ID
+          database_name=$EXPECTED_DB_NAME
+          migration_file=$MIGRATION_FILE
+          index_name=$INDEX_NAME
+          controlled_remote_mutation=true
+          EOF
+
+      - name: Upload migration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w03-creator-index-${{ github.run_id }}
+          path: artifacts/mapping-0/w03-creator-index/
+          if-no-files-found: error
+          retention-days: 30

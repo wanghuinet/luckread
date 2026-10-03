@@ -1,3 +1,5 @@
+import { invalidatePublicContentDetail } from '../../../../../../lib/public-response-cache.js'
+
 import {
   callW03Content,
   resolveContentPrincipal,
@@ -32,13 +34,15 @@ export async function POST(
     if (principal instanceof Response) return principal
     const preconditionError = requireStatePreconditions(request)
     if (preconditionError) return preconditionError
-    return await callW03Content({
+    const response = await callW03Content({
       request,
       pathname: `/internal/content/contents/${encodeURIComponent(contentId)}/state`,
       method: 'POST',
       body: await request.json(),
       principal,
     })
+    if (response.ok) await invalidatePublicContentDetail(request, contentId)
+    return response
   } catch (error) {
     if (error instanceof SyntaxError) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid content request')
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')

@@ -5,6 +5,7 @@ import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route
 
 import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
 import { validateSession } from '@/auth/w02-session-client'
+import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaPost>[1]
 
@@ -36,6 +37,16 @@ async function authenticate(request: Request) {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  try {
+    await enforcePublicReadRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
+      status: 503,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    })
+  }
+
   const authenticated = await authenticate(request)
   if (!authenticated) return unauthorized()
 
@@ -85,6 +96,16 @@ export async function POST(request: Request): Promise<Response> {
       JSON.stringify({ error: { code: 'PRECONDITION_REQUIRED', message: 'Idempotency-Key required' } }),
       { status: 428, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } },
     )
+  }
+
+  try {
+    await enforceW01WriteRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
+      status: 503,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    })
   }
 
   const target = new URL('/api/media', request.url)

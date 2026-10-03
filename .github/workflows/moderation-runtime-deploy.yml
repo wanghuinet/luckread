@@ -82,6 +82,18 @@ jobs:
       - name: Record W03 deployment
         run: echo W03_DEPLOYMENT_COMPLETE
 
+      - name: Verify W06 traffic guard bindings
+        working-directory: workers/W06-governance
+        run: |
+          node - <<'NODE'
+          const fs=require('fs')
+          const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'))
+          const required=['GOVERNANCE_ORIGIN_GLOBAL_LIMITER','GOVERNANCE_READ_LIMITER','GOVERNANCE_WRITE_LIMITER']
+          const names=new Set((c.ratelimits||[]).map(x=>x.name))
+          for(const name of required) if(!names.has(name)) throw new Error('missing rate limiter: '+name)
+          console.log(JSON.stringify({rateLimitBindings:[...names].sort()}))
+          NODE
+
       - name: Deploy W06 moderation authority
         working-directory: workers/W06-governance
         env:

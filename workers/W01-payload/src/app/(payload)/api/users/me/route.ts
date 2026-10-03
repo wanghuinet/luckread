@@ -1,8 +1,11 @@
 import { getPayload } from 'payload'
 
+import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
+
 import config from '@payload-config'
 
 import { etagForUserProfile, normalizeEtag, pickUserProfileSnapshot, PROFILE_MUTABLE_FIELDS } from '@/auth/user-profile-etag'
+import { invalidatePublicUserProfile } from '@/lib/public-response-cache'
 import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
 import { validateSession } from '@/auth/w02-session-client'
 
@@ -80,6 +83,13 @@ async function authenticate(request: Request) {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  try {
+    await enforcePublicReadRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile service unavailable')
+  }
+
   const authenticated = await authenticate(request)
   if (!authenticated) return unauthorized()
 
@@ -87,6 +97,13 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function PATCH(request: Request): Promise<Response> {
+  try {
+    await enforceW01WriteRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile service unavailable')
+  }
+
   const authenticated = await authenticate(request)
   if (!authenticated) return unauthorized()
 
@@ -169,5 +186,6 @@ export async function PATCH(request: Request): Promise<Response> {
     return errorResponse(412, 'PRECONDITION_FAILED', 'Profile changed before update')
   }
 
+  await invalidatePublicUserProfile(request, String(authenticated.user.id))
   return profileResponse(updated as Record<string, unknown>)
 }

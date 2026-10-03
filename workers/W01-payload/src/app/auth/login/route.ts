@@ -4,6 +4,7 @@ import config from '@payload-config'
 
 import { buildPayloadAccessCookie, issuePayloadAccessToken } from '../../../auth/payload-access-token.js'
 import { establishSession, W02AuthClientError } from '../../../auth/w02-session-client.js'
+import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -60,6 +61,13 @@ const sanitizePayloadLoginMessage = (error: unknown) => {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  try {
+    const clientIp = request.headers.get('cf-connecting-ip')?.trim() || 'unknown'
+    await enforceAuthRateLimit(request, 'AUTH_LOGIN_LIMITER', ['ip:' + clientIp])
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
+  }
   let body: { identity?: unknown; credential?: unknown; deviceId?: unknown }
 
   try {

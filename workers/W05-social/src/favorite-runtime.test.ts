@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
-import { describe, expect, it, vi } from 'vitest'
-import { favorite, getFavoriteStatus, unfavorite } from './favorite-runtime.js'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { clearFavoriteStatusCacheForTests, favorite, getFavoriteStatus, unfavorite } from './favorite-runtime.js'
 
 const db = (firstResults: unknown[] = []) => {
   let firstIndex = 0
@@ -14,6 +14,7 @@ const db = (firstResults: unknown[] = []) => {
 }
 
 describe('favorite runtime', () => {
+  beforeEach(() => clearFavoriteStatusCacheForTests())
   it('creates a content favorite after verifying published visibility', async () => {
     const d = db([
       { id: 'content-1', state: 'PUBLISHED' },
@@ -89,7 +90,21 @@ describe('favorite runtime', () => {
     ).resolves.toEqual({ favorited: false })
   })
 
-  it('unfavorites idempotently without a preliminary read', async () => {
+  
+  it('serves repeated favorite status reads from the private cache', async () => {
+    const first = db([{ favorited: 1 }])
+    await expect(
+      getFavoriteStatus(first, 'cache-user', { targetType: 'content', targetId: 'cache-content' }),
+    ).resolves.toEqual({ favorited: true })
+    const secondPrepare = vi.fn(() => { throw new Error('D1_SHOULD_NOT_BE_READ') })
+    const second = { prepare: secondPrepare } as unknown as D1Database
+    await expect(
+      getFavoriteStatus(second, 'cache-user', { targetType: 'content', targetId: 'cache-content' }),
+    ).resolves.toEqual({ favorited: true })
+    expect(secondPrepare).not.toHaveBeenCalled()
+  })
+
+it('unfavorites idempotently without a preliminary read', async () => {
     await expect(
       unfavorite(db(), 'user-1', { targetType: 'content', targetId: 'content-1' }),
     ).resolves.toBeUndefined()

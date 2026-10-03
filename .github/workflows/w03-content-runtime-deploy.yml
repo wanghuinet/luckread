@@ -65,6 +65,18 @@ jobs:
           npx --no-install tsc --noEmit --strict --skipLibCheck             --target ES2022 --module ESNext --moduleResolution Bundler             --lib ES2022,DOM --types @cloudflare/workers-types             workers/W03-content/src/content-runtime.ts             workers/W03-content/src/publish-preflight.ts             workers/W03-content/src/index.ts
           npx --yes vitest@3.2.4 run workers/W03-content/src/content-runtime.test.ts workers/W03-content/src/publish-preflight.test.ts
 
+      - name: Verify W03 traffic guard bindings
+        working-directory: workers/W03-content
+        run: |
+          node - <<'NODE'
+          const fs=require('fs')
+          const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'))
+          const required=['CONTENT_ORIGIN_GLOBAL_LIMITER','CONTENT_PUBLIC_READ_LIMITER','CONTENT_MUTATION_LIMITER']
+          const names=new Set((c.ratelimits||[]).map(x=>x.name))
+          for(const name of required) if(!names.has(name)) throw new Error('missing rate limiter: '+name)
+          console.log(JSON.stringify({rateLimitBindings:[...names].sort()}))
+          NODE
+
       - name: Deploy W03 without migration execution
         working-directory: workers/W03-content
         env:

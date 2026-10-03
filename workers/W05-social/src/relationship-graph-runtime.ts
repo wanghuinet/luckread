@@ -18,6 +18,17 @@ export class RelationshipGraphRuntimeError extends Error {
 }
 
 const MAX_ID = 128
+const RELATIONSHIP_GRAPH_CACHE_TTL_MS = 5000
+const RELATIONSHIP_GRAPH_CACHE_MAX_ENTRIES = 2048
+const relationshipGraphCache = new Map<string, { value: RelationshipGraph; expiresAt: number }>()
+
+const relationshipGraphKey = (viewerUserId: string, targetUserId: string): string => viewerUserId + '\\0' + targetUserId
+
+const pruneRelationshipGraphCache = (): void => {
+  if (relationshipGraphCache.size < RELATIONSHIP_GRAPH_CACHE_MAX_ENTRIES) return
+  const oldestKey = relationshipGraphCache.keys().next().value
+  if (typeof oldestKey === 'string') relationshipGraphCache.delete(oldestKey)
+}
 
 const validateUserId = (value: string): string => {
   const normalized = value.trim()
@@ -48,6 +59,13 @@ export async function getRelationshipGraph(
       relationshipId: null,
       createdAt: null,
     }
+  }
+
+  const cacheKey = relationshipGraphKey(viewer, target)
+  const cached = relationshipGraphCache.get(cacheKey)
+  if (cached) {
+    if (cached.expiresAt > Date.now()) return { ...cached.value }
+    relationshipGraphCache.delete(cacheKey)
   }
 
   const row = await db.prepare(
@@ -109,7 +127,7 @@ export async function getRelationshipGraph(
   const blockedBy = Boolean(row?.blocked_by)
   const relationshipVisible = !blocked && !blockedBy
 
-  return {
+  const value = {
     viewerUserId: viewer,
     targetUserId: target,
     following: relationshipVisible && Boolean(row?.following),
@@ -121,4 +139,18 @@ export async function getRelationshipGraph(
     relationshipId: relationshipVisible ? row?.relationship_id ?? null : null,
     createdAt: relationshipVisible ? row?.created_at ?? null : null,
   }
+  pruneRelationshipGraphCache()
+  relationshipGraphCache.set(cacheKey, { value, expiresAt: Date.now() + RELATIONSHIP_GRAPH_CACHE_TTL_MS })
+  return { ...value }
 }
+
+export const invalidateRelationshipGraph = async (viewerUserId: string, targetUserId: string): Promise<void> => {
+  const viewer = viewerUserId.trim()
+  const target = targetUserId.trim()
+  if (!viewer || !target) return
+  relationshipGraphCache.delete(relationshipGraphKey(viewer, target))
+  relationshipGraphCache.delete(relationshipGraphKey(target, viewer))
+}
+
+
+export const clearRelationshipGraphCacheForTests = (): void => relationshipGraphCache.clear()

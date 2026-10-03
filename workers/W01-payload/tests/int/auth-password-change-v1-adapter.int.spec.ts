@@ -15,3 +15,13 @@ describe('versioned auth password change adapter', () => {
     expect(route).not.toContain('assertPasswordPolicy(')
   })
 })
+
+
+it('guards password changes before Payload authentication', () => {
+  const route = readFileSync(resolve(process.cwd(), 'src/app/auth/password/change/route.ts'), 'utf8')
+  const guardIndex = route.indexOf('await enforceW01WriteRateLimit(request)')
+  const authIndex = route.indexOf('const authResult = await payload.auth(')
+  expect(guardIndex).toBeGreaterThanOrEqual(0)
+  expect(authIndex).toBeGreaterThanOrEqual(0)
+  expect(guardIndex).toBeLessThan(authIndex)
+})

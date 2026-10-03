@@ -15,3 +15,24 @@ describe('versioned users/me adapter', () => {
     expect(route).not.toContain('PROFILE_MUTABLE_FIELDS')
   })
 })
+
+it('guards viewer profile reads before authentication', () => {
+  const route = readFileSync(resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'), 'utf8')
+  const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
+  const authIndex = route.indexOf('const authenticated = await authenticate(request)')
+  expect(guardIndex).toBeGreaterThanOrEqual(0)
+  expect(authIndex).toBeGreaterThanOrEqual(0)
+  expect(guardIndex).toBeLessThan(authIndex)
+})
+
+
+it('guards self-profile mutations before Payload authentication', () => {
+  const route = readFileSync(resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'), 'utf8')
+  const patchIndex = route.indexOf('export async function PATCH')
+  const guardIndex = route.indexOf('await enforceW01WriteRateLimit(request)', patchIndex)
+  const authIndex = route.indexOf('const authenticated = await authenticate(request)', patchIndex)
+  expect(patchIndex).toBeGreaterThanOrEqual(0)
+  expect(guardIndex).toBeGreaterThanOrEqual(0)
+  expect(authIndex).toBeGreaterThanOrEqual(0)
+  expect(guardIndex).toBeLessThan(authIndex)
+})

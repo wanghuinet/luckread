@@ -42,6 +42,48 @@
       "remote": true
     }
   ],
+  "ratelimits": [
+    {
+      "name": "PUBLIC_ORIGIN_GLOBAL_LIMITER",
+      "namespace_id": "2026100311",
+      "simple": { "limit": 10000, "period": 60 }
+    },
+    {
+      "name": "PUBLIC_READ_LIMITER",
+      "namespace_id": "2026100312",
+      "simple": { "limit": 300, "period": 60 }
+    },
+    {
+      "name": "W01_WRITE_ORIGIN_GLOBAL_LIMITER",
+      "namespace_id": "2026100319",
+      "simple": { "limit": 3000, "period": 60 }
+    },
+    {
+      "name": "W01_WRITE_LIMITER",
+      "namespace_id": "2026100320",
+      "simple": { "limit": 60, "period": 60 }
+    },
+    {
+      "name": "AUTH_ORIGIN_GLOBAL_LIMITER",
+      "namespace_id": "2026100310",
+      "simple": { "limit": 3000, "period": 60 }
+    },
+    {
+      "name": "AUTH_REGISTER_LIMITER",
+      "namespace_id": "2026100305",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      "name": "AUTH_LOGIN_LIMITER",
+      "namespace_id": "2026100306",
+      "simple": { "limit": 30, "period": 60 }
+    },
+    {
+      "name": "AUTH_REFRESH_LIMITER",
+      "namespace_id": "2026100307",
+      "simple": { "limit": 120, "period": 60 }
+    }
+  ],
   "routes": [
     {
       "pattern": "luckread.cn",

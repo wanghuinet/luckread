@@ -4,6 +4,23 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-09-30",
   "workers_dev": false,
+  "ratelimits": [
+    {
+      "name": "SOCIAL_ORIGIN_GLOBAL_LIMITER",
+      "namespace_id": "2026100309",
+      "simple": { "limit": 10000, "period": 60 }
+    },
+    {
+      "name": "SOCIAL_READ_LIMITER",
+      "namespace_id": "2026100303",
+      "simple": { "limit": 300, "period": 60 }
+    },
+    {
+      "name": "SOCIAL_WRITE_LIMITER",
+      "namespace_id": "2026100304",
+      "simple": { "limit": 60, "period": 60 }
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

@@ -163,3 +163,43 @@ describe('Media upload access', () => {
     expect(route).not.toContain('signedUrl')
     expect(route).not.toContain('presigned')
   })
+
+it('guards creator media listing before Payload authentication', () => {
+  const route = read('src/app/api/v1/media/route.ts')
+  const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
+  const authIndex = route.indexOf('const authenticated = await authenticate(request)')
+  expect(guardIndex).toBeGreaterThanOrEqual(0)
+  expect(authIndex).toBeGreaterThanOrEqual(0)
+  expect(guardIndex).toBeLessThan(authIndex)
+  expect(route).toContain('TrafficLimitError')
+  expect(route).toContain('rateLimitResponse(request)')
+})
+
+it('guards media detail reads before the Payload route', () => {
+  const route = read('src/app/api/v1/media/[mediaId]/route.ts')
+  const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
+  const payloadIndex = route.indexOf('await payloadMediaGet(')
+  expect(guardIndex).toBeGreaterThanOrEqual(0)
+  expect(payloadIndex).toBeGreaterThanOrEqual(0)
+  expect(guardIndex).toBeLessThan(payloadIndex)
+  expect(route).toContain('TrafficLimitError')
+})
+
+
+it('guards media creation before the Payload upload handler', () => {
+  const route = read('src/app/api/v1/media/route.ts')
+  const guardIndex = route.indexOf('await enforceW01WriteRateLimit(request)')
+  const payloadIndex = route.indexOf('return payloadMediaPost(')
+  expect(guardIndex).toBeGreaterThanOrEqual(0)
+  expect(payloadIndex).toBeGreaterThanOrEqual(0)
+  expect(guardIndex).toBeLessThan(payloadIndex)
+})
+
+it('guards media update and delete before the Payload handlers', () => {
+  const route = read('src/app/api/v1/media/[mediaId]/route.ts')
+  expect(route).toContain('await enforceW01WriteRateLimit(request)')
+  expect(route).toContain('return payloadMediaDelete')
+  expect(route).toContain('return payloadMediaPatch')
+  const guards = [...route.matchAll(/await enforceW01WriteRateLimit\(request\)/g)]
+  expect(guards.length).toBe(2)
+})

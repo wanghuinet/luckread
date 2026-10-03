@@ -11,9 +11,31 @@ import {
 } from './moderation-runtime'
 import { createReport, ReportRuntimeError } from './report-runtime'
 
+interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
   D1_03: D1Database
   W03_CONTENT_MODERATION: Fetcher
+  GOVERNANCE_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
+  GOVERNANCE_READ_LIMITER?: RateLimitBinding
+  GOVERNANCE_WRITE_LIMITER?: RateLimitBinding
+}
+
+const getRateKey = (request: Request): string =>
+  request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ||
+  request.headers.get('X-LuckRead-Client-IP')?.trim() ||
+  'transport:W01'
+
+const enforceRateLimit = async (request: Request, env: Env): Promise<void> => {
+  const operation = request.method === 'GET' ? 'read' : 'write'
+  if (env.GOVERNANCE_ORIGIN_GLOBAL_LIMITER) {
+    const result = await env.GOVERNANCE_ORIGIN_GLOBAL_LIMITER.limit({ key: 'origin:' + operation })
+    if (!result.success) throw new ModerationRuntimeError('RATE_LIMITED', 429)
+  }
+  const actorLimiter = operation === 'read' ? env.GOVERNANCE_READ_LIMITER : env.GOVERNANCE_WRITE_LIMITER
+  if (actorLimiter) {
+    const result = await actorLimiter.limit({ key: operation + ':' + getRateKey(request) })
+    if (!result.success) throw new ModerationRuntimeError('RATE_LIMITED', 429)
+  }
 }
 
 const json = (body: unknown, status = 200) =>
@@ -204,6 +226,14 @@ const errorResponse = (error: unknown, requestId?: string): Response => {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    try {
+      await enforceRateLimit(request, env)
+    } catch (error) {
+      if (error instanceof ModerationRuntimeError && error.code === 'RATE_LIMITED') {
+        return json({ error: { code: 'RATE_LIMITED', message: 'Too many requests', details: { retryAfter: 60 } }, requestId: crypto.randomUUID() }, 429)
+      }
+      throw error
+    }
     const url = new URL(request.url)
 
     if (url.pathname === '/health' && request.method === 'GET') {

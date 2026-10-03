@@ -273,5 +273,17 @@
     "No Payload collection becomes the public API.",
     "No physical D1 UUID is assigned by inference.",
     "No runtime GREEN is claimed by this contract."
-  ]
+  ],
+  "performanceIndexes": {
+    "contents_owner_updated_at_id_idx": {
+      "columns": [
+        "owner_user_id",
+        "updated_at",
+        "id"
+      ],
+      "supports": "listCreatorContents cursor pagination",
+      "requiredForCorrectness": false,
+      "purpose": "reduce D1 rows scanned for creator-scoped ordered pages"
+    }
+  }
 }

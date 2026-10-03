@@ -1,7 +1,9 @@
+import { cachedPublicGet, invalidatePublicContentDetail } from '../../../../../lib/public-response-cache.js'
+
 import {
   callW03Content,
   resolveContentPrincipal,
-  resolveOptionalContentPrincipal,
+  resolveOptionalCookieContentPrincipal,
   W03ContentClientError,
 } from '../../../../../content/w03-content-client.js'
 
@@ -33,8 +35,21 @@ export async function GET(
 ): Promise<Response> {
   try {
     const { contentId } = await context.params
-    const principal = await resolveOptionalContentPrincipal(request)
+    const principal = await resolveOptionalCookieContentPrincipal(request)
     if (principal instanceof Response) return principal
+    if (!principal) {
+      return await cachedPublicGet(
+        request,
+        'content-detail',
+        () => callW03Content({
+          request,
+          pathname: contentPath(contentId),
+          method: 'GET',
+        }),
+        30,
+      )
+    }
+
     return await callW03Content({
       request,
       pathname: contentPath(contentId),
@@ -57,13 +72,15 @@ export async function PATCH(
     if (principal instanceof Response) return principal
     const mutationError = requireMutationHeaders(request)
     if (mutationError) return mutationError
-    return await callW03Content({
+    const response = await callW03Content({
       request,
       pathname: contentPath(contentId),
       method: 'PATCH',
       body: await request.json(),
       principal,
     })
+    if (response.ok) await invalidatePublicContentDetail(request, contentId)
+    return response
   } catch (error) {
     if (error instanceof SyntaxError) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid content request')
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
@@ -81,12 +98,14 @@ export async function DELETE(
     if (principal instanceof Response) return principal
     const mutationError = requireMutationHeaders(request)
     if (mutationError) return mutationError
-    return await callW03Content({
+    const response = await callW03Content({
       request,
       pathname: contentPath(contentId),
       method: 'DELETE',
       principal,
     })
+    if (response.ok) await invalidatePublicContentDetail(request, contentId)
+    return response
   } catch (error) {
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')

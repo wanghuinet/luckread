@@ -1,3 +1,5 @@
+import { cachedPublicGet } from '../../../../../../lib/public-response-cache.js'
+
 import {
   callW05Social,
   callW05SocialPublic,
@@ -36,6 +38,19 @@ export async function GET(
 
     const viewer = await resolveOptionalCookieSocialPrincipal(request)
     if (viewer instanceof Response) return viewer
+
+    if (!viewer) {
+      return await cachedPublicGet(
+        request,
+        'content-comments',
+        () => callW05SocialPublic({
+          request,
+          pathname: '/internal/social/contents/' + encodeURIComponent(contentId) + '/comments' + suffix,
+          method: 'GET',
+        }),
+        10,
+      )
+    }
 
     return await callW05SocialPublic({
       request,

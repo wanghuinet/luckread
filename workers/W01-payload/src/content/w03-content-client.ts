@@ -2,6 +2,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
+import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../auth/traffic-limit.js'
 import { readVerifiedPayloadTokenVersion } from '../auth/payload-access-token.js'
 import { resolveAuthenticatedPrincipal, W02AuthClientError } from '../auth/w02-session-client.js'
 
@@ -54,6 +55,13 @@ export async function resolveContentPrincipal(request: Request): Promise<Content
   const authorization = request.headers.get('Authorization') ?? ''
   if (!authorization.startsWith('Bearer ')) {
     return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
+  }
+
+  try {
+    await enforcePublicReadRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
 
   const payload = await getPayload({ config })
@@ -120,6 +128,18 @@ export async function resolveOptionalContentPrincipal(
   return resolveContentPrincipal(request)
 }
 
+export async function resolveOptionalCookieContentPrincipal(
+  request: Request,
+): Promise<ContentPrincipal | Response | null> {
+  const authorization = request.headers.get('Authorization') ?? ''
+  if (authorization.startsWith('Bearer ')) return resolveContentPrincipal(request)
+  if (!getPayloadCookieToken(request)) return null
+
+  const result = await resolveCookieContentPrincipal(request)
+  if (result instanceof Response && result.status === 401) return null
+  return result
+}
+
 export async function callW03Content(input: {
   request: Request
   pathname: string
@@ -137,6 +157,13 @@ export async function callW03Content(input: {
 
   if (input.principal?.userId) {
     headers.set('X-LuckRead-Principal-User-Id', input.principal.userId)
+    headers.set('X-LuckRead-Rate-Key', 'user:' + input.principal.userId)
+  } else {
+    const clientIp = input.request.headers.get('cf-connecting-ip')?.trim()
+    if (clientIp) {
+      headers.set('X-LuckRead-Client-IP', clientIp)
+      headers.set('X-LuckRead-Rate-Key', 'ip:' + clientIp)
+    }
   }
   if (input.principal?.layer) {
     headers.set('X-LuckRead-Principal-Layer', input.principal.layer)

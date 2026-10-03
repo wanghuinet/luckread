@@ -1,6 +1,7 @@
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
+import { TrafficLimitError, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 
 type PasswordChangeRequest = {
   currentPassword?: unknown
@@ -41,6 +42,13 @@ const isValidationError = (error: unknown) => {
 export async function POST(request: Request): Promise<Response> {
   if (!request.headers.get('Idempotency-Key')?.trim()) {
     return jsonError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key is required')
+  }
+
+  try {
+    await enforceW01WriteRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password change service unavailable')
   }
 
   let body: PasswordChangeRequest

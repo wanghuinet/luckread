@@ -1,0 +1,140 @@
+name: 1.0 D1 Traffic Guard Contract CI
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/resource-budget/1.0-d1-traffic-guard.v1.json'
+      - 'contracts/api/content-operation-policy.v1.json'
+      - 'contracts/api/feed-operation-policy.v1.json'
+      - 'contracts/api/interaction-operation-policy.v1.json'
+      - 'workers/W01-payload/src/lib/public-response-cache.ts'
+      - 'workers/W01-payload/src/lib/public-response-cache.test.ts'
+      - 'workers/W01-payload/src/auth/traffic-limit.ts'
+      - 'workers/W01-payload/src/app/auth/register/route.ts'
+      - 'workers/W01-payload/src/app/auth/login/route.ts'
+      - 'workers/W01-payload/src/app/auth/refresh/route.ts'
+      - 'workers/W01-payload/src/app/api/v1/contents/**'
+      - 'workers/W01-payload/src/app/api/v1/media/**'
+      - 'workers/W01-payload/src/app/(payload)/api/users/me/route.ts'
+      - 'workers/W01-payload/src/app/api/v1/users/[userId]/route.ts'
+      - 'workers/W01-payload/src/app/api/v1/users/[userId]/followers/route.ts'
+      - 'workers/W01-payload/src/app/api/v1/users/[userId]/following/route.ts'
+      - 'workers/W01-payload/src/app/api/v1/media/**'
+      - 'workers/W01-payload/src/app/(payload)/api/users/me/route.ts'
+      - 'workers/W01-payload/src/app/api/v1/contents/[contentId]/comments/route.ts'
+      - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/page.tsx'
+      - 'workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts'
+      - 'workers/W01-payload/src/content/w03-content-client.ts'
+      - 'workers/W01-payload/src/social/w05-social-client.ts'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/W03-content/src/**'
+      - 'workers/W03-content/wrangler.jsonc'
+      - 'workers/W05-social/src/**'
+      - 'workers/W05-social/wrangler.jsonc'
+      - 'workers/W06-governance/src/**'
+      - 'workers/W06-governance/wrangler.jsonc'
+      - 'workers/W07-subscription-commerce/src/**'
+      - 'workers/W07-subscription-commerce/wrangler.jsonc'
+      - '.github/workflows/1.0-d1-traffic-guard-ci.yml'
+  push:
+    branches:
+      - 'codex/1.0-d1-traffic-guard-*'
+    paths:
+      - 'contracts/resource-budget/1.0-d1-traffic-guard.v1.json'
+      - 'workers/W01-payload/src/lib/public-response-cache.ts'
+      - 'workers/W01-payload/src/lib/public-response-cache.test.ts'
+      - 'workers/W01-payload/src/auth/traffic-limit.ts'
+      - 'workers/W01-payload/src/app/auth/**'
+      - 'workers/W01-payload/src/app/api/v1/contents/**'
+      - 'workers/W01-payload/src/content/w03-content-client.ts'
+      - 'workers/W01-payload/src/social/w05-social-client.ts'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/W03-content/src/**'
+      - 'workers/W03-content/wrangler.jsonc'
+      - 'workers/W05-social/src/**'
+      - 'workers/W05-social/wrangler.jsonc'
+      - '.github/workflows/1.0-d1-traffic-guard-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  traffic-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install root dependencies
+        run: npm ci --ignore-scripts
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+      - name: Install W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Static contract checks
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const contract = JSON.parse(fs.readFileSync('contracts/resource-budget/1.0-d1-traffic-guard.v1.json', 'utf8'))
+          const expected = [
+            ['publicReadNormalD1Max', 0],
+            ['publicReadCacheMissD1Max', 1],
+            ['simpleAuthoritativeMutationD1WriteTransactionMax', 1],
+            ['synchronousEventFanoutMax', 0]
+          ]
+          for (const [key, value] of expected) {
+            if (contract.invariants[key] !== value) throw new Error(key + ' mismatch')
+          }
+          for (const [path, bindings] of [
+            ['workers/W01-payload/wrangler.jsonc', ['PUBLIC_ORIGIN_GLOBAL_LIMITER', 'PUBLIC_READ_LIMITER', 'AUTH_ORIGIN_GLOBAL_LIMITER', 'AUTH_LOGIN_LIMITER', 'AUTH_REGISTER_LIMITER', 'AUTH_REFRESH_LIMITER', 'W01_WRITE_ORIGIN_GLOBAL_LIMITER', 'W01_WRITE_LIMITER']],
+            ['workers/W03-content/wrangler.jsonc', ['CONTENT_PUBLIC_READ_LIMITER', 'CONTENT_MUTATION_LIMITER', 'CONTENT_ORIGIN_GLOBAL_LIMITER']],
+            ['workers/W05-social/wrangler.jsonc', ['SOCIAL_READ_LIMITER', 'SOCIAL_WRITE_LIMITER', 'SOCIAL_ORIGIN_GLOBAL_LIMITER']],
+            ['workers/W06-governance/wrangler.jsonc', ['GOVERNANCE_READ_LIMITER', 'GOVERNANCE_WRITE_LIMITER', 'GOVERNANCE_ORIGIN_GLOBAL_LIMITER']],
+            ['workers/W07-subscription-commerce/wrangler.jsonc', ['SUBSCRIPTION_READ_LIMITER', 'SUBSCRIPTION_WRITE_LIMITER', 'SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER']]
+          ]) {
+            const source = fs.readFileSync(path, 'utf8')
+            if (!source.includes('"ratelimits"')) throw new Error(path + ' missing ratelimits')
+            for (const binding of bindings) if (!source.includes('"' + binding + '"')) throw new Error(path + ' missing ' + binding)
+          }
+          const listRoute = fs.readFileSync('workers/W01-payload/src/app/api/v1/contents/route.ts', 'utf8')
+          const detailRoute = fs.readFileSync('workers/W01-payload/src/app/api/v1/contents/[contentId]/route.ts', 'utf8')
+          if (!listRoute.includes('cachedPublicGet')) throw new Error('public content list is not cache-first')
+          if (!detailRoute.includes('cachedPublicGet')) throw new Error('public content detail is not cache-first')
+          if (!detailRoute.includes('invalidatePublicContentDetail')) throw new Error('content cache invalidation missing')
+          for (const [path, marker] of [
+            ['workers/W01-payload/src/app/api/v1/users/[userId]/route.ts', 'cachedPublicGet'],
+            ['workers/W01-payload/src/app/api/v1/users/[userId]/followers/route.ts', 'cachedPublicGet'],
+            ['workers/W01-payload/src/app/api/v1/users/[userId]/following/route.ts', 'cachedPublicGet'],
+            ['workers/W01-payload/src/app/api/v1/contents/[contentId]/comments/route.ts', 'cachedPublicGet'],
+            ['workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts', 'cachedPublicGet'],
+            ['workers/W01-payload/src/app/api/v1/users/[userId]/route.ts', 'enforcePublicReadRateLimit']
+          ]) {
+            if (!fs.readFileSync(path, 'utf8').includes(marker)) throw new Error(path + ' is not cache-first')
+          }
+          const persistence = JSON.parse(fs.readFileSync('contracts/persistence/CONTENT-ARTICLE-d1-02-persistence.v1.json', 'utf8'))
+          if (persistence.performanceIndexes?.contents_owner_updated_at_id_idx?.columns?.join(',') !== 'owner_user_id,updated_at,id') throw new Error('creator pagination performance index contract missing')
+          if (!fs.readFileSync('workers/W03-content/migrations/0003_creator_list_pagination_index.sql', 'utf8').includes('contents_owner_updated_at_id_idx')) throw new Error('creator pagination migration missing index')
+          console.log('D1_TRAFFIC_GUARD_STATIC=PASS')
+          NODE
+      - name: Run traffic guard tests
+        working-directory: workers/W01-payload
+        run: npx --no-install vitest run src/lib/public-response-cache.test.ts src/auth/traffic-limit.test.ts ../W03-content/src/d1-traffic-guard.test.ts ../W05-social/src/d1-traffic-guard.test.ts ../W05-social/src/favorite-runtime.test.ts ../W05-social/src/relationship-graph-runtime.test.ts ../W06-governance/src/d1-traffic-guard.test.ts ../W07-subscription-commerce/src/d1-traffic-guard.test.ts tests/int/homepage-d1-guard.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/media-access.int.spec.ts tests/int/users-me-v1-adapter.int.spec.ts tests/int/auth-password-change-v1-adapter.int.spec.ts
+      - name: Typecheck W03
+        run: ./node_modules/.bin/tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W03-content/src/index.ts workers/W03-content/src/content-runtime.ts
+      - name: Validate Wrangler JSON structure
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          for (const path of ['workers/W01-payload/wrangler.jsonc','workers/W03-content/wrangler.jsonc','workers/W05-social/wrangler.jsonc']) {
+            JSON.parse(fs.readFileSync(path, 'utf8'))
+          }
+          console.log('WRANGLER_CONFIG_JSON=PASS')
+          NODE
+      - name: Typecheck W05
+        run: ./node_modules/.bin/tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W05-social/src/index.ts

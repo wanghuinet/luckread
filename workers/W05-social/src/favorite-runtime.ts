@@ -18,6 +18,17 @@ export type FavoriteResult = {
 }
 
 const RESOURCE_ID_MAX = 128
+const FAVORITE_STATUS_CACHE_TTL_MS = 5000
+const FAVORITE_STATUS_CACHE_MAX_ENTRIES = 2048
+const favoriteStatusCache = new Map<string, { value: { favorited: boolean }; expiresAt: number }>()
+
+const favoriteStatusKey = (actorUserId: string, targetId: string): string => actorUserId + '\\0' + targetId
+
+const pruneFavoriteStatusCache = (): void => {
+  if (favoriteStatusCache.size < FAVORITE_STATUS_CACHE_MAX_ENTRIES) return
+  const oldestKey = favoriteStatusCache.keys().next().value
+  if (typeof oldestKey === 'string') favoriteStatusCache.delete(oldestKey)
+}
 
 const validateTarget = (target: FavoriteTarget): { targetType: 'content'; targetId: string } => {
   if (target.targetType !== 'content') {
@@ -84,6 +95,8 @@ export async function favorite(
 
   if (!row) throw new FavoriteRuntimeError('NOT_FOUND', 404)
 
+  favoriteStatusCache.delete(favoriteStatusKey(actor, targetId))
+
   return {
     relationshipId: row.relationship_id,
     actorUserId: row.actor_user_id,
@@ -100,6 +113,12 @@ export async function getFavoriteStatus(
 ): Promise<{ favorited: boolean }> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
+  const cacheKey = favoriteStatusKey(actor, targetId)
+  const cached = favoriteStatusCache.get(cacheKey)
+  if (cached) {
+    if (cached.expiresAt > Date.now()) return { ...cached.value }
+    favoriteStatusCache.delete(cacheKey)
+  }
 
   const row = await db.prepare(
     `SELECT EXISTS (
@@ -115,7 +134,10 @@ export async function getFavoriteStatus(
      LIMIT 1`,
   ).bind(actor, targetType, targetId).first<{ favorited: number }>()
 
-  return { favorited: Boolean(row?.favorited) }
+  const value = { favorited: Boolean(row?.favorited) }
+  pruneFavoriteStatusCache()
+  favoriteStatusCache.set(cacheKey, { value, expiresAt: Date.now() + FAVORITE_STATUS_CACHE_TTL_MS })
+  return { ...value }
 }
 
 export async function unfavorite(
@@ -129,4 +151,8 @@ export async function unfavorite(
   await db.prepare(
     'DELETE FROM interaction_favorites WHERE actor_user_id = ? AND target_type = ? AND target_id = ?',
   ).bind(actor, targetType, targetId).run()
+  favoriteStatusCache.delete(favoriteStatusKey(actor, targetId))
 }
+
+
+export const clearFavoriteStatusCacheForTests = (): void => favoriteStatusCache.clear()

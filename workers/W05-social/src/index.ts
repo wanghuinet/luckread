@@ -9,7 +9,7 @@ import {
 } from './favorite-runtime.js'
 import { ShareRuntimeError, createShare, resolveShare } from './share-runtime.js'
 import { BlockMuteRuntimeError, removeRelation, setRelation } from './block-mute-runtime.js'
-import { getRelationshipGraph } from './relationship-graph-runtime.js'
+import { getRelationshipGraph, invalidateRelationshipGraph, RelationshipGraphRuntimeError } from './relationship-graph-runtime.js'
 import {
   FollowRuntimeError,
   follow,
@@ -19,16 +19,44 @@ import {
   unfollow,
 } from './follow-runtime.js'
 
-interface Env { DB: D1Database }
+type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
-const json = (body: unknown, status = 200) =>
-  Response.json(body, {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-    },
+interface Env {
+  DB: D1Database
+  SOCIAL_READ_LIMITER?: RateLimitBinding
+  SOCIAL_WRITE_LIMITER?: RateLimitBinding
+  SOCIAL_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
+}
+
+const getRateKey = (request: Request): string => {
+  const supplied = request.headers.get('X-LuckRead-Rate-Key')?.trim()
+  if (supplied) return supplied
+  const principal = request.headers.get('X-LuckRead-Principal-User-Id')?.trim()
+  if (principal) return 'user:' + principal
+  const clientIp = request.headers.get('X-LuckRead-Client-IP')?.trim()
+  return clientIp ? 'ip:' + clientIp : 'transport:W01'
+}
+
+const enforceRateLimit = async (request: Request, env: Env, operation: string): Promise<void> => {
+  const actorLimiter = request.method === 'GET' ? env.SOCIAL_READ_LIMITER : env.SOCIAL_WRITE_LIMITER
+  if (env.SOCIAL_ORIGIN_GLOBAL_LIMITER) {
+    const globalResult = await env.SOCIAL_ORIGIN_GLOBAL_LIMITER.limit({ key: 'origin:' + operation })
+    if (!globalResult.success) throw new FollowRuntimeError('RATE_LIMITED', 429)
+  }
+  if (actorLimiter) {
+    const result = await actorLimiter.limit({ key: operation + ':' + getRateKey(request) })
+    if (!result.success) throw new FollowRuntimeError('RATE_LIMITED', 429)
+  }
+}
+
+const json = (body: unknown, status = 200) => {
+  const headers = new Headers({
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
   })
+  if (status === 429) headers.set('retry-after', '60')
+  return Response.json(body, { status, headers })
+}
 
 const requireTransport = (request: Request): void => {
   if (
@@ -119,6 +147,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url)
+      await enforceRateLimit(request, env, request.method === 'GET' ? 'read:' + url.pathname.split('/').slice(0, 4).join('/') : 'write:' + url.pathname.split('/').slice(0, 4).join('/'))
 
       if (url.pathname.startsWith('/internal/social/shares/')) {
         const parts = url.pathname.split('/').filter(Boolean)
@@ -166,8 +195,10 @@ export default {
           if (typeof targetUserId !== 'string' || !targetUserId.trim()) {
             throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
           }
+          const relation = await setRelation(env.DB, actorUserId, targetUserId, relationType)
+          await invalidateRelationshipGraph(actorUserId, targetUserId)
           return json({
-            data: await setRelation(env.DB, actorUserId, targetUserId, relationType),
+            data: relation,
             requestId: crypto.randomUUID(),
           })
         }
@@ -180,6 +211,7 @@ export default {
             throw new BlockMuteRuntimeError('PRECONDITION_REQUIRED', 428)
           }
           await removeRelation(env.DB, actorUserId, targetFromPath, relationType)
+          await invalidateRelationshipGraph(actorUserId, targetFromPath)
           return new Response(null, { status: 204 })
         }
 
@@ -386,6 +418,7 @@ export default {
             throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
           }
           const row = await follow(env.DB, viewerUserId, path.userId)
+          await invalidateRelationshipGraph(viewerUserId, path.userId)
           return json({
             data: {
               following: true,
@@ -404,6 +437,7 @@ export default {
             throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
           }
           await unfollow(env.DB, viewerUserId, path.userId)
+          await invalidateRelationshipGraph(viewerUserId, path.userId)
           return new Response(null, { status: 204 })
         }
 

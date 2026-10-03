@@ -6,6 +6,7 @@ import React from 'react'
 
 import config from '@payload-config'
 
+import { enforcePublicReadRateLimit } from '@/auth/traffic-limit'
 import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
 import { validateSession } from '@/auth/w02-session-client'
 
@@ -32,24 +33,43 @@ export default async function HomePage() {
     const request = new Request('https://mp.luckread.com/', {
       headers: requestHeaders,
     })
+    const authorization = request.headers.get('authorization')?.trim() || ''
+    const hasPayloadTokenCookie = request.headers.get('cookie')?.split(';').some((part) => {
+      const [name, ...value] = part.trim().split('=')
+      return name === 'payload-token' && value.join('=').trim().length > 0
+    }) === true
+    const hasAuthCredential =
+      authorization.startsWith('Bearer ') ||
+      hasPayloadTokenCookie
 
     let authenticatedUser: {
       id?: string | number
       _sid?: string
     } | null = null
 
-    try {
-      const payload = await getPayload({ config })
-      const authResult = await payload.auth({
-        headers: request.headers,
-        canSetHeaders: false,
-      })
-      authenticatedUser = authResult.user as unknown as {
-        id?: string | number
-        _sid?: string
-      } | null
-    } catch {
-      authenticatedUser = null
+    if (hasAuthCredential) {
+      let edgeReadAllowed = true
+      try {
+        await enforcePublicReadRateLimit(request)
+      } catch {
+        edgeReadAllowed = false
+      }
+
+      if (edgeReadAllowed) {
+        try {
+          const payload = await getPayload({ config })
+          const authResult = await payload.auth({
+            headers: request.headers,
+            canSetHeaders: false,
+          })
+          authenticatedUser = authResult.user as unknown as {
+            id?: string | number
+            _sid?: string
+          } | null
+        } catch {
+          authenticatedUser = null
+        }
+      }
     }
 
     if (authenticatedUser?.id && typeof authenticatedUser._sid === 'string' && authenticatedUser._sid) {

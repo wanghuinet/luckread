@@ -124,33 +124,33 @@ describe('follow runtime', () => {
   })
 
   it('lists followers with a bounded total count and opaque next cursor', async () => {
-    const d = db([], [{
+    const d = db([{ total_count: 3 }], [{
       results: [
         {
           relationship_id: 'r2',
           user_id: 'u4',
           followed_at: '2026-10-02T00:01:00.000Z',
-          total_count: 3,
         },
         {
           relationship_id: 'r1',
           user_id: 'u3',
           followed_at: '2026-10-02T00:00:00.000Z',
-          total_count: 3,
         },
         {
           relationship_id: 'r0',
           user_id: 'u2',
           followed_at: '2026-09-30T00:00:00.000Z',
-          total_count: 3,
         },
       ],
     }])
-    const query = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as string
-    expect(query).toContain("block.relation_type = 'block'")
-    expect(query).toContain('NOT EXISTS')
-    expect(query).toContain('rel_count.')
     const result = await listFollowers(d, 'u9', null, 2)
+    const pageQuery = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])
+    const countQuery = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[1]?.[0])
+    expect(pageQuery).toContain("block.relation_type = 'block'")
+    expect(pageQuery).toContain('NOT EXISTS')
+    expect(pageQuery).not.toContain('COUNT(*)')
+    expect(countQuery).toContain('COUNT(*)')
+    expect(countQuery).toContain('rel_count.')
     expect(result).toMatchObject({
       items: [
         { relationshipId: 'r2', userId: 'u4', followedAt: '2026-10-02T00:01:00.000Z' },
@@ -163,12 +163,11 @@ describe('follow runtime', () => {
   })
 
   it('lists following relationships', async () => {
-    const d = db([], [{
+    const d = db([{ total_count: 1 }], [{
       results: [{
         relationship_id: 'r3',
         user_id: 'u7',
         followed_at: '2026-10-02T00:00:00.000Z',
-        total_count: 1,
       }],
     }])
     await expect(listFollowing(d, 'u5', null, 20)).resolves.toEqual({

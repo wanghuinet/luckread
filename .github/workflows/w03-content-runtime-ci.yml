@@ -32,7 +32,7 @@ jobs:
         run: npm ci
 
       - name: Run W03 content unit tests
-        run: npx --yes vitest@3.2.4 run workers/W03-content/src/content-runtime.test.ts workers/W03-content/src/publish-preflight.test.ts
+        run: npx --yes vitest@3.2.4 run workers/W03-content/src/content-runtime.test.ts workers/W03-content/src/publish-preflight.test.ts workers/W03-content/src/d1-traffic-guard.test.ts
 
       - name: Typecheck W03 content runtime
         run: >

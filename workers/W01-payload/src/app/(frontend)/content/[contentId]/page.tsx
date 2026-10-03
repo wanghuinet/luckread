@@ -65,6 +65,7 @@ export default function ContentDetailPage({
           const { contentId } = await params
           const [response, viewerResponse] = await Promise.all([
             fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`, {
+              credentials: 'omit',
               headers: { accept: 'application/json' },
               cache: 'no-store',
               signal: controller.signal,

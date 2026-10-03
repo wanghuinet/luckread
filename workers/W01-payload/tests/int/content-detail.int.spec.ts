@@ -149,3 +149,16 @@ it('cancels stale public profile content pagination requests', () => {
   expect(page).toContain("cause.name === 'AbortError'")
   expect(page).toContain('if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return')
 })
+
+it('keeps arbitrary cookies from bypassing the public content cache', () => {
+  const route = read('src/app/api/v1/contents/[contentId]/route.ts')
+  expect(route).toContain('resolveOptionalCookieContentPrincipal')
+  expect(route).toContain('if (!principal) {')
+  expect(route).not.toContain("!request.headers.get('Authorization') && !request.headers.get('cookie')")
+})
+
+
+it('keeps public content metadata requests anonymous so signed-in browsers can use the shared cache', () => {
+  const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+  expect(page).toContain("fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`, {\n              credentials: 'omit',\n              headers: { accept: 'application/json' },\n              cache: 'no-store',\n              signal: controller.signal,\n            })")
+})

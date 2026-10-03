@@ -104,18 +104,26 @@ const publicMessage = (code: string): string => {
     case 'IDEMPOTENCY_KEY_REUSE_CONFLICT': return 'Idempotency-Key cannot be reused with different input'
     case 'SERVICE_UNAVAILABLE': return 'Content service unavailable'
     case 'PREFLIGHT_BLOCKED': return 'Publish preflight blocked submission'
+    case 'RATE_LIMITED': return 'Rate limit exceeded'
     default: return 'Content request failed'
   }
 }
 
-const errorResponse = (error: ContentRuntimeError): Response =>
-  Response.json({
-    error: { code: error.code, message: publicMessage(error.code), details: {} },
-    requestId: crypto.randomUUID(),
-  }, {
-    status: error.status,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+const errorResponse = (error: ContentRuntimeError): Response => {
+  const headers = new Headers({
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
   })
+  if (error.code === 'RATE_LIMITED') headers.set('retry-after', '60')
+  return Response.json({
+    error: {
+      code: error.code,
+      message: publicMessage(error.code),
+      details: error.code === 'RATE_LIMITED' ? { retryAfter: 60 } : {},
+    },
+    requestId: crypto.randomUUID(),
+  }, { status: error.status, headers })
+}
 
 const toContent = (row: ContentRow): ContentRecord => ({
   id: row.id,

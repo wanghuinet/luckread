@@ -18,6 +18,69 @@ export type LikeResult = {
 }
 
 const RESOURCE_ID_MAX = 128
+const LIKE_STATUS_CACHE_TTL_SECONDS = 5
+
+const getDefaultCache = (): Cache | null => {
+  if (typeof globalThis.caches === 'undefined') return null
+  return (globalThis.caches as unknown as { default?: Cache }).default ?? null
+}
+
+const likeStatusCacheKey = (actorUserId: string, targetType: string, targetId: string): Request =>
+  new Request(
+    'https://cache.luckread.internal/__social-like-status?v=1&actor=' +
+      encodeURIComponent(actorUserId) +
+      '&type=' +
+      encodeURIComponent(targetType) +
+      '&id=' +
+      encodeURIComponent(targetId),
+    { method: 'GET' },
+  )
+
+const readCachedLikeStatus = async (
+  actorUserId: string,
+  targetType: string,
+  targetId: string,
+): Promise<{ liked: boolean; likeCount: number } | null> => {
+  const cache = getDefaultCache()
+  if (!cache) return null
+  const hit = await cache.match(likeStatusCacheKey(actorUserId, targetType, targetId))
+  if (!hit) return null
+  try {
+    const value = await hit.json() as { liked?: unknown; likeCount?: unknown }
+    const likeCount = value.likeCount
+    if (typeof value.liked !== 'boolean' || typeof likeCount !== 'number' || !Number.isSafeInteger(likeCount) || likeCount < 0) return null
+    return { liked: value.liked, likeCount }
+  } catch {
+    return null
+  }
+}
+
+const writeCachedLikeStatus = async (
+  actorUserId: string,
+  targetType: string,
+  targetId: string,
+  value: { liked: boolean; likeCount: number },
+): Promise<void> => {
+  const cache = getDefaultCache()
+  if (!cache) return
+  const response = Response.json(value, {
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': `private, max-age=0, s-maxage=${LIKE_STATUS_CACHE_TTL_SECONDS}`,
+    },
+  })
+  await cache.put(likeStatusCacheKey(actorUserId, targetType, targetId), response)
+}
+
+const invalidateCachedLikeStatus = async (
+  actorUserId: string,
+  targetType: string,
+  targetId: string,
+): Promise<void> => {
+  const cache = getDefaultCache()
+  if (!cache) return
+  await cache.delete(likeStatusCacheKey(actorUserId, targetType, targetId))
+}
 
 const validateTarget = (target: LikeTarget): { targetType: 'content' | 'comment'; targetId: string } => {
   if (target.targetType !== 'content' && target.targetType !== 'comment') {
@@ -164,6 +227,8 @@ export async function like(
 
   if (!row) throw new LikeRuntimeError('NOT_FOUND', 404)
 
+  await invalidateCachedLikeStatus(actor, targetType, targetId)
+
   return {
     relationshipId: row.relationship_id,
     actorUserId: row.actor_user_id,
@@ -180,6 +245,8 @@ export async function getLikeStatus(
 ): Promise<{ liked: boolean; likeCount: number }> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
+  const cached = await readCachedLikeStatus(actor, targetType, targetId)
+  if (cached) return cached
   const row = targetType === 'content'
     ? await db.prepare(
         `SELECT
@@ -249,15 +316,21 @@ export async function getLikeStatus(
       ).bind(actor, targetType, targetType, actor, actor, actor, actor, targetId)
         .first<{ liked: number; like_count: number; blocked: number }>()
 
-  if (!row) return { liked: false, likeCount: 0 }
+  if (!row) {
+    const result = { liked: false, likeCount: 0 }
+    await writeCachedLikeStatus(actor, targetType, targetId, result)
+    return result
+  }
   if (Number(row.blocked) === 1) {
     throw new LikeRuntimeError('RELATIONSHIP_BLOCKED', 409)
   }
 
-  return {
+  const result = {
     liked: Boolean(row.liked),
     likeCount: Math.max(0, Number(row.like_count ?? 0)),
   }
+  await writeCachedLikeStatus(actor, targetType, targetId, result)
+  return result
 }
 
 export async function unlike(
@@ -270,4 +343,5 @@ export async function unlike(
   await db.prepare(
     'DELETE FROM interaction_likes WHERE actor_user_id = ? AND target_type = ? AND target_id = ?',
   ).bind(actor, targetType, targetId).run()
+  await invalidateCachedLikeStatus(actor, targetType, targetId)
 }
