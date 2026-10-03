@@ -118,7 +118,7 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("router.replace('/login?returnTo=' + encodeURIComponent(returnTo))")
     expect(contentDetail).toContain("const [actionMessage, setActionMessage] = useState('')")
     expect(homeFeed).toContain('const cover = item.coverRef')
-    expect(homeFeed).toContain("alt={item.title ? item.title + '封面' : '内容封面'}")
+    expect(homeFeed).toContain('copy.content.cover')
     expect(homeFeed).not.toContain('item.coverRef || item.mediaRefs?.[0]')
     expect(homeFeed).toContain('content-feed-card-skeleton')
     expect(homeFeed).toContain('const [retryKey, setRetryKey] = useState(0)')
