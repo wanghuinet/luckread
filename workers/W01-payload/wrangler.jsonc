@@ -44,6 +44,11 @@
   ],
   "ratelimits": [
     {
+      "name": "AUTH_ORIGIN_GLOBAL_LIMITER",
+      "namespace_id": "2026100310",
+      "simple": { "limit": 3000, "period": 60 }
+    },
+    {
       "name": "AUTH_REGISTER_LIMITER",
       "namespace_id": "2026100305",
       "simple": { "limit": 10, "period": 60 }
