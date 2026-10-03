@@ -313,7 +313,7 @@ async function preparePositiveAuthSubject(user, label) {
     testedCommitSha: TESTED_COMMIT_SHA,
   })
 
-  return { roleAssignmentId, accountState: String(after.account_state) }
+  return { roleAssignmentId: effectiveRoleAssignmentId, accountState: String(after.account_state) }
 }
 
 async function login(user, deviceId) {
