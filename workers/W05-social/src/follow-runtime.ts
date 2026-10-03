@@ -99,19 +99,46 @@ async function listFollowRelations(
   const isFollowers = direction === 'followers'
   const relationColumn = isFollowers ? 'target_user_id' : 'follower_user_id'
   const itemColumn = isFollowers ? 'follower_user_id' : 'target_user_id'
-  const countSql = `(SELECT COUNT(*) FROM social_follow_relationships WHERE ${relationColumn} = ?)`
+  const blockPredicate = `NOT EXISTS (
+      SELECT 1
+      FROM social_user_interactions block
+      WHERE block.relation_type = 'block'
+        AND (
+          (block.actor_user_id = ? AND block.target_user_id = ${itemColumn})
+          OR
+          (block.actor_user_id = ${itemColumn} AND block.target_user_id = ?)
+        )
+    )`
+  const countSql = `(SELECT COUNT(*)
+    FROM social_follow_relationships rel_count
+    WHERE rel_count.${relationColumn} = ?
+      AND ${blockPredicate.replaceAll(`${itemColumn}`, `rel_count.${itemColumn}`)}
+  )`
   const where = cursor
     ? `WHERE ${relationColumn} = ?
-       AND (created_at < ? OR (created_at = ? AND relationship_id < ?))`
-    : `WHERE ${relationColumn} = ?`
+       AND (created_at < ? OR (created_at = ? AND relationship_id < ?))
+       AND ${blockPredicate}`
+    : `WHERE ${relationColumn} = ?
+       AND ${blockPredicate}`
   const statement = `SELECT relationship_id, ${itemColumn} AS user_id, created_at AS followed_at, ${countSql} AS total_count
     FROM social_follow_relationships
     ${where}
     ORDER BY created_at DESC, relationship_id DESC
     LIMIT ?`
   const parameters = cursor
-    ? [ownerId, ownerId, cursor.createdAt, cursor.createdAt, cursor.relationshipId, limit + 1]
-    : [ownerId, ownerId, limit + 1]
+    ? [
+        ownerId,
+        ownerId,
+        ownerId,
+        ownerId,
+        cursor.createdAt,
+        cursor.createdAt,
+        cursor.relationshipId,
+        ownerId,
+        ownerId,
+        limit + 1,
+      ]
+    : [ownerId, ownerId, ownerId, ownerId, ownerId, ownerId, limit + 1]
   const result = await db.prepare(statement).bind(...parameters).all<{
     relationship_id: string
     user_id: string

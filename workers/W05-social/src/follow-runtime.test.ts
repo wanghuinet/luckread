@@ -108,6 +108,10 @@ describe('follow runtime', () => {
         },
       ],
     }])
+    const query = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as string
+    expect(query).toContain("block.relation_type = 'block'")
+    expect(query).toContain('NOT EXISTS')
+    expect(query).toContain('rel_count.')
     const result = await listFollowers(d, 'u9', null, 2)
     expect(result).toMatchObject({
       items: [
