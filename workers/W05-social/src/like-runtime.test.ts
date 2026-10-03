@@ -13,20 +13,6 @@ const db = (firstResults: unknown[] = []) => {
   return { prepare } as unknown as D1Database
 }
 
-/// <reference types="@cloudflare/workers-types" />
-import { describe, expect, it, vi } from 'vitest'
-import { getLikeStatus, like, unlike } from './like-runtime.js'
-
-const db = (firstResults: unknown[] = []) => {
-  let firstIndex = 0
-  const prepare = vi.fn((sql: string) => ({
-    bind: vi.fn((...args: unknown[]) => ({
-      first: vi.fn(async () => firstResults[firstIndex++] ?? null),
-      run: vi.fn(async () => ({ sql, args })),
-    })),
-  }))
-  return { prepare } as unknown as D1Database
-}
 
 describe('like runtime', () => {
   it('reads effective like status for the actor and target', async () => {
