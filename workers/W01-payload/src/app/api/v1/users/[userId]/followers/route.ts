@@ -1,3 +1,4 @@
+import { withPublicEdgeCache } from '../../../../../../cache/edge-cache.js'
 import {
   callW05SocialPublic,
   W05SocialClientError,
@@ -25,11 +26,15 @@ export async function GET(
     if (limit) query.set('limit', limit)
 
     const suffix = query.toString() ? `?${query.toString()}` : ''
-    return await callW05SocialPublic({
+    return await withPublicEdgeCache(
       request,
-      pathname: `/internal/social/users/${encodeURIComponent(userId)}/followers${suffix}`,
-      method: 'GET',
-    })
+      () => callW05SocialPublic({
+        request,
+        pathname: `/internal/social/users/${encodeURIComponent(userId)}/followers${suffix}`,
+        method: 'GET',
+      }),
+      { ttlSeconds: 20, staleWhileRevalidateSeconds: 60 },
+    )
   } catch (error) {
     if (error instanceof W05SocialClientError) {
       return errorResponse(error.status, error.code, error.message)
