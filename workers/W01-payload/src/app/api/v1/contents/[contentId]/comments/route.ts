@@ -1,3 +1,4 @@
+import { withPublicEdgeCache } from '../../../../../../cache/edge-cache.js'
 import {
   callW05Social,
   callW05SocialPublic,
@@ -37,12 +38,19 @@ export async function GET(
     const viewer = await resolveOptionalCookieSocialPrincipal(request)
     if (viewer instanceof Response) return viewer
 
-    return await callW05SocialPublic({
+    const load = () => callW05SocialPublic({
       request,
       pathname: '/internal/social/contents/' + encodeURIComponent(contentId) + '/comments' + suffix,
       method: 'GET',
       principal: viewer,
     })
+
+    return viewer
+      ? await load()
+      : await withPublicEdgeCache(request, load, {
+          ttlSeconds: 10,
+          staleWhileRevalidateSeconds: 30,
+        })
   } catch (error) {
     if (error instanceof W05SocialClientError) {
       return errorResponse(error.status, error.code, error.message)
