@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import { cachedPublicGet, publicCacheKey } from '../src/lib/public-response-cache.js'
+import { cachedPublicGet, publicCacheKey } from './public-response-cache.js'
 
 describe('public response cache', () => {
   const cache = {
