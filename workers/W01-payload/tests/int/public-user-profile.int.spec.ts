@@ -123,3 +123,4 @@ describe('public user profile', () => {
     expect(page).not.toContain("backgroundImage: 'linear-gradient(135deg")
   })
 })
+
