@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
-import { describe, expect, it, vi } from 'vitest'
-import { getRelationshipGraph } from './relationship-graph-runtime.js'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { clearRelationshipGraphCacheForTests, getRelationshipGraph } from './relationship-graph-runtime.js'
 
 const db = (result: unknown) => ({
   prepare: vi.fn(() => ({
@@ -11,6 +11,7 @@ const db = (result: unknown) => ({
 }) as unknown as D1Database
 
 describe('relationship graph runtime', () => {
+  beforeEach(() => clearRelationshipGraphCacheForTests())
   it('derives mutual follow without creating another authoritative relation', async () => {
     const graph = await getRelationshipGraph(
       db({
