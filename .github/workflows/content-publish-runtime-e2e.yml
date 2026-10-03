@@ -17,12 +17,12 @@ on:
         description: W01 public content API base URL
         required: true
         type: string
-        default: https://api.luckread.cn
+        default: https://api.luckread.com
       moderation_base_url:
         description: W01 public moderation API base URL
         required: true
         type: string
-        default: https://luckread.cn
+        default: https://luckread.com
       confirm:
         description: Type RUN_CONTENT_PUBLISH_E2E to permit controlled remote fixture/test mutations
         required: true
