@@ -66,11 +66,11 @@ jobs:
             echo "BOUND ${hostname} -> ${WORKER_NAME}"
           }
 
-          attach "luckread.cn"
-          attach "api.luckread.cn"
-          attach "www.luckread.cn"
-          attach "sso.luckread.cn"
-          attach "mp.luckread.cn"
+          attach "luckread.com"
+          attach "api.luckread.com"
+          attach "www.luckread.com"
+          attach "sso.luckread.com"
+          attach "mp.luckread.com"
           attach "mp.luckread.com"
 
       - name: Verify W01 public domains
@@ -86,12 +86,12 @@ jobs:
 
           printf '%s' "${response}" | jq -e '
             .success == true
-            and ([.result[] | select(.hostname == "luckread.cn" and .service == "luckread-w01-payload")] | length) == 1
-            and ([.result[] | select(.hostname == "api.luckread.cn" and .service == "luckread-w01-payload")] | length) == 1
-            and ([.result[] | select(.hostname == "www.luckread.cn" and .service == "luckread-w01-payload")] | length) == 1
-            and ([.result[] | select(.hostname == "sso.luckread.cn" and .service == "luckread-w01-payload")] | length) == 1
-            and ([.result[] | select(.hostname == "mp.luckread.cn" and .service == "luckread-w01-payload")] | length) == 1
+            and ([.result[] | select(.hostname == "luckread.com" and .service == "luckread-w01-payload")] | length) == 1
+            and ([.result[] | select(.hostname == "api.luckread.com" and .service == "luckread-w01-payload")] | length) == 1
+            and ([.result[] | select(.hostname == "www.luckread.com" and .service == "luckread-w01-payload")] | length) == 1
+            and ([.result[] | select(.hostname == "sso.luckread.com" and .service == "luckread-w01-payload")] | length) == 1
+            and ([.result[] | select(.hostname == "mp.luckread.com" and .service == "luckread-w01-payload")] | length) == 1
             and ([.result[] | select(.hostname == "mp.luckread.com" and .service == "luckread-w01-payload")] | length) == 1
           ' >/dev/null
 
-          printf '%s' "${response}" | jq '[.result[] | select((.hostname == "luckread.cn" or .hostname == "api.luckread.cn" or .hostname == "www.luckread.cn" or .hostname == "sso.luckread.cn" or .hostname == "mp.luckread.cn" or .hostname == "mp.luckread.com")) | {hostname,service,zone_name,id,cert_id}]'
+          printf '%s' "${response}" | jq '[.result[] | select((.hostname == "luckread.com" or .hostname == "api.luckread.com" or .hostname == "www.luckread.com" or .hostname == "sso.luckread.com" or .hostname == "mp.luckread.com" or .hostname == "mp.luckread.com")) | {hostname,service,zone_name,id,cert_id}]'
