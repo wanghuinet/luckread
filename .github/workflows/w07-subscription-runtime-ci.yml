@@ -39,7 +39,7 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Run Subscription runtime and adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W07-subscription-commerce/src/subscription-runtime.test.ts tests/int/subscription-v1-adapter.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W07-subscription-commerce/src/subscription-runtime.test.ts ../../workers/W07-subscription-commerce/src/d1-traffic-guard.test.ts tests/int/subscription-v1-adapter.int.spec.ts
       - name: Verify Subscription migration shape
         run: |
           set -euo pipefail
