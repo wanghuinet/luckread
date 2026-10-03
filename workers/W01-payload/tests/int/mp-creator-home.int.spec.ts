@@ -19,6 +19,7 @@ describe('mp.luckread.cn creator home routing', () => {
     expect(creator).toContain('readVerifiedPayloadTokenVersion(request)')
     expect(creator).toContain('validateSession({')
     expect(creator).toContain('<CreatorStudio displayName={displayName} userId={String(user.id)} />')
+    expect(creator).not.toContain('/admin/login')
     expect(page).toContain("export const dynamic = 'force-dynamic'")
   })
 
