@@ -36,6 +36,6 @@ describe('mp.luckread.cn creator home routing', () => {
     expect(creator).toContain("redirect('/login?returnTo=%2Fcreator-center')")
     expect(creator).toContain('validateSession({')
     expect(creatorCenter).toContain("CreatorStudio")
-    expect(creator).toContain("href=\"/me/profile\"")
+    expect(creatorStudio).toContain("href=\"/me/profile\"")
   })
 })
