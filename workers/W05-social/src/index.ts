@@ -43,14 +43,14 @@ const enforceRateLimit = async (request: Request, env: Env, operation: string): 
   if (!result.success) throw new FollowRuntimeError('RATE_LIMITED', 429)
 }
 
-const json = (body: unknown, status = 200) =>
-  Response.json(body, {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-    },
+const json = (body: unknown, status = 200) => {
+  const headers = new Headers({
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
   })
+  if (status === 429) headers.set('retry-after', '60')
+  return Response.json(body, { status, headers })
+}
 
 const requireTransport = (request: Request): void => {
   if (
