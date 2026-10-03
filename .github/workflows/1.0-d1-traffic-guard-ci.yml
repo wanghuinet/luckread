@@ -26,6 +26,10 @@ on:
       - 'workers/W03-content/wrangler.jsonc'
       - 'workers/W05-social/src/**'
       - 'workers/W05-social/wrangler.jsonc'
+      - 'workers/W06-governance/src/**'
+      - 'workers/W06-governance/wrangler.jsonc'
+      - 'workers/W07-subscription-commerce/src/**'
+      - 'workers/W07-subscription-commerce/wrangler.jsonc'
       - '.github/workflows/1.0-d1-traffic-guard-ci.yml'
   push:
     branches:
@@ -77,7 +81,9 @@ jobs:
           for (const [path, bindings] of [
             ['workers/W01-payload/wrangler.jsonc', ['PUBLIC_ORIGIN_GLOBAL_LIMITER', 'PUBLIC_READ_LIMITER', 'AUTH_ORIGIN_GLOBAL_LIMITER', 'AUTH_LOGIN_LIMITER', 'AUTH_REGISTER_LIMITER', 'AUTH_REFRESH_LIMITER']],
             ['workers/W03-content/wrangler.jsonc', ['CONTENT_PUBLIC_READ_LIMITER', 'CONTENT_MUTATION_LIMITER', 'CONTENT_ORIGIN_GLOBAL_LIMITER']],
-            ['workers/W05-social/wrangler.jsonc', ['SOCIAL_READ_LIMITER', 'SOCIAL_WRITE_LIMITER', 'SOCIAL_ORIGIN_GLOBAL_LIMITER']]
+            ['workers/W05-social/wrangler.jsonc', ['SOCIAL_READ_LIMITER', 'SOCIAL_WRITE_LIMITER', 'SOCIAL_ORIGIN_GLOBAL_LIMITER']],
+            ['workers/W06-governance/wrangler.jsonc', ['GOVERNANCE_READ_LIMITER', 'GOVERNANCE_WRITE_LIMITER', 'GOVERNANCE_ORIGIN_GLOBAL_LIMITER']],
+            ['workers/W07-subscription-commerce/wrangler.jsonc', ['SUBSCRIPTION_READ_LIMITER', 'SUBSCRIPTION_WRITE_LIMITER', 'SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER']]
           ]) {
             const source = fs.readFileSync(path, 'utf8')
             if (!source.includes('"ratelimits"')) throw new Error(path + ' missing ratelimits')
@@ -104,7 +110,7 @@ jobs:
           console.log('D1_TRAFFIC_GUARD_STATIC=PASS')
           NODE
       - name: Run traffic guard tests
-        run: npx --no-install vitest run workers/W01-payload/src/lib/public-response-cache.test.ts workers/W01-payload/src/auth/traffic-limit.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W05-social/src/d1-traffic-guard.test.ts
+        run: npx --no-install vitest run workers/W01-payload/src/lib/public-response-cache.test.ts workers/W01-payload/src/auth/traffic-limit.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W05-social/src/d1-traffic-guard.test.ts workers/W06-governance/src/d1-traffic-guard.test.ts workers/W07-subscription-commerce/src/d1-traffic-guard.test.ts
       - name: Typecheck W03
         run: npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W03-content/src/index.ts workers/W03-content/src/content-runtime.ts
       - name: Validate Wrangler JSON structure
