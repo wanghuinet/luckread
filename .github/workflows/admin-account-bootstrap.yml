@@ -1,0 +1,127 @@
+name: Admin Account Bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: Existing Payload user id
+        required: true
+        default: "1"
+        type: string
+      username:
+        description: New username
+        required: true
+        default: "wanghui"
+        type: string
+      confirm:
+        description: Type APPLY_WANGHUI_L8 to permit the one-time production account update
+        required: true
+        default: APPLY_WANGHUI_L8
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    if: ${{ inputs.confirm == 'APPLY_WANGHUI_L8' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      DATABASE_NAME: luckread
+      USER_ID: ${{ inputs.user_id }}
+      USERNAME: ${{ inputs.username }}
+      LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD: ${{ secrets.LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD }}
+    steps:
+      - name: Checkout exact main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate target and account preconditions
+        run: |
+          set -euo pipefail
+          test "$DATABASE_NAME" = "luckread"
+          test "$USER_ID" = "1"
+          test "$USERNAME" = "wanghui"
+          test -n "$LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD"
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc \
+            --command "SELECT id, email, username, account_state, account_state_version FROM users WHERE id=1;" > /tmp/admin-user-preflight.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs'
+          const rows = JSON.parse(fs.readFileSync('/tmp/admin-user-preflight.json','utf8'))?.[0]?.results ?? []
+          if (rows.length !== 1) throw new Error('user id 1 must exist exactly once')
+          const user = rows[0]
+          if (user.account_state !== 'ACTIVE') throw new Error('user id 1 is not ACTIVE; refusing implicit account-state mutation')
+          console.log(JSON.stringify({id:user.id,email:user.email,username:user.username,account_state:user.account_state,account_state_version:user.account_state_version}))
+          NODE
+
+      - name: Validate username uniqueness
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc \
+            --command "SELECT id, username FROM users WHERE username='wanghui' AND id<>1;" > /tmp/admin-username-collision.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs'
+          const rows = JSON.parse(fs.readFileSync('/tmp/admin-username-collision.json','utf8'))?.[0]?.results ?? []
+          if (rows.length !== 0) throw new Error('username wanghui is already owned by another user')
+          NODE
+
+      - name: Prepare native Payload password material
+        env:
+          ROLE_ASSIGNMENT_ID: admin-bootstrap-1-super-admin
+        run: |
+          set -euo pipefail
+          node scripts/admin-account-bootstrap.mjs
+          chmod 600 /tmp/luckread-admin-bootstrap.sql /tmp/luckread-admin-bootstrap-meta.json
+          cat /tmp/luckread-admin-bootstrap-meta.json
+
+      - name: Apply account username/password
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config workers/W01-payload/wrangler.jsonc --file=/tmp/luckread-admin-bootstrap.sql
+
+      - name: Revoke existing user sessions
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config workers/W01-payload/wrangler.jsonc \
+            --command "DELETE FROM users_sessions WHERE _parent_id=1;"
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config workers/W01-payload/wrangler.jsonc \
+            --command "DELETE FROM auth_session_state WHERE user_id='1';"
+
+      - name: Verify D1 result
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc \
+            --command "SELECT id,email,username,account_state,login_attempts,lock_until FROM users WHERE id=1;" > /tmp/admin-user-post.json
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc \
+            --command "SELECT id,subject_id,role_id,scope_type,status,valid_from,valid_until FROM role_assignments WHERE subject_id='1' AND role_id='super_admin' AND scope_type='global' AND status='ACTIVE';" > /tmp/admin-role-post.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs'
+          const userRows = JSON.parse(fs.readFileSync('/tmp/admin-user-post.json','utf8'))?.[0]?.results ?? []
+          const roleRows = JSON.parse(fs.readFileSync('/tmp/admin-role-post.json','utf8'))?.[0]?.results ?? []
+          if (userRows.length !== 1 || userRows[0].username !== 'wanghui' || userRows[0].account_state !== 'ACTIVE') throw new Error('post-update user verification failed')
+          if (roleRows.length < 1) throw new Error('L8 super_admin role assignment missing')
+          console.log(JSON.stringify({user:{id:userRows[0].id,username:userRows[0].username,account_state:userRows[0].account_state},activeSuperAdminAssignments:roleRows.length}))
+          NODE
+
+      - name: Verify production login without printing credentials
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            -X POST 'https://mp.luckread.cn/auth/login' \
+            -H 'Content-Type: application/json' \
+            --data-raw "{\"identity\":\"wanghui\",\"credential\":$(printf '%s' "$LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD" | node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.stringify(s)))'),\"deviceId\":\"admin-bootstrap-${GITHUB_RUN_ID}\"}")"
+          test "$status" = "200"
+
+      - name: Secure cleanup
+        if: always()
+        run: |
+          rm -f /tmp/luckread-admin-bootstrap.sql /tmp/luckread-admin-bootstrap-meta.json /tmp/admin-user-preflight.json /tmp/admin-username-collision.json /tmp/admin-user-post.json /tmp/admin-role-post.json
