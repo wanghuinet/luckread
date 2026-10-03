@@ -266,7 +266,8 @@ export default {
           if (cursor && cursor.length > 2048) {
             throw new CommentRuntimeError('INVALID_CURSOR', 400)
           }
-          const page = await listComments(env.DB, commentContentId, cursor, limit)
+          const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+          const page = await listComments(env.DB, commentContentId, cursor, limit, viewerUserId)
           return json({ data: page, requestId: crypto.randomUUID() })
         }
 
