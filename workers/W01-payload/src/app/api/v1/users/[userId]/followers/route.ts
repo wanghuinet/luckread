@@ -1,5 +1,4 @@
 import {
-  callW05Social,
   callW05SocialPublic,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
