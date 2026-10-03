@@ -270,7 +270,21 @@ export async function createComment(
   const inserted = await db.prepare(
     `INSERT INTO social_comments
       (id, content_id, author_user_id, parent_id, body, state, depth, idempotency_key, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'PUBLISHED', ?, ?, ?, ?)
+     SELECT ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?, ?, ?
+       FROM contents content
+      WHERE content.id = ?
+        AND content.state = 'PUBLISHED'
+        AND (
+          ? IS NULL
+          OR EXISTS (
+            SELECT 1
+              FROM social_comments parent
+             WHERE parent.id = ?
+               AND parent.content_id = content.id
+               AND parent.state = 'PUBLISHED'
+               AND parent.depth < 3
+          )
+        )
      ON CONFLICT(author_user_id, idempotency_key)
      DO UPDATE SET id = social_comments.id
      RETURNING id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at`,
@@ -284,6 +298,9 @@ export async function createComment(
     idempotencyKey,
     now,
     now,
+    contentId,
+    parentId,
+    parentId,
   ).first<{
     id: string
     content_id: string
@@ -369,11 +386,20 @@ export async function deleteComment(
 
   const now = new Date().toISOString()
   const result = await db.prepare(
-    "UPDATE social_comments SET state = 'AUTHOR_DELETED', updated_at = ? WHERE id = ? AND author_user_id = ? AND state = 'PUBLISHED'",
+    `UPDATE social_comments
+        SET state = 'AUTHOR_DELETED', updated_at = ?
+      WHERE id = ?
+        AND author_user_id = ?
+        AND state = 'PUBLISHED'
+        AND NOT EXISTS (
+          SELECT 1
+            FROM social_comments child
+           WHERE child.parent_id = social_comments.id
+        )`,
   ).bind(now, commentId, actorUserId).run()
 
   if (Number(result.meta?.changes ?? 0) !== 1) {
-    throw new CommentRuntimeError('COMMENT_DELETE_FAILED', 500)
+    throw new CommentRuntimeError('COMMENT_HAS_REPLIES', 409)
   }
 }
 

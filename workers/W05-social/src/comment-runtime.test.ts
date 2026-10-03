@@ -164,6 +164,39 @@ describe('comment runtime', () => {
     })
   })
 
+  it('rechecks published parent state in the final comment insert', async () => {
+    const d = db([
+      {
+        content_state: 'PUBLISHED',
+        parent_content_id: 'content-1',
+        parent_state: 'PUBLISHED',
+        parent_depth: 1,
+      },
+      {
+        id: 'c-race-safe',
+        content_id: 'content-1',
+        author_user_id: 'user-2',
+        parent_id: 'c1',
+        body: '回复',
+        state: 'PUBLISHED',
+        depth: 2,
+        created_at: '2026-10-02T00:01:00.000Z',
+        updated_at: '2026-10-02T00:01:00.000Z',
+      },
+    ])
+
+    await expect(createComment(d, 'user-2', 'content-1', {
+      body: '回复',
+      parentId: 'c1',
+      idempotencyKey: 'idem-race-safe',
+    })).resolves.toMatchObject({ id: 'c-race-safe', parentId: 'c1' })
+
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    expect(prepare.mock.calls[1]?.[0]).toContain("content.state = 'PUBLISHED'")
+    expect(prepare.mock.calls[1]?.[0]).toContain("parent.state = 'PUBLISHED'")
+    expect(prepare.mock.calls[1]?.[0]).toContain('parent.depth < 3')
+  })
+
   it('creates a nested comment only while the parent depth is below three', async () => {
     const d = db([
       {
@@ -216,6 +249,33 @@ describe('comment runtime', () => {
       body: '不可见',
       idempotencyKey: 'idem-4',
     })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+  })
+
+  it('keeps comment deletion atomic against a concurrent reply', async () => {
+    const d = db([
+      { id: 'c1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
+    ])
+    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    prepare.mockImplementationOnce(() => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => ({
+          id: 'c1',
+          author_user_id: 'user-1',
+          state: 'PUBLISHED',
+          content_state: 'PUBLISHED',
+          has_replies: 0,
+        })),
+      })),
+    })).mockImplementationOnce(() => ({
+      bind: vi.fn(() => ({
+        run: vi.fn(async () => ({ success: true, meta: { changes: 0 } })),
+      })),
+    }))
+
+    await expect(deleteComment(d, 'user-1', 'c1')).rejects.toMatchObject({
+      code: 'COMMENT_HAS_REPLIES',
+      status: 409,
+    })
   })
 
   it('deletes an owned leaf comment', async () => {
