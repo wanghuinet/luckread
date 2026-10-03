@@ -285,6 +285,24 @@ export async function createComment(
                AND parent.depth < 3
           )
         )
+        AND NOT EXISTS (
+          SELECT 1
+            FROM social_user_interactions block
+           WHERE block.relation_type = 'block'
+             AND (
+               (block.actor_user_id = ? AND block.target_user_id = content.owner_user_id)
+               OR
+               (block.actor_user_id = content.owner_user_id AND block.target_user_id = ?)
+               OR
+               (block.actor_user_id = ? AND block.target_user_id = (
+                 SELECT author_user_id FROM social_comments WHERE id = ? LIMIT 1
+               ))
+               OR
+               (block.actor_user_id = (
+                 SELECT author_user_id FROM social_comments WHERE id = ? LIMIT 1
+               ) AND block.target_user_id = ?)
+             )
+        )
      ON CONFLICT(author_user_id, idempotency_key)
      DO UPDATE SET id = social_comments.id
      RETURNING id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at`,
@@ -301,6 +319,12 @@ export async function createComment(
     contentId,
     parentId,
     parentId,
+    actor,
+    actor,
+    actor,
+    parentId,
+    parentId,
+    actor,
   ).first<{
     id: string
     content_id: string
