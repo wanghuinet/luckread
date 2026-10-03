@@ -21,6 +21,11 @@ export async function PATCH(
     const principal = await resolveCookieSocialPrincipal(request)
     if (principal instanceof Response) return principal
 
+    const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+    if (!idempotencyKey || idempotencyKey.length > 256) {
+      return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
+    }
+
     const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
     if (!ifMatch || ifMatch.length > 256) {
       return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match required')
