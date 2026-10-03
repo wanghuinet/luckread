@@ -70,6 +70,13 @@ export const cachedPublicGet = async (
 
   const keyString = key.url
   let pending = inflight.get(keyString)
+  if (!pending && inflight.size >= MAX_INFLIGHT) {
+    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Public cache origin is at capacity' } }), {
+      status: 503,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'retry-after': '1', 'x-luckread-cache': 'OVERLOADED' },
+    })
+  }
+
   if (!pending) {
     pending = (async () => {
       const response = await withOriginSlot(loader)
@@ -84,7 +91,6 @@ export const cachedPublicGet = async (
       return response
     })()
     inflight.set(keyString, pending)
-    if (inflight.size > MAX_INFLIGHT) inflight.delete(inflight.keys().next().value as string)
     void pending.then(() => inflight.delete(keyString), () => inflight.delete(keyString))
   }
 
