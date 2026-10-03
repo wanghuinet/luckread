@@ -8,6 +8,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import {
   enforceAuthRateLimit,
   enforcePublicReadRateLimit,
+  enforceW01WriteRateLimit,
   rateLimitResponse,
   TrafficLimitError,
 } from './traffic-limit.js'
@@ -92,4 +93,41 @@ describe('traffic limits', () => {
       error: { code: 'RATE_LIMITED', details: { retryAfter: 60 } },
     })
   })
+
+  it('checks W01 write origin and IP limits before Payload writes', async () => {
+    const calls: string[] = []
+    const globalLimiter = { limit: vi.fn(async ({ key }: { key: string }) => { calls.push(key); return { success: true } }) }
+    const writeLimiter = { limit: vi.fn(async ({ key }: { key: string }) => { calls.push(key); return { success: true } }) }
+    contextMock.mockResolvedValue({
+      env: {
+        W01_WRITE_ORIGIN_GLOBAL_LIMITER: globalLimiter,
+        W01_WRITE_LIMITER: writeLimiter,
+      },
+    } as never)
+
+    await expect(
+      enforceW01WriteRateLimit(
+        new Request('https://luckread.cn/api/v1/media', { headers: { 'cf-connecting-ip': '203.0.113.11' } }),
+      ),
+    ).resolves.toBeUndefined()
+
+    expect(calls).toEqual(['w01-write:origin', 'w01-write:ip:203.0.113.11'])
+  })
+
+  it('rejects W01 writes when the origin breaker is exhausted', async () => {
+    const globalLimiter = { limit: vi.fn(async () => ({ success: false })) }
+    const writeLimiter = { limit: vi.fn(async () => ({ success: true })) }
+    contextMock.mockResolvedValue({
+      env: {
+        W01_WRITE_ORIGIN_GLOBAL_LIMITER: globalLimiter,
+        W01_WRITE_LIMITER: writeLimiter,
+      },
+    } as never)
+
+    await expect(
+      enforceW01WriteRateLimit(new Request('https://luckread.cn/api/v1/media')),
+    ).rejects.toBeInstanceOf(TrafficLimitError)
+    expect(writeLimiter.limit).not.toHaveBeenCalled()
+  })
+
 })
