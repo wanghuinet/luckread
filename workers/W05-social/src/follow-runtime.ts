@@ -225,13 +225,32 @@ export async function follow(db: D1Database, followerUserId: string, targetUserI
   const row = await db.prepare(
     `INSERT INTO social_follow_relationships
       (relationship_id, follower_user_id, target_user_id, created_at)
-     VALUES (?, ?, ?, ?)
+     SELECT ?, ?, ?, ?
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM social_user_interactions block
+        WHERE block.relation_type = 'block'
+          AND (
+            (block.actor_user_id = ? AND block.target_user_id = ?)
+            OR
+            (block.actor_user_id = ? AND block.target_user_id = ?)
+          )
+      )
      ON CONFLICT(follower_user_id, target_user_id)
      DO UPDATE SET relationship_id = social_follow_relationships.relationship_id
      RETURNING relationship_id, follower_user_id, target_user_id, created_at`,
-  ).bind(relationshipId, follower, target, createdAt).first<FollowRow>()
+  ).bind(
+    relationshipId,
+    follower,
+    target,
+    createdAt,
+    follower,
+    target,
+    target,
+    follower,
+  ).first<FollowRow>()
 
-  if (!row) throw new FollowRuntimeError('FOLLOW_WRITE_FAILED', 500)
+  if (!row) throw new FollowRuntimeError('RELATIONSHIP_BLOCKED', 409)
   return row
 }
 
