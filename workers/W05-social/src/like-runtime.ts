@@ -47,8 +47,9 @@ const readCachedLikeStatus = async (
   if (!hit) return null
   try {
     const value = await hit.json() as { liked?: unknown; likeCount?: unknown }
-    if (typeof value.liked !== 'boolean' || !Number.isSafeInteger(value.likeCount) || value.likeCount < 0) return null
-    return { liked: value.liked, likeCount: value.likeCount }
+    const likeCount = value.likeCount
+    if (typeof value.liked !== 'boolean' || typeof likeCount !== 'number' || !Number.isSafeInteger(likeCount) || likeCount < 0) return null
+    return { liked: value.liked, likeCount }
   } catch {
     return null
   }
