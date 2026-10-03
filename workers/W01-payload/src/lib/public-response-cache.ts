@@ -39,7 +39,7 @@ export const publicCacheKey = (request: Request, namespace: string): Request => 
   keyUrl.searchParams.set('v', CACHE_VERSION)
   keyUrl.searchParams.set('n', namespace)
   keyUrl.searchParams.set('p', url.pathname)
-  keyUrl.searchParams.set('lang', normalizeLanguage(request))
+  if (namespace === 'content-list') keyUrl.searchParams.set('lang', normalizeLanguage(request))
   if (query) keyUrl.searchParams.set('q', query)
   return new Request(keyUrl.toString(), { method: 'GET' })
 }
