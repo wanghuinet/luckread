@@ -51,7 +51,13 @@
       "retryAfterSeconds": 60,
       "stableCode": "RATE_LIMITED"
     },
-    "deploymentRequirement": "Every production Worker named by this contract MUST have its corresponding Rate Limiting bindings declared; missing bindings may be tolerated only by unit-test doubles."
+    "deploymentRequirement": "Every production Worker named by this contract MUST have its corresponding Rate Limiting bindings declared; missing bindings may be tolerated only by unit-test doubles.",
+    "originCircuitBreaker": {
+      "note": "Cloudflare Rate Limiting counters are location-scoped; this caps aggregate origin pressure within each Cloudflare location before D1.",
+      "contentRequestsPerLocationPerMinute": 10000,
+      "socialRequestsPerLocationPerMinute": 10000,
+      "appliedBeforeD1": true
+    }
   },
   "operationBudgets": {
     "content.listContents": {
@@ -94,7 +100,8 @@
     "anonymousPublicContentReadUsesCache": "required",
     "mutationInvalidatesAffectedPublicCache": "required",
     "noSyncProjectionWriteAmplification": "required",
-    "noNPlus1PublicRead": "required"
+    "noNPlus1PublicRead": "required",
+    "globalOriginBurstIsShedBeforeD1": "required"
   },
   "nonGoals": [
     "No fifth D1",
