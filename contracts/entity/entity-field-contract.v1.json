@@ -612,6 +612,21 @@
           "status": "CONTRACTED_NOT_VERIFIED"
         },
         {
+          "fieldId": "ENT-SUBSCRIPTION-F-VERSION",
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "required": true,
+          "unique": false,
+          "indexed": false,
+          "lifecycle": "mutable_concurrency",
+          "classification": "CONCURRENCY_VERSION",
+          "apiExposure": "SCOPED",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED",
+          "status": "CONTRACTED_NOT_VERIFIED"
+        },
+        {
           "fieldId": "ENT-SUBSCRIPTION-F-SUBSCRIBER-ID",
           "name": "subscriberId",
           "type": "text",
@@ -800,7 +815,8 @@
         "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
         "docs/108-MEMBERSHIP-AND-SUBSCRIPTION-SYSTEM-CONTRACT-v1.0.md",
         "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md",
-        "contracts/state-machines/subscription.json"
+        "contracts/state-machines/subscription.json",
+        "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
       ],
       "fieldContractRef": "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json"
     },
