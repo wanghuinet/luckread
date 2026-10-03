@@ -5,8 +5,6 @@ import Link from 'next/link'
 import React from 'react'
 
 import { CreatorStudio } from './CreatorStudio'
-import PublishComposer from '../../(frontend)/publish/PublishComposer'
-import '../../(frontend)/publish/publish.css'
 import styles from './creator-center.module.css'
 
 type CreatorNavItem = {
