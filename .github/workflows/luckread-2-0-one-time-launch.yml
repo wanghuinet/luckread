@@ -117,6 +117,7 @@ jobs:
             https://mp.luckread.cn/register
             https://mp.luckread.cn/login
             https://mp.luckread.cn/publish
+            https://mp.luckread.cn/creator-center
             https://mp.luckread.cn/admin/creator-center
             https://api.luckread.cn/api/v1/contents
           )
