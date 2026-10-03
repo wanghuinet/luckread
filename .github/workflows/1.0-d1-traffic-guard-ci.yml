@@ -74,15 +74,14 @@ jobs:
           for (const [key, value] of expected) {
             if (contract.invariants[key] !== value) throw new Error(key + ' mismatch')
           }
-          for (const [path, binding] of [
-            ['workers/W01-payload/wrangler.jsonc', 'AUTH_LOGIN_LIMITER'],
-            ['workers/W03-content/wrangler.jsonc', 'CONTENT_PUBLIC_READ_LIMITER'],
-            ['workers/W05-social/wrangler.jsonc', 'SOCIAL_READ_LIMITER']
+          for (const [path, bindings] of [
+            ['workers/W01-payload/wrangler.jsonc', ['AUTH_LOGIN_LIMITER', 'AUTH_REGISTER_LIMITER', 'AUTH_REFRESH_LIMITER']],
+            ['workers/W03-content/wrangler.jsonc', ['CONTENT_PUBLIC_READ_LIMITER', 'CONTENT_MUTATION_LIMITER', 'CONTENT_ORIGIN_GLOBAL_LIMITER']],
+            ['workers/W05-social/wrangler.jsonc', ['SOCIAL_READ_LIMITER', 'SOCIAL_WRITE_LIMITER', 'SOCIAL_ORIGIN_GLOBAL_LIMITER']]
           ]) {
             const source = fs.readFileSync(path, 'utf8')
-            if (!source.includes('"ratelimits"') || !source.includes('"' + binding + '"')) {
-              throw new Error(path + ' missing ' + binding)
-            }
+            if (!source.includes('"ratelimits"')) throw new Error(path + ' missing ratelimits')
+            for (const binding of bindings) if (!source.includes('"' + binding + '"')) throw new Error(path + ' missing ' + binding)
           }
           const listRoute = fs.readFileSync('workers/W01-payload/src/app/api/v1/contents/route.ts', 'utf8')
           const detailRoute = fs.readFileSync('workers/W01-payload/src/app/api/v1/contents/[contentId]/route.ts', 'utf8')
