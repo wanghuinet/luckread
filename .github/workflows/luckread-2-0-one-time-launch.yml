@@ -125,7 +125,7 @@ jobs:
             code="$(curl -L -sS -o /tmp/luckread-smoke -w '%{http_code}' "$url")"
             echo "$url -> $code"
             case "$url" in
-              */register|*/login|*/publish|*/admin/creator-center) test "$code" -ge 200 && test "$code" -lt 500 ;;
+              */register|*/login|*/publish|*/creator-center|*/admin/creator-center) test "$code" -ge 200 && test "$code" -lt 500 ;;
               */contents) test "$code" = 200 ;;
             esac
           done
