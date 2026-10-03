@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 type Direction = 'followers' | 'following'
 
@@ -52,6 +52,8 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [unfollowingId, setUnfollowingId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const requestControllerRef = useRef<AbortController | null>(null)
+  const requestIdRef = useRef(0)
 
   const loadProfile = useCallback(async (signal?: AbortSignal): Promise<string> => {
     const response = await fetch('/api/v1/users/me', {
@@ -103,37 +105,60 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
     setHasMore(data.data.hasMore)
   }, [direction])
 
+  const beginRequest = useCallback(() => {
+    requestControllerRef.current?.abort()
+    const controller = new AbortController()
+    requestControllerRef.current = controller
+    const requestId = ++requestIdRef.current
+    return { controller, requestId }
+  }, [])
+
   const load = useCallback(async () => {
+    const { controller, requestId } = beginRequest()
     setLoading(true)
     setError('')
     try {
-      const ownerId = userId ?? await loadProfile()
-      await loadList(ownerId, null, false)
+      const ownerId = userId ?? await loadProfile(controller.signal)
+      if (controller.signal.aborted || requestId !== requestIdRef.current) return
+      await loadList(ownerId, null, false, controller.signal)
     } catch (cause) {
+      if (controller.signal.aborted || requestId !== requestIdRef.current) return
       if (cause instanceof Error && cause.message === 'UNAUTHENTICATED') return
       setError(cause instanceof Error ? cause.message : '关系列表加载失败')
     } finally {
-      setLoading(false)
+      if (requestId === requestIdRef.current && !controller.signal.aborted) {
+        setLoading(false)
+        if (requestControllerRef.current === controller) requestControllerRef.current = null
+      }
     }
-  }, [loadList, loadProfile, userId])
+  }, [beginRequest, loadList, loadProfile, userId])
 
   useEffect(() => {
-    const controller = new AbortController()
+    const { controller, requestId } = beginRequest()
 
     void (async () => {
       try {
         const ownerId = await loadProfile(controller.signal)
+        if (controller.signal.aborted || requestId !== requestIdRef.current) return
         await loadList(ownerId, null, false, controller.signal)
       } catch (cause) {
-        if (controller.signal.aborted || (cause instanceof Error && cause.message === 'UNAUTHENTICATED')) return
+        if (controller.signal.aborted || requestId !== requestIdRef.current) return
+        if (cause instanceof Error && cause.message === 'UNAUTHENTICATED') return
         setError(cause instanceof Error ? cause.message : '关系列表加载失败')
       } finally {
-        if (!controller.signal.aborted) setLoading(false)
+        if (requestId === requestIdRef.current && !controller.signal.aborted) {
+          setLoading(false)
+          if (requestControllerRef.current === controller) requestControllerRef.current = null
+        }
       }
     })()
 
-    return () => controller.abort()
-  }, [direction, loadList, loadProfile])
+    return () => {
+      requestIdRef.current += 1
+      if (requestControllerRef.current === controller) requestControllerRef.current = null
+      controller.abort()
+    }
+  }, [beginRequest, direction, loadList, loadProfile])
 
   async function unfollow(targetUserId: string) {
     if (isFollowers || unfollowingId) return
@@ -172,14 +197,19 @@ export default function MeFollowList({ direction }: { direction: Direction }) {
 
   async function loadMore() {
     if (!userId || loadingMore || !hasMore || !nextCursor) return
+    const { controller, requestId } = beginRequest()
     setLoadingMore(true)
     setError('')
     try {
-      await loadList(userId, nextCursor, true)
+      await loadList(userId, nextCursor, true, controller.signal)
     } catch (cause) {
+      if (controller.signal.aborted || requestId !== requestIdRef.current) return
       setError(cause instanceof Error ? cause.message : '更多关系加载失败')
     } finally {
-      setLoadingMore(false)
+      if (requestId === requestIdRef.current && !controller.signal.aborted) {
+        setLoadingMore(false)
+        if (requestControllerRef.current === controller) requestControllerRef.current = null
+      }
     }
   }
 
