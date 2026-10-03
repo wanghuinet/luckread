@@ -43,6 +43,6 @@ describe('v1 content adapter', () => {
 
   it('keeps public GET without mutation preconditions', () => {
     expect(route).toContain("method: 'GET'")
-    expect(route).toContain('resolveOptionalContentPrincipal')
+    expect(route).toContain('resolveOptionalCookieContentPrincipal')
   })
 })
