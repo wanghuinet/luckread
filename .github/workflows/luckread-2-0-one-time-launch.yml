@@ -114,16 +114,16 @@ jobs:
         run: |
           set -euo pipefail
           urls=(
-            https://mp.luckread.cn/register
-            https://mp.luckread.cn/login
-            https://mp.luckread.cn/publish
-            https://mp.luckread.cn/creator-center
+            https://mp.luckread.com/register
+            https://mp.luckread.com/login
+            https://mp.luckread.com/publish
+            https://mp.luckread.com/creator-center
             https://mp.luckread.com/register
             https://mp.luckread.com/login
             https://mp.luckread.com/publish
             https://mp.luckread.com/creator-center
             https://mp.luckread.com/admin
-            https://api.luckread.cn/api/v1/contents
+            https://api.luckread.com/api/v1/contents
           )
           for url in "${urls[@]}"; do
             code="$(curl -L -sS -o /tmp/luckread-smoke -w '%{http_code}' "$url")"
