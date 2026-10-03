@@ -21,7 +21,15 @@ type CommentPage = {
   hasMore: boolean
 }
 
-export default function ContentComments({ contentId, viewerUserId }: { contentId: string; viewerUserId: string | null }) {
+export default function ContentComments({
+  contentId,
+  viewerUserId,
+  interactionRestricted = false,
+}: {
+  contentId: string
+  viewerUserId: string | null
+  interactionRestricted?: boolean
+}) {
   const [comments, setComments] = useState<CommentItem[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
@@ -258,7 +266,8 @@ export default function ContentComments({ contentId, viewerUserId }: { contentId
         <h2 id="content-comments-heading">评论</h2>
       </div>
 
-      <form className="content-comment-form" onSubmit={submitComment}>
+      {!interactionRestricted ? (
+        <form className="content-comment-form" onSubmit={submitComment}>
         <label htmlFor="content-comment-body">发表评论</label>
         <textarea
           id="content-comment-body"
@@ -276,8 +285,11 @@ export default function ContentComments({ contentId, viewerUserId }: { contentId
           <button disabled={!body.trim() || submitting} type="submit">
             {submitting ? '提交中…' : '发表评论'}
           </button>
-        </div>
-      </form>
+          </div>
+        </form>
+      ) : (
+        <p className="content-comment-message" role="status">当前关系受屏蔽规则限制，暂不可发表评论或互动。</p>
+      )}
 
       {message ? <p className="content-comment-message" role="status">{message}</p> : null}
 
@@ -336,18 +348,20 @@ export default function ContentComments({ contentId, viewerUserId }: { contentId
               ) : (
                 <>
                   <p>{comment.body}</p>
-                  <button
-                    className="content-comment-reply"
-                    disabled={likingCommentId === comment.id}
-                    onClick={() => void toggleCommentLike(comment)}
-                    type="button"
-                  >
-                    {likingCommentId === comment.id
-                      ? '处理中…'
-                      : likedComments[comment.id]
-                        ? '已赞'
-                        : '赞'}
-                  </button>
+                  {!interactionRestricted ? (
+                    <button
+                      className="content-comment-reply"
+                      disabled={likingCommentId === comment.id}
+                      onClick={() => void toggleCommentLike(comment)}
+                      type="button"
+                    >
+                      {likingCommentId === comment.id
+                        ? '处理中…'
+                        : likedComments[comment.id]
+                          ? '已赞'
+                          : '赞'}
+                    </button>
+                  ) : null}
                   {comment.authorUserId === viewerUserId ? (
                     <button
                       className="content-comment-reply"
@@ -372,7 +386,7 @@ export default function ContentComments({ contentId, viewerUserId }: { contentId
                       {deletingId === comment.id ? '删除中…' : '删除'}
                     </button>
                   ) : null}
-                  {comment.depth < 3 ? (
+                  {!interactionRestricted && comment.depth < 3 ? (
                     <button
                       className="content-comment-reply"
                       onClick={() => {
