@@ -37,6 +37,12 @@ async function forward(request: Request, method: 'GET' | 'POST' | 'DELETE'): Pro
   try {
     const principal = await resolveCookieSocialPrincipal(request)
     if (principal instanceof Response) return principal
+    if (method !== 'GET') {
+      const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+      if (!idempotencyKey || idempotencyKey.length > 256) {
+        return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
+      }
+    }
     const target = method === 'GET' ? parseQueryTarget(request) : await parseTarget(request)
     if (target instanceof Response) return target
     const pathname = method === 'GET'
