@@ -22,6 +22,7 @@ on:
       - 'workers/W01-payload/src/app/api/v1/media/**'
       - 'workers/W01-payload/src/app/(payload)/api/users/me/route.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/[contentId]/comments/route.ts'
+      - 'workers/W01-payload/src/app/(frontend)/content/[contentId]/page.tsx'
       - 'workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts'
       - 'workers/W01-payload/src/content/w03-content-client.ts'
       - 'workers/W01-payload/src/social/w05-social-client.ts'
@@ -83,7 +84,7 @@ jobs:
             if (contract.invariants[key] !== value) throw new Error(key + ' mismatch')
           }
           for (const [path, bindings] of [
-            ['workers/W01-payload/wrangler.jsonc', ['PUBLIC_ORIGIN_GLOBAL_LIMITER', 'PUBLIC_READ_LIMITER', 'AUTH_ORIGIN_GLOBAL_LIMITER', 'AUTH_LOGIN_LIMITER', 'AUTH_REGISTER_LIMITER', 'AUTH_REFRESH_LIMITER']],
+            ['workers/W01-payload/wrangler.jsonc', ['PUBLIC_ORIGIN_GLOBAL_LIMITER', 'PUBLIC_READ_LIMITER', 'AUTH_ORIGIN_GLOBAL_LIMITER', 'AUTH_LOGIN_LIMITER', 'AUTH_REGISTER_LIMITER', 'AUTH_REFRESH_LIMITER', 'W01_WRITE_ORIGIN_GLOBAL_LIMITER', 'W01_WRITE_LIMITER']],
             ['workers/W03-content/wrangler.jsonc', ['CONTENT_PUBLIC_READ_LIMITER', 'CONTENT_MUTATION_LIMITER', 'CONTENT_ORIGIN_GLOBAL_LIMITER']],
             ['workers/W05-social/wrangler.jsonc', ['SOCIAL_READ_LIMITER', 'SOCIAL_WRITE_LIMITER', 'SOCIAL_ORIGIN_GLOBAL_LIMITER']],
             ['workers/W06-governance/wrangler.jsonc', ['GOVERNANCE_READ_LIMITER', 'GOVERNANCE_WRITE_LIMITER', 'GOVERNANCE_ORIGIN_GLOBAL_LIMITER']],
