@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { changeSubscriptionPlan, createSubscription, getSubscription, listSubscriptions, SubscriptionRuntimeError, transitionSubscription, validateIfMatch, validateIdempotencyKey, validatePrincipal } from './subscription-runtime.js'
+import { changeSubscriptionPlan, createSubscription, getSubscription, listSubscriptions, parseBoundedPositiveInt, SubscriptionRuntimeError, transitionSubscription, validateIfMatch, validateIdempotencyKey, validatePrincipal } from './subscription-runtime.js'
 
 interface Env { D1_01: D1Database }
 
@@ -67,11 +67,8 @@ export default {
       }
       if (operation.operation === 'list') {
         const url = new URL(request.url)
-        const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)
-        const requestedPage = Number.parseInt(url.searchParams.get('page') ?? '1', 10)
-        if ((url.searchParams.has('limit') && !Number.isFinite(requestedLimit)) || (url.searchParams.has('page') && !Number.isFinite(requestedPage))) {
-          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
-        }
+        const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
+        const requestedPage = parseBoundedPositiveInt(url.searchParams.get('page'), 1, 10000)
         const result = await listSubscriptions(env.D1_01, principal, requestedLimit, requestedPage)
         return json({ data: result, requestId: crypto.randomUUID() })
       }

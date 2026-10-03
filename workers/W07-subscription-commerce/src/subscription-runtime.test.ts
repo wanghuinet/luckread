@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { changeSubscriptionPlan, createSubscription, etagForUpdatedAt, getSubscription, listSubscriptions, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
+import { changeSubscriptionPlan, createSubscription, etagForUpdatedAt, getSubscription, listSubscriptions, parseBoundedPositiveInt, transitionSubscription, type SubscriptionRow, type SubscriptionStatus } from './subscription-runtime.js'
 
 type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; all: <T>() => Promise<{ results: T[] }>; run: () => Promise<{ meta: { changes: number } }> }
 
@@ -72,6 +72,23 @@ const baseRow = (overrides: Partial<SubscriptionRow> = {}): SubscriptionRow => (
 })
 
 describe('subscription runtime', () => {
+  it('rejects malformed or out-of-range pagination parameters', () => {
+    const cases = [
+      ['0', 20, 50],
+      ['-1', 20, 50],
+      ['1abc', 20, 50],
+      ['51', 20, 50],
+      ['10001', 1, 10000],
+    ] as const
+    for (const [value, fallback, max] of cases) {
+      expect(() => parseBoundedPositiveInt(value, fallback, max)).toThrowError(
+        expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }),
+      )
+    }
+    expect(parseBoundedPositiveInt(null, 20, 50)).toBe(20)
+    expect(parseBoundedPositiveInt('50', 20, 50)).toBe(50)
+    expect(parseBoundedPositiveInt('10000', 1, 10000)).toBe(10000)
+  })
   it('enforces idempotency at the W07 transport boundary for every mutation operation', () => {
     const index = readFileSync(resolve(process.cwd(), 'src/index.ts'), 'utf8')
     expect(index).toContain("if (isMutationOperation(operation.operation)) validateIdempotencyKey(request.headers.get('Idempotency-Key'))")
