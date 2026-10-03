@@ -22,6 +22,12 @@ export async function enforceAuthRateLimit(
   } catch {
     return
   }
+  const globalLimiter = env.AUTH_ORIGIN_GLOBAL_LIMITER as RateLimitBinding | undefined
+  if (globalLimiter) {
+    const globalResult = await globalLimiter.limit({ key: bindingName + ':origin' })
+    if (!globalResult.success) throw new TrafficLimitError()
+  }
+
   const limiter = env[bindingName] as RateLimitBinding | undefined
   if (!limiter) return
 
