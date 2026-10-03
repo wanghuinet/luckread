@@ -107,6 +107,15 @@ describe('public user profile', () => {
     expect(page).toContain('加载更多作品')
     expect(page).toContain("href={'/content/' + encodeURIComponent(item.id)}")
   })
+  it('invalidates stale public-profile content pagination on navigation', () => {
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    expect(page).toContain('const contentRequestRef = useRef<AbortController | null>(null)')
+    expect(page).toContain('const contentRequestIdRef = useRef(0)')
+    expect(page).toContain('contentRequestIdRef.current += 1')
+    expect(page).toContain('contentRequestRef.current?.abort()')
+    expect(page).toContain('signal: controller.signal')
+  })
+
   it('renders existing work cover URLs as public thumbnails', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
     expect(page).toContain("src={item.coverRef}")

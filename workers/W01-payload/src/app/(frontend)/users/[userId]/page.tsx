@@ -164,7 +164,9 @@ export default function PublicProfilePage({
     return () => {
       cancelled = true
       controller.abort()
+      contentRequestIdRef.current += 1
       contentRequestRef.current?.abort()
+      contentRequestRef.current = null
     }
   }, [params])
 
