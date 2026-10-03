@@ -20,6 +20,11 @@ export type LikeResult = {
 const RESOURCE_ID_MAX = 128
 const LIKE_STATUS_CACHE_TTL_SECONDS = 5
 
+const getDefaultCache = (): Cache | null => {
+  if (typeof globalThis.caches === 'undefined') return null
+  return (globalThis.caches as unknown as { default?: Cache }).default ?? null
+}
+
 const likeStatusCacheKey = (actorUserId: string, targetType: string, targetId: string): Request =>
   new Request(
     'https://cache.luckread.internal/__social-like-status?v=1&actor=' +
@@ -36,8 +41,9 @@ const readCachedLikeStatus = async (
   targetType: string,
   targetId: string,
 ): Promise<{ liked: boolean; likeCount: number } | null> => {
-  if (typeof caches === 'undefined' || !caches.default) return null
-  const hit = await caches.default.match(likeStatusCacheKey(actorUserId, targetType, targetId))
+  const cache = getDefaultCache()
+  if (!cache) return null
+  const hit = await cache.match(likeStatusCacheKey(actorUserId, targetType, targetId))
   if (!hit) return null
   try {
     const value = await hit.json() as { liked?: unknown; likeCount?: unknown }
@@ -54,14 +60,15 @@ const writeCachedLikeStatus = async (
   targetId: string,
   value: { liked: boolean; likeCount: number },
 ): Promise<void> => {
-  if (typeof caches === 'undefined' || !caches.default) return
+  const cache = getDefaultCache()
+  if (!cache) return
   const response = Response.json(value, {
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': `private, max-age=0, s-maxage=${LIKE_STATUS_CACHE_TTL_SECONDS}`,
     },
   })
-  await caches.default.put(likeStatusCacheKey(actorUserId, targetType, targetId), response)
+  await cache.put(likeStatusCacheKey(actorUserId, targetType, targetId), response)
 }
 
 const invalidateCachedLikeStatus = async (
@@ -69,8 +76,9 @@ const invalidateCachedLikeStatus = async (
   targetType: string,
   targetId: string,
 ): Promise<void> => {
-  if (typeof caches === 'undefined' || !caches.default) return
-  await caches.default.delete(likeStatusCacheKey(actorUserId, targetType, targetId))
+  const cache = getDefaultCache()
+  if (!cache) return
+  await cache.delete(likeStatusCacheKey(actorUserId, targetType, targetId))
 }
 
 const validateTarget = (target: LikeTarget): { targetType: 'content' | 'comment'; targetId: string } => {
