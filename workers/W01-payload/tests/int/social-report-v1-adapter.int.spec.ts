@@ -19,6 +19,18 @@ describe('v1 report adapter', () => {
     expect(route).not.toContain('D1_03')
   })
 
+  it('enforces canonical report field bounds before forwarding', () => {
+    const route = readFileSync(
+      resolve(process.cwd(), 'src/app/api/v1/reports/route.ts'),
+      'utf8',
+    )
+    expect(route).toContain('targetId.length > 128')
+    expect(route).toContain('reasonCode.length > 128')
+    expect(route).toContain('description.length > 4000')
+    expect(route).toContain('evidenceRefs.length > 20')
+    expect(route).toContain('value.length > 512')
+  })
+
   it('keeps the public payload aligned with the canonical report target model', () => {
     const route = readFileSync(
       resolve(process.cwd(), 'src/app/api/v1/reports/route.ts'),
