@@ -479,70 +479,70 @@ export default function PublicProfilePage({
                   <span aria-hidden="true">✉</span>
                 </button>
               ) : null}
-                <div className="creator-profile-overflow">
-                  <button
-                    className="creator-profile-circle-button"
-                    type="button"
-                    aria-label="更多操作"
-                    aria-expanded={actionsOpen}
-                    aria-haspopup="menu"
-                    onClick={() => setActionsOpen((open) => !open)}
-                  >
-                    <span aria-hidden="true">•••</span>
-                  </button>
-                  {actionsOpen ? (
-                    <div className="creator-profile-overflow-menu" role="menu" aria-label="更多操作">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setActionsOpen(false)
-                          void shareProfile()
-                        }}
-                      >
-                        分享
-                      </button>
-                      {viewerUserId !== profile.id ? (
-                        <>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            disabled={muteBusy}
-                        onClick={() => {
-                          setActionsOpen(false)
-                          void applySafetyAction('mute')
-                        }}
-                      >
-                        {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音'}
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        disabled={blockBusy}
-                        onClick={() => {
-                          setActionsOpen(false)
-                          void applySafetyAction('block')
-                        }}
-                      >
-                        {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽'}
-                      </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            disabled={reportBusy}
-                            onClick={() => {
-                              setActionsOpen(false)
-                              void reportProfile()
-                            }}
-                          >
-                            {reportBusy ? '举报中…' : '举报'}
-                          </button>
-                        </>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
+              <div className="creator-profile-overflow">
+                <button
+                  className="creator-profile-circle-button"
+                  type="button"
+                  aria-label="更多操作"
+                  aria-expanded={actionsOpen}
+                  aria-haspopup="menu"
+                  onClick={() => setActionsOpen((open) => !open)}
+                >
+                  <span aria-hidden="true">•••</span>
+                </button>
+                {actionsOpen ? (
+                  <div className="creator-profile-overflow-menu" role="menu" aria-label="更多操作">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setActionsOpen(false)
+                        void shareProfile()
+                      }}
+                    >
+                      分享
+                    </button>
+                    {viewerUserId !== profile.id ? (
+                      <>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={muteBusy}
+                          onClick={() => {
+                            setActionsOpen(false)
+                            void applySafetyAction('mute')
+                          }}
+                        >
+                          {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音'}
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={blockBusy}
+                          onClick={() => {
+                            setActionsOpen(false)
+                            void applySafetyAction('block')
+                          }}
+                        >
+                          {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽'}
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={reportBusy}
+                          onClick={() => {
+                            setActionsOpen(false)
+                            void reportProfile()
+                          }}
+                        >
+                          {reportBusy ? '举报中…' : '举报'}
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
+            </div>
 
             <div className="creator-profile-actions">
               {viewerUserId !== profile.id && !blocked && !blockedBy ? (
