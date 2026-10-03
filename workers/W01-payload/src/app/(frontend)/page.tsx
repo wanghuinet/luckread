@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { getPayload } from 'payload'
 import React from 'react'
 
@@ -9,6 +9,7 @@ import { enforcePublicReadRateLimit } from '@/auth/traffic-limit'
 import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
 import { validateSession } from '@/auth/w02-session-client'
 
+import CreatorLanguageToggle from './creator-center/CreatorLanguageToggle'
 import { CreatorStudio } from './creator-center/CreatorStudio'
 import HomeContentFeed from './HomeContentFeed'
 import './styles.css'
@@ -17,6 +18,8 @@ const CREATOR_CENTER_URL = 'https://mp.luckread.com/'
 const CREATOR_CENTER_HOSTS = new Set(['mp.luckread.com'])
 
 export const dynamic = 'force-dynamic'
+
+type StudioLocale = 'zh-CN' | 'en-US'
 
 const highlights = [
   { index: '01', eyebrow: '发现', title: '从日常阅读，到更广阔的世界', body: '汇聚图文、视频与深度内容，让每一次停留都有值得带走的东西。' },
@@ -28,6 +31,8 @@ const categories = ['图文', '视频', '动态', '专栏', '创作者']
 export default async function HomePage() {
   const requestHeaders = await headers()
   const host = (requestHeaders.get('host') || '').split(':')[0].toLowerCase()
+  const localeCookie = (await cookies()).get('luckread-ui-locale')?.value
+  const locale: StudioLocale = localeCookie === 'en-US' ? 'en-US' : 'zh-CN'
 
   if (CREATOR_CENTER_HOSTS.has(host)) {
     const request = new Request('https://mp.luckread.com/', {
@@ -97,7 +102,7 @@ export default async function HomePage() {
                   ? authenticatedUser.email
                   : '创作者'
 
-          return <CreatorStudio displayName={displayName} userId={String(authenticatedUser.id)} />
+          return <CreatorStudio displayName={displayName} userId={String(authenticatedUser.id)} locale={locale} />
         }
       }
     }
@@ -107,20 +112,23 @@ export default async function HomePage() {
     return (
       <div className="mp-entry-shell">
         <header className="mp-entry-header">
-          <Link className="mp-entry-brand" href="/" aria-label="LuckRead 创作者中心首页">
+          <Link className="mp-entry-brand" href="/" aria-label={locale === 'en-US' ? 'LuckRead Creator Studio home' : 'LuckRead 创作者中心首页'}>
             <span className="mp-entry-brand-mark">L</span>
             <span>LuckRead Creator Studio</span>
           </Link>
-          <span className="mp-entry-domain">mp.luckread.com</span>
+          <div className="mp-entry-header-tools">
+            <span className="mp-entry-domain">mp.luckread.com</span>
+            <CreatorLanguageToggle locale={locale} />
+          </div>
         </header>
         <main className="mp-entry-main">
           <section className="mp-entry-copy" aria-labelledby="mp-entry-title">
             <span className="mp-entry-kicker">CREATOR WORKSPACE</span>
             <h1 id="mp-entry-title">创作、管理、运营，<strong>一站完成。</strong></h1>
-            <p>登录 LuckRead 账号后进入创作者工作台，直接发布文章、动态和视频，并管理内容、审核、素材与粉丝关系。</p>
+            <p>{locale === 'en-US' ? 'Sign in to LuckRead Creator Studio to publish articles, posts, and videos, and manage content, review, media, and audience relationships.' : '登录 LuckRead 账号后进入创作者工作台，直接发布文章、动态和视频，并管理内容、审核、素材与粉丝关系。'}</p>
             <div className="mp-entry-actions">
-              <Link className="mp-entry-primary" href="/login?returnTo=%2F">登录并进入创作者中心</Link>
-              <Link className="mp-entry-secondary" href="/creator-center">进入兼容入口</Link>
+              <Link className="mp-entry-primary" href="/login?returnTo=%2F">{locale === 'en-US' ? 'Sign in to Creator Studio' : '登录并进入创作者中心'}</Link>
+              <Link className="mp-entry-secondary" href="/creator-center">{locale === 'en-US' ? 'Open creator center' : '进入兼容入口'}</Link>
             </div>
           </section>
           <section className="mp-entry-preview" aria-label="创作者工作台预览">
