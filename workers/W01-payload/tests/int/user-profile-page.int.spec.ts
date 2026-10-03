@@ -37,7 +37,9 @@ describe('user profile page', () => {
     expect(page).toContain("credentials: 'include'")
     expect(page).toContain("response.status !== 401")
     expect(page).toContain("window.location.assign('/')")
+    expect(page).toContain('onClick={() => void logout()}')
     expect(page).toContain('退出登录')
+    expect(page).toContain('disabled={saving || loggingOut}')
   })
 
   it('uploads avatars through the existing authenticated media API and waits for profile save', () => {
