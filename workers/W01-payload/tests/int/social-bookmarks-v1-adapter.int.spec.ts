@@ -17,6 +17,13 @@ describe('v1 bookmark adapters', () => {
     expect(route).not.toContain('interaction_favorites')
   })
 
+  it('enforces Idempotency-Key on bookmark mutations', () => {
+    expect(route).toContain("method !== 'GET'")
+    expect(route).toContain("request.headers.get('Idempotency-Key')")
+    expect(route).toContain("PRECONDITION_REQUIRED")
+    expect(route).toContain('idempotencyKey.length > 256')
+  })
+
   it('exposes favorite status plus both idempotent mutation methods', () => {
     expect(route).toContain("return forward(request, 'GET')")
     expect(route).toContain("return forward(request, 'POST')")
