@@ -18,6 +18,60 @@ export type LikeResult = {
 }
 
 const RESOURCE_ID_MAX = 128
+const LIKE_STATUS_CACHE_TTL_SECONDS = 5
+
+const likeStatusCacheKey = (actorUserId: string, targetType: string, targetId: string): Request =>
+  new Request(
+    'https://cache.luckread.internal/__social-like-status?v=1&actor=' +
+      encodeURIComponent(actorUserId) +
+      '&type=' +
+      encodeURIComponent(targetType) +
+      '&id=' +
+      encodeURIComponent(targetId),
+    { method: 'GET' },
+  )
+
+const readCachedLikeStatus = async (
+  actorUserId: string,
+  targetType: string,
+  targetId: string,
+): Promise<{ liked: boolean; likeCount: number } | null> => {
+  if (typeof caches === 'undefined' || !caches.default) return null
+  const hit = await caches.default.match(likeStatusCacheKey(actorUserId, targetType, targetId))
+  if (!hit) return null
+  try {
+    const value = await hit.json() as { liked?: unknown; likeCount?: unknown }
+    if (typeof value.liked !== 'boolean' || !Number.isSafeInteger(value.likeCount) || value.likeCount < 0) return null
+    return { liked: value.liked, likeCount: value.likeCount }
+  } catch {
+    return null
+  }
+}
+
+const writeCachedLikeStatus = async (
+  actorUserId: string,
+  targetType: string,
+  targetId: string,
+  value: { liked: boolean; likeCount: number },
+): Promise<void> => {
+  if (typeof caches === 'undefined' || !caches.default) return
+  const response = Response.json(value, {
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': `private, max-age=0, s-maxage=${LIKE_STATUS_CACHE_TTL_SECONDS}`,
+    },
+  })
+  await caches.default.put(likeStatusCacheKey(actorUserId, targetType, targetId), response)
+}
+
+const invalidateCachedLikeStatus = async (
+  actorUserId: string,
+  targetType: string,
+  targetId: string,
+): Promise<void> => {
+  if (typeof caches === 'undefined' || !caches.default) return
+  await caches.default.delete(likeStatusCacheKey(actorUserId, targetType, targetId))
+}
 
 const validateTarget = (target: LikeTarget): { targetType: 'content' | 'comment'; targetId: string } => {
   if (target.targetType !== 'content' && target.targetType !== 'comment') {
@@ -164,6 +218,8 @@ export async function like(
 
   if (!row) throw new LikeRuntimeError('NOT_FOUND', 404)
 
+  await invalidateCachedLikeStatus(actor, targetType, targetId)
+
   return {
     relationshipId: row.relationship_id,
     actorUserId: row.actor_user_id,
@@ -180,6 +236,8 @@ export async function getLikeStatus(
 ): Promise<{ liked: boolean; likeCount: number }> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
+  const cached = await readCachedLikeStatus(actor, targetType, targetId)
+  if (cached) return cached
   const row = targetType === 'content'
     ? await db.prepare(
         `SELECT
@@ -254,10 +312,12 @@ export async function getLikeStatus(
     throw new LikeRuntimeError('RELATIONSHIP_BLOCKED', 409)
   }
 
-  return {
+  const result = {
     liked: Boolean(row.liked),
     likeCount: Math.max(0, Number(row.like_count ?? 0)),
   }
+  await writeCachedLikeStatus(actor, targetType, targetId, result)
+  return result
 }
 
 export async function unlike(
