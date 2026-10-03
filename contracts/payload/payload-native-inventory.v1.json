@@ -62,6 +62,12 @@
           "sourceRef": "workers/W01-payload/src/collections/Media.ts:field:alt",
           "classification": "PAYLOAD_CONFIG_DISCOVERED",
           "required": true
+        },
+        {
+          "name": "ownerUserId",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Media.ts:field:ownerUserId",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED"
         }
       ]
     }
