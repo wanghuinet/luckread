@@ -137,6 +137,13 @@ export async function callW03Content(input: {
 
   if (input.principal?.userId) {
     headers.set('X-LuckRead-Principal-User-Id', input.principal.userId)
+    headers.set('X-LuckRead-Rate-Key', 'user:' + input.principal.userId)
+  } else {
+    const clientIp = input.request.headers.get('cf-connecting-ip')?.trim()
+    if (clientIp) {
+      headers.set('X-LuckRead-Client-IP', clientIp)
+      headers.set('X-LuckRead-Rate-Key', 'ip:' + clientIp)
+    }
   }
   if (input.principal?.layer) {
     headers.set('X-LuckRead-Principal-Layer', input.principal.layer)
