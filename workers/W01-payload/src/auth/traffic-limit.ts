@@ -29,7 +29,7 @@ export async function enforceAuthRateLimit(
   }
 
   const limiter = env[bindingName] as RateLimitBinding | undefined
-  if (!limiter) return
+  if (!limiter) throw new Error('RATE_LIMIT_BINDING_UNAVAILABLE:' + bindingName)
 
   const key = [bindingName, ...keyParts.map((part) => part.trim()).filter(Boolean)].join(':')
   const result = await limiter.limit({ key })
@@ -74,7 +74,7 @@ export async function enforcePublicReadRateLimit(request: Request): Promise<void
   }
 
   const limiter = env.PUBLIC_READ_LIMITER as RateLimitBinding | undefined
-  if (!limiter) return
+  if (!limiter) throw new Error('RATE_LIMIT_BINDING_UNAVAILABLE:PUBLIC_READ_LIMITER')
   const clientIp = request.headers.get('cf-connecting-ip')?.trim() || 'unknown'
   const result = await limiter.limit({ key: 'public-read:ip:' + clientIp })
   if (!result.success) throw new TrafficLimitError()
