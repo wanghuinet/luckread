@@ -38,6 +38,25 @@ describe('favorite runtime', () => {
     expect(d.prepare).toHaveBeenCalledTimes(2)
   })
 
+  it('binds the final bookmark write to published content', async () => {
+    const d = db([
+      { id: 'content-1', state: 'PUBLISHED' },
+      null,
+    ])
+
+    await expect(
+      favorite(d, 'user-1', { targetType: 'content', targetId: 'content-1' }),
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
+    })
+
+    const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[1]?.[0])
+    expect(sql).toContain("c.state = 'PUBLISHED'")
+    expect(sql).toContain('INSERT INTO interaction_favorites')
+    expect(sql).toContain('SELECT')
+  })
+
   it('is idempotent for an already-favorited content item', async () => {
     const d = db([
       { id: 'content-1', state: 'PUBLISHED' },
