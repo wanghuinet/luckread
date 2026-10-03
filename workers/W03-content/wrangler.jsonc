@@ -10,6 +10,7 @@
       "namespace_id": "2026100308",
       "simple": { "limit": 10000, "period": 60 }
     },
+    {
       "name": "CONTENT_PUBLIC_READ_LIMITER",
       "namespace_id": "2026100301",
       "simple": { "limit": 300, "period": 60 }
