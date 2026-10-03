@@ -1,6 +1,6 @@
 import { getPayload } from 'payload'
 
-import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
+import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 
 import config from '@payload-config'
 
@@ -97,6 +97,13 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function PATCH(request: Request): Promise<Response> {
+  try {
+    await enforceW01WriteRateLimit(request)
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile service unavailable')
+  }
+
   const authenticated = await authenticate(request)
   if (!authenticated) return unauthorized()
 
