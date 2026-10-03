@@ -617,12 +617,12 @@ export async function updateContent(
     etag: etagForVersion(nextVersion),
     updatedAt,
   }
-  const responseBody = publicContent(updated)
+  const idempotencyResponseBody = JSON.stringify(updated)
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
 
   await batchMutation(db, [
     expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
-    insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(responseBody), updatedAt, expiresAt),
+    insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, idempotencyResponseBody, updatedAt, expiresAt),
     db.prepare(
       `UPDATE contents
           SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, version = ?, revision = ?, etag = ?, updated_at = ?
