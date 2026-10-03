@@ -42,6 +42,6 @@ describe('public frontend i18n', () => {
 
     expect(browse).toContain("href={'/content/' + encodeURIComponent(item.id)}")
     expect(feed).toContain('href={`/content/${encodeURIComponent(item.id)}`}')
-    expect(detail).toContain("'/api/v1/contents/' + encodeURIComponent(contentId)")
+    expect(detail).toContain('fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`')
   })
 })
