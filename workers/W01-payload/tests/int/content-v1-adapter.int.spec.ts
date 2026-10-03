@@ -13,8 +13,10 @@ describe('v1 content adapter', () => {
     expect(route).toContain('callW03Content')
     expect(route).toContain("method: 'PATCH'")
     expect(route).toContain("method: 'DELETE'")
-    expect(route).not.toContain('contents')
     expect(route).not.toContain('D1Database')
+    expect(route).not.toContain('prepare(')
+    expect(route).not.toContain('INSERT INTO')
+    expect(route).not.toContain('UPDATE ')
   })
 
   it('enforces If-Match and Idempotency-Key on content mutations', () => {
