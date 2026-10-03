@@ -195,6 +195,10 @@ export default {
       ) {
         const actorUserId = requirePrincipal(request)
         requireInteractionLayer(request)
+        const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        if (!idempotencyKey || idempotencyKey.length > 256) {
+          throw new CommentRuntimeError('PRECONDITION_REQUIRED', 428)
+        }
         const commentId = decodePathPart(commentIdParts[3])
         if (commentId === null) throw new CommentRuntimeError('VALIDATION_FAILED', 400)
 
