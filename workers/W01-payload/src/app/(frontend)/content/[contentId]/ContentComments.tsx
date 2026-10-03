@@ -180,6 +180,7 @@ export default function ContentComments({ contentId, viewerUserId }: { contentId
           headers: {
             accept: 'application/json',
             'content-type': 'application/json',
+            'Idempotency-Key': 'social-comment-update:' + crypto.randomUUID(),
             'If-Match': '"' + comment.updatedAt + '"',
           },
           body: JSON.stringify({ body: editBody.trim() }),
