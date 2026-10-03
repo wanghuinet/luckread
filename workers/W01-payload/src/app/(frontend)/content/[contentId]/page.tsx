@@ -464,7 +464,11 @@ export default function ContentDetailPage({
           )}
         </div>
       </article>
-      <ContentComments contentId={content.id} viewerUserId={viewerUserId} />
+      <ContentComments
+        contentId={content.id}
+        viewerUserId={viewerUserId}
+        interactionRestricted={interactionRestricted}
+      />
     </main>
   )
 }

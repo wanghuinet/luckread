@@ -15,7 +15,9 @@ describe('content comments UI', () => {
   it('renders the comment component from the content detail page', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain("import ContentComments from './ContentComments'")
-    expect(page).toContain('<ContentComments contentId={content.id} viewerUserId={viewerUserId} />')
+    expect(page).toContain('<ContentComments')
+    expect(page).toContain('contentId={content.id}')
+    expect(page).toContain('viewerUserId={viewerUserId}')
   })
 
   it('keeps newly posted comments in the same chronological order as the public list', () => {
