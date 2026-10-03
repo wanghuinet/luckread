@@ -537,6 +537,8 @@ describe('W05 social query transport', () => {
           relationship_id: 'r1',
           user_id: 'fan-1',
           followed_at: '2026-10-02T00:00:00.000Z',
+        },
+        {
           total_count: 1,
         },
       ]),
@@ -571,6 +573,8 @@ describe('W05 social query transport', () => {
           relationship_id: 'r2',
           user_id: 'creator-2',
           followed_at: '2026-10-02T00:00:00.000Z',
+        },
+        {
           total_count: 1,
         },
       ]),
