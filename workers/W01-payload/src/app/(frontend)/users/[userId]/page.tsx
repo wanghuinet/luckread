@@ -34,6 +34,15 @@ type ContentListResponse = {
   }
 }
 
+type ProfileFilter = 'all' | PublicContent['contentType']
+
+const filterLabels: Record<ProfileFilter, string> = {
+  all: '作品',
+  video: '视频',
+  article: '文章',
+  post: '动态',
+}
+
 const contentTypeLabels: Record<PublicContent['contentType'], string> = {
   article: '文章',
   post: '动态',
@@ -60,6 +69,7 @@ export default function PublicProfilePage({
   const [muteBusy, setMuteBusy] = useState(false)
   const [reportBusy, setReportBusy] = useState(false)
   const [safetyMessage, setSafetyMessage] = useState('')
+  const [filter, setFilter] = useState<ProfileFilter>('all')
   const [contents, setContents] = useState<PublicContent[]>([])
   const [contentCursor, setContentCursor] = useState<string | null>(null)
   const [contentHasMore, setContentHasMore] = useState(false)
@@ -121,14 +131,13 @@ export default function PublicProfilePage({
 
         if (cancelled) return
         setProfile(data)
+
         const followerData = await followersResponse.json().catch((): null => null) as CountResponse | null
         const followingData = await followingResponse.json().catch((): null => null) as CountResponse | null
         const followData = await followResponse.json().catch((): null => null) as {
           data?: {
             following?: boolean
             relationship?: {
-              following?: boolean
-              followedBy?: boolean
               mutualFollow?: boolean
               blocked?: boolean
               blockedBy?: boolean
@@ -138,6 +147,7 @@ export default function PublicProfilePage({
         } | null
         const contentData = await contentResponse.json().catch((): null => null) as ContentListResponse | null
         const viewerData = await viewerResponse.json().catch((): null => null) as { id?: string } | null
+
         if (!cancelled) {
           setFollowers(typeof followerData?.data?.totalCount === 'number' ? followerData.data.totalCount : null)
           setFollowing(typeof followingData?.data?.totalCount === 'number' ? followingData.data.totalCount : null)
@@ -170,6 +180,48 @@ export default function PublicProfilePage({
     }
   }, [params])
 
+  async function reloadContents(nextFilter: ProfileFilter) {
+    if (!profile) return
+    contentRequestRef.current?.abort()
+    const controller = new AbortController()
+    contentRequestRef.current = controller
+    const requestId = ++contentRequestIdRef.current
+
+    setFilter(nextFilter)
+    setContentLoading(true)
+    setContentError('')
+    setContents([])
+    setContentCursor(null)
+    setContentHasMore(false)
+
+    try {
+      const query = [
+        'creatorId=' + encodeURIComponent(profile.id),
+        'limit=6',
+        ...(nextFilter === 'all' ? [] : ['type=' + encodeURIComponent(nextFilter)]),
+      ].join('&')
+      const response = await fetch('/api/v1/contents?' + query, {
+        headers: { accept: 'application/json' },
+        cache: 'no-store',
+        signal: controller.signal,
+      })
+      const data = await response.json().catch((): null => null) as ContentListResponse | null
+      if (!response.ok || !Array.isArray(data?.data?.items)) {
+        throw new Error('CONTENT_LIST_FAILED')
+      }
+      if (requestId !== contentRequestIdRef.current || controller.signal.aborted) return
+      setContents(data.data.items)
+      setContentCursor(typeof data.data.nextCursor === 'string' ? data.data.nextCursor : null)
+      setContentHasMore(data.data.hasMore === true)
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
+      if (requestId !== contentRequestIdRef.current) return
+      setContentError('暂时无法加载作品，请稍后重试。')
+    } finally {
+      if (requestId === contentRequestIdRef.current) setContentLoading(false)
+    }
+  }
+
   async function loadMoreContents() {
     if (contentLoading || !contentHasMore || !contentCursor || !profile) return
     contentRequestRef.current?.abort()
@@ -177,16 +229,20 @@ export default function PublicProfilePage({
     contentRequestRef.current = controller
     const requestId = ++contentRequestIdRef.current
     setContentLoading(true)
-    setContentError('')
+
     try {
-      const response = await fetch(
-        '/api/v1/contents?creatorId=' + encodeURIComponent(profile.id) + '&limit=6&cursor=' + encodeURIComponent(contentCursor),
-        {
-          headers: { accept: 'application/json' },
-          cache: 'no-store',
-          signal: controller.signal,
-        },
-      )
+      const params = new URLSearchParams({
+        creatorId: profile.id,
+        limit: '6',
+        cursor: contentCursor,
+      })
+      if (filter !== 'all') params.set('type', filter)
+
+      const response = await fetch('/api/v1/contents?' + params.toString(), {
+        headers: { accept: 'application/json' },
+        cache: 'no-store',
+        signal: controller.signal,
+      })
       const data = await response.json().catch((): null => null) as ContentListResponse | null
       if (!response.ok || !Array.isArray(data?.data?.items)) {
         throw new Error('CONTENT_LIST_FAILED')
@@ -226,9 +282,7 @@ export default function PublicProfilePage({
       }
 
       const data = await response.json().catch((): null => null) as { data?: { following?: boolean } } | null
-      if (!response.ok || typeof data?.data?.following !== 'boolean') {
-        throw new Error('FOLLOW_FAILED')
-      }
+      if (!response.ok || typeof data?.data?.following !== 'boolean') throw new Error('FOLLOW_FAILED')
 
       setIsFollowing(data.data.following)
       setFollowers((value) => value === null ? value : Math.max(0, value + (data.data.following ? 1 : -1)))
@@ -256,11 +310,7 @@ export default function PublicProfilePage({
           'content-type': 'application/json',
           'Idempotency-Key': 'report:profile:' + profile.id + ':' + crypto.randomUUID(),
         },
-        body: JSON.stringify({
-          targetType: 'profile',
-          targetId: profile.id,
-          reasonCode,
-        }),
+        body: JSON.stringify({ targetType: 'profile', targetId: profile.id, reasonCode }),
       })
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
@@ -332,213 +382,212 @@ export default function PublicProfilePage({
     }
   }
 
+  async function shareProfile() {
+    if (!profile) return
+    const shareData = {
+      title: displayName(profile),
+      text: 'LuckRead Creator',
+      url: window.location.href,
+    }
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData)
+        return
+      }
+      await navigator.clipboard.writeText(window.location.href)
+      setSafetyMessage('主页链接已复制。')
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
+      setSafetyMessage('暂时无法分享该主页。')
+    }
+  }
+
   if (loading) {
-    return <main className="content-detail" aria-busy="true"><p className="content-detail-state" role="status">正在加载作者资料…</p></main>
+    return <main className="creator-profile-state" aria-busy="true"><p role="status">正在加载作者资料…</p></main>
   }
 
   if (error && !profile) {
     return (
-      <main className="content-detail">
-        <div className="content-detail-state">
-          <p role="alert">{error}</p>
-          <Link href="/content">返回发现</Link>
-        </div>
+      <main className="creator-profile-state">
+        <p role="alert">{error}</p>
+        <Link href="/content">返回发现</Link>
       </main>
     )
   }
 
-  const displayName = profile?.displayName?.trim() || profile?.username || 'LuckRead 用户'
-  const initial = displayName.slice(0, 1).toUpperCase()
+  const name = displayName(profile)
+  const initial = name.slice(0, 1).toUpperCase()
+  const visibleContents = filter === 'all' ? contents : contents.filter((item) => item.contentType === filter)
+
+  function getContentHref(item: PublicContent) {
+    return '/' + encodeURIComponent(profile!.username) + '/' + item.contentType + '/' + encodeURIComponent(item.id)
+  }
 
   return (
-    <main className="content-detail">
-      <div className="content-detail-top">
-        <div className="content-detail-breadcrumbs">
+    <div className="creator-profile-shell">
+      <aside className="creator-profile-sidebar" aria-label="主导航">
+        <Link className="creator-profile-brand" href="/" aria-label="LuckRead 首页">L</Link>
+        <nav>
+          <Link className="creator-profile-nav-link" href="/">首页</Link>
+          <Link className="creator-profile-nav-link" href="/content">发现</Link>
+          <Link className="creator-profile-nav-link" href="#works">作品</Link>
+          <Link className="creator-profile-nav-link" href="/me/profile">我的</Link>
+        </nav>
+      </aside>
+
+      <header className="creator-profile-mobile-header">
+        <Link className="creator-profile-mobile-icon" href="/content" aria-label="返回发现">←</Link>
+        <strong>{name}</strong>
+        <button className="creator-profile-mobile-icon" type="button" onClick={() => void shareProfile()} aria-label="分享主页">↗</button>
+      </header>
+
+      <main className="creator-profile-page">
+        <div className="creator-profile-toolbar">
           <Link href="/content">← 返回发现</Link>
-          <Link href="/">首页</Link>
-        </div>
-      </div>
-
-      <article className="content-detail-card" aria-labelledby="public-profile-title">
-        <header className="content-detail-header">
-          <div
-            aria-label={displayName + ' 头像'}
-            role="img"
-            style={{
-              width: 72,
-              height: 72,
-              display: 'grid',
-              placeItems: 'center',
-              marginBottom: 16,
-              overflow: 'hidden',
-              borderRadius: '50%',
-              background: '#eef4ff',
-              color: '#2458e6',
-              fontSize: 28,
-              fontWeight: 800,
-            }}
-          >
-            {profile?.avatar ? (
-              <img
-                alt=""
-                height={72}
-                loading="eager"
-                src={profile.avatar}
-                style={{ width: 72, height: 72, objectFit: 'cover' }}
-                width={72}
-              />
-            ) : initial}
-          </div>
-          <p className="eyebrow">LUCKREAD CREATOR</p>
-          <h1 id="public-profile-title">{displayName}</h1>
-          <p style={{ margin: '6px 0 0', color: '#617086' }}>@{profile?.username}</p>
-        </header>
-
-        {profile?.bio ? (
-          <p style={{ margin: 0, color: '#334155', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{profile.bio}</p>
-        ) : (
-          <p className="content-detail-muted">这个用户还没有填写个人简介。</p>
-        )}
-
-        <div className="content-detail-actions" style={{ marginTop: 24 }}>
-          <Link href={'/users/' + encodeURIComponent(profile.id) + '/followers'}>
-            {followers === null ? '—' : followers.toLocaleString('zh-CN')} 粉丝
-          </Link>
-          <Link href={'/users/' + encodeURIComponent(profile.id) + '/following'}>
-            {following === null ? '—' : following.toLocaleString('zh-CN')} 关注
-          </Link>
-          {mutualFollow ? <span className="content-detail-relationship-badge">互相关注</span> : null}
-          {viewerUserId === profile.id ? (
-            <span className="content-detail-muted">这是你的主页</span>
-          ) : blocked || blockedBy ? (
-            <span className="content-detail-muted" role="status">当前关系受屏蔽规则限制。</span>
-          ) : (
-            <button
-              className="content-detail-follow"
-              disabled={followBusy}
-              onClick={() => void toggleFollow()}
-              type="button"
-            >
-              {followBusy ? '处理中…' : isFollowing ? '已关注' : '关注作者'}
-            </button>
-          )}
-          {error ? <span className="content-detail-action-status" role="status">{error}</span> : null}
+          <button type="button" onClick={() => void shareProfile()}>分享</button>
         </div>
 
-        {viewerUserId !== profile.id ? (
-          <div className="content-detail-safety-actions" aria-label="关系控制">
-            <button
-              className="content-detail-follow"
-              disabled={blockBusy}
-              onClick={() => void applySafetyAction('block')}
-              type="button"
-            >
-              {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽作者'}
-            </button>
-            <button
-              className="content-detail-follow"
-              disabled={muteBusy}
-              onClick={() => void applySafetyAction('mute')}
-              type="button"
-            >
-              {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音作者'}
-            </button>
-            <button
-              className="content-detail-follow"
-              disabled={reportBusy}
-              onClick={() => void reportProfile()}
-              type="button"
-            >
-              {reportBusy ? '举报中…' : '举报用户'}
-            </button>
-            {safetyMessage ? <span className="content-detail-action-status" role="status">{safetyMessage}</span> : null}
+        <section className="creator-profile-hero" aria-labelledby="creator-profile-title">
+          <div className="creator-profile-cover" aria-hidden="true" />
+          <div className="creator-profile-hero-main">
+            <div className="creator-profile-avatar" aria-label={name + ' 头像'}>
+              {profile?.avatar ? (
+                <img
+                  alt=""
+                  height={96}
+                  loading="eager"
+                  src={profile.avatar}
+                  width={96}
+                />
+              ) : initial}
+            </div>
+
+            <div className="creator-profile-identity">
+              <p className="creator-profile-eyebrow">LUCKREAD CREATOR</p>
+              <h1 id="creator-profile-title">{name}</h1>
+              <p className="creator-profile-handle">@{profile?.username}</p>
+              {profile?.bio ? <p className="creator-profile-bio">{profile.bio}</p> : null}
+            </div>
+
+            <div className="creator-profile-actions">
+              {viewerUserId !== profile.id && !blocked && !blockedBy ? (
+                <button
+                  className="creator-profile-button creator-profile-button-primary"
+                  disabled={followBusy}
+                  onClick={() => void toggleFollow()}
+                  type="button"
+                >
+                  {followBusy ? '处理中…' : isFollowing ? '已关注' : '关注'}
+                </button>
+              ) : null}
+              <button className="creator-profile-button" type="button" onClick={() => setSafetyMessage('订阅入口将在会员功能接通后启用。')}>
+                订阅
+              </button>
+              {mutualFollow ? <span className="creator-profile-badge">互相关注</span> : null}
+            </div>
           </div>
-        ) : null}
-      </article>
 
-      <section className="content-detail-card" aria-labelledby="author-content-title" style={{ marginTop: 20 }}>
-        <header className="content-detail-header">
-          <p className="eyebrow">PUBLISHED WORKS</p>
-          <h2 id="author-content-title" style={{ marginBottom: 0 }}>公开作品</h2>
-        </header>
+          <dl className="creator-profile-stats" aria-label="作者数据">
+            <div>
+              <dt>关注</dt>
+              <dd>{following === null ? '—' : following.toLocaleString('zh-CN')}</dd>
+            </div>
+            <div>
+              <dt>粉丝</dt>
+              <dd>{followers === null ? '—' : followers.toLocaleString('zh-CN')}</dd>
+            </div>
+            <div>
+              <dt>作品</dt>
+              <dd>{contents.length.toLocaleString('zh-CN')}</dd>
+            </div>
+          </dl>
 
-        {contentError ? <p className="content-detail-action-status" role="status">{contentError}</p> : null}
-        {contentLoading && contents.length === 0 ? (
-          <p className="content-detail-state" role="status">正在加载作品…</p>
-        ) : null}
-        {!contentLoading && contents.length === 0 && !contentError ? (
-          <p className="content-detail-muted">这个作者还没有公开作品。</p>
-        ) : null}
+          {viewerUserId !== profile.id ? (
+            <div className="creator-profile-secondary-actions" aria-label="关系控制">
+              <button type="button" disabled={blockBusy} onClick={() => void applySafetyAction('block')}>
+                {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽'}
+              </button>
+              <button type="button" disabled={muteBusy} onClick={() => void applySafetyAction('mute')}>
+                {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音'}
+              </button>
+              <button type="button" disabled={reportBusy} onClick={() => void reportProfile()}>
+                {reportBusy ? '举报中…' : '举报'}
+              </button>
+              {safetyMessage ? <span role="status">{safetyMessage}</span> : null}
+            </div>
+          ) : null}
+        </section>
 
-        {contents.length > 0 ? (
-          <div style={{ display: 'grid', gap: 12 }}>
-            {contents.map((item) => (
-              <Link
-                href={'/' + encodeURIComponent(profile!.username) + '/' + item.contentType + '/' + encodeURIComponent(item.id)}
-                key={item.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: item.coverRef ? '96px minmax(0, 1fr)' : '1fr',
-                  gap: 14,
-                  padding: 14,
-                  border: '1px solid #e4eaf1',
-                  borderRadius: 12,
-                  color: 'inherit',
-                  textDecoration: 'none',
-                  background: '#fff',
-                }}
-              >
-                {item.coverRef ? (
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      width: 96,
-                      height: 72,
-                      display: 'block',
-                      overflow: 'hidden',
-                      borderRadius: 8,
-                      background: '#eef4ff',
-                    }}
-                  >
-                    <img
-                      alt=""
-                      loading="lazy"
-                      src={item.coverRef}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  </span>
-                ) : null}
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'block', color: '#617086', fontSize: 11, fontWeight: 700 }}>
-                    {contentTypeLabels[item.contentType]}
-                  </span>
-                  <strong style={{ display: 'block', marginTop: 5, overflow: 'hidden', fontSize: 15, textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {item.title}
-                  </strong>
-                  {item.updatedAt ? (
-                    <time dateTime={item.updatedAt} style={{ display: 'block', marginTop: 7, color: '#8a98ab', fontSize: 11 }}>
-                      更新于 {new Date(item.updatedAt).toLocaleString('zh-CN', { hour12: false })}
-                    </time>
-                  ) : null}
-                </span>
-              </Link>
-            ))}
-          </div>
-        ) : null}
-
-        {contentHasMore && contentCursor ? (
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+        <nav className="creator-profile-tabs" aria-label="作者内容频道" role="tablist">
+          {(Object.keys(filterLabels) as ProfileFilter[]).map((value) => (
             <button
-              className="content-detail-follow"
-              disabled={contentLoading}
-              onClick={() => void loadMoreContents()}
+              className={'creator-profile-tab' + (filter === value ? ' is-active' : '')}
+              key={value}
+              aria-selected={filter === value}
+              role="tab"
               type="button"
+              onClick={() => void reloadContents(value)}
             >
-              {contentLoading ? '加载中…' : '加载更多作品'}
+              {filterLabels[value]}
             </button>
-          </div>
-        ) : null}
-      </section>
-    </main>
+          ))}
+        </nav>
+
+        <section className="creator-profile-works" id="works" aria-labelledby="creator-profile-works-title">
+          <header className="creator-profile-section-heading">
+            <div>
+              <p className="creator-profile-eyebrow">PUBLIC WORKS</p>
+              <h2 id="creator-profile-works-title">{filterLabels[filter]}</h2>
+            </div>
+            {contentHasMore && contentCursor ? (
+              <button className="creator-profile-more-link" type="button" disabled={contentLoading} onClick={() => void loadMoreContents()}>
+                {contentLoading ? '加载中…' : '加载更多'}
+              </button>
+            ) : null}
+          </header>
+
+          {contentError ? <p className="creator-profile-message" role="status">{contentError}</p> : null}
+          {contentLoading && contents.length === 0 ? (
+            <div className="creator-profile-empty"><p role="status">正在加载作品…</p></div>
+          ) : null}
+          {!contentLoading && visibleContents.length === 0 && !contentError ? (
+            <div className="creator-profile-empty">
+              <p>暂无{filter === 'all' ? '' : filterLabels[filter] + ' '}公开作品</p>
+            </div>
+          ) : null}
+
+          {visibleContents.length > 0 ? (
+            <div className="creator-profile-grid">
+              {visibleContents.map((item) => (
+                <Link className="creator-profile-card" href={getContentHref(item)} key={item.id}>
+                  <div className="creator-profile-card-media">
+                    {item.coverRef ? (
+                      <img alt="" height={360} loading="lazy" src={item.coverRef} width={480} />
+                    ) : (
+                      <span>{item.contentType === 'video' ? '▶' : item.contentType === 'article' ? 'A' : '•'}</span>
+                    )}
+                  </div>
+                  <div className="creator-profile-card-body">
+                    <span>{contentTypeLabels[item.contentType]}</span>
+                    <h3>{item.title}</h3>
+                    {item.updatedAt ? (
+                      <time dateTime={item.updatedAt}>
+                        {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
+                      </time>
+                    ) : null}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      </main>
+
+      {error ? <p className="creator-profile-global-message" role="status">{error}</p> : null}
+    </div>
   )
+}
+
+function displayName(profile: PublicProfile | null): string {
+  return profile?.displayName?.trim() || profile?.username || 'LuckRead 用户'
 }
