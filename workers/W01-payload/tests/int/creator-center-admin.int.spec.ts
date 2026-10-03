@@ -25,7 +25,7 @@ describe('Creator Center admin extension', () => {
   it('redirects creator content management auth expiry to admin login', () => {
     const contentList = read('src/app/(payload)/admin/CreatorContentList.tsx')
     expect(contentList).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
-    expect(contentList).toContain("window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(contentList).toContain("window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))")
     expect(contentList).toContain("if (response.status === 401)")
   })
 
@@ -52,7 +52,7 @@ describe('Creator Center admin extension', () => {
     const audience = read('src/app/(payload)/admin/CreatorAudienceSummary.tsx')
 
     expect(audience).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
-    expect(audience).toContain("window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(audience).toContain("window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))")
     expect(audience.match(/response\.status === 401/g)?.length).toBe(2)
   })
 
@@ -74,7 +74,7 @@ describe('Creator Center admin extension', () => {
   })
 
   it('embeds the existing publisher with a scoped W03 content bridge', () => {
-    const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     const contentDetail = read('src/app/(frontend)/content/[contentId]/page.tsx')
     const homeFeed = read('src/app/(frontend)/HomeContentFeed.tsx')
@@ -202,13 +202,13 @@ describe('Creator Center admin extension', () => {
   })
 
   it('exposes the creator-owned content management read slice', () => {
-    const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const list = read('src/app/(payload)/admin/CreatorContentList.tsx')
     const route = read('src/app/(payload)/api/creator/contents/route.ts')
     const client = read('src/content/w03-content-client.ts')
 
-    expect(view).toContain("import CreatorContentList from './CreatorContentList'")
-    expect(view).toContain('<CreatorContentList />')
+    expect(view).toContain("import CreatorContentList from '../../(payload)/admin/CreatorContentList'")
+    expect(view).toContain('<CreatorContentList loginPath={adminMode ? \'/admin/login\' : \'/login\'} />')
 
     expect(list).toContain("/api/creator/contents?")
     expect(list).toContain("['DRAFT', 'REJECTED'].includes(item.state)")
@@ -277,7 +277,7 @@ describe('Creator Center admin extension', () => {
   })
 
   it('organizes the creator center around creator-first workflows', () => {
-    const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const assistant = read('src/app/(payload)/admin/CreatorCenterAssistant.tsx')
     const styles = read('src/app/(payload)/admin/creator-center.module.css')
     const moderation = read('src/app/(payload)/admin/CreatorModerationQueue.tsx')
@@ -318,17 +318,17 @@ describe('Creator Center admin extension', () => {
     expect(moderation).toContain("decision: outcome")
     expect(moderation).toContain("expectedVersion: item.version")
     expect(moderation).toContain("outcome === 'REJECTED' ? 'BLOCK' : 'INFO'")
-    expect(view).toContain('<CreatorModerationQueue />')
+    expect(view).toContain('{adminMode ? <CreatorModerationQueue /> : null}')
 
     expect(styles).toContain('.creatorLayout select:focus-visible')
   })
 
   it('uses the stable v1 creator media library instead of a second media authority', () => {
-    const view = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const assets = read('src/app/(payload)/admin/CreatorAssetLibrary.tsx')
 
-    expect(view).toContain("import CreatorAssetLibrary from './CreatorAssetLibrary'")
-    expect(view).toContain('<CreatorAssetLibrary />')
+    expect(view).toContain("import CreatorAssetLibrary from '../../(payload)/admin/CreatorAssetLibrary'")
+    expect(view).toContain('<CreatorAssetLibrary adminMode={adminMode} loginPath={adminMode ? \'/admin/login\' : \'/login\'} />')
     expect(assets).toContain("fetch('/api/v1/media?limit=8&page=' + String(page)")
     expect(assets).toContain('pageNumber + 1')
     expect(assets).toContain('totalPages')
@@ -343,7 +343,7 @@ describe('Creator Center admin extension', () => {
     expect(assets).toContain("'/api/v1/media/' + encodeURIComponent(String(id))")
     expect(assets).toContain("credentials: 'include'")
     expect(assets).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
-    expect(assets).toContain("window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))")
+    expect(assets).toContain("window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))")
     expect(assets.match(/response\.status === 401/g)?.length).toBe(4)
     expect(assets).toContain('mimeType.startsWith(\'video/\')')
     expect(assets).not.toContain('D1Database')

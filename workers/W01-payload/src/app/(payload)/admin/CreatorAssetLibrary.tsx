@@ -19,12 +19,12 @@ type MediaListResponse = {
   totalPages?: number
 }
 
-function redirectToAdminLogin() {
+function redirectToLogin(loginPath: '/admin/login' | '/login') {
   const returnTo = window.location.pathname + window.location.search + window.location.hash
-  window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))
+  window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
 }
 
-export default function CreatorAssetLibrary() {
+export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/admin/login' }: { adminMode?: boolean; loginPath?: '/admin/login' | '/login' }) {
   const [items, setItems] = useState<MediaItem[]>([])
   const [totalDocs, setTotalDocs] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -48,7 +48,7 @@ export default function CreatorAssetLibrary() {
       })
       const data = await response.json().catch((): null => null) as MediaListResponse | { error?: { message?: string } } | null
       if (response.status === 401) {
-        redirectToAdminLogin()
+        redirectToLogin(loginPath)
         return
       }
       if (!response.ok) {
@@ -105,7 +105,7 @@ export default function CreatorAssetLibrary() {
         })
         const data = await response.json().catch((): null => null) as MediaItem | { doc?: MediaItem; error?: { message?: string } } | null
         if (response.status === 401) {
-          redirectToAdminLogin()
+          redirectToLogin(loginPath)
           return
         }
         if (!response.ok) {
@@ -141,7 +141,7 @@ export default function CreatorAssetLibrary() {
       })
       const data = await response.json().catch((): null => null) as MediaItem | { error?: { message?: string } } | null
       if (response.status === 401) {
-        redirectToAdminLogin()
+        redirectToLogin(loginPath)
         return
       }
       if (!response.ok) {
@@ -174,7 +174,7 @@ export default function CreatorAssetLibrary() {
         },
       })
       if (response.status === 401) {
-        redirectToAdminLogin()
+        redirectToLogin(loginPath)
         return
       }
       if (!response.ok) {
@@ -198,7 +198,7 @@ export default function CreatorAssetLibrary() {
   return (
     <div>
       <div className="assetLinks">
-        <Link className="secondaryButton btn" href="/admin/collections/media">打开完整媒体库</Link>
+        {adminMode ? <Link className="secondaryButton btn" href="/admin/collections/media">打开完整媒体库</Link> : null}
         <label className="primaryButton btn">
           上传素材
           <input

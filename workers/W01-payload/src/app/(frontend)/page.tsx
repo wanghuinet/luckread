@@ -22,7 +22,7 @@ export default async function HomePage() {
   const host = (requestHeaders.get('host') || '').split(':')[0].toLowerCase()
 
   if (host === 'mp.luckread.cn') {
-    redirect('/admin/creator-center')
+    redirect('/creator-center')
   }
 
   return (

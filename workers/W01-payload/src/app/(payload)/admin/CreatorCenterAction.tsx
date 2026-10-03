@@ -5,7 +5,7 @@ import Link from 'next/link'
 export function CreatorCenterAction() {
   return (
     <Link
-      href="/admin/creator-center"
+      href="/creator-center"
       style={{
         display: 'inline-flex',
         alignItems: 'center',

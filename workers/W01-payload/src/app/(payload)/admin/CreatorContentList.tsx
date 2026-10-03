@@ -44,7 +44,7 @@ const typeLabels: Record<ContentType, string> = {
   video: '视频',
 }
 
-export default function CreatorContentList() {
+export default function CreatorContentList({ loginPath = '/admin/login' }: { loginPath?: '/admin/login' | '/login' }) {
   const [status, setStatus] = useState<string>('')
   const [type, setType] = useState<string>('')
   const [page, setPage] = useState<Page>({ items: [], nextCursor: null, hasMore: false })
@@ -78,7 +78,7 @@ export default function CreatorContentList() {
       const data = await response.json().catch((): null => null)
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
-        window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))
+        window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
         return
       }
       if (!response.ok || !data?.data) {
@@ -142,7 +142,7 @@ export default function CreatorContentList() {
     const data = await response.json().catch((): null => null)
     if (response.status === 401) {
       const returnTo = window.location.pathname + window.location.search + window.location.hash
-      window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))
+      window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
       throw new Error('AUTH_REQUIRED')
     }
     if (!response.ok) throw new Error(data?.error?.message || '内容状态更新失败')
@@ -230,7 +230,7 @@ export default function CreatorContentList() {
       const data = await response.json().catch((): null => null)
       if (response.status === 401) {
         const returnTo = window.location.pathname + window.location.search + window.location.hash
-        window.location.assign('/admin/login?returnTo=' + encodeURIComponent(returnTo))
+        window.location.assign(loginPath + '?returnTo=' + encodeURIComponent(returnTo))
         return
       }
       if (!response.ok) throw new Error(data?.error?.message || '删除失败')

@@ -16,7 +16,7 @@ describe('user profile page', () => {
     expect(page).toContain('displayName')
     expect(page).toContain('个人简介')
     expect(page).toContain('保存资料')
-    expect(page).toContain("href=\"/admin/creator-center\"")
+    expect(page).toContain("href=\"/creator-center\"")
     expect(page).toContain('href="/me/password"')
   })
 
