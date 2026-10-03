@@ -49,17 +49,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.34.5
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: npm ci --ignore-scripts
       - name: Static contract checks
         run: |
           node --input-type=module <<'NODE'
@@ -92,8 +87,8 @@ jobs:
           console.log('D1_TRAFFIC_GUARD_STATIC=PASS')
           NODE
       - name: Run traffic guard tests
-        run: pnpm exec vitest run workers/W01-payload/src/lib/public-response-cache.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W05-social/src/d1-traffic-guard.test.ts
+        run: npx --no-install vitest run workers/W01-payload/src/lib/public-response-cache.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W05-social/src/d1-traffic-guard.test.ts
       - name: Typecheck W03
-        run: pnpm exec tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W03-content/src/index.ts workers/W03-content/src/content-runtime.ts
+        run: npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W03-content/src/index.ts workers/W03-content/src/content-runtime.ts
       - name: Typecheck W05
         run: pnpm exec tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W05-social/src/index.ts
