@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
 
-const base = String(process.env.AUTH_BASE_URL || 'https://api.luckread.cn').replace(/\/$/, '')
+const base = String(process.env.AUTH_BASE_URL || 'https://api.luckread.com').replace(/\/$/, '')
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
 const apiToken = process.env.CLOUDFLARE_API_TOKEN
 const runId = String(process.env.GITHUB_RUN_ID || Date.now())
