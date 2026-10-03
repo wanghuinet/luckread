@@ -58,6 +58,12 @@ describe('public response cache', () => {
     expect(second.headers.get('X-LuckRead-Cache')).toBe('MISS')
   })
 
+  it('keeps language out of non-localized cache keys', () => {
+    const a = publicCacheKey(new Request('https://luckread.cn/api/v1/users/u1', { headers: { 'accept-language': 'en-US' } }), 'user-profile')
+    const b = publicCacheKey(new Request('https://luckread.cn/api/v1/users/u1', { headers: { 'accept-language': 'zh-CN' } }), 'user-profile')
+    expect(a.url).toBe(b.url)
+  })
+
   it('normalizes cache keys deterministically', () => {
     const a = publicCacheKey(new Request('https://luckread.cn/api/v1/contents?type=article&limit=20'), 'content-list')
     const b = publicCacheKey(new Request('https://luckread.cn/api/v1/contents?limit=20&type=article'), 'content-list')
