@@ -65,6 +65,18 @@
       "perLocationPerMinute": 10000,
       "appliesBeforePayloadD1": true,
       "anonymousFallbackKey": "cf-connecting-ip"
+    },
+    "governance": {
+      "perActorReadPerMinute": 120,
+      "perActorWritePerMinute": 30,
+      "perLocationPerMinute": 3000,
+      "appliesBeforeD1": true
+    },
+    "subscription": {
+      "perActorReadPerMinute": 120,
+      "perActorWritePerMinute": 30,
+      "perLocationPerMinute": 3000,
+      "appliesBeforeD1": true
     }
   },
   "operationBudgets": {
