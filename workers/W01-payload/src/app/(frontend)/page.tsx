@@ -6,7 +6,7 @@ import React from 'react'
 
 import config from '@payload-config'
 
-import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
+import { enforcePublicReadRateLimit } from '@/auth/traffic-limit'
 import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
 import { validateSession } from '@/auth/w02-session-client'
 
@@ -51,20 +51,17 @@ export default async function HomePage() {
       let edgeReadAllowed = true
       try {
         await enforcePublicReadRateLimit(request)
-      } catch (error) {
+      } catch {
         edgeReadAllowed = false
-        if (error instanceof TrafficLimitError) {
-          rateLimitResponse(request)
-        }
       }
 
       if (edgeReadAllowed) {
         try {
           const payload = await getPayload({ config })
-        const authResult = await payload.auth({
-          headers: request.headers,
-          canSetHeaders: false,
-        })
+          const authResult = await payload.auth({
+            headers: request.headers,
+            canSetHeaders: false,
+          })
           authenticatedUser = authResult.user as unknown as {
             id?: string | number
             _sid?: string
