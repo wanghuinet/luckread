@@ -50,6 +50,7 @@ export default function ContentDetailPage({
   const [reportBusy, setReportBusy] = useState(false)
   const [viewerUserId, setViewerUserId] = useState<string | null>(null)
   const [following, setFollowing] = useState(false)
+  const [interactionRestricted, setInteractionRestricted] = useState(false)
   const [followRestricted, setFollowRestricted] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
@@ -128,6 +129,7 @@ export default function ContentDetailPage({
               if (!cancelled && followResponse.ok) {
                 const blocked = Boolean(followData?.data?.relationship?.blocked)
                 const blockedBy = Boolean(followData?.data?.relationship?.blockedBy)
+                setInteractionRestricted(blocked || blockedBy)
                 setFollowRestricted(blocked || blockedBy)
                 setFollowing(!blocked && !blockedBy && followData?.data?.following === true)
               }
@@ -382,10 +384,12 @@ export default function ContentDetailPage({
               )}
             </>
           ) : null}
-          <button className="content-detail-like" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
-            {likeBusy ? '处理中…' : liked ? '已点赞' : '点赞'}
-            {likeCount === null ? '' : ' · ' + likeCount.toLocaleString('zh-CN')}
-          </button>
+          {!interactionRestricted ? (
+            <button className="content-detail-like" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
+              {likeBusy ? '处理中…' : liked ? '已点赞' : '点赞'}
+              {likeCount === null ? '' : ' · ' + likeCount.toLocaleString('zh-CN')}
+            </button>
+          ) : null}
           <button className="content-detail-like" disabled={bookmarkBusy} onClick={() => void toggleBookmark()} type="button">
             {bookmarkBusy ? '处理中…' : bookmarked ? '已收藏' : '收藏'}
           </button>

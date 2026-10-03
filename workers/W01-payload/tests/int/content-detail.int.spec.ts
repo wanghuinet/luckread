@@ -102,6 +102,13 @@ describe('public content detail', () => {
     expect(page).not.toContain("请先登录后关注作者。")
   })
 
+  it('hides like when the content relationship is blocked', () => {
+    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    expect(page).toContain('interactionRestricted')
+    expect(page).toContain('setInteractionRestricted(blocked || blockedBy)')
+    expect(page).toContain('{!interactionRestricted ? (')
+  })
+
   it('connects the content detail page to the authenticated like API', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain("fetch('/api/v1/interactions/likes'")
