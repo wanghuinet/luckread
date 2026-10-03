@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 
-import { getPublicCopy, readPublicLocaleCookie, type PublicLocale } from '../../i18n/public-locale'
+import { getPublicCopy, type PublicLocale } from '../../i18n/public-locale'
 
 type CommentItem = {
   id: string
@@ -27,7 +27,7 @@ export default function ContentComments({
   contentId,
   viewerUserId,
   interactionRestricted = false,
-  locale = readPublicLocaleCookie(),
+  locale = 'zh',
 }: {
   contentId: string
   viewerUserId: string | null
