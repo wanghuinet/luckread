@@ -85,7 +85,6 @@ export default buildConfig({
         creatorCenter: {
           Component: '/app/(payload)/admin/CreatorCenter#CreatorCenter',
           path: '/creator-center',
-          exact: true,
           meta: {
             title: 'Creator Center · LuckRead',
           },
