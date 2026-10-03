@@ -126,7 +126,7 @@ export function CreatorStudio({
           </div>
 
           <div className={styles.sidebarFooter}>
-            <Link href="https://luckread.cn/">
+            <Link href="https://luckread.com/">
               <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden="true" />
               <span>查看 LuckRead 主站</span>
             </Link>
@@ -154,7 +154,7 @@ export function CreatorStudio({
                 <i className="fa-solid fa-chart-simple" aria-hidden="true" />
                 数据
               </a>
-              <Link className={styles.topbarSiteButton} href="https://luckread.cn/">
+              <Link className={styles.topbarSiteButton} href="https://luckread.com/">
                 <i className="fa-solid fa-globe" aria-hidden="true" />
                 主站
               </Link>
@@ -311,7 +311,7 @@ export function CreatorStudio({
                 </div>
                 <div>
                   <Link href="/me/profile">账号设置</Link>
-                  <Link href="https://luckread.cn/">回到主站</Link>
+                  <Link href="https://luckread.com/">回到主站</Link>
                 </div>
               </footer>
           </div>
