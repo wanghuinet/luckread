@@ -6,6 +6,7 @@ import React from 'react'
 
 import config from '@payload-config'
 
+import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
 import { validateSession } from '@/auth/w02-session-client'
 
@@ -32,9 +33,14 @@ export default async function HomePage() {
     const request = new Request('https://mp.luckread.com/', {
       headers: requestHeaders,
     })
+    const authorization = request.headers.get('authorization')?.trim() || ''
+    const hasPayloadTokenCookie = request.headers.get('cookie')?.split(';').some((part) => {
+      const [name, ...value] = part.trim().split('=')
+      return name === 'payload-token' && value.join('=').trim().length > 0
+    }) === true
     const hasAuthCredential =
-      Boolean(request.headers.get('authorization')?.trim()) ||
-      Boolean(request.headers.get('cookie')?.trim())
+      authorization.startsWith('Bearer ') ||
+      hasPayloadTokenCookie
 
     let authenticatedUser: {
       id?: string | number
@@ -42,18 +48,30 @@ export default async function HomePage() {
     } | null = null
 
     if (hasAuthCredential) {
+      let edgeReadAllowed = true
       try {
-        const payload = await getPayload({ config })
+        await enforcePublicReadRateLimit(request)
+      } catch (error) {
+        edgeReadAllowed = false
+        if (error instanceof TrafficLimitError) {
+          rateLimitResponse(request)
+        }
+      }
+
+      if (edgeReadAllowed) {
+        try {
+          const payload = await getPayload({ config })
         const authResult = await payload.auth({
           headers: request.headers,
           canSetHeaders: false,
         })
-        authenticatedUser = authResult.user as unknown as {
-          id?: string | number
-          _sid?: string
-        } | null
-      } catch {
-        authenticatedUser = null
+          authenticatedUser = authResult.user as unknown as {
+            id?: string | number
+            _sid?: string
+          } | null
+        } catch {
+          authenticatedUser = null
+        }
       }
     }
 
