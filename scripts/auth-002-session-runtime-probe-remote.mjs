@@ -269,7 +269,7 @@ async function preparePositiveAuthSubject(user, label) {
   const assignment = d1Rows(
     `SELECT id,subject_id,role_id,scope_type,status,valid_from,valid_until
      FROM role_assignments
-     WHERE id=${sqlString(roleAssignmentId)}
+     WHERE id=${sqlString(effectiveRoleAssignmentId)}
      LIMIT 1`,
   )[0]
 
