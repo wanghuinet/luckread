@@ -23,9 +23,20 @@ const normalizeLanguage = (request: Request): string => {
   return value && /^[a-z]{2,3}(?:-[a-z0-9]{2,8})?$/.test(value) ? value : 'default'
 }
 
-const normalizedQuery = (url: URL): string => {
+const CACHE_QUERY_KEYS: Record<string, readonly string[]> = {
+  'content-list': ['creatorId', 'cursor', 'limit', 'type'],
+  'content-detail': [],
+  'content-comments': ['cursor', 'limit'],
+  followers: ['cursor', 'limit'],
+  following: ['cursor', 'limit'],
+  'share-detail': [],
+  'user-profile': [],
+}
+
+const normalizedQuery = (url: URL, namespace: string): string => {
+  const allowedKeys = CACHE_QUERY_KEYS[namespace]
+  const keys = (allowedKeys ?? Array.from(url.searchParams.keys())).slice().sort()
   const params = new URLSearchParams()
-  const keys = Array.from(url.searchParams.keys()).sort()
   for (const key of keys) {
     for (const value of url.searchParams.getAll(key).sort()) params.append(key, value)
   }
@@ -34,7 +45,7 @@ const normalizedQuery = (url: URL): string => {
 
 export const publicCacheKey = (request: Request, namespace: string): Request => {
   const url = new URL(request.url)
-  const query = normalizedQuery(url)
+  const query = normalizedQuery(url, namespace)
   const keyUrl = new URL('https://cache.luckread.internal/__edge-cache')
   keyUrl.searchParams.set('v', CACHE_VERSION)
   keyUrl.searchParams.set('n', namespace)
