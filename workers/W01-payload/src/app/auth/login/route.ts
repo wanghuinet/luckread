@@ -60,6 +60,13 @@ const sanitizePayloadLoginMessage = (error: unknown) => {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  try {
+    const clientIp = request.headers.get('cf-connecting-ip')?.trim() || 'unknown'
+    await enforceAuthRateLimit(request, 'AUTH_LOGIN_LIMITER', ['ip:' + clientIp])
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
+  }
   import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 
 let body: { identity?: unknown; credential?: unknown; deviceId?: unknown }
