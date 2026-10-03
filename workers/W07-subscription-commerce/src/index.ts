@@ -2,7 +2,31 @@
 
 import { changeSubscriptionPlan, createSubscription, getSubscription, listSubscriptions, parseBoundedPositiveInt, SubscriptionRuntimeError, transitionSubscription, validateIfMatch, validateIdempotencyKey, validatePrincipal } from './subscription-runtime.js'
 
-interface Env { D1_01: D1Database }
+interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
+interface Env {
+  D1_01: D1Database
+  SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
+  SUBSCRIPTION_READ_LIMITER?: RateLimitBinding
+  SUBSCRIPTION_WRITE_LIMITER?: RateLimitBinding
+}
+
+const getRateKey = (request: Request): string =>
+  request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ||
+  request.headers.get('X-LuckRead-Client-IP')?.trim() ||
+  'transport:W01'
+
+const enforceRateLimit = async (request: Request, env: Env): Promise<void> => {
+  const operation = request.method === 'GET' ? 'read' : 'write'
+  if (env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER) {
+    const result = await env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER.limit({ key: 'origin:' + operation })
+    if (!result.success) throw new SubscriptionRuntimeError('RATE_LIMITED', 429)
+  }
+  const actorLimiter = operation === 'read' ? env.SUBSCRIPTION_READ_LIMITER : env.SUBSCRIPTION_WRITE_LIMITER
+  if (actorLimiter) {
+    const result = await actorLimiter.limit({ key: operation + ':' + getRateKey(request) })
+    if (!result.success) throw new SubscriptionRuntimeError('RATE_LIMITED', 429)
+  }
+}
 
 const json = (body: unknown, status = 200, etag?: string) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(etag ? { ETag: etag } : {}) } })
 
@@ -51,6 +75,7 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
+      await enforceRateLimit(request, env)
       requireTransport(request)
       const operation = toOperation(request.method, parseSegments(new URL(request.url).pathname))
       if (!operation) return new Response(null, { status: 404 })
@@ -87,8 +112,8 @@ export default {
       return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
     } catch (error) {
       if (error instanceof SubscriptionRuntimeError) {
-        const message = error.code === 'PERMISSION_DENIED' ? 'permission denied' : error.code === 'PRECONDITION_REQUIRED' ? 'precondition required' : error.code === 'PRECONDITION_FAILED' ? 'precondition failed' : error.code === 'RESOURCE_NOT_FOUND' ? 'resource not found' : error.code === 'INVALID_STATE' ? 'invalid subscription state' : error.code === 'CONFLICT' ? 'subscription conflict' : error.code === 'VALIDATION_FAILED' ? 'validation failed' : error.code
-        return json({ error: { code: error.code, message, details: {} }, requestId: crypto.randomUUID() }, error.status)
+        const message = error.code === 'PERMISSION_DENIED' ? 'permission denied' : error.code === 'PRECONDITION_REQUIRED' ? 'precondition required' : error.code === 'PRECONDITION_FAILED' ? 'precondition failed' : error.code === 'RESOURCE_NOT_FOUND' ? 'resource not found' : error.code === 'INVALID_STATE' ? 'invalid subscription state' : error.code === 'CONFLICT' ? 'subscription conflict' : error.code === 'VALIDATION_FAILED' ? 'validation failed' : error.code === 'RATE_LIMITED' ? 'too many requests' : error.code
+        return new Response(JSON.stringify({ error: { code: error.code, message, details: error.code === 'RATE_LIMITED' ? { retryAfter: 60 } : {} }, requestId: crypto.randomUUID() }), { status: error.status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(error.code === 'RATE_LIMITED' ? { 'retry-after': '60' } : {}) } })
       }
       console.error(error)
       return json({ error: { code: 'INTERNAL_ERROR', message: 'Internal error', details: {} }, requestId: crypto.randomUUID() }, 500)
