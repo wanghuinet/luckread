@@ -26,12 +26,13 @@ describe('mp.luckread.cn creator home routing', () => {
   it('keeps the public site separate and sends creator CTAs to the mp domain', () => {
     const page = read('src/app/(frontend)/page.tsx')
     const creatorCenter = read('src/app/(payload)/admin/CreatorCenter.tsx')
-    const creator = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
+    const creator = read('src/app/(frontend)/creator-center/page.tsx')
+    const creatorStudio = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
 
     expect(page).toContain("const CREATOR_CENTER_URL = 'https://mp.luckread.cn/'")
     expect(page).toContain('href={CREATOR_CENTER_URL}')
     expect(page).toContain('LuckRead 是面向新一代创作者与读者的内容平台')
-    expect(creator).toContain('href="https://luckread.cn/"')
+    expect(creatorStudio).toContain('href="https://luckread.cn/"')
     expect(creator).toContain("redirect('/login?returnTo=%2Fcreator-center')")
     expect(creator).toContain('validateSession({')
     expect(creatorCenter).toContain("CreatorStudio")
