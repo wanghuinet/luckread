@@ -44,7 +44,7 @@ describe('public response cache', () => {
 
     const request = new Request('https://luckread.cn/api/v1/contents?cursor=c1')
     const a = cachedPublicGet(request, 'content-list', loader, 30)
-    await Promise.resolve()
+    await vi.waitFor(() => expect(loader).toHaveBeenCalledTimes(1))
     const b = cachedPublicGet(request.clone(), 'content-list', loader, 30)
     releaseLoader?.(new Response(JSON.stringify({ data: 'origin' }), {
       status: 200,
