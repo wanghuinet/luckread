@@ -19,29 +19,6 @@ type CreatorNavItem = {
   hint?: string
 }
 
-const workspaceNav: CreatorNavItem[] = [
-  { label: '首页', href: '#overview', icon: 'fa-house' },
-]
-
-const creationNav: CreatorNavItem[] = [
-  { label: '写文章', href: '#publisher', icon: 'fa-file-pen' },
-  { label: '发动态', href: '#publisher', icon: 'fa-comment-dots' },
-  { label: '发视频', href: '#publisher', icon: 'fa-video' },
-]
-
-const manageNav: CreatorNavItem[] = [
-  { label: '内容管理', href: '#content', icon: 'fa-list-check' },
-  { label: '审核与发布', href: '#quality', icon: 'fa-shield-halved' },
-  { label: '素材库', href: '#assets', icon: 'fa-photo-film' },
-]
-
-const operateNav: CreatorNavItem[] = [
-  { label: '粉丝与关注', href: '#audience', icon: 'fa-users' },
-  { label: '数据中心', href: '#future-data', icon: 'fa-chart-line', hint: '即将开放' },
-  { label: '收益中心', href: '#future-earnings', icon: 'fa-wallet', hint: '即将开放' },
-  { label: '创作者成长', href: '#future-growth', icon: 'fa-arrow-up-right-dots', hint: '即将开放' },
-]
-
 type StudioLocale = 'zh-CN' | 'en-US'
 
 const navigationByLocale: Record<StudioLocale, {
