@@ -98,11 +98,22 @@ jobs:
           ]) {
             if (!fs.readFileSync(path, 'utf8').includes(marker)) throw new Error(path + ' is not cache-first')
           }
+          const persistence = JSON.parse(fs.readFileSync('contracts/persistence/CONTENT-ARTICLE-d1-02-persistence.v1.json', 'utf8'))
+          if (persistence.performanceIndexes?.contents_owner_updated_at_id_idx?.columns?.join(',') !== 'owner_user_id,updated_at,id') throw new Error('creator pagination performance index contract missing')
+          if (!fs.readFileSync('workers/W03-content/migrations/0003_creator_list_pagination_index.sql', 'utf8').includes('contents_owner_updated_at_id_idx')) throw new Error('creator pagination migration missing index')
           console.log('D1_TRAFFIC_GUARD_STATIC=PASS')
           NODE
       - name: Run traffic guard tests
-        run: npx --no-install vitest run workers/W01-payload/src/lib/public-response-cache.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W05-social/src/d1-traffic-guard.test.ts
+        run: npx --no-install vitest run workers/W01-payload/src/lib/public-response-cache.test.ts workers/W01-payload/src/auth/traffic-limit.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W05-social/src/d1-traffic-guard.test.ts
       - name: Typecheck W03
         run: npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W03-content/src/index.ts workers/W03-content/src/content-runtime.ts
+      - name: Validate Wrangler JSON structure
+        run: node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          for (const path of ['workers/W01-payload/wrangler.jsonc','workers/W03-content/wrangler.jsonc','workers/W05-social/wrangler.jsonc']) {
+            JSON.parse(fs.readFileSync(path, 'utf8'))
+          }
+          console.log('WRANGLER_CONFIG_JSON=PASS')
+          NODE
       - name: Typecheck W05
-        run: pnpm exec tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W05-social/src/index.ts
+        run: npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W05-social/src/index.ts
