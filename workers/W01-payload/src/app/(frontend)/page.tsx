@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { headers } from 'next/headers'
-import { redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 import React from 'react'
 
@@ -9,6 +8,7 @@ import config from '@payload-config'
 import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
 import { validateSession } from '@/auth/w02-session-client'
 
+import CreatorStudio from './creator-center/CreatorStudio'
 import HomeContentFeed from './HomeContentFeed'
 import './styles.css'
 
@@ -36,6 +36,9 @@ export default async function HomePage() {
     let authenticatedUser: {
       id?: string | number
       _sid?: string
+      displayName?: unknown
+      username?: unknown
+      email?: unknown
     } | null = null
 
     try {
@@ -47,6 +50,9 @@ export default async function HomePage() {
       authenticatedUser = authResult.user as unknown as {
         id?: string | number
         _sid?: string
+        displayName?: unknown
+        username?: unknown
+        email?: unknown
       } | null
     } catch {
       authenticatedUser = null
@@ -62,10 +68,72 @@ export default async function HomePage() {
         }).catch(() => false)
 
         if (active) {
-          redirect('/creator-center')
+          const displayName =
+            typeof authenticatedUser.displayName === 'string' && authenticatedUser.displayName.trim()
+              ? authenticatedUser.displayName
+              : typeof authenticatedUser.username === 'string' && authenticatedUser.username.trim()
+                ? authenticatedUser.username
+                : typeof authenticatedUser.email === 'string' && authenticatedUser.email.trim()
+                  ? authenticatedUser.email
+                  : '创作者'
+
+          return <CreatorStudio displayName={displayName} userId={String(authenticatedUser.id)} />
         }
       }
     }
+  }
+
+  if (CREATOR_CENTER_HOSTS.has(host)) {
+    return (
+      <div className="mp-entry-shell">
+        <header className="mp-entry-header">
+          <Link className="mp-entry-brand" href="/" aria-label="LuckRead 创作者中心首页">
+            <span className="mp-entry-brand-mark">L</span>
+            <span>LuckRead Creator Studio</span>
+          </Link>
+          <span className="mp-entry-domain">mp.luckread.com</span>
+        </header>
+        <main className="mp-entry-main">
+          <section className="mp-entry-copy" aria-labelledby="mp-entry-title">
+            <span className="mp-entry-kicker">CREATOR WORKSPACE</span>
+            <h1 id="mp-entry-title">创作、管理、运营，<strong>一站完成。</strong></h1>
+            <p>登录 LuckRead 账号后进入创作者工作台，直接发布文章、动态和视频，并管理内容、审核、素材与粉丝关系。</p>
+            <div className="mp-entry-actions">
+              <Link className="mp-entry-primary" href="/login?returnTo=%2F">登录并进入创作者中心</Link>
+              <Link className="mp-entry-secondary" href="/creator-center">进入兼容入口</Link>
+            </div>
+          </section>
+          <section className="mp-entry-preview" aria-label="创作者工作台预览">
+            <aside className="mp-entry-sidebar">
+              <div className="mp-entry-mini-logo">LR</div>
+              <span>工作台</span>
+              <span className="active">首页</span>
+              <span>创作</span>
+              <span>内容管理</span>
+              <span>数据中心</span>
+              <span>粉丝与关注</span>
+              <span>设置</span>
+            </aside>
+            <div className="mp-entry-dashboard">
+              <div className="mp-entry-dashboard-top">
+                <div><small>CREATOR DASHBOARD</small><strong>欢迎来到 LuckRead</strong></div>
+                <span>发布内容</span>
+              </div>
+              <div className="mp-entry-create-row">
+                <div><b>文章</b><small>图文与长文</small></div>
+                <div><b>动态</b><small>短内容分享</small></div>
+                <div><b>视频</b><small>视频内容</small></div>
+              </div>
+              <div className="mp-entry-stat-row">
+                <div><small>内容</small><b>作品管理</b></div>
+                <div><small>质量</small><b>发布检测</b></div>
+                <div><small>运营</small><b>粉丝关系</b></div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    )
   }
 
   return (
