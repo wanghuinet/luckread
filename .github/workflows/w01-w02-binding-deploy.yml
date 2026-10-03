@@ -7,7 +7,7 @@ on:
         description: Exact W01 source commit to deploy
         required: true
         type: string
-        default: cefce86501c9b2f42bf812994bee5a875fb20ff5
+        default: 6eaa9d4c32a569bc0bba5f613ec450cf4e169aef
       confirm:
         description: Type DEPLOY_BINDING to permit W01 application deployment
         required: true
