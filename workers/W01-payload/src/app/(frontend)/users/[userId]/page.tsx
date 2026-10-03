@@ -68,6 +68,7 @@ export default function PublicProfilePage({
   const [muted, setMuted] = useState(false)
   const [muteBusy, setMuteBusy] = useState(false)
   const [reportBusy, setReportBusy] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false)
   const [safetyMessage, setSafetyMessage] = useState('')
   const [filter, setFilter] = useState<ProfileFilter>('all')
   const [contents, setContents] = useState<PublicContent[]>([])
@@ -463,7 +464,6 @@ export default function PublicProfilePage({
             </div>
 
             <div className="creator-profile-identity">
-              <p className="creator-profile-eyebrow">LUCKREAD CREATOR</p>
               <h1 id="creator-profile-title">{name}</h1>
               <p className="creator-profile-handle">@{profile?.username}</p>
               {profile?.bio ? <p className="creator-profile-bio">{profile.bio}</p> : null}
@@ -480,9 +480,74 @@ export default function PublicProfilePage({
                   {followBusy ? '处理中…' : isFollowing ? '已关注' : '关注'}
                 </button>
               ) : null}
-              <button className="creator-profile-button" type="button" onClick={() => setSafetyMessage('订阅入口将在会员功能接通后启用。')}>
+              <button
+                className="creator-profile-button"
+                type="button"
+                onClick={() => setSafetyMessage('订阅入口将在会员功能接通后启用。')}
+              >
                 订阅
               </button>
+              {viewerUserId !== profile.id ? (
+                <>
+                  <button
+                    className="creator-profile-circle-button"
+                    type="button"
+                    aria-label="私信"
+                    onClick={() => setSafetyMessage('私信功能将在消息中心接通后启用。')}
+                  >
+                    <span aria-hidden="true">✉</span>
+                  </button>
+                  <div className="creator-profile-overflow">
+                    <button
+                      className="creator-profile-circle-button"
+                      type="button"
+                      aria-label="更多操作"
+                      aria-expanded={actionsOpen}
+                      aria-haspopup="menu"
+                      onClick={() => setActionsOpen((open) => !open)}
+                    >
+                      <span aria-hidden="true">•••</span>
+                    </button>
+                    {actionsOpen ? (
+                      <div className="creator-profile-overflow-menu" role="menu" aria-label="更多操作">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={muteBusy}
+                          onClick={() => {
+                            setActionsOpen(false)
+                            void applySafetyAction('mute')
+                          }}
+                        >
+                          {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音'}
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={blockBusy}
+                          onClick={() => {
+                            setActionsOpen(false)
+                            void applySafetyAction('block')
+                          }}
+                        >
+                          {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽'}
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={reportBusy}
+                          onClick={() => {
+                            setActionsOpen(false)
+                            void reportProfile()
+                          }}
+                        >
+                          {reportBusy ? '举报中…' : '举报'}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </>
+              ) : null}
               {mutualFollow ? <span className="creator-profile-badge">互相关注</span> : null}
             </div>
           </div>
@@ -503,18 +568,7 @@ export default function PublicProfilePage({
           </dl>
 
           {viewerUserId !== profile.id ? (
-            <div className="creator-profile-secondary-actions" aria-label="关系控制">
-              <button type="button" disabled={blockBusy} onClick={() => void applySafetyAction('block')}>
-                {blockBusy ? (blocked ? '取消中…' : '屏蔽中…') : blocked ? '取消屏蔽' : '屏蔽'}
-              </button>
-              <button type="button" disabled={muteBusy} onClick={() => void applySafetyAction('mute')}>
-                {muteBusy ? (muted ? '取消中…' : '静音中…') : muted ? '取消静音' : '静音'}
-              </button>
-              <button type="button" disabled={reportBusy} onClick={() => void reportProfile()}>
-                {reportBusy ? '举报中…' : '举报'}
-              </button>
-              {safetyMessage ? <span role="status">{safetyMessage}</span> : null}
-            </div>
+            {safetyMessage ? <p className="creator-profile-global-message" role="status">{safetyMessage}</p> : null}
           ) : null}
         </section>
 
