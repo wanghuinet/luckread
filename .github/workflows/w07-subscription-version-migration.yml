@@ -7,7 +7,6 @@ on:
         description: Exact source commit containing the admitted migration
         required: true
         type: string
-        default: 32bbde19db6ec071efd780b915255a1d7f59549d
       database_name:
         description: Current Cloudflare display name for the D1-01 database
         required: true
@@ -24,14 +23,14 @@ permissions:
 
 jobs:
   migrate:
-    if: \${{ inputs.confirm == 'APPLY_W07_SUBSCRIPTION_MIGRATION' }}
+    if: ${{ inputs.confirm == 'APPLY_W07_SUBSCRIPTION_MIGRATION' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout exact migration source
         uses: actions/checkout@v4
         with:
-          ref: \${{ inputs.source_sha }}
+          ref: ${{ inputs.source_sha }}
 
       - name: Setup Node 24
         uses: actions/setup-node@v4
@@ -41,7 +40,7 @@ jobs:
       - name: Verify W07 D1-01 binding
         working-directory: workers/W07-subscription-commerce
         env:
-          EXPECTED_DB_NAME: \${{ inputs.database_name }}
+          EXPECTED_DB_NAME: ${{ inputs.database_name }}
           EXPECTED_DB_ID: 2f80471e-3756-49f9-8db1-7707a433ad64
         run: |
           node - <<'NODE'
@@ -65,13 +64,13 @@ jobs:
       - name: Preflight controlled target
         working-directory: workers/W07-subscription-commerce
         env:
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration"
-          npx --yes wrangler@4.116.0 d1 execute "\${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT COUNT(*) AS subscription_count FROM membership_subscriptions;' > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/preflight-count.json" || true
-          npx --yes wrangler@4.116.0 d1 execute "\${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("membership_subscriptions");' > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/preflight-schema.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT CASE WHEN EXISTS (SELECT 1 FROM sqlite_master WHERE type = ''table'' AND name = ''membership_subscriptions'') THEN (SELECT COUNT(*) FROM membership_subscriptions) ELSE 0 END AS subscription_count;' > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/preflight-count.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("membership_subscriptions");' > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/preflight-schema.json"
           node - <<'NODE'
           const fs = require('node:fs');
           const root = process.env.GITHUB_WORKSPACE + '/artifacts/w07-subscription-version-migration';
@@ -87,20 +86,20 @@ jobs:
       - name: Apply W07 Subscription migrations remotely
         working-directory: workers/W07-subscription-commerce
         env:
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx --yes wrangler@4.116.0 d1 migrations apply "\${{ inputs.database_name }}" --remote --config wrangler.jsonc
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 d1 migrations apply "${{ inputs.database_name }}" --remote --config wrangler.jsonc
 
       - name: Capture post-migration schema
         working-directory: workers/W07-subscription-commerce
         env:
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.116.0 d1 execute "\${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("membership_subscriptions");' > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/post-schema.json"
-          npx --yes wrangler@4.116.0 d1 execute "\${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT COUNT(*) AS subscription_count FROM membership_subscriptions;' > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/post-count.json"
-          npx --yes wrangler@4.116.0 d1 execute "\${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT * FROM d1_migrations ORDER BY id;' > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/d1-migrations.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("membership_subscriptions");' > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/post-schema.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT COUNT(*) AS subscription_count FROM membership_subscriptions;' > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/post-count.json"
+          npx --yes wrangler@4.116.0 d1 execute "${{ inputs.database_name }}" --remote --json --config wrangler.jsonc --command 'SELECT * FROM d1_migrations ORDER BY id;' > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/d1-migrations.json"
           node - <<'NODE'
           const fs = require('node:fs');
           const root = process.env.GITHUB_WORKSPACE + '/artifacts/w07-subscription-version-migration';
@@ -120,8 +119,8 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration"
           cat > "$GITHUB_WORKSPACE/artifacts/w07-subscription-version-migration/provenance.txt" <<'EOF'
           workflow=W07 Subscription Version D1-01 Migration
-          source_sha=\${{ inputs.source_sha }}
-          database_name=\${{ inputs.database_name }}
+          source_sha=${{ inputs.source_sha }}
+          database_name=${{ inputs.database_name }}
           database_id=2f80471e-3756-49f9-8db1-7707a433ad64
           migration=0002_subscription_version.sql
           migration_sha256=ce1673415eec33c110e01bff201394ae0ed7ac73970ec840379fdaf24590ad8a
@@ -132,7 +131,7 @@ jobs:
       - name: Upload controlled migration evidence
         uses: actions/upload-artifact@v4
         with:
-          name: w07-subscription-version-migration-\${{ github.run_id }}
-          path: \${{ github.workspace }}/artifacts/w07-subscription-version-migration/
+          name: w07-subscription-version-migration-${{ github.run_id }}
+          path: ${{ github.workspace }}/artifacts/w07-subscription-version-migration/
           if-no-files-found: error
           retention-days: 14
