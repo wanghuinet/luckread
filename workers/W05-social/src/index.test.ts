@@ -713,6 +713,21 @@ describe('W05 social comment transport', () => {
     expect(response.status).toBe(204)
   })
 
+  it('requires an idempotency key for comment deletion', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
+        method: 'DELETE',
+        headers: {
+          ...commentHeaders,
+          'X-LuckRead-Principal-User-Id': 'viewer-1',
+          'X-LuckRead-Principal-Layer': 'L2',
+        },
+      }),
+      { DB: dbFor() },
+    )
+    expect(response.status).toBe(428)
+  })
+
   it('rejects non-DELETE comment item transport', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
