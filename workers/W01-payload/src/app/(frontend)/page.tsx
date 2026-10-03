@@ -8,7 +8,7 @@ import config from '@payload-config'
 import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
 import { validateSession } from '@/auth/w02-session-client'
 
-import CreatorStudio from './creator-center/CreatorStudio'
+import { CreatorStudio } from './creator-center/CreatorStudio'
 import HomeContentFeed from './HomeContentFeed'
 import './styles.css'
 
