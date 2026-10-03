@@ -6,7 +6,8 @@ describe('homepage D1 guard', () => {
   it('does not call Payload auth for anonymous creator-center homepage requests', () => {
     const page = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/page.tsx'), 'utf8')
     expect(page).toContain("const hasAuthCredential =")
-    expect(page).toContain("Boolean(request.headers.get('authorization')?.trim())")
+    expect(page).toContain("const authorization = request.headers.get('authorization')?.trim() || ''")
+    expect(page).toContain("authorization.startsWith('Bearer ')")
     expect(page).toContain("request.headers.get('cookie')?.split(';').some")
     expect(page).toContain("name === 'payload-token'")
     expect(page).toContain("if (hasAuthCredential) {")
