@@ -1,7 +1,7 @@
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
-import { enforcePublicReadRateLimit, TrafficLimitError, rateLimitResponse } from '../../../../auth/traffic-limit.js'
+import { enforcePublicReadRateLimit, TrafficLimitError, rateLimitResponse } from '../../../../../auth/traffic-limit.js'
 import { cachedPublicGet } from '../../../../../lib/public-response-cache.js'
 
 export async function GET(
