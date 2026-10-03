@@ -1,4 +1,8 @@
 import {
+  invalidateScopedEdgeCache,
+  withScopedEdgeCache,
+} from '../../../../../cache/edge-cache.js'
+import {
   callW05Social,
   resolveCookieSocialPrincipal,
   W05SocialClientError,
@@ -33,6 +37,9 @@ const parseTarget = async (request: Request): Promise<{ targetType: string; targ
   }
 }
 
+const likeScope = (userId: string, targetType: string, targetId: string): string =>
+  `like:${userId}:${targetType}:${targetId}`
+
 async function forward(request: Request, method: 'GET' | 'POST' | 'DELETE'): Promise<Response> {
   try {
     const principal = await resolveCookieSocialPrincipal(request)
@@ -48,13 +55,32 @@ async function forward(request: Request, method: 'GET' | 'POST' | 'DELETE'): Pro
     const pathname = method === 'GET'
       ? '/internal/social/interactions/likes?targetType=' + encodeURIComponent(target.targetType) + '&targetId=' + encodeURIComponent(target.targetId)
       : '/internal/social/interactions/likes'
-    return await callW05Social({
+
+    const load = () => callW05Social({
       request,
       pathname,
       method,
       principal,
       body: method === 'GET' ? undefined : target,
     })
+
+    if (method === 'GET') {
+      return await withScopedEdgeCache(
+        likeScope(principal.userId, target.targetType, target.targetId),
+        load,
+        request,
+        { ttlSeconds: 3, staleWhileRevalidateSeconds: 10 },
+      )
+    }
+
+    const response = await load()
+    if (response.ok) {
+      await invalidateScopedEdgeCache(
+        likeScope(principal.userId, target.targetType, target.targetId),
+        request,
+      )
+    }
+    return response
   } catch (error) {
     if (error instanceof W05SocialClientError) {
       return errorResponse(error.status, error.code, error.message)
