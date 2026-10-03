@@ -14,15 +14,14 @@ const isAnonymousPublicRequest = (request: Request): boolean =>
   !request.headers.get('Authorization') &&
   !request.headers.get('Cookie')
 
-const cacheKey = (request: Request, scopeKey?: string): Request => {
-  if (!scopeKey) return new Request(request.url, { method: 'GET' })
-  const url = new URL(request.url)
-  url.protocol = 'https:'
-  url.hostname = 'luckread-edge-cache.internal'
-  url.pathname = '/v1/' + encodeURIComponent(scopeKey) + url.pathname
-  url.search = request.url.includes('?') ? new URL(request.url).search : ''
-  return new Request(url.toString(), { method: 'GET' })
-}
+const publicCacheKey = (request: Request): Request =>
+  new Request(request.url, { method: 'GET' })
+
+const scopedCacheKey = (scopeKey: string): Request =>
+  new Request(
+    'https://luckread-edge-cache.internal/v1/scoped/' + encodeURIComponent(scopeKey),
+    { method: 'GET' },
+  )
 
 const cacheHeaders = (
   response: Response,
@@ -38,6 +37,16 @@ const cacheHeaders = (
   return headers
 }
 
+const materializeCacheableResponse = (
+  response: Response,
+  ttlSeconds: number,
+  staleWhileRevalidateSeconds: number,
+): Response => new Response(response.clone().body, {
+  status: response.status,
+  statusText: response.statusText,
+  headers: cacheHeaders(response, ttlSeconds, staleWhileRevalidateSeconds),
+})
+
 export async function withPublicEdgeCache(
   request: Request,
   loader: () => Promise<Response>,
@@ -50,32 +59,22 @@ export async function withPublicEdgeCache(
     0,
     options.staleWhileRevalidateSeconds ?? DEFAULT_SWR,
   )
-  const key = cacheKey(request, options.scopeKey)
+  const key = publicCacheKey(request)
   const cache = caches.default
-
   const cached = await cache.match(key)
   if (cached) return cached
 
   const response = await loader()
   if (!response.ok || response.headers.has('set-cookie')) return response
 
-  const headers = cacheHeaders(response, ttlSeconds, staleWhileRevalidateSeconds)
-  const cacheable = new Response(response.clone().body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  })
-
-  await cache.put(
-    key,
-    cacheable.clone(),
+  const cacheable = materializeCacheableResponse(
+    response,
+    ttlSeconds,
+    staleWhileRevalidateSeconds,
   )
+  await cache.put(key, cacheable.clone())
 
-  return new Response(await cacheable.arrayBuffer(), {
-    status: cacheable.status,
-    statusText: cacheable.statusText,
-    headers,
-  })
+  return response
 }
 
 export async function withScopedEdgeCache(
@@ -91,31 +90,25 @@ export async function withScopedEdgeCache(
     0,
     options.staleWhileRevalidateSeconds ?? 15,
   )
-  const key = cacheKey(request, scopeKey)
+  const key = scopedCacheKey(scopeKey)
   const cached = await caches.default.match(key)
   if (cached) return cached
 
   const response = await loader()
   if (!response.ok || response.headers.has('set-cookie')) return response
 
-  const headers = cacheHeaders(response, ttlSeconds, staleWhileRevalidateSeconds)
-  const cacheable = new Response(response.clone().body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  })
+  const cacheable = materializeCacheableResponse(
+    response,
+    ttlSeconds,
+    staleWhileRevalidateSeconds,
+  )
   await caches.default.put(key, cacheable.clone())
-  return new Response(await cacheable.arrayBuffer(), {
-    status: cacheable.status,
-    statusText: cacheable.statusText,
-    headers,
-  })
+  return response
 }
 
 export async function invalidateScopedEdgeCache(
   scopeKey: string,
-  request: Request,
+  _request: Request,
 ): Promise<void> {
-  const key = cacheKey(request, scopeKey)
-  await caches.default.delete(key)
+  await caches.default.delete(scopedCacheKey(scopeKey))
 }
