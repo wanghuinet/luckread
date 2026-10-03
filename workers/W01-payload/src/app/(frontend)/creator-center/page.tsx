@@ -1,4 +1,4 @@
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 
@@ -11,8 +11,12 @@ import { CreatorStudio } from './CreatorStudio'
 
 export const dynamic = 'force-dynamic'
 
+type StudioLocale = 'zh-CN' | 'en-US'
+
 export default async function CreatorCenterPage() {
   const requestHeaders = await headers()
+  const localeCookie = (await cookies()).get('luckread-ui-locale')?.value
+  const locale: StudioLocale = localeCookie === 'en-US' ? 'en-US' : 'zh-CN'
   const request = new Request('https://mp.luckread.com/creator-center', {
     headers: requestHeaders,
   })
@@ -60,5 +64,5 @@ export default async function CreatorCenterPage() {
           ? user.email
           : '创作者'
 
-  return <CreatorStudio displayName={displayName} userId={String(user.id)} />
+  return <CreatorStudio displayName={displayName} userId={String(user.id)} locale={locale} />
 }
