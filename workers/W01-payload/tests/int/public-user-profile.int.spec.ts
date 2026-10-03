@@ -64,7 +64,7 @@ describe('public user profile', () => {
     expect(page).toContain('const [blockedBy, setBlockedBy] = useState(false)')
     expect(page).toContain('setBlockedBy(followData?.data?.relationship?.blockedBy === true)')
     expect(page).toContain('blocked || blockedBy ?')
-    expect(page).toContain('当前关系受屏蔽规则限制。')
+    expect(page).toContain('lr-profile-relation-note')
   })
 
   it('provides profile-level block and mute actions through the canonical interaction adapters', () => {
