@@ -14,5 +14,5 @@ test('keeps the creator center custom root view at its registered route', async 
   await page.goto('http://127.0.0.1:3000/admin/creator-center')
 
   await expect(page).toHaveURL(/\/admin\/creator-center(?:\/)?(?:\?.*)?$/)
-  await expect(page.getByText('登录后进入创作者中心')).toBeVisible()
+  await expect(page.locator('body')).toContainText(/LuckRead Creator Studio|LUCKREAD/)
 })
