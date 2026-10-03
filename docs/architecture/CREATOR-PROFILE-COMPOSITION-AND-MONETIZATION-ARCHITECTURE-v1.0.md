@@ -54,6 +54,7 @@ Examples:
 | Comic | Comic, comic series |
 | Drama / Series | Micro-drama, series |
 | Membership | Membership, exclusive space |
+| Program Developer | Developer products, code assets, software downloads |
 | Collection | Collection, playlist |
 | Community | Posts, community |
 
@@ -68,7 +69,7 @@ Hero / identity
 → Creator-selected modules
 → External links
 
-The current public profile page already has Hero, Follow, Share, Membership-2.0 placeholder, Drama-2.0 placeholder and content tabs. The next evolution is to replace hard-coded future placeholders with a capability-aware Module Registry.
+The public profile target remains a composition model; runtime UI placeholders are not part of the admitted implementation. The next implementation step is to replace hard-coded future placeholders with a capability-aware Module Registry after the corresponding contract admission.
 
 The profile remains one public URL and one Creator identity.
 
@@ -304,7 +305,48 @@ Profile composition should evolve in this order:
 
 Persistent creator-controlled layout is the only step that requires a new presentation-state contract. Before that contract is admitted, use server-defined defaults and do not invent a free-form JSON database field.
 
-## 12. Architectural result
+
+## 13. Program Developer paid-download component
+
+LuckRead also needs a dedicated creator capability for software and reusable technical assets.
+
+The creator may publish paid developer products such as:
+
+- code snippets / source packages
+- website themes / templates
+- desktop executable programs (EXE or equivalent)
+- Android application packages (APK)
+- future developer assets such as plugins, scripts, SDK examples or project templates
+
+The public profile module may present these as a **Developer Products / 软件作品** section, but the module itself is presentation-only. Product metadata, payment facts and access rights stay in their owning authorities.
+
+Target business chain:
+
+Developer Creator
+→ Developer Product
+→ Offer / Price
+→ Payment / Order
+→ Durable Download Entitlement
+→ Versioned Artifact
+→ Download / Delivery
+
+A critical rule is that this is **not** the same as an ordinary expiring membership entitlement. After a successful paid subscription / purchase that grants the product, the user receives a durable download right for the acquired product version or product family, according to the admitted product policy. Cancelling a recurring creator membership must not automatically revoke an already-earned permanent download right unless a separately disclosed license rule requires revocation.
+
+The download boundary must therefore verify, at minimum:
+
+- authenticated account
+- durable entitlement for the product
+- product/version publication state
+- artifact integrity and availability
+- download authorization / anti-abuse limits
+
+Never trust a client-supplied product price, entitlement, download URL, file key or license state.
+
+For implementation, artifact delivery should remain outside D1 hot-path payloads. Store durable metadata and entitlement facts in the existing authoritative domains, while large EXE/APK/archive artifacts use object storage / CDN delivery with short-lived delivery authorization. No new fixed Worker or D1 is required by this component.
+
+The initial 2.0 design should support creator-configurable product categories while keeping the underlying authority stable: a creator can select a system-defined category or add a controlled display label, but the persistence model must not become a free-form unvalidated JSON bucket.
+
+## 14. Architectural result
 
 The final model is:
 
@@ -314,6 +356,7 @@ One Account
 → One Public Profile Surface
 → Many Profile Modules
 → Many Content / Commerce Products
-→ One coherent Membership / Entitlement / Revenue chain
+→ Membership / Subscription Entitlements + Durable Product Download Entitlements
+→ One coherent Revenue / Settlement chain
 
 This lets LuckRead grow from article + video into a mainstream creator platform where photography, COS, comics, novels, audio, movies, micro-drama, subscriptions and future paid products can coexist on one creator page without duplicating authority or expanding the fixed 12-Worker / 4-D1 architecture.
