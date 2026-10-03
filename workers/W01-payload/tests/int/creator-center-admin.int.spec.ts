@@ -437,7 +437,7 @@ describe('Creator Center admin extension', () => {
     const importMap = read('src/app/(payload)/admin/importMap.js')
 
     expect(importMap).toContain('@payloadcms/storage-r2/client')
-    expect(importMap).toContain('@payloadcms/next/rsc#CollectionCards')
+    expect(importMap).toContain('@payloadcms/ui/rsc#CollectionCards')
     expect(importMap).not.toContain('CreatorCenterAction')
     expect(importMap).not.toContain('/app/(payload)/admin/CreatorCenter')
     expect(importMap).not.toContain('/app/(payload)/v1beta/CreatorCenter')
