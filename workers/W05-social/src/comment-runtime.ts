@@ -334,20 +334,21 @@ export async function deleteComment(
        c.id,
        c.author_user_id,
        c.state,
+       content.state AS content_state,
        EXISTS (
          SELECT 1
          FROM social_comments child
          WHERE child.parent_id = c.id
        ) AS has_replies
      FROM social_comments c
-     JOIN contents content ON content.id = c.content_id
+     LEFT JOIN contents content ON content.id = c.content_id
      WHERE c.id = ?
-       AND content.state = 'PUBLISHED'
      LIMIT 1`,
   ).bind(commentId).first<{
     id: string
     author_user_id: string
     state: 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'AUTHOR_DELETED'
+    content_state: string | null
     has_replies: number
   }>()
 
@@ -356,6 +357,9 @@ export async function deleteComment(
     throw new CommentRuntimeError('PERMISSION_DENIED', 403)
   }
   if (row.state === 'AUTHOR_DELETED') return
+  if (row.content_state !== 'PUBLISHED') {
+    throw new CommentRuntimeError('NOT_FOUND', 404)
+  }
   if (row.state !== 'PUBLISHED') {
     throw new CommentRuntimeError('INVALID_STATE', 409)
   }

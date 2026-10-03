@@ -131,6 +131,19 @@ describe('comment runtime', () => {
     expect(d.prepare).toHaveBeenCalledTimes(1)
   })
 
+  it('retries an author deletion tombstone after the parent content is unpublished', async () => {
+    const d = db([{
+      id: 'c-deleted',
+      author_user_id: 'user-1',
+      state: 'AUTHOR_DELETED',
+      content_state: 'DRAFT',
+      has_replies: 0,
+    }])
+
+    await expect(deleteComment(d, 'user-1', 'c-deleted')).resolves.toBeUndefined()
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects comments when the actor is blocked by the content relationship', async () => {
     const d = db([{
       content_state: 'PUBLISHED',
