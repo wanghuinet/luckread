@@ -71,7 +71,6 @@ jobs:
           attach "www.luckread.com"
           attach "sso.luckread.com"
           attach "mp.luckread.com"
-          attach "mp.luckread.com"
 
       - name: Verify W01 public domains
         env:
@@ -91,7 +90,6 @@ jobs:
             and ([.result[] | select(.hostname == "www.luckread.com" and .service == "luckread-w01-payload")] | length) == 1
             and ([.result[] | select(.hostname == "sso.luckread.com" and .service == "luckread-w01-payload")] | length) == 1
             and ([.result[] | select(.hostname == "mp.luckread.com" and .service == "luckread-w01-payload")] | length) == 1
-            and ([.result[] | select(.hostname == "mp.luckread.com" and .service == "luckread-w01-payload")] | length) == 1
           ' >/dev/null
 
-          printf '%s' "${response}" | jq '[.result[] | select((.hostname == "luckread.com" or .hostname == "api.luckread.com" or .hostname == "www.luckread.com" or .hostname == "sso.luckread.com" or .hostname == "mp.luckread.com" or .hostname == "mp.luckread.com")) | {hostname,service,zone_name,id,cert_id}]'
+          printf '%s' "${response}" | jq '[.result[] | select((.hostname == "luckread.com" or .hostname == "api.luckread.com" or .hostname == "www.luckread.com" or .hostname == "sso.luckread.com" or .hostname == "mp.luckread.com")) | {hostname,service,zone_name,id,cert_id}]'
