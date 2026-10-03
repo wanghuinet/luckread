@@ -307,7 +307,11 @@ export async function getLikeStatus(
       ).bind(actor, targetType, targetType, actor, actor, actor, actor, targetId)
         .first<{ liked: number; like_count: number; blocked: number }>()
 
-  if (!row) return { liked: false, likeCount: 0 }
+  if (!row) {
+    const result = { liked: false, likeCount: 0 }
+    await writeCachedLikeStatus(actor, targetType, targetId, result)
+    return result
+  }
   if (Number(row.blocked) === 1) {
     throw new LikeRuntimeError('RELATIONSHIP_BLOCKED', 409)
   }
@@ -330,4 +334,5 @@ export async function unlike(
   await db.prepare(
     'DELETE FROM interaction_likes WHERE actor_user_id = ? AND target_type = ? AND target_id = ?',
   ).bind(actor, targetType, targetId).run()
+  await invalidateCachedLikeStatus(actor, targetType, targetId)
 }
