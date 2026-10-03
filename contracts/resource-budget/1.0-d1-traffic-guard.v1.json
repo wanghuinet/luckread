@@ -44,7 +44,9 @@
     "auth": {
       "registerPerIpPerMinute": 10,
       "loginPerIpPerMinute": 30,
-      "refreshPerIpPerMinute": 120
+      "refreshPerIpPerMinute": 120,
+      "originRequestsPerLocationPerMinute": 3000,
+      "appliesBeforePayloadD1": true
     },
     "response": {
       "status": 429,
