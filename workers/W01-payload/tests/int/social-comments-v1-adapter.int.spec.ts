@@ -41,6 +41,12 @@ describe('v1 comment adapters', () => {
     expect(updateRoute).not.toContain('social_comments')
   })
 
+  it('enforces idempotency precondition on comment updates', () => {
+    expect(updateRoute).toContain("request.headers.get('Idempotency-Key')")
+    expect(updateRoute).toContain("PRECONDITION_REQUIRED")
+    expect(updateRoute).toContain('idempotencyKey.length > 256')
+  })
+
   it('exposes conditional comment updates through the W05 adapter', () => {
     expect(updateRoute).toContain('resolveCookieSocialPrincipal')
     expect(updateRoute).toContain('callW05Social')
