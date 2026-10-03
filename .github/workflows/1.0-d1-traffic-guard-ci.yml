@@ -128,7 +128,8 @@ jobs:
       - name: Typecheck W03
         run: ./node_modules/.bin/tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W03-content/src/index.ts workers/W03-content/src/content-runtime.ts
       - name: Validate Wrangler JSON structure
-        run: node --input-type=module <<'NODE'
+        run: |
+          node --input-type=module <<'NODE'
           import fs from 'node:fs'
           for (const path of ['workers/W01-payload/wrangler.jsonc','workers/W03-content/wrangler.jsonc','workers/W05-social/wrangler.jsonc']) {
             JSON.parse(fs.readFileSync(path, 'utf8'))
