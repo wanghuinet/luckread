@@ -115,7 +115,7 @@ jobs:
           console.log('D1_TRAFFIC_GUARD_STATIC=PASS')
           NODE
       - name: Run traffic guard tests
-        run: npx --no-install vitest run workers/W01-payload/src/lib/public-response-cache.test.ts workers/W01-payload/src/auth/traffic-limit.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W05-social/src/d1-traffic-guard.test.ts workers/W06-governance/src/d1-traffic-guard.test.ts workers/W07-subscription-commerce/src/d1-traffic-guard.test.ts workers/W01-payload/tests/int/homepage-d1-guard.int.spec.ts workers/W01-payload/tests/int/content-detail.int.spec.ts workers/W01-payload/tests/int/media-access.int.spec.ts workers/W01-payload/tests/int/users-me-v1-adapter.int.spec.ts
+        run: npx --no-install vitest run workers/W01-payload/src/lib/public-response-cache.test.ts workers/W01-payload/src/auth/traffic-limit.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W05-social/src/d1-traffic-guard.test.ts workers/W06-governance/src/d1-traffic-guard.test.ts workers/W07-subscription-commerce/src/d1-traffic-guard.test.ts workers/W01-payload/tests/int/homepage-d1-guard.int.spec.ts workers/W01-payload/tests/int/content-detail.int.spec.ts workers/W01-payload/tests/int/media-access.int.spec.ts workers/W01-payload/tests/int/users-me-v1-adapter.int.spec.ts workers/W01-payload/tests/int/auth-password-change-v1-adapter.int.spec.ts
       - name: Typecheck W03
         run: npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W03-content/src/index.ts workers/W03-content/src/content-runtime.ts
       - name: Validate Wrangler JSON structure
