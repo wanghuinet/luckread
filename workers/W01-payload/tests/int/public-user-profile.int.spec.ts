@@ -59,6 +59,14 @@ describe('public user profile', () => {
     expect(socialClient).toContain('overrideAccess: true')
   })
 
+  it('does not offer follow while the relationship is blocked in either direction', () => {
+    const page = read('src/app/(frontend)/users/[userId]/page.tsx')
+    expect(page).toContain('const [blockedBy, setBlockedBy] = useState(false)')
+    expect(page).toContain('setBlockedBy(followData?.data?.relationship?.blockedBy === true)')
+    expect(page).toContain('blocked || blockedBy ?')
+    expect(page).toContain('当前关系受屏蔽规则限制。')
+  })
+
   it('provides profile-level block and mute actions through the canonical interaction adapters', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
     expect(page).toContain("applySafetyAction('block')")

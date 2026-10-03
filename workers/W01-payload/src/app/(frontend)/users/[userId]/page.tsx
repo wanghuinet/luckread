@@ -54,6 +54,7 @@ export default function PublicProfilePage({
   const [mutualFollow, setMutualFollow] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
   const [blocked, setBlocked] = useState(false)
+  const [blockedBy, setBlockedBy] = useState(false)
   const [blockBusy, setBlockBusy] = useState(false)
   const [muted, setMuted] = useState(false)
   const [muteBusy, setMuteBusy] = useState(false)
@@ -142,6 +143,7 @@ export default function PublicProfilePage({
           setIsFollowing(followData?.data?.following === true)
           setMutualFollow(followData?.data?.relationship?.mutualFollow === true)
           setBlocked(followData?.data?.relationship?.blocked === true)
+          setBlockedBy(followData?.data?.relationship?.blockedBy === true)
           setMuted(followData?.data?.relationship?.muted === true)
           const items = Array.isArray(contentData?.data?.items) ? contentData.data.items : []
           setContents(items)
@@ -395,6 +397,8 @@ export default function PublicProfilePage({
           {mutualFollow ? <span className="content-detail-relationship-badge">互相关注</span> : null}
           {viewerUserId === profile.id ? (
             <span className="content-detail-muted">这是你的主页</span>
+          ) : blocked || blockedBy ? (
+            <span className="content-detail-muted" role="status">当前关系受屏蔽规则限制。</span>
           ) : (
             <button
               className="content-detail-follow"
