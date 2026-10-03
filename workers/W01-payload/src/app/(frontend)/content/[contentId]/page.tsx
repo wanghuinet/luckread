@@ -32,8 +32,12 @@ export default function ContentDetailPage({
 }: {
   params: Promise<{ contentId: string }>
 }) {
-  const [locale] = useState<PublicLocale>(() => readPublicLocaleCookie())
+  const [locale, setLocale] = useState<PublicLocale>('zh')
   const copy = getPublicCopy(locale)
+
+  useEffect(() => {
+    setLocale(readPublicLocaleCookie())
+  }, [])
   const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
   const typeLabels: Record<ContentType, string> = {
     article: copy.content.tabs.article,
@@ -418,7 +422,7 @@ export default function ContentDetailPage({
           {!interactionRestricted ? (
             <button className="content-detail-like" disabled={likeBusy} onClick={() => void toggleLike()} type="button">
               {likeBusy ? copy.comments.processing : liked ? copy.detail.liked : copy.detail.like}
-              {likeCount === null ? '' : ' · ' + likeCount.toLocaleString('zh-CN')}
+              {likeCount === null ? '' : ' · ' + likeCount.toLocaleString(dateLocale)}
             </button>
           ) : null}
           <button className="content-detail-like" disabled={bookmarkBusy} onClick={() => void toggleBookmark()} type="button">
