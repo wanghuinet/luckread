@@ -443,4 +443,33 @@ describe('Creator Center admin extension', () => {
     expect(importMap).not.toContain('/app/(payload)/v1beta/CreatorCenter')
   })
 
+  it('supports a persistent Chinese/English creator studio interface toggle', () => {
+    const toggle = read('src/app/(frontend)/creator-center/CreatorLanguageToggle.tsx')
+    const page = read('src/app/(frontend)/creator-center/page.tsx')
+    const home = read('src/app/(frontend)/page.tsx')
+    const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
+    const styles = read('src/app/(payload)/v1beta/creator-center.module.css')
+
+    expect(toggle).toContain("'use client'")
+    expect(toggle).toContain("const COOKIE_NAME = 'luckread-ui-locale'")
+    expect(toggle).toContain("中文")
+    expect(toggle).toContain("English")
+    expect(toggle).toContain('aria-pressed')
+    expect(toggle).toContain("Max-Age=31536000")
+    expect(page).toContain("(await cookies()).get('luckread-ui-locale')?.value")
+    expect(page).toContain("localeCookie === 'en-US' ? 'en-US' : 'zh-CN'")
+    expect(page).toContain('locale={locale}')
+    expect(home).toContain("import CreatorLanguageToggle from './creator-center/CreatorLanguageToggle'")
+    expect(home).toContain("const localeCookie = (await cookies()).get('luckread-ui-locale')?.value")
+    expect(home).toContain('<CreatorLanguageToggle locale={locale} />')
+    expect(view).toContain("locale?: StudioLocale")
+    expect(view).toContain('navigationByLocale')
+    expect(view).toContain('<CreatorLanguageToggle locale={locale} />')
+    expect(view).toContain("locale === 'en-US' ? 'Publish check' : '发布检测'")
+    expect(view).toContain("locale === 'en-US' ? 'Audience' : '粉丝'")
+    expect(styles).toContain('.languageSwitch')
+    expect(styles).toContain('.languageSwitchButtonActive')
+  })
+
+
 })
