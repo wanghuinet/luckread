@@ -259,7 +259,7 @@ describe('subscription runtime', () => {
   })
 
   it('binds the canonical frontend cursor response shape', () => {
-    const page = readFileSync(resolve(process.cwd(), '../../W01-payload/src/app/(frontend)/me/subscriptions/page.tsx'), 'utf8')
+    const page = readFileSync(resolve(process.cwd(), '../W01-payload/src/app/(frontend)/me/subscriptions/page.tsx'), 'utf8')
     expect(page).toContain("new URLSearchParams({ limit: '20' })")
     expect(page).toContain('setNextCursor(data.data.nextCursor ?? null)')
     expect(page).toContain('load(nextCursor, true)')
