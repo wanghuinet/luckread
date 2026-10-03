@@ -284,7 +284,7 @@ export function CreatorStudio({
 
               {adminMode ? <CreatorModerationQueue /> : null}
 
-              <CreatorAudienceSummary userId={String(serverUser.id)} />
+              <CreatorAudienceSummary userId={String(userId)} loginPath={adminMode ? '/admin/login' : '/login'} />
 
               <section className={styles.futureDashboardGrid} aria-label="后续创作者能力">
                 <article id="future-data" className={styles.futureDashboardCard}>
