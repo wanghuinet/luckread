@@ -47,6 +47,18 @@ describe('like runtime', () => {
     expect(d.prepare).toHaveBeenCalledTimes(1)
   })
 
+  it('binds the final content like write to published visibility and Block policy', async () => {
+    const d = db([{ id: 'content-1', state: 'PUBLISHED', owner_user_id: 'user-2', blocked: 0 }, null])
+    await expect(like(d, 'user-1', { targetType: 'content', targetId: 'content-1' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
+    })
+    const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[1]?.[0])
+    expect(sql).toContain("c.state = 'PUBLISHED'")
+    expect(sql).toContain("block.relation_type = 'block'")
+    expect(sql).toContain('NOT EXISTS')
+  })
+
   it('creates a content like after verifying published visibility', async () => {
     const d = db([
       { id: 'content-1', state: 'PUBLISHED' },
@@ -101,6 +113,19 @@ describe('like runtime', () => {
       status: 404,
     })
     expect(d.prepare).toHaveBeenCalledTimes(1)
+  })
+
+  it('binds the final comment like write to published visibility and Block policy', async () => {
+    const d = db([{ id: 'comment-1', state: 'PUBLISHED', author_user_id: 'user-2', content_owner_user_id: 'user-3', blocked: 0 }, null])
+    await expect(like(d, 'user-1', { targetType: 'comment', targetId: 'comment-1' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
+    })
+    const sql = String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[1]?.[0])
+    expect(sql).toContain("c.state = 'PUBLISHED'")
+    expect(sql).toContain("content.state = 'PUBLISHED'")
+    expect(sql).toContain("block.relation_type = 'block'")
+    expect(sql).toContain('NOT EXISTS')
   })
 
   it('creates a like on a published comment after validating its parent content', async () => {
