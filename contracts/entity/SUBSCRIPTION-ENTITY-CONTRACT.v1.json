@@ -18,6 +18,7 @@
     "docs/111-MEMBERSHIP-API-CONTRACT-v1.0.md",
     "docs/114-MEMBERSHIP-TEST-AND-ACCEPTANCE-CONTRACT-v1.0.md",
     "contracts/state-machines/subscription.json",
+    "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
     "docs/02-FINAL-MAPPING-v1.0.md",
     "docs/09-D1-DOMAIN-MASTER-v1.0.md",
     "docs/04-WORKER-MASTER-v1.0.md"
@@ -36,6 +37,21 @@
       "apiExposure": "SCOPED_IDENTIFIER",
       "adminExposure": "SCOPED",
       "eventExposure": "RESOURCE_IDENTIFIER",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SUBSCRIPTION-F-VERSION",
+      "name": "version",
+      "type": "integer",
+      "nullable": false,
+      "required": true,
+      "unique": false,
+      "indexed": false,
+      "lifecycle": "mutable_concurrency",
+      "classification": "CONCURRENCY_VERSION",
+      "apiExposure": "SCOPED",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
       "status": "CONTRACTED_NOT_VERIFIED"
     },
     {
@@ -228,6 +244,7 @@
     "subscriberId is always bound to authoritative ENT-USER; the client cannot establish identity authority.",
     "planId + planVersion identifies the immutable plan definition used by the subscription.",
     "Exactly one authoritative current status exists for a subscription.",
+    "version starts at 1 and increments exactly once for each successful authoritative mutation.",
     "Historical lifecycle transitions remain auditable and replay-safe.",
     "Payment/order state is referenced, not duplicated as financial authority.",
     "Entitlement is derived from valid subscription state but remains the authoritative access decision state in D1-01.",
@@ -238,17 +255,13 @@
   "stateMachineReconciliation": {
     "ref": "contracts/state-machines/subscription.json",
     "status": "RECONCILIATION_REQUIRED",
-    "reason": "Membership contract and events define pause/resume semantics, while the current machine-readable state vocabulary does not yet include PAUSED. This entity contract therefore records status as the lifecycle field without silently inventing a new state.",
+    "reason": "Membership contract and events define pause/resume semantics, and the machine-readable Subscription state vocabulary now includes PAUSED. This entity contract records status as the lifecycle field without introducing a second state authority.",
     "otherTerminology": "The capability contract uses startAt; the data contract uses startedAt. The entity canonical field is startedAt with startAt retained as a semantic alias, not a second persisted field."
-  },
-  "persistence": {
-    "status": "NOT_BOUND",
-    "note": "Physical D1-01 table/column binding, migration, Worker execution binding and runtime evidence are intentionally deferred until the state-machine/API reconciliation and global implementation gate admit them."
   },
   "persistence": {
     "status": "CONTRACTED_NOT_VERIFIED",
     "persistenceContract": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
-    "note": "Logical D1-01 table/column binding is now defined. Migration execution, W07 runtime binding, concurrency version source and active-subscription uniqueness policy remain unverified or pending decision."
+    "note": "Logical D1-01 table/column binding is now defined. Migration execution, W07 runtime binding and active-subscription uniqueness policy remain unverified or pending decision; concurrency version source is bound to ENT-SUBSCRIPTION-F-VERSION."
   },
   "nonGoals": [
     "No Payload collection.",
