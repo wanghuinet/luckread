@@ -151,7 +151,7 @@ export function CreatorCenter({
               <strong>欢迎回来，{displayName}</strong>
             </div>
             <div className={styles.topbarActions}>
-              <Link className={styles.ghostButton + ' btn'} href="/">
+              <Link className={styles.ghostButton + ' btn'} href="https://luckread.cn/">
                 <i className="fa-solid fa-arrow-up-right-from-square" aria-hidden="true" />
                 查看前台
               </Link>
