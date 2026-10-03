@@ -29,7 +29,10 @@ jobs:
           attach() {
             local hostname="$1"
             local response existing_service attach_response
-            local zone_name="${hostname#*.}"
+            local zone_name="${hostname}"
+            if [[ "${hostname}" == *.*.* ]]; then
+              zone_name="${hostname#*.}"
+            fi
 
             response="$(curl --fail-with-body --silent --show-error \
               --get "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/domains" \
