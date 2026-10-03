@@ -179,8 +179,10 @@
     "status": "DECISION_REQUIRED"
   },
   "migration": {
-    "status": "NOT_CREATED",
-    "rule": "A physical migration requires a separate admitted migration contract, exact artifact hash, controlled target D1-01 execution and post-schema evidence."
+    "status": "ADMITTED_NOT_EXECUTED",
+    "rule": "A physical migration requires a separate admitted migration contract, exact artifact hash, controlled target D1-01 execution and post-schema evidence.",
+    "contract": "contracts/migration/SUBSCRIPTION-version-migration.v1.json",
+    "migrationFile": "workers/W07-subscription-commerce/migrations/0002_subscription_version.sql"
   },
   "runtime": {
     "w07Binding": "NOT_VERIFIED",
