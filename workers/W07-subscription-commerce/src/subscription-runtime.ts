@@ -64,6 +64,42 @@ export const validateIfMatch = (value: string | null): string => {
 
 export const etagForUpdatedAt = (updatedAt: string): string => '"lr-' + updatedAt + '"'
 
+type SubscriptionCursor = {
+  createdAt: string
+  id: string
+}
+
+const encodeCursorBytes = (value: string): string => {
+  const bytes = new TextEncoder().encode(value)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+const decodeCursorBytes = (value: string): string => {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4)
+  let binary: string
+  try { binary = atob(padded) } catch { throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400) }
+  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0))
+  return new TextDecoder().decode(bytes)
+}
+
+export const encodeSubscriptionCursor = (cursor: SubscriptionCursor): string => encodeCursorBytes(JSON.stringify(cursor))
+
+export const decodeSubscriptionCursor = (value: string): SubscriptionCursor => {
+  if (!value || value.length > 1024) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  let parsed: unknown
+  try { parsed = JSON.parse(decodeCursorBytes(value)) } catch { throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400) }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  const createdAt = (parsed as { createdAt?: unknown }).createdAt
+  const id = (parsed as { id?: unknown }).id
+  if (typeof createdAt !== 'string' || typeof id !== 'string' || !createdAt.trim() || !id.trim() || id.length > MAX_ID || !Number.isFinite(Date.parse(createdAt))) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+  return { createdAt: createdAt.trim(), id: id.trim() }
+}
+
 const updatedAtFromEtag = (etag: string): string => {
   const match = /^"lr-(.+)"$/.exec(etag)
   if (!match?.[1]) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
@@ -140,30 +176,38 @@ export async function getSubscription(db: D1Database, subscriberId: string, subs
 export async function listSubscriptions(
   db: D1Database,
   subscriberId: string,
+  cursor: string | null = null,
   limit = 20,
-  page = 1,
 ): Promise<{
   docs: ReturnType<typeof toPublic>[]
   limit: number
-  page: number
+  nextCursor: string | null
   hasNextPage: boolean
 }> {
   const subscriber = validatePrincipal(subscriberId)
+  const decodedCursor = cursor ? decodeSubscriptionCursor(cursor) : null
   const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), 50) : 20
-  const safePage = Number.isFinite(page) ? Math.min(Math.max(Math.trunc(page), 1), 10000) : 1
-  const offset = (safePage - 1) * safeLimit
-  const rows = await db.prepare(
-    'SELECT * FROM membership_subscriptions WHERE subscriber_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
-  ).bind(subscriber, safeLimit + 1, offset).all<SubscriptionRow>()
+  let statement: D1PreparedStatement
+  if (decodedCursor) {
+    statement = db.prepare(
+      'SELECT * FROM membership_subscriptions WHERE subscriber_id = ? AND (created_at < ? OR (created_at = ? AND subscription_id < ?)) ORDER BY created_at DESC, subscription_id DESC LIMIT ?',
+    ).bind(subscriber, decodedCursor.createdAt, decodedCursor.createdAt, decodedCursor.id, safeLimit + 1)
+  } else {
+    statement = db.prepare(
+      'SELECT * FROM membership_subscriptions WHERE subscriber_id = ? ORDER BY created_at DESC, subscription_id DESC LIMIT ?',
+    ).bind(subscriber, safeLimit + 1)
+  }
+  const rows = await statement.all<SubscriptionRow>()
   const docs = (rows.results ?? []).slice(0, safeLimit).map(toPublic)
+  const last = docs.at(-1)
+  const hasNextPage = (rows.results ?? []).length > safeLimit
   return {
     docs,
     limit: safeLimit,
-    page: safePage,
-    hasNextPage: (rows.results ?? []).length > safeLimit,
+    nextCursor: hasNextPage && last ? encodeSubscriptionCursor({ createdAt: last.createdAt, id: last.subscriptionId }) : null,
+    hasNextPage,
   }
 }
-
 const transitionTargets: Record<'cancel' | 'pause' | 'resume', SubscriptionStatus[]> = { cancel: ['ACTIVE', 'PAST_DUE', 'PAUSED'], pause: ['ACTIVE'], resume: ['PAUSED'] }
 const nextStates: Record<'cancel' | 'pause' | 'resume', SubscriptionStatus> = { cancel: 'CANCELED', pause: 'PAUSED', resume: 'ACTIVE' }
 const nextState = (operation: 'cancel' | 'pause' | 'resume'): SubscriptionStatus => nextStates[operation]
