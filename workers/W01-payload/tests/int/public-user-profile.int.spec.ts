@@ -105,7 +105,10 @@ describe('public user profile', () => {
     expect(page).toContain('objectFit: \'cover\'')
     expect(page).toContain('/api/v1/contents?creatorId=')
     expect(page).toContain('加载更多作品')
-    expect(page).toContain("href={'/content/' + encodeURIComponent(item.id)}")
+    expect(page).toContain("href={'/' + encodeURIComponent(profile!.username) + '/' + item.contentType + '/' + encodeURIComponent(item.id)}")
+    expect(page).toContain('会员订阅')
+    expect(page).toContain('漫剧')
+    expect(page).toContain('MEMBERSHIP · 2.0')
   })
   it('invalidates stale public-profile content pagination on navigation', () => {
     const page = read('src/app/(frontend)/users/[userId]/page.tsx')
