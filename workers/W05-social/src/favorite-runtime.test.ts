@@ -90,7 +90,21 @@ describe('favorite runtime', () => {
     ).resolves.toEqual({ favorited: false })
   })
 
-  it('unfavorites idempotently without a preliminary read', async () => {
+  
+  it('serves repeated favorite status reads from the private cache', async () => {
+    const first = db([{ favorited: 1 }])
+    await expect(
+      getFavoriteStatus(first, 'cache-user', { targetType: 'content', targetId: 'cache-content' }),
+    ).resolves.toEqual({ favorited: true })
+    const secondPrepare = vi.fn(() => { throw new Error('D1_SHOULD_NOT_BE_READ') })
+    const second = { prepare: secondPrepare } as unknown as D1Database
+    await expect(
+      getFavoriteStatus(second, 'cache-user', { targetType: 'content', targetId: 'cache-content' }),
+    ).resolves.toEqual({ favorited: true })
+    expect(secondPrepare).not.toHaveBeenCalled()
+  })
+
+it('unfavorites idempotently without a preliminary read', async () => {
     await expect(
       unfavorite(db(), 'user-1', { targetType: 'content', targetId: 'content-1' }),
     ).resolves.toBeUndefined()
