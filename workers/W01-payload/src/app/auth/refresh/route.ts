@@ -4,6 +4,7 @@ import config from '@payload-config'
 
 import { buildPayloadAccessCookie, issuePayloadAccessToken } from '../../../auth/payload-access-token.js'
 import { refreshSession, W02AuthClientError } from '../../../auth/w02-session-client.js'
+import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -35,9 +36,7 @@ export async function POST(request: Request): Promise<Response> {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
-  import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
-
-let body: { refreshToken?: unknown; deviceId?: unknown }
+  let body: { refreshToken?: unknown; deviceId?: unknown }
 
   try {
     body = (await request.json()) as { refreshToken?: unknown; deviceId?: unknown }
