@@ -6,7 +6,6 @@
   "workers_dev": false,
   "ratelimits": [
     {
-    {
       "name": "SOCIAL_ORIGIN_GLOBAL_LIMITER",
       "namespace_id": "2026100309",
       "simple": { "limit": 10000, "period": 60 }
