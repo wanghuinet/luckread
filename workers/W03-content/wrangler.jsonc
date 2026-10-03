@@ -4,6 +4,18 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-08-15",
   "workers_dev": false,
+  "ratelimits": [
+    {
+      "name": "CONTENT_PUBLIC_READ_LIMITER",
+      "namespace_id": "2026100301",
+      "simple": { "limit": 300, "period": 60 }
+    },
+    {
+      "name": "CONTENT_MUTATION_LIMITER",
+      "namespace_id": "2026100302",
+      "simple": { "limit": 60, "period": 60 }
+    }
+  ],
   "d1_databases": [
     {
       "binding": "D1_02",
