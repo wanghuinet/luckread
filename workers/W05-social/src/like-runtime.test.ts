@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getLikeStatus, like, unlike } from './like-runtime.js'
 
 const db = (firstResults: unknown[] = []) => {
@@ -15,6 +15,20 @@ const db = (firstResults: unknown[] = []) => {
 
 
 describe('like runtime', () => {
+  afterEach(() => { delete (globalThis as Record<string, unknown>).caches })
+
+  it('serves a cached derived like status without touching D1', async () => {
+    const cache = {
+      match: vi.fn(async () => Response.json({ liked: true, likeCount: 9 })),
+      put: vi.fn(async () => undefined),
+      delete: vi.fn(async () => true),
+    }
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+    const d = db([])
+    await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-hot' })).resolves.toEqual({ liked: true, likeCount: 9 })
+    expect(d.prepare).not.toHaveBeenCalled()
+  })
+
   it('reads effective like status for the actor and target', async () => {
     const existing = {
       liked: 1,
