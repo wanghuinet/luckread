@@ -6,11 +6,11 @@ const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relat
 
 describe('creator audience integration', () => {
   it('mounts the live follower/following summary inside Creator Center', () => {
-    const center = read('src/app/(payload)/admin/CreatorCenter.tsx')
+    const center = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const summary = read('src/app/(payload)/admin/CreatorAudienceSummary.tsx')
 
-    expect(center).toContain("import CreatorAudienceSummary from './CreatorAudienceSummary'")
-    expect(center).toContain('<CreatorAudienceSummary userId={String(serverUser.id)} />')
+    expect(center).toContain("import CreatorAudienceSummary from '../../(payload)/admin/CreatorAudienceSummary'")
+    expect(center).toContain('<CreatorAudienceSummary userId={String(userId)} loginPath={adminMode ? \'/admin/login\' : \'/login\'} />')
     expect(center).toContain("{ label: '粉丝与关注', href: '#audience'")
     expect(center).not.toContain("{ label: '粉丝与订阅', href: '#future-audience'")
     expect(summary).toContain('/api/v1/users/')
