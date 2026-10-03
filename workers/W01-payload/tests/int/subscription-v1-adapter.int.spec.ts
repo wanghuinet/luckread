@@ -23,6 +23,14 @@ describe('v1 subscription adapter', () => {
     expect(route).toContain('callW07Subscription')
   })
 
+  it('enforces mutation preconditions at the public adapter', () => {
+    expect(route).toContain("requireHeader(request, 'Idempotency-Key')")
+    expect(route).toContain("requireHeader(request, 'If-Match')")
+    expect(route).toContain("segments.length === 2")
+    expect(route).toContain("PRECONDITION_REQUIRED")
+    expect(route).toContain("PRECONDITION_FAILED")
+  })
+
   it('exposes only the canonical subscription lifecycle paths', () => {
     expect(route).toContain("/memberships/subscriptions")
     expect(route).toContain("parts.length === 0 && method === 'GET'")
