@@ -567,8 +567,8 @@ export default function PublicProfilePage({
             </div>
           </dl>
 
-          {viewerUserId !== profile.id ? (
-            {safetyMessage ? <p className="creator-profile-global-message" role="status">{safetyMessage}</p> : null}
+          {viewerUserId !== profile.id && safetyMessage ? (
+            <p className="creator-profile-global-message" role="status">{safetyMessage}</p>
           ) : null}
         </section>
 
