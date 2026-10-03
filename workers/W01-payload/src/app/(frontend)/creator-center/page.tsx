@@ -13,12 +13,15 @@ export const dynamic = 'force-dynamic'
 
 export default async function CreatorCenterPage() {
   const requestHeaders = await headers()
+  const request = new Request('https://mp.luckread.cn/creator-center', {
+    headers: requestHeaders,
+  })
   const payload = await getPayload({ config })
 
   let authResult: Awaited<ReturnType<typeof payload.auth>>
   try {
     authResult = await payload.auth({
-      headers: requestHeaders,
+      headers: request.headers,
       canSetHeaders: false,
     })
   } catch {
@@ -33,7 +36,7 @@ export default async function CreatorCenterPage() {
     email?: unknown
   } | null)
 
-  const tokenVersion = readVerifiedPayloadTokenVersion(requestHeaders)
+  const tokenVersion = readVerifiedPayloadTokenVersion(request)
   if (!user?.id || typeof user._sid !== 'string' || !user._sid || tokenVersion === null) {
     redirect('/login?returnTo=%2Fcreator-center')
   }
