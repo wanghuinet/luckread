@@ -758,4 +758,3 @@ describe('W05 social comment transport', () => {
     expect(response.status).toBe(401)
   })
 })
-
