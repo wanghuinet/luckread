@@ -104,17 +104,65 @@ export async function like(
 
   const createdAt = new Date().toISOString()
   const relationshipId = crypto.randomUUID()
-  const row = await db.prepare(
-    `INSERT INTO interaction_likes
-      (relationship_id, actor_user_id, target_type, target_id, created_at)
-     VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(actor_user_id, target_type, target_id)
-     DO UPDATE SET relationship_id = interaction_likes.relationship_id
-     RETURNING relationship_id, actor_user_id, target_type, target_id, created_at`,
-  ).bind(relationshipId, actor, targetType, targetId, createdAt)
+  const insertSql = targetType === 'content'
+    ? `INSERT INTO interaction_likes
+        (relationship_id, actor_user_id, target_type, target_id, created_at)
+       SELECT ?, ?, 'content', c.id, ?
+         FROM contents c
+        WHERE c.id = ?
+          AND c.state = 'PUBLISHED'
+          AND NOT EXISTS (
+            SELECT 1
+              FROM social_user_interactions block
+             WHERE block.relation_type = 'block'
+               AND (
+                 (block.actor_user_id = ? AND block.target_user_id = c.owner_user_id)
+                 OR
+                 (block.actor_user_id = c.owner_user_id AND block.target_user_id = ?)
+               )
+          )
+       ON CONFLICT(actor_user_id, target_type, target_id)
+       DO UPDATE SET relationship_id = interaction_likes.relationship_id
+       RETURNING relationship_id, actor_user_id, target_type, target_id, created_at`
+    : `INSERT INTO interaction_likes
+        (relationship_id, actor_user_id, target_type, target_id, created_at)
+       SELECT ?, ?, 'comment', c.id, ?
+         FROM social_comments c
+         JOIN contents content ON content.id = c.content_id
+        WHERE c.id = ?
+          AND c.state = 'PUBLISHED'
+          AND content.state = 'PUBLISHED'
+          AND NOT EXISTS (
+            SELECT 1
+              FROM social_user_interactions block
+             WHERE block.relation_type = 'block'
+               AND (
+                 (block.actor_user_id = ? AND block.target_user_id = c.author_user_id)
+                 OR
+                 (block.actor_user_id = c.author_user_id AND block.target_user_id = ?)
+                 OR
+                 (block.actor_user_id = ? AND block.target_user_id = content.owner_user_id)
+                 OR
+                 (block.actor_user_id = content.owner_user_id AND block.target_user_id = ?)
+               )
+          )
+       ON CONFLICT(actor_user_id, target_type, target_id)
+       DO UPDATE SET relationship_id = interaction_likes.relationship_id
+       RETURNING relationship_id, actor_user_id, target_type, target_id, created_at`
+
+  const row = await db.prepare(insertSql)
+    .bind(
+      relationshipId,
+      actor,
+      createdAt,
+      targetId,
+      ...(targetType === 'content'
+        ? [actor, actor]
+        : [actor, actor, actor, actor]),
+    )
     .first<{ relationship_id: string; actor_user_id: string; target_type: 'content' | 'comment'; target_id: string; created_at: string }>()
 
-  if (!row) throw new LikeRuntimeError('LIKE_WRITE_FAILED', 500)
+  if (!row) throw new LikeRuntimeError('NOT_FOUND', 404)
 
   return {
     relationshipId: row.relationship_id,
