@@ -34,13 +34,12 @@ type ContentListResponse = {
   }
 }
 
-type ProfileFilter = 'all' | PublicContent['contentType']
+type ProfileFilter = PublicContent['contentType']
 
 const filterLabels: Record<ProfileFilter, string> = {
-  all: '作品',
-  video: '视频',
+  post: '笔记',
   article: '文章',
-  post: '动态',
+  video: '视频',
 }
 
 const contentTypeLabels: Record<PublicContent['contentType'], string> = {
@@ -70,7 +69,7 @@ export default function PublicProfilePage({
   const [reportBusy, setReportBusy] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
   const [safetyMessage, setSafetyMessage] = useState('')
-  const [filter, setFilter] = useState<ProfileFilter>('all')
+  const [filter, setFilter] = useState<ProfileFilter>('post')
   const [contents, setContents] = useState<PublicContent[]>([])
   const [contentCursor, setContentCursor] = useState<string | null>(null)
   const [contentHasMore, setContentHasMore] = useState(false)
@@ -111,7 +110,7 @@ export default function PublicProfilePage({
             cache: 'no-store',
             signal: controller.signal,
           }),
-          fetch('/api/v1/contents?creatorId=' + encodeURIComponent(userId) + '&limit=6', {
+          fetch('/api/v1/contents?creatorId=' + encodeURIComponent(userId) + '&limit=6&type=post', {
             headers: { accept: 'application/json' },
             cache: 'no-store',
             signal: controller.signal,
@@ -199,7 +198,7 @@ export default function PublicProfilePage({
       const query = [
         'creatorId=' + encodeURIComponent(profile.id),
         'limit=6',
-        ...(nextFilter === 'all' ? [] : ['type=' + encodeURIComponent(nextFilter)]),
+        'type=' + encodeURIComponent(nextFilter),
       ].join('&')
       const response = await fetch('/api/v1/contents?' + query, {
         headers: { accept: 'application/json' },
@@ -418,7 +417,7 @@ export default function PublicProfilePage({
 
   const name = displayName(profile)
   const initial = name.slice(0, 1).toUpperCase()
-  const visibleContents = filter === 'all' ? contents : contents.filter((item) => item.contentType === filter)
+  const visibleContents = contents.filter((item) => item.contentType === filter)
 
   function getContentHref(item: PublicContent) {
     return '/' + encodeURIComponent(profile!.username) + '/' + item.contentType + '/' + encodeURIComponent(item.id)
@@ -603,9 +602,7 @@ export default function PublicProfilePage({
 
         <section className="creator-profile-works" id="works" aria-labelledby="creator-profile-works-title">
           <header className="creator-profile-section-heading">
-            <div>
-              <h2 id="creator-profile-works-title">{filterLabels[filter]}</h2>
-            </div>
+            <div aria-hidden="true" />
             {contentHasMore && contentCursor ? (
               <button className="creator-profile-more-link" type="button" disabled={contentLoading} onClick={() => void loadMoreContents()}>
                 {contentLoading ? '加载中…' : '加载更多'}
@@ -619,7 +616,7 @@ export default function PublicProfilePage({
           ) : null}
           {!contentLoading && visibleContents.length === 0 && !contentError ? (
             <div className="creator-profile-empty">
-              <p>暂无{filter === 'all' ? '' : filterLabels[filter] + ' '}公开作品</p>
+              <p>暂无{filterLabels[filter]}公开作品</p>
             </div>
           ) : null}
 
