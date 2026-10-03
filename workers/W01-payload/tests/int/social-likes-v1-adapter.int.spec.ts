@@ -17,6 +17,13 @@ describe('v1 like adapters', () => {
     expect(route).not.toContain('interaction_likes')
   })
 
+  it('enforces Idempotency-Key on like mutations', () => {
+    expect(route).toContain("method !== 'GET'")
+    expect(route).toContain("request.headers.get('Idempotency-Key')")
+    expect(route).toContain("PRECONDITION_REQUIRED")
+    expect(route).toContain('idempotencyKey.length > 256')
+  })
+
   it('exposes like status plus both idempotent mutation methods', () => {
     expect(route).toContain("return forward(request, 'GET')")
     expect(route).toContain("return forward(request, 'POST')")
