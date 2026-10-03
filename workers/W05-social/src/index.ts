@@ -375,6 +375,7 @@ export default {
       if (path.kind === 'follow') {
         const viewerUserId = requirePrincipal(request)
         if (request.method === 'POST') {
+          requireInteractionLayer(request)
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
           if (!idempotencyKey || idempotencyKey.length > 256) {
             throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
@@ -392,6 +393,7 @@ export default {
         }
 
         if (request.method === 'DELETE') {
+          requireInteractionLayer(request)
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
           if (!idempotencyKey || idempotencyKey.length > 256) {
             throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)

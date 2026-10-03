@@ -437,6 +437,34 @@ describe('W05 social query transport', () => {
     expect(del.status).toBe(428)
   })
 
+  it('denies follow mutations below the minimum interaction permission layer', async () => {
+    const post = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/follows/target-1', {
+        method: 'POST',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L1',
+          'Idempotency-Key': 'follow-low-layer',
+        },
+      }),
+      { DB: dbFor() },
+    )
+    expect(post.status).toBe(403)
+
+    const del = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/follows/target-1', {
+        method: 'DELETE',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L1',
+          'Idempotency-Key': 'unfollow-low-layer',
+        },
+      }),
+      { DB: dbFor() },
+    )
+    expect(del.status).toBe(403)
+  })
+
   it('serves follow status and relationship from one relationship authority', async () => {
     const response = await worker.fetch(
       request('/internal/social/follows/target-1', {
