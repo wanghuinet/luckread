@@ -209,7 +209,7 @@ describe('Creator Center admin extension', () => {
     const route = read('src/app/(payload)/api/creator/contents/route.ts')
     const client = read('src/content/w03-content-client.ts')
 
-    expect(view).toContain("import CreatorContentList from '../../(payload)/admin/CreatorContentList'")
+    expect(view).toContain("import CreatorContentList from '../../(payload)/v1beta/CreatorContentList'")
     expect(view).toContain('<CreatorContentList loginPath={adminMode ? \'/admin/login\' : \'/login\'} />')
 
     expect(list).toContain("/api/creator/contents?")
