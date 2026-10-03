@@ -61,14 +61,17 @@ export async function favorite(
   const row = await db.prepare(
     `INSERT INTO interaction_favorites
       (relationship_id, actor_user_id, target_type, target_id, created_at)
-     VALUES (?, ?, ?, ?, ?)
+     SELECT ?, ?, 'content', c.id, ?
+       FROM contents c
+      WHERE c.id = ?
+        AND c.state = 'PUBLISHED'
      ON CONFLICT(actor_user_id, target_type, target_id)
      DO UPDATE SET relationship_id = interaction_favorites.relationship_id
      RETURNING relationship_id, actor_user_id, target_type, target_id, created_at`,
   ).bind(
     relationshipId,
     actor,
-    targetType,
+    targetId,
     targetId,
     createdAt,
   ).first<{
@@ -79,7 +82,7 @@ export async function favorite(
     created_at: string
   }>()
 
-  if (!row) throw new FavoriteRuntimeError('FAVORITE_WRITE_FAILED', 500)
+  if (!row) throw new FavoriteRuntimeError('NOT_FOUND', 404)
 
   return {
     relationshipId: row.relationship_id,
