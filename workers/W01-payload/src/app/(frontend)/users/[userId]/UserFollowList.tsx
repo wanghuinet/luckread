@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 type Direction = 'followers' | 'following'
 
@@ -57,8 +57,22 @@ export default function UserFollowList({
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
+  const activeRequestRef = useRef<AbortController | null>(null)
+  const requestGenerationRef = useRef(0)
+
+  const beginRequest = useCallback(() => {
+    activeRequestRef.current?.abort()
+    const controller = new AbortController()
+    activeRequestRef.current = controller
+    requestGenerationRef.current += 1
+    return { controller, generation: requestGenerationRef.current }
+  }, [])
+
+  const isCurrentRequest = (controller: AbortController, generation: number): boolean =>
+    activeRequestRef.current === controller && requestGenerationRef.current === generation && !controller.signal.aborted
 
   const load = useCallback(async (cursor: string | null = null) => {
+    const { controller, generation } = beginRequest()
     if (cursor) setLoadingMore(true)
     else setLoading(true)
     setError('')
@@ -72,6 +86,7 @@ export default function UserFollowList({
         {
           headers: { accept: 'application/json' },
           cache: 'no-store',
+          signal: controller.signal,
         },
       )
       const data = await response.json().catch((): null => null) as ListResponse | null
@@ -80,21 +95,25 @@ export default function UserFollowList({
         throw new Error(data?.error?.message || '关系列表加载失败')
       }
 
+      if (!isCurrentRequest(controller, generation)) return
       setItems((current) => cursor ? [...current, ...data.data!.items] : data.data!.items)
       setTotalCount(typeof data.data.totalCount === 'number' ? data.data.totalCount : null)
       setNextCursor(data.data.nextCursor)
       setHasMore(data.data.hasMore)
     } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
+      if (!isCurrentRequest(controller, generation)) return
       setError(cause instanceof Error ? cause.message : '关系列表加载失败')
     } finally {
-      setLoading(false)
-      setLoadingMore(false)
+      if (isCurrentRequest(controller, generation)) {
+        setLoading(false)
+        setLoadingMore(false)
+      }
     }
-  }, [direction, userId])
+  }, [beginRequest, direction, userId])
 
   useEffect(() => {
-    const controller = new AbortController()
-    let cancelled = false
+    const { controller, generation } = beginRequest()
 
     void (async () => {
       try {
@@ -120,7 +139,7 @@ export default function UserFollowList({
         if (!listResponse.ok || !listData?.data || !Array.isArray(listData.data.items)) {
           throw new Error(listData?.error?.message || '关系列表加载失败')
         }
-        if (cancelled) return
+        if (!isCurrentRequest(controller, generation)) return
 
         setProfile(profileData)
         setItems(listData.data.items)
@@ -128,18 +147,18 @@ export default function UserFollowList({
         setNextCursor(listData.data.nextCursor)
         setHasMore(listData.data.hasMore)
       } catch (cause) {
-        if (cancelled || controller.signal.aborted) return
+        if (cause instanceof DOMException && cause.name === 'AbortError') return
+        if (!isCurrentRequest(controller, generation)) return
         setError(cause instanceof Error ? cause.message : '页面加载失败')
       } finally {
-        if (!cancelled) setLoading(false)
+        if (isCurrentRequest(controller, generation)) setLoading(false)
       }
     })()
 
     return () => {
-      cancelled = true
-      controller.abort()
+      if (activeRequestRef.current === controller) controller.abort()
     }
-  }, [direction, userId])
+  }, [beginRequest, direction, userId])
 
   const displayName = profile?.displayName?.trim() || profile?.username || 'LuckRead 用户'
   const initial = displayName.slice(0, 1).toUpperCase()
