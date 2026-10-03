@@ -172,14 +172,14 @@ describe('AUTH-011 W01 refresh route', () => {
     )
 
     expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toMatchObject({
+    const responseBody = await response.json()
+    expect(responseBody).toMatchObject({
       error: {
         code: 'VALIDATION_FAILED',
         message: 'Authentication service unavailable',
       },
     })
-    const body = await response.json()
-    expect(JSON.stringify(body)).not.toContain('invalid device binding')
+    expect(JSON.stringify(responseBody)).not.toContain('invalid device binding')
     expect(mocks.issuePayloadAccessToken).not.toHaveBeenCalled()
   })
 
