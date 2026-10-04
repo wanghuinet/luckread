@@ -26,7 +26,7 @@ export default async function CreatorCenterPage() {
     id: String(session.user.id),
     depth: 0,
     overrideAccess: true,
-  }).catch((): null => null) as Record<string, unknown> | null
+  }).catch((): null => null) as unknown as Record<string, unknown> | null
 
   if (!user) redirect('/login?returnTo=%2Fcreator-center')
 
