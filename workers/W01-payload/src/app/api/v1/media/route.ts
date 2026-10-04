@@ -89,7 +89,8 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const target = new URL('/api/media', request.url)
-  const context: Parameters<typeof payloadMediaPost>[1] = {
+  type PayloadRouteContext = Parameters<typeof payloadMediaPost>[1]
+  const context: PayloadRouteContext = {
     params: Promise.resolve({ slug: ['media'] }),
   }
   return payloadMediaPost(new Request(target, request.clone()), context)
