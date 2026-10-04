@@ -69,4 +69,6 @@ The completed lifecycle and W04 projection/deindex evidence are now PASS_VERIFIE
 
 ## Current main
 
-The boundary-control status cursor was last reconciled from main at baseline commit `4484de32df9b32e6648a881441b6cbc2facc1229`. The live repository head must always be read from `main` itself.
+Current live repository head: `e9963507b47e281600f6ce800b65c4eb86ef9754`.
+
+The authoritative execution cursor is reconciled to this head. Historical decision/evidence documents remain immutable snapshots.
