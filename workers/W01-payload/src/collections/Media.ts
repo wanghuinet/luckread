@@ -16,7 +16,10 @@ const ownsMedia: Access = async ({ req, id }) => {
 export const Media: CollectionConfig = {
   slug: 'media',
   access: {
-    read: () => true,
+    read: ({ req }) => {
+      if (!req.user?.id) return false
+      return { ownerUserId: { equals: String(req.user.id) } }
+    },
     create: authenticated,
     update: ownsMedia,
     delete: ownsMedia,

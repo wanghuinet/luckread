@@ -1,5 +1,4 @@
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
-import { cachedPublicGet } from '@/lib/public-response-cache'
 import { DELETE as payloadMediaDelete, GET as payloadMediaGet, PATCH as payloadMediaPatch } from '../../../../(payload)/api/[...slug]/route'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaGet>[1]
@@ -12,6 +11,8 @@ type MediaDocument = {
   filesize?: number | null
   width?: number | null
   height?: number | null
+  filename?: string | null
+  alt?: string | null
   [key: string]: unknown
 }
 
@@ -26,7 +27,14 @@ const withDeliveryStatus = (body: unknown): unknown => {
 
   const deliveryReady = typeof document.url === 'string' && document.url.trim().length > 0
   const projected = {
-    ...document,
+    id: document.id ?? null,
+    url: document.url ?? null,
+    mimeType: document.mimeType ?? null,
+    filesize: document.filesize ?? null,
+    width: document.width ?? null,
+    height: document.height ?? null,
+    filename: document.filename ?? null,
+    alt: document.alt ?? null,
     status: deliveryReady ? 'READY' : 'FAILED',
   }
 
@@ -63,36 +71,29 @@ export async function GET(
   const { mediaId } = await context.params
   if (!mediaId?.trim()) return new Response(null, { status: 404 })
 
-  return await cachedPublicGet(
-    request,
-    'media-detail',
-    async () => {
-      const target = new URL('/api/media/' + encodeURIComponent(mediaId), request.url)
-      const payloadContext: PayloadRouteContext = {
-        params: Promise.resolve({ slug: ['media', mediaId] }),
-      }
+  const target = new URL('/api/media/' + encodeURIComponent(mediaId), request.url)
+  const payloadContext: PayloadRouteContext = {
+    params: Promise.resolve({ slug: ['media', mediaId] }),
+  }
 
-      const response = await payloadMediaGet(new Request(target, request.clone()), payloadContext)
-      if (!response.ok) return response
+  const response = await payloadMediaGet(new Request(target, request.clone()), payloadContext)
+  if (!response.ok) return response
 
-      let body: unknown
-      try {
-        body = await response.clone().json()
-      } catch {
-        return response
-      }
+  let body: unknown
+  try {
+    body = await response.clone().json()
+  } catch {
+    return response
+  }
 
-      return new Response(JSON.stringify(withDeliveryStatus(body)), {
-        status: response.status,
-        headers: {
-          'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
-          'cache-control': 'public, max-age=0, s-maxage=30',
-          ...(response.headers.get('etag') ? { etag: response.headers.get('etag')! } : {}),
-        },
-      })
+  return new Response(JSON.stringify(withDeliveryStatus(body)), {
+    status: response.status,
+    headers: {
+      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+      'cache-control': 'private, no-store',
+      ...(response.headers.get('etag') ? { etag: response.headers.get('etag')! } : {}),
     },
-    30,
-  )
+  })
 }
 
 type PayloadDeleteRouteContext = Parameters<typeof payloadMediaDelete>[1]

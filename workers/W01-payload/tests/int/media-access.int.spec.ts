@@ -81,17 +81,18 @@ describe('Media upload access', () => {
   })
 
 
-  it('puts public media metadata behind the shared cache and bounded miss guard', () => {
+  it('keeps media metadata owner-scoped and out of shared cache', () => {
+    const media = read('src/collections/Media.ts')
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
-    expect(route).toContain("import { cachedPublicGet } from '@/lib/public-response-cache'")
-    expect(route).toContain("'media-detail'")
-    expect(route).toContain('cachedPublicGet(')
-    expect(route).toContain('},\n    30,\n  )')
-    const payloadIndex = route.indexOf('await payloadMediaGet(')
-    const cacheIndex = route.indexOf('return await cachedPublicGet(')
-    expect(cacheIndex).toBeGreaterThanOrEqual(0)
-    expect(payloadIndex).toBeGreaterThan(cacheIndex)
+    expect(media).toContain("read: ({ req }) => {")
+    expect(media).toContain("return { ownerUserId: { equals: String(req.user.id) } }")
+    expect(route).not.toContain("from '@/lib/public-response-cache'")
+    expect(route).not.toContain('cachedPublicGet(')
+    expect(route).toContain("cache-control': 'private, no-store'")
+    expect(route).toContain('id: document.id ?? null')
+    expect(route).toContain('alt: document.alt ?? null')
+    expect(route).not.toContain('...document')
   })
 
   it('projects existing Payload/R2 media readiness without inventing a processing job', () => {
