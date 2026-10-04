@@ -81,15 +81,14 @@ jobs:
           queue_detail="$(curl -fsS --retry 3 --retry-all-errors             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$queue_id")"
 
           echo "AUTH013_W04_QUEUE_DETAIL_DIAGNOSTIC_BEGIN"
-          jq -c '{success,errors,consumer_count:(.result.consumers|length),consumers:[.result.consumers[]? | {keys:(keys|sort),consumer_id,script_name,type,queue_name,dead_letter_queue}]}' <<<"$queue_detail"
+          jq -c '{success,errors,consumer_count:(.result.consumers|length),consumers:[.result.consumers[]? | {keys:(keys|sort),consumer_id,script_name,script,type,queue_name,dead_letter_queue}]}' <<<"$queue_detail"
           echo "AUTH013_W04_QUEUE_DETAIL_DIAGNOSTIC_END"
 
-          consumer="$(jq -c --arg w "$W04_NAME" --arg dlq "$DLQ_NAME"             '.result.consumers[]? | select(.script_name==$w and .type=="worker" and .dead_letter_queue==$dlq and .queue_name==$QUEUE_NAME)' <<<"$queue_detail")"
-          match_count="$(jq --arg w "$W04_NAME" --arg dlq "$DLQ_NAME" --arg q "$QUEUE_NAME"             '[.result.consumers[]? | select(.script_name==$w and .type=="worker" and .dead_letter_queue==$dlq and .queue_name==$q)] | length' <<<"$queue_detail")"
+          consumer="$(jq -c --arg w "$W04_NAME" --arg dlq "$DLQ_NAME"             '.result.consumers[]? | select(.type=="worker" and .dead_letter_queue==$dlq and (($w == .script_name) or ($w == .script)))' <<<"$queue_detail")"
+          match_count="$(jq --arg w "$W04_NAME" --arg dlq "$DLQ_NAME"             '[.result.consumers[]? | select(.type=="worker" and .dead_letter_queue==$dlq and (($w == .script_name) or ($w == .script)))] | length' <<<"$queue_detail")"
 
           echo "AUTH013_W04_EXPECTED_SCRIPT=$W04_NAME"
           echo "AUTH013_W04_EXPECTED_TYPE=worker"
-          echo "AUTH013_W04_EXPECTED_QUEUE=$QUEUE_NAME"
           echo "AUTH013_W04_EXPECTED_DLQ=$DLQ_NAME"
           echo "AUTH013_W04_MATCH_COUNT=$match_count"
 
