@@ -2,16 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const read = (relativePath: string) =>
-  readFileSync(resolve(process.cwd(), relativePath), 'utf8')
-
 describe('versioned auth login adapter', () => {
-  it('exposes the existing login handler under /api/v1/auth/login', () => {
-    const route = read('src/app/api/v1/auth/login/route.ts')
-
+  it('keeps the v1 login route as a thin facade over the Better Auth-backed handler', () => {
+    const route = readFileSync(resolve(process.cwd(), 'src/app/api/v1/auth/login/route.ts'), 'utf8')
     expect(route).toContain("export { POST } from '../../../../auth/login/route'")
-    expect(route).not.toContain('getPayload(')
-    expect(route).not.toContain('establishSession(')
-    expect(route).not.toContain('issuePayloadAccessToken(')
+    const login = readFileSync(resolve(process.cwd(), 'src/app/auth/login/route.ts'), 'utf8')
+    expect(login).toContain("proxyBetterAuth")
+    expect(login).toContain("'/sign-in/email'")
   })
 })
