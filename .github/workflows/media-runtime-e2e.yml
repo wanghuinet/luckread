@@ -32,21 +32,21 @@ permissions:
 
 env:
   WRANGLER_VERSION: 4.116.0
-  TESTED_COMMIT: \${{ inputs.tested_commit }}
-  DEPLOYMENT_RUN_ID: \${{ inputs.deployment_run_id }}
-  W01_BASE_URL: \${{ inputs.w01_base_url }}
-  DATABASE_NAME: \${{ inputs.database_name }}
+  TESTED_COMMIT: ${{ inputs.tested_commit }}
+  DEPLOYMENT_RUN_ID: ${{ inputs.deployment_run_id }}
+  W01_BASE_URL: ${{ inputs.w01_base_url }}
+  DATABASE_NAME: ${{ inputs.database_name }}
 
 jobs:
   media-runtime-e2e:
-    if: \${{ inputs.confirm == 'RUN_MEDIA_RUNTIME_E2E' }}
+    if: ${{ inputs.confirm == 'RUN_MEDIA_RUNTIME_E2E' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
     steps:
       - name: Verify deployment provenance
         env:
-          GH_TOKEN: \${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$DEPLOYMENT_RUN_ID" > /tmp/deploy.json
@@ -67,19 +67,19 @@ jobs:
       - name: Checkout exact deployed source
         uses: actions/checkout@v4
         with:
-          ref: \${{ inputs.tested_commit }}
+          ref: ${{ inputs.tested_commit }}
           path: deployed-source
           fetch-depth: 1
 
-      - name: Setup Node 24 and Wrangler
+      - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
           node-version: 24
 
       - name: Create authenticated owner fixtures
         env:
-          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
@@ -87,7 +87,7 @@ jobs:
           import { appendFileSync } from 'node:fs'
           import { execFileSync } from 'node:child_process'
 
-          const base = process.env.W01_BASE_URL.replace(/\/$/, '')
+          const base = process.env.W01_BASE_URL.replace(//$/, '')
           const runId = process.env.GITHUB_RUN_ID
           const token = randomBytes(16).toString('hex')
           const accounts = [
@@ -102,6 +102,7 @@ jobs:
             try { data = raw ? JSON.parse(raw) : null } catch {}
             return { status:r.status, data }
           }
+
           const q = v => "'" + String(v).replaceAll("'","''") + "'"
           const d1 = sql => execFileSync('npx',['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME,'--remote','--yes','--config','deployed-source/workers/W01-payload/wrangler.jsonc','--command',sql],{encoding:'utf8',env:process.env})
 
@@ -121,7 +122,7 @@ jobs:
             const accessToken = login.data?.accessToken
             if (login.status !== 200 || typeof accessToken !== 'string' || login.data?.layer !== 'L3') throw new Error(a.key+' login failed: '+JSON.stringify(login.data))
             console.log('::add-mask::'+accessToken)
-            out.push({key:a.key,userId,roleId,registerKey,accessToken,email:a.email})
+            out.push({key:a.key,userId,roleId,registerKey,accessToken})
           }
 
           const owner = out.find(x=>x.key==='OWNER')
@@ -135,42 +136,34 @@ jobs:
             'MEDIA_OTHER_TOKEN='+other.accessToken,
             'MEDIA_OTHER_ROLE_ID='+other.roleId,
             'MEDIA_OTHER_REGISTER_KEY='+other.registerKey,
-          ]) appendFileSync(process.env.GITHUB_ENV,line+'\\n')
+          ]) appendFileSync(process.env.GITHUB_ENV,line+'\n')
           NODE
 
       - name: Upload synthetic media
         run: |
           set -euo pipefail
           printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/media-e2e.png
-          curl --silent --show-error --fail-with-body \
-            -X POST \
-            -H "Authorization: Bearer $MEDIA_OWNER_TOKEN" \
-            -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-UPLOAD" \
-            -F "file=@/tmp/media-e2e.png;type=image/png" \
-            "$W01_BASE_URL/api/v1/media" > /tmp/media-upload.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MEDIA_OWNER_TOKEN"             -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-UPLOAD"             -F "file=@/tmp/media-e2e.png;type=image/png"             "$W01_BASE_URL/api/v1/media" > /tmp/media-upload.json
           node --input-type=module <<'NODE'
           import { readFileSync, appendFileSync } from 'node:fs'
           const value = JSON.parse(readFileSync('/tmp/media-upload.json','utf8'))
           const doc = value?.doc && typeof value.doc === 'object' ? value.doc : value
           const id = doc?.id == null ? '' : String(doc.id)
           if (!id) throw new Error('media upload missing id: '+JSON.stringify(value))
-          appendFileSync(process.env.GITHUB_ENV,'MEDIA_ID='+id+'\\n')
-          console.log('MEDIA_ID='+id)
+          appendFileSync(process.env.GITHUB_ENV,'MEDIA_ID='+id+'\n')
+          console.log('media upload PASS, id='+id)
           NODE
 
       - name: Verify owner can read private media metadata
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body \
-            -D /tmp/media-owner-headers.txt \
-            -H "Authorization: Bearer $MEDIA_OWNER_TOKEN" \
-            "$W01_BASE_URL/api/v1/media/$MEDIA_ID" > /tmp/media-owner.json
+          curl --silent --show-error --fail-with-body             -D /tmp/media-owner-headers.txt             -H "Authorization: Bearer $MEDIA_OWNER_TOKEN"             "$W01_BASE_URL/api/v1/media/$MEDIA_ID" > /tmp/media-owner.json
           node --input-type=module <<'NODE'
           import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
           const body = readFileSync('/tmp/media-owner.json','utf8')
           const value = JSON.parse(body)
           const headers = readFileSync('/tmp/media-owner-headers.txt','utf8').toLowerCase()
-          const cache = headers.match(/^cache-control:\s*(.+)$/m)?.[1]?.trim() ?? ''
+          const cache = headers.match(/^cache-control:s*(.+)$/m)?.[1]?.trim() ?? ''
           const doc = value?.doc && typeof value.doc === 'object' ? value.doc : value
           const allowed = new Set(['id','url','mimeType','filesize','width','height','filename','alt','status'])
           const checks = {
@@ -183,43 +176,78 @@ jobs:
           }
           for (const [k,ok] of Object.entries(checks)) if (!ok) throw new Error('Media owner check failed: '+k)
           mkdirSync('artifacts/mapping-0/media-runtime-e2e',{recursive:true})
-          writeFileSync('artifacts/mapping-0/media-runtime-e2e/owner.json',JSON.stringify({status:'PASS',checks,cacheControl:cache,mediaId:String(doc.id)},null,2)+'\\n')
+          writeFileSync('artifacts/mapping-0/media-runtime-e2e/owner.json',JSON.stringify({status:'PASS',checks,cacheControl:cache,mediaId:String(doc.id)},null,2)+'\n')
           NODE
 
       - name: Verify non-owner and anonymous are denied
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
           other="$(curl --silent --show-error -o /tmp/media-other.json -w '%{http_code}' -H "Authorization: Bearer $MEDIA_OTHER_TOKEN" "$W01_BASE_URL/api/v1/media/$MEDIA_ID")"
           anon="$(curl --silent --show-error -o /tmp/media-anon.json -w '%{http_code}' "$W01_BASE_URL/api/v1/media/$MEDIA_ID")"
-          node --input-type=module <<'NODE'
-          import { readFileSync, writeFileSync } from 'node:fs'
-          const other = Number(process.env.OTHER_STATUS)
-          const anon = Number(process.env.ANON_STATUS)
-          if (![401,403].includes(other)) throw new Error('non-owner access not denied: '+other)
-          if (![401,403].includes(anon)) throw new Error('anonymous access not denied: '+anon)
-          writeFileSync('artifacts/mapping-0/media-runtime-e2e/access.json',JSON.stringify({status:'PASS',nonOwnerHttpStatus:other,anonymousHttpStatus:anon},null,2)+'\\n')
-          NODE
-        env:
-          OTHER_STATUS: \${{ env.OTHER_STATUS }}
-          ANON_STATUS: \${{ env.ANON_STATUS }}
+          node --input-type=module -e "const other=Number(process.argv[1]); const anon=Number(process.argv[2]); if(![401,403].includes(other)) throw new Error('non-owner access not denied: '+other); if(![401,403].includes(anon)) throw new Error('anonymous access not denied: '+anon); const fs=require('node:fs'); fs.writeFileSync('artifacts/mapping-0/media-runtime-e2e/access.json',JSON.stringify({status:'PASS',nonOwnerHttpStatus:other,anonymousHttpStatus:anon},null,2)+'\\n')" "$other" "$anon"
 
       - name: Cleanup fixtures
         if: always()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set +e
-          if [ -n "\${MEDIA_ID:-}" ]; then
-            curl --silent --show-error -X DELETE \
-              -H "Authorization: Bearer $MEDIA_OWNER_TOKEN" \
-              -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-DELETE" \
-              "$W01_BASE_URL/api/v1/media/$MEDIA_ID" -o /tmp/media-delete.json -w 'media_delete_http=%{http_code}\\n' || true
+          if [ -n "${MEDIA_ID:-}" ] && [ -n "${MEDIA_OWNER_TOKEN:-}" ]; then
+            curl --silent --show-error -X DELETE               -H "Authorization: Bearer $MEDIA_OWNER_TOKEN"               -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-DELETE"               "$W01_BASE_URL/api/v1/media/$MEDIA_ID" -o /tmp/media-delete.json -w 'media_delete_http=%{http_code}\n' || true
           fi
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --command "DELETE FROM role_assignments WHERE id IN ('$MEDIA_OWNER_ROLE_ID','$MEDIA_OTHER_ROLE_ID'); DELETE FROM auth_session_state WHERE user_id IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID') OR CAST(owner_subject_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM auth_registration_envelopes WHERE idempotency_key IN ('$MEDIA_OWNER_REGISTER_KEY','$MEDIA_OTHER_REGISTER_KEY'); DELETE FROM users WHERE CAST(id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID');" || true
+          if [ -n "${MEDIA_OWNER_USER_ID:-}" ] && [ -n "${MEDIA_OTHER_USER_ID:-}" ]; then
+            npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --command "DELETE FROM role_assignments WHERE id IN ('$MEDIA_OWNER_ROLE_ID','$MEDIA_OTHER_ROLE_ID'); DELETE FROM auth_session_state WHERE user_id IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID') OR CAST(owner_subject_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM auth_registration_envelopes WHERE idempotency_key IN ('$MEDIA_OWNER_REGISTER_KEY','$MEDIA_OTHER_REGISTER_KEY'); DELETE FROM users WHERE CAST(id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID');" || true
+          fi
+
+      - name: Verify fixture cleanup
+        if: always()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process'
+          const userIds = [process.env.MEDIA_OWNER_USER_ID, process.env.MEDIA_OTHER_USER_ID].filter(Boolean)
+          if (userIds.length !== 2) throw new Error('missing fixture user IDs')
+          const q = v => "'" + String(v).replaceAll("'","''") + "'"
+          const sql = "SELECT (SELECT COUNT(*) FROM users WHERE CAST(id AS TEXT) IN (" + userIds.map(q).join(',') + ")) AS users_remaining, (SELECT COUNT(*) FROM media WHERE owner_user_id IN (" + userIds.map(q).join(',') + ")) AS media_remaining;"
+          const raw = execFileSync('npx',['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME,'--remote','--json','--yes','--config','deployed-source/workers/W01-payload/wrangler.jsonc','--command',sql],{encoding:'utf8',env:process.env})
+          const value = JSON.parse(raw)
+          const row = value?.[0]?.results?.[0] ?? value?.result?.results?.[0] ?? {}
+          if (Number(row.users_remaining)!==0 || Number(row.media_remaining)!==0) throw new Error('fixture cleanup incomplete: '+JSON.stringify(row))
+          console.log(JSON.stringify({cleanup:'PASS',row}))
+          NODE
+
+      - name: Capture runtime evidence
+        if: always()
+        run: |
+          mkdir -p artifacts/mapping-0/media-runtime-e2e
+          cp media-owner-result.json artifacts/mapping-0/media-runtime-e2e/owner.json 2>/dev/null || true
+          cp artifacts/mapping-0/media-runtime-e2e/access.json artifacts/mapping-0/media-runtime-e2e/access.json 2>/dev/null || true
+          cat > artifacts/mapping-0/media-runtime-e2e/provenance.json <<EOF
+          {
+            "workflow": "Media Owner Scope Runtime E2E",
+            "testedSourceSha": "$TESTED_COMMIT",
+            "deploymentRunId": "$DEPLOYMENT_RUN_ID",
+            "worker": "luckread-w01-payload",
+            "publicPath": "/api/v1/media/{mediaId}",
+            "ownerScope": true,
+            "cacheControl": "private, no-store",
+            "sharedCache": false,
+            "syntheticFixtureOnly": true
+          }
+          EOF
 
       - name: Upload runtime evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: media-runtime-e2e-\${{ inputs.tested_commit }}-\${{ github.run_id }}
+          name: media-runtime-e2e-${{ inputs.tested_commit }}-${{ github.run_id }}
           path: artifacts/mapping-0/media-runtime-e2e/
           if-no-files-found: error
           retention-days: 30
