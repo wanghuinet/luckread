@@ -1,49 +1,12 @@
-import { proxyBetterAuth } from '../../../../auth/better-auth-route'
+import { proxyBetterAuthOperation } from '../../../../auth/w02-auth-client'
 import { TrafficLimitError, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
-
-type PasswordChangeRequest = {
-  currentPassword?: unknown
-  newPassword?: unknown
-}
-
-const jsonError = (status: number, code: string, message: string) =>
-  Response.json(
-    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
-    { status, headers: { 'cache-control': 'no-store' } },
-  )
-
-const assertPasswordPolicy = (value: unknown): value is string => {
-  if (typeof value !== 'string') return false
-  const length = Array.from(value).length
-  return length >= 15 && length <= 128
-}
-
-export async function POST(request: Request): Promise<Response> {
-  if (!request.headers.get('Idempotency-Key')?.trim()) {
-    return jsonError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key is required')
-  }
-
-  try {
-    await enforceW01WriteRateLimit(request)
-  } catch (error) {
-    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
-    return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password change service unavailable')
-  }
-
-  let body: PasswordChangeRequest
-  try {
-    body = (await request.json()) as PasswordChangeRequest
-  } catch {
-    return jsonError(422, 'VALIDATION_FAILED', 'Invalid password change request')
-  }
-
-  if (!assertPasswordPolicy(body.currentPassword) || !assertPasswordPolicy(body.newPassword)) {
-    return jsonError(422, 'VALIDATION_FAILED', 'Password does not satisfy the canonical length policy')
-  }
-
-  return proxyBetterAuth(request, '/change-password', 'POST', {
-    currentPassword: body.currentPassword,
-    newPassword: body.newPassword,
-    revokeOtherSessions: true,
-  })
+const error=(status:number,code:string,message:string)=>Response.json({error:{code,message,details:{}},requestId:crypto.randomUUID()},{status,headers:{'cache-control':'no-store'}})
+const okPassword=(v:unknown):v is string=>typeof v==='string'&&Array.from(v).length>=15&&Array.from(v).length<=128
+export async function POST(request:Request):Promise<Response>{
+  if(!request.headers.get('Idempotency-Key')?.trim())return error(400,'IDEMPOTENCY_KEY_REQUIRED','Idempotency-Key is required')
+  try{await enforceW01WriteRateLimit(request)}catch(e){if(e instanceof TrafficLimitError)return rateLimitResponse(request);return error(503,'SERVICE_UNAVAILABLE','Password change service unavailable')}
+  let body:{currentPassword?:unknown;newPassword?:unknown}
+  try{body=await request.json() as {currentPassword?:unknown;newPassword?:unknown}}catch{return error(422,'VALIDATION_FAILED','Invalid password change request')}
+  if(!okPassword(body.currentPassword)||!okPassword(body.newPassword))return error(422,'VALIDATION_FAILED','Password does not satisfy the canonical length policy')
+  return proxyBetterAuthOperation(request,'/change-password','POST',{currentPassword:body.currentPassword,newPassword:body.newPassword,revokeOtherSessions:true})
 }
