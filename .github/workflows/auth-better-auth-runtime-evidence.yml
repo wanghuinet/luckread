@@ -136,7 +136,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --port 8787 --var "PAYLOAD_SECRET:${PAYLOAD_SECRET}" --var "BETTER_AUTH_SECRET:${BETTER_AUTH_SECRET}" --var "CLOUDFLARE_ENV:development" --var "W02_AUTH_LOCAL_URL:http://127.0.0.1:8788" > auth-better-auth-preview.log 2>&1 &
+          pnpm exec wrangler dev --local --port 8787 --var "PAYLOAD_SECRET:${PAYLOAD_SECRET}" --var "CLOUDFLARE_ENV:development" --var "W02_AUTH_LOCAL_URL:http://127.0.0.1:8788" > auth-better-auth-preview.log 2>&1 &
           echo $! > auth-better-auth-preview.pid
           ready=0
           for _ in $(seq 1 120); do
