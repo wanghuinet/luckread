@@ -1,8 +1,10 @@
 {
   "version": "1.0",
-  "status": "CONTRACTED_NOT_VERIFIED",
+  "status": "SUPERSEDED",
   "entityId": "ENT-SESSION",
-  "featureRefs": ["AUTH-002"],
+  "featureRefs": [
+    "AUTH-002"
+  ],
   "sourceRefs": [
     "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
     "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md",
@@ -200,5 +202,9 @@
       "security-E2E evidence",
       "Evidence Registry execution record"
     ]
-  }
+  },
+  "supersededBy": "contracts/persistence/BETTER-AUTH-W02-session-persistence-contract.v1.json",
+  "supersededAt": "2026-10-05",
+  "supersessionReason": "Current Session authority is Better Auth 1.7.7 in W02/D1-01; this contract described the retired Payload-native users.sessions[] plus auth_session_state/session-runtime model.",
+  "changeControlRef": "docs/change-control/CC-BETTER-AUTH-W02-AUTHORITY-2026-10-05.md"
 }
