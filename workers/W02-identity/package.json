@@ -3,5 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "engines": { "node": ">=24" }
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "better-auth": "1.7.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260914.1"
+  }
 }
