@@ -1150,8 +1150,9 @@
       "status": "VERIFIED",
       "checkId": "109272654888",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/36527170976",
-      "freshnessMode": "EXACT_SHA",
-      "note": "Controlled remote D1 lifecycle matrix passed ACTIVE→RESTRICTED→FROZEN→SUSPENDED→BANNED→RESTORED→ACTIVE; L7 approval was required for BAN; rejected BAN caused no mutation; direct BANNED→ACTIVE was rejected; suspension and ban retained session revocation; final account state/version were ACTIVE/7; journal source versions 2–7 were canonical identity.account_state_changed events; synthetic user/session/journal cleanup completed."
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "note": "Controlled remote D1 lifecycle matrix passed ACTIVE→RESTRICTED→FROZEN→SUSPENDED→BANNED→RESTORED→ACTIVE; L7 approval was required for BAN; rejected BAN caused no mutation; direct BANNED→ACTIVE was rejected; suspension and ban retained session revocation; final account state/version were ACTIVE/7; journal source versions 2–7 were canonical identity.account_state_changed events; synthetic user/session/journal cleanup completed.",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-013-LIFECYCLE-MATRIX-INHERITANCE-2026-10-04.md"
     },
     {
       "evidenceId": "EVD-SAFETY001-MODERATION-RUNTIME-E2E-001",
