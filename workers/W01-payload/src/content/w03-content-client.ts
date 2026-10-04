@@ -1,7 +1,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../auth/traffic-limit.js'
 import { getBetterAuthSession } from '../auth/better-auth.js'
-import { resolveGlobalLayer, W02AuthClientError } from '../auth/w02-session-client.js'
+import { resolveGlobalLayer, W02AuthClientError } from '../auth/w02-identity-client.js'
 
 type W03ContentService = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
