@@ -2,6 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { Users } from '../../src/collections/Users'
 
 describe('W01 Users collection contract', () => {
+  it('uses Better Auth as the sole Payload authentication strategy', () => {
+    expect(Users.slug).toBe('users')
+    expect(Users.auth).toEqual(
+      expect.objectContaining({
+        disableLocalStrategy: true,
+      }),
+    )
+    expect(Users.auth).toHaveProperty('strategies')
+    expect((Users.auth as any).strategies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'better-auth' }),
+      ]),
+    )
+  })
+
   it('declares the approved ENT-USER profile and preference fields', () => {
     const fields = Users.fields as Array<{
       name?: string
@@ -11,14 +26,6 @@ describe('W01 Users collection contract', () => {
       index?: boolean
       defaultValue?: string
     }>
-
-    expect(Users.slug).toBe('users')
-    expect(Users.auth).toEqual(
-      expect.objectContaining({
-        forgotPassword: expect.any(Object),
-        removeTokenFromResponses: true,
-      }),
-    )
 
     expect(fields).toEqual(
       expect.arrayContaining([
