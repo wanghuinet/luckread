@@ -25,7 +25,6 @@ const authDtoContractPath = path.join(root, 'contracts/dto/auth-dto-contract.v1.
 const authOperationPolicyPath = path.join(root, 'contracts/api/auth-operation-policy.v1.json')
 
 const apiContractPaths = {
-  'AUTH-003': path.join(root, 'contracts/api/AUTH-003-credential-management-contract.v1.json'),
   'AUTH-004': path.join(root, 'contracts/api/AUTH-004-password-recovery-contract.v1.json'),
   'AUTH-005': path.join(root, 'contracts/api/AUTH-005-identity-verification-contract.v1.json'),
   'AUTH-006': path.join(root, 'contracts/api/AUTH-006-passkey-webauthn-contract.v1.json'),
@@ -59,10 +58,10 @@ if (!Array.isArray(auth013EntityCatalog.records)) throw new Error('AUTH-013 enti
 const authRegisterPolicy = authOperationPolicy.operations?.find((record) => record?.operationId === 'authRegister')
 if (!authRegisterPolicy) throw new Error('AUTH-001 requires canonical authRegister operation policy')
 const consistency = authRegisterPolicy.consistency ?? {}
-if (consistency.identityCredentialMaterialization !== 'EVENTUAL') throw new Error('AUTH-001 requires EVENTUAL identity/credential materialization')
-if (consistency.materializerAuthority !== 'W02_D1-01') throw new Error('AUTH-001 materializer authority must be W02_D1-01')
-if (consistency.materializationSource !== 'AUTH-001_REGISTRATION_ENVELOPE + PAYLOAD_USERS_NATIVE_AUTH_SOURCE') throw new Error('AUTH-001 materialization source drift detected')
-if (consistency.recovery !== 'W02_SCHEDULED_RECONCILIATION') throw new Error('AUTH-001 recovery authority must remain W02 scheduled reconciliation')
+if (consistency.identityCredentialMaterialization !== 'AUTHORITATIVE') throw new Error('AUTH-001 requires AUTHORITATIVE Better Auth identity/credential materialization')
+if (consistency.materializerAuthority !== 'W02_BETTER_AUTH_D1_01') throw new Error('AUTH-001 materializer authority must be W02_BETTER_AUTH_D1_01')
+if (consistency.materializationSource !== 'AUTH-001_REGISTRATION_ENVELOPE + BETTER_AUTH_AUTH_TABLES') throw new Error('AUTH-001 materialization source drift detected')
+if (consistency.recovery !== 'W02_REGISTRATION_ENVELOPE_RECOVERY') throw new Error('AUTH-001 recovery authority must remain W02 registration-envelope recovery')
 if (consistency.crossWorkerTransaction !== false || consistency.crossD1Transaction !== false) throw new Error('AUTH-001 cannot admit cross-worker/cross-D1 registration transaction')
 
 const auth013UserEntities = auth013EntityCatalog.records.filter((record) => record?.name === 'User' && record?.entityId === 'ENT-USER' && record?.status === 'VERIFIED')
@@ -100,6 +99,7 @@ const addEntityBinding = (featureId, entityRefs, source) => {
 
 for (const record of jsonBinding.bindings) {
   if (['AUTH-002', 'AUTH-003', 'AUTH-004', 'AUTH-005', 'AUTH-006'].includes(record?.featureId)) {
+    if (record.featureId === 'AUTH-003') continue
     addEntityBinding(record.featureId, record.entityRefs, 'AUTH-002..006 persistence/API/entity/field contract')
     addEvidenceRef(record.featureId, 'contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json')
   }
@@ -136,7 +136,7 @@ for (const featureId of ['AUTH-001', 'AUTH-002', 'AUTH-010']) {
   addEvidenceRef(featureId, 'contracts/dto/auth-dto-contract.v1.json')
   if (featureId === 'AUTH-001') {
     addEvidenceRef(featureId, 'contracts/api/auth-operation-policy.v1.json')
-    addEvidenceRef(featureId, 'docs/change-control/CC-MAPPING-0-AUTH-001-EVENTUAL-MATERIALIZATION-ADMISSION-2026-09-28.md')
+    addEvidenceRef(featureId, 'docs/change-control/CC-BETTER-AUTH-W02-AUTHORITY-2026-10-05.md')
   }
 }
 
