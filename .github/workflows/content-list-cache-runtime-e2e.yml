@@ -1,0 +1,361 @@
+name: Content List Cache Runtime E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      tested_commit:
+        description: Exact W01 source commit used by the controlled binding deployment
+        required: true
+        type: string
+      deployment_run_id:
+        description: Successful W01 W02 Auth Binding Deploy run ID for that exact source
+        required: true
+        type: string
+      content_api_base_url:
+        description: Controlled public W01 content API URL
+        required: true
+        default: https://api.luckread.com
+        type: string
+      database_name_w01:
+        description: Controlled W01 D1 database name
+        required: true
+        default: luckread
+        type: string
+      database_name_w03:
+        description: Controlled W03 D1 database name
+        required: true
+        default: luckreadpro
+        type: string
+      confirm:
+        description: Type RUN_CONTENT_LIST_CACHE_E2E
+        required: true
+        type: string
+        default: RUN_CONTENT_LIST_CACHE_E2E
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  TESTED_COMMIT: ${{ inputs.tested_commit }}
+  DEPLOYMENT_RUN_ID: ${{ inputs.deployment_run_id }}
+  CONTENT_API_BASE_URL: ${{ inputs.content_api_base_url }}
+  DATABASE_NAME_W01: ${{ inputs.database_name_w01 }}
+  DATABASE_NAME_W03: ${{ inputs.database_name_w03 }}
+
+jobs:
+  content-list-cache-runtime-e2e:
+    if: ${{ inputs.confirm == 'RUN_CONTENT_LIST_CACHE_E2E' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Verify deployment provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$DEPLOYMENT_RUN_ID" > /tmp/deploy.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$DEPLOYMENT_RUN_ID/artifacts?per_page=100" > /tmp/deploy-artifacts.json
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const run = JSON.parse(readFileSync('/tmp/deploy.json','utf8'))
+          const artifacts = JSON.parse(readFileSync('/tmp/deploy-artifacts.json','utf8'))
+          const expected = process.env.TESTED_COMMIT
+          const artifactName = 'w01-w02-binding-deployment-' + expected
+          if (run.name !== 'W01 W02 Auth Binding Deploy') throw new Error('wrong deployment workflow')
+          if (run.conclusion !== 'success' || run.head_branch !== 'main') throw new Error('deployment is not a successful main run')
+          if (run.head_sha !== expected) throw new Error('deployment head SHA mismatch')
+          const matches = (artifacts.artifacts ?? []).filter(a => a.name === artifactName && !a.expired)
+          if (matches.length !== 1) throw new Error('exact deployment artifact not found')
+          console.log(JSON.stringify({deploymentRunId:run.id,testedCommit:expected,artifact:matches[0].name}))
+          NODE
+
+      - name: Checkout exact deployed source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tested_commit }}
+          path: deployed-source
+          fetch-depth: 1
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Create authenticated creator fixture
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { randomBytes } from 'node:crypto'
+          import { appendFileSync } from 'node:fs'
+          import { execFileSync } from 'node:child_process'
+
+          const base = process.env.CONTENT_API_BASE_URL.replace(/\/$/, '')
+          const runId = process.env.GITHUB_RUN_ID
+          const nonce = randomBytes(8).toString('hex')
+          const email = 'content-cache-e2e-' + runId + '-' + nonce + '@example.com'
+          const username = 'content_cache_e2e_' + runId + '_' + nonce.slice(0, 8)
+          const password = 'Evd-Cache-' + randomBytes(24).toString('base64url') + '-Z9!'
+          const roleId = 'CONTENT-CACHE-E2E-ROLE-' + runId + '-' + nonce
+          const registerKey = 'CONTENT-CACHE-E2E-' + runId + '-REGISTER'
+
+          async function post(path, body, headers = {}) {
+            const r = await fetch(base + path, {
+              method: 'POST',
+              headers: { accept: 'application/json', 'content-type': 'application/json', ...headers },
+              body: JSON.stringify(body),
+            })
+            const raw = await r.text()
+            let data = null
+            try { data = raw ? JSON.parse(raw) : null } catch {}
+            return { status: r.status, data }
+          }
+
+          const reg = await post('/auth/register', {
+            identityType: 'email',
+            identity: email,
+            credential: password,
+            username,
+            consent: { purpose: 'ACCOUNT_REGISTRATION', policyVersion: 'PROD-2026-09-28.1' },
+          }, { 'Idempotency-Key': registerKey })
+
+          if (reg.status !== 201 || typeof reg.data?.userId !== 'string') {
+            throw new Error('creator registration failed: HTTP ' + reg.status + ' body=' + JSON.stringify(reg.data))
+          }
+
+          const userId = String(reg.data.userId)
+          const now = new Date().toISOString()
+          const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
+          const d1 = (databaseName, config, command) => execFileSync(
+            'npx',
+            ['--yes', 'wrangler@' + process.env.WRANGLER_VERSION, 'd1', 'execute', databaseName, '--remote', '--yes', '--config', config, '--command', command],
+            { encoding: 'utf8', env: process.env, maxBuffer: 8 * 1024 * 1024 },
+          )
+
+          d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
+            'UPDATE users SET account_state=\'ACTIVE\', account_state_version=COALESCE(account_state_version,0)+1 WHERE CAST(id AS TEXT)=' + q(userId))
+          d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
+            'INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' +
+            [roleId,userId,'creator','global',null,'ACTIVE',now,null,now,now].map((v,i)=>i === 4 ? 'NULL' : q(v)).join(',') + ')')
+
+          const login = await post('/auth/login', {
+            identity: email,
+            credential: password,
+            deviceId: 'content-cache-e2e-' + runId,
+          })
+          const token = login.data?.accessToken
+          if (login.status !== 200 || typeof token !== 'string' || login.data?.layer !== 'L3') {
+            throw new Error('creator login failed: HTTP ' + login.status + ' body=' + JSON.stringify(login.data))
+          }
+
+          console.log('::add-mask::' + token)
+          for (const line of [
+            'CACHE_TEST_USER_ID=' + userId,
+            'CACHE_TEST_ROLE_ID=' + roleId,
+            'CACHE_TEST_REGISTER_KEY=' + registerKey,
+            'CACHE_TEST_TOKEN=' + token,
+          ]) appendFileSync(process.env.GITHUB_ENV, line + '\n')
+
+          console.log(JSON.stringify({userId, layer: login.data.layer}))
+          NODE
+
+      - name: Seed published content fixture
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs'
+          import { execFileSync } from 'node:child_process'
+          const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
+          const contentId = 'cachee2e-' + process.env.GITHUB_RUN_ID
+          const now = new Date().toISOString()
+          const sql =
+            'INSERT INTO contents ' +
+            '(id,content_type,owner_user_id,creator_id,ip_id,state,version,revision,title,body_ref,media_refs_json,cover_ref,etag,created_at,updated_at) VALUES (' +
+            [
+              contentId,'article',process.env.CACHE_TEST_USER_ID,process.env.CACHE_TEST_USER_ID,null,'PUBLISHED',1,1,
+              'Content List Cache Runtime E2E',
+              'r2://content-cache-e2e/' + process.env.GITHUB_RUN_ID + '/body',
+              '[]',null,'W/"1"',now,now,
+            ].map((v,i)=>i === 4 || i === 11 ? 'NULL' : q(v)).join(',') + ')'
+          execFileSync(
+            'npx',
+            ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME_W03,'--remote','--yes','--config','deployed-source/workers/W03-content/wrangler.jsonc','--command',sql],
+            { encoding:'utf8', env:process.env, maxBuffer:8*1024*1024 },
+          )
+          appendFileSync(process.env.GITHUB_ENV, 'CACHE_TEST_CONTENT_ID=' + contentId + '\n')
+          console.log('seeded contentId=' + contentId)
+          NODE
+
+      - name: Verify anonymous filtered list MISS
+        run: |
+          set -euo pipefail
+          filter="?creatorId=$CACHE_TEST_USER_ID&type=article&limit=10"
+          status="$(curl --silent --show-error -o /tmp/cache-list-miss.json -D /tmp/cache-list-miss.headers -w '%{http_code}' "$CONTENT_API_BASE_URL/api/v1/contents$filter")"
+          echo "HTTP status: $status"
+          cat /tmp/cache-list-miss.json
+          test "$status" = "200"
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const body = readFileSync('/tmp/cache-list-miss.json','utf8')
+          const value = JSON.parse(body)
+          const headers = readFileSync('/tmp/cache-list-miss.headers','utf8').toLowerCase()
+          const cache = (headers.split(/\r?\n/).find(x => x.startsWith('x-luckread-cache:')) || '').split(':',2)[1]?.trim()
+          const items = value?.data?.items
+          if (cache !== 'miss') throw new Error('expected anonymous MISS, got ' + cache)
+          if (!Array.isArray(items) || !items.some(x => String(x.id) === process.env.CACHE_TEST_CONTENT_ID)) {
+            throw new Error('seeded fixture missing from anonymous list: ' + JSON.stringify(value))
+          }
+          writeFileSync('cache-list-miss.json', JSON.stringify({status:'PASS',cache,contentId:process.env.CACHE_TEST_CONTENT_ID},null,2)+'\n')
+          NODE
+
+      - name: Verify anonymous filtered list HIT
+        run: |
+          set -euo pipefail
+          filter="?creatorId=$CACHE_TEST_USER_ID&type=article&limit=10"
+          status="$(curl --silent --show-error -o /tmp/cache-list-hit.json -D /tmp/cache-list-hit.headers -w '%{http_code}' "$CONTENT_API_BASE_URL/api/v1/contents$filter")"
+          echo "HTTP status: $status"
+          test "$status" = "200"
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const body = readFileSync('/tmp/cache-list-hit.json','utf8')
+          const value = JSON.parse(body)
+          const headers = readFileSync('/tmp/cache-list-hit.headers','utf8').toLowerCase()
+          const cache = (headers.split(/\r?\n/).find(x => x.startsWith('x-luckread-cache:')) || '').split(':',2)[1]?.trim()
+          const items = value?.data?.items
+          if (cache !== 'hit') throw new Error('expected anonymous HIT, got ' + cache)
+          if (!Array.isArray(items) || !items.some(x => String(x.id) === process.env.CACHE_TEST_CONTENT_ID)) {
+            throw new Error('seeded fixture missing from anonymous HIT: ' + JSON.stringify(value))
+          }
+          writeFileSync('cache-list-hit.json', JSON.stringify({status:'PASS',cache,contentId:process.env.CACHE_TEST_CONTENT_ID},null,2)+'\n')
+          NODE
+
+      - name: Verify authenticated list bypass
+        run: |
+          set -euo pipefail
+          filter="?creatorId=$CACHE_TEST_USER_ID&type=article&limit=10"
+          status="$(curl --silent --show-error -o /tmp/cache-list-auth.json -D /tmp/cache-list-auth.headers -w '%{http_code}' -H "Authorization: Bearer $CACHE_TEST_TOKEN" "$CONTENT_API_BASE_URL/api/v1/contents$filter")"
+          echo "HTTP status: $status"
+          test "$status" = "200"
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const value = JSON.parse(readFileSync('/tmp/cache-list-auth.json','utf8'))
+          const headers = readFileSync('/tmp/cache-list-auth.headers','utf8').toLowerCase()
+          const cacheHeader = headers.split(/\r?\n/).find(x => x.startsWith('x-luckread-cache:'))
+          if (cacheHeader) throw new Error('authenticated request entered shared cache: ' + cacheHeader)
+          const items = value?.data?.items
+          if (!Array.isArray(items) || !items.some(x => String(x.id) === process.env.CACHE_TEST_CONTENT_ID)) {
+            throw new Error('seeded fixture missing from authenticated list: ' + JSON.stringify(value))
+          }
+          writeFileSync('cache-list-auth-bypass.json', JSON.stringify({status:'PASS',sharedCacheHeader:null,contentId:process.env.CACHE_TEST_CONTENT_ID},null,2)+'\n')
+          NODE
+
+      - name: Unpublish fixture through public mutation boundary
+        run: |
+          set -euo pipefail
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $CACHE_TEST_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: CONTENT-CACHE-E2E-$GITHUB_RUN_ID-UNPUBLISH"             -H 'If-Match: W/"1"'             --data '{"to":"UNPUBLISHED"}'             "$CONTENT_API_BASE_URL/api/v1/contents/$CACHE_TEST_CONTENT_ID/state" > /tmp/cache-unpublish.json
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const value = JSON.parse(readFileSync('/tmp/cache-unpublish.json','utf8'))
+          if (value.from !== 'PUBLISHED' || value.to !== 'UNPUBLISHED' || Number(value.version) !== 2) {
+            throw new Error('unpublish transition failed: ' + JSON.stringify(value))
+          }
+          NODE
+
+      - name: Verify filtered list invalidated after mutation
+        run: |
+          set -euo pipefail
+          filter="?creatorId=$CACHE_TEST_USER_ID&type=article&limit=10"
+          status="$(curl --silent --show-error -o /tmp/cache-list-after.json -D /tmp/cache-list-after.headers -w '%{http_code}' "$CONTENT_API_BASE_URL/api/v1/contents$filter")"
+          echo "HTTP status: $status"
+          test "$status" = "200"
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const value = JSON.parse(readFileSync('/tmp/cache-list-after.json','utf8'))
+          const headers = readFileSync('/tmp/cache-list-after.headers','utf8').toLowerCase()
+          const cache = (headers.split(/\r?\n/).find(x => x.startsWith('x-luckread-cache:')) || '').split(':',2)[1]?.trim()
+          const items = value?.data?.items
+          if (cache !== 'miss') throw new Error('expected post-mutation MISS, got ' + cache)
+          if (!Array.isArray(items) || items.some(x => String(x.id) === process.env.CACHE_TEST_CONTENT_ID)) {
+            throw new Error('stale unpublished fixture still visible in filtered list: ' + JSON.stringify(value))
+          }
+          writeFileSync('cache-list-after-mutation.json', JSON.stringify({status:'PASS',cache,contentId:process.env.CACHE_TEST_CONTENT_ID,fixtureVisible:false},null,2)+'\n')
+          NODE
+
+      - name: Verify fixture cleanup
+        if: always()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process'
+          const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
+          const contentId = process.env.CACHE_TEST_CONTENT_ID || '__none__'
+          const userId = process.env.CACHE_TEST_USER_ID || '__none__'
+          const roleId = process.env.CACHE_TEST_ROLE_ID || '__none__'
+          const registerKey = process.env.CACHE_TEST_REGISTER_KEY || '__none__'
+          const env = process.env
+          const run = (databaseName, config, sql) => execFileSync(
+            'npx',
+            ['--yes','wrangler@'+env.WRANGLER_VERSION,'d1','execute',databaseName,'--remote','--yes','--config',config,'--command',sql],
+            {encoding:'utf8',env,maxBuffer:8*1024*1024},
+          )
+
+          run(env.DATABASE_NAME_W03,'deployed-source/workers/W03-content/wrangler.jsonc',
+            'DELETE FROM content_mutation_idempotency WHERE owner_user_id=' + q(userId) + '; DELETE FROM contents WHERE id=' + q(contentId) + ';')
+          run(env.DATABASE_NAME_W01,'deployed-source/workers/W01-payload/wrangler.jsonc',
+            'DELETE FROM role_assignments WHERE id=' + q(roleId) + ' OR subject_id=' + q(userId) + ';' +
+            'DELETE FROM auth_session_state WHERE user_id=' + q(userId) + ';' +
+            'DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)=' + q(userId) + ';' +
+            'DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT)=' + q(userId) + ' OR CAST(owner_subject_id AS TEXT)=' + q(userId) + ';' +
+            'DELETE FROM auth_registration_envelopes WHERE idempotency_key=' + q(registerKey) + ';' +
+            'DELETE FROM users WHERE CAST(id AS TEXT)=' + q(userId) + ';')
+          console.log(JSON.stringify({contentId,userId,cleanup:'COMPLETE'}))
+          NODE
+
+      - name: Write runtime evidence
+        if: always()
+        run: |
+          mkdir -p artifacts/mapping-0/content-list-cache-runtime-e2e
+          cat > artifacts/mapping-0/content-list-cache-runtime-e2e/provenance.json <<EOF
+          {
+            "workflow": "Content List Cache Runtime E2E",
+            "testedSourceSha": "$TESTED_COMMIT",
+            "deploymentRunId": "$DEPLOYMENT_RUN_ID",
+            "worker": "luckread-w01-payload",
+            "publicPath": "/api/v1/contents",
+            "cacheNamespace": "content-list",
+            "filteredVariant": "creatorId,type,limit",
+            "anonymousMiss": true,
+            "anonymousHit": true,
+            "authenticatedSharedCacheBypass": true,
+            "mutationBoundary": "PUBLISHED->UNPUBLISHED",
+            "postMutationFilteredListMiss": true,
+            "postMutationFixtureHidden": true,
+            "newWorker": 0,
+            "newD1": 0,
+            "syntheticFixtureOnly": true
+          }
+          EOF
+          for file in cache-list-miss.json cache-list-hit.json cache-list-auth-bypass.json cache-list-after-mutation.json; do
+            test -f "$file"
+            cp "$file" "artifacts/mapping-0/content-list-cache-runtime-e2e/$file"
+          done
+
+      - name: Upload runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: content-list-cache-runtime-e2e-${{ inputs.tested_commit }}-${{ github.run_id }}
+          path: artifacts/mapping-0/content-list-cache-runtime-e2e/
+          if-no-files-found: error
+          retention-days: 30
