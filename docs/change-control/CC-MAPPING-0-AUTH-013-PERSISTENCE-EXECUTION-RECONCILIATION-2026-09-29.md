@@ -46,3 +46,23 @@ Service Binding topology, authorization rule, or Evidence Registry promotion is 
 Backup: `backup/pre-auth013-persistence-contract-execution-reconciliation-20260929`
 Working branch: `reconcile/auth013-persistence-contract-execution-20260929`
 Evidence: Run `35937873769` / artifact `10784305258`
+
+
+## Current-head schema evidence reconciliation — 2026-10-04
+
+A fresh controlled remote read-only schema evidence package completed successfully:
+
+- Run: https://github.com/wanghuinet/luckread/actions/runs/37196564139
+- Artifact: https://github.com/wanghuinet/luckread/actions/runs/37196564139/artifacts/11300814115
+- Tested source: `d36474da3a848c6b390e83bff2056c25bfd9cf7f`
+- Database: `luckread` / D1-01
+- Evidence query writes: `0`
+- `users.account_state`: TEXT NOT NULL DEFAULT 'PENDING_VERIFICATION'
+- `users.account_state_version`: INTEGER NOT NULL DEFAULT 1
+- Migration `20261002_120000_media_owner`: present at batch 6
+- Users count observed: 56
+
+This refreshes the persistence-schema evidence at the current main source and is admitted as:
+`EVD-AUTH013-PERSISTENCE-SCHEMA-REMOTE-002` = `PASS / VERIFIED`.
+
+This does not promote AUTH-013 or Mapping 0. Downstream lifecycle, event/publication, W04 side-effect, and Evidence Registry/global Mapping 0 gates remain separate.
