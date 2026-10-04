@@ -160,7 +160,7 @@ describe('public response cache', () => {
     const results: Response[] = []
     for (let i = 0; i < 6; i += 1) {
       results.push(await cachedPublicGet(
-        new Request('https://luckread.com/api/v1/contents?cursor=fuse-' + i),
+        new Request('https://luckread.com/api/v1/contents?cursor=fuse'),
         'content-list',
         loader,
         1,
