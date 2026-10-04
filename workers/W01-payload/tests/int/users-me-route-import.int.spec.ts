@@ -26,4 +26,19 @@ describe('users/me route imports', () => {
     expect(source).toContain("{ updatedAt: { equals: current.updatedAt } }")
     expect(source).not.toContain('data: input')
   })
+  it('short-circuits credential-free GET/PATCH before Payload authentication', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'),
+      'utf8',
+    )
+
+    expect(source).toContain("import { readPayloadAccessToken, readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'")
+    expect(source).toContain('if (!readPayloadAccessToken(request)) return unauthorized()')
+    const credentialCheck = source.indexOf('if (!readPayloadAccessToken(request)) return unauthorized()')
+    const payloadInit = source.indexOf('const payload = await getPayload({ config })')
+    expect(credentialCheck).toBeGreaterThan(-1)
+    expect(payloadInit).toBeGreaterThan(credentialCheck)
+    expect(source.indexOf('if (!readPayloadAccessToken(request)) return unauthorized()', credentialCheck + 1)).toBeGreaterThan(payloadInit)
+  })
+
 })
