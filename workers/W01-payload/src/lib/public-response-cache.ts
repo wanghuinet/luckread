@@ -113,30 +113,21 @@ const missFuseResponse = (): Response =>
     },
   })
 
-const hashCacheKey = (keyString: string): string => {
-  let hash = 2166136261
-  for (let i = 0; i < keyString.length; i += 1) {
-    hash ^= keyString.charCodeAt(i)
-    hash = Math.imul(hash, 16777619)
-  }
-  return (hash >>> 0).toString(16)
-}
-
 const enforceCacheMissOriginFuse = (keyString: string): boolean => {
   const now = Date.now()
-  const historyKey = hashCacheKey(keyString)
-  const existing = cacheMissHistory.get(historyKey) ?? []
+  const existing = cacheMissHistory.get(keyString) ?? []
   const recent = existing.filter((timestamp) => timestamp > now - CACHE_MISS_WINDOW_MS)
   if (recent.length >= CACHE_MISS_LIMIT_PER_KEY) return false
 
-  if (cacheMissHistory.size >= CACHE_MISS_MAX_KEYS && !cacheMissHistory.has(historyKey)) {
+  if (cacheMissHistory.size >= CACHE_MISS_MAX_KEYS && !cacheMissHistory.has(keyString)) {
     const oldestKey = cacheMissHistory.keys().next().value
     if (typeof oldestKey === 'string') cacheMissHistory.delete(oldestKey)
   }
   recent.push(now)
-  cacheMissHistory.set(historyKey, recent)
+  cacheMissHistory.set(keyString, recent)
   return true
 }
+
 
 const withCacheHeader = (response: Response, value: 'HIT' | 'MISS'): Response => {
   const headers = new Headers(response.headers)
