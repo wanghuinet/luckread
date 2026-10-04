@@ -36,8 +36,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+          run_install: false
       - name: Install root dependencies
         run: npm ci --ignore-scripts
+      - name: Install W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Record current HEAD
         run: |
           mkdir -p artifacts/current-head/1.1
@@ -84,7 +91,7 @@ jobs:
           exit 0
       - name: Cache boundary unit tests
         working-directory: workers/W01-payload
-        run: ../../node_modules/.bin/vitest run --config ./vitest.cache.config.mts
+        run: pnpm exec vitest run --config ./vitest.cache.config.mts
       - name: Current-head reconciliation summary
         run: |
           {
