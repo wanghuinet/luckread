@@ -1,10 +1,10 @@
 # Change Control — AUTH-013 Lifecycle Matrix Evidence Inheritance — 2026-10-04
 
-Status: CLOSED — UNCHANGED-SCOPE EVIDENCE INHERITANCE
+Status: VALIDATED — UNCHANGED-SCOPE EVIDENCE INHERITANCE
 
 Baseline:
 - authoritative main before this change: d822a9af98cd4bebc9c36834a5e4597707b3f628
-- backup: backup/2026-10-04-pre-auth013-lifecycle-inheritance
+- backup: backup/pre-auth013-lifecycle-inheritance-20261004
 - working branch: chore/1.1-auth013-lifecycle-inheritance
 
 ## Scope
