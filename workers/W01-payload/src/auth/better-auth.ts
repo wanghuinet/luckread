@@ -200,7 +200,7 @@ function makeAuth(env: BetterAuthEnv) {
     advanced: {
       crossSubDomainCookies: {
         enabled: true,
-        domain: 'luckread.cn',
+        domain: 'luckread.com',
       },
       database: {
         generateId: (options) => {
