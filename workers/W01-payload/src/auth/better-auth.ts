@@ -1,4 +1,5 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+import type { D1Database } from 'better-auth'
 import { betterAuth } from 'better-auth'
 import { hashPassword as betterAuthHashPassword, verifyPassword as betterAuthVerifyPassword } from 'better-auth/crypto'
 import { bearer } from 'better-auth/plugins/bearer'
@@ -9,9 +10,6 @@ type BetterAuthEnv = {
   PAYLOAD_SECRET?: string
 }
 
-type BetterAuthInstance = ReturnType<typeof betterAuth>
-
-const authCache = new WeakMap<object, BetterAuthInstance>()
 
 const textEncoder = new TextEncoder()
 
@@ -104,7 +102,7 @@ async function verifyPassword(input: { hash: string; password: string }): Promis
   }
 }
 
-function makeAuth(env: BetterAuthEnv): BetterAuthInstance {
+function makeAuth(env: BetterAuthEnv) {
   const secret = env.BETTER_AUTH_SECRET ?? env.PAYLOAD_SECRET
   if (!secret) throw new Error('BETTER_AUTH_SECRET is required')
 
@@ -213,6 +211,10 @@ function makeAuth(env: BetterAuthEnv): BetterAuthInstance {
     },
   })
 }
+
+type BetterAuthInstance = ReturnType<typeof makeAuth>
+
+const authCache = new WeakMap<object, BetterAuthInstance>()
 
 export async function getBetterAuth(): Promise<BetterAuthInstance> {
   const context = await getCloudflareContext({ async: true })
