@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-import { getBetterAuthSession } from '@/auth/better-auth'
+import { getBetterAuthSession } from '@/auth/w02-auth-client'
 import { payloadAdminOnly } from '@/auth/payload-admin-access'
 
 export const Users: CollectionConfig = {
