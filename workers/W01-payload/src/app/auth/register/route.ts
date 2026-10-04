@@ -192,7 +192,7 @@ const validatePolicy = (now: Date) => {
 }
 
 const findUser = async (
-  db: D1Database,
+  db: D1DatabaseLike,
   email: string,
   username: string,
 ): Promise<{ id: string; accountState: string | null } | null> =>
@@ -206,7 +206,7 @@ const findUser = async (
     .bind(email, username)
     .first<{ id: string; accountState: string | null }>()
 
-const hasConsent = async (db: D1Database, userId: string, policyVersion: string) =>
+const hasConsent = async (db: D1DatabaseLike, userId: string, policyVersion: string) =>
   Boolean(
     (
       await db
@@ -224,7 +224,7 @@ const hasConsent = async (db: D1Database, userId: string, policyVersion: string)
   )
 
 const completeEnvelope = async (
-  db: D1Database,
+  db: D1DatabaseLike,
   envelopeId: string,
   userId: string,
   consentRecordId: string,
