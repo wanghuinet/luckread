@@ -1,3 +1,4 @@
+import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 
 import { getBetterAuth } from '../../../auth/better-auth'
@@ -515,7 +516,7 @@ export async function POST(request: Request): Promise<Response> {
       env.D1,
       normalized.identity,
       normalized.username,
-    ).catch(() => null)
+    ).catch((): null => null)
 
     if (existingUser?.id) {
       try {
