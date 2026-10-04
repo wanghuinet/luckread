@@ -2,26 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-describe('versioned auth password change adapter', () => {
-  it('exposes the existing password change handler without duplicating auth logic', () => {
-    const route = readFileSync(
-      resolve(process.cwd(), 'src/app/api/v1/auth/password/change/route.ts'),
-      'utf8',
-    )
+const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
+describe('Better Auth password change boundary', () => {
+  it('keeps the versioned route thin', () => {
+    const route = read('src/app/api/v1/auth/password/change/route.ts')
     expect(route).toContain("export { POST } from '../../../../../auth/password/change/route'")
     expect(route).not.toContain('getPayload(')
-    expect(route).not.toContain('payload.update(')
-    expect(route).not.toContain('assertPasswordPolicy(')
   })
-})
 
-
-it('guards password changes before Payload authentication', () => {
-  const route = readFileSync(resolve(process.cwd(), 'src/app/auth/password/change/route.ts'), 'utf8')
-  const guardIndex = route.indexOf('await enforceW01WriteRateLimit(request)')
-  const authIndex = route.indexOf('const authResult = await payload.auth(')
-  expect(guardIndex).toBeGreaterThanOrEqual(0)
-  expect(authIndex).toBeGreaterThanOrEqual(0)
-  expect(guardIndex).toBeLessThan(authIndex)
+  it('delegates password change to Better Auth', () => {
+    const route = read('src/app/auth/password/change/route.ts')
+    expect(route).toContain("proxyBetterAuth")
+    expect(route).toContain("'/change-password'")
+    expect(route).toContain('revokeOtherSessions: true')
+    expect(route).not.toContain('payload.login(')
+    expect(route).not.toContain('payload.update(')
+  })
 })
