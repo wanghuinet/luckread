@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import {
   PUBLIC_LOCALE_COOKIE,
@@ -10,13 +10,19 @@ import {
 
 export default function PublicLanguageToggle({ locale }: { locale: PublicLocale }) {
   const [pending, setPending] = useState(false)
+  const [requestedLocale, setRequestedLocale] = useState<PublicLocale | null>(null)
+
+  useEffect(() => {
+    if (!requestedLocale) return
+    document.cookie =
+      PUBLIC_LOCALE_COOKIE + '=' + requestedLocale + '; Path=/; Max-Age=31536000; SameSite=Lax'
+    window.location.reload()
+  }, [requestedLocale])
 
   function switchLocale(nextLocale: PublicLocale) {
     if (nextLocale === locale || pending) return
     setPending(true)
-    document.cookie =
-      PUBLIC_LOCALE_COOKIE + '=' + nextLocale + '; Path=/; Max-Age=31536000; SameSite=Lax'
-    window.location.reload()
+    setRequestedLocale(nextLocale)
   }
 
   return (
