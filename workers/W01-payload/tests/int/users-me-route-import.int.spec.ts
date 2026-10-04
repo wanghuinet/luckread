@@ -16,7 +16,7 @@ describe('users/me route auth boundary', () => {
     expect(source).toContain('export async function GET')
     expect(source).toContain('export async function PATCH')
     expect(source).toContain("PROFILE_MUTABLE_FIELDS")
-    expect(source).toContain("status: 428")
+    expect(source).toContain("errorResponse(428, 'PRECONDITION_REQUIRED'")
     expect(source).not.toContain('data: input')
   })
 })
