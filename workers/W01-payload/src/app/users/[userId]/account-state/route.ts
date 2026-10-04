@@ -1,5 +1,5 @@
 import { getBetterAuthSession } from '@/auth/better-auth'
-import { transitionAccountState, W02AuthClientError } from '../../../../auth/w02-session-client.js'
+import { transitionAccountState, W02AuthClientError } from '../../../../auth/w02-identity-client.js'
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
