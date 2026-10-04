@@ -80,13 +80,14 @@ jobs:
 
           consumers="$(curl -fsS --retry 3 --retry-all-errors             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$queue_id/consumers?per_page=100")"
           consumer="$(jq -c --arg w "$W04_NAME" --arg dlq "$DLQ_NAME"             '.result[]? | select(.script_name==$w and .type=="worker" and .dead_letter_queue==$dlq)' <<<"$consumers")"
-          count="$(jq '[.result[]?] | length' <<<"$consumers")"
+          match_count="$(jq --arg w "$W04_NAME" --arg dlq "$DLQ_NAME" \
+            '[.result[]? | select(.script_name==$w and .type=="worker" and .dead_letter_queue==$dlq)] | length' <<<"$consumers")"
 
           test -n "$consumer"
-          test "$count" = "1"
+          test "$match_count" = "1"
           printf '%s\n' "$queue_id" > /tmp/auth013-queue-id
           printf '%s\n' "$consumer" > /tmp/auth013-consumer
-          printf '%s\n' "$count" > /tmp/auth013-consumer-count
+          printf '%s\n' "$match_count" > /tmp/auth013-consumer-count
           echo "AUTH013_W04_LIVE_CONSUMER=PASS"
 
       - name: Execute controlled lifecycle projection/deindex matrix
