@@ -233,3 +233,6 @@ export const invalidatePublicContentList = async (request: Request): Promise<voi
 
 export const invalidatePublicUserProfile = async (request: Request, userId: string): Promise<void> =>
   invalidatePublicRoute(request, 'user-profile', `/api/v1/users/${encodeURIComponent(userId)}`)
+
+export const invalidatePublicUserProfileByUsername = async (request: Request, username: string): Promise<void> =>
+  invalidatePublicRoute(request, 'user-profile-by-username', `/api/v1/users/by-username/${encodeURIComponent(username)}`)
