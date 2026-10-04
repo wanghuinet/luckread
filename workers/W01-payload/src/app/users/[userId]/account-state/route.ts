@@ -1,16 +1,5 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
-
-import {
-  getPayloadAuthorizationHeader,
-  readVerifiedPayloadTokenVersion,
-} from '../../../../auth/payload-access-token.js'
-import {
-  transitionAccountState,
-  validateSession,
-  W02AuthClientError,
-} from '../../../../auth/w02-session-client.js'
+import { getBetterAuthSession } from '@/auth/better-auth'
+import { transitionAccountState, W02AuthClientError } from '../../../../auth/w02-session-client.js'
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -23,14 +12,7 @@ const json = (body: unknown, status = 200) =>
 
 const errorResponse = (status: number, code: string, message: string) =>
   json(
-    {
-      error: {
-        code,
-        message,
-        details: {},
-      },
-      requestId: crypto.randomUUID(),
-    },
+    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
     status,
   )
 
@@ -76,46 +58,14 @@ export async function POST(
     return errorResponse(400, 'VALIDATION_FAILED', 'Invalid account-state transition request')
   }
 
-  const payload = await getPayload({ config })
-
-  let authResult: Awaited<ReturnType<typeof payload.auth>>
-  try {
-    authResult = await payload.auth({
-      headers: new Headers(
-        request.headers.get('Authorization')
-          ? request.headers
-          : {
-              ...(getPayloadAuthorizationHeader(request)
-                ? { Authorization: getPayloadAuthorizationHeader(request)! }
-                : {}),
-            },
-      ),
-      canSetHeaders: false,
-    })
-  } catch {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
-  }
-
-  const user = authResult.user as ({ id?: unknown; _sid?: unknown } | null)
-  if (!user?.id || typeof user._sid !== 'string') {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-  }
-
-  const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (tokenVersion === null) {
+  const session = await getBetterAuthSession(request).catch(() => null)
+  if (!session?.user?.id) {
     return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
   }
 
   try {
-    const active = await validateSession({
-      sessionId: user._sid,
-      userId: String(user.id),
-      tokenVersion,
-    })
-    if (!active) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-
     const result = await transitionAccountState({
-      subjectId: String(user.id),
+      subjectId: String(session.user.id),
       targetUserId,
       to: body.to,
       reason: body.reason,
