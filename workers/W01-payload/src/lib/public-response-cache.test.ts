@@ -100,7 +100,9 @@ describe('public response cache', () => {
   })
 
   it('reuses bounded memory fallback after an edge cache write failure', async () => {
-    cache.match.mockResolvedValue(undefined)
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-list-generation') ? generationResponse() : undefined,
+    )
     cache.put.mockRejectedValueOnce(new Error('CACHE_WRITE_FAILED'))
     Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
 
@@ -140,7 +142,9 @@ describe('public response cache', () => {
   })
 
   it('bounds concurrent cache-miss origin work', async () => {
-    cache.match.mockResolvedValue(undefined)
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-list-generation') ? generationResponse() : undefined,
+    )
     cache.put.mockResolvedValue(undefined)
     Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
 

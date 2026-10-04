@@ -1,4 +1,4 @@
-# Change Control+ßuÁ‚ùÁT 1.1 Content-List Cache Generation Invalidation ∫w^~)ﬁt 2026-10-04
+# Change Control - 1.1 Content-List Cache Generation Invalidation - 2026-10-04
 
 Status: CHANGE-CONTROL / IMPLEMENTATION-PENDING-RUNTIME-EVIDENCE
 
