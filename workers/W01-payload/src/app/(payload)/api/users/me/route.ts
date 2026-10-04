@@ -6,7 +6,7 @@ import config from '@payload-config'
 
 import { etagForUserProfile, normalizeEtag, pickUserProfileSnapshot, PROFILE_MUTABLE_FIELDS } from '@/auth/user-profile-etag'
 import { invalidatePublicUserProfile, invalidatePublicUserProfileByUsername } from '@/lib/public-response-cache'
-import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
+import { readPayloadAccessToken, readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
 import { validateSession } from '@/auth/w02-session-client'
 
 const unauthorized = () =>
@@ -90,6 +90,8 @@ export async function GET(request: Request): Promise<Response> {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile service unavailable')
   }
 
+  if (!readPayloadAccessToken(request)) return unauthorized()
+
   const authenticated = await authenticate(request)
   if (!authenticated) return unauthorized()
 
@@ -103,6 +105,8 @@ export async function PATCH(request: Request): Promise<Response> {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile service unavailable')
   }
+
+  if (!readPayloadAccessToken(request)) return unauthorized()
 
   const authenticated = await authenticate(request)
   if (!authenticated) return unauthorized()
