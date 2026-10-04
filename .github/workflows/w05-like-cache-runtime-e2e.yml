@@ -236,12 +236,10 @@ jobs:
           NODE
 
       - name: Verify viewer state and empty aggregate
-        env:
-          AUTHORIZATION: Bearer ${{ env.LIKE_CACHE_TEST_TOKEN }}
         run: |
           set -euo pipefail
           url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
-          curl --silent --show-error --fail-with-body -H "Authorization: $AUTHORIZATION" "$url" > /tmp/like-0.json
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-0.json
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
           const value = JSON.parse(readFileSync('/tmp/like-0.json','utf8'))
@@ -275,13 +273,11 @@ jobs:
           NODE
 
       - name: Verify aggregate remains cached while fresh
-        env:
-          AUTHORIZATION: Bearer ${{ env.LIKE_CACHE_TEST_TOKEN }}
         run: |
           set -euo pipefail
           url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
           sleep 1
-          curl --silent --show-error --fail-with-body -H "Authorization: $AUTHORIZATION" "$url" > /tmp/like-stale-0.json
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-stale-0.json
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
           const value = JSON.parse(readFileSync('/tmp/like-stale-0.json','utf8'))
@@ -292,13 +288,11 @@ jobs:
           NODE
 
       - name: Verify aggregate refresh after TTL
-        env:
-          AUTHORIZATION: Bearer ${{ env.LIKE_CACHE_TEST_TOKEN }}
         run: |
           set -euo pipefail
           url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
           sleep 5
-          curl --silent --show-error --fail-with-body -H "Authorization: $AUTHORIZATION" "$url" > /tmp/like-refresh-1.json
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-refresh-1.json
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
           const value = JSON.parse(readFileSync('/tmp/like-refresh-1.json','utf8'))
@@ -309,13 +303,11 @@ jobs:
           NODE
 
       - name: Verify viewer-state invalidation is independent
-        env:
-          AUTHORIZATION: Bearer ${{ env.LIKE_CACHE_TEST_TOKEN }}
         run: |
           set -euo pipefail
           url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: $AUTHORIZATION"             -H "Content-Type: application/json"             -H "Idempotency-Key: LIKE-CACHE-E2E-$GITHUB_RUN_ID-LIKE"             --data '{"targetType":"content","targetId":"'"$LIKE_CACHE_TEST_CONTENT_ID"'"}'             "$SOCIAL_API_BASE_URL/api/v1/interactions/likes" > /tmp/like-post.json
-          curl --silent --show-error --fail-with-body -H "Authorization: $AUTHORIZATION" "$url" > /tmp/like-viewer-after-post.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: LIKE-CACHE-E2E-$GITHUB_RUN_ID-LIKE"             --data '{"targetType":"content","targetId":"'"$LIKE_CACHE_TEST_CONTENT_ID"'"}'             "$SOCIAL_API_BASE_URL/api/v1/interactions/likes" > /tmp/like-post.json
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-viewer-after-post.json
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
           const posted = JSON.parse(readFileSync('/tmp/like-post.json','utf8'))
@@ -330,8 +322,6 @@ jobs:
           NODE
 
       - name: Verify shared aggregate is not synchronously invalidated
-        env:
-          AUTHORIZATION: Bearer ${{ env.LIKE_CACHE_TEST_TOKEN }}
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
@@ -351,7 +341,7 @@ jobs:
           NODE
           url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
           sleep 1
-          curl --silent --show-error --fail-with-body -H "Authorization: $AUTHORIZATION" "$url" > /tmp/like-shared-stale.json"
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-shared-stale.json"
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
           const value = JSON.parse(readFileSync('/tmp/like-shared-stale.json','utf8'))
@@ -362,13 +352,11 @@ jobs:
           NODE
 
       - name: Verify shared aggregate refreshes after second TTL
-        env:
-          AUTHORIZATION: Bearer ${{ env.LIKE_CACHE_TEST_TOKEN }}
         run: |
           set -euo pipefail
           url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
           sleep 5
-          curl --silent --show-error --fail-with-body -H "Authorization: $AUTHORIZATION" "$url" > /tmp/like-shared-refresh.json"
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-shared-refresh.json
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
           const value = JSON.parse(readFileSync('/tmp/like-shared-refresh.json','utf8'))
