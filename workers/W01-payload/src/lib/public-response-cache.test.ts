@@ -135,7 +135,11 @@ describe('public response cache', () => {
     const request = new Request('https://luckread.com/api/v1/contents?cursor=read-fallback')
 
     await cachedPublicGet(request, 'content-list', loader, 30)
-    cache.match.mockRejectedValueOnce(new Error('CACHE_READ_FAILED'))
+    cache.match
+      .mockImplementationOnce(async (request: Request) =>
+        request.url.includes('__content-list-generation') ? generationResponse() : undefined,
+      )
+      .mockRejectedValueOnce(new Error('CACHE_READ_FAILED'))
     const response = await cachedPublicGet(request.clone(), 'content-list', loader, 30)
 
     expect(loader).toHaveBeenCalledTimes(1)
