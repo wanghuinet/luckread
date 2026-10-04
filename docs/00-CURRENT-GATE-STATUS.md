@@ -65,7 +65,7 @@ The Mapping 0 authoritative cursor remains:
 
 The W04 side-effect matrix is now `PASS_VERIFIED` from controlled Run `37202032741` with Artifact `11303336889`. The workflow remains the historical execution mechanism and is not to be rerun unchanged.
 
-The next evidence is the remaining feature-wide AUTH-013 lifecycle/security scope: approval-required BANNED behavior, negative transition/permission/precondition enforcement, full token/session enforcement, and actual cache/deindex/feed/search convergence. No W04 runtime or topology change is required by the completed sub-gate.
+The completed lifecycle and W04 projection/deindex evidence are now PASS_VERIFIED at their tested scopes. The remaining AUTH-013 blocker is the canonical Feed/Recommendation/Search serving runtime: current W04 exposes only /health plus the account-state Queue consumer, so feature-wide serving-time account-state eligibility and applicable cache safety remain unproven. No W04 runtime/topology change is authorized until the serving implementation is admitted by Change Control.
 
 ## Current main
 
