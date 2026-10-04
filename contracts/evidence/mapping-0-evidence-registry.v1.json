@@ -1142,16 +1142,16 @@
       "subjectType": "FEATURE",
       "subjectId": "AUTH-013",
       "source": "GitHub Actions AUTH-013 Lifecycle Matrix Runtime Evidence",
-      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/37205765043",
-      "commitSha": "bc67642943c027927646280da8e4da0c6f84291d",
-      "timestamp": "2026-10-04T13:29:19Z",
-      "producer": "AUTH-013 Lifecycle Matrix Runtime Evidence / run 37205765043 / job 111446507189",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/37208063552#artifact-11305782085",
+      "commitSha": "9a16b10abb3795c7d4bffd21ec98ca26ede66174",
+      "timestamp": "2026-10-04T14:07:59Z",
+      "producer": "AUTH-013 Lifecycle Matrix Runtime Evidence / run 37208063552 / job 111453344052",
       "result": "PASS",
       "status": "VERIFIED",
-      "checkId": "111446507189",
-      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/37205765043",
+      "checkId": "111453344052",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/37208063552",
       "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
-      "note": "Controlled remote D1 lifecycle matrix executed at current main bc67642943c027927646280da8e4da0c6f84291d. PASS assertions covered ACTIVE→RESTRICTED→FROZEN→SUSPENDED→BANNED→RESTORED→ACTIVE; L7 approval was required for BANNED; rejected BANNED transition caused no mutation; direct BANNED→ACTIVE was rejected; entering SUSPENDED revoked the session and BANNED retained the revocation; final account state/version were ACTIVE/7; journal source versions 2–7 were canonical identity.account_state_changed events; synthetic user/session/journal cleanup completed with cleanup verification."
+      "note": "Fresh controlled remote D1 execution on current main 9a16b10abb3795c7d4bffd21ec98ca26ede66174 exercised all 26 canonical account-state transitions. Every transition passed target-state, account_state_version increment, exactly-once auth_013_publication_journal, canonical identity.account_state_changed event, and contracted session-revocation assertions. The negative ACTIVE→BANNED case without the required approval was rejected with FORBIDDEN and left state/version unchanged. Synthetic users, sessions, and journal rows were deleted and cleanup verification passed. Artifact 11305782085 (sha256:51bf511c19f1bd7ddcda6f9b1933706dec591956d7488663c2064efd1f5b43ac). This evidence closes the remote 26-transition matrix coverage sub-gate; it does not by itself close deletion/recovery precondition semantics, feature-wide HTTP/security convergence, or cache/deindex/feed/search convergence."
     },
     {
       "evidenceId": "EVD-SAFETY001-MODERATION-RUNTIME-E2E-001",
