@@ -10,9 +10,8 @@ export const payloadAdminOnly = async ({ req }: { req: PayloadRequest }): Promis
     )
     if (!session?.user?.id) return false
 
-    const accountState = typeof session.user.accountState === 'string'
-      ? session.user.accountState
-      : 'ACTIVE'
+    const rawAccountState = (session.user as typeof session.user & { accountState?: unknown }).accountState
+    const accountState = typeof rawAccountState === 'string' ? rawAccountState : 'ACTIVE'
     if (accountState !== 'PENDING_VERIFICATION' && accountState !== 'ACTIVE') return false
 
     const principal = await resolveGlobalLayer({
