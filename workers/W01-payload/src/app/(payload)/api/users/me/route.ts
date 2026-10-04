@@ -6,8 +6,6 @@ import config from '@payload-config'
 
 import { etagForUserProfile, normalizeEtag, pickUserProfileSnapshot, PROFILE_MUTABLE_FIELDS } from '@/auth/user-profile-etag'
 import { invalidatePublicUserProfile, invalidatePublicUserProfileByUsername } from '@/lib/public-response-cache'
-import { readPayloadAccessToken, readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
-import { validateSession } from '@/auth/w02-session-client'
 
 const unauthorized = () =>
   new Response(
@@ -67,19 +65,8 @@ async function authenticate(request: Request) {
     return null
   }
 
-  const user = authResult.user as unknown as ({ id?: string | number; _sid?: string } & Record<string, unknown>) | null
-  if (!user?.id || typeof user._sid !== 'string' || user._sid.length === 0) return null
-
-  const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (tokenVersion === null) return null
-
-  const active = await validateSession({
-    sessionId: user._sid,
-    userId: String(user.id),
-    tokenVersion,
-  }).catch(() => false)
-
-  return active ? { payload, user } : null
+  const user = authResult.user as unknown as ({ id?: string | number } & Record<string, unknown>) | null
+  return user?.id ? { payload, user } : null
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -89,8 +76,6 @@ export async function GET(request: Request): Promise<Response> {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile service unavailable')
   }
-
-  if (!readPayloadAccessToken(request)) return unauthorized()
 
   const authenticated = await authenticate(request)
   if (!authenticated) return unauthorized()
