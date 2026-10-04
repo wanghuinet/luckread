@@ -1,0 +1,76 @@
+name: W03 Content Revision Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact 40-character SHA containing migration 0004
+        required: true
+        default: "REPLACE_WITH_RELEASE_SHA"
+        type: string
+      confirm:
+        description: Type APPLY_W03_CONTENT_REVISIONS to permit remote D1 mutation
+        required: true
+        default: APPLY_W03_CONTENT_REVISIONS
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  EXPECTED_DB_NAME: luckreadpro
+  EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  EXPECTED_WORKER: luckread-w03
+  MIGRATION_FILE: workers/W03-content/migrations/0004_content_revisions.sql
+
+jobs:
+  migrate:
+    if: \${{ inputs.confirm == 'APPLY_W03_CONTENT_REVISIONS' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate source SHA
+        run: printf '%s' '\${{ inputs.source_sha }}' | grep -Eq '^[0-9a-f]{40}$'
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ inputs.source_sha }}
+          fetch-depth: 1
+      - name: Verify source and migration
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '\${{ inputs.source_sha }}'
+          test -f "$MIGRATION_FILE"
+          grep -q 'CREATE TABLE content_revisions' "$MIGRATION_FILE"
+          echo W03_CONTENT_REVISION_MIGRATION_SOURCE=PASS
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Remote preflight
+        working-directory: workers/W03-content
+        env:
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+            --command "SELECT name FROM sqlite_master WHERE type='table' AND name='content_revisions';"
+      - name: Apply migration
+        working-directory: workers/W03-content
+        env:
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
+      - name: Verify migration
+        working-directory: workers/W03-content
+        env:
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+            --command "SELECT name FROM sqlite_master WHERE type='table' AND name='content_revisions';" | tee /tmp/content-revisions-postflight.json
+          grep -q 'content_revisions' /tmp/content-revisions-postflight.json
+          echo W03_CONTENT_REVISION_MIGRATION_REMOTE=PASS
