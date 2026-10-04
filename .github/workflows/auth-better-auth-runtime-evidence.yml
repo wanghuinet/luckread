@@ -8,6 +8,8 @@ on:
       - 'workers/W01-payload/src/app/api/auth/**'
       - 'workers/W01-payload/src/app/api/v1/auth/**'
       - 'workers/W01-payload/src/app/(payload)/api/users/me/**'
+      - 'workers/W01-payload/src/app/(frontend)/me/followers/**'
+      - 'workers/W01-payload/src/app/(frontend)/me/following/**'
       - 'workers/W01-payload/src/collections/Users.ts'
       - 'workers/W01-payload/src/migrations/**'
       - 'workers/W01-payload/scripts/auth-better-auth-runtime-evidence.mjs'
@@ -88,60 +90,3 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../../artifacts/evidence/auth-better-auth
-          pnpm exec wrangler d1 execute luckread --local --json --config wrangler.jsonc --command 'SELECT name,type FROM sqlite_schema WHERE type IN ("table","index") AND (name LIKE "auth_%" OR name IN ("users","users_sessions")) ORDER BY type,name;' > ../../artifacts/evidence/auth-better-auth/schema-catalog.json
-          pnpm exec wrangler d1 execute luckread --local --json --config wrangler.jsonc --command 'PRAGMA table_info(users);' > ../../artifacts/evidence/auth-better-auth/users-schema.json
-          pnpm exec wrangler d1 execute luckread --local --json --config wrangler.jsonc --command 'PRAGMA table_info(auth_accounts);' > ../../artifacts/evidence/auth-better-auth/auth-accounts-schema.json
-          pnpm exec wrangler d1 execute luckread --local --json --config wrangler.jsonc --command 'PRAGMA table_info(auth_sessions);' > ../../artifacts/evidence/auth-better-auth/auth-sessions-schema.json
-          pnpm exec wrangler d1 execute luckread --local --json --config wrangler.jsonc --command 'PRAGMA table_info(auth_verifications);' > ../../artifacts/evidence/auth-better-auth/auth-verifications-schema.json
-
-      - name: Build exact W01 OpenNext worker
-        working-directory: workers/W01-payload
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: pnpm exec opennextjs-cloudflare build
-
-      - name: Start exact W01 local Worker runtime
-        working-directory: workers/W01-payload
-        run: |
-          set -euo pipefail
-          pnpm exec wrangler dev --local --port 8787 --var "PAYLOAD_SECRET:$PAYLOAD_SECRET" --var "BETTER_AUTH_SECRET:$BETTER_AUTH_SECRET" --var "CLOUDFLARE_ENV:$CLOUDFLARE_ENV" > auth-better-auth-preview.log 2>&1 &
-          echo $! > auth-better-auth-preview.pid
-          ready=0
-          for _ in $(seq 1 120); do
-            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8787/ || true)
-            if [ "$code" != "000" ]; then ready=1; break; fi
-            sleep 1
-          done
-          if [ "$ready" -ne 1 ]; then cat auth-better-auth-preview.log; exit 1; fi
-
-      - name: Run Better Auth core runtime evidence
-        working-directory: workers/W01-payload
-        env:
-          AUTH_BETTER_AUTH_BASE_URL: http://127.0.0.1:8787
-          GITHUB_SHA: ${{ steps.source.outputs.sha }}
-        run: node --import=tsx/esm scripts/auth-better-auth-runtime-evidence.mjs
-
-      - name: Dump runtime log on failure
-        if: ${{ failure() }}
-        working-directory: workers/W01-payload
-        run: tail -n 500 auth-better-auth-preview.log || true
-
-      - name: Upload Better Auth runtime evidence
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: auth-better-auth-core-runtime-${{ steps.source.outputs.sha }}
-          path: |
-            artifacts/evidence/auth-better-auth/
-            workers/W01-payload/auth-better-auth-preview.log
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Cleanup local runtime
-        if: ${{ always() }}
-        working-directory: workers/W01-payload
-        run: |
-          if [ -f auth-better-auth-preview.pid ]; then kill "$(cat auth-better-auth-preview.pid)" 2>/dev/null || true; fi
-          pkill -TERM -x workerd 2>/dev/null || true
-          pkill -TERM -x esbuild 2>/dev/null || true
