@@ -1,6 +1,10 @@
 name: Content List Cache Runtime E2E
 
 on:
+  workflow_run:
+    workflows:
+      - W01 W02 Auth Binding Deploy
+    types: [completed]
   workflow_dispatch:
     inputs:
       tested_commit:
@@ -8,8 +12,8 @@ on:
         required: true
         type: string
       deployment_run_id:
-        description: Successful W01 W02 Auth Binding Deploy run ID for that exact source
-        required: true
+        description: Optional successful W01 W02 Auth Binding Deploy run ID; resolved from source artifact when omitted
+        required: false
         type: string
       content_api_base_url:
         description: Controlled public W01 content API URL
@@ -38,44 +42,67 @@ permissions:
 
 env:
   WRANGLER_VERSION: 4.116.0
-  TESTED_COMMIT: ${{ inputs.tested_commit }}
-  DEPLOYMENT_RUN_ID: ${{ inputs.deployment_run_id }}
-  CONTENT_API_BASE_URL: ${{ inputs.content_api_base_url }}
-  DATABASE_NAME_W01: ${{ inputs.database_name_w01 }}
-  DATABASE_NAME_W03: ${{ inputs.database_name_w03 }}
+  TESTED_COMMIT: ${{ github.event_name == 'workflow_run' && '' || inputs.tested_commit }}
+  DEPLOYMENT_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || inputs.deployment_run_id }}
+  CONTENT_API_BASE_URL: ${{ github.event_name == 'workflow_run' && 'https://api.luckread.com' || inputs.content_api_base_url }}
+  DATABASE_NAME_W01: ${{ github.event_name == 'workflow_run' && 'luckread' || inputs.database_name_w01 }}
+  DATABASE_NAME_W03: ${{ github.event_name == 'workflow_run' && 'luckreadpro' || inputs.database_name_w03 }}
 
 jobs:
   content-list-cache-runtime-e2e:
-    if: ${{ inputs.confirm == 'RUN_CONTENT_LIST_CACHE_E2E' }}
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' &&
+       inputs.confirm == 'RUN_CONTENT_LIST_CACHE_E2E')
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
-      - name: Verify deployment provenance
+      - name: Resolve and verify deployment provenance
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$DEPLOYMENT_RUN_ID" > /tmp/deploy.json
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$DEPLOYMENT_RUN_ID/artifacts?per_page=100" > /tmp/deploy-artifacts.json
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_run" ]; then
+            test -n "${DEPLOYMENT_RUN_ID}"
+            test -n "${TESTED_COMMIT}"
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}" > /tmp/deploy.json
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}/artifacts?per_page=100" > /tmp/deploy-artifacts.json
+          else
+            test -n "${DEPLOYMENT_RUN_ID}"
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}" > /tmp/deploy.json
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}/artifacts?per_page=100" > /tmp/deploy-artifacts.json
+          fi
+
           node --input-type=module <<'NODE'
-          import { readFileSync } from 'node:fs'
+          import { appendFileSync, readFileSync } from 'node:fs'
           const run = JSON.parse(readFileSync('/tmp/deploy.json','utf8'))
           const artifacts = JSON.parse(readFileSync('/tmp/deploy-artifacts.json','utf8'))
-          const expected = process.env.TESTED_COMMIT
-          const artifactName = 'w01-w02-binding-deployment-' + expected
           if (run.name !== 'W01 W02 Auth Binding Deploy') throw new Error('wrong deployment workflow')
           if (run.conclusion !== 'success' || run.head_branch !== 'main') throw new Error('deployment is not a successful main run')
-          if (run.head_sha !== expected) throw new Error('deployment head SHA mismatch')
-          const matches = (artifacts.artifacts ?? []).filter(a => a.name === artifactName && !a.expired)
-          if (matches.length !== 1) throw new Error('exact deployment artifact not found')
-          console.log(JSON.stringify({deploymentRunId:run.id,testedCommit:expected,artifact:matches[0].name}))
+          const prefix = 'w01-w02-binding-deployment-'
+          const matches = (artifacts.artifacts ?? []).filter(
+            (artifact) =>
+              typeof artifact?.name === 'string' &&
+              artifact.name.startsWith(prefix) &&
+              artifact?.expired_at == null,
+          )
+          if (matches.length !== 1) throw new Error('expected exactly one live W01 deployment source artifact; found ' + matches.length)
+          const sourceSha = matches[0].name.slice(prefix.length)
+          if (!/^[0-9a-f]{40}$/.test(sourceSha)) throw new Error('invalid deployed source SHA: ' + sourceSha)
+          if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' && process.env.TESTED_COMMIT !== sourceSha) {
+            throw new Error('manual tested_commit does not match deployment artifact source SHA')
+          }
+          appendFileSync(process.env.GITHUB_ENV, 'TESTED_COMMIT=' + sourceSha + '\n')
+          console.log(JSON.stringify({deploymentRunId:run.id,workflowHeadSha:run.head_sha,deployedSourceSha:sourceSha,artifact:matches[0].name}))
           NODE
 
       - name: Checkout exact deployed source
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tested_commit }}
+          ref: ${{ env.TESTED_COMMIT }}
           path: deployed-source
           fetch-depth: 1
 
