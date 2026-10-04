@@ -90,3 +90,75 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../../artifacts/evidence/auth-better-auth
+
+      - name: Build exact W01 OpenNext worker
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: production
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          pnpm exec opennextjs-cloudflare build > auth-better-auth-open-next-build.log 2>&1
+
+      - name: Start exact W01 local Worker runtime
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: production
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler dev --local --port 8787 --var "PAYLOAD_SECRET:${PAYLOAD_SECRET}" --var "BETTER_AUTH_SECRET:${BETTER_AUTH_SECRET}" --var "CLOUDFLARE_ENV:development" > auth-better-auth-preview.log 2>&1 &
+          echo $! > auth-better-auth-preview.pid
+          ready=0
+          for _ in $(seq 1 120); do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8787/ || true)
+            if [ "$code" != "000" ]; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat auth-better-auth-open-next-build.log
+            cat auth-better-auth-preview.log
+            exit 1
+          fi
+
+      - name: Run Better Auth core runtime evidence
+        working-directory: workers/W01-payload
+        env:
+          AUTH_BETTER_AUTH_BASE_URL: http://127.0.0.1:8787
+          AUTH_BETTER_AUTH_SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          node --import=tsx/esm scripts/auth-better-auth-runtime-evidence.mjs
+          test -s ../../artifacts/evidence/auth-better-auth/runtime-result.json
+          node --input-type=module -e "const fs=require('fs'); const p='../../artifacts/evidence/auth-better-auth/runtime-result.json'; const r=JSON.parse(fs.readFileSync(p,'utf8')); if(r.result!=='PASS') throw new Error('runtime evidence did not PASS'); if(r.sourceSha!=='${{ steps.source.outputs.sha }}') throw new Error('runtime evidence source SHA mismatch');"
+
+      - name: Dump W01 runtime logs on evidence failure
+        if: ${{ failure() }}
+        working-directory: workers/W01-payload
+        run: |
+          echo "===== W01 OpenNext build log ====="
+          tail -n 500 auth-better-auth-open-next-build.log || true
+          echo "===== W01 local preview log ====="
+          tail -n 500 auth-better-auth-preview.log || true
+
+      - name: Upload same-SHA Better Auth runtime evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-better-auth-core-runtime-${{ steps.source.outputs.sha }}
+          path: |
+            artifacts/evidence/auth-better-auth/runtime-result.json
+            workers/W01-payload/auth-better-auth-open-next-build.log
+            workers/W01-payload/auth-better-auth-preview.log
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Cleanup local runtime
+        if: ${{ always() }}
+        working-directory: workers/W01-payload
+        run: |
+          if [ -f auth-better-auth-preview.pid ]; then kill "$(cat auth-better-auth-preview.pid)" 2>/dev/null || true; fi
+          pkill -TERM -x workerd 2>/dev/null || true
+          pkill -TERM -x esbuild 2>/dev/null || true
