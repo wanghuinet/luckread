@@ -1,5 +1,5 @@
 import { getBetterAuth, type BetterAuthEnv } from './better-auth.js'
-import priv004DevPolicy from '../../../../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'
+import priv004DevPolicy from '../../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'
 import priv004ProdPolicy from '../../../../../../artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json'
 
 const SCOPE = 'ACCOUNT_REGISTRATION'
