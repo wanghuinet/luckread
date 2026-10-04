@@ -14,13 +14,15 @@ describe('public response cache', () => {
   })
 
   beforeEach(() => {
+    vi.resetAllMocks()
     cache.match.mockImplementation(async (request: Request) =>
       request.url.includes('__content-list-generation') ? generationResponse() : undefined,
     )
+    cache.put.mockResolvedValue(undefined)
+    cache.delete.mockResolvedValue(true)
   })
 
   afterEach(() => {
-    vi.clearAllMocks()
     vi.restoreAllMocks()
     delete (globalThis as Record<string, unknown>).caches
   })
@@ -38,7 +40,7 @@ describe('public response cache', () => {
     const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
     const response = await cachedPublicGet(
       new Request('https://luckread.com/api/v1/contents'),
-      'content-list',
+      'user-profile',
       loader,
       30,
     )
@@ -49,16 +51,14 @@ describe('public response cache', () => {
   })
 
   it('coalesces concurrent misses into one origin request', async () => {
-    cache.match.mockImplementation(async (request: Request) =>
-      request.url.includes('__content-list-generation') ? generationResponse() : undefined,
-    )
+    cache.match.mockResolvedValue(undefined)
     cache.put.mockResolvedValue(undefined)
     Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
 
     let releaseLoader: ((response: Response) => void) | null = null
     const loader = vi.fn(() => new Promise<Response>((resolve) => { releaseLoader = resolve }))
 
-    const request = new Request('https://luckread.com/api/v1/contents?cursor=c1')
+    const request = new Request('https://luckread.com/api/v1/users/u-coalesce')
     const a = cachedPublicGet(request, 'content-list', loader, 30)
     await vi.waitFor(() => expect(loader).toHaveBeenCalledTimes(1))
     const b = cachedPublicGet(request.clone(), 'content-list', loader, 30)
@@ -130,7 +130,7 @@ describe('public response cache', () => {
       status: 200,
       headers: { 'content-type': 'application/json' },
     }))
-    const request = new Request('https://luckread.com/api/v1/contents?cursor=read-fallback')
+    const request = new Request('https://luckread.com/api/v1/users/u-read-fallback')
 
     await cachedPublicGet(request, 'content-list', loader, 30)
     cache.match.mockRejectedValueOnce(new Error('CACHE_READ_FAILED'))
