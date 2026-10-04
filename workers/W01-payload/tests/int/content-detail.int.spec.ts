@@ -21,7 +21,7 @@ describe('public content detail', () => {
     expect(page).toContain('likeData?.data?.liked')
     expect(page).toContain('likeData?.data?.likeCount')
     expect(page).toContain('setLikeCount(')
-    expect(page).toContain("toLocaleString('zh-CN')")
+    expect(page).toContain('toLocaleString(dateLocale')
 
   })
 
@@ -136,7 +136,7 @@ describe('public content detail', () => {
 it('links published content to the public author profile when creatorId is present', () => {
   const page = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/content/[contentId]/page.tsx'), 'utf8')
   expect(page).toContain("href={'/users/' + encodeURIComponent(content.creatorId)}")
-  expect(page).toContain('查看作者')
+  expect(page).toContain('copy.detail.author')
 })
 
 it('cancels stale public profile content pagination requests', () => {
