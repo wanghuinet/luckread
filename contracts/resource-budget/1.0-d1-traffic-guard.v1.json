@@ -20,6 +20,8 @@
     "synchronousDerivedProjectionWrites": 0,
     "synchronousEventFanoutMax": 0,
     "cacheMissSingleFlight": true,
+    "cacheMissOriginFusePerKeyPerMinute": 5,
+    "negativeCacheMaxTtlSeconds": 10,
     "privateResponsesNeverSharedCached": true,
     "highFrequencyDerivedWork": "QUEUE_OR_AGGREGATION_BEFORE_BATCH_PERSISTENCE",
     "d1Authority": "PRIMARY_ONLY_FOR_AUTHORITATIVE_WRITES"
@@ -30,7 +32,8 @@
     "anonymousOnly": true,
     "singleFlight": true,
     "cacheKeyVersionRequired": true,
-    "staleWhileRevalidate": "DEFERRED_TO_ZONE_CACHE_RULES; Workers Cache API path does not implement it"
+    "staleWhileRevalidate": "DEFERRED_TO_ZONE_CACHE_RULES; Workers Cache API path does not implement it",
+    "negativeCacheTtlSeconds": 10
   },
   "rateLimits": {
     "content": {
