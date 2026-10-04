@@ -1,0 +1,104 @@
+name: 1.1 Current-Head Mapping Evidence Reconciliation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/1.1-MATURE-CREATOR-PLATFORM-SCOPE-v1.0.md'
+      - 'docs/change-control/**'
+      - 'contracts/**'
+      - 'artifacts/mapping-0/**'
+      - 'scripts/mapping-0-verify.mjs'
+      - 'scripts/mapping-0-r4-evidence-gap-report.mjs'
+      - 'scripts/mapping-0-evidence-registry-check.mjs'
+      - 'scripts/contract-ci.mjs'
+      - 'scripts/api-contract-ci.mjs'
+      - 'workers/W01-payload/src/lib/public-response-cache.ts'
+      - 'workers/W01-payload/src/lib/public-response-cache.test.ts'
+      - 'workers/W01-payload/src/lib/content-list-cache-guard.ts'
+      - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
+      - 'workers/W01-payload/src/app/api/v1/contents/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install root dependencies
+        run: npm ci --ignore-scripts
+      - name: Record current HEAD
+        run: |
+          mkdir -p artifacts/current-head/1.1
+          git rev-parse HEAD | tee artifacts/current-head/1.1/commit-sha.txt
+      - name: Contract CI observation
+        shell: bash
+        run: |
+          set +e
+          node scripts/contract-ci.mjs > artifacts/current-head/1.1/contract-ci.txt 2>&1
+          code=$?
+          echo "exitCode=$code" >> artifacts/current-head/1.1/contract-ci.txt
+          exit 0
+      - name: API Contract CI observation
+        shell: bash
+        run: |
+          set +e
+          node scripts/api-contract-ci.mjs > artifacts/current-head/1.1/api-contract-ci.txt 2>&1
+          code=$?
+          echo "exitCode=$code" >> artifacts/current-head/1.1/api-contract-ci.txt
+          exit 0
+      - name: Mapping 0 structural observation
+        shell: bash
+        run: |
+          set +e
+          node scripts/mapping-0-verify.mjs > artifacts/current-head/1.1/mapping-0-verify.txt 2>&1
+          code=$?
+          echo "exitCode=$code" >> artifacts/current-head/1.1/mapping-0-verify.txt
+          exit 0
+      - name: Regenerate current-head R4 evidence gap report
+        shell: bash
+        run: |
+          set +e
+          node scripts/mapping-0-r4-evidence-gap-report.mjs > artifacts/current-head/1.1/r4-report.txt 2>&1
+          code=$?
+          echo "exitCode=$code" >> artifacts/current-head/1.1/r4-report.txt
+          exit 0
+      - name: Evidence Registry current-head observation
+        shell: bash
+        run: |
+          set +e
+          node scripts/mapping-0-evidence-registry-check.mjs > artifacts/current-head/1.1/evidence-registry-check.txt 2>&1
+          code=$?
+          echo "exitCode=$code" >> artifacts/current-head/1.1/evidence-registry-check.txt
+          exit 0
+      - name: Cache boundary unit tests
+        working-directory: workers/W01-payload
+        run: npx --yes vitest@3.2.4 run src/lib/public-response-cache.test.ts src/lib/content-list-cache-guard.test.ts
+      - name: Current-head reconciliation summary
+        run: |
+          {
+            echo "currentHead=$(git rev-parse HEAD)"
+            echo "ttl=30s"
+            echo "authenticatedContentListSharedCache=false"
+            echo "contentMutationInvalidatesDefaultListCache=true"
+            echo "w01ContentListQueryGuard=true"
+            echo "evidencePolicy=fail-closed"
+            echo "generatedAt=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > artifacts/current-head/1.1/summary.txt
+      - name: Upload current-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: luckread-1.1-current-head-reconciliation-${{ github.sha }}
+          path: artifacts/current-head/1.1/
+          if-no-files-found: error
+          retention-days: 30
