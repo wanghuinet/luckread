@@ -1,3 +1,12 @@
+import {
+  getBetterAuthSession,
+  handleBetterAuth,
+  listBetterAuthSessions,
+  revokeBetterAuthSession,
+  type BetterAuthEnv,
+} from './auth/better-auth.js'
+import { registerWithBetterAuth } from './auth/registration.js'
+
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import {
   AccountStateTransitionError,
@@ -7,7 +16,8 @@ import {
 } from './account/account-state-transition.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
 
-interface Env {
+interface Env extends BetterAuthEnv {
+  CLOUDFLARE_ENV?: string
   D1_01: D1Database
   AUTH013_QUEUE: Queue
   AUTH013_PROJECTION_QUEUE: Queue
@@ -39,6 +49,38 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
+
+    if (url.pathname.startsWith('/internal/better-auth')) {
+      const suffix = url.pathname.slice('/internal/better-auth'.length) || '/'
+      const target = new URL('/api/auth' + suffix, request.url)
+      target.search = url.search
+      const headers = new Headers(request.headers)
+      headers.delete('host')
+      headers.delete('content-length')
+      const body = request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.arrayBuffer()
+      return handleBetterAuth(new Request(target, { method: request.method, headers, body }), env)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/register') return registerWithBetterAuth(request, env)
+
+    if (request.method === 'GET' && url.pathname === '/internal/auth/session') {
+      try { return json(await getBetterAuthSession(request, env)) } catch { return json(null, 200) }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/internal/auth/sessions') {
+      const session = await getBetterAuthSession(request, env)
+      if (!session?.user?.id) return json({ error: { code: 'UNAUTHENTICATED' } }, 401)
+      try { return json(await listBetterAuthSessions(request, env)) } catch { return json({ error: { code: 'SERVICE_UNAVAILABLE' } }, 503) }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/sessions/revoke') {
+      const body = await readJsonBody<{ token?: unknown }>(request)
+      if (!body || typeof body.token !== 'string' || !body.token) return json({ error: { code: 'VALIDATION_FAILED' } }, 400)
+      const session = await getBetterAuthSession(request, env)
+      if (!session?.user?.id) return json({ error: { code: 'UNAUTHENTICATED' } }, 401)
+      try { await revokeBetterAuthSession(request, body.token, env); return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } }) }
+      catch { return json({ error: { code: 'SERVICE_UNAVAILABLE' } }, 503) }
+    }
 
     if (request.method === 'POST' && url.pathname === '/internal/account/transition') {
       const body = await readJsonBody<{
