@@ -3,7 +3,6 @@ import {
   listBetterAuthSessions,
   revokeBetterAuthSession,
 } from '../../../../auth/better-auth'
-import { W02AuthClientError } from '../../../../auth/w02-session-client'
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
