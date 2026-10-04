@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -76,8 +77,8 @@ export default function LoginForm() {
         {busy ? '登录中…' : '登录'}
       </button>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-        <a className="lr-link" href="/forgot-password">忘记密码？</a>
-        <a className="lr-link" href="/register">还没有账号？立即注册</a>
+        <Link className="lr-link" href="/forgot-password">忘记密码？</Link>
+        <Link className="lr-link" href="/register">还没有账号？立即注册</Link>
       </div>
     </form>
   )
