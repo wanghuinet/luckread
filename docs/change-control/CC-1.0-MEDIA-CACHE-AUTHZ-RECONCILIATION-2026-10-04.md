@@ -4,9 +4,9 @@ Status: IMPLEMENTED / CI-VALIDATION-PENDING / RUNTIME-EVIDENCE-PENDING
 
 ## Baseline
 
-- authoritative main: `8482ba75bf5194b3955e7560074f78d20d558978`
-- backup: `backup/2026-10-04-pre-media-cache-authz-reconciliation`
-- working branch: `superpowers/media-cache-authz-reconciliation`
+- authoritative main: `e5d4e62f8c30a08bbcab3f48107139ae241f5a39`
+- backup: `backup/2026-10-04-pre-media-private-metadata-hardening`
+- working branch: `superpowers/media-private-metadata-hardening`
 
 ## Finding
 
@@ -49,6 +49,7 @@ Choose the conservative authenticated media metadata path.
 - The v1 response is explicitly projected to delivery metadata and excludes internal ownership fields.
 - Public article/video rendering continues to use the content's stored R2 URL references; it does not depend on the media metadata endpoint.
 - Public asset policy and public media metadata caching remain deferred until an explicit canonical asset-visibility contract exists.
+- The authorization catalog conflict is resolved by adding `media.read.own` (L3 / own scope) for the owner-scoped metadata path; existing `media.read` remains L0 / public for a future explicitly-public asset path.
 
 ## Non-Goals
 
