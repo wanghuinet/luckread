@@ -4641,3 +4641,13 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - This closes only the W04 side-effect runtime sub-gate. AUTH-013 remains `PARTIAL / BLOCKED_NOT_GREEN`; Mapping 0 and the canonical Evidence Registry remain fail-closed.
 - Remaining AUTH-013 scope: approval-required BANNED behavior, negative transition/permission/precondition enforcement, full token/session enforcement, and actual feature-wide cache/deindex/feed/search convergence.
 - Change Control: `docs/change-control/CC-MAPPING-0-AUTH-013-W04-SIDE-EFFECT-EVIDENCE-ADMISSION-2026-10-04.md`.
+
+
+## 2026-10-04 — AUTH-013 feed/search serving gap confirmed
+
+- W04 lifecycle/deindex evidence is now closed at the derived-projection scope by Run `37202032741` and Evidence Registry record `EVD-AUTH013-W04-SIDE-EFFECT-MATRIX-REMOTE-001`.
+- Existing lifecycle matrix evidence `EVD-AUTH013-LIFECYCLE-MATRIX-REMOTE-001` already proves approval-required BAN, rejected-BAN no-mutation, restoration path, journal version progression and session-revocation retention at its tested scope.
+- Current W04 `workers/W04-feed-search/src/index.ts` exposes only `GET /health` and the `identity.account_state_changed` Queue consumer. It does not expose a canonical Feed/Recommendation/Search serving route.
+- Therefore the remaining AUTH-013 gap is not another projection-consumer run. It is the missing canonical feature-serving path that must consume the derived visibility state and enforce account-state eligibility before final Feed/Search output and any applicable shared-cache response.
+- This is recorded as `GAP_CONFIRMED / IMPLEMENTATION_NOT_AUTHORIZED` under `docs/change-control/CC-MAPPING-0-AUTH-013-FEED-SEARCH-SERVING-GAP-2026-10-04.md`.
+- No new Worker, D1, Queue, KV namespace, public evidence-only route, or alternate authority is authorized.
