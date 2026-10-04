@@ -10,6 +10,15 @@ on:
       - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
       - '.github/workflows/1.1-p0-cache-hardening-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W01-payload/src/lib/public-response-cache.ts'
+      - 'workers/W01-payload/src/lib/public-response-cache.test.ts'
+      - 'workers/W01-payload/src/lib/content-list-cache-guard.ts'
+      - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
+      - 'workers/W01-payload/src/app/api/v1/contents/**'
+      - '.github/workflows/1.1-p0-cache-hardening-ci.yml'
   workflow_dispatch:
 
 permissions:
@@ -42,6 +51,7 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
+
           route = Path('workers/W01-payload/src/app/api/v1/contents/route.ts').read_text()
           cache = Path('workers/W01-payload/src/lib/public-response-cache.ts').read_text()
           detail = Path('workers/W01-payload/src/app/api/v1/contents/[contentId]/route.ts').read_text()
@@ -55,9 +65,12 @@ jobs:
           assert 'invalidatePublicContentList' in detail
           assert 'invalidatePublicContentList' in state
           assert 'MAX_QUERY_LENGTH = 4096' in guard
-          assert 'values.length > 1' in guard
           assert 'MAX_CURSOR_LENGTH = 2048' in guard
-          assert 'content-list' in cache
+          assert '^[A-Za-z0-9_-]+$' in guard
+          assert 'payload-token' in guard
+          assert 'values.length > 1' in guard
+          assert "content-list': ['creatorId', 'cursor', 'limit', 'type']" in cache
           assert 's-maxage=' in cache
+          assert "        30," in route
           print('1.1_P0_CACHE_BOUNDARY_STATIC=PASS')
           PY
