@@ -11,6 +11,8 @@ type MediaDocument = {
   filesize?: number | null
   width?: number | null
   height?: number | null
+  filename?: string | null
+  alt?: string | null
   [key: string]: unknown
 }
 
