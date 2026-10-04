@@ -162,7 +162,6 @@ export const invalidatePublicRoute = async (request: Request, namespace: string,
   const url = new URL(request.url)
   url.pathname = pathname
   url.search = ''
-  memoryFallback.delete(publicCacheKey(new Request(url.toString()), namespace).url)
   await deletePublicCacheKey(publicCacheKey(new Request(url.toString()), namespace))
 }
 
