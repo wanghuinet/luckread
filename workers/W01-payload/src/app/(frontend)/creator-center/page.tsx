@@ -18,7 +18,7 @@ export default async function CreatorCenterPage() {
   const request = new Request('https://mp.luckread.com/creator-center', { headers: requestHeaders })
   const payload = await getPayload({ config })
 
-  const session = await getBetterAuthSession(request).catch(() => null)
+  const session = await getBetterAuthSession(request).catch((): null => null)
   if (!session?.user?.id) redirect('/login?returnTo=%2Fcreator-center')
 
   const user = await payload.findByID({
@@ -26,7 +26,7 @@ export default async function CreatorCenterPage() {
     id: String(session.user.id),
     depth: 0,
     overrideAccess: true,
-  }).catch(() => null) as Record<string, unknown> | null
+  }).catch((): null => null) as Record<string, unknown> | null
 
   if (!user) redirect('/login?returnTo=%2Fcreator-center')
 
