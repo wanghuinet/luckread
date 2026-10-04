@@ -1,4 +1,8 @@
-import { cachedPublicGet } from '../../../../lib/public-response-cache.js'
+import { cachedPublicGet, invalidatePublicContentList } from '../../../../lib/public-response-cache.js'
+import {
+  hasAuthenticatedSessionCredential,
+  validateContentListQuery,
+} from '../../../../lib/content-list-cache-guard.js'
 
 import {
   callW03Content,
@@ -15,16 +19,21 @@ const unavailable = (error: W03ContentClientError) =>
 export async function GET(request: Request): Promise<Response> {
   try {
     const url = new URL(request.url)
-    const query = new URLSearchParams()
-    const cursor = url.searchParams.get('cursor')
-    const limit = url.searchParams.get('limit')
-    const creatorId = url.searchParams.get('creatorId')
-    const contentType = url.searchParams.get('type')
-    if (cursor) query.set('cursor', cursor)
-    if (limit) query.set('limit', limit)
-    if (creatorId) query.set('creatorId', creatorId)
-    if (contentType) query.set('type', contentType)
+    const query = validateContentListQuery(url)
     const suffix = query.toString() ? `?${query.toString()}` : ''
+
+    // Never put an authenticated request into the shared public cache. This
+    // includes both the Payload auth cookie and Authorization credentials.
+    if (hasAuthenticatedSessionCredential(request)) {
+      const principal = await resolveCookieContentPrincipal(request)
+      if (principal instanceof Response) return principal
+      return await callW03Content({
+        request,
+        pathname: `/internal/content/contents${suffix}`,
+        method: 'GET',
+        principal,
+      })
+    }
 
     return await cachedPublicGet(
       request,
@@ -38,6 +47,9 @@ export async function GET(request: Request): Promise<Response> {
     )
   } catch (error) {
     if (error instanceof W03ContentClientError) return unavailable(error)
+    if (error instanceof Error && error.message === 'VALIDATION_FAILED') {
+      return unavailable(new W03ContentClientError(400, 'VALIDATION_FAILED', 'Invalid content query'))
+    }
     return unavailable(new W03ContentClientError(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable'))
   }
 }
@@ -65,13 +77,15 @@ export async function POST(request: Request): Promise<Response> {
       )
     }
 
-    return await callW03Content({
+    const response = await callW03Content({
       request,
       pathname: '/internal/content/contents',
       method: 'POST',
       body,
       principal,
     })
+    if (response.ok) await invalidatePublicContentList(request)
+    return response
   } catch (error) {
     if (error instanceof W03ContentClientError) return unavailable(error)
     return unavailable(new W03ContentClientError(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable'))
