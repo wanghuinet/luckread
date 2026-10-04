@@ -25,13 +25,16 @@
       "entityName": "Identity",
       "domainId": "D1-01",
       "entityStatus": "PROPOSED",
-      "implementationRef": "",
-      "persistenceStatus": "NOT_VERIFIED",
-      "adapter": "",
-      "migrationRefs": [],
+      "implementationRef": "workers/W02-identity/src/auth/better-auth.ts; workers/W02-identity/src/auth/registration.ts",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+      "adapter": "Better Auth W02 / Cloudflare D1 (D1-01)",
+      "migrationRefs": [
+        "workers/W02-identity/migrations/0002_better_auth_core.sql"
+      ],
       "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
       "evidenceRefs": [
-        "contracts/entity/entity-catalog.v1.json"
+        "contracts/persistence/BETTER-AUTH-W02-session-persistence-contract.v1.json",
+        "docs/change-control/CC-BETTER-AUTH-W02-AUTHORITY-2026-10-05.md"
       ]
     },
     {
@@ -39,24 +42,22 @@
       "entityName": "Credential",
       "domainId": "D1-01",
       "entityStatus": "PROPOSED",
-      "implementationRef": "workers/W02-identity/src/credentials/credential-add.ts; workers/W02-identity/src/credentials/credential-list.ts; workers/W02-identity/src/credentials/credential-lifecycle.ts",
-      "persistenceStatus": "VERIFIED",
-      "adapter": "Cloudflare D1 (D1-01) / W02 native D1 binding",
+      "implementationRef": "workers/W02-identity/src/auth/better-auth.ts; workers/W02-identity/src/auth/registration.ts",
+      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+      "adapter": "Better Auth W02 / D1-01 / auth_accounts",
       "migrationRefs": [
-        "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
-        "https://github.com/wanghuinet/luckread/actions/runs/36296831559",
-        "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
+        "workers/W02-identity/migrations/0002_better_auth_core.sql",
+        "contracts/persistence/BETTER-AUTH-W02-session-persistence-contract.v1.json"
       ],
       "fieldContractRef": "contracts/entity/entity-field-contract.v1.json",
       "evidenceRefs": [
-        "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/AUTH-003-credential-field-contract.v1.json",
+        "contracts/persistence/BETTER-AUTH-W02-session-persistence-contract.v1.json"
+      ],
+      "historicalImplementationRef": "workers/W02-identity/src/credentials/credential-add.ts; workers/W02-identity/src/credentials/credential-list.ts; workers/W02-identity/src/credentials/credential-lifecycle.ts",
+      "historicalMigrationRefs": [
         "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
-        "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
-        "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
-        "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
-        "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
-        "docs/change-control/CC-MAPPING-0-AUTH-003-ENTITY-FIELD-OWNERSHIP-RECONCILIATION-2026-09-27.md"
+        "https://github.com/wanghuinet/luckread/actions/runs/36296831559",
+        "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
       ]
     },
     {
@@ -64,19 +65,23 @@
       "entityName": "Session",
       "domainId": "D1-01",
       "entityStatus": "PROPOSED",
-      "implementationRef": "workers/W02-identity/src/session/session-runtime.ts",
+      "implementationRef": "workers/W02-identity/src/auth/better-auth.ts",
       "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
-      "adapter": "Payload native users.sessions[] + auth_session_state extension through W01/W02 E6 bridge",
+      "adapter": "Better Auth W02 / D1-01 / auth_sessions",
       "migrationRefs": [
-        "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
-        "https://github.com/wanghuinet/luckread/actions/runs/36217784262"
+        "workers/W02-identity/migrations/0002_better_auth_core.sql"
       ],
       "fieldContractRef": "contracts/entity/AUTH-002-session-field-contract.v1.json",
-      "persistenceContractRef": "contracts/persistence/AUTH-002-session-persistence-migration-runtime-contract.v1.json",
+      "persistenceContractRef": "contracts/persistence/BETTER-AUTH-W02-session-persistence-contract.v1.json",
       "evidenceRefs": [
-        "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
-        "artifacts/mapping-0/auth-002-e6-runtime-evidence-reconciliation-2026-09-26.json",
-        "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
+        "contracts/persistence/BETTER-AUTH-W02-session-persistence-contract.v1.json",
+        "docs/change-control/CC-BETTER-AUTH-W02-AUTHORITY-2026-10-05.md"
+      ],
+      "historicalImplementationRef": "workers/W02-identity/src/session/session-runtime.ts",
+      "historicalAdapter": "Payload native users.sessions[] + auth_session_state extension through W01/W02 E6 bridge",
+      "historicalMigrationRefs": [
+        "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
+        "https://github.com/wanghuinet/luckread/actions/runs/36217784262"
       ]
     },
     {
