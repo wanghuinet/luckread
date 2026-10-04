@@ -1,5 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { betterAuth } from 'better-auth'
+import { hashPassword as betterAuthHashPassword, verifyPassword as betterAuthVerifyPassword } from 'better-auth/crypto'
 import { bearer } from 'better-auth/plugins/bearer'
 
 type BetterAuthEnv = {
@@ -60,20 +61,25 @@ async function derivePbkdf2(password: string, saltHex: string, iterations: numbe
 }
 
 async function hashPassword(password: string): Promise<string> {
-  const saltBytes = crypto.getRandomValues(new Uint8Array(32))
-  const saltHex = bytesToHex(saltBytes)
-  const derivedHash = await derivePbkdf2(password, saltHex, 600_000, 32)
-  return `pbkdf2-sha256-v1:${saltHex}:${derivedHash}`
+  return betterAuthHashPassword(password)
 }
 
 async function verifyPassword(input: { hash: string; password: string }): Promise<boolean> {
   const current = /^pbkdf2-sha256-v1:([0-9a-f]{64}):([0-9a-f]{64})$/i.exec(input.hash)
   if (current) {
     try {
-      const derived = await derivePbkdf2(input.password, current[1], 600_000, 32)
       const expected = hexToBytes(current[2])
-      const actual = hexToBytes(derived)
-      return expected !== null && actual !== null && constantTimeEqual(expected, actual)
+      if (!expected) return false
+      for (const iterations of [100_000, 600_000]) {
+        try {
+          const derived = await derivePbkdf2(input.password, current[1], iterations, 32)
+          const actual = hexToBytes(derived)
+          if (actual !== null && constantTimeEqual(expected, actual)) return true
+        } catch {
+          // Try the alternate admitted Payload hash cost before failing closed.
+        }
+      }
+      return false
     } catch {
       return false
     }
@@ -91,7 +97,11 @@ async function verifyPassword(input: { hash: string; password: string }): Promis
     }
   }
 
-  return false
+  try {
+    return await betterAuthVerifyPassword(input)
+  } catch {
+    return false
+  }
 }
 
 function makeAuth(env: BetterAuthEnv): BetterAuthInstance {
