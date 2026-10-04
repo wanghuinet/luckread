@@ -33,7 +33,7 @@ describe('public creator profile', () => {
     expect(page).not.toContain('creator-profile-secondary-actions')
     expect(page).not.toContain("type ProfileFilter = 'all' | PublicContent['contentType']")
     expect(page).toContain("const [filter, setFilter] = useState<ProfileFilter>('post')")
-    expect(page).toContain("'type=post'")
+    expect(page).toContain("params.set('type', filter)")
     expect(page).toContain("post: '笔记'")
     expect(page).not.toContain("post: '动态'")
     expect(page).toContain("article: '文章'")
