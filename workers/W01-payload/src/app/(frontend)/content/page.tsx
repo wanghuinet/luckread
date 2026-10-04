@@ -128,3 +128,94 @@ export default function ContentBrowsePage() {
             className={contentType === type ? 'button button-primary' : 'button button-quiet'}
             onClick={() => setContentType(type)}
             role="tab"
+            type="button"
+          >
+            {labels[type]}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <>
+          <div className="content-browse-state">{copy.content.loading}</div>
+          <section className="content-browse-grid" aria-label={copy.content.loadingAria} aria-busy="true">
+            {Array.from({ length: 6 }, (_, index) => (
+              <div className="content-feed-card content-feed-card-skeleton" key={index} aria-hidden="true">
+                <div className="content-feed-cover content-feed-skeleton-block" />
+                <div className="content-feed-body">
+                  <span className="content-feed-skeleton-line content-feed-skeleton-line-short" />
+                  <span className="content-feed-skeleton-line content-feed-skeleton-line-title" />
+                  <span className="content-feed-skeleton-line content-feed-skeleton-line-title" />
+                  <span className="content-feed-skeleton-line content-feed-skeleton-line-meta" />
+                </div>
+              </div>
+            ))}
+          </section>
+        </>
+      ) : null}
+      {!loading && error ? (
+        <div className="content-browse-state" role="status">
+          <p>{error}</p>
+          <button className="button button-quiet" onClick={() => void load()} type="button">{copy.content.retry}</button>
+        </div>
+      ) : null}
+      {!loading && !error && page.items.length === 0 ? (
+        <div className="content-browse-state">
+          <p>{locale === 'tw'
+              ? (contentType === 'all' ? '目前還沒有公開內容。' : '目前還沒有公開' + labels[contentType] + '。')
+              : locale === 'en'
+                ? (contentType === 'all' ? 'No public content yet.' : 'No public ' + labels[contentType].toLowerCase() + ' yet.')
+                : (contentType === 'all' ? '还没有公开内容。' : '还没有公开' + labels[contentType] + '。')}</p>
+          <Link className="button button-primary" href="/publish">{copy.content.firstPublish}</Link>
+        </div>
+      ) : null}
+
+      {!loading && !error && page.items.length > 0 ? (
+        <>
+          <section className="content-browse-grid" aria-label={locale === 'en' ? 'Public content list' : locale === 'tw' ? '公開內容列表' : '公开内容列表'}>
+            {page.items.map((item) => {
+              const cover = item.coverRef
+              return (
+                <Link className="content-feed-card" href={'/content/' + encodeURIComponent(item.id)} key={item.id}>
+                  <div className="content-feed-cover">
+                    {cover ? (
+                      <img alt={item.title ? item.title + copy.content.cover : copy.content.cover} loading="lazy" src={cover} />
+                    ) : (
+                      <span>{labels[item.contentType].toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="content-feed-body">
+                    <div className="content-feed-meta">
+                      <span>{labels[item.contentType]}</span>
+                      <span>{copy.content.published}</span>
+                    </div>
+                    <h2>{item.title}</h2>
+                    {item.updatedAt ? (
+                      <time dateTime={item.updatedAt}>
+                        {new Date(item.updatedAt).toLocaleDateString('zh-CN')}
+                      </time>
+                    ) : null}
+                    <span className="content-feed-open">{copy.content.open}</span>
+                  </div>
+                </Link>
+              )
+            })}
+          </section>
+          {page.hasMore && page.nextCursor ? (
+            <div className="content-browse-more">
+              <button
+                aria-busy={loadingMore}
+                className="button button-quiet"
+                disabled={loadingMore}
+                onClick={() => void load(page.nextCursor)}
+                type="button"
+              >
+                {loadingMore ? copy.content.loading : copy.content.more}
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </main>
+  )
+}
