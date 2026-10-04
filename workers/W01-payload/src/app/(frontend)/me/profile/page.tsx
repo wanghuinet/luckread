@@ -105,7 +105,7 @@ export default function ProfilePage() {
     setError('')
     try {
       const form = new FormData()
-      form.append('alt', file.name)
+      form.append('_payload', JSON.stringify({ alt: file.name }))
       form.append('file', file)
       const response = await fetch('/api/v1/media', {
         method: 'POST',
