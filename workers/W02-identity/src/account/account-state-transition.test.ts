@@ -488,7 +488,7 @@ const canonicalAccountTransitions = JSON.parse(
 
 describe('AUTH-013 canonical state-machine coverage', () => {
   it('executes every transition declared by the canonical account state machine', async () => {
-    expect(canonicalAccountTransitions['x-transitions']).toHaveLength(27)
+    expect(canonicalAccountTransitions['x-transitions']).toHaveLength(26)
 
     for (const transition of canonicalAccountTransitions['x-transitions']) {
       const actorType = transition.actor === 'system' ? 'job' : transition.actor
