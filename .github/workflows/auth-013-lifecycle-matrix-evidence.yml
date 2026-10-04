@@ -267,7 +267,6 @@ jobs:
             }
           }
           EOF
-          EOF
       - name: Start and execute ephemeral remote Worker canonical 26-transition harness
         run: |
           set -euo pipefail
