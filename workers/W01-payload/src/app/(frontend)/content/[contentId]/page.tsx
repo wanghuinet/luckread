@@ -36,7 +36,10 @@ export default function ContentDetailPage({
   const copy = getPublicCopy(locale)
 
   useEffect(() => {
-    setLocale(readPublicLocaleCookie())
+    const timer = window.setTimeout(() => {
+      setLocale(readPublicLocaleCookie())
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [])
   const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
   const typeLabels: Record<ContentType, string> = {
@@ -188,7 +191,6 @@ export default function ContentDetailPage({
       </main>
     )
   }
-
 
   async function toggleLike() {
     if (!content || likeBusy) return
@@ -382,7 +384,6 @@ export default function ContentDetailPage({
           return
         } catch (shareError) {
           if (shareError instanceof DOMException && shareError.name === 'AbortError') return
-          // Native sharing may be unavailable or blocked; fall back to clipboard.
         }
       }
 
