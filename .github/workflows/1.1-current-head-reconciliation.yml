@@ -84,7 +84,7 @@ jobs:
           exit 0
       - name: Cache boundary unit tests
         working-directory: workers/W01-payload
-        run: ../../node_modules/.bin/vitest run src/lib/public-response-cache.test.ts src/lib/content-list-cache-guard.test.ts
+        run: ../../node_modules/.bin/vitest run --config ./workers/W01-payload/vitest.cache.config.mts
       - name: Current-head reconciliation summary
         run: |
           {
