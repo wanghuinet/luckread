@@ -111,4 +111,15 @@ The rerun removes the immediate Homepage E2E blocker for this slice. The origina
 
 Independent deployed runtime evidence for the owner-scoped/no-store Media path is still pending.
 
+A dedicated controlled workflow has been added for this evidence path:
+
+- workflow: `.github/workflows/media-runtime-e2e.yml`
+- trigger: `workflow_dispatch` only;
+- provenance: requires a successful `W01 W02 Auth Binding Deploy` run for the exact tested W01 source commit and matching deployment artifact;
+- assertions: owner can read the media metadata; response is `private, no-store`; shared-cache marker is absent; `ownerUserId` is absent; response fields are projected; non-owner and anonymous callers are denied;
+- fixture policy: synthetic accounts and a synthetic 1x1 image only, with D1 cleanup verification;
+- no production GREEN claim is made by workflow definition alone.
+
+The current production deployment still has to be performed through the existing controlled `workflow_dispatch` path before this E2E can be executed against the exact deployed source.
+
 No production GREEN claim is made.
