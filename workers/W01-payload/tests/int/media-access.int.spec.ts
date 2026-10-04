@@ -153,9 +153,9 @@ describe('Media upload access', () => {
     const route = read('src/app/api/v1/media/route.ts')
 
     expect(route).toContain("export async function GET(request: Request)")
-    expect(route).toContain("await payload.auth({ headers: request.headers, canSetHeaders: false })")
-    expect(route).toContain('readVerifiedPayloadTokenVersion(request)')
-    expect(route).toContain('validateSession({')
+    expect(route).toContain('getBetterAuthSession')
+    expect(route).not.toContain('readVerifiedPayloadTokenVersion')
+    expect(route).not.toContain('validateSession')
     expect(route).toContain("collection: 'media'")
     expect(route).toContain("ownerUserId: { equals: String(authenticated.user.id) }")
     expect(route).toContain("sort: '-createdAt'")
