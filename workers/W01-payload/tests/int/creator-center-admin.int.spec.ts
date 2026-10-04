@@ -125,7 +125,7 @@ describe('Creator Center admin extension', () => {
     expect(homeFeed).toContain('setRetryKey((value) => value + 1)')
     expect(homeFeed).toContain('Array.from({ length: 3 }')
     expect(homeFeed).toContain("const [error, setError] = useState(false)")
-    expect(homeFeed).toContain('内容暂时无法加载。')
+    expect(homeFeed).toContain('copy.content.error')
     expect(contentBrowse).toContain('content-feed-card-skeleton')
     expect(contentBrowse).toContain('Array.from({ length: 6 }')
     expect(contentBrowse).toContain('aria-busy="true"')
