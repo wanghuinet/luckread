@@ -41,14 +41,13 @@ export async function resolveContentPrincipal(request: Request): Promise<Content
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
 
-  const session = await getBetterAuthSession(request).catch(() => null)
+  const session = await getBetterAuthSession(request).catch((): null => null)
   if (!session?.user?.id) {
     return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
   }
 
-  const accountState = typeof session.user.accountState === 'string'
-    ? session.user.accountState
-    : 'ACTIVE'
+  const rawAccountState = (session.user as typeof session.user & { accountState?: unknown }).accountState
+  const accountState = typeof rawAccountState === 'string' ? rawAccountState : 'ACTIVE'
   if (accountState !== 'PENDING_VERIFICATION' && accountState !== 'ACTIVE') {
     return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
   }
@@ -75,7 +74,7 @@ export async function resolveCookieContentPrincipal(request: Request): Promise<C
 export async function resolveOptionalContentPrincipal(
   request: Request,
 ): Promise<ContentPrincipal | Response | null> {
-  const session = await getBetterAuthSession(request).catch(() => null)
+  const session = await getBetterAuthSession(request).catch((): null => null)
   if (!session?.user?.id) return null
   return resolveContentPrincipal(request)
 }
