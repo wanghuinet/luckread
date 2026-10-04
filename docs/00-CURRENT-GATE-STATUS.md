@@ -53,10 +53,10 @@ For all other authoritative business state, calls must terminate at the owning W
 |---|---|
 | W01 ingress / terminal Worker boundary | COMPLETE — official Gate run 36819360570 |
 | D1-03 Worker owner partition | COMPLETE — official Gate run 36819667831 |
-| Worker D1 access Guard | IMPLEMENTED / OFFICIAL CURRENT-SHA RUN NOT OBSERVED |
+| Worker D1 access Guard | PASS_VERIFIED — Run 37202657136 on main / fb161c579021bf2ec5b661841c449f443b47ffba |
 | AUTH-013 W04 projection/deindex evidence | PASS_VERIFIED — Run 37202032741 / Artifact 11303336889; W04 side-effect sub-gate closed |
 
-The Worker D1 access Guard remains intentionally unmarked GREEN until an Actions run against its finalized detector returns a terminal result.
+The Worker D1 access Guard is now PASS_VERIFIED on the authoritative current main head; this closes the static Worker×D1 boundary gate only.
 
 ## Current evidence cursor
 
@@ -65,7 +65,7 @@ The Mapping 0 authoritative cursor remains:
 
 The W04 side-effect matrix is now `PASS_VERIFIED` from controlled Run `37202032741` with Artifact `11303336889`. The workflow remains the historical execution mechanism and is not to be rerun unchanged.
 
-The completed lifecycle and W04 projection/deindex evidence are now PASS_VERIFIED at their tested scopes. The remaining AUTH-013 blocker is the canonical Feed/Recommendation/Search serving runtime: current W04 exposes only /health plus the account-state Queue consumer, so feature-wide serving-time account-state eligibility and applicable cache safety remain unproven. No W04 runtime/topology change is authorized until the serving implementation is admitted by Change Control.
+The completed AUTH-013 lifecycle and W04 projection/deindex evidence are PASS_VERIFIED at their tested scopes. The remaining AUTH-013 blocker is the canonical Feed/Recommendation/Search serving runtime: current W04 exposes only /health plus the account-state Queue consumer, so feature-wide serving-time account-state eligibility and applicable cache safety remain unproven. The Worker D1 access-boundary gate is separately PASS_VERIFIED and does not change this AUTH-013 serving disposition. No W04 runtime/topology change is authorized until the serving implementation is admitted by Change Control.
 
 ## Current main
 
