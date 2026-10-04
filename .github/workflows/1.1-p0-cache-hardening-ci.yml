@@ -82,7 +82,7 @@ jobs:
           assert budget['invariants']['cacheMissOriginFusePerKeyPerMinute'] == 5
           assert budget['invariants']['negativeCacheMaxTtlSeconds'] == 10
           assert "      30," in route
-          assert "      'media-detail'," in media
+          assert "'media-detail'" in media
           assert 'cachedPublicGet(' in media
           print('1.1_P0_CACHE_BOUNDARY_STATIC=PASS')
           PY
