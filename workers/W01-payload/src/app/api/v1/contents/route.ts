@@ -1,5 +1,6 @@
 import { cachedPublicGet, invalidatePublicContentList } from '../../../../lib/public-response-cache.js'
 import {
+  ContentListQueryError,
   hasAuthenticatedSessionCredential,
   validateContentListQuery,
 } from '../../../../lib/content-list-cache-guard.js'
@@ -47,8 +48,8 @@ export async function GET(request: Request): Promise<Response> {
     )
   } catch (error) {
     if (error instanceof W03ContentClientError) return unavailable(error)
-    if (error instanceof Error && error.message === 'VALIDATION_FAILED') {
-      return unavailable(new W03ContentClientError(400, 'VALIDATION_FAILED', 'Invalid content query'))
+    if (error instanceof ContentListQueryError) {
+      return unavailable(new W03ContentClientError(error.status, error.code, 'Invalid content query'))
     }
     return unavailable(new W03ContentClientError(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable'))
   }
