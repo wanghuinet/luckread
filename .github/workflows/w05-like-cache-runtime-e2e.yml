@@ -1,0 +1,437 @@
+name: W05 Like Aggregate Cache Runtime E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      tested_w01_commit:
+        description: Exact W01 source commit used by the controlled binding deployment
+        required: true
+        type: string
+        default: 3793f7c7b9c2d964a870d9d9cdc39605639efc2a
+      w01_deployment_run_id:
+        description: Successful W01 W02 Auth Binding Deploy run ID for that exact source
+        required: true
+        type: string
+        default: "37191968881"
+      tested_w05_commit:
+        description: Exact W05 source commit used by the controlled D1-02 deployment
+        required: true
+        type: string
+        default: 3793f7c7b9c2d964a870d9d9cdc39605639efc2a
+      w05_deployment_run_id:
+        description: Successful W05 D1-02 Physical Binding Deploy run ID for that exact source
+        required: true
+        type: string
+      social_api_base_url:
+        description: Controlled public W01 social API URL
+        required: true
+        default: https://api.luckread.com
+        type: string
+      database_name_w01:
+        description: Controlled W01 D1 database name
+        required: true
+        default: luckread
+        type: string
+      database_name_w05:
+        description: Controlled W05 D1-02 database name
+        required: true
+        default: luckreadpro
+        type: string
+      confirm:
+        description: Type RUN_W05_LIKE_CACHE_E2E
+        required: true
+        type: string
+        default: RUN_W05_LIKE_CACHE_E2E
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  TESTED_W01_COMMIT: ${{ inputs.tested_w01_commit }}
+  W01_DEPLOYMENT_RUN_ID: ${{ inputs.w01_deployment_run_id }}
+  TESTED_W05_COMMIT: ${{ inputs.tested_w05_commit }}
+  W05_DEPLOYMENT_RUN_ID: ${{ inputs.w05_deployment_run_id }}
+  SOCIAL_API_BASE_URL: ${{ inputs.social_api_base_url }}
+  DATABASE_NAME_W01: ${{ inputs.database_name_w01 }}
+  DATABASE_NAME_W05: ${{ inputs.database_name_w05 }}
+
+jobs:
+  w05-like-cache-runtime-e2e:
+    if: ${{ inputs.confirm == 'RUN_W05_LIKE_CACHE_E2E' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Verify deployment provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$W01_DEPLOYMENT_RUN_ID" > /tmp/w01-deploy.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$W01_DEPLOYMENT_RUN_ID/artifacts?per_page=100" > /tmp/w01-artifacts.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$W05_DEPLOYMENT_RUN_ID" > /tmp/w05-deploy.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$W05_DEPLOYMENT_RUN_ID/artifacts?per_page=100" > /tmp/w05-artifacts.json
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+
+          const w01 = JSON.parse(readFileSync('/tmp/w01-deploy.json', 'utf8'))
+          const w01Artifacts = JSON.parse(readFileSync('/tmp/w01-artifacts.json', 'utf8'))
+          const w05 = JSON.parse(readFileSync('/tmp/w05-deploy.json', 'utf8'))
+          const w05Artifacts = JSON.parse(readFileSync('/tmp/w05-artifacts.json', 'utf8'))
+
+          if (w01.name !== 'W01 W02 Auth Binding Deploy') throw new Error('wrong W01 deployment workflow')
+          if (w01.conclusion !== 'success' || w01.head_branch !== 'main') throw new Error('W01 deployment is not a successful main run')
+          if (w01.head_sha !== process.env.TESTED_W01_COMMIT) throw new Error('W01 deployment head SHA mismatch')
+          const w01Artifact = 'w01-w02-binding-deployment-' + process.env.TESTED_W01_COMMIT
+          if ((w01Artifacts.artifacts ?? []).filter(a => a.name === w01Artifact && !a.expired).length !== 1) {
+            throw new Error('exact W01 deployment artifact not found')
+          }
+
+          if (w05.name !== 'W05 D1-02 Physical Binding Deploy') throw new Error('wrong W05 deployment workflow')
+          if (w05.conclusion !== 'success' || w05.head_branch !== 'main') throw new Error('W05 deployment is not a successful main run')
+          if (w05.head_sha !== process.env.TESTED_W05_COMMIT) throw new Error('W05 deployment head SHA mismatch')
+          const w05Artifact = 'w05-d1-02-binding-' + process.env.TESTED_W05_COMMIT
+          if ((w05Artifacts.artifacts ?? []).filter(a => a.name === w05Artifact && !a.expired).length !== 1) {
+            throw new Error('exact W05 deployment artifact not found')
+          }
+
+          console.log(JSON.stringify({
+            w01DeploymentRunId: w01.id,
+            w01TestedCommit: process.env.TESTED_W01_COMMIT,
+            w05DeploymentRunId: w05.id,
+            w05TestedCommit: process.env.TESTED_W05_COMMIT,
+          }))
+          NODE
+
+      - name: Checkout exact deployed sources
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tested_w01_commit }}
+          path: deployed-source
+          fetch-depth: 1
+
+      - name: Checkout exact W05 source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tested_w05_commit }}
+          path: w05-source
+          fetch-depth: 1
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Create authenticated viewer fixture
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { randomBytes } from 'node:crypto'
+          import { appendFileSync } from 'node:fs'
+          import { execFileSync } from 'node:child_process'
+
+          const base = process.env.SOCIAL_API_BASE_URL.replace(/\/$/, '')
+          const runId = process.env.GITHUB_RUN_ID
+          const nonce = randomBytes(8).toString('hex')
+          const email = 'like-cache-e2e-' + runId + '-' + nonce + '@example.com'
+          const username = 'like_cache_e2e_' + runId + '_' + nonce.slice(0, 8)
+          const password = 'Evd-LikeCache-' + randomBytes(24).toString('base64url') + '-Z9!'
+          const roleId = 'LIKE-CACHE-E2E-ROLE-' + runId + '-' + nonce
+          const registerKey = 'LIKE-CACHE-E2E-' + runId + '-REGISTER'
+
+          async function post(path, body, headers = {}) {
+            const r = await fetch(base + path, {
+              method: 'POST',
+              headers: { accept: 'application/json', 'content-type': 'application/json', ...headers },
+              body: JSON.stringify(body),
+            })
+            const raw = await r.text()
+            let data = null
+            try { data = raw ? JSON.parse(raw) : null } catch {}
+            return { status: r.status, data }
+          }
+
+          const reg = await post('/auth/register', {
+            identityType: 'email',
+            identity: email,
+            credential: password,
+            username,
+            consent: { purpose: 'ACCOUNT_REGISTRATION', policyVersion: 'PROD-2026-09-28.1' },
+          }, { 'Idempotency-Key': registerKey })
+
+          if (reg.status !== 201 || typeof reg.data?.userId !== 'string') {
+            throw new Error('viewer registration failed: HTTP ' + reg.status + ' body=' + JSON.stringify(reg.data))
+          }
+
+          const userId = String(reg.data.userId)
+          const now = new Date().toISOString()
+          const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
+          const d1 = (databaseName, config, command) => execFileSync(
+            'npx',
+            ['--yes', 'wrangler@' + process.env.WRANGLER_VERSION, 'd1', 'execute', databaseName, '--remote', '--yes', '--config', config, '--command', command],
+            { encoding: 'utf8', env: process.env, maxBuffer: 8 * 1024 * 1024 },
+          )
+
+          d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
+            'UPDATE users SET account_state=\'ACTIVE\', account_state_version=COALESCE(account_state_version,0)+1 WHERE CAST(id AS TEXT)=' + q(userId))
+          d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
+            'INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' +
+            [roleId,userId,'creator','global',null,'ACTIVE',now,null,now,now].map((v,i)=>i === 4 ? 'NULL' : q(v)).join(',') + ')')
+
+          const login = await post('/auth/login', {
+            identity: email,
+            credential: password,
+            deviceId: 'like-cache-e2e-' + runId,
+          })
+          const token = login.data?.accessToken
+          if (login.status !== 200 || typeof token !== 'string' || login.data?.layer !== 'L3') {
+            throw new Error('viewer login failed: HTTP ' + login.status + ' body=' + JSON.stringify(login.data))
+          }
+
+          console.log('::add-mask::' + token)
+          for (const line of [
+            'LIKE_CACHE_TEST_USER_ID=' + userId,
+            'LIKE_CACHE_TEST_ROLE_ID=' + roleId,
+            'LIKE_CACHE_TEST_REGISTER_KEY=' + registerKey,
+            'LIKE_CACHE_TEST_TOKEN=' + token,
+          ]) appendFileSync(process.env.GITHUB_ENV, line + '\n')
+
+          console.log(JSON.stringify({ userId, layer: login.data.layer }))
+          NODE
+
+      - name: Seed published content fixture
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs'
+          import { execFileSync } from 'node:child_process'
+
+          const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
+          const contentId = 'likecachee2e-' + process.env.GITHUB_RUN_ID
+          const now = new Date().toISOString()
+          const sql =
+            'INSERT INTO contents ' +
+            '(id,content_type,owner_user_id,creator_id,ip_id,state,version,revision,title,body_ref,media_refs_json,cover_ref,etag,created_at,updated_at) VALUES (' +
+            [
+              contentId, 'article', process.env.LIKE_CACHE_TEST_USER_ID, process.env.LIKE_CACHE_TEST_USER_ID, null, 'PUBLISHED', 1, 1,
+              'Like Aggregate Cache Runtime E2E',
+              'r2://like-cache-e2e/' + process.env.GITHUB_RUN_ID + '/body',
+              '[]', null, 'W/"1"', now, now,
+            ].map((v,i)=>i === 4 || i === 11 ? 'NULL' : q(v)).join(',') + ')'
+          execFileSync(
+            'npx',
+            ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME_W05,'--remote','--yes','--config','w05-source/workers/W05-social/wrangler.jsonc','--command',sql],
+            { encoding:'utf8', env:process.env, maxBuffer:8*1024*1024 },
+          )
+          appendFileSync(process.env.GITHUB_ENV, 'LIKE_CACHE_TEST_CONTENT_ID=' + contentId + '\n')
+          console.log('seeded contentId=' + contentId)
+          NODE
+
+      - name: Verify viewer state and empty aggregate
+        run: |
+          set -euo pipefail
+          url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-0.json
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const value = JSON.parse(readFileSync('/tmp/like-0.json','utf8'))
+          if (value?.data?.liked !== false || Number(value?.data?.likeCount) !== 0) {
+            throw new Error('expected initial liked=false likeCount=0: ' + JSON.stringify(value))
+          }
+          writeFileSync('like-initial.json', JSON.stringify({status:'PASS',liked:false,likeCount:0},null,2)+'\n')
+          NODE
+
+      - name: Seed second actor like outside the API
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process'
+          const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
+          const now = new Date().toISOString()
+          const actor = 'like-cache-seed-actor-' + process.env.GITHUB_RUN_ID
+          const relationship = 'like-cache-seed-rel-' + process.env.GITHUB_RUN_ID
+          const sql =
+            'INSERT INTO interaction_likes (relationship_id,actor_user_id,target_type,target_id,created_at) VALUES (' +
+            [relationship,actor,'content',process.env.LIKE_CACHE_TEST_CONTENT_ID,now].map(q).join(',') + ')'
+          execFileSync(
+            'npx',
+            ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME_W05,'--remote','--yes','--config','w05-source/workers/W05-social/wrangler.jsonc','--command',sql],
+            { encoding:'utf8', env:process.env, maxBuffer:8*1024*1024 },
+          )
+          console.log(JSON.stringify({seedActor:actor,relationship}))
+          NODE
+
+      - name: Verify aggregate remains cached while fresh
+        run: |
+          set -euo pipefail
+          url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
+          sleep 1
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-stale-0.json
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const value = JSON.parse(readFileSync('/tmp/like-stale-0.json','utf8'))
+          if (value?.data?.liked !== false || Number(value?.data?.likeCount) !== 0) {
+            throw new Error('shared aggregate did not remain stale within TTL: ' + JSON.stringify(value))
+          }
+          writeFileSync('like-aggregate-fresh-stale.json', JSON.stringify({status:'PASS',viewerLiked:false,aggregateLikeCount:0,expectedAuthoritativeCount:1},null,2)+'\n')
+          NODE
+
+      - name: Verify aggregate refresh after TTL
+        run: |
+          set -euo pipefail
+          url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
+          sleep 5
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-refresh-1.json
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const value = JSON.parse(readFileSync('/tmp/like-refresh-1.json','utf8'))
+          if (value?.data?.liked !== false || Number(value?.data?.likeCount) !== 1) {
+            throw new Error('aggregate did not refresh after TTL: ' + JSON.stringify(value))
+          }
+          writeFileSync('like-aggregate-refresh.json', JSON.stringify({status:'PASS',viewerLiked:false,aggregateLikeCount:1,expectedAuthoritativeCount:1},null,2)+'\n')
+          NODE
+
+      - name: Verify viewer-state invalidation is independent
+        run: |
+          set -euo pipefail
+          url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: LIKE-CACHE-E2E-$GITHUB_RUN_ID-LIKE"             --data '{"targetType":"content","targetId":"'"$LIKE_CACHE_TEST_CONTENT_ID"'"}'             "$SOCIAL_API_BASE_URL/api/v1/interactions/likes" > /tmp/like-post.json
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-viewer-after-post.json
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const posted = JSON.parse(readFileSync('/tmp/like-post.json','utf8'))
+          const value = JSON.parse(readFileSync('/tmp/like-viewer-after-post.json','utf8'))
+          if (typeof posted?.data?.relationshipId !== 'string') {
+            throw new Error('like mutation did not return relationshipId: ' + JSON.stringify(posted))
+          }
+          if (value?.data?.liked !== true) {
+            throw new Error('private viewer state was not invalidated: ' + JSON.stringify(value))
+          }
+          writeFileSync('like-viewer-invalidation.json', JSON.stringify({status:'PASS',viewerLiked:true,aggregateLikeCount:Number(value?.data?.likeCount)},null,2)+'\n')
+          NODE
+
+      - name: Verify shared aggregate is not synchronously invalidated
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process'
+          const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
+          const now = new Date().toISOString()
+          const actor = 'like-cache-seed-actor-2-' + process.env.GITHUB_RUN_ID
+          const relationship = 'like-cache-seed-rel-2-' + process.env.GITHUB_RUN_ID
+          const sql =
+            'INSERT INTO interaction_likes (relationship_id,actor_user_id,target_type,target_id,created_at) VALUES (' +
+            [relationship,actor,'content',process.env.LIKE_CACHE_TEST_CONTENT_ID,now].map(q).join(',') + ')'
+          execFileSync(
+            'npx',
+            ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME_W05,'--remote','--yes','--config','w05-source/workers/W05-social/wrangler.jsonc','--command',sql],
+            { encoding:'utf8', env:process.env, maxBuffer:8*1024*1024 },
+          )
+          NODE
+          url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
+          sleep 1
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-shared-stale.json"
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const value = JSON.parse(readFileSync('/tmp/like-shared-stale.json','utf8'))
+          if (value?.data?.liked !== true || Number(value?.data?.likeCount) !== 1) {
+            throw new Error('shared aggregate appears synchronously invalidated or viewer state was not preserved: ' + JSON.stringify(value))
+          }
+          writeFileSync('like-shared-no-sync-invalidation.json', JSON.stringify({status:'PASS',viewerLiked:true,aggregateLikeCount:1,expectedAuthoritativeCount:2},null,2)+'\n')
+          NODE
+
+      - name: Verify shared aggregate refreshes after second TTL
+        run: |
+          set -euo pipefail
+          url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
+          sleep 5
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-shared-refresh.json
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const value = JSON.parse(readFileSync('/tmp/like-shared-refresh.json','utf8'))
+          if (value?.data?.liked !== true || Number(value?.data?.likeCount) !== 2) {
+            throw new Error('shared aggregate did not refresh to authoritative count 2: ' + JSON.stringify(value))
+          }
+          writeFileSync('like-shared-refresh-2.json', JSON.stringify({status:'PASS',viewerLiked:true,aggregateLikeCount:2,expectedAuthoritativeCount:2},null,2)+'\n')
+          NODE
+
+      - name: Verify cleanup
+        if: always()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process'
+          const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
+          const contentId = process.env.LIKE_CACHE_TEST_CONTENT_ID || '__none__'
+          const userId = process.env.LIKE_CACHE_TEST_USER_ID || '__none__'
+          const roleId = process.env.LIKE_CACHE_TEST_ROLE_ID || '__none__'
+          const registerKey = process.env.LIKE_CACHE_TEST_REGISTER_KEY || '__none__'
+
+          const run = (databaseName, config, sql) => execFileSync(
+            'npx',
+            ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',databaseName,'--remote','--yes','--config',config,'--command',sql],
+            {encoding:'utf8',env:process.env,maxBuffer:8*1024*1024},
+          )
+
+          run(process.env.DATABASE_NAME_W05,'w05-source/workers/W05-social/wrangler.jsonc',
+            'DELETE FROM interaction_likes WHERE target_id=' + q(contentId) + '; DELETE FROM contents WHERE id=' + q(contentId) + ';')
+          run(process.env.DATABASE_NAME_W01,'deployed-source/workers/W01-payload/wrangler.jsonc',
+            'DELETE FROM role_assignments WHERE id=' + q(roleId) + ' OR subject_id=' + q(userId) + ';' +
+            'DELETE FROM auth_session_state WHERE user_id=' + q(userId) + ';' +
+            'DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)=' + q(userId) + ';' +
+            'DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT)=' + q(userId) + ' OR CAST(owner_subject_id AS TEXT)=' + q(userId) + ';' +
+            'DELETE FROM auth_registration_envelopes WHERE idempotency_key=' + q(registerKey) + ';' +
+            'DELETE FROM users WHERE CAST(id AS TEXT)=' + q(userId) + ';')
+          console.log(JSON.stringify({contentId,userId,cleanup:'COMPLETE'}))
+          NODE
+
+      - name: Write runtime evidence
+        if: always()
+        run: |
+          mkdir -p artifacts/mapping-0/w05-like-cache-runtime-e2e
+          cat > artifacts/mapping-0/w05-like-cache-runtime-e2e/provenance.json <<EOF
+          {
+            "workflow": "W05 Like Aggregate Cache Runtime E2E",
+            "testedW01SourceSha": "$TESTED_W01_COMMIT",
+            "w01DeploymentRunId": "$W01_DEPLOYMENT_RUN_ID",
+            "testedW05SourceSha": "$TESTED_W05_COMMIT",
+            "w05DeploymentRunId": "$W05_DEPLOYMENT_RUN_ID",
+            "publicPath": "/api/v1/interactions/likes",
+            "cacheModel": "private viewer state + shared aggregate",
+            "aggregateTtlSecondsMax": 5,
+            "freshAggregateStalenessObserved": true,
+            "aggregateRefreshAfterTtl": true,
+            "viewerStateInvalidationImmediate": true,
+            "sharedAggregateNotSynchronouslyInvalidated": true,
+            "noNewWorker": 0,
+            "newD1": 0,
+            "syntheticFixtureOnly": true
+          }
+          EOF
+          for file in like-initial.json like-aggregate-fresh-stale.json like-aggregate-refresh.json like-viewer-invalidation.json like-shared-no-sync-invalidation.json like-shared-refresh-2.json; do
+            test -f "$file"
+            cp "$file" "artifacts/mapping-0/w05-like-cache-runtime-e2e/$file"
+          done
+
+      - name: Upload runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w05-like-cache-runtime-e2e-${{ inputs.tested_w05_commit }}-${{ github.run_id }}
+          path: artifacts/mapping-0/w05-like-cache-runtime-e2e/
+          if-no-files-found: error
+          retention-days: 30
