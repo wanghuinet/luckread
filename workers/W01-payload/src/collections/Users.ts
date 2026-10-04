@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
+import { getBetterAuthSession } from '@/auth/better-auth'
 import { payloadAdminOnly } from '@/auth/payload-admin-access'
 
 export const Users: CollectionConfig = {
@@ -8,29 +9,47 @@ export const Users: CollectionConfig = {
     useAsTitle: 'email',
   },
   auth: {
-    // Use Payload's native authentication/recovery pipeline. Keep recovery
-    // policy at the collection boundary instead of introducing a parallel
-    // W02 password-recovery subsystem.
-    forgotPassword: {},
-    removeTokenFromResponses: true,
-    // AUTH-004 remains contract/evidence gated; native capability is the implementation baseline.
-  },
-  hooks: {
-    // Payload strips loginResult.token from Local API responses when
-    // removeTokenFromResponses=true. Preserve the native token only in the
-    // request-local context so the W01 adapter can immediately call payload.auth().
-    afterLogin: [
-      ({ req, token }) => {
-        if (req.context && typeof token === 'string') {
-          ;(req.context as Record<string, unknown>).__luckreadNativeAuthToken = token
-        }
+    disableLocalStrategy: true,
+    strategies: [
+      {
+        name: 'better-auth',
+        authenticate: async ({ headers, payload }) => {
+          try {
+            const session = await getBetterAuthSession(
+              new Request('https://luckread-w01.internal/auth', { headers }),
+            )
+            if (!session?.user?.id) return null
+
+            const accountState = session.user.accountState
+            if (accountState && accountState !== 'PENDING_VERIFICATION' && accountState !== 'ACTIVE') {
+              return null
+            }
+
+            const user = await payload.findByID({
+              collection: 'users',
+              id: String(session.user.id),
+              depth: 0,
+              overrideAccess: true,
+            })
+
+            if (!user) return null
+
+            return {
+              user: {
+                collection: 'users',
+                ...user,
+              },
+            }
+          } catch {
+            return null
+          }
+        },
       },
     ],
   },
-  // AUTH-001 contract: account registration is anonymous/public. Keep the
-  // public boundary limited to creation; read/update/delete remain protected
-  // by Payload's default authenticated access control until explicit rules
-  // are defined at the canonical API boundary.
+  // Better Auth is now the account/session/password/recovery authority.
+  // Payload remains the Users/CMS document authority and never runs a second
+  // local password/session implementation.
   access: {
     create: () => true,
     admin: payloadAdminOnly,
