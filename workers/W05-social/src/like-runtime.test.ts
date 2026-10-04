@@ -17,9 +17,13 @@ const db = (firstResults: unknown[] = []) => {
 describe('like runtime', () => {
   afterEach(() => { delete (globalThis as Record<string, unknown>).caches })
 
-  it('serves a cached derived like status without touching D1', async () => {
+  it('serves cached viewer state plus shared aggregate without touching D1', async () => {
     const cache = {
-      match: vi.fn(async () => Response.json({ liked: true, likeCount: 9 })),
+      match: vi.fn(async (request: Request) => {
+        if (request.url.includes('__social-like-viewer-state')) return Response.json({ liked: true })
+        if (request.url.includes('__social-like-aggregate')) return Response.json({ likeCount: 9 })
+        return undefined
+      }),
       put: vi.fn(async () => undefined),
       delete: vi.fn(async () => true),
     }
@@ -27,6 +31,23 @@ describe('like runtime', () => {
     const d = db([])
     await expect(getLikeStatus(d, 'user-1', { targetType: 'content', targetId: 'content-hot' })).resolves.toEqual({ liked: true, likeCount: 9 })
     expect(d.prepare).not.toHaveBeenCalled()
+  })
+
+  it('reuses a shared aggregate without executing COUNT for another viewer', async () => {
+    const cache = {
+      match: vi.fn(async (request: Request) => {
+        if (request.url.includes('__social-like-viewer-state')) return Response.json({ liked: false })
+        if (request.url.includes('__social-like-aggregate')) return Response.json({ likeCount: 21 })
+        return undefined
+      }),
+      put: vi.fn(async () => undefined),
+      delete: vi.fn(async () => true),
+    }
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+    const d = db([{ liked: 1, blocked: 0 }])
+    await expect(getLikeStatus(d, 'user-2', { targetType: 'content', targetId: 'content-hot' })).resolves.toEqual({ liked: true, likeCount: 21 })
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+    expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0])).not.toContain('COUNT(*)')
   })
 
   it('reads effective like status for the actor and target', async () => {
