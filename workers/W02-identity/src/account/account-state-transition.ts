@@ -102,13 +102,6 @@ const transitionRules = accountStateMachine['x-transitions'] as TransitionRule[]
 
 const EVENT_TYPE = 'identity.account_state_changed' as const
 const EVENT_SCHEMA_VERSION = '1.0' as const
-const SESSION_INVALIDATION_STATES = new Set<AccountState>([
-  'SUSPENDED',
-  'BANNED',
-  'DELETION_PENDING',
-  'DELETED',
-])
-
 function assertInput(input: AccountStateTransitionInput): void {
   if (!input || typeof input.userId !== 'string' || input.userId.length === 0) {
     throw new AccountStateTransitionError('INVALID_INPUT', 'userId is required')
@@ -369,16 +362,10 @@ export async function applyAccountStateTransition(
       null,
     )
 
+  // Better Auth is the sole authentication/session authority. Account-state
+  // transitions remain owned by W02, while the W01 Better Auth strategy
+  // denies non-authenticatable states on every authenticated request.
   const statements = [updateStatement, journalStatement]
-  if (SESSION_INVALIDATION_STATES.has(input.to)) {
-    statements.push(
-      db
-        .prepare(
-          'UPDATE auth_session_state SET revoked_at = COALESCE(revoked_at, ?), last_seen_at = ? WHERE user_id = ? AND revoked_at IS NULL',
-        )
-        .bind(now, now, input.userId),
-    )
-  }
 
   let batchResult: D1Result[]
   try {
