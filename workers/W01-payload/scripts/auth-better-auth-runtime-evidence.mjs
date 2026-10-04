@@ -82,7 +82,11 @@ const main = async () => {
 
   const register = await request('/api/v1/auth/register', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json',
+      'Idempotency-Key': 'better-auth-runtime-register-' + suffix,
+    },
     body: JSON.stringify({
       identityType: 'email',
       identity: email,
