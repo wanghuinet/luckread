@@ -33,7 +33,8 @@ export async function POST(request: Request): Promise<Response> {
     )
   }
 
-  return proxyBetterAuth(request, '/reset-password/' + encodeURIComponent(body.recoveryToken), 'POST', {
+  return proxyBetterAuth(request, '/reset-password', 'POST', {
+    token: body.recoveryToken,
     newPassword: body.newPassword,
   })
 }
