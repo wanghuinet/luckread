@@ -1,4 +1,5 @@
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
+import { cachedPublicGet } from '@/lib/public-response-cache'
 import { DELETE as payloadMediaDelete, GET as payloadMediaGet, PATCH as payloadMediaPatch } from '../../../../(payload)/api/[...slug]/route'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaGet>[1]
@@ -62,29 +63,36 @@ export async function GET(
   const { mediaId } = await context.params
   if (!mediaId?.trim()) return new Response(null, { status: 404 })
 
-  const target = new URL('/api/media/' + encodeURIComponent(mediaId), request.url)
-  const payloadContext: PayloadRouteContext = {
-    params: Promise.resolve({ slug: ['media', mediaId] }),
-  }
+  return await cachedPublicGet(
+    request,
+    'media-detail',
+    async () => {
+      const target = new URL('/api/media/' + encodeURIComponent(mediaId), request.url)
+      const payloadContext: PayloadRouteContext = {
+        params: Promise.resolve({ slug: ['media', mediaId] }),
+      }
 
-  const response = await payloadMediaGet(new Request(target, request.clone()), payloadContext)
-  if (!response.ok) return response
+      const response = await payloadMediaGet(new Request(target, request.clone()), payloadContext)
+      if (!response.ok) return response
 
-  let body: unknown
-  try {
-    body = await response.clone().json()
-  } catch {
-    return response
-  }
+      let body: unknown
+      try {
+        body = await response.clone().json()
+      } catch {
+        return response
+      }
 
-  return new Response(JSON.stringify(withDeliveryStatus(body)), {
-    status: response.status,
-    headers: {
-      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-      ...(response.headers.get('etag') ? { etag: response.headers.get('etag')! } : {}),
+      return new Response(JSON.stringify(withDeliveryStatus(body)), {
+        status: response.status,
+        headers: {
+          'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+          'cache-control': 'public, max-age=0, s-maxage=30',
+          ...(response.headers.get('etag') ? { etag: response.headers.get('etag')! } : {}),
+        },
+      })
     },
-  })
+    30,
+  )
 }
 
 type PayloadDeleteRouteContext = Parameters<typeof payloadMediaDelete>[1]
