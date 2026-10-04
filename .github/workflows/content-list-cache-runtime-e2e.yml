@@ -66,8 +66,22 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${GITHUB_EVENT_NAME}" != "workflow_run" ]; then
-            test -n "${DEPLOYMENT_RUN_ID}"
             test -n "${TESTED_COMMIT}"
+            if [ -z "${DEPLOYMENT_RUN_ID}" ]; then
+              gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/w01-w02-binding-deploy.yml/runs?branch=main&status=success&per_page=100" > /tmp/deployment-runs.json
+              selected_run_id=""
+              while IFS= read -r run_id; do
+                artifact_names="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" --jq '.artifacts[].name')"
+                if printf '%s
+' "${artifact_names}" | grep -Fqx "w01-w02-binding-deployment-${TESTED_COMMIT}"; then
+                  selected_run_id="${run_id}"
+                  break
+                fi
+              done < <(node --input-type=module -e 'const fs=require("fs"); for (const r of (JSON.parse(fs.readFileSync("/tmp/deployment-runs.json","utf8")).workflow_runs ?? [])) console.log(r.id)')
+              test -n "${selected_run_id}"
+              echo "DEPLOYMENT_RUN_ID=${selected_run_id}" >> "${GITHUB_ENV}"
+              export DEPLOYMENT_RUN_ID="${selected_run_id}"
+            fi
             gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}" > /tmp/deploy.json
             gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOYMENT_RUN_ID}/artifacts?per_page=100" > /tmp/deploy-artifacts.json
           else
