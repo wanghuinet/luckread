@@ -16,6 +16,11 @@ import {
   type ContentD1,
 } from './content-runtime.js'
 import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
+import {
+  getContentRevision,
+  listContentRevisions,
+  rollbackContentRevision,
+} from './revision-runtime.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
@@ -188,6 +193,52 @@ export default {
       }
 
       requireTransport(request)
+
+      const revisionListMatch = /^\/internal\/content\/contents\/([^/]+)\/revisions$/.exec(url.pathname)
+      if (request.method === 'GET' && revisionListMatch) {
+        const principal = requiredCreatorPrincipal(request)
+        const cursor = url.searchParams.get('cursor')
+        const limit = parseListLimit(url.searchParams.get('limit'))
+        const page = await listContentRevisions(
+          env.D1_02,
+          principal.userId,
+          decodeURIComponent(revisionListMatch[1]),
+          cursor,
+          limit,
+        )
+        return json({ data: page, requestId: crypto.randomUUID() })
+      }
+
+      const revisionItemMatch = /^\/internal\/content\/contents\/([^/]+)\/revisions\/([^/]+)$/.exec(url.pathname)
+      if (request.method === 'GET' && revisionItemMatch) {
+        const principal = requiredCreatorPrincipal(request)
+        return json({
+          data: await getContentRevision(
+            env.D1_02,
+            principal.userId,
+            decodeURIComponent(revisionItemMatch[1]),
+            decodeURIComponent(revisionItemMatch[2]),
+          ),
+          requestId: crypto.randomUUID(),
+        })
+      }
+
+      const revisionRollbackMatch = /^\/internal\/content\/contents\/([^/]+)\/revisions\/([^/]+)\/rollback$/.exec(url.pathname)
+      if (request.method === 'POST' && revisionRollbackMatch) {
+        const principal = requiredCreatorPrincipal(request)
+        const body = await parseBody(request)
+        const result = await rollbackContentRevision(
+          env.D1_02,
+          principal.userId,
+          decodeURIComponent(revisionRollbackMatch[1]),
+          decodeURIComponent(revisionRollbackMatch[2]),
+          requireIfMatch(request),
+          requireIdempotency(request),
+          typeof body.reason === 'string' ? body.reason : undefined,
+        )
+        return json({ data: result, requestId: crypto.randomUUID() })
+      }
+
       const path = getPath(url.pathname)
 
       if (request.method === 'GET' && url.pathname === '/internal/content/creator-contents') {
