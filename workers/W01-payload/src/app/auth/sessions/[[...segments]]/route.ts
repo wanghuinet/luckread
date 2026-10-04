@@ -26,7 +26,7 @@ export async function GET(
   const { segments = [] } = await context.params
   if (segments.length !== 0) return new Response(null, { status: 404 })
 
-  const session = await getBetterAuthSession(request).catch(() => null)
+  const session = await getBetterAuthSession(request).catch((): null => null)
   if (!session?.user?.id) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
 
   try {
@@ -58,7 +58,7 @@ export async function DELETE(
     return errorResponse(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key is required')
   }
 
-  const session = await getBetterAuthSession(request).catch(() => null)
+  const session = await getBetterAuthSession(request).catch((): null => null)
   if (!session?.user?.id) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
 
   try {
@@ -74,10 +74,7 @@ export async function DELETE(
       status: 204,
       headers: { 'cache-control': 'no-store' },
     })
-  } catch (error) {
-    if (error instanceof W02AuthClientError) {
-      return errorResponse(error.status, error.status === 401 ? 'UNAUTHENTICATED' : 'SERVICE_UNAVAILABLE', 'Session service unavailable')
-    }
+  } catch {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Session service unavailable')
   }
 }
