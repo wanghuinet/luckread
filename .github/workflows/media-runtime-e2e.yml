@@ -12,8 +12,8 @@ on:
         required: true
         type: string
       deployment_run_id:
-        description: Optional successful W01 W02 Auth Binding Deploy run ID; resolved from source artifact when omitted
-        required: false
+        description: Successful W01 W02 Auth Binding Deploy run ID for the exact source
+        required: true
         type: string
       w01_base_url:
         description: Controlled public W01 API URL
