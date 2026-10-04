@@ -29,8 +29,8 @@
         "workers/W01-payload/src/app/auth/register/route.ts",
         "workers/W01-payload/src/collections/Users.ts",
         "workers/W01-payload/src/payload.config.ts",
-        "workers/W02-identity/src/credentials/credential-add.ts",
-        "workers/W02-identity/src/credentials/credential-add.test.ts"
+        "workers/W02-identity/src/auth/registration.ts",
+        "workers/W02-identity/src/auth/better-auth.ts"
       ],
       "evidence": [
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
@@ -59,7 +59,13 @@
       "workerRefs": [
         "W01",
         "W02"
-      ]
+      ],
+      "historicalCodeEvidenceRefs": [
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/src/credentials/credential-add.test.ts"
+      ],
+      "currentAuthority": "W02_BETTER_AUTH_D1_01",
+      "transport": "W01 -> W02_AUTH -> W02"
     },
     {
       "featureId": "AUTH-002",
@@ -71,11 +77,11 @@
       "entityIds": [],
       "payloadCollections": [],
       "codeEvidenceRefs": [
-        "workers/W02-identity/src/session/session-runtime.ts",
-        "workers/W02-identity/src/session/session-runtime.test.ts",
-        "workers/W02-identity/src/index.ts",
         "workers/W01-payload/src/app/auth/login/route.ts",
-        "workers/W01-payload/src/app/auth/logout/route.ts"
+        "workers/W01-payload/src/app/auth/refresh/route.ts",
+        "workers/W01-payload/src/app/auth/logout/route.ts",
+        "workers/W01-payload/src/app/auth/sessions/[[...segments]]/route.ts",
+        "workers/W02-identity/src/auth/better-auth.ts"
       ],
       "evidence": [
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
@@ -84,22 +90,36 @@
         "artifacts/mapping-0/auth-002-e6-runtime-evidence-reconciliation-2026-09-26.json"
       ],
       "blockers": [
-        "session DTO/entity/field/worker/D1/security/test/evidence mapping remains incomplete"
-      ]
+        "Current Better Auth W02 cross-worker session runtime evidence is pending.",
+        "Mapping 0 / Five-Way remains NOT_GREEN."
+      ],
+      "historicalCodeEvidenceRefs": [
+        "workers/W02-identity/src/session/session-runtime.ts",
+        "workers/W02-identity/src/session/session-runtime.test.ts"
+      ],
+      "currentAuthority": "W02_BETTER_AUTH_AUTH_SESSIONS_D1_01",
+      "transport": "W01 -> W02_AUTH -> W02"
     },
     {
       "featureId": "AUTH-003",
-      "status": "PARTIAL",
+      "status": "SUPERSEDED",
       "apiOperationIds": [],
       "entityIds": [],
       "payloadCollections": [],
-      "codeEvidenceRefs": [],
+      "codeEvidenceRefs": [
+        "workers/W02-identity/src/auth/better-auth.ts",
+        "workers/W02-identity/src/auth/registration.ts"
+      ],
       "evidence": [
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json"
       ],
       "blockers": [
-        "canonical credential API/entity/field/security mapping remains incomplete"
-      ]
+        "The historical custom AUTH-003 credential-management slice is superseded by Better Auth W02 core.",
+        "A future credential-management API, if required, must be separately contracted against Better Auth auth_accounts.",
+        "Mapping 0 / Five-Way remains NOT_GREEN."
+      ],
+      "historicalCodeEvidenceRefs": [],
+      "currentAuthority": "W02_BETTER_AUTH_D1_01"
     },
     {
       "featureId": "AUTH-004",
