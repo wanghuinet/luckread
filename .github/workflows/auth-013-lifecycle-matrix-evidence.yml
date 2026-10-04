@@ -38,7 +38,7 @@ jobs:
       - name: Verify exact evidence admission inputs
         run: |
           set -euo pipefail
-          test "${{ inputs.source_sha }}" = "56908b2f49845428db7c36520d0d989e70256e33"
+          test "${{ inputs.source_sha }}" = "26c4bdf4370e39c278ec2703d45e4ccaecdc93ae"
           test "${{ inputs.database_name }}" = "luckread"
           test -f workers/W02-identity/src/account/account-state-transition.ts
           test -f contracts/state-machines/account.json
