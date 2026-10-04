@@ -17,6 +17,16 @@ const readMemoryFallback = (keyString: string): Response | null => {
   return entry.response.clone()
 }
 
+const deletePublicCacheKey = async (key: Request): Promise<void> => {
+  memoryFallback.delete(key.url)
+  try {
+    await ((globalThis.caches as unknown as { default: Cache }).default).delete(key)
+  } catch {
+    // Cache invalidation is best-effort. An authoritative mutation must not be
+    // reported as failed solely because edge-cache storage is unavailable.
+  }
+}
+
 const rememberMemoryFallback = (keyString: string, response: Response, ttlSeconds: number): void => {
   if (memoryFallback.size >= MAX_MEMORY_ENTRIES && !memoryFallback.has(keyString)) {
     const oldestKey = memoryFallback.keys().next().value
@@ -152,12 +162,31 @@ export const invalidatePublicRoute = async (request: Request, namespace: string,
   const url = new URL(request.url)
   url.pathname = pathname
   url.search = ''
-  memoryFallback.delete(publicCacheKey(new Request(url.toString()), namespace).url)
-  await ((globalThis.caches as unknown as { default: Cache }).default).delete(publicCacheKey(new Request(url.toString()), namespace))
+  await deletePublicCacheKey(publicCacheKey(new Request(url.toString()), namespace))
 }
 
 export const invalidatePublicContentDetail = async (request: Request, contentId: string): Promise<void> =>
   invalidatePublicRoute(request, 'content-detail', `/api/v1/contents/${encodeURIComponent(contentId)}`)
+
+export const invalidatePublicContentList = async (request: Request): Promise<void> => {
+  const url = new URL(request.url)
+  url.pathname = '/api/v1/contents'
+  url.search = ''
+
+  // Always invalidate the canonical/default language key plus the request
+  // language key. Content-list is not yet fully wildcard-invalidatable, so this
+  // guarantees the default /contents landing cache is never left stale.
+  await deletePublicCacheKey(publicCacheKey(new Request(url.toString()), 'content-list'))
+
+  const requestLanguage = request.headers.get('accept-language')?.trim()
+  if (requestLanguage) {
+    const localized = new Request(url.toString(), {
+      method: 'GET',
+      headers: { 'accept-language': requestLanguage },
+    })
+    await deletePublicCacheKey(publicCacheKey(localized, 'content-list'))
+  }
+}
 
 export const invalidatePublicUserProfile = async (request: Request, userId: string): Promise<void> =>
   invalidatePublicRoute(request, 'user-profile', `/api/v1/users/${encodeURIComponent(userId)}`)

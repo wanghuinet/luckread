@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import { cachedPublicGet, publicCacheKey } from './public-response-cache.js'
+import { cachedPublicGet, invalidatePublicContentList, publicCacheKey } from './public-response-cache.js'
 
 describe('public response cache', () => {
   const cache = {
@@ -166,3 +166,20 @@ describe('public response cache', () => {
     expect(a.url).toBe(b.url)
   })
 })
+
+
+  it('invalidates the canonical content-list landing key', async () => {
+    cache.delete.mockResolvedValue(true)
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    await invalidatePublicContentList(
+      new Request('https://luckread.com/api/v1/contents?limit=20', {
+        headers: { 'accept-language': 'en-US' },
+      }),
+    )
+
+    const urls = cache.delete.mock.calls.map(([request]) => request.url)
+    expect(urls).toContain(
+      publicCacheKey(new Request('https://luckread.com/api/v1/contents'), 'content-list').url,
+    )
+  })

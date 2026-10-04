@@ -1,0 +1,63 @@
+name: 1.1 P0 Cache Hardening CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'workers/W01-payload/src/lib/public-response-cache.ts'
+      - 'workers/W01-payload/src/lib/public-response-cache.test.ts'
+      - 'workers/W01-payload/src/lib/content-list-cache-guard.ts'
+      - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
+      - 'workers/W01-payload/src/app/api/v1/contents/**'
+      - '.github/workflows/1.1-p0-cache-hardening-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cache-hardening:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.0
+          run_install: false
+      - name: Install W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Cache hardening unit tests
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run src/lib/public-response-cache.test.ts src/lib/content-list-cache-guard.test.ts
+      - name: W01 typecheck
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit
+      - name: Static boundary assertions
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          route = Path('workers/W01-payload/src/app/api/v1/contents/route.ts').read_text()
+          cache = Path('workers/W01-payload/src/lib/public-response-cache.ts').read_text()
+          detail = Path('workers/W01-payload/src/app/api/v1/contents/[contentId]/route.ts').read_text()
+          state = Path('workers/W01-payload/src/app/api/v1/contents/[contentId]/state/route.ts').read_text()
+          guard = Path('workers/W01-payload/src/lib/content-list-cache-guard.ts').read_text()
+
+          assert route.index('validateContentListQuery') < route.index('cachedPublicGet')
+          assert route.index('hasAuthenticatedSessionCredential') < route.index('cachedPublicGet')
+          assert 'resolveCookieContentPrincipal' in route
+          assert 'invalidatePublicContentList' in route
+          assert 'invalidatePublicContentList' in detail
+          assert 'invalidatePublicContentList' in state
+          assert 'MAX_QUERY_LENGTH = 4096' in guard
+          assert 'values.length > 1' in guard
+          assert 'MAX_CURSOR_LENGTH = 2048' in guard
+          assert 'content-list' in cache
+          assert 's-maxage=' in cache
+          print('1.1_P0_CACHE_BOUNDARY_STATIC=PASS')
+          PY
