@@ -1329,7 +1329,9 @@
       "producer": "GitHub Actions Content List Cache Runtime E2E",
       "result": "PASS",
       "status": "VERIFIED",
-      "note": "Production runtime evidence against deployment run 37195981263. Synthetic fixture verified anonymous filtered-list MISS then HIT, authenticated shared-cache bypass, publish→unpublish mutation invalidation, filtered-list MISS after mutation, and fixture disappearance. No new Worker or D1 was introduced. This record supports cache-specific acceptance only and does not promote CONTENT-007, Mapping 0, or the canonical Evidence Registry."
+      "note": "Production runtime evidence against deployment run 37195981263. Synthetic fixture verified anonymous filtered-list MISS then HIT, authenticated shared-cache bypass, publish→unpublish mutation invalidation, filtered-list MISS after mutation, and fixture disappearance. No new Worker or D1 was introduced. This record supports cache-specific acceptance only and does not promote CONTENT-007, Mapping 0, or the canonical Evidence Registry.",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-CACHE-RUNTIME-EVIDENCE-ADMISSION-2026-10-04.md"
     },
     {
       "evidenceId": "EVD-MEDIA001-OWNER-SCOPE-RUNTIME-001",
@@ -1344,7 +1346,9 @@
       "producer": "GitHub Actions Media Owner Scope Runtime E2E",
       "result": "PASS",
       "status": "VERIFIED",
-      "note": "Production runtime evidence against deployment run 37195981263. Synthetic fixture verified owner-read, private no-store, no shared-cache header, ownerUserId exclusion, projected fields only, non-owner 404, and anonymous 403. This record supports the owner-scoped media metadata boundary only and does not promote MEDIA-001, Mapping 0, or the canonical Evidence Registry."
+      "note": "Production runtime evidence against deployment run 37195981263. Synthetic fixture verified owner-read, private no-store, no shared-cache header, ownerUserId exclusion, projected fields only, non-owner 404, and anonymous 403. This record supports the owner-scoped media metadata boundary only and does not promote MEDIA-001, Mapping 0, or the canonical Evidence Registry.",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-CACHE-RUNTIME-EVIDENCE-ADMISSION-2026-10-04.md"
     },
     {
       "evidenceId": "EVD-AUTH013-PERSISTENCE-SCHEMA-REMOTE-002",
@@ -1359,7 +1363,9 @@
       "producer": "AUTH-013 Persistence Schema Evidence workflow",
       "result": "PASS",
       "status": "VERIFIED",
-      "note": "Fresh current-head read-only remote evidence. D1-01/luckread reports users schema containing account_state TEXT NOT NULL DEFAULT 'PENDING_VERIFICATION' and account_state_version INTEGER NOT NULL DEFAULT 1; migration history contains 20261002_120000_media_owner as batch 6; users count is 56; all evidence queries report changes=0 and rows_written=0. This record proves the AUTH-013 persistence-schema claim only and does not promote AUTH-013, Mapping 0, or the Evidence Registry to GREEN."
+      "note": "Fresh current-head read-only remote evidence. D1-01/luckread reports users schema containing account_state TEXT NOT NULL DEFAULT 'PENDING_VERIFICATION' and account_state_version INTEGER NOT NULL DEFAULT 1; migration history contains 20261002_120000_media_owner as batch 6; users count is 56; all evidence queries report changes=0 and rows_written=0. This record proves the AUTH-013 persistence-schema claim only and does not promote AUTH-013, Mapping 0, or the Evidence Registry to GREEN.",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-013-PERSISTENCE-EXECUTION-RECONCILIATION-2026-09-29.md"
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
