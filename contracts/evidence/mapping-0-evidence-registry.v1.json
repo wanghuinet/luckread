@@ -1296,6 +1296,25 @@
       "type": "INTEGRATION_TEST",
       "claimId": "AUTH-002::EXTENSION-CORRELATION",
       "note": "Attempt 3 confirmed native session identity matched the extension lookup identity, unsupported dimensions were observed, and mismatch handling remained fail-closed."
+    },
+    {
+      "evidenceId": "EVD-SOCIAL003-LIKE-CACHE-RUNTIME-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "SOCIAL-003::LIKE-AGGREGATE-CACHE",
+      "subjectType": "FEATURE",
+      "subjectId": "SOCIAL-003",
+      "source": "GitHub Actions W05 Like Aggregate Cache Runtime E2E against exact deployed W05 source",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/37194522154/artifacts/11300670380",
+      "commitSha": "016c0aa7bbc84c341fb456bda45653b824b3c402",
+      "timestamp": "2026-10-04T10:11:51Z",
+      "producer": "W05 Like Aggregate Cache Runtime E2E / run 37194522154 / job 111413499684",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "111413499684",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/37194522154",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-SOCIAL-003-LIKE-CACHE-RUNTIME-EVIDENCE-ADMISSION-2026-10-04.md",
+      "note": "Controlled runtime evidence passed initial aggregate state, shared aggregate staleness within the 5-second TTL, refresh after TTL, immediate viewer-state invalidation, explicit shared-cache priming, non-synchronous shared aggregate invalidation after an authoritative D1 like, refresh to authoritative count 3 after the second TTL, exact W05 deployment provenance, and synthetic fixture cleanup. Comparison from the tested source to current main found only E2E workflow changes and no W05 production like/cache implementation changes, so the evidence is inherited unchanged-scope evidence."
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
