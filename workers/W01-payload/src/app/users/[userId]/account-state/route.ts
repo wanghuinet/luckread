@@ -58,7 +58,7 @@ export async function POST(
     return errorResponse(400, 'VALIDATION_FAILED', 'Invalid account-state transition request')
   }
 
-  const session = await getBetterAuthSession(request).catch(() => null)
+  const session = await getBetterAuthSession(request).catch((): null => null)
   if (!session?.user?.id) {
     return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
   }
