@@ -19,7 +19,7 @@ describe('public creator profile', () => {
     expect(page).toContain('aria-label="私信"')
     expect(page).toContain('aria-label="更多操作"')
     expect(page).toContain("void shareProfile()")
-    expect(page).toContain(">\n                        分享\n                      </button>")
+    expect(page).toContain('role="menuitem"')
     expect(page).not.toContain('aria-label="分享主页"')
     expect(page).toContain('creator-profile-circle-actions')
     expect(page).toContain("profile?.bio?.trim() ? profile.bio : '尚无个人简介'")
