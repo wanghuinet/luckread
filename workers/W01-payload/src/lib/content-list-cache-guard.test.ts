@@ -28,6 +28,14 @@ describe('content list cache guard', () => {
     expect(() => validateContentListQuery(
       new URL('https://luckread.com/api/v1/contents?cursor=' + 'x'.repeat(2049)),
     )).toThrow(ContentListQueryError)
+
+    expect(() => validateContentListQuery(
+      new URL('https://luckread.com/api/v1/contents?cursor=../not-a-cursor'),
+    )).toThrow(ContentListQueryError)
+
+    expect(validateContentListQuery(
+      new URL('https://luckread.com/api/v1/contents?cursor=YWJjXzEyMy0'),
+    ).toString()).toBe('cursor=YWJjXzEyMy0')
   })
 
   it('normalizes valid query values at the W01 boundary', () => {
