@@ -1,4 +1,4 @@
-import { proxyBetterAuth } from '../../../../auth/better-auth-route'
+import { proxyBetterAuth } from '../../../../../auth/better-auth-route'
 
 type PasswordResetRequest = {
   identifier?: unknown
