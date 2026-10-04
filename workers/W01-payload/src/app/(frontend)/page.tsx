@@ -45,7 +45,7 @@ export default async function HomePage() {
       // request-rate budget is exhausted.
     }
 
-    const session = await getBetterAuthSession(request).catch(() => null)
+    const session = await getBetterAuthSession(request).catch((): null => null)
     if (session?.user?.id) {
       const displayName =
         typeof session.user.displayName === 'string' && session.user.displayName.trim()
