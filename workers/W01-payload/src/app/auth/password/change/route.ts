@@ -1,4 +1,4 @@
-import { proxyBetterAuth } from '../../../auth/better-auth-route'
+import { proxyBetterAuth } from '../../../../auth/better-auth-route'
 import { TrafficLimitError, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 
 type PasswordChangeRequest = {
