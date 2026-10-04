@@ -1,4 +1,8 @@
+import { getCloudflareContext } from '@opennextjs/cloudflare'
+
 const CACHE_VERSION = 'lr-public-v1-20261003'
+const CACHE_MISS_LIMITER_NAME = 'PUBLIC_CACHE_MISS_LIMITER'
+const NEGATIVE_CACHE_TTL_SECONDS = 10
 const inflight = new Map<string, Promise<Response>>()
 const MAX_INFLIGHT = 128
 const MAX_ORIGIN_CONCURRENCY = 16
@@ -64,6 +68,8 @@ const CACHE_QUERY_KEYS: Record<string, readonly string[]> = {
   following: ['cursor', 'limit'],
   'share-detail': [],
   'user-profile': [],
+  'user-profile-by-username': [],
+  'media-detail': [],
 }
 
 const normalizedQuery = (url: URL, namespace: string): string => {
@@ -89,10 +95,43 @@ export const publicCacheKey = (request: Request, namespace: string): Request => 
 }
 
 const cacheable = (response: Response): boolean => {
-  if (response.status !== 200) return false
+  if (response.status !== 200 && response.status !== 404) return false
   if (response.headers.has('set-cookie')) return false
   const contentType = response.headers.get('content-type') ?? ''
   return contentType.includes('application/json')
+}
+
+const missFuseResponse = (): Response =>
+  new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Public cache origin is at capacity' } }), {
+    status: 503,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'retry-after': '1',
+      'x-luckread-cache': 'OVERLOADED',
+    },
+  })
+
+const sha256Key = async (value: string): Promise<string> => {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+const enforceCacheMissOriginFuse = async (keyString: string): Promise<boolean> => {
+  let context
+  try {
+    context = await getCloudflareContext({ async: true })
+  } catch {
+    // Unit-test/local environments do not have a Cloudflare execution context.
+    return true
+  }
+
+  const env = context.env as unknown as Record<string, unknown>
+  const limiter = env[CACHE_MISS_LIMITER_NAME] as { limit(input: { key: string }): Promise<{ success: boolean }> } | undefined
+  if (!limiter) throw new Error('RATE_LIMIT_BINDING_UNAVAILABLE:' + CACHE_MISS_LIMITER_NAME)
+  const keyHash = await sha256Key(keyString)
+  const result = await limiter.limit({ key: 'public-cache-miss:v1:' + keyHash })
+  return result.success
 }
 
 const withCacheHeader = (response: Response, value: 'HIT' | 'MISS'): Response => {
@@ -131,13 +170,18 @@ export const cachedPublicGet = async (
 
   if (!pending) {
     pending = (async () => {
+      const fuseAllowed = await enforceCacheMissOriginFuse(keyString)
+      if (!fuseAllowed) return missFuseResponse()
       const response = await withOriginSlot(loader)
       if (cacheable(response)) {
+        const effectiveTtl = response.status === 404
+          ? Math.min(NEGATIVE_CACHE_TTL_SECONDS, Math.max(1, Math.floor(ttlSeconds)))
+          : Math.max(1, Math.floor(ttlSeconds))
         const cacheResponse = new Response(response.body ? response.clone().body : null, {
           status: response.status,
           headers: new Headers(response.headers),
         })
-        cacheResponse.headers.set('Cache-Control', `public, max-age=0, s-maxage=${Math.max(1, Math.floor(ttlSeconds))}`)
+        cacheResponse.headers.set('Cache-Control', `public, max-age=0, s-maxage=${effectiveTtl}`)
         try {
           await cache.put(key, cacheResponse)
           memoryFallback.delete(keyString)
@@ -155,6 +199,9 @@ export const cachedPublicGet = async (
   }
 
   const response = await pending
+  if (response.status === 503 && response.headers.get('x-luckread-cache') === 'OVERLOADED') {
+    return response
+  }
   return withCacheHeader(response.clone(), 'MISS')
 }
 
