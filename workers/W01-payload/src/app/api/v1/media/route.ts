@@ -3,11 +3,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route'
 
-import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
-import { validateSession } from '@/auth/w02-session-client'
+import { getBetterAuthSession } from '@/auth/better-auth'
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
-
-type PayloadRouteContext = Parameters<typeof payloadMediaPost>[1]
 
 const unauthorized = () => new Response(JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }), {
   status: 401,
@@ -16,24 +13,17 @@ const unauthorized = () => new Response(JSON.stringify({ error: { code: 'UNAUTHE
 
 async function authenticate(request: Request) {
   const payload = await getPayload({ config })
-  let authResult: Awaited<ReturnType<typeof payload.auth>>
-  try {
-    authResult = await payload.auth({ headers: request.headers, canSetHeaders: false })
-  } catch {
-    return null
-  }
+  const session = await getBetterAuthSession(request).catch(() => null)
+  if (!session?.user?.id) return null
 
-  const user = authResult.user as unknown as ({ id?: string | number; _sid?: string } & Record<string, unknown>) | null
-  if (!user?.id || typeof user._sid !== 'string' || user._sid.length === 0) return null
+  const user = await payload.findByID({
+    collection: 'users',
+    id: String(session.user.id),
+    depth: 0,
+    overrideAccess: true,
+  }).catch(() => null)
 
-  const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (tokenVersion === null) return null
-  const active = await validateSession({
-    sessionId: user._sid,
-    userId: String(user.id),
-    tokenVersion,
-  }).catch(() => false)
-  return active ? { payload, user } : null
+  return user ? { payload, user } : null
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -69,10 +59,7 @@ export async function GET(request: Request): Promise<Response> {
 
     return new Response(JSON.stringify(result), {
       status: 200,
-      headers: {
-        'content-type': 'application/json; charset=utf-8',
-        'cache-control': 'no-store',
-      },
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
     })
   } catch {
     return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
@@ -82,13 +69,6 @@ export async function GET(request: Request): Promise<Response> {
   }
 }
 
-/**
- * Stable v1 upload entry for clients.
- *
- * The canonical media implementation remains Payload Media + R2. This route
- * only normalizes the public URL to Payload's existing /api/media upload
- * handler; it does not introduce a second media authority or storage path.
- */
 export async function POST(request: Request): Promise<Response> {
   const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   if (!idempotencyKey || idempotencyKey.length > 256) {
@@ -109,7 +89,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const target = new URL('/api/media', request.url)
-  const context: PayloadRouteContext = {
+  const context: Parameters<typeof payloadMediaPost>[1] = {
     params: Promise.resolve({ slug: ['media'] }),
   }
   return payloadMediaPost(new Request(target, request.clone()), context)
