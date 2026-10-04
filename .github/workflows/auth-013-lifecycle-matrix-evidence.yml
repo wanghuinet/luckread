@@ -36,10 +36,14 @@ jobs:
         with:
           node-version: 24
       - name: Verify exact evidence admission inputs
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
-          test "${{ inputs.source_sha }}" = "26c4bdf4370e39c278ec2703d45e4ccaecdc93ae"
-          test "${{ inputs.database_name }}" = "luckread"
+          MAIN_SHA="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
+          test -n "$MAIN_SHA"
+          test "$SOURCE_SHA" = "$MAIN_SHA"
+          test "$DATABASE_NAME" = "luckread"
           test -f workers/W02-identity/src/account/account-state-transition.ts
           test -f contracts/state-machines/account.json
           test -f contracts/events/identity-account-state-changed.v1.json
