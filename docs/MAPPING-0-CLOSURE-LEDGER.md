@@ -4627,3 +4627,17 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Main commit `3dfc139366f56105d3f3496ac5b227c089300509` only adds `default: RUN` to the existing workflow_dispatch choice input so the authorized evidence action is prefilled in the GitHub UI. No runtime, schema, Worker/D1 topology, queue, or policy semantics changed.
 - Backup: `backup/pre-auth013-w04-side-effect-run-default-20261001`.
 - The runtime evidence itself is not claimed until a successful Actions run is observed and its artifact is inspected.
+
+
+## 2026-10-04 — AUTH-013 W04 side-effect matrix run 37202032741 PASS
+
+- Run `37202032741` completed SUCCESS for `AUTH-013 W04 Side-Effect Matrix Evidence` on `main` at `b6fdb8dc3a524de15126e6beee71c06a5c157554`.
+- `Inspect live W04 consumer` passed against the existing Queue. The live Queue detail reported exactly one worker consumer with the expected DLQ; Cloudflare's live response uses the `script` field, which is now handled by the evidence workflow without changing W04 runtime code.
+- The controlled lifecycle matrix passed: ACTIVE→FROZEN, FROZEN→SUSPENDED, SUSPENDED→BANNED, DELETION_REQUESTED→DELETION_PENDING, DELETION_PENDING→DELETED, BANNED→RESTORED, DELETED→REACTIVATED, ACTIVE→RESTRICTED, and RESTRICTED→ACTIVE.
+- Duplicate same-version delivery passed; older-version non-regression passed; non-resurrection passed; bounded stale metadata passed; projection contained no authorization-decision material; synthetic KV cleanup passed.
+- Artifact: `11303336889`; artifact digest: `sha256:44467019305f34f8e1a06d4a6391fefce05ec87088f97495b8d1c11e76d214ca`.
+- Evidence Registry admission: `EVD-AUTH013-W04-SIDE-EFFECT-MATRIX-REMOTE-001` = `PASS / VERIFIED`, with `EXECUTED_AT_TESTED_COMMIT` at W04 source `53e3bcbb855be8e1240171390c69dd034bf04f8b`.
+- Current-main comparison confirmed `workers/W04-feed-search/src/index.ts`, `src/auth-013-projection.ts`, and `wrangler.jsonc` are byte-identical to the tested W04 source. The post-tested-source changes are governance/evidence changes only.
+- This closes only the W04 side-effect runtime sub-gate. AUTH-013 remains `PARTIAL / BLOCKED_NOT_GREEN`; Mapping 0 and the canonical Evidence Registry remain fail-closed.
+- Remaining AUTH-013 scope: approval-required BANNED behavior, negative transition/permission/precondition enforcement, full token/session enforcement, and actual feature-wide cache/deindex/feed/search convergence.
+- Change Control: `docs/change-control/CC-MAPPING-0-AUTH-013-W04-SIDE-EFFECT-EVIDENCE-ADMISSION-2026-10-04.md`.
