@@ -1,4 +1,3 @@
-import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 
 import { getBetterAuth } from '../../../auth/better-auth'
@@ -10,6 +9,17 @@ const SCOPE = 'ACCOUNT_REGISTRATION'
 const ENDPOINT = 'authRegister'
 const ACCOUNT_STATE = 'PENDING_VERIFICATION'
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
+
+type D1PreparedStatementLike = {
+  bind: (...args: unknown[]) => D1PreparedStatementLike
+  first: <T>() => Promise<T | null>
+  run: () => Promise<{ meta?: { changes?: number } }>
+}
+
+type D1DatabaseLike = {
+  prepare: (sql: string) => D1PreparedStatementLike
+  batch: (statements: D1PreparedStatementLike[]) => Promise<Array<{ meta?: { changes?: number } }>>
+}
 
 type RegistrationResponse = {
   userId: string
@@ -80,7 +90,7 @@ const isExpired = (expiresAt: string, now: Date) => {
 }
 
 const getExistingEnvelope = async (
-  db: D1Database,
+  db: D1DatabaseLike,
   idempotencyKey: string,
 ): Promise<ExistingEnvelope | null> =>
   db
@@ -244,7 +254,7 @@ const completeEnvelope = async (
   )
 
   const existingConsent = await hasConsent(db, userId, policy.policyVersion)
-  const statements: D1PreparedStatement[] = []
+  const statements: D1PreparedStatementLike[] = []
 
   if (!existingConsent) {
     statements.push(
