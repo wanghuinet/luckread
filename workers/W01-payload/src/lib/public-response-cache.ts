@@ -24,6 +24,7 @@ const readMemoryFallback = (keyString: string): Response | null => {
 
 const deletePublicCacheKey = async (key: Request): Promise<void> => {
   memoryFallback.delete(key.url)
+  cacheMissHistory.delete(key.url)
   try {
     await ((globalThis.caches as unknown as { default: Cache }).default).delete(key)
   } catch {
@@ -184,7 +185,7 @@ export const cachedPublicGet = async (
           // Cache failure must not turn a successful authoritative read into a 503.
           // Keep a bounded, TTL-limited per-isolate response so repeated reads do not
           // immediately re-enter the authoritative path while edge storage recovers.
-          rememberMemoryFallback(keyString, response, ttlSeconds)
+          rememberMemoryFallback(keyString, response, effectiveTtl)
         }
       }
       return response
