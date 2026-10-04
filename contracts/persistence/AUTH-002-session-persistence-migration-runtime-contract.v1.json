@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "status": "CONTRACTED_NOT_VERIFIED",
+  "status": "SUPERSEDED",
   "featureId": "AUTH-002",
   "entityId": "ENT-SESSION",
   "fieldContractRef": "contracts/entity/AUTH-002-session-field-contract.v1.json",
@@ -16,19 +16,75 @@
     "tableAuthority": "CONTRACT_ONLY_UNTIL_MIGRATION_EVIDENCE",
     "primaryKey": "id",
     "foreignKeys": [
-      { "column": "user_id", "logicalTarget": "ENT-USER.id", "physicalTargetAuthority": "REQUIRES_SCHEMA_EVIDENCE", "onDelete": "RESTRICT" },
-      { "column": "device_id", "logicalTarget": "ENT-DEVICE-RECORD.id", "physicalTargetAuthority": "REQUIRES_DEVICE_ENTITY_PERSISTENCE_EVIDENCE", "onDelete": "RESTRICT" }
+      {
+        "column": "user_id",
+        "logicalTarget": "ENT-USER.id",
+        "physicalTargetAuthority": "REQUIRES_SCHEMA_EVIDENCE",
+        "onDelete": "RESTRICT"
+      },
+      {
+        "column": "device_id",
+        "logicalTarget": "ENT-DEVICE-RECORD.id",
+        "physicalTargetAuthority": "REQUIRES_DEVICE_ENTITY_PERSISTENCE_EVIDENCE",
+        "onDelete": "RESTRICT"
+      }
     ],
     "columns": [
-      { "fieldId": "ENT-SESSION-F-ID", "column": "id", "dbType": "TEXT", "nullable": false, "primaryKey": true },
-      { "fieldId": "ENT-SESSION-F-USER-ID", "column": "user_id", "dbType": "TEXT", "nullable": false },
-      { "fieldId": "ENT-SESSION-F-DEVICE-ID", "column": "device_id", "dbType": "TEXT", "nullable": false },
-      { "fieldId": "ENT-SESSION-F-TOKEN-VERSION", "column": "token_version", "dbType": "INTEGER", "nullable": false },
-      { "fieldId": "ENT-SESSION-F-REFRESH-CREDENTIAL-HASH", "column": "refresh_credential_hash", "dbType": "TEXT", "nullable": false },
-      { "fieldId": "ENT-SESSION-F-EXPIRES-AT", "column": "expires_at", "dbType": "TEXT", "nullable": false },
-      { "fieldId": "ENT-SESSION-F-REVOKED-AT", "column": "revoked_at", "dbType": "TEXT", "nullable": true },
-      { "fieldId": "ENT-SESSION-F-CREATED-AT", "column": "created_at", "dbType": "TEXT", "nullable": false },
-      { "fieldId": "ENT-SESSION-F-LAST-SEEN-AT", "column": "last_seen_at", "dbType": "TEXT", "nullable": true }
+      {
+        "fieldId": "ENT-SESSION-F-ID",
+        "column": "id",
+        "dbType": "TEXT",
+        "nullable": false,
+        "primaryKey": true
+      },
+      {
+        "fieldId": "ENT-SESSION-F-USER-ID",
+        "column": "user_id",
+        "dbType": "TEXT",
+        "nullable": false
+      },
+      {
+        "fieldId": "ENT-SESSION-F-DEVICE-ID",
+        "column": "device_id",
+        "dbType": "TEXT",
+        "nullable": false
+      },
+      {
+        "fieldId": "ENT-SESSION-F-TOKEN-VERSION",
+        "column": "token_version",
+        "dbType": "INTEGER",
+        "nullable": false
+      },
+      {
+        "fieldId": "ENT-SESSION-F-REFRESH-CREDENTIAL-HASH",
+        "column": "refresh_credential_hash",
+        "dbType": "TEXT",
+        "nullable": false
+      },
+      {
+        "fieldId": "ENT-SESSION-F-EXPIRES-AT",
+        "column": "expires_at",
+        "dbType": "TEXT",
+        "nullable": false
+      },
+      {
+        "fieldId": "ENT-SESSION-F-REVOKED-AT",
+        "column": "revoked_at",
+        "dbType": "TEXT",
+        "nullable": true
+      },
+      {
+        "fieldId": "ENT-SESSION-F-CREATED-AT",
+        "column": "created_at",
+        "dbType": "TEXT",
+        "nullable": false
+      },
+      {
+        "fieldId": "ENT-SESSION-F-LAST-SEEN-AT",
+        "column": "last_seen_at",
+        "dbType": "TEXT",
+        "nullable": true
+      }
     ],
     "indexes": [
       "sessions_user_id_idx",
@@ -158,5 +214,9 @@
     "tests": "NOT_EXECUTED",
     "evidence": "NOT_BOUND",
     "entityPromotion": "BLOCKED"
-  }
+  },
+  "supersededBy": "contracts/persistence/BETTER-AUTH-W02-session-persistence-contract.v1.json",
+  "supersededAt": "2026-10-05",
+  "supersessionReason": "Current Session authority is Better Auth 1.7.7 in W02/D1-01; this contract described the retired Payload-native users.sessions[] plus auth_session_state/session-runtime model.",
+  "changeControlRef": "docs/change-control/CC-BETTER-AUTH-W02-AUTHORITY-2026-10-05.md"
 }
