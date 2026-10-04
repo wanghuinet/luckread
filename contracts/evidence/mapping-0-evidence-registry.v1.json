@@ -1366,8 +1366,7 @@
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/37202032741",
       "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
       "note": "Controlled remote side-effect evidence passed live W04 consumer admission, all exercised lifecycle deindex/recovery/visibility transitions, duplicate same-version idempotency, older-version rejection, non-resurrection, bounded stale-window metadata, no authorization-decision material in projection, and synthetic KV cleanup. Artifact 11303336889. Tested W04 runtime files are byte-identical to current main, so this record remains valid at the tested runtime scope. This closes the W04 side-effect runtime sub-gate only; AUTH-013 and Mapping 0 remain NOT_GREEN pending approval-required BANNED behavior, negative transition/permission/precondition enforcement, full token/session enforcement, and actual feature-wide cache/deindex/feed/search convergence."
-    }
-,
+    },
     {
       "evidenceId": "EVD-MAPPING0-WORKER-D1-ACCESS-BOUNDARY-001",
       "type": "INTEGRATION_TEST",
@@ -1385,6 +1384,44 @@
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/37202657136",
       "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
       "note": "Current-main static boundary verification passed: 12 Worker directories, 7 checked Wrangler configurations, and 168 Worker code files were checked; the detector returned WORKER_D1_ACCESS_BOUNDARY=PASS. This evidence closes the preventive Worker×D1 access-boundary gate only. It does not promote Mapping 0 or the canonical Evidence Registry GREEN, and it does not claim remote deployment or D1 runtime behavior."
+    },
+    {
+      "evidenceId": "EVD-AUTH010-B09-SESSION-LIST-REMOTE-001",
+      "type": "SECURITY",
+      "claimId": "AUTH-010::SESSION-LIST-REMOTE-E2E",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-010",
+      "source": "GitHub Actions AUTH-010 Remote Session E2E Evidence against deployed W01/W02 runtime",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/37214582415/artifacts/11307623679",
+      "commitSha": "5def70a5edd2d64bd585fe4251f5ba97f2f792aa",
+      "timestamp": "2026-10-04T15:53:00.152Z",
+      "producer": "AUTH-010 Remote Session E2E / run 37214582415 / job 111472387377",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "111472387377",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/37214582415",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-010-REMOTE-RUNTIME-EVIDENCE-CHANNEL-2026-09-29.md",
+      "note": "Controlled remote HTTP evidence at exact deployed source 5def70a5edd2d64bd585fe4251f5ba97f2f792aa. GET /auth/sessions passed unauthenticated denial, 50-item bound, owned-session visibility, privacy-safe projection, no-store boundary, invalid-cursor rejection, revoked-session hiding, and stale token-version fail-closed behavior. Synthetic cleanup completed; secretsExposed=false. Current main changes after the tested source are governance/CI-only, so the runtime scope is inherited unchanged."
+    },
+    {
+      "evidenceId": "EVD-AUTH010-B10-SESSION-REVOKE-REMOTE-001",
+      "type": "SECURITY",
+      "claimId": "AUTH-010::SESSION-REVOKE-REMOTE-E2E",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-010",
+      "source": "GitHub Actions AUTH-010 Remote Session E2E Evidence against deployed W01/W02 runtime",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/37214582415/artifacts/11307623679",
+      "commitSha": "5def70a5edd2d64bd585fe4251f5ba97f2f792aa",
+      "timestamp": "2026-10-04T15:53:00.152Z",
+      "producer": "AUTH-010 Remote Session E2E / run 37214582415 / job 111472387377",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "111472387377",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/37214582415",
+      "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
+      "inheritanceRef": "docs/change-control/CC-MAPPING-0-AUTH-010-REMOTE-RUNTIME-EVIDENCE-CHANNEL-2026-09-29.md",
+      "note": "Controlled remote HTTP evidence at exact deployed source 5def70a5edd2d64bd585fe4251f5ba97f2f792aa. DELETE /auth/sessions/{sessionId} passed owner revoke, native-session removal, extension revocation, repeated idempotent revoke, cross-account denial, and no-store boundary. Synthetic cleanup completed; secretsExposed=false. Current main changes after the tested source are governance/CI-only, so the runtime scope is inherited unchanged."
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
