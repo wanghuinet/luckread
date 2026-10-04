@@ -1,7 +1,7 @@
 {
   "version": "1.7.1",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "584d80622b1e805d8e02ba6d1f90ca045ca61123",
+  "sourceHead": "caac01d851dfe56a00934aac00efde2c05e178ba",
   "backupBranch": "backup/pre-current-main-execution-cursor-reconciliation-20260929",
   "currentCursor": {
     "id": "AUTH-013-LIFECYCLE-SIDE-EFFECT-COVERAGE-001",
@@ -27,9 +27,9 @@
       "w04SideEffectArtifactId": "11303336889",
       "w04SideEffectEvidenceId": "EVD-AUTH013-W04-SIDE-EFFECT-MATRIX-REMOTE-001"
     },
-    "currentMainSha": "584d80622b1e805d8e02ba6d1f90ca045ca61123",
-    "sourceHead": "584d80622b1e805d8e02ba6d1f90ca045ca61123",
-    "reconciliationNote": "Current main is 584d80622b1e805d8e02ba6d1f90ca045ca61123. AUTH-013 lifecycle matrix (Run 37208063552 / Evidence Registry registration) and W04 side-effect matrix (Run 37202032741) are verified at their recorded scopes. The remaining gap is the absence of a canonical user-facing W04 Feed/Recommendation/Search serving path that consumes derived visibility state and enforces account-state eligibility before final output. No new Worker/D1 or evidence-only public route is authorized."
+    "currentMainSha": "caac01d851dfe56a00934aac00efde2c05e178ba",
+    "sourceHead": "caac01d851dfe56a00934aac00efde2c05e178ba",
+    "reconciliationNote": "Current main is caac01d851dfe56a00934aac00efde2c05e178ba. AUTH-013 lifecycle matrix (Run 37208063552 / Evidence Registry registration) and W04 side-effect matrix (Run 37202032741) are verified at their recorded scopes. The remaining gap is the absence of a canonical user-facing W04 Feed/Recommendation/Search serving path that consumes derived visibility state and enforces account-state eligibility before final output. No new Worker/D1 or evidence-only public route is authorized."
   },
   "alreadyClosed": {
     "auth003Wire": true,
