@@ -1,4 +1,7 @@
-import { invalidatePublicContentDetail } from '../../../../../../lib/public-response-cache.js'
+import {
+  invalidatePublicContentDetail,
+  invalidatePublicContentList,
+} from '../../../../../../lib/public-response-cache.js'
 
 import {
   callW03Content,
@@ -41,7 +44,10 @@ export async function POST(
       body: await request.json(),
       principal,
     })
-    if (response.ok) await invalidatePublicContentDetail(request, contentId)
+    if (response.ok) {
+      await invalidatePublicContentDetail(request, contentId)
+      await invalidatePublicContentList(request)
+    }
     return response
   } catch (error) {
     if (error instanceof SyntaxError) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid content request')
