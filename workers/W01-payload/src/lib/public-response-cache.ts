@@ -1,7 +1,4 @@
-import { getCloudflareContext } from '@opennextjs/cloudflare'
-
 const CACHE_VERSION = 'lr-public-v1-20261003'
-const CACHE_MISS_LIMITER_NAME = 'PUBLIC_CACHE_MISS_LIMITER'
 const NEGATIVE_CACHE_TTL_SECONDS = 10
 const inflight = new Map<string, Promise<Response>>()
 const MAX_INFLIGHT = 128
@@ -10,6 +7,10 @@ const MAX_MEMORY_ENTRIES = 64
 let originInFlight = 0
 const originWaiters: Array<() => void> = []
 const memoryFallback = new Map<string, { response: Response; expiresAt: number }>()
+const CACHE_MISS_WINDOW_MS = 60_000
+const CACHE_MISS_LIMIT_PER_KEY = 5
+const CACHE_MISS_MAX_KEYS = 1024
+const cacheMissHistory = new Map<string, number[]>()
 
 const readMemoryFallback = (keyString: string): Response | null => {
   const entry = memoryFallback.get(keyString)
@@ -102,7 +103,7 @@ const cacheable = (response: Response): boolean => {
 }
 
 const missFuseResponse = (): Response =>
-  new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Public cache origin is at capacity' } }), {
+  new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Public cache origin is temporarily protected' } }), {
     status: 503,
     headers: {
       'content-type': 'application/json; charset=utf-8',
@@ -112,26 +113,29 @@ const missFuseResponse = (): Response =>
     },
   })
 
-const sha256Key = async (value: string): Promise<string> => {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
-  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('')
+const hashCacheKey = (keyString: string): string => {
+  let hash = 2166136261
+  for (let i = 0; i < keyString.length; i += 1) {
+    hash ^= keyString.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(16)
 }
 
-const enforceCacheMissOriginFuse = async (keyString: string): Promise<boolean> => {
-  let context
-  try {
-    context = await getCloudflareContext({ async: true })
-  } catch {
-    // Unit-test/local environments do not have a Cloudflare execution context.
-    return true
-  }
+const enforceCacheMissOriginFuse = (keyString: string): boolean => {
+  const now = Date.now()
+  const historyKey = hashCacheKey(keyString)
+  const existing = cacheMissHistory.get(historyKey) ?? []
+  const recent = existing.filter((timestamp) => timestamp > now - CACHE_MISS_WINDOW_MS)
+  if (recent.length >= CACHE_MISS_LIMIT_PER_KEY) return false
 
-  const env = context.env as unknown as Record<string, unknown>
-  const limiter = env[CACHE_MISS_LIMITER_NAME] as { limit(input: { key: string }): Promise<{ success: boolean }> } | undefined
-  if (!limiter) throw new Error('RATE_LIMIT_BINDING_UNAVAILABLE:' + CACHE_MISS_LIMITER_NAME)
-  const keyHash = await sha256Key(keyString)
-  const result = await limiter.limit({ key: 'public-cache-miss:v1:' + keyHash })
-  return result.success
+  if (cacheMissHistory.size >= CACHE_MISS_MAX_KEYS && !cacheMissHistory.has(historyKey)) {
+    const oldestKey = cacheMissHistory.keys().next().value
+    if (typeof oldestKey === 'string') cacheMissHistory.delete(oldestKey)
+  }
+  recent.push(now)
+  cacheMissHistory.set(historyKey, recent)
+  return true
 }
 
 const withCacheHeader = (response: Response, value: 'HIT' | 'MISS'): Response => {
@@ -170,7 +174,7 @@ export const cachedPublicGet = async (
 
   if (!pending) {
     pending = (async () => {
-      const fuseAllowed = await enforceCacheMissOriginFuse(keyString)
+      const fuseAllowed = enforceCacheMissOriginFuse(keyString)
       if (!fuseAllowed) return missFuseResponse()
       const response = await withOriginSlot(loader)
       if (cacheable(response)) {
