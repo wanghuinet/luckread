@@ -10,24 +10,6 @@ type W02ErrorPayload = {
   }
 }
 
-export type EstablishSessionResult = {
-  sessionId: string
-  refreshToken: string
-  tokenVersion: number
-  layer: string
-  nativeExpiresAt: string
-}
-
-export type RefreshSessionResult = {
-  sessionId: string
-  userId: string
-  refreshToken: string
-  tokenVersion: number
-  layer: string
-  nativeExpiresAt: string
-  email: string
-}
-
 export class W02AuthClientError extends Error {
   constructor(
     readonly status: number,
@@ -40,16 +22,14 @@ export class W02AuthClientError extends Error {
 async function getW02Service(): Promise<W02ServiceBinding> {
   const context = await getCloudflareContext({ async: true })
   const service = (context.env as unknown as { W02_AUTH?: W02ServiceBinding }).W02_AUTH
-  if (!service) {
-    throw new W02AuthClientError(503, 'W02 authentication service is unavailable')
-  }
+  if (!service) throw new W02AuthClientError(503, 'W02 identity service is unavailable')
   return service
 }
 
 async function callW02<T>(path: string, body: unknown): Promise<T> {
   const service = await getW02Service()
   const response = await service.fetch(
-    new Request(`https://luckread-w02.internal${path}`, {
+    new Request('https://luckread-w02.internal' + path, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
@@ -73,67 +53,29 @@ async function callW02<T>(path: string, body: unknown): Promise<T> {
         ? (payload as W02ErrorPayload).error!.code!
         : 'SERVICE_UNAVAILABLE'
 
-    if (code === 'UNAUTHENTICATED') {
-      throw new W02AuthClientError(401, 'authentication denied')
-    }
-    if (code === 'VALIDATION_FAILED' || code === 'INVALID_CURSOR') {
-      throw new W02AuthClientError(400, 'invalid authentication request')
-    }
-    if (code === 'PERMISSION_DENIED') {
-      throw new W02AuthClientError(403, 'permission denied')
-    }
-    if (code === 'NOT_FOUND') {
-      throw new W02AuthClientError(404, 'resource not found')
-    }
-    if (code === 'INVALID_STATE') {
-      throw new W02AuthClientError(409, 'invalid state')
-    }
-    if (code === 'PRECONDITION_FAILED') {
-      throw new W02AuthClientError(412, 'precondition failed')
-    }
-
-    throw new W02AuthClientError(503, 'authentication service unavailable')
+    if (code === 'UNAUTHENTICATED') throw new W02AuthClientError(401, 'authentication denied')
+    if (code === 'VALIDATION_FAILED' || code === 'INVALID_CURSOR') throw new W02AuthClientError(400, 'invalid identity request')
+    if (code === 'PERMISSION_DENIED') throw new W02AuthClientError(403, 'permission denied')
+    if (code === 'NOT_FOUND') throw new W02AuthClientError(404, 'resource not found')
+    if (code === 'INVALID_STATE') throw new W02AuthClientError(409, 'invalid state')
+    if (code === 'PRECONDITION_FAILED') throw new W02AuthClientError(412, 'precondition failed')
+    throw new W02AuthClientError(503, 'identity service unavailable')
   }
 
   if (!payload || typeof payload !== 'object') {
-    throw new W02AuthClientError(503, 'invalid authentication service response')
+    throw new W02AuthClientError(503, 'invalid identity service response')
   }
 
   return payload as T
 }
 
-export const establishSession = (body: {
-  sessionId: string
-  userId: string
-  deviceId: string
+export async function resolveGlobalLayer(body: {
+  subjectId: string
+  accountState: string
   now?: string
-}) => callW02<EstablishSessionResult>('/internal/auth/session/establish', body)
-
-export const refreshSession = (body: {
-  refreshToken: string
-  deviceId: string
-  now?: string
-}) => callW02<RefreshSessionResult>('/internal/auth/session/refresh', body)
-
-
-export const revokeSession = (body: { sessionId: string }) =>
-  callW02<{ revoked: boolean }>('/internal/auth/session/revoke', body)
-
-export const validateSession = async (body: {
-  sessionId: string
-  userId: string
-  tokenVersion: number
-}) => {
-  const result = await callW02<{ active: boolean }>('/internal/auth/session/validate', body)
-  return result.active
+}): Promise<{ decision: 'ALLOW' | 'DENY'; layer?: string }> {
+  return callW02('/internal/authz/resolve-layer', body)
 }
-
-export const resolveAuthenticatedPrincipal = async (body: {
-  sessionId: string
-  userId: string
-  tokenVersion: number
-}) =>
-  callW02<{ active: boolean; layer?: string }>('/internal/auth/session/principal', body)
 
 export type AccountStateTransitionResult = {
   from: string
@@ -141,36 +83,12 @@ export type AccountStateTransitionResult = {
   auditEventId: string
 }
 
-export type SessionListResult = {
-  items: Array<{
-    sessionId: string
-    deviceId: string | null
-    createdAt: string
-    expiresAt: string
-    lastSeenAt: string | null
-  }>
-  nextCursor: string | null
-}
-
-export type SessionPrincipal = {
-  userId: string
-  currentSessionId: string
-  tokenVersion: number
-}
-
-export const listSessions = (body: SessionPrincipal & {
-  cursor?: string
-  limit?: number
-}) => callW02<SessionListResult>('/internal/auth/session/list', body)
-
-export const revokeOwnedSession = (body: SessionPrincipal & {
-  targetSessionId: string
-}) => callW02<{ revoked: boolean }>('/internal/auth/session/revoke-owned', body)
-
-export const transitionAccountState = (body: {
+export function transitionAccountState(body: {
   subjectId: string
   targetUserId: string
   to: string
   reason: string
   expectedVersion: number
-}) => callW02<AccountStateTransitionResult>('/internal/account/transition', body)
+}) {
+  return callW02<AccountStateTransitionResult>('/internal/account/transition', body)
+}
