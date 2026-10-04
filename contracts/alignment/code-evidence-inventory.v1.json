@@ -61,10 +61,11 @@
         "workers/W01-payload/src/app/auth/register/route.ts",
         "workers/W01-payload/src/collections/Users.ts",
         "workers/W01-payload/src/payload.config.ts",
-        "workers/W02-identity/src/credentials/credential-add.ts"
+        "workers/W02-identity/src/auth/registration.ts",
+        "workers/W02-identity/src/auth/better-auth.ts"
       ],
       "testRefs": [
-        "workers/W02-identity/src/credentials/credential-add.test.ts"
+        "workers/W01-payload/scripts/auth-better-auth-runtime-evidence.mjs"
       ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
@@ -72,7 +73,15 @@
         "contracts/api/api-inventory.v1.json",
         "contracts/alignment/cross-system-mapping.v1.json"
       ],
-      "blockers": []
+      "blockers": [
+        "Current Better Auth W02 cross-worker runtime evidence is required; historical AUTH-003 credential-add evidence is not reused."
+      ],
+      "historicalImplementationRefs": [
+        "workers/W02-identity/src/credentials/credential-add.ts"
+      ],
+      "historicalTestRefs": [
+        "workers/W02-identity/src/credentials/credential-add.test.ts"
+      ]
     },
     {
       "evidenceId": "API_OPERATION:batchUpdateNotifications",
@@ -2435,14 +2444,14 @@
       "evidenceId": "ENTITY:ENT-CREDENTIAL",
       "subjectType": "ENTITY",
       "subjectId": "ENT-CREDENTIAL",
-      "implementationStatus": "IMPLEMENTED",
+      "implementationStatus": "CONTRACTED_NOT_VERIFIED",
       "implementationRefs": [
-        "workers/W02-identity/src/credentials/credential-add.ts",
-        "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
-        "workers/W02-identity/src/credentials/credential-list.ts",
-        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
+        "workers/W02-identity/src/auth/better-auth.ts",
+        "workers/W02-identity/migrations/0002_better_auth_core.sql"
       ],
-      "testRefs": [],
+      "testRefs": [
+        "workers/W01-payload/scripts/auth-better-auth-runtime-evidence.mjs"
+      ],
       "schemaEvidenceRefs": [
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
       ],
@@ -2451,10 +2460,17 @@
         "contracts/entity/entity-implementation-evidence.v1.json"
       ],
       "blockers": [
-        "ENT-CREDENTIAL runtime/persistence evidence is complete for the admitted AUTH-003 List/Add/Replace/Remove slice.",
-        "Canonical catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and final Mapping 0 / Five-Way reconciliation is NOT_GREEN.",
-        "No promotion is inferred from the credential entity's dependency on auth_identities."
-      ]
+        "Historical AUTH-003 custom credential-management implementation is superseded.",
+        "Current Better Auth credential persistence/runtime evidence is pending.",
+        "Mapping 0 / Five-Way remains NOT_GREEN."
+      ],
+      "historicalImplementationRefs": [
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
+        "workers/W02-identity/src/credentials/credential-list.ts",
+        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
+      ],
+      "historicalTestRefs": []
     },
     {
       "evidenceId": "ENTITY:ENT-DEVICE-RECORD",
@@ -2553,25 +2569,40 @@
       "subjectId": "ENT-SESSION",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "workers/W02-identity/src/session/session-runtime.ts",
+        "workers/W02-identity/src/auth/better-auth.ts",
         "workers/W02-identity/src/index.ts",
         "workers/W01-payload/src/app/auth/login/route.ts",
         "workers/W01-payload/src/app/auth/refresh/route.ts",
-        "workers/W01-payload/src/app/auth/logout/route.ts"
+        "workers/W01-payload/src/app/auth/logout/route.ts",
+        "workers/W01-payload/src/app/auth/sessions/[[...segments]]/route.ts"
       ],
-      "testRefs": [],
+      "testRefs": [
+        "workers/W01-payload/scripts/auth-better-auth-runtime-evidence.mjs"
+      ],
       "schemaEvidenceRefs": [
-        "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
-        "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
-        "artifacts/mapping-0/auth-002-e6-runtime-evidence-reconciliation-2026-09-26.json"
+        "workers/W02-identity/migrations/0002_better_auth_core.sql",
+        "contracts/persistence/BETTER-AUTH-W02-session-persistence-contract.v1.json"
       ],
       "sourceRefs": [
         "contracts/entity/entity-catalog.v1.json",
         "contracts/entity/entity-implementation-evidence.v1.json"
       ],
       "blockers": [
-        "Gate-1 schema, native session runtime, security-negative, concurrency and extension-correlation evidence are now VERIFIED at the exact tested source 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55.",
-        "ENT-SESSION catalog promotion remains blocked pending final Mapping 0 / Five-Way admission."
+        "Current Better Auth W02 session runtime requires executable cross-worker evidence.",
+        "Historical Payload-native session evidence is preserved separately and is not current GREEN evidence.",
+        "Mapping 0 / Five-Way remains NOT_GREEN."
+      ],
+      "historicalImplementationRefs": [
+        "workers/W02-identity/src/session/session-runtime.ts",
+        "workers/W02-identity/src/index.ts",
+        "workers/W01-payload/src/app/auth/login/route.ts",
+        "workers/W01-payload/src/app/auth/refresh/route.ts",
+        "workers/W01-payload/src/app/auth/logout/route.ts"
+      ],
+      "historicalSchemaEvidenceRefs": [
+        "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
+        "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
+        "artifacts/mapping-0/auth-002-e6-runtime-evidence-reconciliation-2026-09-26.json"
       ]
     },
     {
