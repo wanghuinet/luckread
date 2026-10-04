@@ -165,8 +165,6 @@ describe('public response cache', () => {
     const b = publicCacheKey(new Request('https://luckread.com/api/v1/contents?limit=20&type=article'), 'content-list')
     expect(a.url).toBe(b.url)
   })
-})
-
 
   it('invalidates the canonical content-list landing key', async () => {
     cache.delete.mockResolvedValue(true)
@@ -183,3 +181,5 @@ describe('public response cache', () => {
       publicCacheKey(new Request('https://luckread.com/api/v1/contents'), 'content-list').url,
     )
   })
+
+})
