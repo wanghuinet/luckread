@@ -20,8 +20,8 @@ export const Users: CollectionConfig = {
             )
             if (!session?.user?.id) return null
 
-            const accountState = session.user.accountState
-            if (accountState && accountState !== 'PENDING_VERIFICATION' && accountState !== 'ACTIVE') {
+            const accountState = (session.user as typeof session.user & { accountState?: unknown }).accountState
+            if (typeof accountState === 'string' && accountState !== 'PENDING_VERIFICATION' && accountState !== 'ACTIVE') {
               return null
             }
 
