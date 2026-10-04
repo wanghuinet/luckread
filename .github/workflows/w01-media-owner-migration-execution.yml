@@ -72,7 +72,7 @@ jobs:
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT COUNT(*) AS media_count FROM media;' > ../../artifacts/evidence/media-owner-migration/preflight-media-count.json
           node --input-type=module <<'NODE'
           import {readFileSync,writeFileSync} from 'node:fs'
-          const collect=(value,out=[])=>{if(Array.isArray(value)){for(const v of value)collect(v,out);return}if(!value||typeof value!=='object')return;if(Array.isArray(value.results))out.push(...value.results);if(Array.isArray(value.result))out.push(...value.result);if(value.result&&Array.isArray(value.result.results))out.push(...value.result.results);for(const v of Object.values(value))collect(v,out)}
+          const collect=(value,out=[])=>{if(Array.isArray(value)){for(const v of value)collect(v,out);return out}if(!value||typeof value!=='object')return out;if(Array.isArray(value.results))out.push(...value.results);if(Array.isArray(value.result))out.push(...value.result);if(value.result&&Array.isArray(value.result.results))out.push(...value.result.results);for(const v of Object.values(value))collect(v,out);return out}
           const rows=p=>[...new Map(collect(JSON.parse(readFileSync(p,'utf8'))).map(x=>[JSON.stringify(x),x])).values()]
           const migrations=rows('../../artifacts/evidence/media-owner-migration/preflight-migrations.json').map(x=>String(x.name)).filter(Boolean)
           const schema=rows('../../artifacts/evidence/media-owner-migration/preflight-media-schema.json')
