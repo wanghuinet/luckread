@@ -42,7 +42,7 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Cache hardening unit tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run src/lib/public-response-cache.test.ts src/lib/content-list-cache-guard.test.ts
+        run: pnpm exec vitest run --config ./vitest.cache.config.mts
       - name: W01 typecheck
         working-directory: workers/W01-payload
         run: pnpm exec tsc --noEmit
