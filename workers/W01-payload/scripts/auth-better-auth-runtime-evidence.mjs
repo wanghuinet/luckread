@@ -184,7 +184,13 @@ const main = async () => {
   })
   expect(ok(knownReset.response.status) && knownReset.response.status === unknownReset.response.status, 'password reset leaks account existence by status')
 
-  const logout = await request('/api/v1/auth/logout', { method: 'POST', headers: { accept: 'application/json' } }, jar3)
+  const logout = await request('/api/v1/auth/logout', {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'Idempotency-Key': 'better-auth-runtime-logout-' + suffix,
+    },
+  }, jar3)
   expect(ok(logout.response.status), 'logout failed: ' + logout.response.status)
   const postLogout = await request('/api/auth/get-session', { headers: { accept: 'application/json' } }, jar3)
   expect(postLogout.body === null, 'logout did not revoke session')
