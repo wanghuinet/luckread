@@ -422,8 +422,8 @@
         "docs/change-control/CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-SUCCESS-2026-09-29.md"
       ],
       "blockers": [
-        "Feature-wide lifecycle transition coverage remains incomplete beyond the proven ACTIVE → RESTRICTED public path; FROZEN/SUSPENDED/BANNED plus escalation/reinstatement/restore paths require bounded evidence.",
-        "Approval-required BANNED behavior and complete cache/deindex/feed/search convergence across contracted lifecycle states remain unproven at feature-wide scope.",
+        "Feature-wide lifecycle transition coverage remains incomplete beyond the proven remote ACTIVE → RESTRICTED → FROZEN → SUSPENDED → BANNED → RESTORED → ACTIVE matrix; deletion/recovery timeout paths and full feature-wide HTTP/security convergence still require bounded evidence.",
+        "Complete cache/deindex/feed/search convergence across contracted lifecycle states remains unproven at feature-wide scope.",
         "AUTH-013 remains PARTIAL until the remaining lifecycle/side-effect/evidence graph gates are reconciled."
       ]
     },
