@@ -75,12 +75,15 @@ jobs:
         run: |
           set -euo pipefail
           queues="$(curl -fsS --retry 3 --retry-all-errors             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues?per_page=100")"
-          consumer="$(jq -c --arg q "$QUEUE_NAME" '.result[]? | select(.queue_name==$q) | .consumers[]? | select(.script_name=="luckread-w04" and .type=="worker" and .dead_letter_queue=="luckread-auth013-account-state-projection-dlq")' <<<"$queues")"
-          count="$(jq -r --arg q "$QUEUE_NAME" '.result[]? | select(.queue_name==$q) | .consumers_total_count' <<<"$queues")"
-          queue_id="$(jq -r --arg q "$QUEUE_NAME" '.result[]? | select(.queue_name==$q) | .queue_id' <<<"$queues")"
+          queue_id="$(jq -r --arg q "$QUEUE_NAME" '.result[]? | select(.queue_name==$q) | .queue_id // empty' <<<"$queues")"
+          test -n "$queue_id"
+
+          consumers="$(curl -fsS --retry 3 --retry-all-errors             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$queue_id/consumers?per_page=100")"
+          consumer="$(jq -c --arg w "$W04_NAME" --arg dlq "$DLQ_NAME"             '.result[]? | select(.script_name==$w and .type=="worker" and .dead_letter_queue==$dlq)' <<<"$consumers")"
+          count="$(jq '[.result[]?] | length' <<<"$consumers")"
+
           test -n "$consumer"
           test "$count" = "1"
-          test -n "$queue_id"
           printf '%s\n' "$queue_id" > /tmp/auth013-queue-id
           printf '%s\n' "$consumer" > /tmp/auth013-consumer
           printf '%s\n' "$count" > /tmp/auth013-consumer-count
