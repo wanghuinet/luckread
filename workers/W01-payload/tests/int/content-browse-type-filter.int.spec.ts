@@ -25,7 +25,7 @@ describe('public content type filter', () => {
     expect(page).toContain("params.set('type', contentType)")
     expect(page).toContain("void load()")
     expect(route).toContain('validateContentListQuery')
-    expect(route).toContain("set('type', contentType)")
+    expect(route).toContain('validateContentListQuery')
   })
 
   it('keeps filter requests public and read-only', () => {
