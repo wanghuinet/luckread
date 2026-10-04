@@ -29,6 +29,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Install W02 dependencies
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-package-lock
+
+      - name: Verify Better Auth W02 source
+        run: |
+          set -euo pipefail
+          test -s workers/W02-identity/src/auth/better-auth.ts
+          test -s workers/W02-identity/src/auth/registration.ts
+          test -s workers/W02-identity/migrations/0002_better_auth_core.sql
+          npm --prefix workers/W02-identity ls better-auth --depth=0
+
+      - name: Verify Better Auth production secret is configured
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 secret list --name luckread-w02 | grep -q '"name":"BETTER_AUTH_SECRET"'
+
       - name: Verify RoleAssignment migration artifacts
         run: |
           node scripts/generate-role-assignment-migration.mjs
