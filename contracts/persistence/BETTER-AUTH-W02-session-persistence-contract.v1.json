@@ -1,0 +1,10 @@
+{
+  "version":"1.0.0",
+  "status":"CONTRACTED_NOT_VERIFIED",
+  "featureId":"AUTH-BETTER-AUTH-W02",
+  "authority":{"worker":"W02","workerDirectory":"workers/W02-identity","implementation":"workers/W02-identity/src/auth/better-auth.ts","provider":"Better Auth 1.7.7","d1":"D1-01","database":"luckread"},
+  "transport":{"publicBoundary":"W01","binding":"W02_AUTH","service":"luckread-w02","productionRoute":"W01 -> W02 Service Binding"},
+  "persistence":{"userIdentity":"users","credential":"auth_accounts","session":"auth_sessions","verificationAndRecovery":"auth_verifications","registrationEnvelope":"auth_registration_envelopes"},
+  "rules":["W02/Better Auth is the sole authentication authority.","W01 may validate API shape and enforce edge anti-abuse controls but must not verify credentials or own session state.","Payload native local authentication is disabled for the Users collection.","No second active credential table or session identity may be introduced.","Legacy users.hash/users.salt are compatibility data only.","Authentication establishes the principal; W02 AuthZ evaluates it separately.","Secrets must never be returned in public DTOs or evidence."],
+  "evidence":{"required":["cross-worker registration/login/session/logout runtime","D1-01 schema and migration evidence","controlled W02 deployment provenance","Contract/Evidence Registry reconciliation","Mapping-0 revalidation"],"promotion":"BLOCKED_UNTIL_EVIDENCE_AND_MAPPING0_PASS"}
+}
