@@ -1,6 +1,6 @@
 # Change Control — W05 Like Aggregate Cache Hardening — 2026-10-04
 
-Status: MERGED / RELEVANT-CI-VALIDATED / RUNTIME-EVIDENCE-PENDING
+Status: CLOSED — IMPLEMENTATION / RELEVANT-CI / RUNTIME-EVIDENCE RECONCILED
 
 ## Baseline
 - authoritative main before slice: `36e9f5ad8cf059bf394d7010d2ce631774f232fd`
@@ -44,4 +44,6 @@ API Inventory Reconciliation run `37180481788` reported a pre-existing project-w
 
 ## Acceptance
 
-The scoped shared aggregate cache behavior and bounded D1-read hardening passed the relevant CI gates. No production runtime claim is made here until independent deployment/runtime evidence is recorded.
+The scoped shared aggregate cache behavior and bounded D1-read hardening passed the relevant CI gates and the independent deployed runtime E2E. Runtime evidence is admitted under `CC-MAPPING-0-SOCIAL-003-LIKE-CACHE-RUNTIME-EVIDENCE-ADMISSION-2026-10-04` with unchanged-scope freshness inheritance.
+
+No promotion of SOCIAL-003, the canonical Evidence Registry, or Mapping 0 to GREEN is made by this Change Control.
