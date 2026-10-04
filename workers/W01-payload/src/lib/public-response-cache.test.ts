@@ -40,7 +40,7 @@ describe('public response cache', () => {
     const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
     const response = await cachedPublicGet(
       new Request('https://luckread.com/api/v1/contents'),
-      'user-profile',
+      'content-list',
       loader,
       30,
     )
@@ -59,9 +59,9 @@ describe('public response cache', () => {
     const loader = vi.fn(() => new Promise<Response>((resolve) => { releaseLoader = resolve }))
 
     const request = new Request('https://luckread.com/api/v1/users/u-coalesce')
-    const a = cachedPublicGet(request, 'content-list', loader, 30)
+    const a = cachedPublicGet(request, 'user-profile', loader, 30)
     await vi.waitFor(() => expect(loader).toHaveBeenCalledTimes(1))
-    const b = cachedPublicGet(request.clone(), 'content-list', loader, 30)
+    const b = cachedPublicGet(request.clone(), 'user-profile', loader, 30)
     releaseLoader?.(new Response(JSON.stringify({ data: 'origin' }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -132,9 +132,11 @@ describe('public response cache', () => {
     }))
     const request = new Request('https://luckread.com/api/v1/users/u-read-fallback')
 
-    await cachedPublicGet(request, 'content-list', loader, 30)
-    cache.match.mockRejectedValueOnce(new Error('CACHE_READ_FAILED'))
-    const response = await cachedPublicGet(request.clone(), 'content-list', loader, 30)
+    await cachedPublicGet(request, 'user-profile', loader, 30)
+    cache.match
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('CACHE_READ_FAILED'))
+    const response = await cachedPublicGet(request.clone(), 'user-profile', loader, 30)
 
     expect(loader).toHaveBeenCalledTimes(1)
     expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
