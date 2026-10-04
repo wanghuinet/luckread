@@ -139,7 +139,7 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/media-e2e.png
-          status="$(curl --silent --show-error -o /tmp/media-upload.json -w '%{http_code}'             -X POST             -H "Authorization: Bearer $MEDIA_OWNER_TOKEN"             -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-UPLOAD"             -F "file=@/tmp/media-e2e.png;type=image/png"             -F "alt=Media runtime E2E synthetic fixture"             "$W01_BASE_URL/api/v1/media")"
+          status="$(curl --silent --show-error -o /tmp/media-upload.json -w '%{http_code}'             -X POST             -H "Authorization: Bearer $MEDIA_OWNER_TOKEN"             -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-UPLOAD"             -F "file=@/tmp/media-e2e.png;type=image/png"             -F '_payload={"alt":"Media runtime E2E synthetic fixture"}'             "$W01_BASE_URL/api/v1/media")"
           echo "Media upload HTTP status: $status"
           cat /tmp/media-upload.json
           case "$status" in 2*) ;; *) echo "Media upload failed: HTTP $status"; exit 1;; esac

@@ -94,7 +94,7 @@ export default function CreatorAssetLibrary({ adminMode = true, loginPath = '/ad
       let uploaded = 0
       for (const file of files) {
         const form = new FormData()
-        form.append('alt', file.name)
+        form.append('_payload', JSON.stringify({ alt: file.name }))
         form.append('file', file)
         const response = await fetch('/api/v1/media', {
           method: 'POST',

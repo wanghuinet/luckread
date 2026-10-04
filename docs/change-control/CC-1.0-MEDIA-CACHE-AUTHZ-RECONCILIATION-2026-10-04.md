@@ -122,4 +122,15 @@ A dedicated controlled workflow has been added for this evidence path:
 
 The current production deployment still has to be performed through the existing controlled `workflow_dispatch` path before this E2E can be executed against the exact deployed source.
 
+## Runtime E2E Finding — 2026-10-04 / Run 37188594016
+
+The first controlled Media Owner Scope Runtime E2E reached deployment provenance, exact-source checkout, and authenticated L3 fixture creation successfully. The upload step then returned HTTP 400 because the test sent the required Payload Media field as a standalone multipart field (alt=...) rather than Payload's documented _payload JSON field. Owner/private cache boundary assertions were therefore skipped; this run is not runtime evidence for the cache boundary.
+
+Decision for this follow-up slice:
+
+- Keep the existing Payload Media + R2 upload authority and streaming path.
+- Conform all LuckRead multipart upload callers to Payload's _payload JSON wire format for collection fields.
+- Do not buffer/rebuild multipart bodies inside the v1 Worker adapter.
+- Re-run CI, deploy the exact resulting W01 source through the existing controlled deployment path, then repeat the independent Media Owner Scope Runtime E2E.
+
 No production GREEN claim is made.

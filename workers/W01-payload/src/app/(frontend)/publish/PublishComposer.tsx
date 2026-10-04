@@ -148,7 +148,7 @@ export default function PublishComposer({
 
   async function uploadFile(file: File): Promise<UploadedAsset> {
     const form = new FormData()
-    form.append('alt', file.name)
+    form.append('_payload', JSON.stringify({ alt: file.name }))
     form.append('file', file)
     const response = await authorizedFetch('/api/v1/media', {
       method: 'POST',
