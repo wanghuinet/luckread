@@ -6,7 +6,6 @@ import { bearer } from 'better-auth/plugins/bearer'
 export type BetterAuthEnv = {
   D1_01: D1Database
   BETTER_AUTH_SECRET?: string
-  PAYLOAD_SECRET?: string
 }
 
 
@@ -102,7 +101,7 @@ async function verifyPassword(input: { hash: string; password: string }): Promis
 }
 
 function makeAuth(env: BetterAuthEnv) {
-  const secret = env.BETTER_AUTH_SECRET ?? env.PAYLOAD_SECRET
+  const secret = env.BETTER_AUTH_SECRET
   if (!secret) throw new Error('BETTER_AUTH_SECRET is required')
 
   return betterAuth({
