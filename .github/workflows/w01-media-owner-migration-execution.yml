@@ -1,0 +1,146 @@
+name: W01 Media Owner Migration Execution
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source commit containing the admitted Media owner migration
+        required: true
+        type: string
+      database_name:
+        description: Controlled D1 database name
+        required: true
+        default: luckread
+        type: string
+      confirm:
+        description: Type APPLY_MEDIA_OWNER_MIGRATION
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  TARGET_MIGRATION: 20261002_120000_media_owner
+  EXPECTED_PREDECESSORS: 20250929_111647,20260921_003203_MIG_AUTH_002_SESSION_V1,20260925_111503_MIG_ENT_USER_PROFILE_V1,20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1,20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1
+
+jobs:
+  execute:
+    if: ${{ inputs.confirm == 'APPLY_MEDIA_OWNER_MIGRATION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Validate migration registration
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_sha }}"
+          test -f "src/migrations/$TARGET_MIGRATION.ts"
+          test "$(grep -c "name: '$TARGET_MIGRATION'" src/migrations/index.ts)" -eq 1
+
+      - name: Setup Node 24 and pnpm 11
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
+      - name: Install locked W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
+      - name: Preflight remote state without mutation
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/evidence/media-owner-migration
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' > ../../artifacts/evidence/media-owner-migration/preflight-migrations.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("media");' > ../../artifacts/evidence/media-owner-migration/preflight-media-schema.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT COUNT(*) AS media_count FROM media;' > ../../artifacts/evidence/media-owner-migration/preflight-media-count.json
+          node --input-type=module <<'NODE'
+          import {readFileSync,writeFileSync} from 'node:fs'
+          const collect=(value,out=[])=>{if(Array.isArray(value)){for(const v of value)collect(v,out);return}if(!value||typeof value!=='object')return;if(Array.isArray(value.results))out.push(...value.results);if(Array.isArray(value.result))out.push(...value.result);if(value.result&&Array.isArray(value.result.results))out.push(...value.result.results);for(const v of Object.values(value))collect(v,out)}
+          const rows=p=>[...new Map(collect(JSON.parse(readFileSync(p,'utf8'))).map(x=>[JSON.stringify(x),x])).values()]
+          const migrations=rows('../../artifacts/evidence/media-owner-migration/preflight-migrations.json').map(x=>String(x.name)).filter(Boolean)
+          const schema=rows('../../artifacts/evidence/media-owner-migration/preflight-media-schema.json')
+          const mediaCount=Number(rows('../../artifacts/evidence/media-owner-migration/preflight-media-count.json')[0]?.media_count??-1)
+          const expected=process.env.EXPECTED_PREDECESSORS.split(',')
+          const summary={migrationHistory:migrations,predecessorExact:migrations.length===expected.length&&expected.every((name,i)=>migrations[i]===name),targetPresent:migrations.includes(process.env.TARGET_MIGRATION),ownerColumnPresent:schema.some(x=>String(x.name)==='owner_user_id'),mediaCount}
+          writeFileSync('../../artifacts/evidence/media-owner-migration/preflight-summary.json',JSON.stringify(summary,null,2)+'\n')
+          console.log(JSON.stringify(summary,null,2))
+          if(summary.targetPresent)throw new Error('target migration already recorded')
+          if(summary.ownerColumnPresent)throw new Error('owner_user_id already exists')
+          if(!summary.predecessorExact)throw new Error('predecessor migration history mismatch')
+          if(mediaCount!==0)throw new Error('existing media rows have no provable owner backfill path')
+          NODE
+
+      - name: Execute Media owner migration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ENV: production
+          NODE_ENV: production
+          PAYLOAD_MIGRATION_REMOTE: true
+          PAYLOAD_SECRET: ignore
+        working-directory: workers/W01-payload
+        run: pnpm exec payload migrate
+
+      - name: Validate post-migration state
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command "SELECT id,name,batch FROM payload_migrations WHERE name='$TARGET_MIGRATION';" > ../../artifacts/evidence/media-owner-migration/post-migration.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("media");' > ../../artifacts/evidence/media-owner-migration/post-media-schema.json
+          node --input-type=module <<'NODE'
+          import {readFileSync,writeFileSync} from 'node:fs'
+          const collect=(value,out=[])=>{if(Array.isArray(value)){for(const v of value)collect(v,out);return}if(!value||typeof value!=='object')return;if(Array.isArray(value.results))out.push(...value.results);if(Array.isArray(value.result))out.push(...value.result);if(value.result&&Array.isArray(value.result.results))out.push(...value.result.results);for(const v of Object.values(value))collect(v,out)}
+          const rows=p=>[...new Map(collect(JSON.parse(readFileSync(p,'utf8'))).map(x=>[JSON.stringify(x),x])).values()]
+          const migration=rows('../../artifacts/evidence/media-owner-migration/post-migration.json')
+          const schema=rows('../../artifacts/evidence/media-owner-migration/post-media-schema.json')
+          const summary={migrationApplied:migration.length===1&&String(migration[0]?.name)===process.env.TARGET_MIGRATION,ownerColumnPresent:schema.some(x=>String(x.name)==='owner_user_id'),migration:migration[0]??null}
+          writeFileSync('../../artifacts/evidence/media-owner-migration/post-summary.json',JSON.stringify(summary,null,2)+'\n')
+          console.log(JSON.stringify(summary,null,2))
+          if(!summary.migrationApplied||!summary.ownerColumnPresent)process.exit(1)
+          NODE
+
+      - name: Record provenance
+        if: always()
+        run: |
+          mkdir -p artifacts/evidence/media-owner-migration
+          cat > artifacts/evidence/media-owner-migration/provenance.json <<EOF
+          {
+            "repository": "$GITHUB_REPOSITORY",
+            "workflow": "$GITHUB_WORKFLOW",
+            "runId": $GITHUB_RUN_ID,
+            "sourceSha": "${{ inputs.source_sha }}",
+            "databaseName": "${{ inputs.database_name }}",
+            "migration": "$TARGET_MIGRATION",
+            "environment": "CONTROLLED_REMOTE_D1"
+          }
+          EOF
+
+      - name: Upload migration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-owner-migration-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/evidence/media-owner-migration/
+          if-no-files-found: error
+          retention-days: 30

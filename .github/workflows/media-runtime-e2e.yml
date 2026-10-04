@@ -139,7 +139,7 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/media-e2e.png
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MEDIA_OWNER_TOKEN"             -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-UPLOAD"             -F "file=@/tmp/media-e2e.png;type=image/png"             "$W01_BASE_URL/api/v1/media" > /tmp/media-upload.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $MEDIA_OWNER_TOKEN"             -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-UPLOAD"             -F "file=@/tmp/media-e2e.png;type=image/png"             -F "alt=Media runtime E2E synthetic fixture"             "$W01_BASE_URL/api/v1/media" > /tmp/media-upload.json
           node --input-type=module <<'NODE'
           import {readFileSync,appendFileSync} from 'node:fs'
           const value=JSON.parse(readFileSync('/tmp/media-upload.json','utf8'))
