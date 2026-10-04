@@ -66,7 +66,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${{ steps.source.outputs.sha }}"
           test -s workers/W01-payload/scripts/auth-better-auth-runtime-evidence.mjs
-          test -s workers/W01-payload/src/migrations/20261005_MIG_BETTER_AUTH_CORE_V1.ts
+          test -s workers/W02-identity/migrations/0002_better_auth_core.sql
           test -z "$(git status --short)"
 
       - name: Setup Node 24
@@ -85,6 +85,15 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm payload migrate
 
+      - name: Copy the admitted W01 local D1 state into W02 local D1
+        run: |
+          set -euo pipefail
+          pnpm --dir workers/W01-payload exec wrangler d1 export luckread --local --output /tmp/luckread-w01-auth-runtime.sql --config wrangler.jsonc
+          pnpm --dir workers/W02-identity exec wrangler d1 execute luckread --local --file /tmp/luckread-w01-auth-runtime.sql --config wrangler.jsonc
+
+      - name: Apply exact local W02 Better Auth migration
+        run: node workers/W02-identity/scripts/apply-better-auth-migration.mjs --local
+
       - name: Capture local D1 Better Auth schema
         working-directory: workers/W01-payload
         run: |
@@ -101,6 +110,20 @@ jobs:
           set -euo pipefail
           pnpm exec opennextjs-cloudflare build > auth-better-auth-open-next-build.log 2>&1
 
+      - name: Start exact W02 local Worker runtime
+        working-directory: workers/W02-identity
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler dev --local --port 8788 --var "BETTER_AUTH_SECRET:${BETTER_AUTH_SECRET}" --var "CLOUDFLARE_ENV:development" > auth-better-auth-w02-preview.log 2>&1 &
+          echo $! > auth-better-auth-w02-preview.pid
+          ready=0
+          for _ in $(seq 1 120); do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8788/internal/auth/session || true)
+            if [ "$code" != "000" ]; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then cat auth-better-auth-w02-preview.log; exit 1; fi
+
       - name: Start exact W01 local Worker runtime
         working-directory: workers/W01-payload
         env:
@@ -109,7 +132,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --port 8787 --var "PAYLOAD_SECRET:${PAYLOAD_SECRET}" --var "BETTER_AUTH_SECRET:${BETTER_AUTH_SECRET}" --var "CLOUDFLARE_ENV:development" > auth-better-auth-preview.log 2>&1 &
+          pnpm exec wrangler dev --local --port 8787 --var "PAYLOAD_SECRET:${PAYLOAD_SECRET}" --var "BETTER_AUTH_SECRET:${BETTER_AUTH_SECRET}" --var "CLOUDFLARE_ENV:development" --var "W02_AUTH_LOCAL_URL:http://127.0.0.1:8788" > auth-better-auth-preview.log 2>&1 &
           echo $! > auth-better-auth-preview.pid
           ready=0
           for _ in $(seq 1 120); do
@@ -152,6 +175,7 @@ jobs:
             artifacts/evidence/auth-better-auth/runtime-result.json
             workers/W01-payload/auth-better-auth-open-next-build.log
             workers/W01-payload/auth-better-auth-preview.log
+            workers/W02-identity/auth-better-auth-w02-preview.log
           if-no-files-found: error
           retention-days: 30
 
@@ -159,6 +183,7 @@ jobs:
         if: ${{ always() }}
         working-directory: workers/W01-payload
         run: |
+          if [ -f ../W02-identity/auth-better-auth-w02-preview.pid ]; then kill "$(cat ../W02-identity/auth-better-auth-w02-preview.pid)" 2>/dev/null || true; fi
           if [ -f auth-better-auth-preview.pid ]; then kill "$(cat auth-better-auth-preview.pid)" 2>/dev/null || true; fi
           pkill -TERM -x workerd 2>/dev/null || true
           pkill -TERM -x esbuild 2>/dev/null || true
