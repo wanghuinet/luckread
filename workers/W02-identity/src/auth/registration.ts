@@ -1,4 +1,5 @@
 import { getBetterAuth, type BetterAuthEnv } from './better-auth.js'
+import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types'
 import priv004DevPolicy from '../../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'
 import priv004ProdPolicy from '../../../../artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json'
 
@@ -89,7 +90,7 @@ const isExpired = (expiresAt: string, now: Date) => {
 }
 
 const getExistingEnvelope = async (
-  db: D1DatabaseLike,
+  db: D1Database,
   idempotencyKey: string,
 ): Promise<ExistingEnvelope | null> =>
   db
@@ -250,7 +251,7 @@ const completeEnvelope = async (
   )
 
   const existingConsent = await hasConsent(db, userId, policy.policyVersion)
-  const statements: D1PreparedStatementLike[] = []
+  const statements: D1PreparedStatement[] = []
 
   if (!existingConsent) {
     statements.push(
