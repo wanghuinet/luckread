@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import { cachedPublicGet, invalidatePublicContentList, publicCacheKey } from './public-response-cache.js'
+import { cachedPublicGet, invalidatePublicContentList, invalidatePublicUserProfileByUsername, publicCacheKey } from './public-response-cache.js'
 
 describe('public response cache', () => {
   const cache = {
@@ -235,6 +235,23 @@ describe('public response cache', () => {
     expect(second.status).toBe(404)
     expect(loader).toHaveBeenCalledTimes(1)
     expect(second.headers.get('x-luckread-cache')).toBe('HIT')
+  })
+
+  it('invalidates the explicit username profile cache key', async () => {
+    cache.delete.mockResolvedValue(true)
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    await invalidatePublicUserProfileByUsername(
+      new Request('https://luckread.com/api/v1/users/by-username/alice'),
+      'alice',
+    )
+
+    expect(cache.delete).toHaveBeenCalledWith(
+      publicCacheKey(
+        new Request('https://luckread.com/api/v1/users/by-username/alice'),
+        'user-profile-by-username',
+      ),
+    )
   })
 
   it('invalidates the canonical content-list landing key', async () => {
