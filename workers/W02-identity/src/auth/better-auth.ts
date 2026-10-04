@@ -1,4 +1,4 @@
-import type { D1Database } from 'better-auth'
+import type { D1Database } from '@cloudflare/workers-types'
 import { betterAuth } from 'better-auth'
 import { hashPassword as betterAuthHashPassword, verifyPassword as betterAuthVerifyPassword } from 'better-auth/crypto'
 import { bearer } from 'better-auth/plugins/bearer'
