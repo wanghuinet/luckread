@@ -3,8 +3,6 @@
 import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-const deviceKey = 'luckread.deviceId'
-
 export default function LoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState('')
