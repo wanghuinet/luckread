@@ -1,0 +1,43 @@
+name: W02 Better Auth CI
+
+on:
+  pull_request:
+    paths:
+      - 'workers/W02-identity/**'
+      - 'workers/W01-payload/src/auth/w02-auth-client.ts'
+      - 'workers/W01-payload/src/app/auth/**'
+      - 'workers/W01-payload/src/app/api/auth/**'
+      - 'workers/W01-payload/src/collections/Users.ts'
+      - '.github/workflows/w02-better-auth-ci.yml'
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source SHA to validate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  w02-better-auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.event.pull_request.head.sha || github.sha }}
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install W02 dependencies
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-package-lock
+      - name: Typecheck W02
+        working-directory: workers/W02-identity
+        run: npm run typecheck
+      - name: Bundle W02 with Wrangler dry-run
+        working-directory: workers/W02-identity
+        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc --dry-run
