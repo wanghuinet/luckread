@@ -1,8 +1,6 @@
-import {
-  ContentRuntimeError,
-  type ContentD1,
-  type ContentRecord,
-} from './content-runtime.js'
+import { ContentRuntimeError, type ContentRecord } from './content-runtime.js'
+import type { ContentD1 } from './content-runtime.js'
+import { revisionInsertStatement } from './revision-persistence.js'
 
 type RevisionRow = {
   revision_id: string
@@ -97,48 +95,6 @@ const toRevision = (row: RevisionRow): ContentRevision => ({
   correlationId: row.correlation_id,
   createdAt: row.created_at,
 })
-
-export function revisionInsertStatement(
-  db: ContentD1,
-  input: {
-    revisionId: string
-    contentId: string
-    revisionNumber: number
-    contentVersion: number
-    title: string
-    bodyRef: string
-    mediaRefs: string[]
-    coverRef: string | null
-    state: ContentRecord['state']
-    actorUserId: string
-    sourceRevisionId?: string | null
-    reason?: string | null
-    correlationId: string
-    createdAt: string
-  },
-) {
-  return db.prepare(
-    `INSERT INTO content_revisions
-      (revision_id, content_id, revision_number, content_version, title, body_ref, media_refs_json, cover_ref,
-       state, actor_user_id, source_revision_id, reason, correlation_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(
-    input.revisionId,
-    input.contentId,
-    input.revisionNumber,
-    input.contentVersion,
-    input.title,
-    input.bodyRef,
-    JSON.stringify(input.mediaRefs),
-    input.coverRef,
-    input.state,
-    input.actorUserId,
-    input.sourceRevisionId ?? null,
-    input.reason ?? null,
-    input.correlationId,
-    input.createdAt,
-  )
-}
 
 export async function listContentRevisions(
   db: ContentD1,
@@ -263,9 +219,6 @@ export async function rollbackContentRevision(
   if (!current) throw new ContentRuntimeError('NOT_FOUND', 404)
 
   const normalizedIfMatch = ifMatch.trim().replace(/^W\//, '').replace(/^"/, '').replace(/"$/, '')
-  const actualEtag = current.etag.replace(/^W\//, '').replace(/^"/, '').replace(/"$/, '')
-  if (normalizedIfMatch !== actualEtag) throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
-
   const effectiveReason = (reason ?? '').trim()
   if (effectiveReason.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
 
@@ -304,6 +257,9 @@ export async function rollbackContentRevision(
     }
     if (existing.idem_response_json) return JSON.parse(existing.idem_response_json) as ContentRecord
   }
+
+  const actualEtag = current.etag.replace(/^W\//, '').replace(/^"/, '').replace(/"$/, '')
+  if (normalizedIfMatch !== actualEtag) throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
 
   const updatedAt = now.toISOString()
   const nextVersion = current.version + 1
