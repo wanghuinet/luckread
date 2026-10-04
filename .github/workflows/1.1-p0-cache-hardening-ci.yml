@@ -9,6 +9,7 @@ on:
       - 'workers/W01-payload/src/lib/content-list-cache-guard.ts'
       - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
+      - 'workers/W01-payload/src/app/api/v1/media/[mediaId]/route.ts'
       - '.github/workflows/1.1-p0-cache-hardening-ci.yml'
   push:
     branches: [main]
@@ -55,6 +56,7 @@ jobs:
           route = Path('workers/W01-payload/src/app/api/v1/contents/route.ts').read_text()
           cache = Path('workers/W01-payload/src/lib/public-response-cache.ts').read_text()
           detail = Path('workers/W01-payload/src/app/api/v1/contents/[contentId]/route.ts').read_text()
+          media = Path('workers/W01-payload/src/app/api/v1/media/[mediaId]/route.ts').read_text()
           state = Path('workers/W01-payload/src/app/api/v1/contents/[contentId]/state/route.ts').read_text()
           guard = Path('workers/W01-payload/src/lib/content-list-cache-guard.ts').read_text()
 
@@ -71,6 +73,10 @@ jobs:
           assert 'values.length > 1' in guard
           assert "content-list': ['creatorId', 'cursor', 'limit', 'type']" in cache
           assert 's-maxage=' in cache
+          assert 'CACHE_MISS_LIMIT_PER_KEY = 5' in cache
+          assert 'CACHE_MISS_MAX_KEYS = 1024' in cache
           assert "      30," in route
+          assert "      'media-detail'," in media
+          assert 'cachedPublicGet(' in media
           print('1.1_P0_CACHE_BOUNDARY_STATIC=PASS')
           PY
