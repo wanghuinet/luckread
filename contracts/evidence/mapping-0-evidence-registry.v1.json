@@ -1315,6 +1315,36 @@
       "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
       "inheritanceRef": "docs/change-control/CC-MAPPING-0-SOCIAL-003-LIKE-CACHE-RUNTIME-EVIDENCE-ADMISSION-2026-10-04.md",
       "note": "Controlled runtime evidence passed initial aggregate state, shared aggregate staleness within the 5-second TTL, refresh after TTL, immediate viewer-state invalidation, explicit shared-cache priming, non-synchronous shared aggregate invalidation after an authoritative D1 like, refresh to authoritative count 3 after the second TTL, exact W05 deployment provenance, and synthetic fixture cleanup. Comparison from the tested source to current main found only E2E workflow changes and no W05 production like/cache implementation changes, so the evidence is inherited unchanged-scope evidence."
+    },
+    {
+      "evidenceId": "EVD-CONTENT007-PUBLIC-LIST-CACHE-RUNTIME-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "CONTENT-007::PUBLIC-LIST-CACHE-INVALIDATION",
+      "subjectType": "FEATURE",
+      "subjectId": "CONTENT-007",
+      "source": "GitHub Actions Content List Cache Runtime E2E against exact deployed W01 source",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/37196089360/artifacts/11300637536",
+      "commitSha": "0f0f7d52d8246f45413d5479e5c324365f7efcc5",
+      "timestamp": "2026-10-04T10:40:31Z",
+      "producer": "GitHub Actions Content List Cache Runtime E2E",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "note": "Production runtime evidence against deployment run 37195981263. Synthetic fixture verified anonymous filtered-list MISS then HIT, authenticated shared-cache bypass, publish→unpublish mutation invalidation, filtered-list MISS after mutation, and fixture disappearance. No new Worker or D1 was introduced. This record supports cache-specific acceptance only and does not promote CONTENT-007, Mapping 0, or the canonical Evidence Registry."
+    },
+    {
+      "evidenceId": "EVD-MEDIA001-OWNER-SCOPE-RUNTIME-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "MEDIA-001::OWNER-SCOPED-METADATA-CACHE-BOUNDARY",
+      "subjectType": "FEATURE",
+      "subjectId": "MEDIA-001",
+      "source": "GitHub Actions Media Owner Scope Runtime E2E against exact deployed W01 source",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/37196089353/artifacts/11301086936",
+      "commitSha": "0f0f7d52d8246f45413d5479e5c324365f7efcc5",
+      "timestamp": "2026-10-04T10:40:44Z",
+      "producer": "GitHub Actions Media Owner Scope Runtime E2E",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "note": "Production runtime evidence against deployment run 37195981263. Synthetic fixture verified owner-read, private no-store, no shared-cache header, ownerUserId exclusion, projected fields only, non-owner 404, and anonymous 403. This record supports the owner-scoped media metadata boundary only and does not promote MEDIA-001, Mapping 0, or the canonical Evidence Registry."
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"

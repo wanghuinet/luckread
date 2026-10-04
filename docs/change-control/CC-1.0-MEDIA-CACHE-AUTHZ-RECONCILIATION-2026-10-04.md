@@ -1,6 +1,6 @@
 # Change Control — 1.0 Media Cache / Authorization Reconciliation — 2026-10-04
 
-Status: MERGED / RELEVANT-CI-VALIDATED / RUNTIME-EVIDENCE-PENDING
+Status: CLOSED — IMPLEMENTATION / RUNTIME-EVIDENCE RECONCILED
 
 ## Baseline
 
@@ -134,3 +134,27 @@ Decision for this follow-up slice:
 - Re-run CI, deploy the exact resulting W01 source through the existing controlled deployment path, then repeat the independent Media Owner Scope Runtime E2E.
 
 No production GREEN claim is made.
+
+
+## Runtime evidence reconciliation — 2026-10-04
+
+The independent production runtime evidence is complete on current main commit `0f0f7d52d8246f45413d5479e5c324365f7efcc5`.
+
+- Deployment: https://github.com/wanghuinet/luckread/actions/runs/37195981263
+- Media Owner Scope Runtime E2E: https://github.com/wanghuinet/luckread/actions/runs/37196089353
+- Artifact: https://github.com/wanghuinet/luckread/actions/runs/37196089353/artifacts/11301086936
+- Tested source: `0f0f7d52d8246f45413d5479e5c324365f7efcc5`
+
+Observed:
+- owner can read the projected media metadata;
+- response is `Cache-Control: private, no-store`;
+- no shared-cache header is emitted;
+- `ownerUserId` is not exposed;
+- non-owner requests receive 404;
+- anonymous requests receive 403;
+- synthetic fixtures were cleaned up successfully.
+
+This closes the runtime-evidence boundary for this Change Control. It does not promote MEDIA-001, Mapping 0, or the canonical Evidence Registry to GREEN.
+
+Canonical Evidence Registry record:
+`EVD-MEDIA001-OWNER-SCOPE-RUNTIME-001` = `PASS / VERIFIED`.

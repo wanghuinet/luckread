@@ -1,6 +1,6 @@
 # Change Control - 1.1 Content-List Cache Generation Invalidation - 2026-10-04
 
-Status: CHANGE-CONTROL / IMPLEMENTATION-PENDING-RUNTIME-EVIDENCE
+Status: CLOSED — IMPLEMENTATION / RUNTIME-EVIDENCE RECONCILED
 
 ## GAP
 
@@ -63,3 +63,26 @@ Related contracts:
 Related implementation:
 - `workers/W01-payload/src/lib/public-response-cache.ts`
 - `workers/W01-payload/src/lib/public-response-cache.test.ts`
+
+
+## Runtime evidence reconciliation — 2026-10-04
+
+The required independent production runtime evidence is complete on current main commit `0f0f7d52d8246f45413d5479e5c324365f7efcc5`.
+
+- Deployment: https://github.com/wanghuinet/luckread/actions/runs/37195981263
+- Content List Cache Runtime E2E: https://github.com/wanghuinet/luckread/actions/runs/37196089360
+- Artifact: https://github.com/wanghuinet/luckread/actions/runs/37196089360/artifacts/11300637536
+- Tested source: `0f0f7d52d8246f45413d5479e5c324365f7efcc5`
+
+Observed:
+- anonymous filtered request MISS;
+- repeat anonymous filtered request HIT;
+- authenticated request bypassed shared cache;
+- authoritative PUBLISHED→UNPUBLISHED mutation advanced the cache generation;
+- the previously cached filtered variant became unreachable and the fixture disappeared from the subsequent response;
+- synthetic fixtures were cleaned up successfully.
+
+This closes the runtime-evidence boundary for this Change Control. It does not promote CONTENT-007, Mapping 0, or the canonical Evidence Registry to GREEN.
+
+Canonical Evidence Registry record:
+`EVD-CONTENT007-PUBLIC-LIST-CACHE-RUNTIME-001` = `PASS / VERIFIED`.
