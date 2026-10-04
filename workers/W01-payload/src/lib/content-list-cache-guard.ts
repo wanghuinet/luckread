@@ -30,7 +30,7 @@ export const validateContentListQuery = (url: URL): URLSearchParams => {
     }
 
     if (key === 'cursor') {
-      if (value.length > MAX_CURSOR_LENGTH) {
+      if (value.length > MAX_CURSOR_LENGTH || !/^[A-Za-z0-9_-]+$/.test(value)) {
         throw new ContentListQueryError('VALIDATION_FAILED', 400)
       }
     } else if (key === 'creatorId') {
