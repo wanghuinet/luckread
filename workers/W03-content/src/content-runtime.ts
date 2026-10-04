@@ -1,3 +1,4 @@
+import { revisionInsertStatement } from './revision-persistence.js'
 /// <reference types="@cloudflare/workers-types" />
 
 export type ContentState =
@@ -563,6 +564,20 @@ export async function createContent(
        VALUES (?, ?, ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?, ?, ?) `,
     ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, responseBody.etag, createdAt, createdAt),
     atomicGuard(db),
+    revisionInsertStatement(db, {
+      revisionId: crypto.randomUUID(),
+      contentId,
+      revisionNumber: 1,
+      contentVersion: 1,
+      title: normalized.title,
+      bodyRef: normalized.bodyRef,
+      mediaRefs: normalized.mediaRefs,
+      coverRef: normalized.coverRef,
+      state: 'DRAFT',
+      actorUserId: ownerUserId,
+      correlationId: crypto.randomUUID(),
+      createdAt,
+    }),
   ])
 
   return {
@@ -637,6 +652,20 @@ export async function updateContent(
         WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`,
     ).bind(updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
     atomicGuard(db),
+    revisionInsertStatement(db, {
+      revisionId: crypto.randomUUID(),
+      contentId: content.id,
+      revisionNumber: nextRevision,
+      contentVersion: nextVersion,
+      title: updated.title,
+      bodyRef: updated.bodyRef,
+      mediaRefs: updated.mediaRefs,
+      coverRef: updated.coverRef,
+      state: updated.state,
+      actorUserId: principalUserId,
+      correlationId: crypto.randomUUID(),
+      createdAt: updatedAt,
+    }),
   ])
 
   return updated
