@@ -1,4 +1,8 @@
-import { cachedPublicGet, invalidatePublicContentDetail } from '../../../../../lib/public-response-cache.js'
+import {
+  cachedPublicGet,
+  invalidatePublicContentDetail,
+  invalidatePublicContentList,
+} from '../../../../../lib/public-response-cache.js'
 
 import {
   callW03Content,
@@ -79,7 +83,10 @@ export async function PATCH(
       body: await request.json(),
       principal,
     })
-    if (response.ok) await invalidatePublicContentDetail(request, contentId)
+    if (response.ok) {
+      await invalidatePublicContentDetail(request, contentId)
+      await invalidatePublicContentList(request)
+    }
     return response
   } catch (error) {
     if (error instanceof SyntaxError) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid content request')
@@ -104,7 +111,10 @@ export async function DELETE(
       method: 'DELETE',
       principal,
     })
-    if (response.ok) await invalidatePublicContentDetail(request, contentId)
+    if (response.ok) {
+      await invalidatePublicContentDetail(request, contentId)
+      await invalidatePublicContentList(request)
+    }
     return response
   } catch (error) {
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
