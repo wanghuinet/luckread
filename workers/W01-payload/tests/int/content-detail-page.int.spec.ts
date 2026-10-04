@@ -10,7 +10,7 @@ describe('content detail page', () => {
     expect(page).toContain('followRestricted')
     expect(page).toContain('relationship?.blocked')
     expect(page).toContain('relationship?.blockedBy')
-    expect(page).toContain('当前关系受屏蔽规则限制。')
+    expect(page).toContain('copy.detail.restricted')
     expect(page).not.toContain("setFollowing(followData.data.following)")
   })
 })
