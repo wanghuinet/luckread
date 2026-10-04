@@ -10,6 +10,10 @@ const memoryFallback = new Map<string, { response: Response; expiresAt: number }
 const CACHE_MISS_WINDOW_MS = 60_000
 const CACHE_MISS_LIMIT_PER_KEY = 5
 const CACHE_MISS_MAX_KEYS = 1024
+const DEFAULT_CONTENT_LIST_GENERATION = '0'
+const CONTENT_LIST_GENERATION_KEY = new Request(
+  `https://cache.luckread.internal/__content-list-generation?v=${CACHE_VERSION}`,
+)
 const cacheMissHistory = new Map<string, number[]>()
 
 const readMemoryFallback = (keyString: string): Response | null => {
@@ -84,14 +88,54 @@ const normalizedQuery = (url: URL, namespace: string): string => {
   return params.toString()
 }
 
-export const publicCacheKey = (request: Request, namespace: string): Request => {
+const generateContentListGeneration = (): string => crypto.randomUUID().replaceAll('-', '')
+
+const isValidContentListGeneration = (value: unknown): value is string =>
+  typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value)
+
+const generationResponse = (generation: string): Response =>
+  new Response(JSON.stringify({ generation }), {
+    status: 200,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'public, max-age=3600',
+    },
+  })
+
+const readContentListGeneration = async (cache: Cache): Promise<string | null> => {
+  try {
+    const marker = await cache.match(CONTENT_LIST_GENERATION_KEY)
+    if (!marker) {
+      const generation = generateContentListGeneration()
+      await cache.put(CONTENT_LIST_GENERATION_KEY, generationResponse(generation))
+      return generation
+    }
+
+    const value = await marker.json() as unknown
+    const generation = value && typeof value === 'object' && 'generation' in value
+      ? (value as { generation?: unknown }).generation
+      : null
+    return isValidContentListGeneration(generation) ? generation : null
+  } catch {
+    return null
+  }
+}
+
+export const publicCacheKey = (
+  request: Request,
+  namespace: string,
+  contentListGeneration = DEFAULT_CONTENT_LIST_GENERATION,
+): Request => {
   const url = new URL(request.url)
   const query = normalizedQuery(url, namespace)
   const keyUrl = new URL('https://cache.luckread.internal/__edge-cache')
   keyUrl.searchParams.set('v', CACHE_VERSION)
   keyUrl.searchParams.set('n', namespace)
   keyUrl.searchParams.set('p', url.pathname)
-  if (namespace === 'content-list') keyUrl.searchParams.set('lang', normalizeLanguage(request))
+  if (namespace === 'content-list') {
+    keyUrl.searchParams.set('lang', normalizeLanguage(request))
+    keyUrl.searchParams.set('g', contentListGeneration)
+  }
   if (query) keyUrl.searchParams.set('q', query)
   return new Request(keyUrl.toString(), { method: 'GET' })
 }
@@ -142,8 +186,14 @@ export const cachedPublicGet = async (
   loader: () => Promise<Response>,
   ttlSeconds: number,
 ): Promise<Response> => {
-  const key = publicCacheKey(request, namespace)
   const cache = (globalThis.caches as unknown as { default: Cache }).default
+  let contentListGeneration = DEFAULT_CONTENT_LIST_GENERATION
+  if (namespace === 'content-list') {
+    const resolvedGeneration = await readContentListGeneration(cache)
+    if (!resolvedGeneration) return loader()
+    contentListGeneration = resolvedGeneration
+  }
+  const key = publicCacheKey(request, namespace, contentListGeneration)
   const keyString = key.url
 
   try {
@@ -216,18 +266,33 @@ export const invalidatePublicContentList = async (request: Request): Promise<voi
   url.pathname = '/api/v1/contents'
   url.search = ''
 
-  // Always invalidate the canonical/default language key plus the request
-  // language key. Content-list is not yet fully wildcard-invalidatable, so this
-  // guarantees the default /contents landing cache is never left stale.
-  await deletePublicCacheKey(publicCacheKey(new Request(url.toString()), 'content-list'))
+  const cache = (globalThis.caches as unknown as { default: Cache }).default
+  const previousGeneration = await readContentListGeneration(cache)
+  const nextGeneration = generateContentListGeneration()
 
-  const requestLanguage = request.headers.get('accept-language')?.trim()
-  if (requestLanguage) {
-    const localized = new Request(url.toString(), {
-      method: 'GET',
-      headers: { 'accept-language': requestLanguage },
-    })
-    await deletePublicCacheKey(publicCacheKey(localized, 'content-list'))
+  try {
+    await cache.put(CONTENT_LIST_GENERATION_KEY, generationResponse(nextGeneration))
+  } catch {
+    // Best-effort invalidation. If the generation marker cannot be updated,
+    // existing rate limits and bounded origin guards still protect the source
+    // of truth; the old cache generation remains readable until it expires.
+  }
+
+  if (previousGeneration) {
+    await deletePublicCacheKey(
+      publicCacheKey(new Request(url.toString()), 'content-list', previousGeneration),
+    )
+
+    const requestLanguage = request.headers.get('accept-language')?.trim()
+    if (requestLanguage) {
+      const localized = new Request(url.toString(), {
+        method: 'GET',
+        headers: { 'accept-language': requestLanguage },
+      })
+      await deletePublicCacheKey(
+        publicCacheKey(localized, 'content-list', previousGeneration),
+      )
+    }
   }
 }
 
