@@ -133,6 +133,7 @@ function makeAuth(env: BetterAuthEnv): BetterAuthInstance {
           required: false,
           input: false,
           returned: true,
+          defaultValue: 'PENDING_VERIFICATION',
           fieldName: 'account_state',
         },
         accountStateVersion: {
