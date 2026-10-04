@@ -60,8 +60,8 @@ describe('public response cache', () => {
 
     const request = new Request('https://luckread.com/api/v1/contents?cursor=c1')
     const a = cachedPublicGet(request, 'content-list', loader, 30)
-    await vi.waitFor(() => expect(loader).toHaveBeenCalledTimes(1))
     const b = cachedPublicGet(request.clone(), 'content-list', loader, 30)
+    await vi.waitFor(() => expect(loader).toHaveBeenCalledTimes(1))
     releaseLoader?.(new Response(JSON.stringify({ data: 'origin' }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -122,7 +122,9 @@ describe('public response cache', () => {
   })
 
   it('uses the memory fallback when Cache API reads fail', async () => {
-    cache.match.mockResolvedValue(undefined)
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-list-generation') ? generationResponse() : undefined,
+    )
     cache.put.mockRejectedValueOnce(new Error('CACHE_WRITE_FAILED'))
     Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
 
