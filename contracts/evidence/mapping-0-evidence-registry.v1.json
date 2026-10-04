@@ -1329,8 +1329,7 @@
       "producer": "GitHub Actions Content List Cache Runtime E2E",
       "result": "PASS",
       "status": "VERIFIED",
-      "note": "Production runtime evidence against deployment run 37195981263. Synthetic fixture verified anonymous filtered-list MISS then HIT, authenticated shared-cache bypass, publish→unpublish mutation invalidation, filtered-list MISS after mutation, and fixture disappearance. No new Worker or D1 was introduced. This record supports cache-specific acceptance only and does not promote CONTENT-007, Mapping 0, or the canonical Evidence Registry.",
-      "cacheRuntimeScope": "content-list"
+      "note": "Production runtime evidence against deployment run 37195981263. Synthetic fixture verified anonymous filtered-list MISS then HIT, authenticated shared-cache bypass, publish→unpublish mutation invalidation, filtered-list MISS after mutation, and fixture disappearance. No new Worker or D1 was introduced. This record supports cache-specific acceptance only and does not promote CONTENT-007, Mapping 0, or the canonical Evidence Registry."
     },
     {
       "evidenceId": "EVD-MEDIA001-OWNER-SCOPE-RUNTIME-001",
@@ -1345,8 +1344,7 @@
       "producer": "GitHub Actions Media Owner Scope Runtime E2E",
       "result": "PASS",
       "status": "VERIFIED",
-      "note": "Production runtime evidence against deployment run 37195981263. Synthetic fixture verified owner-read, private no-store, no shared-cache header, ownerUserId exclusion, projected fields only, non-owner 404, and anonymous 403. This record supports the owner-scoped media metadata boundary only and does not promote MEDIA-001, Mapping 0, or the canonical Evidence Registry.",
-      "cacheRuntimeScope": "media-detail"
+      "note": "Production runtime evidence against deployment run 37195981263. Synthetic fixture verified owner-read, private no-store, no shared-cache header, ownerUserId exclusion, projected fields only, non-owner 404, and anonymous 403. This record supports the owner-scoped media metadata boundary only and does not promote MEDIA-001, Mapping 0, or the canonical Evidence Registry."
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
