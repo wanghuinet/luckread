@@ -81,7 +81,7 @@ jobs:
           const contract=JSON.parse(fs.readFileSync('contracts/state-machines/account.json','utf8'))
           const transitions=contract['x-transitions']
           if(!Array.isArray(transitions) || transitions.length!==26) throw new Error('canonical account transition count changed')
-          fs.writeFileSync('.auth-013-lifecycle-rules.ts', 'export const canonicalTransitions = '+JSON.stringify(transitions)+' as const\\n')
+          fs.writeFileSync('.auth-013-lifecycle-rules.ts', 'export const canonicalTransitions = '+JSON.stringify(transitions)+' as const')
           NODE
           cat > .auth-013-lifecycle-harness.ts <<'EOF'
           // CI-only ephemeral harness. Synthetic User/session/journal rows are cleaned.
