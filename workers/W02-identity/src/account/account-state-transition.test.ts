@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
   applyAccountStateTransition,
   authorizeAccountStateTransition,
@@ -466,5 +467,120 @@ describe('AUTH-013 trusted-principal authorization boundary', () => {
         { subjectId: 'other-user', targetUserId: '42', to: 'DELETION_REQUESTED' },
       ),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+  })
+})
+
+
+type CanonicalTransition = {
+  from: AccountStateTransitionInput['to']
+  to: AccountStateTransitionInput['to']
+  actor: 'user' | 'operator' | 'admin' | 'system'
+  permission: string | null
+  precondition?: string
+  requiresApproval?: boolean | string
+}
+
+const canonicalAccountTransitions = JSON.parse(
+  readFileSync(new URL('../../../../contracts/state-machines/account.json', import.meta.url), 'utf8'),
+) as {
+  'x-transitions': CanonicalTransition[]
+}
+
+describe('AUTH-013 canonical state-machine coverage', () => {
+  it('executes every transition declared by the canonical account state machine', async () => {
+    expect(canonicalAccountTransitions['x-transitions']).toHaveLength(26)
+
+    for (const transition of canonicalAccountTransitions['x-transitions']) {
+      const actorType = transition.actor === 'system' ? 'job' : transition.actor
+      const actorId = transition.actor === 'user'
+        ? '42'
+        : actorType === 'operator'
+          ? 'operator-1'
+          : actorType === 'admin'
+            ? 'admin-1'
+            : 'job:account-lifecycle'
+
+      const fake = fakeDb({ state: transition.from, version: 7 })
+
+      const result = await applyAccountStateTransition(
+        fake.db,
+        input({
+          to: transition.to,
+          actor: { id: actorId, type: actorType },
+          permission: transition.permission,
+          preconditionSatisfied: transition.precondition ? true : undefined,
+          approvalLevel: transition.requiresApproval
+            ? transition.requiresApproval === true
+              ? 'L7'
+              : transition.requiresApproval
+            : null,
+        }),
+      )
+
+      expect(result.from).toBe(transition.from)
+      expect(result.to).toBe(transition.to)
+      expect(result.accountStateVersion).toBe(8)
+      expect(fake.row).toEqual({ state: transition.to, version: 8 })
+      expect(fake.batchCalls()).toBe(1)
+
+      const journal = fake.journal()
+      expect(journal?.eventType).toBe('identity.account_state_changed')
+      expect(journal?.sourceVersion).toBe(8)
+
+      const expectedSessionRevocation = new Set([
+        'SUSPENDED',
+        'BANNED',
+        'DELETION_PENDING',
+        'DELETED',
+      ]).has(transition.to)
+
+      expect(fake.sessionRevocation() !== null).toBe(expectedSessionRevocation)
+    }
+  })
+
+  it('rejects the canonical forbidden direct transitions', async () => {
+    const forbidden: Array<{
+      from: string
+      to: AccountStateTransitionInput['to']
+      permission: string | null
+      actor: AccountStateTransitionInput['actor']
+    }> = [
+      {
+        from: 'DELETED',
+        to: 'ACTIVE',
+        permission: null,
+        actor: { id: '42', type: 'user' },
+      },
+      {
+        from: 'BANNED',
+        to: 'ACTIVE',
+        permission: 'user.reinstate',
+        actor: { id: 'admin-1', type: 'admin' },
+      },
+      {
+        from: 'ACTIVE',
+        to: 'UNREGISTERED',
+        permission: null,
+        actor: { id: '42', type: 'user' },
+      },
+    ]
+
+    for (const transition of forbidden) {
+      const fake = fakeDb({ state: transition.from, version: 7 })
+      await expect(
+        applyAccountStateTransition(
+          fake.db,
+          input({
+            to: transition.to,
+            actor: transition.actor,
+            permission: transition.permission,
+            preconditionSatisfied: true,
+          }),
+        ),
+      ).rejects.toMatchObject({ code: 'INVALID_STATE' })
+
+      expect(fake.batchCalls()).toBe(0)
+      expect(fake.row).toEqual({ state: transition.from, version: 7 })
+    }
   })
 })
