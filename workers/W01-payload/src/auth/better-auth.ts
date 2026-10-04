@@ -1,5 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { betterAuth } from 'better-auth'
+import { bearer } from 'better-auth/plugins/bearer'
 
 type BetterAuthEnv = {
   D1: D1Database
@@ -135,6 +136,7 @@ function makeAuth(env: BetterAuthEnv): BetterAuthInstance {
     },
     session: {
       modelName: 'auth_sessions',
+      cookieCache: { enabled: false },
       fields: {
         userId: 'user_id',
         token: 'token',
@@ -170,6 +172,7 @@ function makeAuth(env: BetterAuthEnv): BetterAuthInstance {
         updatedAt: 'updated_at',
       },
     },
+    plugins: [bearer()],
     emailAndPassword: {
       enabled: true,
       autoSignIn: false,
@@ -221,3 +224,19 @@ export async function handleBetterAuth(request: Request): Promise<Response> {
 }
 
 export type BetterAuthSession = Awaited<ReturnType<typeof getBetterAuthSession>>
+
+
+export async function listBetterAuthSessions(request: Request) {
+  const auth = await getBetterAuth()
+  return auth.api.listSessions({
+    headers: request.headers,
+  })
+}
+
+export async function revokeBetterAuthSession(request: Request, token: string) {
+  const auth = await getBetterAuth()
+  return auth.api.revokeSession({
+    body: { token },
+    headers: request.headers,
+  })
+}
