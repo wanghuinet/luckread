@@ -1,7 +1,7 @@
 import type { PayloadRequest } from 'payload'
 
 import { getBetterAuthSession } from '@/auth/better-auth'
-import { resolveGlobalLayer } from '@/auth/w02-session-client'
+import { resolveGlobalLayer } from '@/auth/w02-identity-client'
 
 export const payloadAdminOnly = async ({ req }: { req: PayloadRequest }): Promise<boolean> => {
   try {
