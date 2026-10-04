@@ -1151,9 +1151,7 @@
       "checkId": "111446507189",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/37205765043",
       "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
-      "note": "Controlled remote D1 lifecycle matrix executed at current main bc67642943c027927646280da8e4da0c6f84291d. PASS assertions covered ACTIVE→RESTRICTED→FROZEN→SUSPENDED→BANNED→RESTORED→ACTIVE; L7 approval was required for BANNED; rejected BANNED transition caused no mutation; direct BANNED→ACTIVE was rejected; entering SUSPENDED revoked the session and BANNED retained the revocation; final account state/version were ACTIVE/7; journal source versions 2–7 were canonical identity.account_state_changed events; synthetic user/session/journal cleanup completed with cleanup verification.",
-      "checkId": "111446507189",
-      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/37205765043"
+      "note": "Controlled remote D1 lifecycle matrix executed at current main bc67642943c027927646280da8e4da0c6f84291d. PASS assertions covered ACTIVE→RESTRICTED→FROZEN→SUSPENDED→BANNED→RESTORED→ACTIVE; L7 approval was required for BANNED; rejected BANNED transition caused no mutation; direct BANNED→ACTIVE was rejected; entering SUSPENDED revoked the session and BANNED retained the revocation; final account state/version were ACTIVE/7; journal source versions 2–7 were canonical identity.account_state_changed events; synthetic user/session/journal cleanup completed with cleanup verification."
     },
     {
       "evidenceId": "EVD-SAFETY001-MODERATION-RUNTIME-E2E-001",
