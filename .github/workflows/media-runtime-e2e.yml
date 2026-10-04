@@ -184,7 +184,7 @@ jobs:
           set -euo pipefail
           other="$(curl --silent --show-error -o /tmp/media-other.json -w '%{http_code}' -H "Authorization: Bearer $MEDIA_OTHER_TOKEN" "$W01_BASE_URL/api/v1/media/$MEDIA_ID")"
           anon="$(curl --silent --show-error -o /tmp/media-anon.json -w '%{http_code}' "$W01_BASE_URL/api/v1/media/$MEDIA_ID")"
-          node --input-type=module -e "const other=Number(process.argv[1]);const anon=Number(process.argv[2]);if(![401,403,404].includes(other))throw new Error('non-owner access not denied: '+other);if(![401,403,404].includes(anon))throw new Error('anonymous access not denied: '+anon);const fs=require('node:fs');fs.writeFileSync('artifacts/mapping-0/media-runtime-e2e/access.json',JSON.stringify({status:'PASS',nonOwnerHttpStatus:other,anonymousHttpStatus:anon},null,2)+'\\n')" "$other" "$anon"
+          node --input-type=module -e "import {writeFileSync} from 'node:fs';const other=Number(process.argv[1]);const anon=Number(process.argv[2]);if(![401,403,404].includes(other))throw new Error('non-owner access not denied: '+other);if(![401,403,404].includes(anon))throw new Error('anonymous access not denied: '+anon);writeFileSync('artifacts/mapping-0/media-runtime-e2e/access.json',JSON.stringify({status:'PASS',nonOwnerHttpStatus:other,anonymousHttpStatus:anon},null,2)+'\\n')" "$other" "$anon"
 
       - name: Cleanup media and account fixtures
         if: always()
