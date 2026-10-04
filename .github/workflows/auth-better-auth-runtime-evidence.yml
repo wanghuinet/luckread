@@ -1,0 +1,144 @@
+name: Better Auth Core Runtime Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'workers/W01-payload/src/auth/**'
+      - 'workers/W01-payload/src/app/auth/**'
+      - 'workers/W01-payload/src/app/api/auth/**'
+      - 'workers/W01-payload/src/app/api/v1/auth/**'
+      - 'workers/W01-payload/src/app/(payload)/api/users/me/**'
+      - 'workers/W01-payload/src/collections/Users.ts'
+      - 'workers/W01-payload/src/migrations/**'
+      - 'workers/W01-payload/scripts/auth-better-auth-runtime-evidence.mjs'
+      - 'workers/W01-payload/package.json'
+      - 'workers/W01-payload/pnpm-lock.yaml'
+      - 'workers/W01-payload/payload.config.ts'
+      - 'workers/W01-payload/wrangler.jsonc'
+      - 'artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source SHA to test
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NODE_ENV: development
+      CLOUDFLARE_ENV: development
+      PAYLOAD_SECRET: local-runtime-${{ github.run_id }}-${{ github.run_attempt }}
+      BETTER_AUTH_SECRET: local-runtime-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Resolve exact source SHA
+        id: source
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+          DISPATCH_SHA: ${{ inputs.source_sha }}
+          WORKFLOW_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "sha=$DISPATCH_SHA" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "sha=$PR_SHA" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=$WORKFLOW_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout exact tested source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          fetch-depth: 1
+
+      - name: Validate exact source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.source.outputs.sha }}"
+          test -s workers/W01-payload/scripts/auth-better-auth-runtime-evidence.mjs
+          test -s workers/W01-payload/src/migrations/20261005_MIG_BETTER_AUTH_CORE_V1.ts
+          test -z "$(git status --short)"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Apply exact local Payload migration set
+        working-directory: workers/W01-payload
+        run: pnpm payload migrate
+
+      - name: Capture local D1 Better Auth schema
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/evidence/auth-better-auth
+          pnpm exec wrangler d1 execute luckread --local --json --config wrangler.jsonc --command 'SELECT name,type FROM sqlite_schema WHERE type IN ("table","index") AND (name LIKE "auth_%" OR name IN ("users","users_sessions")) ORDER BY type,name;' > ../../artifacts/evidence/auth-better-auth/schema-catalog.json
+          pnpm exec wrangler d1 execute luckread --local --json --config wrangler.jsonc --command 'PRAGMA table_info(users);' > ../../artifacts/evidence/auth-better-auth/users-schema.json
+          pnpm exec wrangler d1 execute luckread --local --json --config wrangler.jsonc --command 'PRAGMA table_info(auth_accounts);' > ../../artifacts/evidence/auth-better-auth/auth-accounts-schema.json
+          pnpm exec wrangler d1 execute luckread --local --json --config wrangler.jsonc --command 'PRAGMA table_info(auth_sessions);' > ../../artifacts/evidence/auth-better-auth/auth-sessions-schema.json
+          pnpm exec wrangler d1 execute luckread --local --json --config wrangler.jsonc --command 'PRAGMA table_info(auth_verifications);' > ../../artifacts/evidence/auth-better-auth/auth-verifications-schema.json
+
+      - name: Build exact W01 OpenNext worker
+        working-directory: workers/W01-payload
+        run: pnpm exec opennextjs-cloudflare build
+
+      - name: Start exact W01 local Worker runtime
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler dev --local --port 8787 --var "PAYLOAD_SECRET:$PAYLOAD_SECRET" --var "BETTER_AUTH_SECRET:$BETTER_AUTH_SECRET" --var "CLOUDFLARE_ENV:$CLOUDFLARE_ENV" > auth-better-auth-preview.log 2>&1 &
+          echo $! > auth-better-auth-preview.pid
+          ready=0
+          for _ in $(seq 1 120); do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8787/ || true)
+            if [ "$code" != "000" ]; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then cat auth-better-auth-preview.log; exit 1; fi
+
+      - name: Run Better Auth core runtime evidence
+        working-directory: workers/W01-payload
+        env:
+          AUTH_BETTER_AUTH_BASE_URL: http://127.0.0.1:8787
+          GITHUB_SHA: ${{ steps.source.outputs.sha }}
+        run: node --import=tsx/esm scripts/auth-better-auth-runtime-evidence.mjs
+
+      - name: Dump runtime log on failure
+        if: ${{ failure() }}
+        working-directory: workers/W01-payload
+        run: tail -n 500 auth-better-auth-preview.log || true
+
+      - name: Upload Better Auth runtime evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-better-auth-core-runtime-${{ steps.source.outputs.sha }}
+          path: |
+            artifacts/evidence/auth-better-auth/
+            workers/W01-payload/auth-better-auth-preview.log
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Cleanup local runtime
+        if: ${{ always() }}
+        working-directory: workers/W01-payload
+        run: |
+          if [ -f auth-better-auth-preview.pid ]; then kill "$(cat auth-better-auth-preview.pid)" 2>/dev/null || true; fi
+          pkill -TERM -x workerd 2>/dev/null || true
+          pkill -TERM -x esbuild 2>/dev/null || true
