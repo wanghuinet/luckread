@@ -60,8 +60,8 @@ describe('public response cache', () => {
 
     const request = new Request('https://luckread.com/api/v1/contents?cursor=c1')
     const a = cachedPublicGet(request, 'content-list', loader, 30)
-    const b = cachedPublicGet(request.clone(), 'content-list', loader, 30)
     await vi.waitFor(() => expect(loader).toHaveBeenCalledTimes(1))
+    const b = cachedPublicGet(request.clone(), 'content-list', loader, 30)
     releaseLoader?.(new Response(JSON.stringify({ data: 'origin' }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -122,9 +122,7 @@ describe('public response cache', () => {
   })
 
   it('uses the memory fallback when Cache API reads fail', async () => {
-    cache.match.mockImplementation(async (request: Request) =>
-      request.url.includes('__content-list-generation') ? generationResponse() : undefined,
-    )
+    cache.match.mockResolvedValue(undefined)
     cache.put.mockRejectedValueOnce(new Error('CACHE_WRITE_FAILED'))
     Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
 
@@ -135,11 +133,7 @@ describe('public response cache', () => {
     const request = new Request('https://luckread.com/api/v1/contents?cursor=read-fallback')
 
     await cachedPublicGet(request, 'content-list', loader, 30)
-    cache.match
-      .mockImplementationOnce(async (request: Request) =>
-        request.url.includes('__content-list-generation') ? generationResponse() : undefined,
-      )
-      .mockRejectedValueOnce(new Error('CACHE_READ_FAILED'))
+    cache.match.mockRejectedValueOnce(new Error('CACHE_READ_FAILED'))
     const response = await cachedPublicGet(request.clone(), 'content-list', loader, 30)
 
     expect(loader).toHaveBeenCalledTimes(1)
@@ -316,8 +310,7 @@ describe('public response cache', () => {
       ).url,
     )
 
-    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response]>
-    const generationWrite = putCalls
+    const generationWrite = cache.put.mock.calls
       .map(([request, response]) => ({ request, response }))
       .find(({ request }) => request.url.includes('__content-list-generation'))
     expect(generationWrite).toBeDefined()
@@ -338,8 +331,7 @@ describe('public response cache', () => {
 
     await invalidatePublicContentList(new Request('https://luckread.com/api/v1/contents'))
 
-    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response]>
-    const generationWrite = putCalls
+    const generationWrite = cache.put.mock.calls
       .map(([request, response]) => ({ request, response }))
       .find(({ request }) => request.url.includes('__content-list-generation'))
     const body = await generationWrite!.response.clone().json() as { generation: string }
