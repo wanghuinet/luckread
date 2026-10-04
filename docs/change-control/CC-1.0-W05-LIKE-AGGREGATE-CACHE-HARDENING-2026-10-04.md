@@ -1,11 +1,13 @@
 # Change Control — W05 Like Aggregate Cache Hardening — 2026-10-04
 
-Status: IMPLEMENTATION_SLICE / AWAITING CI EVIDENCE
+Status: MERGED / RELEVANT-CI-VALIDATED / RUNTIME-EVIDENCE-PENDING
 
 ## Baseline
-- authoritative main: `36e9f5ad8cf059bf394d7010d2ce631774f232fd`
+- authoritative main before slice: `36e9f5ad8cf059bf394d7010d2ce631774f232fd`
 - backup: `backup/2026-10-04-pre-w05-counter-read-hardening`
 - working branch: `superpowers/w05-counter-read-hardening`
+- merged main: `3e112938fa03184255bcf3f7e12bacfdd03eaff4`
+- pull request: #646
 
 ## Gap
 W05 `getLikeStatus` currently combines viewer-specific like state with a target-wide `COUNT(*)`. Its 5-second cache key contains the actor, so the public aggregate is duplicated across viewers and hot content can repeatedly re-enter D1.
@@ -25,9 +27,21 @@ W05 `getLikeStatus` currently combines viewer-specific like state with a target-
 - No change to public API shape.
 - No Mapping 0 promotion.
 
+## CI Evidence
+
+The merged PR #646 exact head `29efc124c1aee0942a662473cea3ab3f725aef78` produced:
+
+- W05 Social Runtime CI: run `37180481812` — PASS
+- API Contract CI: run `37180481756` — PASS
+- 1.0 D1 Traffic Guard Contract CI: run `37180481763` — PASS
+- Worker D1 Access Boundary Gate: run `37180481787` — PASS
+- Worker Directory Drift Gate: run `37180481864` — PASS
+- Security Hardening Gate: run `37180481797` — PASS
+- Mapping 0 Structural Gate: run `37180481809` — PASS
+- Contract Admission CI: run `37180481865` — PASS
+
+API Inventory Reconciliation run `37180481788` reported a pre-existing project-wide inventory/evidence gap and did not identify a failure in the four changed PR files. This Change Control does not reclassify that baseline issue as a Like Aggregate defect.
+
 ## Acceptance
-- A cached viewer state can be reused without D1.
-- A cached target aggregate avoids `COUNT(*)` on subsequent viewers during the TTL.
-- When aggregate cache is warm, D1 status lookup does not contain `COUNT(*)`.
-- Like/unlike invalidates viewer state but does not force a synchronous aggregate refresh.
-- Existing block/visibility rules remain authoritative.
+
+The scoped shared aggregate cache behavior and bounded D1-read hardening passed the relevant CI gates. No production runtime claim is made here until independent deployment/runtime evidence is recorded.

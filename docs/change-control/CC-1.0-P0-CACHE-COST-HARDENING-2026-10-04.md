@@ -1,12 +1,14 @@
 # Change Control — 1.0 P0 Cache Cost Hardening — 2026-10-04
 
-Status: IMPLEMENTATION_SLICE / AWAITING CI EVIDENCE
+Status: MERGED / RELEVANT-CI-VALIDATED / RUNTIME-EVIDENCE-PENDING
 
 ## Baseline
 
-- authoritative main: `19bd75423930a3776178251fcc9384c78fdb5369`
+- authoritative main before slice: `19bd75423930a3776178251fcc9384c78fdb5369`
 - backup: `backup/2026-10-04-pre-cache-cost-hardening`
 - working branch: `superpowers/1.0-cache-cost-hardening`
+- merged main: `36e9f5ad8cf059bf394d7010d2ce631774f232fd`
+- pull request: #645
 
 ## Scope
 
@@ -58,17 +60,26 @@ The existing Cloudflare public-read/location rate limits remain the broader prot
 
 Public JSON 404 responses may be cached for at most 10 seconds. The shorter TTL prevents repeated lookup of nonexistent resources without retaining stale not-found decisions for a long period.
 
+## CI Evidence
+
+The merged PR #645 exact head `7a6e39e3db390b1aea1e988c5bd2ef60df13dd1b` produced:
+
+- 1.1 P0 Cache Hardening CI: run `37180120328` — PASS
+- 1.0 D1 Traffic Guard Contract CI: run `37180120286` — PASS
+- Worker D1 Access Boundary Gate: run `37180120291` — PASS
+- Worker Directory Drift Gate: run `37180120275` — PASS
+- Security Hardening Gate: run `37180120294` — PASS
+- Mapping 0 Structural Gate: run `37180120293` — PASS
+- Worker Terminal Routing Gate: run `37180120296` — PASS
+- Payload Implementation Admission: run `37180120278` — PASS
+- W05 Social Runtime CI: run `37180120269` — PASS
+- Contract Admission CI: run `37180120281` — PASS
+- W01 Auth Me Import Verification: run `37180120323` — PASS
+- W01 Creator Center Admin Verification: run `37180120303` — PASS
+- W01 Homepage E2E: run `37180120262` — PASS
+
+Payload Foundation CI run `37180120302` remained a pre-existing W01 baseline lint failure outside the cache slice. It is not reclassified as a cache defect and is not represented as GREEN evidence for this Change Control.
+
 ## Acceptance
 
-Required CI evidence:
-
-- public cache unit tests pass;
-- cache miss single-flight remains intact;
-- repeated cache failure triggers bounded fuse without invoking origin after the limit;
-- username lookup cache key ignores attacker-controlled query parameters;
-- media metadata route is cache-first;
-- negative cache is bounded to 10 seconds;
-- W01 typecheck passes;
-- existing 1.0 D1 Traffic Guard CI remains compatible.
-
-No production runtime claim is made by this Change Control until deployment/runtime evidence is independently recorded.
+The scoped cache and D1-guard acceptance checks passed in CI. No production runtime claim is made here until independent deployment/runtime evidence is recorded.
