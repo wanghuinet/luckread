@@ -74,7 +74,6 @@ Choose the conservative authenticated media metadata path.
 
 Implementation is admitted under the owner-scoped/no-store decision. Production GREEN remains blocked until CI and independent runtime evidence pass.
 
-
 ## CI Evidence
 
 PR #650 exact head `bc2178dc9b90d0007cda80de2451fe320f5bcfe3`:
@@ -96,6 +95,20 @@ Two project-level checks failed without a scoped Media defect:
 - Payload Foundation CI run `37182668907` — pre-existing W01 lint baseline; typecheck and security unit tests passed before lint.
 - API Inventory Reconciliation run `37182668932` — `failureCount=0`; existing incomplete inventory findings remain for unrelated operations such as `getHomeFeed` and `transitionAccountState`.
 
-W01 Homepage E2E run `37182668875` failed during the local Miniflare/workerd web-server startup with `SQLITE_BUSY` / `database is locked`; production build completed successfully. This is runtime-test environment evidence, not proof of a Media functional defect.
+## Homepage E2E Reconciliation
 
-No production GREEN claim is made. Independent deployed runtime evidence remains pending.
+The first Homepage E2E attempt in workflow run `37182668875` failed during the local Miniflare/workerd web-server startup with `SQLITE_BUSY` / `database is locked`; the production build completed successfully.
+
+The failed `homepage-e2e` job was rerun as job `111379230926` within the same workflow run. The rerun completed successfully:
+
+- Production build — PASS
+- Run homepage E2E — PASS
+- complete job — PASS
+
+The rerun removes the immediate Homepage E2E blocker for this slice. The original `SQLITE_BUSY` failure is retained as transient test-environment evidence; no Media business-code change was made for it.
+
+## Production Runtime Evidence
+
+Independent deployed runtime evidence for the owner-scoped/no-store Media path is still pending.
+
+No production GREEN claim is made.
