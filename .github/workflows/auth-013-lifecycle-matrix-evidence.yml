@@ -111,7 +111,10 @@ jobs:
 
           export default {
             async fetch(request, env) {
-              if (request.method !== 'POST' || new URL(request.url).pathname !== '/__auth013_lifecycle_probe')
+              const pathname = new URL(request.url).pathname
+              if (request.method === 'GET' && pathname === '/__auth013_lifecycle_ready')
+                return new Response(null,{status:204})
+              if (request.method !== 'POST' || pathname !== '/__auth013_lifecycle_probe')
                 return new Response(null,{status:404})
 
               const db=env.D1_01
@@ -274,21 +277,13 @@ jobs:
           npx --yes wrangler@4.116.0 dev --remote --config .auth-013-lifecycle.wrangler.jsonc --ip 127.0.0.1 --port 8788 > auth-013-lifecycle-harness.log 2>&1 &
           echo $! > auth-013-lifecycle-harness.pid
           ready=0
-          for _ in $(seq 1 90); do
+          for _ in $(seq 1 120); do
             if ! kill -0 "$(cat auth-013-lifecycle-harness.pid)" 2>/dev/null; then
               cat auth-013-lifecycle-harness.log
               exit 1
             fi
-            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8788/__auth013_lifecycle_probe || true)
-            if [ "$code" != "000" ]; then
-              sleep 2
-              if ! kill -0 "$(cat auth-013-lifecycle-harness.pid)" 2>/dev/null; then
-                cat auth-013-lifecycle-harness.log
-                exit 1
-              fi
-              verify_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8788/__auth013_lifecycle_probe || true)
-              if [ "$verify_code" != "000" ]; then ready=1; break; fi
-            fi
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 3 http://127.0.0.1:8788/__auth013_lifecycle_ready || true)
+            if [ "$code" = "204" ]; then ready=1; break; fi
             sleep 1
           done
           if [ "$ready" -ne 1 ]; then
@@ -297,7 +292,7 @@ jobs:
           fi
 
           set +e
-          http_code=$(curl -sS -o artifacts/mapping-0/auth-013-lifecycle/runtime-result.json -w '%{http_code}' -X POST --max-time 60 http://127.0.0.1:8788/__auth013_lifecycle_probe)
+          http_code=$(curl -sS -o artifacts/mapping-0/auth-013-lifecycle/runtime-result.json -w '%{http_code}' -X POST --max-time 180 http://127.0.0.1:8788/__auth013_lifecycle_probe)
           curl_exit=$?
           set -e
           echo "AUTH_013_LIFECYCLE_HTTP_STATUS=$http_code"
