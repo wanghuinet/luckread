@@ -26,6 +26,7 @@ describe('users/me route imports', () => {
     expect(source).toContain("{ updatedAt: { equals: current.updatedAt } }")
     expect(source).not.toContain('data: input')
   })
+
   it('short-circuits credential-free GET/PATCH before Payload authentication', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'),
@@ -33,10 +34,9 @@ describe('users/me route imports', () => {
     )
 
     expect(source).toContain("import { readPayloadAccessToken, readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'")
-    expect(source).toContain('if (!readPayloadAccessToken(request)) return unauthorized()')
-    const credentialChecks = []
-    let searchFrom = 0
     const marker = 'if (!readPayloadAccessToken(request)) return unauthorized()'
+    const credentialChecks: number[] = []
+    let searchFrom = 0
     while (true) {
       const index = source.indexOf(marker, searchFrom)
       if (index < 0) break
@@ -46,15 +46,14 @@ describe('users/me route imports', () => {
 
     const getStart = source.indexOf('export async function GET')
     const patchStart = source.indexOf('export async function PATCH')
-    const authenticateStart = source.indexOf('async function authenticate')
+    const getAuthenticateCall = source.indexOf('const authenticated = await authenticate(request)', getStart)
+    const patchAuthenticateCall = source.indexOf('const authenticated = await authenticate(request)', patchStart)
     const getCheck = credentialChecks.find((index) => index > getStart && index < patchStart)
     const patchCheck = credentialChecks.find((index) => index > patchStart)
+
     expect(getCheck).toBeDefined()
     expect(patchCheck).toBeDefined()
-    expect(getCheck!).toBeGreaterThan(getStart)
-    expect(patchCheck!).toBeGreaterThan(patchStart)
-    expect(getCheck!).toBeLessThan(authenticateStart)
-    expect(patchCheck!).toBeLessThan(authenticateStart)
+    expect(getAuthenticateCall).toBeGreaterThan(getCheck!)
+    expect(patchAuthenticateCall).toBeGreaterThan(patchCheck!)
   })
-
 })
