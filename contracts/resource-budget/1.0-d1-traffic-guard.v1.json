@@ -21,6 +21,7 @@
     "synchronousEventFanoutMax": 0,
     "cacheMissSingleFlight": true,
     "cacheMissOriginFusePerKeyPerMinute": 5,
+    "cacheMissOriginFuseScope": "per-worker-isolate",
     "negativeCacheMaxTtlSeconds": 10,
     "privateResponsesNeverSharedCached": true,
     "highFrequencyDerivedWork": "QUEUE_OR_AGGREGATION_BEFORE_BATCH_PERSISTENCE",
