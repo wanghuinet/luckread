@@ -312,7 +312,8 @@ describe('public response cache', () => {
       ).url,
     )
 
-    const generationWrite = cache.put.mock.calls
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response]>
+    const generationWrite = putCalls
       .map(([request, response]) => ({ request, response }))
       .find(({ request }) => request.url.includes('__content-list-generation'))
     expect(generationWrite).toBeDefined()
