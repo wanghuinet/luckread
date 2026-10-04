@@ -21,7 +21,7 @@ describe('LuckRead H5 blue design system', () => {
     expect(styles).toContain('.my-subscriptions')
     expect(styles).toContain('.lr-publish-shell')
 
-    expect(login).toContain('#2563eb')
+    expect(login).toContain('#102a56')
     expect(register).toContain('#2563eb')
     expect(publish).toContain('#2563eb')
     expect(subscriptions).toContain('#175cd3')
