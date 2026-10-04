@@ -21,7 +21,7 @@ describe('public content detail', () => {
     expect(page).toContain('likeData?.data?.liked')
     expect(page).toContain('likeData?.data?.likeCount')
     expect(page).toContain('setLikeCount(')
-    expect(page).toContain("toLocaleString('zh-CN')")
+    expect(page).toContain('toLocaleString(dateLocale')
 
   })
 
@@ -32,13 +32,13 @@ describe('public content detail', () => {
     expect(page).toContain('setBookmarked(bookmarkData.data.favorited)')
     expect(page).toContain("bookmarked ? 'DELETE' : 'POST'")
     expect(page).toContain("'Idempotency-Key': 'social-bookmark:' + crypto.randomUUID()")
-    expect(page).toContain('收藏')
+    expect(page).toContain('copy.detail.favorite')
   })
 
   it('surfaces normalized mention and hashtag tokens without creating a second taxonomy authority', () => {
     const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
     expect(page).toContain("extractSocialTokens(body)")
-    expect(page).toContain('内容标签与提及')
+    expect(page).toContain('copy.detail.tagAria')
     expect(page).toContain('content-detail-social-token')
     expect(page).not.toContain('hashtags/resolve')
     expect(page).not.toContain('classification_edge')
@@ -51,7 +51,7 @@ describe('public content detail', () => {
     expect(page).toContain('targetId: content.id')
     expect(page).toContain('reasonCode')
     expect(page).toContain('reportBusy')
-    expect(page).toContain('举报')
+    expect(page).toContain('copy.detail.report')
     expect(page).not.toContain('moderation_reports')
     expect(page).not.toContain('audit_events')
   })
@@ -65,7 +65,7 @@ describe('public content detail', () => {
     expect(page).toContain("await navigator.share({ title: content.title, url: shareUrl })")
     expect(page).toContain("shareError.name === 'AbortError'")
     expect(page).toContain('await navigator.clipboard.writeText(shareUrl)')
-    expect(page).toContain('分享链接已复制')
+    expect(page).toContain('copy.detail.copied')
   })
 
   it('hides self-follow on the viewer own content', () => {
@@ -73,7 +73,7 @@ describe('public content detail', () => {
     expect(page).toContain("fetch('/api/v1/users/me'")
     expect(page).toContain("setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)")
     expect(page).toContain('viewerUserId === content.creatorId')
-    expect(page).toContain('这是你的作品')
+    expect(page).toContain('copy.detail.own')
   })
 
   it('connects the content detail page to author follow state and mutations', () => {
@@ -86,15 +86,15 @@ describe('public content detail', () => {
     expect(page).toContain('setFollowRestricted')
     expect(page).toContain("following ? 'DELETE' : 'POST'")
     expect(page).toContain("'Idempotency-Key': 'social-follow:' + crypto.randomUUID()")
-    expect(page).toContain('关注作者')
+    expect(page).toContain('copy.detail.follow')
   })
 
   it('exposes reply controls using the existing parentId comment contract', () => {
     const comments = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
     expect(comments).toContain("const [replyingTo, setReplyingTo] = useState<string | null>(null)")
     expect(comments).toContain('parentId: replyingTo')
-    expect(comments).toContain('回复')
-    expect(comments).toContain('取消回复')
+    expect(comments).toContain('copy.comments.reply')
+    expect(comments).toContain('copy.comments.cancelReply')
     expect(comments).toContain('comment.depth < 3')
   })
 
@@ -111,7 +111,7 @@ describe('public content detail', () => {
     const comments = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
     expect(page).toContain('interactionRestricted={interactionRestricted}')
     expect(comments).toContain('interactionRestricted = false')
-    expect(comments).toContain('当前关系受屏蔽规则限制，暂不可发表评论或互动。')
+    expect(comments).toContain('copy.comments.restricted')
     expect(comments).toContain('{!interactionRestricted ? (')
     expect(comments).toContain('{!interactionRestricted && comment.depth < 3 ? (')
   })
@@ -136,7 +136,7 @@ describe('public content detail', () => {
 it('links published content to the public author profile when creatorId is present', () => {
   const page = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/content/[contentId]/page.tsx'), 'utf8')
   expect(page).toContain("href={'/users/' + encodeURIComponent(content.creatorId)}")
-  expect(page).toContain('查看作者')
+  expect(page).toContain('copy.detail.author')
 })
 
 it('cancels stale public profile content pagination requests', () => {

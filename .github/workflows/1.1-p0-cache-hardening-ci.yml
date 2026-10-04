@@ -9,6 +9,8 @@ on:
       - 'workers/W01-payload/src/lib/content-list-cache-guard.ts'
       - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
+      - 'workers/W01-payload/src/app/api/v1/media/[mediaId]/route.ts'
+      - 'contracts/resource-budget/1.0-d1-traffic-guard.v1.json'
       - '.github/workflows/1.1-p0-cache-hardening-ci.yml'
   push:
     branches: [main]
@@ -18,6 +20,8 @@ on:
       - 'workers/W01-payload/src/lib/content-list-cache-guard.ts'
       - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
+      - 'workers/W01-payload/src/app/api/v1/media/[mediaId]/route.ts'
+      - 'contracts/resource-budget/1.0-d1-traffic-guard.v1.json'
       - '.github/workflows/1.1-p0-cache-hardening-ci.yml'
   workflow_dispatch:
 
@@ -55,8 +59,10 @@ jobs:
           route = Path('workers/W01-payload/src/app/api/v1/contents/route.ts').read_text()
           cache = Path('workers/W01-payload/src/lib/public-response-cache.ts').read_text()
           detail = Path('workers/W01-payload/src/app/api/v1/contents/[contentId]/route.ts').read_text()
+          media = Path('workers/W01-payload/src/app/api/v1/media/[mediaId]/route.ts').read_text()
           state = Path('workers/W01-payload/src/app/api/v1/contents/[contentId]/state/route.ts').read_text()
           guard = Path('workers/W01-payload/src/lib/content-list-cache-guard.ts').read_text()
+          budget = __import__('json').loads(Path('contracts/resource-budget/1.0-d1-traffic-guard.v1.json').read_text())
 
           assert route.index('validateContentListQuery(url)') < route.index('return await cachedPublicGet')
           assert route.index('if (hasAuthenticatedSessionCredential(request))') < route.index('return await cachedPublicGet')
@@ -71,6 +77,12 @@ jobs:
           assert 'values.length > 1' in guard
           assert "content-list': ['creatorId', 'cursor', 'limit', 'type']" in cache
           assert 's-maxage=' in cache
+          assert 'CACHE_MISS_LIMIT_PER_KEY = 5' in cache
+          assert 'CACHE_MISS_MAX_KEYS = 1024' in cache
+          assert budget['invariants']['cacheMissOriginFusePerKeyPerMinute'] == 5
+          assert budget['invariants']['negativeCacheMaxTtlSeconds'] == 10
           assert "      30," in route
+          assert "'media-detail'" in media
+          assert 'cachedPublicGet(' in media
           print('1.1_P0_CACHE_BOUNDARY_STATIC=PASS')
           PY

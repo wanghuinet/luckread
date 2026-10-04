@@ -5,7 +5,7 @@ import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit
 import config from '@payload-config'
 
 import { etagForUserProfile, normalizeEtag, pickUserProfileSnapshot, PROFILE_MUTABLE_FIELDS } from '@/auth/user-profile-etag'
-import { invalidatePublicUserProfile } from '@/lib/public-response-cache'
+import { invalidatePublicUserProfile, invalidatePublicUserProfileByUsername } from '@/lib/public-response-cache'
 import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
 import { validateSession } from '@/auth/w02-session-client'
 
@@ -186,6 +186,12 @@ export async function PATCH(request: Request): Promise<Response> {
     return errorResponse(412, 'PRECONDITION_FAILED', 'Profile changed before update')
   }
 
+  const updatedRecord = updated as Record<string, unknown>
   await invalidatePublicUserProfile(request, String(authenticated.user.id))
-  return profileResponse(updated as Record<string, unknown>)
+  const usernames = new Set<string>()
+  for (const value of [current.username, updatedRecord.username]) {
+    if (typeof value === 'string' && value.trim()) usernames.add(value.trim())
+  }
+  await Promise.all([...usernames].map((username) => invalidatePublicUserProfileByUsername(request, username)))
+  return profileResponse(updatedRecord)
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import { cachedPublicGet, invalidatePublicContentList, publicCacheKey } from './public-response-cache.js'
+import { cachedPublicGet, invalidatePublicContentList, invalidatePublicUserProfileByUsername, publicCacheKey } from './public-response-cache.js'
 
 describe('public response cache', () => {
   const cache = {
@@ -10,6 +10,7 @@ describe('public response cache', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
+    vi.restoreAllMocks()
     delete (globalThis as Record<string, unknown>).caches
   })
 
@@ -144,6 +145,47 @@ describe('public response cache', () => {
     expect(peak).toBeLessThanOrEqual(16)
   })
 
+  it('enforces a bounded origin budget when the cache repeatedly fails', async () => {
+    cache.match.mockResolvedValue(undefined)
+    cache.put.mockRejectedValue(new Error('CACHE_WRITE_FAILED'))
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    let now = 0
+    vi.spyOn(Date, 'now').mockImplementation(() => now)
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+
+    const results: Response[] = []
+    for (let i = 0; i < 6; i += 1) {
+      results.push(await cachedPublicGet(
+        new Request('https://luckread.com/api/v1/contents?cursor=fuse'),
+        'content-list',
+        loader,
+        1,
+      ))
+      now += 2000
+    }
+
+    expect(loader).toHaveBeenCalledTimes(5)
+    expect(results.slice(0, 5).every((response) => response.status === 200)).toBe(true)
+    expect(results[5]?.status).toBe(503)
+    expect(results[5]?.headers.get('x-luckread-cache')).toBe('OVERLOADED')
+  })
+
+  it('normalizes username profile cache keys without attacker-controlled query dimensions', () => {
+    const a = publicCacheKey(new Request('https://luckread.com/api/v1/users/by-username/alice?x=1'), 'user-profile-by-username')
+    const b = publicCacheKey(new Request('https://luckread.com/api/v1/users/by-username/alice?x=2'), 'user-profile-by-username')
+    expect(a.url).toBe(b.url)
+  })
+
+  it('supports the dedicated public media detail cache namespace', () => {
+    const a = publicCacheKey(new Request('https://luckread.com/api/v1/media/m1?x=1'), 'media-detail')
+    const b = publicCacheKey(new Request('https://luckread.com/api/v1/media/m1?x=2'), 'media-detail')
+    expect(a.url).toBe(b.url)
+  })
+
   it('keeps language out of non-localized cache keys', () => {
     const a = publicCacheKey(new Request('https://luckread.com/api/v1/users/u1', { headers: { 'accept-language': 'en-US' } }), 'user-profile')
     const b = publicCacheKey(new Request('https://luckread.com/api/v1/users/u1', { headers: { 'accept-language': 'zh-CN' } }), 'user-profile')
@@ -164,6 +206,52 @@ describe('public response cache', () => {
     const a = publicCacheKey(new Request('https://luckread.com/api/v1/contents?type=article&limit=20'), 'content-list')
     const b = publicCacheKey(new Request('https://luckread.com/api/v1/contents?limit=20&type=article'), 'content-list')
     expect(a.url).toBe(b.url)
+  })
+
+  it('can store a bounded negative cache response after origin lookup', async () => {
+    cache.match.mockResolvedValue(undefined)
+    cache.put.mockRejectedValueOnce(new Error('CACHE_WRITE_FAILED'))
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const loader = vi.fn(async () => new Response(JSON.stringify({ error: { code: 'RESOURCE_NOT_FOUND' } }), {
+      status: 404,
+      headers: { 'content-type': 'application/json' },
+    }))
+
+    const first = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/media/missing'),
+      'media-detail',
+      loader,
+      30,
+    )
+    const second = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/media/missing'),
+      'media-detail',
+      loader,
+      30,
+    )
+
+    expect(first.status).toBe(404)
+    expect(second.status).toBe(404)
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(second.headers.get('x-luckread-cache')).toBe('HIT')
+  })
+
+  it('invalidates the explicit username profile cache key', async () => {
+    cache.delete.mockResolvedValue(true)
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    await invalidatePublicUserProfileByUsername(
+      new Request('https://luckread.com/api/v1/users/by-username/alice'),
+      'alice',
+    )
+
+    expect(cache.delete).toHaveBeenCalledWith(
+      publicCacheKey(
+        new Request('https://luckread.com/api/v1/users/by-username/alice'),
+        'user-profile-by-username',
+      ),
+    )
   })
 
   it('invalidates the canonical content-list landing key', async () => {

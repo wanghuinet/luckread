@@ -1,4 +1,5 @@
 const CACHE_VERSION = 'lr-public-v1-20261003'
+const NEGATIVE_CACHE_TTL_SECONDS = 10
 const inflight = new Map<string, Promise<Response>>()
 const MAX_INFLIGHT = 128
 const MAX_ORIGIN_CONCURRENCY = 16
@@ -6,6 +7,10 @@ const MAX_MEMORY_ENTRIES = 64
 let originInFlight = 0
 const originWaiters: Array<() => void> = []
 const memoryFallback = new Map<string, { response: Response; expiresAt: number }>()
+const CACHE_MISS_WINDOW_MS = 60_000
+const CACHE_MISS_LIMIT_PER_KEY = 5
+const CACHE_MISS_MAX_KEYS = 1024
+const cacheMissHistory = new Map<string, number[]>()
 
 const readMemoryFallback = (keyString: string): Response | null => {
   const entry = memoryFallback.get(keyString)
@@ -19,6 +24,7 @@ const readMemoryFallback = (keyString: string): Response | null => {
 
 const deletePublicCacheKey = async (key: Request): Promise<void> => {
   memoryFallback.delete(key.url)
+  cacheMissHistory.delete(key.url)
   try {
     await ((globalThis.caches as unknown as { default: Cache }).default).delete(key)
   } catch {
@@ -64,6 +70,8 @@ const CACHE_QUERY_KEYS: Record<string, readonly string[]> = {
   following: ['cursor', 'limit'],
   'share-detail': [],
   'user-profile': [],
+  'user-profile-by-username': [],
+  'media-detail': [],
 }
 
 const normalizedQuery = (url: URL, namespace: string): string => {
@@ -89,11 +97,38 @@ export const publicCacheKey = (request: Request, namespace: string): Request => 
 }
 
 const cacheable = (response: Response): boolean => {
-  if (response.status !== 200) return false
+  if (response.status !== 200 && response.status !== 404) return false
   if (response.headers.has('set-cookie')) return false
   const contentType = response.headers.get('content-type') ?? ''
   return contentType.includes('application/json')
 }
+
+const missFuseResponse = (): Response =>
+  new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Public cache origin is temporarily protected' } }), {
+    status: 503,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'retry-after': '1',
+      'x-luckread-cache': 'OVERLOADED',
+    },
+  })
+
+const enforceCacheMissOriginFuse = (keyString: string): boolean => {
+  const now = Date.now()
+  const existing = cacheMissHistory.get(keyString) ?? []
+  const recent = existing.filter((timestamp) => timestamp > now - CACHE_MISS_WINDOW_MS)
+  if (recent.length >= CACHE_MISS_LIMIT_PER_KEY) return false
+
+  if (cacheMissHistory.size >= CACHE_MISS_MAX_KEYS && !cacheMissHistory.has(keyString)) {
+    const oldestKey = cacheMissHistory.keys().next().value
+    if (typeof oldestKey === 'string') cacheMissHistory.delete(oldestKey)
+  }
+  recent.push(now)
+  cacheMissHistory.set(keyString, recent)
+  return true
+}
+
 
 const withCacheHeader = (response: Response, value: 'HIT' | 'MISS'): Response => {
   const headers = new Headers(response.headers)
@@ -131,13 +166,18 @@ export const cachedPublicGet = async (
 
   if (!pending) {
     pending = (async () => {
+      const fuseAllowed = enforceCacheMissOriginFuse(keyString)
+      if (!fuseAllowed) return missFuseResponse()
       const response = await withOriginSlot(loader)
       if (cacheable(response)) {
+        const effectiveTtl = response.status === 404
+          ? Math.min(NEGATIVE_CACHE_TTL_SECONDS, Math.max(1, Math.floor(ttlSeconds)))
+          : Math.max(1, Math.floor(ttlSeconds))
         const cacheResponse = new Response(response.body ? response.clone().body : null, {
           status: response.status,
           headers: new Headers(response.headers),
         })
-        cacheResponse.headers.set('Cache-Control', `public, max-age=0, s-maxage=${Math.max(1, Math.floor(ttlSeconds))}`)
+        cacheResponse.headers.set('Cache-Control', `public, max-age=0, s-maxage=${effectiveTtl}`)
         try {
           await cache.put(key, cacheResponse)
           memoryFallback.delete(keyString)
@@ -145,7 +185,7 @@ export const cachedPublicGet = async (
           // Cache failure must not turn a successful authoritative read into a 503.
           // Keep a bounded, TTL-limited per-isolate response so repeated reads do not
           // immediately re-enter the authoritative path while edge storage recovers.
-          rememberMemoryFallback(keyString, response, ttlSeconds)
+          rememberMemoryFallback(keyString, response, effectiveTtl)
         }
       }
       return response
@@ -155,6 +195,9 @@ export const cachedPublicGet = async (
   }
 
   const response = await pending
+  if (response.status === 503 && response.headers.get('x-luckread-cache') === 'OVERLOADED') {
+    return response
+  }
   return withCacheHeader(response.clone(), 'MISS')
 }
 
@@ -190,3 +233,6 @@ export const invalidatePublicContentList = async (request: Request): Promise<voi
 
 export const invalidatePublicUserProfile = async (request: Request, userId: string): Promise<void> =>
   invalidatePublicRoute(request, 'user-profile', `/api/v1/users/${encodeURIComponent(userId)}`)
+
+export const invalidatePublicUserProfileByUsername = async (request: Request, username: string): Promise<void> =>
+  invalidatePublicRoute(request, 'user-profile-by-username', `/api/v1/users/by-username/${encodeURIComponent(username)}`)

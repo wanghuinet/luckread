@@ -9,10 +9,10 @@ describe('public content type filter', () => {
     const page = read('src/app/(frontend)/content/page.tsx')
 
     expect(page).toContain("useState<ContentType | 'all'>('all')")
-    expect(page).toContain('全部')
-    expect(page).toContain('文章')
-    expect(page).toContain('动态')
-    expect(page).toContain('视频')
+    expect(page).toContain('copy.content.tabs.all')
+    expect(page).toContain('copy.content.tabs.article')
+    expect(page).toContain('copy.content.tabs.post')
+    expect(page).toContain('copy.content.tabs.video')
     expect(page).toContain('role="tablist"')
     expect(page).toContain('aria-selected={contentType === type}')
     expect(page).toContain('key={type}')
@@ -24,8 +24,8 @@ describe('public content type filter', () => {
 
     expect(page).toContain("params.set('type', contentType)")
     expect(page).toContain("void load()")
-    expect(route).toContain("const contentType = url.searchParams.get('type')")
-    expect(route).toContain("query.set('type', contentType)")
+    expect(route).toContain('validateContentListQuery')
+    expect(route).toContain('validateContentListQuery')
   })
 
   it('keeps filter requests public and read-only', () => {
