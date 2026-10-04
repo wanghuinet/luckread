@@ -200,6 +200,10 @@ function makeAuth(env: BetterAuthEnv): BetterAuthInstance {
       },
     },
     advanced: {
+      crossSubDomainCookies: {
+        enabled: true,
+        domain: 'luckread.cn',
+      },
       database: {
         generateId: (options) => {
           if (options.model === 'user' || options.model === 'users') return false
