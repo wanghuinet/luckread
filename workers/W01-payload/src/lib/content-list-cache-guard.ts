@@ -1,4 +1,4 @@
-class ContentListQueryError extends Error {
+export class ContentListQueryError extends Error {
   constructor(readonly code: string, readonly status: number) {
     super(code)
   }
