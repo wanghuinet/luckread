@@ -76,68 +76,199 @@ jobs:
             ]
           }
           EOF
+          node - <<'NODE'
+          const fs=require('node:fs')
+          const contract=JSON.parse(fs.readFileSync('contracts/state-machines/account.json','utf8'))
+          const transitions=contract['x-transitions']
+          if(!Array.isArray(transitions) || transitions.length!==26) throw new Error('canonical account transition count changed')
+          fs.writeFileSync('.auth-013-lifecycle-rules.ts', 'export const canonicalTransitions = '+JSON.stringify(transitions)+' as const\\n')
+          NODE
           cat > .auth-013-lifecycle-harness.ts <<'EOF'
           // CI-only ephemeral harness. Synthetic User/session/journal rows are cleaned.
+          // This exercises every canonical account-state transition against remote D1.
           // @ts-nocheck
           import { applyAccountStateTransition } from './workers/W02-identity/src/account/account-state-transition.ts'
-          const json = (body, status=200) => new Response(JSON.stringify(body, null, 2), {status,headers:{'content-type':'application/json'}})
+          import { canonicalTransitions } from './.auth-013-lifecycle-rules.ts'
+
+          const json = (body, status=200) =>
+            new Response(JSON.stringify(body, null, 2), {status, headers:{'content-type':'application/json'}})
+
           const transition = async (db, input) => {
             try { return {ok:true, result:await applyAccountStateTransition(db,input)} }
-            catch (e) { return {ok:false,error:{code:e?.code??'UNKNOWN',message:String(e?.message??e)}} }
+            catch (e) { return {ok:false, error:{code:e?.code??'UNKNOWN', message:String(e?.message??e)}} }
           }
+
+          const actorFor = (rule, uid) => {
+            if (rule.actor === 'user') return { id:String(uid), type:'user' }
+            if (rule.actor === 'operator') return { id:'auth013-operator', type:'operator' }
+            if (rule.actor === 'admin') return { id:'auth013-admin', type:'admin' }
+            return { id:'auth013-system', type:'job' }
+          }
+
+          const permissionFor = (rule) => rule.permission ?? null
+          const approvalFor = (rule) =>
+            rule.requiresApproval ? (rule.requiresApproval === true ? 'L7' : rule.requiresApproval) : null
+
           export default {
             async fetch(request, env) {
-              if (request.method !== 'POST' || new URL(request.url).pathname !== '/__auth013_lifecycle_probe') return new Response(null,{status:404})
-              const db=env.D1_01, uid=900013900+(Date.now()%100000), sid='auth013-session-'+uid, email='auth013-lifecycle-'+uid+'@invalid.local', username='auth013-lifecycle-'+uid, now='2026-09-29T05:30:00.000Z'
-              let iu=false, is=false
+              if (request.method !== 'POST' || new URL(request.url).pathname !== '/__auth013_lifecycle_probe')
+                return new Response(null,{status:404})
+
+              const db=env.D1_01
+              const baseUid=910013000+(Date.now()%100000)
+              const created=[]
+              const now='2026-10-04T13:30:00.000Z'
+              const results=[]
+
               try {
-                await db.prepare('INSERT INTO users (id,email,username,account_state,account_state_version) VALUES (?,?,?,?,?)').bind(uid,email,username,'ACTIVE',1).run(); iu=true
-                await db.prepare('INSERT INTO auth_session_state (session_id,user_id,device_id,token_version,refresh_credential_hash,revoked_at,last_seen_at) VALUES (?,?,?,?,?,NULL,?)').bind(sid,String(uid),'auth013-device-'+uid,1,'synthetic-refresh-'+uid,now).run(); is=true
-                const base={userId:String(uid),reason:'AUTH-013 lifecycle matrix evidence',now,correlationId:'auth013-lifecycle-'+uid,causationId:'auth013-lifecycle-'+uid}
-                const s={}
-                s.r=await transition(db,{...base,expectedVersion:1,to:'RESTRICTED',actor:{id:'auth013-operator',type:'operator'},permission:'user.restrict.limited'})
-                s.f=await transition(db,{...base,expectedVersion:2,to:'FROZEN',actor:{id:'auth013-operator',type:'operator'},permission:'user.freeze'})
-                const sb=await db.prepare('SELECT revoked_at FROM auth_session_state WHERE session_id=?').bind(sid).first()
-                s.s=await transition(db,{...base,expectedVersion:3,to:'SUSPENDED',actor:{id:'auth013-admin',type:'admin'},permission:'user.suspend'})
-                const sa=await db.prepare('SELECT revoked_at FROM auth_session_state WHERE session_id=?').bind(sid).first()
-                s.b0=await transition(db,{...base,expectedVersion:4,to:'BANNED',actor:{id:'auth013-admin',type:'admin'},permission:'user.ban'})
-                const rb=await db.prepare('SELECT account_state,account_state_version FROM users WHERE id=?').bind(uid).first()
-                s.b=await transition(db,{...base,expectedVersion:4,to:'BANNED',actor:{id:'auth013-admin',type:'admin'},permission:'user.ban',approvalLevel:'L7'})
-                const sbn=await db.prepare('SELECT revoked_at FROM auth_session_state WHERE session_id=?').bind(sid).first()
-                s.ba=await transition(db,{...base,expectedVersion:5,to:'ACTIVE',actor:{id:'auth013-admin',type:'admin'},permission:'user.restore',approvalLevel:'L7'})
-                s.br=await transition(db,{...base,expectedVersion:5,to:'RESTORED',actor:{id:'auth013-admin',type:'admin'},permission:'user.restore',approvalLevel:'L7'})
-                s.ra=await transition(db,{...base,expectedVersion:6,to:'ACTIVE',actor:{id:'auth013-system',type:'system'},permission:'system.job'})
-                const fu=await db.prepare('SELECT account_state,account_state_version FROM users WHERE id=?').bind(uid).first()
-                const jr=await db.prepare('SELECT event_type,source_version FROM auth_013_publication_journal WHERE resource_id=? ORDER BY source_version').bind(String(uid)).all()
-                const checks={
-                  restricted:s.r.ok&&s.r.result.accountStateVersion===2,
-                  frozen:s.f.ok&&s.f.result.accountStateVersion===3,
-                  suspended:s.s.ok&&s.s.result.accountStateVersion===4,
-                  suspensionRevokesSession:sb?.revoked_at==null&&typeof sa?.revoked_at==='string'&&sa.revoked_at.length>0,
-                  banApprovalRequired:!s.b0.ok&&s.b0.error.code==='FORBIDDEN',
-                  rejectedBanNoMutation:rb?.account_state==='SUSPENDED'&&Number(rb?.account_state_version)===4,
-                  banned:s.b.ok&&s.b.result.accountStateVersion===5,
-                  bannedRetainsRevocation:typeof sbn?.revoked_at==='string'&&sbn.revoked_at.length>0,
-                  directBannedToActiveForbidden:!s.ba.ok&&s.ba.error.code==='INVALID_STATE',
-                  restored:s.br.ok&&s.br.result.accountStateVersion===6,
-                  restoredToActive:s.ra.ok&&s.ra.result.accountStateVersion===7,
-                  finalState:fu?.account_state==='ACTIVE'&&Number(fu?.account_state_version)===7,
-                  journalVersions:JSON.stringify((jr.results??[]).map(x=>Number(x.source_version)))===JSON.stringify([2,3,4,5,6,7]),
-                  canonicalEvents:(jr.results??[]).every(x=>x.event_type==='identity.account_state_changed')
+                if (canonicalTransitions.length !== 26) throw new Error('expected 26 canonical transitions')
+
+                for (let i=0;i<canonicalTransitions.length;i++) {
+                  const rule=canonicalTransitions[i]
+                  const uid=baseUid+i
+                  const sid='auth013-full-matrix-session-'+uid
+                  const email='auth013-full-matrix-'+uid+'@invalid.local'
+                  const username='auth013-full-matrix-'+uid
+                  const correlationId='auth013-full-matrix-'+i+'-'+uid
+
+                  await db.prepare(
+                    'INSERT INTO users (id,email,username,account_state,account_state_version) VALUES (?,?,?,?,?)'
+                  ).bind(uid,email,username,rule.from,1).run()
+                  created.push({uid:String(uid),sid})
+
+                  await db.prepare(
+                    'INSERT INTO auth_session_state (session_id,user_id,device_id,token_version,refresh_credential_hash,revoked_at,last_seen_at) VALUES (?,?,?,?,?,NULL,?)'
+                  ).bind(
+                    sid,String(uid),'auth013-full-matrix-device-'+uid,1,
+                    'synthetic-refresh-'+uid,now
+                  ).run()
+
+                  const input={
+                    userId:String(uid),
+                    expectedVersion:1,
+                    to:rule.to,
+                    reason:'AUTH-013 canonical 26-transition remote matrix',
+                    now,
+                    correlationId,
+                    causationId:correlationId,
+                    actor:actorFor(rule,uid),
+                    permission:permissionFor(rule),
+                    approvalLevel:approvalFor(rule),
+                    preconditionSatisfied:rule.precondition ? true : undefined
+                  }
+
+                  const out=await transition(db,input)
+                  const after=await db.prepare(
+                    'SELECT account_state,account_state_version FROM users WHERE id=?'
+                  ).bind(uid).first()
+                  const session=await db.prepare(
+                    'SELECT revoked_at FROM auth_session_state WHERE session_id=?'
+                  ).bind(sid).first()
+                  const journal=await db.prepare(
+                    'SELECT event_type,source_version FROM auth_013_publication_journal WHERE resource_id=? ORDER BY source_version'
+                  ).bind(String(uid)).all()
+
+                  const observed={
+                    index:i+1,
+                    from:rule.from,
+                    to:rule.to,
+                    actor:rule.actor,
+                    permission:rule.permission,
+                    precondition:rule.precondition ?? null,
+                    requiresApproval:rule.requiresApproval ?? false,
+                    ok:out.ok,
+                    error:out.ok ? null : out.error?.code ?? 'UNKNOWN',
+                    finalState:after?.account_state ?? null,
+                    finalVersion:Number(after?.account_state_version ?? -1),
+                    revokedAt:session?.revoked_at ?? null,
+                    journalVersions:(journal.results??[]).map(x=>Number(x.source_version)),
+                    journalTypes:(journal.results??[]).map(x=>x.event_type)
+                  }
+
+                  const expectedRevocation=['SUSPENDED','BANNED','DELETION_PENDING','DELETED'].includes(rule.to)
+                  const checks={
+                    transitionSucceeded:out.ok,
+                    targetState:after?.account_state===rule.to,
+                    versionIncrement:Number(after?.account_state_version)===2,
+                    journalExactlyOnce:(journal.results??[]).length===1,
+                    journalVersion:Number(journal.results?.[0]?.source_version??-1)===2,
+                    canonicalEvent:journal.results?.[0]?.event_type==='identity.account_state_changed',
+                    targetStateRevokesSession:!expectedRevocation || typeof session?.revoked_at==='string'
+                  }
+
+                  for(const [k,v] of Object.entries(checks))
+                    if(!v) throw new Error('AUTH-013 full lifecycle assertion failed: transition '+(i+1)+' '+rule.from+'->'+rule.to+' '+k)
+
+                  results.push({rule, observed, checks})
                 }
-                for(const [k,v] of Object.entries(checks)) if(!v) throw new Error('AUTH-013 lifecycle assertion failed: '+k)
-                return json({status:'PASS',environment:'CONTROLLED_REMOTE_D1_LIFECYCLE_MATRIX',testUserId:uid,sessionId:sid,steps:s,observed:{sb,sa,sbn,fu,journal:jr.results},checks})
-              } catch(e) { return json({status:'RUNTIME_EXCEPTION',testUserId:uid,error:{message:String(e?.message??e),code:String(e?.code??'')}},500) }
-              finally {
-                if(is) await db.prepare('DELETE FROM auth_session_state WHERE session_id=?').bind(sid).run()
-                if(iu){await db.prepare('DELETE FROM auth_013_publication_journal WHERE resource_id=?').bind(String(uid)).run(); await db.prepare('DELETE FROM users WHERE id=?').bind(uid).run()}
-                const cu=await db.prepare('SELECT COUNT(*) count FROM users WHERE id=?').bind(uid).first(), cs=await db.prepare('SELECT COUNT(*) count FROM auth_session_state WHERE session_id=?').bind(sid).first(), cj=await db.prepare('SELECT COUNT(*) count FROM auth_013_publication_journal WHERE resource_id=?').bind(String(uid)).first()
-                if(Number(cu?.count??-1)!==0||Number(cs?.count??-1)!==0||Number(cj?.count??-1)!==0) throw new Error('AUTH-013 lifecycle evidence cleanup failed')
+
+                const negUid=baseUid+1000
+                const negSid='auth013-full-matrix-negative-session-'+negUid
+                await db.prepare(
+                  'INSERT INTO users (id,email,username,account_state,account_state_version) VALUES (?,?,?,?,?)'
+                ).bind(negUid,'auth013-negative-'+negUid+'@invalid.local','auth013-negative-'+negUid,'ACTIVE',1).run()
+                created.push({uid:String(negUid),sid:negSid})
+                await db.prepare(
+                  'INSERT INTO auth_session_state (session_id,user_id,device_id,token_version,refresh_credential_hash,revoked_at,last_seen_at) VALUES (?,?,?,?,?,NULL,?)'
+                ).bind(
+                  negSid,String(negUid),'auth013-negative-device-'+negUid,1,
+                  'synthetic-negative-refresh-'+negUid,now
+                ).run()
+                const negative=await transition(db,{
+                  userId:String(negUid),
+                  expectedVersion:1,
+                  to:'BANNED',
+                  reason:'AUTH-013 negative approval assertion',
+                  now,
+                  correlationId:'auth013-full-matrix-negative-'+negUid,
+                  causationId:'auth013-full-matrix-negative-'+negUid,
+                  actor:{id:'auth013-admin',type:'admin'},
+                  permission:'user.ban'
+                })
+                const negRow=await db.prepare(
+                  'SELECT account_state,account_state_version FROM users WHERE id=?'
+                ).bind(negUid).first()
+                if(negative.ok || negRow?.account_state!=='ACTIVE' || Number(negRow?.account_state_version)!==1)
+                  throw new Error('AUTH-013 negative approval assertion failed')
+
+                return json({
+                  status:'PASS',
+                  environment:'CONTROLLED_REMOTE_D1_CANONICAL_26_TRANSITION_MATRIX',
+                  transitionCount:canonicalTransitions.length,
+                  results,
+                  negativeApproval:{
+                    status:'PASS',
+                    code:negative.ok ? null : negative.error?.code ?? 'UNKNOWN',
+                    state:negRow?.account_state,
+                    version:Number(negRow?.account_state_version)
+                  }
+                })
+              } catch(e) {
+                return json({
+                  status:'RUNTIME_EXCEPTION',
+                  transitionCount:canonicalTransitions.length,
+                  completedTransitions:results.length,
+                  error:{message:String(e?.message??e),code:String(e?.code??'')}
+                },500)
+              } finally {
+                for(const item of created) {
+                  await db.prepare('DELETE FROM auth_session_state WHERE session_id=?').bind(item.sid).run()
+                  await db.prepare('DELETE FROM auth_013_publication_journal WHERE resource_id=?').bind(item.uid).run()
+                  await db.prepare('DELETE FROM users WHERE id=?').bind(Number(item.uid)).run()
+                }
+                for(const item of created) {
+                  const cu=await db.prepare('SELECT COUNT(*) count FROM users WHERE id=?').bind(Number(item.uid)).first()
+                  const cs=await db.prepare('SELECT COUNT(*) count FROM auth_session_state WHERE session_id=?').bind(item.sid).first()
+                  const cj=await db.prepare('SELECT COUNT(*) count FROM auth_013_publication_journal WHERE resource_id=?').bind(item.uid).first()
+                  if(Number(cu?.count??-1)!==0||Number(cs?.count??-1)!==0||Number(cj?.count??-1)!==0)
+                    throw new Error('AUTH-013 canonical matrix cleanup failed for '+item.uid)
+                }
               }
             }
           }
           EOF
-      - name: Start and execute ephemeral remote Worker lifecycle harness
+          EOF
+      - name: Start and execute ephemeral remote Worker canonical 26-transition harness
         run: |
           set -euo pipefail
           mkdir -p artifacts/mapping-0/auth-013-lifecycle
@@ -167,14 +298,12 @@ jobs:
           fi
 
           set +e
-          http_code=$(curl -sS -o artifacts/mapping-0/auth-013-lifecycle/runtime-result.json -w '%{http_code}' -X POST --max-time 30 http://127.0.0.1:8788/__auth013_lifecycle_probe)
+          http_code=$(curl -sS -o artifacts/mapping-0/auth-013-lifecycle/runtime-result.json -w '%{http_code}' -X POST --max-time 60 http://127.0.0.1:8788/__auth013_lifecycle_probe)
           curl_exit=$?
           set -e
           echo "AUTH_013_LIFECYCLE_HTTP_STATUS=$http_code"
           echo "AUTH_013_LIFECYCLE_CURL_EXIT=$curl_exit"
-          echo "--- runtime result ---"
           cat artifacts/mapping-0/auth-013-lifecycle/runtime-result.json || true
-          echo "--- wrangler harness log ---"
           cat auth-013-lifecycle-harness.log || true
           test "$curl_exit" = "0"
           test "$http_code" = "200"
@@ -182,19 +311,29 @@ jobs:
           node - <<'NODE'
           const fs=require('node:fs')
           const r=JSON.parse(fs.readFileSync('artifacts/mapping-0/auth-013-lifecycle/runtime-result.json','utf8'))
-          if(r.status!=='PASS') throw new Error('AUTH-013 lifecycle matrix did not PASS')
-          for(const [k,v] of Object.entries(r.checks||{})) if(!v) throw new Error('AUTH-013 lifecycle assertion failed: '+k)
+          if(r.status!=='PASS') throw new Error('AUTH-013 canonical 26-transition matrix did not PASS')
+          if(r.transitionCount!==26) throw new Error('AUTH-013 canonical transition count mismatch')
+          if((r.results||[]).length!==26) throw new Error('AUTH-013 remote transition coverage incomplete')
+          for(const item of r.results) {
+            for(const [k,v] of Object.entries(item.checks||{})) if(!v) throw new Error('AUTH-013 transition assertion failed: '+item.observed.from+' -> '+item.observed.to+' '+k)
+          }
+          if(r.negativeApproval?.status!=='PASS') throw new Error('AUTH-013 negative approval assertion failed')
           console.log('AUTH_013_LIFECYCLE_MATRIX=PASS')
           NODE
       - name: Capture provenance
         run: |
+          set -euo pipefail
+          CHECKED_OUT_SHA="$(git rev-parse HEAD)"
+          MAIN_SHA="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
           cat > artifacts/mapping-0/auth-013-lifecycle/provenance.txt <<EOF
           workflow=AUTH-013 Lifecycle Matrix Runtime Evidence
-          source_ref=$SOURCE_REF
+          source_ref=${{ inputs.source_sha }}
           source_sha=$CHECKED_OUT_SHA
+          main_sha=$MAIN_SHA
           database_name=$DATABASE_NAME
           database_id=$D1_01_ID
-          environment=CONTROLLED_REMOTE_D1_LIFECYCLE_MATRIX
+          environment=CONTROLLED_REMOTE_D1_CANONICAL_26_TRANSITION_MATRIX
+          canonical_transition_count=26
           synthetic_data_cleanup=true
           EOF
           cat auth-013-lifecycle-harness.log >> artifacts/mapping-0/auth-013-lifecycle/wrangler-harness.log
@@ -209,4 +348,4 @@ jobs:
         if: ${{ always() }}
         run: |
           if [ -f auth-013-lifecycle-harness.pid ]; then kill "$(cat auth-013-lifecycle-harness.pid)" 2>/dev/null || true; fi
-          rm -f .auth-013-lifecycle-harness.ts .auth-013-lifecycle.wrangler.jsonc
+          rm -f .auth-013-lifecycle-harness.ts .auth-013-lifecycle-rules.ts .auth-013-lifecycle.wrangler.jsonc
