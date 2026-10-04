@@ -1,12 +1,14 @@
 # Change Control — 1.0 Media Cache / Authorization Reconciliation — 2026-10-04
 
-Status: IMPLEMENTED / CI-VALIDATION-PENDING / RUNTIME-EVIDENCE-PENDING
+Status: MERGED / RELEVANT-CI-VALIDATED / RUNTIME-EVIDENCE-PENDING
 
 ## Baseline
 
-- authoritative main: `e5d4e62f8c30a08bbcab3f48107139ae241f5a39`
+- authoritative main before slice: `e5d4e62f8c30a08bbcab3f48107139ae241f5a39`
 - backup: `backup/2026-10-04-pre-media-private-metadata-hardening`
 - working branch: `superpowers/media-private-metadata-hardening`
+- merged main: `45ee88ae47dc2a4c42c195ac240f20291fcbd86d`
+- pull request: #650
 
 ## Finding
 
@@ -71,3 +73,29 @@ Choose the conservative authenticated media metadata path.
 ## Gate
 
 Implementation is admitted under the owner-scoped/no-store decision. Production GREEN remains blocked until CI and independent runtime evidence pass.
+
+
+## CI Evidence
+
+PR #650 exact head `bc2178dc9b90d0007cda80de2451fe320f5bcfe3`:
+
+- Contract Admission CI run `37182668889` — PASS
+- Security Hardening Gate run `37182668920` — PASS
+- Payload Implementation Admission run `37182668957` — PASS
+- API Contract CI run `37182668909` — PASS
+- Worker Directory Drift Gate run `37182668904` — PASS
+- W02 RoleAssignment Verification run `37182668916` — PASS
+- Worker D1 Access Boundary Gate run `37182668890` — PASS
+- Mapping 0 Structural Gate run `37182668902` — PASS
+- Worker Terminal Routing Gate run `37182668896` — PASS
+- 1.0 D1 Traffic Guard Contract CI run `37182668880` — PASS
+- W01 Creator Center Admin Verification run `37182668894` — PASS
+
+Two project-level checks failed without a scoped Media defect:
+
+- Payload Foundation CI run `37182668907` — pre-existing W01 lint baseline; typecheck and security unit tests passed before lint.
+- API Inventory Reconciliation run `37182668932` — `failureCount=0`; existing incomplete inventory findings remain for unrelated operations such as `getHomeFeed` and `transitionAccountState`.
+
+W01 Homepage E2E run `37182668875` failed during the local Miniflare/workerd web-server startup with `SQLITE_BUSY` / `database is locked`; production build completed successfully. This is runtime-test environment evidence, not proof of a Media functional defect.
+
+No production GREEN claim is made. Independent deployed runtime evidence remains pending.
