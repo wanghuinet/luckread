@@ -1,14 +1,14 @@
 {
-  "version": "1.5.0",
+  "version": "1.6.0",
   "status": "CURRENT_CURSOR_AUTHORITATIVE",
-  "sourceHead": "18780de74b232b90f40cee1bda6492fa01b1e168",
+  "sourceHead": "b6fdb8dc3a524de15126e6beee71c06a5c157554",
   "backupBranch": "backup/pre-current-main-execution-cursor-reconciliation-20260929",
   "currentCursor": {
     "id": "AUTH-013-LIFECYCLE-SIDE-EFFECT-COVERAGE-001",
     "state": "TODO_VERIFY",
     "objective": "Complete the remaining AUTH-013 lifecycle transition and side-effect evidence using the existing W01/W02 authoritative path and already-admitted W04/W06 consumers, without adding Worker/D1 topology.",
     "authoritativeControl": "docs/change-control/CC-MAPPING-0-AUTH-013-SIDE-EFFECT-DECISION-RECONCILIATION-2026-09-29.md",
-    "nextGate": "Build the minimum controlled evidence slice for FROZEN, SUSPENDED, BANNED (approval required), escalation/reinstatement/restore paths and contracted cache/deindex convergence; reuse existing deployed resources and do not create a new public route or data store.",
+    "nextGate": "Complete remaining feature-wide AUTH-013 lifecycle/security evidence: approval-required BANNED behavior, negative transition/permission/precondition enforcement, full token/session enforcement, and actual cache/deindex/feed/search convergence.",
     "logicalOwnership": "W02 -> D1-01 account authority; W06 -> D1-03 audit; W04 -> derived Feed / Recommendation / Search projection",
     "physicalBinding": "VERIFIED. W04 luckread-w04, W06 audit consumer, W02 authority path, dedicated W04 projection queue/DLQ, and existing globe KV derived destination are admitted/verified.",
     "physicalRuntimeTarget": "T01 -> W02/D1-01; audit -> W06/D1-03; T08/T09/T10 -> W04 derived projection",
@@ -22,11 +22,14 @@
       "mainSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b",
       "w04RuntimeRun": "36522900537",
       "w04WorkerVersion": "83e69e13-104c-482f-bc4c-2176bc9ef824",
-      "evidenceId": "EVD-AUTH013-W04-PROJECTION-RUNTIME-001"
+      "evidenceId": "EVD-AUTH013-W04-PROJECTION-RUNTIME-001",
+      "w04SideEffectMatrixRun": "37202032741",
+      "w04SideEffectArtifactId": "11303336889",
+      "w04SideEffectEvidenceId": "EVD-AUTH013-W04-SIDE-EFFECT-MATRIX-REMOTE-001"
     },
-    "currentMainSha": "18780de74b232b90f40cee1bda6492fa01b1e168",
-    "sourceHead": "18780de74b232b90f40cee1bda6492fa01b1e168",
-    "reconciliationNote": "Current execution source is main at 18780de74b232b90f40cee1bda6492fa01b1e168. The W04 runtime evidence source/version remains pinned to the previously deployed exact source; later main changes are retained as current repository state and are not retroactively claimed as deployed."
+    "currentMainSha": "b6fdb8dc3a524de15126e6beee71c06a5c157554",
+    "sourceHead": "b6fdb8dc3a524de15126e6beee71c06a5c157554",
+    "reconciliationNote": "Current execution source is main at b6fdb8dc3a524de15126e6beee71c06a5c157554. W04 side-effect evidence Run 37202032741 executed against admitted W04 source 53e3bcbb855be8e1240171390c69dd034bf04f8b. W04 runtime files index.ts, auth-013-projection.ts and wrangler.jsonc are byte-identical between the tested source and current main; this closes only the W04 side-effect runtime sub-gate. Remaining AUTH-013 feature-wide lifecycle/security/cache/deindex/feed/search evidence is still TODO_VERIFY."
   },
   "alreadyClosed": {
     "auth003Wire": true,
@@ -218,7 +221,7 @@
     "w04ResourceStatus": "PASS_VERIFIED",
     "reviewedAt": "2026-09-29"
   },
-  "nextGate": "AUTH-013-W04-PROJECTION-DEINDEX-ADMISSION-001 / BLOCKED_EXTERNAL",
+  "nextGate": "AUTH-013 remaining feature-wide lifecycle/security/cache/deindex/feed/search evidence / TODO_VERIFY",
   "latestControlGate": {
     "workflow": ".github/workflows/auth-013-public-http-e2e.yml",
     "runId": 36503534440,

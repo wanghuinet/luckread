@@ -54,7 +54,7 @@ For all other authoritative business state, calls must terminate at the owning W
 | W01 ingress / terminal Worker boundary | COMPLETE — official Gate run 36819360570 |
 | D1-03 Worker owner partition | COMPLETE — official Gate run 36819667831 |
 | Worker D1 access Guard | IMPLEMENTED / OFFICIAL CURRENT-SHA RUN NOT OBSERVED |
-| AUTH-013 W04 projection/deindex evidence | NEXT — controlled workflow dispatch required |
+| AUTH-013 W04 projection/deindex evidence | PASS_VERIFIED — Run 37202032741 / Artifact 11303336889; W04 side-effect sub-gate closed |
 
 The Worker D1 access Guard remains intentionally unmarked GREEN until an Actions run against its finalized detector returns a terminal result.
 
@@ -63,10 +63,9 @@ The Worker D1 access Guard remains intentionally unmarked GREEN until an Actions
 The Mapping 0 authoritative cursor remains:
 `AUTH-013-LIFECYCLE-SIDE-EFFECT-COVERAGE-001`
 
-The next controlled external evidence is the existing W04 side-effect matrix workflow:
-`.github/workflows/auth-013-w04-side-effect-matrix-evidence.yml`
+The W04 side-effect matrix is now `PASS_VERIFIED` from controlled Run `37202032741` with Artifact `11303336889`. The workflow remains the historical execution mechanism and is not to be rerun unchanged.
 
-It is pinned to the admitted W04 source/version and has `confirm=RUN` as the default workflow-dispatch input. This evidence requires Cloudflare credentials and deliberately does not redeploy W04.
+The next evidence is the remaining feature-wide AUTH-013 lifecycle/security scope: approval-required BANNED behavior, negative transition/permission/precondition enforcement, full token/session enforcement, and actual cache/deindex/feed/search convergence. No W04 runtime or topology change is required by the completed sub-gate.
 
 ## Current main
 

@@ -1349,6 +1349,24 @@
       "note": "Production runtime evidence against deployment run 37195981263. Synthetic fixture verified owner-read, private no-store, no shared-cache header, ownerUserId exclusion, projected fields only, non-owner 404, and anonymous 403. This record supports the owner-scoped media metadata boundary only and does not promote MEDIA-001, Mapping 0, or the canonical Evidence Registry.",
       "freshnessMode": "INHERITED_UNCHANGED_SCOPE",
       "inheritanceRef": "docs/change-control/CC-MAPPING-0-CACHE-RUNTIME-EVIDENCE-ADMISSION-2026-10-04.md"
+    },
+    {
+      "evidenceId": "EVD-AUTH013-W04-SIDE-EFFECT-MATRIX-REMOTE-001",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-013::W04_SIDE_EFFECT_MATRIX",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-013",
+      "source": "GitHub Actions AUTH-013 W04 Side-Effect Matrix Evidence against the admitted W04 runtime and existing Queue/KV resources",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/37202032741#artifact-11303336889",
+      "commitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b",
+      "timestamp": "2026-10-04T12:26:29Z",
+      "producer": "AUTH-013 W04 Side-Effect Matrix Evidence / run 37202032741 / job 111435532950",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "checkId": "111435532950",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/37202032741",
+      "freshnessMode": "EXECUTED_AT_TESTED_COMMIT",
+      "note": "Controlled remote side-effect evidence passed live W04 consumer admission, all exercised lifecycle deindex/recovery/visibility transitions, duplicate same-version idempotency, older-version rejection, non-resurrection, bounded stale-window metadata, no authorization-decision material in projection, and synthetic KV cleanup. Artifact 11303336889. Tested W04 runtime files are byte-identical to current main, so this record remains valid at the tested runtime scope. This closes the W04 side-effect runtime sub-gate only; AUTH-013 and Mapping 0 remain NOT_GREEN pending approval-required BANNED behavior, negative transition/permission/precondition enforcement, full token/session enforcement, and actual feature-wide cache/deindex/feed/search convergence."
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
