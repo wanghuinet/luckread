@@ -3,16 +3,19 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact current main source containing the admitted AUTH-013 transition kernel
+        description: Source ref for the admitted AUTH-013 transition kernel; default is current main
         required: true
+        default: main
         type: string
       database_name:
         description: Current Cloudflare display name for D1-01
         required: true
+        default: luckread
         type: string
       confirm:
         description: Type RUN to execute the controlled remote lifecycle evidence
         required: true
+        default: RUN
         type: string
 permissions:
   contents: read
@@ -37,12 +40,13 @@ jobs:
           node-version: 24
       - name: Verify exact evidence admission inputs
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_REF: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
+          CHECKED_OUT_SHA="$(git rev-parse HEAD)"
           MAIN_SHA="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
           test -n "$MAIN_SHA"
-          test "$SOURCE_SHA" = "$MAIN_SHA"
+          test "$CHECKED_OUT_SHA" = "$MAIN_SHA"
           test "$DATABASE_NAME" = "luckread"
           test -f workers/W02-identity/src/account/account-state-transition.ts
           test -f contracts/state-machines/account.json
@@ -186,7 +190,8 @@ jobs:
         run: |
           cat > artifacts/mapping-0/auth-013-lifecycle/provenance.txt <<EOF
           workflow=AUTH-013 Lifecycle Matrix Runtime Evidence
-          source_sha=${{ inputs.source_sha }}
+          source_ref=$SOURCE_REF
+          source_sha=$CHECKED_OUT_SHA
           database_name=$DATABASE_NAME
           database_id=$D1_01_ID
           environment=CONTROLLED_REMOTE_D1_LIFECYCLE_MATRIX
