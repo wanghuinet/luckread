@@ -324,10 +324,25 @@ jobs:
           writeFileSync('like-viewer-invalidation.json', JSON.stringify({status:'PASS',viewerLiked:true,aggregateLikeCount:Number(value?.data?.likeCount)},null,2)+'\n')
           NODE
 
+      - name: Prime shared aggregate before non-invalidation check
+        run: |
+          set -euo pipefail
+          url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
+          sleep 5
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-shared-prime.json
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const value = JSON.parse(readFileSync('/tmp/like-shared-prime.json','utf8'))
+          if (value?.data?.liked !== true || Number(value?.data?.likeCount) !== 2) {
+            throw new Error('shared aggregate did not prime to authoritative count 2: ' + JSON.stringify(value))
+          }
+          writeFileSync('like-shared-prime.json', JSON.stringify({status:'PASS',viewerLiked:true,aggregateLikeCount:2,expectedAuthoritativeCount:2},null,2)+'\n')
+          NODE
+
       - name: Verify shared aggregate is not synchronously invalidated
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
@@ -351,10 +366,10 @@ jobs:
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
           const value = JSON.parse(readFileSync('/tmp/like-shared-stale.json','utf8'))
-          if (value?.data?.liked !== true || Number(value?.data?.likeCount) !== 1) {
+          if (value?.data?.liked !== true || Number(value?.data?.likeCount) !== 2) {
             throw new Error('shared aggregate appears synchronously invalidated or viewer state was not preserved: ' + JSON.stringify(value))
           }
-          writeFileSync('like-shared-no-sync-invalidation.json', JSON.stringify({status:'PASS',viewerLiked:true,aggregateLikeCount:1,expectedAuthoritativeCount:2},null,2)+'\n')
+          writeFileSync('like-shared-no-sync-invalidation.json', JSON.stringify({status:'PASS',viewerLiked:true,aggregateLikeCount:2,expectedAuthoritativeCount:3},null,2)+'\n')
           NODE
 
       - name: Verify shared aggregate refreshes after second TTL
@@ -366,10 +381,10 @@ jobs:
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
           const value = JSON.parse(readFileSync('/tmp/like-shared-refresh.json','utf8'))
-          if (value?.data?.liked !== true || Number(value?.data?.likeCount) !== 2) {
-            throw new Error('shared aggregate did not refresh to authoritative count 2: ' + JSON.stringify(value))
+          if (value?.data?.liked !== true || Number(value?.data?.likeCount) !== 3) {
+            throw new Error('shared aggregate did not refresh to authoritative count 3: ' + JSON.stringify(value))
           }
-          writeFileSync('like-shared-refresh-2.json', JSON.stringify({status:'PASS',viewerLiked:true,aggregateLikeCount:2,expectedAuthoritativeCount:2},null,2)+'\n')
+          writeFileSync('like-shared-refresh-2.json', JSON.stringify({status:'PASS',viewerLiked:true,aggregateLikeCount:3,expectedAuthoritativeCount:3},null,2)+'\n')
           NODE
 
       - name: Verify cleanup
@@ -428,7 +443,7 @@ jobs:
             "syntheticFixtureOnly": true
           }
           EOF
-          for file in like-initial.json like-aggregate-fresh-stale.json like-aggregate-refresh.json like-viewer-invalidation.json like-shared-no-sync-invalidation.json like-shared-refresh-2.json; do
+          for file in like-initial.json like-aggregate-fresh-stale.json like-aggregate-refresh.json like-viewer-invalidation.json like-shared-prime.json like-shared-no-sync-invalidation.json like-shared-refresh-2.json; do
             test -f "$file"
             cp "$file" "artifacts/mapping-0/w05-like-cache-runtime-e2e/$file"
           done
