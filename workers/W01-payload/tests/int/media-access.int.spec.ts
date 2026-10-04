@@ -38,11 +38,16 @@ describe('Media upload access', () => {
   it('keeps the existing R2-backed Payload media collection and upload path', () => {
     const config = read('src/payload.config.ts')
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    const assetLibrary = read('src/app/(payload)/v1beta/CreatorAssetLibrary.tsx')
 
     expect(config).toContain("r2Storage({")
     expect(config).toContain("collections: { media: true }")
     expect(publisher).toContain("authorizedFetch('/api/v1/media'")
     expect(publisher).toContain("headers: { 'Idempotency-Key': 'media-upload:' + crypto.randomUUID() }")
+    expect(publisher).toContain("form.append('_payload', JSON.stringify({ alt: file.name }))")
+    expect(publisher).not.toContain("form.append('alt', file.name)")
+    expect(assetLibrary).toContain("form.append('_payload', JSON.stringify({ alt: file.name }))")
+    expect(assetLibrary).not.toContain("form.append('alt', file.name)")
   })
 })
 
