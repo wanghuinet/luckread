@@ -71,6 +71,6 @@ jobs:
           assert 'values.length > 1' in guard
           assert "content-list': ['creatorId', 'cursor', 'limit', 'type']" in cache
           assert 's-maxage=' in cache
-          assert "        30," in route
+          assert "      30," in route
           print('1.1_P0_CACHE_BOUNDARY_STATIC=PASS')
           PY
