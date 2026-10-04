@@ -31,8 +31,8 @@
         "workers/W01-payload/src/app/auth/register/route.ts",
         "workers/W01-payload/src/collections/Users.ts",
         "workers/W01-payload/src/payload.config.ts",
-        "workers/W02-identity/src/credentials/credential-add.ts",
-        "workers/W02-identity/src/credentials/credential-add.test.ts"
+        "workers/W02-identity/src/auth/registration.ts",
+        "workers/W02-identity/src/auth/better-auth.ts"
       ],
       "evidence": [
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
@@ -61,7 +61,13 @@
       "workerRefs": [
         "W01",
         "W02"
-      ]
+      ],
+      "historicalCodeEvidenceRefs": [
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/src/credentials/credential-add.test.ts"
+      ],
+      "currentAuthority": "W02_BETTER_AUTH_D1_01",
+      "transport": "W01 -> W02_AUTH -> W02"
     },
     {
       "featureId": "AUTH-002",
@@ -76,7 +82,13 @@
         "ENT-SESSION"
       ],
       "payloadCollections": [],
-      "codeEvidenceRefs": [],
+      "codeEvidenceRefs": [
+        "workers/W01-payload/src/app/auth/login/route.ts",
+        "workers/W01-payload/src/app/auth/refresh/route.ts",
+        "workers/W01-payload/src/app/auth/logout/route.ts",
+        "workers/W01-payload/src/app/auth/sessions/[[...segments]]/route.ts",
+        "workers/W02-identity/src/auth/better-auth.ts"
+      ],
       "evidence": [
         "artifacts/mapping-0/auth-002-historical-migration-evidence-admission-2026-09-28.json",
         "artifacts/mapping-0/auth-002-remote-baseline-evidence-2026-09-20.json",
@@ -96,14 +108,16 @@
         "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
       ],
       "blockers": [
-        "ENT-SESSION catalog promotion remains blocked even though Gate-1, native runtime, security, concurrency and extension-correlation evidence are VERIFIED.",
-        "Mapping 0 / Five-Way remains globally NOT_GREEN.",
-        "ENT-SESSION catalog promotion remains blocked pending final Mapping 0 / Five-Way admission."
-      ]
+        "Current Better Auth W02 cross-worker session runtime evidence is pending.",
+        "Mapping 0 / Five-Way remains NOT_GREEN."
+      ],
+      "historicalCodeEvidenceRefs": [],
+      "currentAuthority": "W02_BETTER_AUTH_AUTH_SESSIONS_D1_01",
+      "transport": "W01 -> W02_AUTH -> W02"
     },
     {
       "featureId": "AUTH-003",
-      "status": "PARTIAL",
+      "status": "SUPERSEDED",
       "apiOperationIds": [
         "authCredentialList",
         "authCredentialAdd",
@@ -116,10 +130,8 @@
       ],
       "payloadCollections": [],
       "codeEvidenceRefs": [
-        "workers/W02-identity/src/credentials/credential-add.ts",
-        "workers/W02-identity/src/credentials/credential-add.test.ts",
-        "workers/W02-identity/src/credentials/credential-list.ts",
-        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
+        "workers/W02-identity/src/auth/better-auth.ts",
+        "workers/W02-identity/src/auth/registration.ts"
       ],
       "evidence": [
         "artifacts/mapping-0/auth-003-wire-projection-authority-2026-09-26.json",
@@ -148,10 +160,17 @@
         "workers/W02-identity/src/credentials/credential-add.ts"
       ],
       "blockers": [
-        "ENT-IDENTITY materialization ownership is now executable-evidence verified through the AUTH-001 W02 scheduled materializer; final entity catalog promotion remains blocked.",
-        "ENT-IDENTITY / ENT-CREDENTIAL catalog promotion remains BLOCKED while global Mapping 0 / Five-Way is NOT_GREEN.",
-        "Mapping 0 / Five-Way remains globally NOT_GREEN."
-      ]
+        "The historical custom AUTH-003 credential-management slice is superseded by Better Auth W02 core.",
+        "A future credential-management API, if required, must be separately contracted against Better Auth auth_accounts.",
+        "Mapping 0 / Five-Way remains NOT_GREEN."
+      ],
+      "historicalCodeEvidenceRefs": [
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/src/credentials/credential-add.test.ts",
+        "workers/W02-identity/src/credentials/credential-list.ts",
+        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
+      ],
+      "currentAuthority": "W02_BETTER_AUTH_D1_01"
     },
     {
       "featureId": "AUTH-004",
@@ -6758,7 +6777,8 @@
         "Actor principal, actor account state, follow permission, target identity, block policy, anti-abuse admission and caller provenance are bound to existing authoritative contracts.",
         "Target followability and privacy/audience operational authority remain unresolved.",
         "Runtime, tests and Evidence Registry provenance remain unverified."
-      ]    },
+      ]
+    },
     {
       "featureId": "SOCIAL-002",
       "status": "UNRESOLVED",
