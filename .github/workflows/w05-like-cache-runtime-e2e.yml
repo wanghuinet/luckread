@@ -17,11 +17,12 @@ on:
         description: Exact W05 source commit used by the controlled D1-02 deployment
         required: true
         type: string
-        default: 3793f7c7b9c2d964a870d9d9cdc39605639efc2a
+        default: 016c0aa7bbc84c341fb456bda45653b824b3c402
       w05_deployment_run_id:
         description: Successful W05 D1-02 Physical Binding Deploy run ID for that exact source
         required: true
         type: string
+        default: "37192984828"
       social_api_base_url:
         description: Controlled public W01 social API URL
         required: true
@@ -137,12 +138,14 @@ jobs:
 
           const base = process.env.SOCIAL_API_BASE_URL.replace(/\/$/, '')
           const runId = process.env.GITHUB_RUN_ID
+          const runAttempt = process.env.GITHUB_RUN_ATTEMPT || '1'
+          const fixtureId = runId + '-a' + runAttempt
           const nonce = randomBytes(8).toString('hex')
-          const email = 'like-cache-e2e-' + runId + '-' + nonce + '@example.com'
-          const username = 'like_cache_e2e_' + runId + '_' + nonce.slice(0, 8)
+          const email = 'like-cache-e2e-' + fixtureId + '-' + nonce + '@example.com'
+          const username = 'like_cache_e2e_' + fixtureId + '_' + nonce.slice(0, 8)
           const password = 'Evd-LikeCache-' + randomBytes(24).toString('base64url') + '-Z9!'
-          const roleId = 'LIKE-CACHE-E2E-ROLE-' + runId + '-' + nonce
-          const registerKey = 'LIKE-CACHE-E2E-' + runId + '-REGISTER'
+          const roleId = 'LIKE-CACHE-E2E-ROLE-' + fixtureId + '-' + nonce
+          const registerKey = 'LIKE-CACHE-E2E-' + fixtureId + '-REGISTER'
 
           async function post(path, body, headers = {}) {
             const r = await fetch(base + path, {
@@ -186,7 +189,7 @@ jobs:
           const login = await post('/auth/login', {
             identity: email,
             credential: password,
-            deviceId: 'like-cache-e2e-' + runId,
+            deviceId: 'like-cache-e2e-' + fixtureId,
           })
           const token = login.data?.accessToken
           if (login.status !== 200 || typeof token !== 'string' || login.data?.layer !== 'L3') {
@@ -215,7 +218,7 @@ jobs:
           import { execFileSync } from 'node:child_process'
 
           const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
-          const contentId = 'likecachee2e-' + process.env.GITHUB_RUN_ID
+          const contentId = 'likecachee2e-' + process.env.GITHUB_RUN_ID + '-a' + process.env.GITHUB_RUN_ATTEMPT
           const now = new Date().toISOString()
           const sql =
             'INSERT INTO contents ' +
@@ -223,7 +226,7 @@ jobs:
             [
               contentId, 'article', process.env.LIKE_CACHE_TEST_USER_ID, process.env.LIKE_CACHE_TEST_USER_ID, null, 'PUBLISHED', 1, 1,
               'Like Aggregate Cache Runtime E2E',
-              'r2://like-cache-e2e/' + process.env.GITHUB_RUN_ID + '/body',
+              'r2://like-cache-e2e/' + process.env.GITHUB_RUN_ID + '/a' + process.env.GITHUB_RUN_ATTEMPT + '/body',
               '[]', null, 'W/"1"', now, now,
             ].map((v,i)=>i === 4 || i === 11 ? 'NULL' : q(v)).join(',') + ')'
           execFileSync(
@@ -259,8 +262,8 @@ jobs:
           import { execFileSync } from 'node:child_process'
           const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
           const now = new Date().toISOString()
-          const actor = 'like-cache-seed-actor-' + process.env.GITHUB_RUN_ID
-          const relationship = 'like-cache-seed-rel-' + process.env.GITHUB_RUN_ID
+          const actor = 'like-cache-seed-actor-' + process.env.GITHUB_RUN_ID + '-a' + process.env.GITHUB_RUN_ATTEMPT
+          const relationship = 'like-cache-seed-rel-' + process.env.GITHUB_RUN_ID + '-a' + process.env.GITHUB_RUN_ATTEMPT
           const sql =
             'INSERT INTO interaction_likes (relationship_id,actor_user_id,target_type,target_id,created_at) VALUES (' +
             [relationship,actor,'content',process.env.LIKE_CACHE_TEST_CONTENT_ID,now].map(q).join(',') + ')'
@@ -306,7 +309,7 @@ jobs:
         run: |
           set -euo pipefail
           url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
-          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: LIKE-CACHE-E2E-$GITHUB_RUN_ID-LIKE"             --data '{"targetType":"content","targetId":"'"$LIKE_CACHE_TEST_CONTENT_ID"'"}'             "$SOCIAL_API_BASE_URL/api/v1/interactions/likes" > /tmp/like-post.json
+          curl --silent --show-error --fail-with-body             -X POST             -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN"             -H "Content-Type: application/json"             -H "Idempotency-Key: LIKE-CACHE-E2E-$GITHUB_RUN_ID-A$GITHUB_RUN_ATTEMPT-LIKE"             --data '{"targetType":"content","targetId":"'"$LIKE_CACHE_TEST_CONTENT_ID"'"}'             "$SOCIAL_API_BASE_URL/api/v1/interactions/likes" > /tmp/like-post.json
           curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-viewer-after-post.json
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
@@ -328,8 +331,8 @@ jobs:
           import { execFileSync } from 'node:child_process'
           const q = (value) => "'" + String(value).replaceAll("'", "''") + "'"
           const now = new Date().toISOString()
-          const actor = 'like-cache-seed-actor-2-' + process.env.GITHUB_RUN_ID
-          const relationship = 'like-cache-seed-rel-2-' + process.env.GITHUB_RUN_ID
+          const actor = 'like-cache-seed-actor-2-' + process.env.GITHUB_RUN_ID + '-a' + process.env.GITHUB_RUN_ATTEMPT
+          const relationship = 'like-cache-seed-rel-2-' + process.env.GITHUB_RUN_ID + '-a' + process.env.GITHUB_RUN_ATTEMPT
           const sql =
             'INSERT INTO interaction_likes (relationship_id,actor_user_id,target_type,target_id,created_at) VALUES (' +
             [relationship,actor,'content',process.env.LIKE_CACHE_TEST_CONTENT_ID,now].map(q).join(',') + ')'
