@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const baseUrl = process.env.AUTH_BETTER_AUTH_BASE_URL ?? 'http://127.0.0.1:8787'
-const sourceSha = process.env.GITHUB_SHA ?? 'unknown'
+const sourceSha = process.env.AUTH_BETTER_AUTH_SOURCE_SHA ?? process.env.GITHUB_SHA ?? 'unknown'
 const evidenceDir = resolve(process.cwd(), '../../artifacts/evidence/auth-better-auth')
 mkdirSync(evidenceDir, { recursive: true })
 
