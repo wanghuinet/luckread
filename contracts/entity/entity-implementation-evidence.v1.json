@@ -33,7 +33,9 @@
       "catalogStatus": "PROPOSED",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
-        "workers/W02-identity/src/account/registration-materializer.ts"
+        "workers/W02-identity/src/account/registration-materializer.ts",
+        "workers/W02-identity/src/auth/better-auth.ts",
+        "workers/W02-identity/src/auth/registration.ts"
       ],
       "schemaEvidenceRefs": [
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
@@ -44,49 +46,62 @@
       ],
       "payloadNativeEvidenceRefs": [],
       "extensionEvidenceRefs": [
+        "workers/W02-identity/src/auth/registration.ts"
+      ],
+      "blockers": [
+        "AUTH-001 W02 scheduled registration materializer now provides exact-SHA executable identity materialization evidence; no independent public identity CRUD lifecycle is claimed by this admission.",
+        "Canonical entity catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and global Mapping 0 / Five-Way remains NOT_GREEN.",
+        "Better Auth W02 is the current identity/authentication authority; the historical AUTH-003 credential-add evidence is preserved separately and is not current evidence."
+      ],
+      "status": "BLOCKED",
+      "historicalExtensionEvidenceRefs": [
         "workers/W02-identity/src/credentials/credential-add.ts",
         "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
         "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
         "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
         "https://github.com/wanghuinet/luckread/actions/runs/36377880967",
         "docs/change-control/CC-MAPPING-0-AUTH-003-IDENTITY-MATERIALIZATION-EVIDENCE-ADMISSION-2026-09-28.md"
-      ],
-      "blockers": [
-        "AUTH-001 W02 scheduled registration materializer now provides exact-SHA executable identity materialization evidence; no independent public identity CRUD lifecycle is claimed by this admission.",
-        "Canonical entity catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and global Mapping 0 / Five-Way remains NOT_GREEN."
-      ],
-      "status": "BLOCKED"
+      ]
     },
     {
       "entityId": "ENT-CREDENTIAL",
       "catalogStatus": "PROPOSED",
-      "implementationStatus": "IMPLEMENTED",
+      "implementationStatus": "CONTRACTED_NOT_VERIFIED",
       "implementationRefs": [
-        "workers/W02-identity/src/credentials/credential-add.ts",
-        "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
-        "workers/W02-identity/src/credentials/credential-list.ts",
-        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
+        "workers/W02-identity/src/auth/better-auth.ts",
+        "workers/W02-identity/src/auth/registration.ts",
+        "workers/W02-identity/migrations/0002_better_auth_core.sql"
       ],
       "schemaEvidenceRefs": [
         "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
       ],
       "migrationEvidenceRefs": [
+        "workers/W02-identity/migrations/0002_better_auth_core.sql"
+      ],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "The previous custom AUTH-003 credential List/Add/Replace/Remove implementation is superseded by the Better Auth W02 authority and its historical evidence is preserved separately.",
+        "Current Better Auth credential persistence/runtime requires fresh executable evidence before promotion.",
+        "Global Mapping 0 / Five-Way remains NOT_GREEN."
+      ],
+      "status": "BLOCKED",
+      "historicalImplementationRefs": [
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
+        "workers/W02-identity/src/credentials/credential-list.ts",
+        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
+      ],
+      "historicalMigrationEvidenceRefs": [
         "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
         "https://github.com/wanghuinet/luckread/actions/runs/36296831559"
       ],
-      "payloadNativeEvidenceRefs": [],
-      "extensionEvidenceRefs": [
+      "historicalExtensionEvidenceRefs": [
         "workers/W02-identity/src/credentials/credential-add.ts",
         "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
         "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
         "https://github.com/wanghuinet/luckread/actions/runs/36308120758"
-      ],
-      "blockers": [
-        "ENT-CREDENTIAL runtime/persistence evidence is complete for the admitted AUTH-003 List/Add/Replace/Remove slice.",
-        "Canonical catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and final Mapping 0 / Five-Way reconciliation is NOT_GREEN.",
-        "No promotion is inferred from the credential entity's dependency on auth_identities."
-      ],
-      "status": "BLOCKED"
+      ]
     },
     {
       "entityId": "ENT-CONSENT",
@@ -109,18 +124,41 @@
       "catalogStatus": "PROPOSED",
       "implementationStatus": "IMPLEMENTED",
       "implementationRefs": [
+        "workers/W02-identity/src/auth/better-auth.ts",
+        "workers/W02-identity/src/index.ts",
+        "workers/W01-payload/src/app/auth/login/route.ts",
+        "workers/W01-payload/src/app/auth/refresh/route.ts",
+        "workers/W01-payload/src/app/auth/logout/route.ts",
+        "workers/W01-payload/src/app/auth/sessions/[[...segments]]/route.ts"
+      ],
+      "schemaEvidenceRefs": [
+        "workers/W02-identity/migrations/0002_better_auth_core.sql",
+        "contracts/persistence/BETTER-AUTH-W02-session-persistence-contract.v1.json"
+      ],
+      "migrationEvidenceRefs": [
+        "workers/W02-identity/migrations/0002_better_auth_core.sql"
+      ],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "Current Session authority is Better Auth W02 / D1-01; the previous Payload-native/session-runtime evidence is historical and is not reused as current GREEN evidence.",
+        "Cross-worker runtime, migration application and Evidence Registry admission are still required.",
+        "ENT-SESSION promotion remains blocked pending executable evidence and Mapping 0 / Five-Way."
+      ],
+      "status": "BLOCKED",
+      "historicalImplementationRefs": [
         "workers/W02-identity/src/session/session-runtime.ts",
         "workers/W02-identity/src/index.ts",
         "workers/W01-payload/src/app/auth/login/route.ts",
         "workers/W01-payload/src/app/auth/refresh/route.ts",
         "workers/W01-payload/src/app/auth/logout/route.ts"
       ],
-      "schemaEvidenceRefs": [
+      "historicalSchemaEvidenceRefs": [
         "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
         "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
         "artifacts/mapping-0/auth-002-e6-runtime-evidence-reconciliation-2026-09-26.json"
       ],
-      "migrationEvidenceRefs": [
+      "historicalMigrationEvidenceRefs": [
         "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
         "https://github.com/wanghuinet/luckread/actions/runs/36217784262",
         "https://github.com/wanghuinet/luckread/actions/runs/36219132123",
@@ -128,19 +166,14 @@
         "docs/change-control/CC-MAPPING-0-AUTH-002-HISTORICAL-MIGRATION-EVIDENCE-ADMISSION-2026-09-28.md",
         "https://github.com/wanghuinet/luckread/actions/runs/35552919573/artifacts/10618729380"
       ],
-      "payloadNativeEvidenceRefs": [
+      "historicalPayloadNativeEvidenceRefs": [
         "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
       ],
-      "extensionEvidenceRefs": [
+      "historicalExtensionEvidenceRefs": [
         "workers/W02-identity/src/session/session-runtime.ts",
         "workers/W02-identity/src/session/session-runtime.test.ts",
         "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
-      ],
-      "blockers": [
-        "Gate-1 schema, native session runtime, security-negative, concurrency and extension-correlation evidence are now VERIFIED at the exact tested source 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55.",
-        "ENT-SESSION catalog promotion remains blocked pending final Mapping 0 / Five-Way admission."
-      ],
-      "status": "BLOCKED"
+      ]
     },
     {
       "entityId": "ENT-VERIFICATION",
