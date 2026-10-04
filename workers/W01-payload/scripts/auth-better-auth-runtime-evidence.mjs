@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 const baseUrl = process.env.AUTH_BETTER_AUTH_BASE_URL ?? 'http://127.0.0.1:8787'
 const sourceSha = process.env.AUTH_BETTER_AUTH_SOURCE_SHA ?? process.env.GITHUB_SHA ?? 'unknown'
 const evidenceDir = resolve(process.cwd(), '../../artifacts/evidence/auth-better-auth')
+const w02Config = resolve(process.cwd(), '../W02-identity/wrangler.jsonc')
 mkdirSync(evidenceDir, { recursive: true })
 
 const policy = JSON.parse(readFileSync(
@@ -53,7 +54,7 @@ const sql = (value) => "'" + String(value).replaceAll("'", "''") + "'"
 const d1 = (command) => {
   const raw = execFileSync(
     'pnpm',
-    ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', '--json', '--config', 'wrangler.jsonc', '--command', command],
+    ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', '--json', '--config', w02Config, '--command', command],
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
   )
   const parsed = JSON.parse(raw)
@@ -118,8 +119,8 @@ const main = async () => {
   const session = await request('/api/auth/get-session', { headers: { accept: 'application/json' } }, jar1)
   expect(ok(session.response.status) && String(session.body?.user?.id ?? '') === userId, 'Better Auth get-session failed')
 
-  const me = await request('/api/v1/users/me', { headers: { accept: 'application/json' } }, jar1)
-  expect(me.response.status === 200 && String(me.body?.id ?? '') === userId, 'Payload user facade failed')
+  const proxySession = await request('/api/auth/get-session', { headers: { accept: 'application/json' } }, jar1)
+  expect(ok(proxySession.response.status) && String(proxySession.body?.user?.id ?? '') === userId, 'W01 to W02 session proxy failed')
 
   const list1 = await request('/api/v1/auth/sessions', { headers: { accept: 'application/json' } }, jar1)
   expect(list1.response.status === 200 && Array.isArray(list1.body?.items), 'session list failed')
@@ -208,7 +209,7 @@ const main = async () => {
       betterAuthCredentialPersisted: true,
       legacyHashSaltUntouched: true,
       sessionCreatedAndRead: true,
-      payloadUserFacadeAuthenticated: true,
+      w01ToW02SessionProxyAuthenticated: true,
       compatibilityRefreshRoute: true,
       secondSessionAndRevocation: true,
       passwordChangeAndReplacement: true,
