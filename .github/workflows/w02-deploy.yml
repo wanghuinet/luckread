@@ -40,6 +40,7 @@ jobs:
           test -s workers/W02-identity/src/auth/registration.ts
           test -s workers/W02-identity/migrations/0002_better_auth_core.sql
           npm --prefix workers/W02-identity ls better-auth --depth=0
+          npm --prefix workers/W02-identity run typecheck
 
       - name: Verify Better Auth production secret is configured
         env:
