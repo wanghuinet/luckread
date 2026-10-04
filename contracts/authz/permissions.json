@@ -248,6 +248,13 @@
       "auditRequired": true
     },
     {
+      "name": "media.read.own",
+      "resource": "media",
+      "action": "read",
+      "minLayer": "L3",
+      "scope": "own"
+    },
+    {
       "name": "media.read",
       "resource": "media",
       "action": "read",
