@@ -81,12 +81,9 @@ jobs:
           test -n "$consumer"
           test "$count" = "1"
           test -n "$queue_id"
-          printf '%s
-' "$queue_id" > /tmp/auth013-queue-id
-          printf '%s
-' "$consumer" > /tmp/auth013-consumer
-          printf '%s
-' "$count" > /tmp/auth013-consumer-count
+          printf '%s\n' "$queue_id" > /tmp/auth013-queue-id
+          printf '%s\n' "$consumer" > /tmp/auth013-consumer
+          printf '%s\n' "$count" > /tmp/auth013-consumer-count
           echo "AUTH013_W04_LIVE_CONSUMER=PASS"
 
       - name: Execute controlled lifecycle projection/deindex matrix
