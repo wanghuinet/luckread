@@ -91,8 +91,6 @@ export async function PATCH(request: Request): Promise<Response> {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile service unavailable')
   }
 
-  if (!readPayloadAccessToken(request)) return unauthorized()
-
   const authenticated = await authenticate(request)
   if (!authenticated) return unauthorized()
 
