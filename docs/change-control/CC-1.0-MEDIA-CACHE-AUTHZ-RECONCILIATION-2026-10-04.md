@@ -1,6 +1,6 @@
 # Change Control — 1.0 Media Cache / Authorization Reconciliation — 2026-10-04
 
-Status: BLOCKED / DECISION-MATERIAL / IMPLEMENTATION-PENDING
+Status: IMPLEMENTED / CI-VALIDATION-PENDING / RUNTIME-EVIDENCE-PENDING
 
 ## Baseline
 
@@ -40,22 +40,15 @@ Without an explicit asset-publicness source, a shared cache cannot prove that a 
 
 This must not be classified as GREEN.
 
-## Decision material
+## Decision
 
-No implementation is admitted in this change-control record.
+Choose the conservative authenticated media metadata path.
 
-The minimum safe direction is to choose one canonical policy before code changes:
-
-1. **Explicit asset visibility path** — add/define a canonical public/private asset policy, then allow shared cache only for explicitly public assets and use an allowlisted public response projection.
-2. **Authenticated media metadata path** — keep Media detail resource-scoped and remove anonymous/shared cache semantics until public asset policy exists.
-
-Any choice must also define:
-
-- how existing assets are classified;
-- how publish/unpublish affects asset publicness, if applicable;
-- whether playback may remain public independently of metadata authorization;
-- cache invalidation when asset visibility changes;
-- test/evidence requirements for private-asset non-leakage.
+- Media detail reads are owner-scoped at the Payload collection boundary.
+- `GET /api/v1/media/{mediaId}` does not enter shared public cache.
+- The v1 response is explicitly projected to delivery metadata and excludes internal ownership fields.
+- Public article/video rendering continues to use the content's stored R2 URL references; it does not depend on the media metadata endpoint.
+- Public asset policy and public media metadata caching remain deferred until an explicit canonical asset-visibility contract exists.
 
 ## Non-Goals
 
@@ -76,4 +69,4 @@ Any choice must also define:
 
 ## Gate
 
-Implementation remains BLOCKED until the asset-publicness / authorization policy is explicitly resolved and the resulting contract/runtime/test changes pass the normal admission gates.
+Implementation is admitted under the owner-scoped/no-store decision. Production GREEN remains blocked until CI and independent runtime evidence pass.
