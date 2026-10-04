@@ -58,8 +58,8 @@ jobs:
           state = Path('workers/W01-payload/src/app/api/v1/contents/[contentId]/state/route.ts').read_text()
           guard = Path('workers/W01-payload/src/lib/content-list-cache-guard.ts').read_text()
 
-          assert route.index('validateContentListQuery') < route.index('cachedPublicGet')
-          assert route.index('hasAuthenticatedSessionCredential') < route.index('cachedPublicGet')
+          assert route.index('validateContentListQuery(url)') < route.index('return await cachedPublicGet')
+          assert route.index('if (hasAuthenticatedSessionCredential(request))') < route.index('return await cachedPublicGet')
           assert 'resolveCookieContentPrincipal' in route
           assert 'invalidatePublicContentList' in route
           assert 'invalidatePublicContentList' in detail
