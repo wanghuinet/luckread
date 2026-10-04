@@ -34,11 +34,27 @@ describe('users/me route imports', () => {
 
     expect(source).toContain("import { readPayloadAccessToken, readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'")
     expect(source).toContain('if (!readPayloadAccessToken(request)) return unauthorized()')
-    const credentialCheck = source.indexOf('if (!readPayloadAccessToken(request)) return unauthorized()')
-    const payloadInit = source.indexOf('const payload = await getPayload({ config })')
-    expect(credentialCheck).toBeGreaterThan(-1)
-    expect(payloadInit).toBeGreaterThan(credentialCheck)
-    expect(source.indexOf('if (!readPayloadAccessToken(request)) return unauthorized()', credentialCheck + 1)).toBeGreaterThan(payloadInit)
+    const credentialChecks = []
+    let searchFrom = 0
+    const marker = 'if (!readPayloadAccessToken(request)) return unauthorized()'
+    while (true) {
+      const index = source.indexOf(marker, searchFrom)
+      if (index < 0) break
+      credentialChecks.push(index)
+      searchFrom = index + marker.length
+    }
+
+    const getStart = source.indexOf('export async function GET')
+    const patchStart = source.indexOf('export async function PATCH')
+    const authenticateStart = source.indexOf('async function authenticate')
+    const getCheck = credentialChecks.find((index) => index > getStart && index < patchStart)
+    const patchCheck = credentialChecks.find((index) => index > patchStart)
+    expect(getCheck).toBeDefined()
+    expect(patchCheck).toBeDefined()
+    expect(getCheck!).toBeGreaterThan(getStart)
+    expect(patchCheck!).toBeGreaterThan(patchStart)
+    expect(getCheck!).toBeLessThan(authenticateStart)
+    expect(patchCheck!).toBeLessThan(authenticateStart)
   })
 
 })
