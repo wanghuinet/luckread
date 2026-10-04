@@ -1,0 +1,41 @@
+name: W02 Better Auth Core Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source SHA containing the admitted W02 migration
+        required: true
+        type: string
+      confirm:
+        description: Type APPLY to permit controlled D1-01 mutation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Assert exact source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_sha }}"
+          test -s workers/W02-identity/migrations/0002_better_auth_core.sql
+          test -s workers/W02-identity/scripts/apply-better-auth-migration.mjs
+      - name: Apply controlled D1-01 migration
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node workers/W02-identity/scripts/apply-better-auth-migration.mjs --remote
