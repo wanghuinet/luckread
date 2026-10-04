@@ -213,6 +213,12 @@
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
+      },
+      "consistency": {
+        "authenticationAuthority": "W02_BETTER_AUTH",
+        "credentialPersistenceAuthority": "W02_BETTER_AUTH_D1_01",
+        "sessionAuthority": "W02_BETTER_AUTH_AUTH_SESSIONS",
+        "transport": "W01_W02_AUTH_SERVICE_BINDING"
       }
     },
     {
@@ -290,6 +296,11 @@
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
+      },
+      "consistency": {
+        "authenticationAuthority": "W02_BETTER_AUTH",
+        "sessionAuthority": "W02_BETTER_AUTH_AUTH_SESSIONS",
+        "transport": "W01_W02_AUTH_SERVICE_BINDING"
       }
     },
     {
@@ -442,6 +453,10 @@
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
+      },
+      "consistency": {
+        "sessionAuthority": "W02_BETTER_AUTH_AUTH_SESSIONS",
+        "transport": "W01_W02_AUTH_SERVICE_BINDING"
       }
     },
     {
@@ -519,6 +534,10 @@
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
+      },
+      "consistency": {
+        "sessionAuthority": "W02_BETTER_AUTH_AUTH_SESSIONS",
+        "transport": "W01_W02_AUTH_SERVICE_BINDING"
       }
     },
     {
@@ -921,6 +940,12 @@
       },
       "queue": {
         "enqueueMax": 0
+      },
+      "consistency": {
+        "authenticationAuthority": "W02_BETTER_AUTH",
+        "credentialPersistenceAuthority": "W02_BETTER_AUTH_D1_01",
+        "sessionAuthority": "W02_BETTER_AUTH_AUTH_SESSIONS",
+        "transport": "W01_W02_AUTH_SERVICE_BINDING"
       }
     },
     {
@@ -985,6 +1010,11 @@
       "retry": {
         "maxAttempts": 1,
         "clientRetrySafe": true
+      },
+      "consistency": {
+        "authenticationAuthority": "W02_BETTER_AUTH",
+        "verificationPersistenceAuthority": "W02_BETTER_AUTH_AUTH_VERIFICATIONS",
+        "transport": "W01_W02_AUTH_SERVICE_BINDING"
       }
     },
     {
@@ -1050,6 +1080,13 @@
       },
       "queue": {
         "enqueueMax": 0
+      },
+      "consistency": {
+        "authenticationAuthority": "W02_BETTER_AUTH",
+        "credentialPersistenceAuthority": "W02_BETTER_AUTH_D1_01",
+        "sessionAuthority": "W02_BETTER_AUTH_AUTH_SESSIONS",
+        "verificationPersistenceAuthority": "W02_BETTER_AUTH_AUTH_VERIFICATIONS",
+        "transport": "W01_W02_AUTH_SERVICE_BINDING"
       }
     }
   ]
