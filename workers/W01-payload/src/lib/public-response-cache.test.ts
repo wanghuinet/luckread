@@ -5,7 +5,7 @@ describe('public response cache', () => {
   const cache = {
     match: vi.fn(),
     put: vi.fn(async () => undefined),
-    delete: vi.fn(async () => true),
+    delete: vi.fn<(request: Request) => Promise<boolean>>(async (_request) => true),
   }
 
   afterEach(() => {
