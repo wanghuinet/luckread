@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, validateInput, validateListFilters } from './content-runtime.js'
-import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
+import w03Worker, { hasContentPermission, hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
   it('accepts the canonical lifecycle vocabulary and cursor round-trip', () => {
@@ -120,6 +120,13 @@ describe('W03 content contract core', () => {
 
     expect(page.items[0]?.contentType).toBe('video')
     expect(preparedQueries[0]).toContain("WHERE state = 'PUBLISHED' AND content_type = ?")
+  })
+
+  it('enforces canonical revision permissions separately from generic creator access', () => {
+    expect(hasContentPermission('L3', 'content.revision.read')).toBe(true)
+    expect(hasContentPermission('L3', 'content.revision.rollback')).toBe(true)
+    expect(hasContentPermission('L2', 'content.revision.read')).toBe(false)
+    expect(hasContentPermission('L3', 'unknown.permission')).toBe(false)
   })
 
   it('requires L3 or higher for creator content operations', () => {
