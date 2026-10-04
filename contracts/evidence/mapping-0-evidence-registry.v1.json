@@ -1345,6 +1345,21 @@
       "result": "PASS",
       "status": "VERIFIED",
       "note": "Production runtime evidence against deployment run 37195981263. Synthetic fixture verified owner-read, private no-store, no shared-cache header, ownerUserId exclusion, projected fields only, non-owner 404, and anonymous 403. This record supports the owner-scoped media metadata boundary only and does not promote MEDIA-001, Mapping 0, or the canonical Evidence Registry."
+    },
+    {
+      "evidenceId": "EVD-AUTH013-PERSISTENCE-SCHEMA-REMOTE-002",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-013::PERSISTENCE_SCHEMA",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-013",
+      "source": "GitHub Actions AUTH-013 Persistence Schema Evidence against controlled Cloudflare D1 D1-01",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/37196564139/artifacts/11300814115",
+      "commitSha": "d36474da3a848c6b390e83bff2056c25bfd9cf7f",
+      "timestamp": "2026-10-04T10:49:11Z",
+      "producer": "AUTH-013 Persistence Schema Evidence workflow",
+      "result": "PASS",
+      "status": "VERIFIED",
+      "note": "Fresh current-head read-only remote evidence. D1-01/luckread reports users schema containing account_state TEXT NOT NULL DEFAULT 'PENDING_VERIFICATION' and account_state_version INTEGER NOT NULL DEFAULT 1; migration history contains 20261002_120000_media_owner as batch 6; users count is 56; all evidence queries report changes=0 and rows_written=0. This record proves the AUTH-013 persistence-schema claim only and does not promote AUTH-013, Mapping 0, or the Evidence Registry to GREEN."
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
