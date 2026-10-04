@@ -13,7 +13,7 @@ const unauthorized = () => new Response(JSON.stringify({ error: { code: 'UNAUTHE
 
 async function authenticate(request: Request) {
   const payload = await getPayload({ config })
-  const session = await getBetterAuthSession(request).catch(() => null)
+  const session = await getBetterAuthSession(request).catch((): null => null)
   if (!session?.user?.id) return null
 
   const user = await payload.findByID({
@@ -21,7 +21,7 @@ async function authenticate(request: Request) {
     id: String(session.user.id),
     depth: 0,
     overrideAccess: true,
-  }).catch(() => null)
+  }).catch((): null => null)
 
   return user ? { payload, user } : null
 }
