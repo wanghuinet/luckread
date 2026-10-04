@@ -36,7 +36,6 @@ jobs:
       NODE_ENV: development
       CLOUDFLARE_ENV: development
       PAYLOAD_SECRET: local-runtime-${{ github.run_id }}-${{ github.run_attempt }}
-      BETTER_AUTH_SECRET: local-runtime-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Resolve exact source SHA
         id: source
