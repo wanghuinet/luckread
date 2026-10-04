@@ -81,6 +81,10 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Install W02 dependencies
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-package-lock
+
       - name: Apply exact local Payload migration set
         working-directory: workers/W01-payload
         run: pnpm payload migrate
@@ -88,8 +92,8 @@ jobs:
       - name: Copy the admitted W01 local D1 state into W02 local D1
         run: |
           set -euo pipefail
-          pnpm --dir workers/W01-payload exec wrangler d1 export luckread --local --output /tmp/luckread-w01-auth-runtime.sql --config wrangler.jsonc
-          pnpm --dir workers/W02-identity exec wrangler d1 execute luckread --local --file /tmp/luckread-w01-auth-runtime.sql --config wrangler.jsonc
+          npx --yes wrangler@4.116.0 d1 export luckread --local --output /tmp/luckread-w01-auth-runtime.sql --config workers/W01-payload/wrangler.jsonc
+          npx --yes wrangler@4.116.0 d1 execute luckread --local --file /tmp/luckread-w01-auth-runtime.sql --config workers/W02-identity/wrangler.jsonc
 
       - name: Apply exact local W02 Better Auth migration
         run: node workers/W02-identity/scripts/apply-better-auth-migration.mjs --local
@@ -114,7 +118,7 @@ jobs:
         working-directory: workers/W02-identity
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --port 8788 --var "BETTER_AUTH_SECRET:${BETTER_AUTH_SECRET}" --var "CLOUDFLARE_ENV:development" > auth-better-auth-w02-preview.log 2>&1 &
+          npx --yes wrangler@4.116.0 dev --local --port 8788 --var "BETTER_AUTH_SECRET:${BETTER_AUTH_SECRET}" --var "CLOUDFLARE_ENV:development" > auth-better-auth-w02-preview.log 2>&1 &
           echo $! > auth-better-auth-w02-preview.pid
           ready=0
           for _ in $(seq 1 120); do
