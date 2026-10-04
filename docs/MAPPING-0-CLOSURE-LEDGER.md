@@ -4651,3 +4651,13 @@ Runtime GREEN is still **NOT_VERIFIED** until current-head Source CI, remote D1-
 - Therefore the remaining AUTH-013 gap is not another projection-consumer run. It is the missing canonical feature-serving path that must consume the derived visibility state and enforce account-state eligibility before final Feed/Search output and any applicable shared-cache response.
 - This is recorded as `GAP_CONFIRMED / IMPLEMENTATION_NOT_AUTHORIZED` under `docs/change-control/CC-MAPPING-0-AUTH-013-FEED-SEARCH-SERVING-GAP-2026-10-04.md`.
 - No new Worker, D1, Queue, KV namespace, public evidence-only route, or alternate authority is authorized.
+
+
+## 2026-10-04 — Worker D1 access-boundary current-main gate PASS
+
+- Run `37202657136` completed SUCCESS for `Worker D1 Access Boundary Gate` on `main` at `fb161c579021bf2ec5b661841c449f443b47ffba`.
+- Job `111437326390` returned `WORKER_D1_ACCESS_BOUNDARY=PASS`.
+- The detector checked 12 Worker directories, 7 Wrangler configurations and 168 Worker code files against the registered Worker×D1 boundary rules.
+- Change Control: `CC-MAPPING-0-WORKER-D1-ACCESS-BOUNDARY-EVIDENCE-ADMISSION-2026-10-04.md`.
+- Evidence Registry admission: `EVD-MAPPING0-WORKER-D1-ACCESS-BOUNDARY-001` = `PASS / VERIFIED`, with `EXECUTED_AT_TESTED_COMMIT`.
+- This closes the preventive static Worker×D1 access-boundary gate only. Mapping 0 remains `NOT_GREEN`, and the AUTH-013 canonical Feed/Recommendation/Search serving gap remains separately blocked.
