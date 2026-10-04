@@ -4,18 +4,16 @@ import { resolve } from 'node:path'
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 
-describe('versioned auth password reset adapters', () => {
-  it('delegates reset request to the existing native handler', () => {
-    const route = read('src/app/api/v1/auth/password/reset/request/route.ts')
-    expect(route).toContain("export { POST } from '../../../../../../auth/password/reset/request/route'")
-    expect(route).not.toContain('getPayload(')
-    expect(route).not.toContain('forgotPassword(')
+describe('Better Auth password reset adapters', () => {
+  it('keeps reset request and confirmation as thin v1 facades', () => {
+    const requestRoute = read('src/app/api/v1/auth/password/reset/request/route.ts')
+    const confirmRoute = read('src/app/api/v1/auth/password/reset/confirm/route.ts')
+    expect(requestRoute).toContain("export { POST } from '../../../../../../auth/password/reset/request/route'")
+    expect(confirmRoute).toContain("export { POST } from '../../../../../../auth/password/reset/confirm/route'")
   })
 
-  it('delegates reset confirmation to the existing native handler', () => {
-    const route = read('src/app/api/v1/auth/password/reset/confirm/route.ts')
-    expect(route).toContain("export { POST } from '../../../../../../auth/password/reset/confirm/route'")
-    expect(route).not.toContain('getPayload(')
-    expect(route).not.toContain('resetPassword(')
+  it('delegates both reset operations to Better Auth', () => {
+    expect(read('src/app/auth/password/reset/request/route.ts')).toContain("'/request-password-reset'")
+    expect(read('src/app/auth/password/reset/confirm/route.ts')).toContain("'/reset-password'")
   })
 })
