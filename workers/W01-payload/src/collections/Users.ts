@@ -9,7 +9,7 @@ export const Users: CollectionConfig = {
     useAsTitle: 'email',
   },
   auth: {
-    disableLocalStrategy: true,
+    disableLocalStrategy: { enableFields: true },
     strategies: [
       {
         name: 'better-auth',
