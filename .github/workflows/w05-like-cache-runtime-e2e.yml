@@ -347,7 +347,7 @@ jobs:
           NODE
           url="$SOCIAL_API_BASE_URL/api/v1/interactions/likes?targetType=content&targetId=$LIKE_CACHE_TEST_CONTENT_ID"
           sleep 1
-          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-shared-stale.json"
+          curl --silent --show-error --fail-with-body -H "Authorization: Bearer $LIKE_CACHE_TEST_TOKEN" "$url" > /tmp/like-shared-stale.json
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
           const value = JSON.parse(readFileSync('/tmp/like-shared-stale.json','utf8'))
