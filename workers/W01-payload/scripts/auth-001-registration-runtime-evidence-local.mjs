@@ -81,7 +81,7 @@ const envelopeForKey = async (idempotencyKey) => scalar('SELECT id, state, paylo
 
 const tableRows = { results: all("SELECT name, type FROM sqlite_master WHERE type IN ('table','index') AND name IN ('users','user','account','session','auth_registration_envelopes','consents') ORDER BY type,name") }
 const requiredObjects = new Set((tableRows.results || []).map((row) => String(row.type) + ':' + String(row.name)))
-for (const required of ['table:user', 'table:account', 'table:session', 'table:auth_registration_envelopes', 'table:consents']) if (!requiredObjects.has(required)) throw new Error('Required local D1 object missing: ' + required)
+for (const required of ['table:users', 'table:user', 'table:account', 'table:session', 'table:auth_registration_envelopes', 'table:consents']) if (!requiredObjects.has(required)) throw new Error('Required local D1 object missing: ' + required)
 
 const suffix = randomUUID().replaceAll('-', '').slice(0, 16)
 const email = 'auth001-runtime-' + suffix + '@luckread.local'
@@ -99,15 +99,13 @@ let triggerName = null
 
 const cleanup = async () => {
   if (triggerName) { runSql('DROP TRIGGER IF EXISTS ' + triggerName); triggerName = null }
-  runSql('DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email IN (?, ?))', email, concurrentEmail)
-  runSql('DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-rollback-' + suffix + '@luckread.local')
-  runSql('DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-same-key-' + suffix + '@luckread.local')
+  runSql('DELETE FROM role_authorization_versions WHERE subject_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-%-' + suffix + '@luckread.local')
+  runSql('DELETE FROM role_assignments WHERE subject_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-%-' + suffix + '@luckread.local')
+  runSql('DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-%-' + suffix + '@luckread.local')
   runSql('DELETE FROM auth_registration_envelopes WHERE idempotency_key IN (?, ?, ?, ?, ?)', keySuccess, keyRollback, keyConcurrentA, keyConcurrentB, keySameKey)
-  runSql('DELETE FROM "session" WHERE user_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email IN (?, ?))', email, concurrentEmail)
-  runSql('DELETE FROM "account" WHERE user_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email IN (?, ?))', email, concurrentEmail)
-  runSql('DELETE FROM "session" WHERE user_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-same-key-' + suffix + '@luckread.local')
-  runSql('DELETE FROM "account" WHERE user_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-same-key-' + suffix + '@luckread.local')
-  runSql('DELETE FROM "user" WHERE email IN (?, ?)', email, concurrentEmail)
+  runSql('DELETE FROM "session" WHERE user_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-%-' + suffix + '@luckread.local')
+  runSql('DELETE FROM "account" WHERE user_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-%-' + suffix + '@luckread.local')
+  runSql('DELETE FROM "user" WHERE email LIKE ?', 'auth001-%-' + suffix + '@luckread.local')
 }
 
 try {
