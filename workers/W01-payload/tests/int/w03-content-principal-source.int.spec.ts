@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+const read = (relativePath: string) =>
+  readFileSync(resolve(process.cwd(), relativePath), 'utf8')
+
 describe('W03 canonical principal boundary', () => {
   it('uses W02 Better Auth principal resolution instead of local Payload session validation', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/content/w03-content-client.ts'),
-      'utf8',
-    )
+    const source = read('src/content/w03-content-client.ts')
 
     expect(source).toContain("from '../auth/w02-principal-client.js'")
     expect(source).toContain('resolveCanonicalPrincipal(request)')
@@ -17,14 +17,12 @@ describe('W03 canonical principal boundary', () => {
     expect(source).not.toContain('payload.auth')
   })
 
-  it('treats either Authorization or cookie presence as a candidate session transport', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'src/content/w03-content-client.ts'),
-      'utf8',
-    )
+  it('accepts the canonical auth transports without inspecting Payload tokens locally', () => {
+    const source = read('src/auth/w02-principal-client.ts')
 
-    expect(source).toContain("request.headers.get('Authorization')")
-    expect(source).toContain("request.headers.get('cookie')")
-    expect(source).toContain('resolveContentPrincipal(request)')
+    expect(source).toContain("new Headers(request.headers)")
+    expect(source).toContain("headers.delete('host')")
+    expect(source).toContain("headers.delete('content-length')")
+    expect(source).toContain('/internal/auth/principal')
   })
 })
