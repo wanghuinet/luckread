@@ -29,12 +29,12 @@ on:
       - 'workers/luck02-content/wrangler.jsonc'
       - 'workers/luck02-content/src/**'
       - 'workers/luck02-content/wrangler.jsonc'
-      - 'workers/W05-social/src/**'
-      - 'workers/W05-social/wrangler.jsonc'
-      - 'workers/W06-governance/src/**'
-      - 'workers/W06-governance/wrangler.jsonc'
-      - 'workers/W07-subscription-commerce/src/**'
-      - 'workers/W07-subscription-commerce/wrangler.jsonc'
+      - 'workers/luck03-social/src/**'
+      - 'workers/luck03-social/wrangler.jsonc'
+      - 'workers/luck04-commerce/src/**'
+      - 'workers/luck04-commerce/wrangler.jsonc'
+      - 'workers/luck04-commerce/src/**'
+      - 'workers/luck04-commerce/wrangler.jsonc'
       - '.github/workflows/1.0-d1-traffic-guard-ci.yml'
   push:
     branches:
@@ -51,8 +51,8 @@ on:
       - 'workers/luck02-content/wrangler.jsonc'
       - 'workers/luck02-content/src/**'
       - 'workers/luck02-content/wrangler.jsonc'
-      - 'workers/W05-social/src/**'
-      - 'workers/W05-social/wrangler.jsonc'
+      - 'workers/luck03-social/src/**'
+      - 'workers/luck03-social/wrangler.jsonc'
       - '.github/workflows/1.0-d1-traffic-guard-ci.yml'
 
 permissions:
@@ -94,9 +94,9 @@ jobs:
           for (const [path, bindings] of [
             ['workers/luck02-content/wrangler.jsonc', ['PUBLIC_ORIGIN_GLOBAL_LIMITER', 'PUBLIC_READ_LIMITER', 'AUTH_ORIGIN_GLOBAL_LIMITER', 'AUTH_LOGIN_LIMITER', 'AUTH_REGISTER_LIMITER', 'AUTH_REFRESH_LIMITER', 'W01_WRITE_ORIGIN_GLOBAL_LIMITER', 'W01_WRITE_LIMITER']],
             ['workers/luck02-content/wrangler.jsonc', ['CONTENT_PUBLIC_READ_LIMITER', 'CONTENT_MUTATION_LIMITER', 'CONTENT_ORIGIN_GLOBAL_LIMITER']],
-            ['workers/W05-social/wrangler.jsonc', ['SOCIAL_READ_LIMITER', 'SOCIAL_WRITE_LIMITER', 'SOCIAL_ORIGIN_GLOBAL_LIMITER']],
-            ['workers/W06-governance/wrangler.jsonc', ['GOVERNANCE_READ_LIMITER', 'GOVERNANCE_WRITE_LIMITER', 'GOVERNANCE_ORIGIN_GLOBAL_LIMITER']],
-            ['workers/W07-subscription-commerce/wrangler.jsonc', ['SUBSCRIPTION_READ_LIMITER', 'SUBSCRIPTION_WRITE_LIMITER', 'SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER']]
+            ['workers/luck03-social/wrangler.jsonc', ['SOCIAL_READ_LIMITER', 'SOCIAL_WRITE_LIMITER', 'SOCIAL_ORIGIN_GLOBAL_LIMITER']],
+            ['workers/luck04-commerce/wrangler.jsonc', ['GOVERNANCE_READ_LIMITER', 'GOVERNANCE_WRITE_LIMITER', 'GOVERNANCE_ORIGIN_GLOBAL_LIMITER']],
+            ['workers/luck04-commerce/wrangler.jsonc', ['SUBSCRIPTION_READ_LIMITER', 'SUBSCRIPTION_WRITE_LIMITER', 'SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER']]
           ]) {
             const source = fs.readFileSync(path, 'utf8')
             if (!source.includes('"ratelimits"')) throw new Error(path + ' missing ratelimits')
@@ -131,10 +131,10 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
-          for (const path of ['workers/luck02-content/wrangler.jsonc','workers/luck02-content/wrangler.jsonc','workers/W05-social/wrangler.jsonc']) {
+          for (const path of ['workers/luck02-content/wrangler.jsonc','workers/luck03-social/wrangler.jsonc','workers/luck04-commerce/wrangler.jsonc']) {
             JSON.parse(fs.readFileSync(path, 'utf8'))
           }
           console.log('WRANGLER_CONFIG_JSON=PASS')
           NODE
       - name: Typecheck W05
-        run: ./node_modules/.bin/tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W05-social/src/index.ts
+        run: ./node_modules/.bin/tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/luck03-social/src/index.ts
