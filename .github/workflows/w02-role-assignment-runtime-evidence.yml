@@ -45,18 +45,18 @@ jobs:
           set -euo pipefail
           test "${{ inputs.source_sha }}" = "6b28786fec3dc5cabb93b58f18292812119ea62e"
           test "${DATABASE_NAME}" = "luckread"
-          test -f workers/W02-identity/migrations/0001_role_assignments.sql
-          test -f workers/W02-identity/migrations/0003_role_authorization_versions.sql
-          test -f workers/W02-identity/src/authz/role-assignment.ts
-          test -f workers/W02-identity/src/authz/role-version.ts
+          test -f workers/luck01-identity/migrations/0001_role_assignments.sql
+          test -f workers/luck01-identity/migrations/0003_role_authorization_versions.sql
+          test -f workers/luck01-identity/src/authz/role-assignment.ts
+          test -f workers/luck01-identity/src/authz/role-version.ts
           test -z "$(git status --short)"
           node scripts/generate-role-assignment-migration.mjs
           node scripts/generate-role-version-migration.mjs
-          git diff --exit-code -- workers/W02-identity/migrations/0001_role_assignments.sql
-          git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
+          git diff --exit-code -- workers/luck01-identity/migrations/0001_role_assignments.sql
+          git diff --exit-code -- workers/luck01-identity/migrations/0003_role_authorization_versions.sql
 
       - name: Validate controlled D1-01 binding
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         run: |
           set -euo pipefail
           node --input-type=module -e "import fs from 'node:fs'; const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8')); const d=c.d1_databases?.find(x=>x.binding==='D1_01'); if(!d) throw new Error('D1_01 binding missing'); if(d.database_name !== process.env.DATABASE_NAME) throw new Error('database_name must equal configured D1_01 name'); if(d.database_id !== process.env.D1_01_ID) throw new Error('D1_01 database_id does not match controlled target'); console.log(JSON.stringify(d,null,2))"
@@ -67,7 +67,7 @@ jobs:
           cat > .w02-role-assignment-runtime.wrangler.jsonc <<EOF
           {
             "\$schema": "./node_modules/wrangler/config-schema.json",
-            "name": "luckread-w02-role-assignment-runtime-evidence-harness",
+            "name": "luck01-identity-role-assignment-runtime-evidence-harness",
             "main": ".w02-role-assignment-runtime-harness.ts",
             "compatibility_date": "2025-08-15",
             "d1_databases": [
