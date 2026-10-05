@@ -1,17 +1,20 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getPayload } from 'payload'
 
-import config from '@payload-config'
-
-import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
-import { validateSession } from '@/auth/w02-session-client'
+import { callW02UserProfile } from '@/auth/w02-user-profile-client'
 
 import { CreatorStudio } from './CreatorStudio'
 
 export const dynamic = 'force-dynamic'
 
 type StudioLocale = 'zh-CN' | 'en-US'
+
+type CreatorProfile = {
+  id?: unknown
+  email?: unknown
+  username?: unknown
+  displayName?: unknown
+}
 
 export default async function CreatorCenterPage() {
   const requestHeaders = await headers()
@@ -20,49 +23,42 @@ export default async function CreatorCenterPage() {
   const request = new Request('https://mp.luckread.com/creator-center', {
     headers: requestHeaders,
   })
-  const payload = await getPayload({ config })
 
-  let authResult: Awaited<ReturnType<typeof payload.auth>>
+  let profileResponse: Response
   try {
-    authResult = await payload.auth({
-      headers: request.headers,
-      canSetHeaders: false,
-    })
+    profileResponse = await callW02UserProfile(request, '/internal/account/profile', 'GET')
   } catch {
     redirect('/login?returnTo=%2Fcreator-center')
   }
 
-  const user = authResult.user as unknown as ({
-    id?: string | number
-    _sid?: string
-    displayName?: unknown
-    username?: unknown
-    email?: unknown
-  } | null)
-
-  const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (!user?.id || typeof user._sid !== 'string' || !user._sid || tokenVersion === null) {
+  if (!profileResponse.ok) {
     redirect('/login?returnTo=%2Fcreator-center')
   }
 
-  const active = await validateSession({
-    sessionId: user._sid,
-    userId: String(user.id),
-    tokenVersion,
-  }).catch(() => false)
+  let profile: CreatorProfile | null = null
+  try {
+    profile = await profileResponse.json() as CreatorProfile
+  } catch {
+    redirect('/login?returnTo=%2Fcreator-center')
+  }
 
-  if (!active) {
+  const userId =
+    typeof profile.id === 'string' && profile.id.trim().length > 0
+      ? profile.id
+      : null
+
+  if (!userId) {
     redirect('/login?returnTo=%2Fcreator-center')
   }
 
   const displayName =
-    typeof user.displayName === 'string' && user.displayName.trim()
-      ? user.displayName
-      : typeof user.username === 'string' && user.username.trim()
-        ? user.username
-        : typeof user.email === 'string' && user.email.trim()
-          ? user.email
+    typeof profile.displayName === 'string' && profile.displayName.trim()
+      ? profile.displayName
+      : typeof profile.username === 'string' && profile.username.trim()
+        ? profile.username
+        : typeof profile.email === 'string' && profile.email.trim()
+          ? profile.email
           : '创作者'
 
-  return <CreatorStudio displayName={displayName} userId={String(user.id)} locale={locale} />
+  return <CreatorStudio displayName={displayName} userId={userId} locale={locale} />
 }
