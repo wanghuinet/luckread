@@ -241,6 +241,20 @@ const finalizeRegistration = async (
   )
 }
 
+
+const markRegistrationFailed = async (db: D1Database, envelopeId: string, now: string) => {
+  await db
+    .prepare(
+      `UPDATE auth_registration_envelopes
+          SET state = 'FAILED',
+              updated_at = ?
+        WHERE id = ?
+          AND state = 'IN_PROGRESS'`,
+    )
+    .bind(now, envelopeId)
+    .run()
+}
+
 const reserveEnvelope = async (
   db: D1Database,
   input: RegistrationInput,
@@ -411,6 +425,7 @@ export async function registerWithBetterAuth(
     }
   } catch (error) {
     if (isUniqueConstraintError(error)) {
+      await markRegistrationFailed(db, envelope.id, input.now)
       throw new RegistrationRuntimeError(
         'REGISTRATION_CONFLICT',
         'Registration could not be completed',
@@ -423,10 +438,16 @@ export async function registerWithBetterAuth(
         : 0
 
     if (status === 400 || status === 422) {
+      await markRegistrationFailed(db, envelope.id, input.now)
       throw new RegistrationRuntimeError(
         'REGISTRATION_CONFLICT',
         'Registration could not be completed',
       )
+    }
+
+    const recoveredUser = await getNativeUser(db, input.email, input.username)
+    if (!recoveredUser) {
+      await markRegistrationFailed(db, envelope.id, input.now)
     }
 
     throw new RegistrationRuntimeError(
