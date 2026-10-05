@@ -1,14 +1,9 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
-
 import {
-  getPayloadAuthorizationHeader,
-  readVerifiedPayloadTokenVersion,
-} from '../../../../auth/payload-access-token.js'
+  resolveCanonicalPrincipal,
+  W02PrincipalClientError,
+} from '../../../../auth/w02-principal-client.js'
 import {
   transitionAccountState,
-  validateSession,
   W02AuthClientError,
 } from '../../../../auth/w02-session-client.js'
 
@@ -76,46 +71,23 @@ export async function POST(
     return errorResponse(400, 'VALIDATION_FAILED', 'Invalid account-state transition request')
   }
 
-  const payload = await getPayload({ config })
-
-  let authResult: Awaited<ReturnType<typeof payload.auth>>
+  let principal: Awaited<ReturnType<typeof resolveCanonicalPrincipal>>
   try {
-    authResult = await payload.auth({
-      headers: new Headers(
-        request.headers.get('Authorization')
-          ? request.headers
-          : {
-              ...(getPayloadAuthorizationHeader(request)
-                ? { Authorization: getPayloadAuthorizationHeader(request)! }
-                : {}),
-            },
-      ),
-      canSetHeaders: false,
-    })
-  } catch {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
+    principal = await resolveCanonicalPrincipal(request)
+  } catch (error) {
+    if (error instanceof W02PrincipalClientError && error.status === 401) {
+      return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
+    }
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
 
-  const user = authResult.user as ({ id?: unknown; _sid?: unknown } | null)
-  if (!user?.id || typeof user._sid !== 'string') {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-  }
-
-  const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (tokenVersion === null) {
+  if (!principal) {
     return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
   }
 
   try {
-    const active = await validateSession({
-      sessionId: user._sid,
-      userId: String(user.id),
-      tokenVersion,
-    })
-    if (!active) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-
     const result = await transitionAccountState({
-      subjectId: String(user.id),
+      subjectId: principal.userId,
       targetUserId,
       to: body.to,
       reason: body.reason,
