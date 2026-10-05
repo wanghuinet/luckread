@@ -1,13 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 
 import {
   PUBLIC_LOCALES,
   setPublicLocaleCookie,
+  readPublicLocaleCookie,
   type PublicLocale,
 } from './public-locale'
 
+
+export const usePublicLocale = (): PublicLocale => useSyncExternalStore(
+  () => () => undefined,
+  readPublicLocaleCookie,
+  () => 'zh',
+)
 export default function PublicLanguageToggle({ locale }: { locale: PublicLocale }) {
   const [pending, setPending] = useState(false)
 
