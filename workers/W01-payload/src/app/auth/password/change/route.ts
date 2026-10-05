@@ -64,7 +64,13 @@ export async function POST(request: Request): Promise<Response> {
     })
   } catch (error) {
     if (error instanceof W02PasswordClientError) {
-      return jsonError(error.status, error.code, error.message)
+      const message =
+        error.status === 400
+          ? 'Invalid password change request'
+          : error.status === 401
+            ? 'Authentication denied'
+            : 'Password change service unavailable'
+      return jsonError(error.status, error.code, message)
     }
     return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password change service unavailable')
   }
