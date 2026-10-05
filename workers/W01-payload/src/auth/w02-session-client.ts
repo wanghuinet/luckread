@@ -79,6 +79,12 @@ async function callW02<T>(path: string, body: unknown): Promise<T> {
     if (code === 'VALIDATION_FAILED' || code === 'INVALID_CURSOR') {
       throw new W02AuthClientError(400, 'invalid authentication request')
     }
+    if (code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' || code === 'REGISTRATION_CONFLICT') {
+      throw new W02AuthClientError(422, 'registration could not be completed')
+    }
+    if (code === 'IDEMPOTENCY_IN_PROGRESS' || code === 'REGISTRATION_RETRY_REQUIRED') {
+      throw new W02AuthClientError(409, 'registration is already in progress')
+    }
     if (code === 'PERMISSION_DENIED') {
       throw new W02AuthClientError(403, 'permission denied')
     }
@@ -101,6 +107,26 @@ async function callW02<T>(path: string, body: unknown): Promise<T> {
 
   return payload as T
 }
+
+export type BetterAuthRegistrationResult = {
+  userId: string
+  accountState: 'PENDING_VERIFICATION'
+}
+
+export const registerWithBetterAuth = (body: {
+  idempotencyKey: string
+  payloadHash: string
+  responseDigest: string
+  email: string
+  password: string
+  username: string
+  policy: {
+    policyVersion: string
+    retentionUntil: string
+    sourceAuthority: string
+  }
+  now: string
+}) => callW02<BetterAuthRegistrationResult>('/internal/auth/register', body)
 
 export type BetterAuthSignInResult = {
   token: string
