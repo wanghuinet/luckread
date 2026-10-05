@@ -133,24 +133,6 @@
       "evidence": { "openapi": "MISSING", "permission": "PASS", "state": "PASS", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
     },
     {
-      "operationId": "transitionAccountState",
-      "method": "POST",
-      "path": "/users/{userId}/account-state",
-      "visibility": "internal_or_admin",
-      "capability": "account_state_transition",
-      "status": "MISSING",
-      "authorization": { "required": true, "permission": "user.freeze", "scope": "resource" },
-      "resource": { "class": "SINGLE_AUTHORITATIVE_WRITE", "d1ReadMax": 1, "d1WriteMax": 1, "d1ReadRowsMax": 8, "d1WriteRowsMax": 4, "rpcMax": 0 },
-      "cache": { "mode": "NO_STORE", "shared": false, "authorizationBoundary": true },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": false, "requiresIdempotency": false },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 1, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 1, "taskType": "account_state_side_effects" },
-      "antiAbuse": { "required": true, "scopes": ["account", "identity", "device", "endpoint"], "actions": ["ALLOW", "BLOCK", "REVIEW"] },
-      "idempotency": { "required": false },
-      "security": ["state_machine_required", "if_match_required", "audit_required", "actor_authority_required"],
-      "evidence": { "openapi": "PASS", "permission": "PASS", "state": "PASS", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
-    },
-    {
       "operationId": "requestAccountDeletion",
       "method": "POST",
       "path": "/account/deletion",
