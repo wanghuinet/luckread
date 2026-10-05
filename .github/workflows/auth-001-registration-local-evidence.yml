@@ -32,10 +32,6 @@ on:
       - "workers/W02-identity/migrations/**"
       - "workers/W02-identity/package.json"
       - "workers/W02-identity/wrangler.jsonc"
-      - "workers/W02-identity/src/account/**"
-      - "workers/W02-identity/src/auth/**"
-      - "workers/W02-identity/src/index.ts"
-      - "workers/W02-identity/migrations/**"
       - "workers/W02-identity/package.json"
       - "workers/W02-identity/wrangler.jsonc"
   workflow_dispatch:
