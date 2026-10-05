@@ -89,9 +89,13 @@ jobs:
         working-directory: workers/W02-identity
         run: pnpm install --frozen-lockfile
 
-      - name: Apply W02 identity migrations locally
+      - name: Apply W02 role-assignment schema locally
         working-directory: workers/W02-identity
-        run: pnpm exec wrangler d1 migrations apply luckread --local --config wrangler.jsonc
+        run: pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file migrations/0001_role_assignments.sql
+
+      - name: Apply W02 Better Auth identity schema locally
+        working-directory: workers/W02-identity
+        run: pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file migrations/0005_better_auth_identity_core.sql
 
       - name: Apply AUTH-001 governance schema to W02 local D1
         working-directory: workers/W01-payload
