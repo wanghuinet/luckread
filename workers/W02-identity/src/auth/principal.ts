@@ -60,20 +60,18 @@ export async function resolveBetterAuthPrincipal(
     ? result.user.accountStateVersion
     : 1
 
-  let tokenVersion: number | undefined
-  try {
-    const extension = await db
-      .prepare(
-        'SELECT token_version AS tokenVersion FROM auth_session_state WHERE CAST(session_id AS TEXT) = ? AND user_id = CAST(? AS TEXT) AND revoked_at IS NULL LIMIT 1',
-      )
-      .bind(String(result.session.id), String(result.user.id))
-      .first<{ tokenVersion?: number | null }>()
-    if (typeof extension?.tokenVersion === 'number' && Number.isSafeInteger(extension.tokenVersion) && extension.tokenVersion >= 0) {
-      tokenVersion = extension.tokenVersion
-    }
-  } catch {
-    tokenVersion = undefined
-  }
+  const extension = await db
+    .prepare(
+      'SELECT token_version AS tokenVersion FROM auth_session_state WHERE CAST(session_id AS TEXT) = ? AND user_id = CAST(? AS TEXT) AND revoked_at IS NULL LIMIT 1',
+    )
+    .bind(String(result.session.id), String(result.user.id))
+    .first<{ tokenVersion?: number | null }>()
+  const tokenVersion =
+    typeof extension?.tokenVersion === 'number' &&
+    Number.isSafeInteger(extension.tokenVersion) &&
+    extension.tokenVersion >= 0
+      ? extension.tokenVersion
+      : undefined
 
   const layerResolution: LayerResolution = await resolveGlobalLayer(
     db,
