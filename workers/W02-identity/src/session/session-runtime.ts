@@ -160,7 +160,7 @@ export async function revokeSessionExtension(
     .bind(now, now, sessionId)
 
   const nativeSessionStatement = db
-    .prepare('DELETE FROM users_sessions WHERE id = ?')
+    .prepare('DELETE FROM "session" WHERE id = ?')
     .bind(sessionId)
 
   try {
@@ -170,7 +170,7 @@ export async function revokeSessionExtension(
     }
 
     // W02 owns the authoritative revocation mutation: the extension state and
-    // the corresponding Payload-native session are changed together.
+    // the corresponding Better Auth session are changed together.
     const extensionChanged = results[0]?.meta?.changes === 1
     const nativeSessionChanged = results[1]?.meta?.changes === 1
     return { revoked: extensionChanged || nativeSessionChanged }
@@ -295,15 +295,15 @@ async function loadAuthoritativeLoginSession(
         `
         SELECT
           s.id AS sessionId,
-          CAST(s._parent_id AS TEXT) AS userId,
+          CAST(s.user_id AS TEXT) AS userId,
           s.created_at AS createdAt,
           s.expires_at AS expiresAt,
           u.account_state AS accountState
-        FROM users_sessions AS s
-        INNER JOIN users AS u
-          ON CAST(u.id AS TEXT) = CAST(s._parent_id AS TEXT)
+        FROM "session" AS s
+        INNER JOIN "user" AS u
+          ON CAST(u.id AS TEXT) = CAST(s.user_id AS TEXT)
         WHERE s.id = ?
-          AND CAST(s._parent_id AS TEXT) = ?
+          AND CAST(s.user_id AS TEXT) = ?
         LIMIT 1
         `,
       )
@@ -457,10 +457,10 @@ async function loadAuthoritativeRefreshContext(
           u.account_state AS accountState,
           u.email AS email
         FROM auth_session_state AS a
-        INNER JOIN users_sessions AS s
+        INNER JOIN "session" AS s
           ON s.id = a.session_id
-         AND CAST(s._parent_id AS TEXT) = a.user_id
-        INNER JOIN users AS u
+         AND CAST(s.user_id AS TEXT) = a.user_id
+        INNER JOIN "user" AS u
           ON CAST(u.id AS TEXT) = a.user_id
         WHERE a.refresh_credential_hash = ?
         LIMIT 1
@@ -509,19 +509,19 @@ export async function resolveAuthenticatedPrincipal(
       .prepare(`
         SELECT
           CAST(s.id AS TEXT) AS sessionId,
-          CAST(s._parent_id AS TEXT) AS userId,
+          CAST(s.user_id AS TEXT) AS userId,
           s.expires_at AS expiresAt,
           a.user_id AS extensionUserId,
           a.token_version AS tokenVersion,
           a.revoked_at AS revokedAt,
           u.account_state AS accountState
-        FROM users_sessions AS s
+        FROM "session" AS s
         INNER JOIN auth_session_state AS a
           ON CAST(a.session_id AS TEXT) = CAST(s.id AS TEXT)
-        INNER JOIN users AS u
-          ON CAST(u.id AS TEXT) = CAST(s._parent_id AS TEXT)
+        INNER JOIN "user" AS u
+          ON CAST(u.id AS TEXT) = CAST(s.user_id AS TEXT)
         WHERE CAST(s.id AS TEXT) = ?
-          AND CAST(s._parent_id AS TEXT) = ?
+          AND CAST(s.user_id AS TEXT) = ?
         LIMIT 1
         `)
       .bind(String(input.sessionId), String(input.userId))
@@ -576,19 +576,19 @@ export async function validateAuthoritativeSession(
         `
         SELECT
           CAST(s.id AS TEXT) AS sessionId,
-          CAST(s._parent_id AS TEXT) AS userId,
+          CAST(s.user_id AS TEXT) AS userId,
           s.expires_at AS expiresAt,
           a.user_id AS extensionUserId,
           a.token_version AS tokenVersion,
           a.revoked_at AS revokedAt,
           u.account_state AS accountState
-        FROM users_sessions AS s
+        FROM "session" AS s
         INNER JOIN auth_session_state AS a
           ON CAST(a.session_id AS TEXT) = CAST(s.id AS TEXT)
-        INNER JOIN users AS u
-          ON CAST(u.id AS TEXT) = CAST(s._parent_id AS TEXT)
+        INNER JOIN "user" AS u
+          ON CAST(u.id AS TEXT) = CAST(s.user_id AS TEXT)
         WHERE CAST(s.id AS TEXT) = ?
-          AND CAST(s._parent_id AS TEXT) = ?
+          AND CAST(s.user_id AS TEXT) = ?
         LIMIT 1
         `,
       )
