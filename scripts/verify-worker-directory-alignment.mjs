@@ -3,23 +3,17 @@ import { readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const expected = [
-  'W01-payload',
-  'W02-identity',
-  'W03-content',
-  'W04-feed-search',
-  'W05-social',
-  'W06-governance',
-  'W07-subscription-commerce',
-  'W08-creator',
-  'W09-platform',
-  'W10-async',
-  'W11-growth-campaign-analytics-operations',
-  'W12-external-developer-integration',
+  'luck01-identity',
+  'luck02-content',
+  'luck03-social',
+  'luck04-commerce',
+  'luck05-creator',
+  'luck06-async',
 ]
 
 const workersRoot = join(process.cwd(), 'workers')
 const actual = readdirSync(workersRoot, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
+  .filter((entry) => entry.isDirectory() && entry.name !== 'old1.0')
   .map((entry) => entry.name)
   .sort()
 
