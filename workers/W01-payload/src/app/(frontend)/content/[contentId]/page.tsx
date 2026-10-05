@@ -6,7 +6,7 @@ import { extractSocialTokens } from '../../../../social/social-token-parser.js'
 import { useEffect, useMemo, useState } from 'react'
 
 import PublicLanguageToggle from '../../i18n/PublicLanguageToggle'
-import { getPublicCopy, readPublicLocaleCookie, type PublicLocale } from '../../i18n/public-locale'
+import { getPublicCopy, usePublicLocale, type PublicLocale } from '../../i18n/public-locale'
 
 type ContentType = 'article' | 'post' | 'video'
 type Content = {
@@ -32,7 +32,7 @@ export default function ContentDetailPage({
 }: {
   params: Promise<{ contentId: string }>
 }) {
-  const [locale] = useState<PublicLocale>(() => readPublicLocaleCookie())
+  const locale = usePublicLocale()
   const copy = getPublicCopy(locale)
   const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
   const typeLabels: Record<ContentType, string> = {
