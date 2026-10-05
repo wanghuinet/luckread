@@ -84,7 +84,7 @@ describe('W02 Better Auth password change', () => {
           newPassword: 'New-password-456!',
         },
       ),
-    ).rejects.toMatchObject<Partial<PasswordChangeServiceError>>({
+    ).rejects.toMatchObject({
       status: 401,
       code: 'UNAUTHENTICATED',
     })
@@ -103,7 +103,7 @@ describe('W02 Better Auth password change', () => {
           newPassword: 'New-password-456!',
         },
       ),
-    ).rejects.toMatchObject<Partial<PasswordChangeServiceError>>({
+    ).rejects.toMatchObject({
       status: 400,
       code: 'VALIDATION_FAILED',
     })
@@ -128,7 +128,7 @@ describe('W02 Better Auth password change', () => {
           newPassword: 'New-password-456!',
         },
       ),
-    ).rejects.toMatchObject<Partial<PasswordChangeServiceError>>({
+    ).rejects.toMatchObject({
       status: 401,
       code: 'UNAUTHENTICATED',
       message: 'Current password is invalid',
@@ -144,7 +144,7 @@ describe('W02 Better Auth password change', () => {
           newPassword: 'New-password-456!',
         },
       ),
-    ).rejects.toMatchObject<Partial<PasswordChangeServiceError>>({
+    ).rejects.toMatchObject({
       message: 'Current password is invalid',
     })
   })
