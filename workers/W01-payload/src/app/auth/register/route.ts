@@ -231,13 +231,14 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     if (error instanceof W02AuthClientError) {
       const code =
-        error.status === 409
-          ? 'IDEMPOTENCY_IN_PROGRESS'
-          : error.status === 422
+        error.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' ||
+        error.code === 'REGISTRATION_CONFLICT' ||
+        error.code === 'IDEMPOTENCY_IN_PROGRESS' ||
+        error.code === 'REGISTRATION_RETRY_REQUIRED'
+          ? error.code
+          : error.status === 422 || error.status === 400
             ? 'VALIDATION_FAILED'
-            : error.status === 400
-              ? 'VALIDATION_FAILED'
-              : 'SERVICE_UNAVAILABLE'
+            : 'SERVICE_UNAVAILABLE'
 
       return errorResponse(
         error.status,
