@@ -5,13 +5,13 @@ on:
     branches:
       - 'fix/w01-auth-me-imports-*'
     paths:
-      - 'workers/W01-payload/src/app/(payload)/api/users/me/route.ts'
-      - 'workers/W01-payload/tests/int/users-me-route-import.int.spec.ts'
+      - 'workers/luck02-content/src/app/(payload)/api/users/me/route.ts'
+      - 'workers/luck02-content/tests/int/users-me-route-import.int.spec.ts'
       - '.github/workflows/w01-auth-me-import-verification.yml'
   pull_request:
     paths:
-      - 'workers/W01-payload/src/app/(payload)/api/users/me/route.ts'
-      - 'workers/W01-payload/tests/int/users-me-route-import.int.spec.ts'
+      - 'workers/luck02-content/src/app/(payload)/api/users/me/route.ts'
+      - 'workers/luck02-content/tests/int/users-me-route-import.int.spec.ts'
       - '.github/workflows/w01-auth-me-import-verification.yml'
   workflow_dispatch:
 
@@ -29,18 +29,18 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
       - name: Install W01 dependencies
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Typecheck W01
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         env:
           PAYLOAD_SECRET: luckread-auth-me-e2e-secret
         run: pnpm exec tsc --noEmit
       - name: Verify auth me route imports
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: pnpm exec vitest run tests/int/users-me-route-import.int.spec.ts --config ./vitest.config.mts
       - name: Production build
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         env:
           PAYLOAD_SECRET: luckread-auth-me-e2e-secret
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
