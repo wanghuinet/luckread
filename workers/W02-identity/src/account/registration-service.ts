@@ -22,6 +22,7 @@ export type RegistrationResult = {
 
 type ExistingEnvelope = {
   id: string
+  idempotencyKey: string
   payloadHash: string
   state: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
   committedResponse: string | null
@@ -222,6 +223,7 @@ const readEnvelope = async (
       `
         SELECT
           id,
+          idempotency_key AS idempotencyKey,
           payload_hash AS payloadHash,
           state,
           committed_response AS committedResponse,
@@ -270,7 +272,7 @@ const finalizeRegistration = async (
       db
         .prepare(
           `
-            INSERT INTO consents (
+            INSERT OR IGNORE INTO consents (
               id,
               actor_subject_id,
               owner_subject_id,
