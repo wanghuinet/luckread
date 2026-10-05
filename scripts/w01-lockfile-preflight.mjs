@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const worker = join(root, 'workers', 'W01-payload')
+const worker = join(root, 'workers', 'luck02-content')
 const pkgPath = join(worker, 'package.json')
 const lockPath = join(worker, 'pnpm-lock.yaml')
 
@@ -47,7 +47,7 @@ for (const [name, expected] of Object.entries(required)) {
 }
 
 const nodeMajor = Number(process.versions.node.split('.')[0])
-if (nodeMajor < 24) fail(`Node 24+ is required for W01; current Node is ${process.versions.node}`)
+if (nodeMajor < 24) fail(`Node 24+ is required for the Content Worker; current Node is ${process.versions.node}`)
 
 // Windows exposes Corepack-managed pnpm through pnpm.ps1/pnpm.cmd.
 // execFileSync cannot directly execute .cmd files on Windows, so invoke
@@ -62,14 +62,14 @@ const pnpmMajor = Number(pnpmVersion.split('.')[0])
 if (![9, 10, 11].includes(pnpmMajor)) fail(`pnpm 9/10/11 is required; current pnpm is ${pnpmVersion}`)
 
 if (existsSync(lockPath)) {
-  console.log('PASS: W01 pnpm-lock.yaml exists')
+  console.log('PASS: Content Worker pnpm-lock.yaml exists')
   console.log(`LOCKFILE=${lockPath}`)
   console.log(`PNPM=${pnpmVersion}`)
   console.log('Next: run the W01 exact-resolution evidence probe and install verification.')
   process.exit(0)
 }
 
-console.log('BLOCKED: W01 pnpm-lock.yaml is missing.')
+console.log('BLOCKED: Content Worker pnpm-lock.yaml is missing.')
 console.log('Generate it only from workers/luck02-content with the controlled Node/pnpm toolchain:')
 console.log('  cd workers/luck02-content')
 console.log('  pnpm install --lockfile-only --ignore-workspace')
