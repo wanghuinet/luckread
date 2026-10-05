@@ -139,6 +139,11 @@ const updateProfile = async (
 ): Promise<UserRow | null> => {
   const columns: string[] = []
   const values: Array<string> = []
+  if ('username' in data && current.name === (current.username ?? '')) {
+    columns.push('name = ?')
+    values.push(data.username ?? '')
+  }
+
   for (const [field, value] of Object.entries(data)) {
     switch (field) {
       case 'username':
