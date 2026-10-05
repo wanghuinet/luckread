@@ -8,24 +8,11 @@ export const Users: CollectionConfig = {
     useAsTitle: 'email',
   },
   auth: {
-    // Use Payload's native authentication/recovery pipeline. Keep recovery
-    // policy at the collection boundary instead of introducing a parallel
-    // W02 password-recovery subsystem.
+    // Keep Payload's native authentication/recovery capability only for the
+    // Payload Admin and legacy recovery boundary. Normal account authority is W02.
     forgotPassword: {},
     removeTokenFromResponses: true,
     // AUTH-004 remains contract/evidence gated; native capability is the implementation baseline.
-  },
-  hooks: {
-    // Payload strips loginResult.token from Local API responses when
-    // removeTokenFromResponses=true. Preserve the native token only in the
-    // request-local context so the W01 adapter can immediately call payload.auth().
-    afterLogin: [
-      ({ req, token }) => {
-        if (req.context && typeof token === 'string') {
-          ;(req.context as Record<string, unknown>).__luckreadNativeAuthToken = token
-        }
-      },
-    ],
   },
   // AUTH-001 contract: account registration is anonymous/public. Keep the
   // public boundary limited to creation; read/update/delete remain protected
