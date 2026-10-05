@@ -22,6 +22,12 @@ import {
   SessionManagementError,
 } from './session/session-management.js'
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
+import {
+  getAuthenticatedUserProfile,
+  updateAuthenticatedUserProfile,
+  getPublicUserProfileById,
+  getPublicUserProfileByUsername,
+} from './account/user-profile.js'
 
 interface Env {
   D1_01: D1Database
@@ -129,6 +135,54 @@ export default {
           },
           503,
         )
+      }
+    }
+
+    if ((request.method === 'GET' || request.method === 'PATCH') && url.pathname === '/internal/account/profile') {
+      if (request.method === 'GET') {
+        try {
+          return await getAuthenticatedUserProfile(env.D1_01, request, env.BETTER_AUTH_SECRET)
+        } catch {
+          return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Profile service unavailable' } }, 503)
+        }
+      }
+
+      let body: unknown = null
+      try {
+        body = await request.json()
+      } catch {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'Invalid profile update' } }, 400)
+      }
+
+      return updateAuthenticatedUserProfile(
+        env.D1_01,
+        request,
+        env.BETTER_AUTH_SECRET,
+        body,
+      )
+    }
+
+    if (request.method === 'GET' && url.pathname === '/internal/account/profile/by-id') {
+      const userId = new URL(request.url).searchParams.get('id')?.trim() ?? ''
+      if (!userId || userId.length > 128) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'Invalid user id' } }, 400)
+      }
+      try {
+        return await getPublicUserProfileById(env.D1_01, userId)
+      } catch {
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Profile service unavailable' } }, 503)
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/internal/account/profile/by-username') {
+      const username = new URL(request.url).searchParams.get('username')?.trim() ?? ''
+      if (!username || username.length > 128) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'Invalid username' } }, 400)
+      }
+      try {
+        return await getPublicUserProfileByUsername(env.D1_01, username)
+      } catch {
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Profile service unavailable' } }, 503)
       }
     }
 

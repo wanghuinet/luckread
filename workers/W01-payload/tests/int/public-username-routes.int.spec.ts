@@ -9,9 +9,10 @@ describe('public username routes', () => {
     const route = read('src/app/api/v1/users/by-username/[username]/route.ts')
     const profile = read('src/app/(frontend)/[username]/page.tsx')
 
-    expect(route).toContain("collection: 'users'")
-    expect(route).toContain("where: { username: { equals: username } }")
-    expect(route).toContain('overrideAccess: true')
+    expect(route).toContain("from '@/auth/w02-user-profile-client'")
+    expect(route).toContain("'/internal/account/profile/by-username?username='")
+    expect(route).not.toContain("collection: 'users'")
+    expect(route).not.toContain('getPayload')
     expect(route).toContain('cachedPublicGet')
     expect(route).toContain('enforcePublicReadRateLimit')
     expect(profile).toContain('/api/v1/users/by-username/')
