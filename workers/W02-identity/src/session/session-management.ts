@@ -364,7 +364,7 @@ export async function revokeCurrentUserSession(
       db.prepare(`
         DELETE FROM "session"
          WHERE CAST(id AS TEXT) = ?
-           AND CAST(_parent_id AS TEXT) = ?
+           AND CAST(user_id AS TEXT) = ?
       `).bind(input.targetSessionId, input.userId),
     ])
 
