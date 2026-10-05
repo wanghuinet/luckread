@@ -48,7 +48,7 @@ jobs:
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
         run: |
           set -euo pipefail
-          if [ "\${#BETTER_AUTH_SECRET}" -lt 32 ]; then
+          if [ "${#BETTER_AUTH_SECRET}" -lt 32 ]; then
             echo "BETTER_AUTH_SECRET must be at least 32 characters."
             exit 1
           fi
