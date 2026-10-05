@@ -347,11 +347,35 @@ const reserveEnvelope = async (
     throw error
   }
 
-  const reserved = await getExistingEnvelope(db, input.idempotencyKey)
-  if (!reserved) {
+  // Read back by the newly generated primary key rather than the idempotency-key index.
+  // This makes the post-reservation invariant independent of secondary-index visibility.
+  const reserved = await db
+    .prepare(
+      `SELECT id,
+              payload_hash AS payloadHash,
+              state,
+              committed_response AS committedResponse,
+              expires_at AS expiresAt,
+              consent_record_id AS consentRecordId
+         FROM auth_registration_envelopes
+        WHERE id = ?
+        LIMIT 1`,
+    )
+    .bind(envelopeId)
+    .first<ExistingEnvelope>()
+
+  if (
+    !reserved ||
+    reserved.payloadHash !== input.payloadHash ||
+    reserved.state !== 'IN_PROGRESS' ||
+    !reserved.consentRecordId
+  ) {
     console.error(JSON.stringify({
       event: 'auth.register.registration_reservation_missing',
       diagnosticCode: 'AUTH001_REGISTRATION_RESERVATION_MISSING',
+      reservationId: envelopeId,
+      observedState: reserved?.state ?? null,
+      hasConsentRecordId: Boolean(reserved?.consentRecordId),
     }))
     throw new RegistrationRuntimeError(
       'SERVICE_UNAVAILABLE',
@@ -362,6 +386,7 @@ const reserveEnvelope = async (
   console.error(JSON.stringify({
     event: 'auth.register.registration_reservation_reserved',
     diagnosticCode: 'AUTH001_REGISTRATION_RESERVATION_RESERVED',
+    reservationId: reserved.id,
     state: reserved.state,
   }))
 
