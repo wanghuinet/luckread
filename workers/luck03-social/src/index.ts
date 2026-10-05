@@ -23,6 +23,7 @@ type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: bool
 
 interface Env {
   DB: D1Database
+  AUTH013_W04_DERIVED_PROJECTION?: ProjectionKV
   SOCIAL_READ_LIMITER?: RateLimitBinding
   SOCIAL_WRITE_LIMITER?: RateLimitBinding
   SOCIAL_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
@@ -143,7 +144,7 @@ const parseCommentPath = (pathname: string): string | null => {
   return null
 }
 
-export default {
+const socialHandler = {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url)
@@ -515,4 +516,13 @@ export default {
       }, 500)
     }
   },
+  async queue(batch: MessageBatchLike, env: Env): Promise<void> {
+    const projectionEnv = { AUTH013_W04_DERIVED_PROJECTION: env.AUTH013_W04_DERIVED_PROJECTION }
+    if (!projectionEnv.AUTH013_W04_DERIVED_PROJECTION) return
+    await projectionHandler.queue(batch, projectionEnv)
+  },
+
 }
+
+
+export default socialHandler
