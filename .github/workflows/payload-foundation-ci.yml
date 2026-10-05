@@ -3,7 +3,7 @@ name: Payload Foundation CI
 on:
   push:
     paths:
-      - 'workers/W01-payload/**'
+      - 'workers/luck02-content/**'
       - 'contracts/payload/**'
       - 'scripts/payload-native-inventory.mjs'
       - 'scripts/payload-contract-reconciliation-check.mjs'
@@ -12,7 +12,7 @@ on:
       - '.github/workflows/payload-foundation-ci.yml'
   pull_request:
     paths:
-      - 'workers/W01-payload/**'
+      - 'workers/luck02-content/**'
       - 'contracts/payload/**'
       - 'scripts/payload-native-inventory.mjs'
       - 'scripts/payload-contract-reconciliation-check.mjs'
@@ -37,28 +37,28 @@ jobs:
         run: corepack enable
 
       - name: Install W01 dependencies from committed lockfile
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Typecheck W01
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: pnpm exec tsc --noEmit
 
       - name: Security unit tests
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: pnpm exec vitest run --passWithNoTests --config ./vitest.config.mts
 
       - name: W01 lint
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: pnpm run lint
 
       - name: W01 production build
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: pnpm run build
 
 
       - name: Verify remote migration admission state
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: node ../../scripts/w01-remote-migration-admission.mjs --check-state
 
       - name: Payload implementation admission gate
