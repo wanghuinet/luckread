@@ -613,6 +613,15 @@ export async function registerWithBetterAuth(
         event: 'auth.register.better_auth_failure',
         diagnosticCode: 'AUTH001_BETTER_AUTH_SIGNUP_FAILURE',
         errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorCauseName:
+          error instanceof Error && error.cause instanceof Error
+            ? error.cause.name
+            : undefined,
+        errorCauseMessage:
+          error instanceof Error && error.cause instanceof Error
+            ? error.cause.message
+            : undefined,
       }),
     )
 
