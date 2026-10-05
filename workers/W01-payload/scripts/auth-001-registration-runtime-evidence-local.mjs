@@ -329,26 +329,6 @@ const envelopeForKey = async (idempotencyKey) =>
     'authRegister',
   )
 
-const tableRows = {
-  results: all(
-    W02_CONFIG,
-    "SELECT name, type FROM sqlite_master WHERE type IN ('table','index') AND name IN ('user','account','session','auth_registration_envelopes','consents','role_assignments') ORDER BY type,name",
-  ),
-}
-const requiredObjects = new Set(
-  (tableRows.results || []).map((row) => String(row.type) + ':' + String(row.name)),
-)
-for (const required of [
-  'table:user',
-  'table:account',
-  'table:session',
-  'table:auth_registration_envelopes',
-  'table:consents',
-  'table:role_assignments',
-]) {
-  if (!requiredObjects.has(required)) throw new Error('Required W02 local D1 object missing: ' + required)
-}
-
 const suffix = randomUUID().replaceAll('-', '').slice(0, 16)
 const email = 'auth001-runtime-' + suffix + '@luckread.local'
 const username = 'auth001rt' + suffix
@@ -435,6 +415,27 @@ try {
   installAndPrepareW02()
   await startW02()
   await restartW01()
+
+const tableRows = {
+  results: all(
+    W02_CONFIG,
+    "SELECT name, type FROM sqlite_master WHERE type IN ('table','index') AND name IN ('user','account','session','auth_registration_envelopes','consents','role_assignments') ORDER BY type,name",
+  ),
+}
+const requiredObjects = new Set(
+  (tableRows.results || []).map((row) => String(row.type) + ':' + String(row.name)),
+)
+for (const required of [
+  'table:user',
+  'table:account',
+  'table:session',
+  'table:auth_registration_envelopes',
+  'table:consents',
+  'table:role_assignments',
+]) {
+  if (!requiredObjects.has(required)) throw new Error('Required W02 local D1 object missing: ' + required)
+}
+
   const health = await fetch(baseUrl + '/')
 
   if (health.status >= 500) throw new Error('Local W01 did not start cleanly: HTTP ' + health.status)
