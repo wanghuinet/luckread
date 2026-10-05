@@ -36,7 +36,7 @@ jobs:
           node-version: 24
 
       - name: Verify W02 D1-01 binding
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         shell: bash
         run: |
           node - <<'NODE'
@@ -54,11 +54,11 @@ jobs:
 
       - name: Verify migration source
         run: |
-          test -f workers/W02-identity/migrations/0002_auth_013_account_state.sql
+          test -f workers/luck01-identity/migrations/0002_auth_013_account_state.sql
           test -z "$(git status --short)"
 
       - name: Preflight controlled target
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         shell: bash
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -81,14 +81,14 @@ jobs:
           NODE
 
       - name: Apply AUTH-013 migration remotely
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx --yes wrangler@4.116.0 d1 migrations apply "${{ inputs.database_name }}" --remote --config wrangler.jsonc
 
       - name: Capture post-migration schema
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
