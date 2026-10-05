@@ -3,7 +3,7 @@ import { cookies, headers } from 'next/headers'
 import React from 'react'
 
 import { enforcePublicReadRateLimit } from '@/auth/traffic-limit'
-import { getBetterAuthSession } from '@/auth/better-auth'
+import { getBetterAuthSession } from '@/auth/w02-auth-client'
 
 import CreatorLanguageToggle from './creator-center/CreatorLanguageToggle'
 import { CreatorStudio } from './creator-center/CreatorStudio'
