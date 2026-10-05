@@ -36,6 +36,7 @@ jobs:
       NODE_ENV: development
       CLOUDFLARE_ENV: development
       PAYLOAD_SECRET: local-runtime-${{ github.run_id }}-${{ github.run_attempt }}
+      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
     steps:
       - name: Resolve exact source SHA
         id: source
@@ -115,8 +116,11 @@ jobs:
 
       - name: Start exact W02 local Worker runtime
         working-directory: workers/W02-identity
+        env:
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
         run: |
           set -euo pipefail
+          test -n "$BETTER_AUTH_SECRET"
           npx --yes wrangler@4.116.0 dev --local --port 8788 --var "BETTER_AUTH_SECRET:${BETTER_AUTH_SECRET}" --var "CLOUDFLARE_ENV:development" > auth-better-auth-w02-preview.log 2>&1 &
           echo $! > auth-better-auth-w02-preview.pid
           ready=0
