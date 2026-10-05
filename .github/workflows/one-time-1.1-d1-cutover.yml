@@ -1,0 +1,205 @@
+name: one-time 1.1 D1 cutover
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type MIGRATE_1_1_D1 to run the one-time table migration
+        required: true
+        type: choice
+        options:
+          - CANCEL
+          - MIGRATE_1_1_D1
+        default: CANCEL
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: "4.116.0"
+  SOCIAL_SOURCE_DB: "luckreadpro"
+  SOCIAL_TARGET_DB: "secondary"
+  COMMERCE_SOURCE_DB: "luckread"
+  GOVERNANCE_SOURCE_DB: "secondary"
+  COMMERCE_TARGET_DB: "unimportant"
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'MIGRATE_1_1_D1' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact migration source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install Wrangler dependencies
+        run: npm ci
+
+      - name: Verify target bindings and bootstrap files
+        run: |
+          set -euo pipefail
+          test -f workers/luck03-social/d1-03-bootstrap.sql
+          test -f workers/luck04-commerce/d1-04-bootstrap.sql
+          test -f workers/luck03-social/wrangler.jsonc
+          test -f workers/luck04-commerce/wrangler.jsonc
+
+          node - <<'NODE'
+          const fs = require('fs')
+          const social = JSON.parse(fs.readFileSync('workers/luck03-social/wrangler.jsonc', 'utf8'))
+          const commerce = JSON.parse(fs.readFileSync('workers/luck04-commerce/wrangler.jsonc', 'utf8'))
+          const socialTarget = (social.d1_databases || []).find(x => x.binding === 'D1_03_TARGET')
+          const commerceTarget = (commerce.d1_databases || []).find(x => x.binding === 'D1_04_TARGET')
+          if (!socialTarget || socialTarget.database_name !== 'secondary') throw new Error('D1-03 target binding missing')
+          if (!commerceTarget || commerceTarget.database_name !== 'unimportant') throw new Error('D1-04 target binding missing')
+          console.log('TARGET_BINDINGS=PASS')
+          NODE
+
+      - name: Preflight target tables are empty or absent
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          check_empty() {
+            local db="$1"
+            local table="$2"
+            local output
+            output="$(npx --yes wrangler@${WRANGLER_VERSION} d1 execute "$db" --remote --json --command "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name='$table';" | tail -n +1)"
+            node - "$output" "$db" "$table" <<'NODE'
+          const raw = process.argv[2]
+          const db = process.argv[3]
+          const table = process.argv[4]
+          const parsed = JSON.parse(raw)
+          const exists = Number(parsed?.[0]?.results?.[0]?.count ?? 0)
+          if (!exists) process.exit(0)
+          NODE
+            output="$(npx --yes wrangler@${WRANGLER_VERSION} d1 execute "$db" --remote --json --command "SELECT COUNT(*) AS count FROM \"$table\";" )"
+            node - "$output" "$db" "$table" <<'NODE'
+          const raw = process.argv[2]
+          const db = process.argv[3]
+          const table = process.argv[4]
+          const parsed = JSON.parse(raw)
+          const count = Number(parsed?.[0]?.results?.[0]?.count ?? -1)
+          if (count !== 0) throw new Error(`Target ${db}.${table} is not empty: ${count}`)
+          NODE
+          }
+
+          social_tables="social_follow_relationships interaction_likes social_comments interaction_favorites social_share_links social_user_interactions"
+          for table in $social_tables; do check_empty "$SOCIAL_TARGET_DB" "$table"; done
+
+          commerce_tables="membership_subscriptions audit_events moderation_cases moderation_decisions moderation_decision_idempotency moderation_txn_guard moderation_enforcement_outbox moderation_reports moderation_report_idempotency"
+          for table in $commerce_tables; do check_empty "$COMMERCE_TARGET_DB" "$table"; done
+          echo "TARGET_PREFLIGHT=PASS"
+
+      - name: Bootstrap D1-03 Social target
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@${WRANGLER_VERSION} d1 execute "$SOCIAL_TARGET_DB" --remote --file=workers/luck03-social/d1-03-bootstrap.sql --yes
+
+      - name: Bootstrap D1-04 Commerce Governance target
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@${WRANGLER_VERSION} d1 execute "$COMMERCE_TARGET_DB" --remote --file=workers/luck04-commerce/d1-04-bootstrap.sql --yes
+
+      - name: Export source table data
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p migration-backup/social migration-backup/commerce
+          export_data() {
+            local db="$1"
+            local table="$2"
+            local out="$3"
+            npx --yes wrangler@${WRANGLER_VERSION} d1 export "$db" --remote --table="$table" --no-schema --output="$out" --skip-confirmation
+          }
+
+          export_data "$SOCIAL_SOURCE_DB" social_follow_relationships migration-backup/social/social_follow_relationships.sql
+          export_data "$SOCIAL_SOURCE_DB" interaction_likes migration-backup/social/interaction_likes.sql
+          export_data "$SOCIAL_SOURCE_DB" social_comments migration-backup/social/social_comments.sql
+          export_data "$SOCIAL_SOURCE_DB" interaction_favorites migration-backup/social/interaction_favorites.sql
+          export_data "$SOCIAL_SOURCE_DB" social_share_links migration-backup/social/social_share_links.sql
+          export_data "$SOCIAL_SOURCE_DB" social_user_interactions migration-backup/social/social_user_interactions.sql
+
+          export_data "$COMMERCE_SOURCE_DB" membership_subscriptions migration-backup/commerce/membership_subscriptions.sql
+          export_data "$GOVERNANCE_SOURCE_DB" audit_events migration-backup/commerce/audit_events.sql
+          export_data "$GOVERNANCE_SOURCE_DB" moderation_cases migration-backup/commerce/moderation_cases.sql
+          export_data "$GOVERNANCE_SOURCE_DB" moderation_decisions migration-backup/commerce/moderation_decisions.sql
+          export_data "$GOVERNANCE_SOURCE_DB" moderation_decision_idempotency migration-backup/commerce/moderation_decision_idempotency.sql
+          export_data "$GOVERNANCE_SOURCE_DB" moderation_txn_guard migration-backup/commerce/moderation_txn_guard.sql
+          export_data "$GOVERNANCE_SOURCE_DB" moderation_enforcement_outbox migration-backup/commerce/moderation_enforcement_outbox.sql
+          export_data "$GOVERNANCE_SOURCE_DB" moderation_reports migration-backup/commerce/moderation_reports.sql
+          export_data "$GOVERNANCE_SOURCE_DB" moderation_report_idempotency migration-backup/commerce/moderation_report_idempotency.sql
+
+      - name: Import copied table data
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          import_data() {
+            local db="$1"
+            local file="$2"
+            npx --yes wrangler@${WRANGLER_VERSION} d1 execute "$db" --remote --file="$file" --yes
+          }
+
+          for file in migration-backup/social/*.sql; do import_data "$SOCIAL_TARGET_DB" "$file"; done
+          for file in migration-backup/commerce/*.sql; do import_data "$COMMERCE_TARGET_DB" "$file"; done
+
+      - name: Verify source and target row counts
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          compare_count() {
+            local source_db="$1"
+            local target_db="$2"
+            local table="$3"
+            local source_json target_json source_count target_count
+            source_json="$(npx --yes wrangler@${WRANGLER_VERSION} d1 execute "$source_db" --remote --json --command "SELECT COUNT(*) AS count FROM \"$table\";")"
+            target_json="$(npx --yes wrangler@${WRANGLER_VERSION} d1 execute "$target_db" --remote --json --command "SELECT COUNT(*) AS count FROM \"$table\";")"
+            source_count="$(node -e 'const r=JSON.parse(process.argv[1]); process.stdout.write(String(r?.[0]?.results?.[0]?.count ?? -1))' "$source_json")"
+            target_count="$(node -e 'const r=JSON.parse(process.argv[1]); process.stdout.write(String(r?.[0]?.results?.[0]?.count ?? -1))' "$target_json")"
+            test "$source_count" = "$target_count" || {
+              echo "COUNT_MISMATCH table=$table source=$source_count target=$target_count"
+              exit 1
+            }
+            echo "COUNT_MATCH table=$table count=$source_count"
+          }
+
+          compare_count "$SOCIAL_SOURCE_DB" "$SOCIAL_TARGET_DB" social_follow_relationships
+          compare_count "$SOCIAL_SOURCE_DB" "$SOCIAL_TARGET_DB" interaction_likes
+          compare_count "$SOCIAL_SOURCE_DB" "$SOCIAL_TARGET_DB" social_comments
+          compare_count "$SOCIAL_SOURCE_DB" "$SOCIAL_TARGET_DB" interaction_favorites
+          compare_count "$SOCIAL_SOURCE_DB" "$SOCIAL_TARGET_DB" social_share_links
+          compare_count "$SOCIAL_SOURCE_DB" "$SOCIAL_TARGET_DB" social_user_interactions
+
+          compare_count "$COMMERCE_SOURCE_DB" "$COMMERCE_TARGET_DB" membership_subscriptions
+          compare_count "$GOVERNANCE_SOURCE_DB" "$COMMERCE_TARGET_DB" audit_events
+          compare_count "$GOVERNANCE_SOURCE_DB" "$COMMERCE_TARGET_DB" moderation_cases
+          compare_count "$GOVERNANCE_SOURCE_DB" "$COMMERCE_TARGET_DB" moderation_decisions
+          compare_count "$GOVERNANCE_SOURCE_DB" "$COMMERCE_TARGET_DB" moderation_decision_idempotency
+          compare_count "$GOVERNANCE_SOURCE_DB" "$COMMERCE_TARGET_DB" moderation_txn_guard
+          compare_count "$GOVERNANCE_SOURCE_DB" "$COMMERCE_TARGET_DB" moderation_enforcement_outbox
+          compare_count "$GOVERNANCE_SOURCE_DB" "$COMMERCE_TARGET_DB" moderation_reports
+          compare_count "$GOVERNANCE_SOURCE_DB" "$COMMERCE_TARGET_DB" moderation_report_idempotency
+
+      - name: Upload migration backups
+        uses: actions/upload-artifact@v4
+        with:
+          name: luckread-1.1-d1-cutover-backup-${{ github.run_id }}
+          path: migration-backup/
+          if-no-files-found: error
+          retention-days: 30
