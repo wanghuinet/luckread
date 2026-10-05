@@ -137,7 +137,11 @@ export default {
             503
           return json({
             error: {
-              code: status === 422 ? 'VALIDATION_FAILED' : status === 409 ? 'IDEMPOTENCY_IN_PROGRESS' : 'SERVICE_UNAVAILABLE',
+              code: status === 422
+                ? (error.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' ? 'IDEMPOTENCY_KEY_REUSE_CONFLICT' : 'REGISTRATION_CONFLICT')
+                : status === 409
+                  ? 'IDEMPOTENCY_IN_PROGRESS'
+                  : 'SERVICE_UNAVAILABLE',
               message: status === 422
                 ? 'Registration could not be completed'
                 : status === 409
