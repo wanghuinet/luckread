@@ -4,7 +4,7 @@ import { bearer } from 'better-auth/plugins'
 
 export interface BetterAuthEnv {
   D1_01: D1Database
-  BETTER_AUTH_SECRET?: string
+  BETTER_AUTH_SECRET: string
 }
 
 export const createLuckReadAuth = (env: BetterAuthEnv) =>
