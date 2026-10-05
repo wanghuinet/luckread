@@ -3,8 +3,10 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route'
 
-import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
-import { validateSession } from '@/auth/w02-session-client'
+import {
+  resolveBetterAuthPrincipalThroughW02,
+  W02AuthClientError,
+} from '@/auth/w02-session-client'
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaPost>[1]
@@ -16,24 +18,15 @@ const unauthorized = () => new Response(JSON.stringify({ error: { code: 'UNAUTHE
 
 async function authenticate(request: Request) {
   const payload = await getPayload({ config })
-  let authResult: Awaited<ReturnType<typeof payload.auth>>
-  try {
-    authResult = await payload.auth({ headers: request.headers, canSetHeaders: false })
-  } catch {
-    return null
+  const principal = await resolveBetterAuthPrincipalThroughW02(request)
+  if (!principal.active || principal.tokenVersion === undefined) {
+    throw new W02AuthClientError(401, 'authentication required')
   }
 
-  const user = authResult.user as unknown as ({ id?: string | number; _sid?: string } & Record<string, unknown>) | null
-  if (!user?.id || typeof user._sid !== 'string' || user._sid.length === 0) return null
-
-  const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (tokenVersion === null) return null
-  const active = await validateSession({
-    sessionId: user._sid,
-    userId: String(user.id),
-    tokenVersion,
-  }).catch(() => false)
-  return active ? { payload, user } : null
+  return {
+    payload,
+    user: { id: principal.userId },
+  }
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -47,8 +40,16 @@ export async function GET(request: Request): Promise<Response> {
     })
   }
 
-  const authenticated = await authenticate(request)
-  if (!authenticated) return unauthorized()
+  let authenticated: Awaited<ReturnType<typeof authenticate>>
+  try {
+    authenticated = await authenticate(request)
+  } catch (error) {
+    if (error instanceof W02AuthClientError && error.status === 401) return unauthorized()
+    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
+      status: 503,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    })
+  }
 
   const url = new URL(request.url)
   const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '24', 10)
