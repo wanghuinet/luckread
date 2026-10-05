@@ -102,6 +102,130 @@ async function callW02<T>(path: string, body: unknown): Promise<T> {
   return payload as T
 }
 
+export type BetterAuthSignInResult = {
+  token: string
+  user: {
+    id: string
+    email: string
+  }
+  setCookie: string | null
+}
+
+export type BetterAuthPrincipalResult = {
+  active: boolean
+  userId: string
+  email: string
+  sessionId: string
+  accountState: string
+  accountStateVersion: number
+  layer: string
+}
+
+export async function signInWithBetterAuth(body: {
+  email: string
+  password: string
+}): Promise<BetterAuthSignInResult> {
+  const service = await getW02Service()
+  const response = await service.fetch(
+    new Request('https://luckread-w02.internal/api/auth/sign-in/email', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: body.email,
+        password: body.password,
+        rememberMe: true,
+      }),
+    }),
+  )
+
+  let payload: unknown = null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new W02AuthClientError(401, 'authentication denied')
+    }
+    if (response.status === 400) {
+      throw new W02AuthClientError(400, 'invalid authentication request')
+    }
+    throw new W02AuthClientError(503, 'authentication service unavailable')
+  }
+
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    typeof (payload as { token?: unknown }).token !== 'string' ||
+    typeof (payload as { user?: { id?: unknown; email?: unknown } }).user?.id !== 'string' ||
+    typeof (payload as { user?: { id?: unknown; email?: unknown } }).user?.email !== 'string'
+  ) {
+    throw new W02AuthClientError(503, 'invalid authentication service response')
+  }
+
+  return {
+    token: (payload as { token: string }).token,
+    user: {
+      id: (payload as { user: { id: string } }).user.id,
+      email: (payload as { user: { email: string } }).user.email,
+    },
+    setCookie: response.headers.get('set-cookie'),
+  }
+}
+
+export async function resolveBetterAuthPrincipal(token: string): Promise<BetterAuthPrincipalResult> {
+  if (typeof token !== 'string' || token.length < 1) {
+    throw new W02AuthClientError(401, 'authentication denied')
+  }
+
+  const service = await getW02Service()
+  const response = await service.fetch(
+    new Request('https://luckread-w02.internal/internal/auth/principal', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer ' + token,
+        'content-type': 'application/json',
+      },
+      body: '{}',
+    }),
+  )
+
+  let payload: unknown = null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new W02AuthClientError(401, 'authentication denied')
+    }
+    if (response.status === 400) {
+      throw new W02AuthClientError(400, 'invalid authentication request')
+    }
+    throw new W02AuthClientError(503, 'authentication service unavailable')
+  }
+
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    (payload as { active?: unknown }).active !== true ||
+    typeof (payload as { userId?: unknown }).userId !== 'string' ||
+    typeof (payload as { email?: unknown }).email !== 'string' ||
+    typeof (payload as { sessionId?: unknown }).sessionId !== 'string' ||
+    typeof (payload as { accountState?: unknown }).accountState !== 'string' ||
+    typeof (payload as { accountStateVersion?: unknown }).accountStateVersion !== 'number' ||
+    typeof (payload as { layer?: unknown }).layer !== 'string'
+  ) {
+    throw new W02AuthClientError(401, 'authentication denied')
+  }
+
+  return payload as BetterAuthPrincipalResult
+}
+
 export const establishSession = (body: {
   sessionId: string
   userId: string
