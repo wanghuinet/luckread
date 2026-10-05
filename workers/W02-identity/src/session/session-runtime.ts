@@ -457,7 +457,7 @@ async function loadAuthoritativeRefreshContext(
           u.account_state AS accountState,
           u.email AS email
         FROM auth_session_state AS a
-        INNER JOIN users_sessions AS s
+        INNER JOIN "session" AS s
           ON s.id = a.session_id
          AND CAST(s.user_id AS TEXT) = a.user_id
         INNER JOIN "user" AS u
