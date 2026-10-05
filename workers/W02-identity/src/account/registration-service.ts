@@ -27,6 +27,7 @@ type ExistingEnvelope = {
   state: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
   committedResponse: string | null
   expiresAt: string
+  createdAt: string
   consentRecordId: string | null
 }
 
@@ -171,17 +172,6 @@ const parseRegistrationInput = (
 
   const email = body.identity.trim().toLowerCase()
   const username = body.username.trim()
-  const normalized = {
-    identityType: 'email',
-    identity: email,
-    credential: body.credential,
-    username,
-    consent: {
-      purpose: SCOPE,
-      policyVersion: policy.policyVersion,
-    },
-  }
-
   return {
     email,
     password: body.credential,
@@ -228,6 +218,7 @@ const readEnvelope = async (
           state,
           committed_response AS committedResponse,
           expires_at AS expiresAt,
+          created_at AS createdAt,
           consent_record_id AS consentRecordId
         FROM auth_registration_envelopes
         WHERE idempotency_key = ?
