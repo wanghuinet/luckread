@@ -20,6 +20,7 @@ import {
   revokeCurrentUserSession,
   SessionManagementError,
 } from './session/session-management.js'
+import { resolveBetterAuthPrincipal } from './auth/principal.js'
 
 interface Env {
   D1_01: D1Database
@@ -151,6 +152,25 @@ export default {
               'account-state service unavailable',
           },
         }, status)
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/principal') {
+      try {
+        const principal = await resolveBetterAuthPrincipal(env.D1_01, request)
+        if (!principal) return json({ active: false }, 401)
+
+        return json({
+          active: true,
+          userId: principal.userId,
+          email: principal.email,
+          sessionId: principal.sessionId,
+          accountState: principal.accountState,
+          accountStateVersion: principal.accountStateVersion,
+          layer: principal.layer,
+        })
+      } catch {
+        return json({ active: false }, 503)
       }
     }
 
