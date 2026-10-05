@@ -1,6 +1,4 @@
 import { createAdapterFactory } from 'better-auth/adapters'
-import { pbkdf2, randomBytes, timingSafeEqual } from 'node:crypto'
-
 const PAYLOAD_HASH_PREFIX = 'pbkdf2-sha256-v1:'
 const PACKED_PASSWORD_PREFIX = 'luckread-payload-pbkdf2-v1:'
 const PBKDF2_ITERATIONS = 600000
@@ -44,22 +42,45 @@ const unpackPassword = (value: string): { salt: string; hash: string } | null =>
     : null
 }
 
-const derive = (
+const derive = async (
   password: string,
-  salt: string,
+  saltHex: string,
   iterations = PBKDF2_ITERATIONS,
   keyLength = PBKDF2_KEY_LENGTH,
-): Promise<Buffer> =>
-  new Promise((resolve, reject) => {
-    pbkdf2(password, salt, iterations, keyLength, 'sha256', (error, key) =>
-      error ? reject(error) : resolve(key),
-    )
-  })
+): Promise<ArrayBuffer> => {
+  const salt = new Uint8Array(saltHex.match(/.{1,2}/g)?.map((byte) => Number.parseInt(byte, 16)) ?? [])
+  const material = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  )
+  return crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    material,
+    keyLength * 8,
+  )
+}
+
+const bytesToHex = (bytes: ArrayBuffer): string =>
+  Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, '0')).join('')
+
+const equalHex = (left: string, right: string): boolean => {
+  if (left.length !== right.length) return false
+  let diff = 0
+  for (let index = 0; index < left.length; index += 1) {
+    diff |= left.charCodeAt(index) ^ right.charCodeAt(index)
+  }
+  return diff === 0
+}
 
 export const hashLuckReadPassword = async (password: string): Promise<string> => {
-  const salt = randomBytes(32).toString('hex')
+  const saltBytes = new Uint8Array(32)
+  crypto.getRandomValues(saltBytes)
+  const salt = bytesToHex(saltBytes.buffer)
   const key = await derive(password, salt)
-  return packPassword(salt, PAYLOAD_HASH_PREFIX + key.toString('hex'))
+  return packPassword(salt, PAYLOAD_HASH_PREFIX + bytesToHex(key))
 }
 
 export const verifyLuckReadPassword = async ({
@@ -74,14 +95,13 @@ export const verifyLuckReadPassword = async ({
   const isCurrent = packed.hash.startsWith(PAYLOAD_HASH_PREFIX)
   const expectedHex = isCurrent ? packed.hash.slice(PAYLOAD_HASH_PREFIX.length) : packed.hash
   if (!/^[0-9a-f]+$/i.test(expectedHex) || expectedHex.length % 2 !== 0) return false
-  const expected = Buffer.from(expectedHex, 'hex')
-  const actual = await derive(
+  const actual = bytesToHex(await derive(
     password,
     packed.salt,
     isCurrent ? PBKDF2_ITERATIONS : LEGACY_PBKDF2_ITERATIONS,
     isCurrent ? PBKDF2_KEY_LENGTH : LEGACY_PBKDF2_KEY_LENGTH,
-  )
-  return expected.length === actual.length && timingSafeEqual(expected, actual)
+  ))
+  return equalHex(expectedHex.toLowerCase(), actual.toLowerCase())
 }
 
 const normalizeUser = (row: Row): Row => {
@@ -247,16 +267,16 @@ const adapter = (db: D1Database) =>
           ).bind(
             email,
             username,
-            typeof data.display_name === 'string' ? data.display_name : email,
-            typeof data.bio === 'string' ? data.bio : null,
-            typeof data.avatar === 'string' ? data.avatar : null,
-            typeof data.locale === 'string' ? data.locale : 'en-US',
-            typeof data.timezone === 'string' ? data.timezone : 'UTC',
+            typeof (data as Record<string, unknown>).display_name === 'string' ? (data as Record<string, unknown>).display_name : email,
+            typeof (data as Record<string, unknown>).bio === 'string' ? (data as Record<string, unknown>).bio : null,
+            typeof (data as Record<string, unknown>).avatar === 'string' ? (data as Record<string, unknown>).avatar : null,
+            typeof (data as Record<string, unknown>).locale === 'string' ? (data as Record<string, unknown>).locale : 'en-US',
+            typeof (data as Record<string, unknown>).timezone === 'string' ? (data as Record<string, unknown>).timezone : 'UTC',
           ).run()
 
           const created = await selectUserByEmail(db, email)
           if (!created) throw new Error('BETTER_AUTH_USER_CREATE_FAILED')
-          return normalizeUser(created)
+          return normalizeUser(created) as unknown as T
         }
 
         if (model === 'account') throw new Error('BETTER_AUTH_ACCOUNT_CREATE_DISABLED')
@@ -273,7 +293,7 @@ const adapter = (db: D1Database) =>
           ).bind(Number(order?.next_order ?? 0), Number(userId), id, iso(data.created_at), iso(data.expires_at)).run()
           const created = await selectSession(db, id)
           if (!created) throw new Error('BETTER_AUTH_SESSION_CREATE_FAILED')
-          return created
+          return created as unknown as T
         }
 
         throw new Error('BETTER_AUTH_MODEL_CREATE_UNSUPPORTED:' + model)
@@ -288,7 +308,7 @@ const adapter = (db: D1Database) =>
           const userId = userIdFromAccountWhere(clauses)
           if (!userId) return null
           const user = await selectUserById(db, userId)
-          return user ? buildCredentialAccount(user) : null
+          return user ? (buildCredentialAccount(user) as unknown as T) : null
         }
 
         if (model === 'users') {
@@ -303,14 +323,14 @@ const adapter = (db: D1Database) =>
               'SELECT * FROM users' + buildWhere('users', clauses, params) + ' LIMIT 1',
             ).bind(...params).first<Row>()
           }
-          return row ? normalizeUser(row) : null
+          return row ? (normalizeUser(row) as unknown as T) : null
         }
 
         if (model === 'users_sessions') {
           const id = whereValue(clauses, 'id', 'token')
           if (id !== undefined && id !== null) {
             const row = await selectSession(db, String(id))
-            return row && AUTHENTICATABLE_STATES.has(String(row.account_state)) ? row : null
+            return row && AUTHENTICATABLE_STATES.has(String(row.account_state)) ? (row as unknown as T) : null
           }
           const params: unknown[] = []
           const row = await db.prepare(
@@ -318,7 +338,7 @@ const adapter = (db: D1Database) =>
               'FROM users_sessions s INNER JOIN users u ON u.id = s._parent_id' +
               buildWhere('users_sessions', clauses, params) + ' LIMIT 1',
           ).bind(...params).first<Row>()
-          return row && AUTHENTICATABLE_STATES.has(String(row.account_state)) ? row : null
+          return row && AUTHENTICATABLE_STATES.has(String(row.account_state)) ? (row as unknown as T) : null
         }
 
         throw new Error('BETTER_AUTH_MODEL_FIND_ONE_UNSUPPORTED:' + modelKey)
@@ -332,7 +352,7 @@ const adapter = (db: D1Database) =>
           if (!userId) return []
           const user = await selectUserById(db, userId)
           const account = user ? buildCredentialAccount(user) : null
-          return account ? [account] : []
+          return account ? [account as unknown as T] : []
         }
 
         if (model === 'users' || model === 'users_sessions') {
@@ -351,8 +371,8 @@ const adapter = (db: D1Database) =>
 
           const result = await db.prepare(sql).bind(...params).all<Row>()
           return model === 'users'
-            ? result.results.map(normalizeUser)
-            : result.results.filter((row) => AUTHENTICATABLE_STATES.has(String(row.account_state)))
+            ? result.results.map((row) => normalizeUser(row) as unknown as T)
+            : result.results.filter((row) => AUTHENTICATABLE_STATES.has(String(row.account_state))) as unknown as T[]
         }
 
         return []
@@ -375,8 +395,9 @@ const adapter = (db: D1Database) =>
         if (modelKey === 'account') {
           const userId = userIdFromAccountWhere(clauses)
           if (!userId) return null
-          if (typeof update.password === 'string') {
-            const packed = unpackPassword(update.password)
+          const accountUpdate = update as Record<string, unknown>
+          if (typeof accountUpdate.password === 'string') {
+            const packed = unpackPassword(accountUpdate.password)
             if (!packed) throw new Error('BETTER_AUTH_PASSWORD_FORMAT_UNSUPPORTED')
             const result = await db.prepare(
               'UPDATE users SET salt = ?, hash = ?, updated_at = ? WHERE CAST(id AS TEXT) = ?',
@@ -384,13 +405,13 @@ const adapter = (db: D1Database) =>
             if (result.meta?.changes !== undefined && result.meta.changes !== 1) return null
           }
           const user = await selectUserById(db, userId)
-          return user ? buildCredentialAccount(user) : null
+          return user ? (buildCredentialAccount(user) as unknown as T) : null
         }
 
         if (model === 'users') {
           const setParts: string[] = []
           const params: unknown[] = []
-          for (const [field, raw] of Object.entries(update)) {
+          for (const [field, raw] of Object.entries(update as Record<string, unknown>)) {
             if (!['display_name', 'username', 'bio', 'avatar', 'locale', 'timezone'].includes(field)) continue
             setParts.push(field + ' = ?')
             params.push(raw)
@@ -402,18 +423,18 @@ const adapter = (db: D1Database) =>
           const result = await db.prepare(sql).bind(...params).run()
           if (result.meta?.changes === 0) return null
           const id = userIdFromWhere(clauses)
-          return id ? normalizeUser((await selectUserById(db, id)) ?? {}) : null
+          return id ? (normalizeUser((await selectUserById(db, id)) ?? {}) as unknown as T) : null
         }
 
         if (model === 'users_sessions') {
-          const expiresAt = update.expires_at
+          const expiresAt = (update as Record<string, unknown>).expires_at
           if (!(expiresAt instanceof Date) && typeof expiresAt !== 'string') return null
           const params: unknown[] = [iso(expiresAt)]
           const sql = 'UPDATE users_sessions SET expires_at = ?' + buildWhere('users_sessions', clauses, params)
           const result = await db.prepare(sql).bind(...params).run()
           if (result.meta?.changes === 0) return null
           const id = whereValue(clauses, 'id', 'token')
-          return id === undefined || id === null ? null : selectSession(db, String(id))
+          return id === undefined || id === null ? null : selectSession(db, String(id)) as Promise<T | null>
         }
 
         return null
