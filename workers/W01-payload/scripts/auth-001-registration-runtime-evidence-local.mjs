@@ -441,8 +441,19 @@ for (const required of [
   if (health.status >= 500) throw new Error('Local W01 did not start cleanly: HTTP ' + health.status)
 
   const firstResponse = await request(keySuccess, body)
+  if (firstResponse.status !== 201) {
+    const failureBody = await firstResponse.clone().text()
+    const failureHeaders = Object.fromEntries(firstResponse.headers.entries())
+    throw new Error(
+      'Registration failed: HTTP ' +
+        firstResponse.status +
+        ' headers=' +
+        JSON.stringify(failureHeaders) +
+        ' body=' +
+        failureBody.slice(0, 2000),
+    )
+  }
   const first = await responseJson(firstResponse)
-  if (firstResponse.status !== 201) throw new Error('Registration failed: HTTP ' + firstResponse.status)
 
   const successRows = await countsForEmail(email, username)
   if (successRows.users !== 1 || successRows.accountRows !== 1 || successRows.consents !== 1) {
