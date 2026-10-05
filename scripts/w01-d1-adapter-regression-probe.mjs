@@ -3,8 +3,8 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { resolve, dirname } from 'node:path'
 
-const requireFromW01 = createRequire(new URL('../workers/W01-payload/package.json', import.meta.url))
-const { getPayload } = requireFromW01('payload')
+const requireFromContentWorker = createRequire(new URL('../workers/luck02-content/package.json', import.meta.url))
+const { getPayload } = requireFromContentWorker('payload')
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const runId = Number(process.env.GITHUB_RUN_ID || 0)
@@ -30,7 +30,7 @@ const result = {
   version: '1.0.0',
   evidenceType: 'AUTH_002_E4_5_D1_ADAPTER_REGRESSION',
   repository: 'wanghuinet/luckread',
-  workerPath: 'workers/W01-payload',
+  workerPath: 'workers/luck02-content',
   runId,
   testedCommitSha: process.env.GITHUB_SHA || '',
   payloadVersion: '3.90.2',
@@ -85,7 +85,7 @@ try {
   writeStage('IMPORT_PAYLOAD_CONFIG_START')
   const { default: config } = await withTimeout(
     'import payload.config.ts',
-    import('../workers/W01-payload/src/payload.config.ts'),
+    import('../workers/luck02-content/src/payload.config.ts'),
   )
   writeStage('IMPORT_PAYLOAD_CONFIG_DONE')
 
