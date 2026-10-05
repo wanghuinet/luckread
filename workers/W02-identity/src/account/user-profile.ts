@@ -139,7 +139,11 @@ const updateProfile = async (
 ): Promise<UserRow | null> => {
   const columns: string[] = []
   const values: Array<string> = []
-  if ('username' in data && current.name === (current.username ?? '')) {
+  if (
+    'username' in data &&
+    !('displayName' in data) &&
+    current.name === (current.username ?? '')
+  ) {
     columns.push('name = ?')
     values.push(data.username ?? '')
   }
