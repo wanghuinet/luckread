@@ -1,14 +1,11 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getPayload } from 'payload'
+import contentHandler from '../content-domain/src/index.js'
 
 import config from '@payload-config'
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../auth/traffic-limit.js'
 import { readVerifiedPayloadTokenVersion } from '../auth/payload-access-token.js'
 import { resolveAuthenticatedPrincipal, W02AuthClientError } from '../auth/w02-session-client.js'
-
-type W03ContentService = {
-  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
-}
 
 export type ContentPrincipal = {
   userId: string
@@ -26,15 +23,6 @@ const errorResponse = (status: number, code: string, message: string) =>
     { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
     { status, headers: { 'cache-control': 'no-store' } },
   )
-
-async function getW03Service(): Promise<W03ContentService> {
-  const context = await getCloudflareContext({ async: true })
-  const service = (context.env as unknown as { W03_CONTENT?: W03ContentService }).W03_CONTENT
-  if (!service) {
-    throw new W03ContentClientError(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
-  }
-  return service
-}
 
 const getPayloadCookieToken = (request: Request): string | null => {
   const cookieHeader = request.headers.get('cookie') ?? ''
@@ -147,7 +135,8 @@ export async function callW03Content(input: {
   body?: unknown
   principal?: ContentPrincipal | null
 }): Promise<Response> {
-  const service = await getW03Service()
+  const context = await getCloudflareContext({ async: true })
+  const env = context.env as unknown as { D1_02: D1Database }
   const headers = new Headers({
     'X-LuckRead-Caller': 'W01',
     'X-LuckRead-Transport-Version': '1.0',
@@ -181,12 +170,13 @@ export async function callW03Content(input: {
     body = JSON.stringify(input.body)
   }
 
-  const response = await service.fetch(
-    new Request(`https://luckread-w03.internal${input.pathname}`, {
+  const response = await contentHandler.fetch(
+    new Request(`https://luckread-content.internal${input.pathname}`, {
       method: input.method,
       headers,
       body,
     }),
+    env,
   )
 
   return new Response(await response.arrayBuffer(), {
