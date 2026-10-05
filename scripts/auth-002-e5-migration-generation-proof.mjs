@@ -29,7 +29,7 @@ const stage1 = path.join(fixture, 'stage1')
 const stage2 = path.join(fixture, 'stage2')
 
 for (const dir of [stage1, stage2]) {
-  for (const sub of ['collections', 'db', 'migrations']) fs.mkdirSync(path.join(dir, sub), { recursive: true })
+  for (const sub of ['collections', 'db', 'migrations', 'runtime']) fs.mkdirSync(path.join(dir, sub), { recursive: true })
   fs.writeFileSync(path.join(dir, 'tsconfig.json'), JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext', target: 'ES2022', strict: true, esModuleInterop: true, skipLibCheck: true } }))
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ type: 'module', private: true }))
 }
@@ -39,6 +39,7 @@ const historicalConfig = show(baselineSha, 'workers/W01-payload/src/payload.conf
 const currentConfig = fs.readFileSync(path.join(root, 'src/payload.config.ts'), 'utf8')
 const currentAuthSchema = fs.readFileSync(path.join(root, 'src/db/auth-session-state-schema.ts'), 'utf8')
 const media = fs.readFileSync(path.join(root, 'src/collections/Media.ts'), 'utf8')
+const workerPbkdf2Compat = fs.readFileSync(path.join(root, 'src/runtime/pbkdf2-worker-compat.ts'), 'utf8')
 
 const setMigrationDir = (config, dir) => config.replace(
   "    migrationDir: path.resolve(dirname, 'migrations'),",
@@ -54,6 +55,7 @@ const writeFixture = (dir, config, users, includeAuthSchema) => {
   fs.writeFileSync(path.join(dir, 'collections/Users.ts'), users)
   fs.writeFileSync(path.join(dir, 'collections/Media.ts'), media)
   if (includeAuthSchema) fs.writeFileSync(path.join(dir, 'db/auth-session-state-schema.ts'), currentAuthSchema)
+  fs.writeFileSync(path.join(dir, 'runtime/pbkdf2-worker-compat.ts'), workerPbkdf2Compat)
 }
 
 writeFixture(stage1, setMigrationDir(historicalConfig, path.join(stage1, 'migrations')), historicalUsers, false)
@@ -110,8 +112,8 @@ fs.writeFileSync(path.join(outDir, 'generation-manifest.json'), JSON.stringify({
   repository: 'wanghuinet/luckread',
   testedCommitSha: testedCommit,
   historicalBaselineSha: baselineSha,
-  payloadVersion: '3.87.1',
-  d1AdapterVersion: '3.87.1',
+  payloadVersion: '3.90.2',
+  d1AdapterVersion: '3.90.2',
   generationCommand: 'pnpm exec payload migrate:create MIG-AUTH-002-SESSION-V1 --skip-empty',
   baselineGenerationCommand: 'pnpm exec payload migrate:create E5_BASELINE_FIXTURE --skip-empty',
   baselineConfigProvenance: baselineSha,
