@@ -323,8 +323,9 @@ const finalizeRegistration = async (
     if (isUniqueConstraintError(error)) {
       const reread = await db.prepare(
         `
-          SELECT id, payload_hash AS payloadHash, state, committed_response AS committedResponse,
-                 expires_at AS expiresAt, consent_record_id AS consentRecordId
+          SELECT id, idempotency_key AS idempotencyKey, payload_hash AS payloadHash, state,
+                 committed_response AS committedResponse, expires_at AS expiresAt,
+                 created_at AS createdAt, consent_record_id AS consentRecordId
           FROM auth_registration_envelopes
           WHERE id = ?
           LIMIT 1
