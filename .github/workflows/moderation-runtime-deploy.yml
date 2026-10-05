@@ -45,14 +45,14 @@ jobs:
         run: |
           node - <<'NODE'
           const fs=require('fs');
-          const w01=JSON.parse(fs.readFileSync('workers/W01-payload/wrangler.jsonc','utf8'));
+          const w01=JSON.parse(fs.readFileSync('workers/luck02-content/wrangler.jsonc','utf8'));
           const w03=JSON.parse(fs.readFileSync('workers/W03-content/wrangler.jsonc','utf8'));
-          const w06=JSON.parse(fs.readFileSync('workers/W06-governance/wrangler.jsonc','utf8'));
-          if (w01.name!=='luckread-w01-payload') throw new Error('W01 identity mismatch');
-          if (w03.name!=='luckread-w03') throw new Error('W03 identity mismatch');
-          if (w06.name!=='luckread-w06') throw new Error('W06 identity mismatch');
-          if (!(w01.services||[]).some(x=>x.binding==='W06_MODERATION'&&x.service==='luckread-w06')) throw new Error('W01→W06 binding missing');
-          if (!(w06.services||[]).some(x=>x.binding==='W03_CONTENT_MODERATION'&&x.service==='luckread-w03')) throw new Error('W06→W03 binding missing');
+          const w06=JSON.parse(fs.readFileSync('workers/luck04-commerce/wrangler.jsonc','utf8'));
+          if (w01.name!=='luck02-content') throw new Error('W01 identity mismatch');
+          if (w03.name!=='luck02-content') throw new Error('W03 identity mismatch');
+          if (w06.name!=='luck04-commerce') throw new Error('W06 identity mismatch');
+          if (!(w01.services||[]).some(x=>x.binding==='W06_MODERATION'&&x.service==='luck04-commerce')) throw new Error('W01→W06 binding missing');
+          if (!(w06.services||[]).some(x=>x.binding==='W03_CONTENT_MODERATION'&&x.service==='luck02-content')) throw new Error('W06→W03 binding missing');
           if (!(w06.d1_databases||[]).some(x=>x.binding==='D1_03'&&x.database_id==='bda1d247-a371-4244-91ae-aef96034db7f')) throw new Error('D1-03 mismatch');
           if ((w03.d1_databases||[]).some(x=>x.database_id==='bda1d247-a371-4244-91ae-aef96034db7f')) throw new Error('Direct W03→D1-03 access detected');
           console.log('MODERATION_BINDINGS=PASS');
@@ -83,7 +83,7 @@ jobs:
         run: echo W03_DEPLOYMENT_COMPLETE
 
       - name: Verify W06 traffic guard bindings
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         run: |
           node - <<'NODE'
           const fs=require('fs')
@@ -95,7 +95,7 @@ jobs:
           NODE
 
       - name: Deploy W06 moderation authority
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
@@ -107,19 +107,19 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.116.0 deployments list --name luckread-w06 --json > /tmp/w06-deployments.json
+          npx --yes wrangler@4.116.0 deployments list --name luck04-commerce --json > /tmp/w06-deployments.json
           node -e "const r=require('/tmp/w06-deployments.json'); if(!Array.isArray(r)||!r.length) throw new Error('No W06 deployment returned'); console.log('W06_DEPLOYMENT_RECORD=PASS')"
 
       - name: Install W01 locked dependencies
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: pnpm install --frozen-lockfile
 
       - name: Build W01 OpenNext application
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: pnpm exec opennextjs-cloudflare build
 
       - name: Deploy W01 moderation gateway
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID  }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN  }}
@@ -132,7 +132,7 @@ jobs:
           workflow=Moderation Runtime Deploy
           source_sha=${{ inputs.source_sha  }}
           confirmation=DEPLOY_MODERATION
-          workers=luckread-w03,luckread-w06,luckread-w01-payload
+          workers=luck02-content,luck04-commerce,luck02-content
           new_workers=0
           new_d1=0
           d1_migration=false
