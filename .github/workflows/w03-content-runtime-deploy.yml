@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact W03 source commit to deploy
+        description: Exact Content Worker source commit to deploy
         required: true
         type: string
         default: 386669f9f20d018523ff390d61c54e79b956224a
       confirm:
-        description: Type DEPLOY_W03 to permit this controlled deployment
+        description: Type DEPLOY_W03 to permit this controlled Content deployment
         required: true
         type: string
         default: DEPLOY_W03
@@ -33,23 +33,23 @@ jobs:
         with:
           node-version: 24
 
-      - name: Verify admitted W03 moderation adapter source
+      - name: Verify admitted Content moderation adapter source
         run: |
           set -euo pipefail
-          test -f workers/luck02-content/src/index.ts
-          test -f workers/luck02-content/src/content-runtime.ts
-          grep -q 'applyModerationContentTransition' workers/luck02-content/src/content-runtime.ts
-          grep -q 'X-LuckRead-Caller.*W06' workers/luck02-content/src/index.ts
-          echo W03_MODERATION_ADAPTER_SOURCE=PASS
+          test -f workers/luck02-content/src/content-domain/src/index.ts
+          test -f workers/luck02-content/src/content-domain/src/content-runtime.ts
+          grep -q 'applyModerationContentTransition' workers/luck02-content/src/content-domain/src/content-runtime.ts
+          grep -q 'X-LuckRead-Caller.*W06' workers/luck02-content/src/content-domain/src/index.ts
+          echo CONTENT_MODERATION_ADAPTER_SOURCE=PASS
 
-      - name: Verify admitted W03 physical binding
+      - name: Verify admitted Content Worker physical binding
         working-directory: workers/luck02-content
         run: |
           node - <<'NODE'
           const fs = require('fs');
           const c = JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
           if (c.name !== 'luck02-content') throw new Error('W03 worker name mismatch');
-          if (c.main !== 'src/index.ts') throw new Error('W03 entrypoint mismatch');
+          if (c.main !== '.open-next/worker.js') throw new Error('Content Worker entrypoint mismatch');
           const d1 = (c.d1_databases || []).find(x => x.binding === 'D1_02');
           if (!d1 || d1.database_id !== '6c342634-97f6-4248-9f4a-85772af4f22c') {
             throw new Error('D1_02 physical binding mismatch');
@@ -57,15 +57,16 @@ jobs:
           console.log(JSON.stringify({worker:c.name, main:c.main, d1Binding:d1}));
           NODE
 
-      - name: Install repository dependencies
-        run: npm ci
+      - name: Install Content Worker dependencies
+        working-directory: workers/luck02-content
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Typecheck and unit-test W03
+      - name: Typecheck and unit-test Content domain
         run: |
-          npx --no-install tsc --noEmit --strict --skipLibCheck             --target ES2022 --module ESNext --moduleResolution Bundler             --lib ES2022,DOM --types @cloudflare/workers-types             workers/luck02-content/src/content-runtime.ts             workers/luck02-content/src/publish-preflight.ts             workers/luck02-content/src/index.ts
+          npx --no-install tsc --noEmit --strict --skipLibCheck             --target ES2022 --module ESNext --moduleResolution Bundler             --lib ES2022,DOM --types @cloudflare/workers-types             workers/luck02-content/src/content-domain/src/content-runtime.ts             workers/luck02-content/src/content-domain/src/publish-preflight.ts             workers/luck02-content/src/content-domain/src/index.ts
           npx --yes vitest@3.2.4 run workers/luck02-content/src/content-runtime.test.ts workers/luck02-content/src/publish-preflight.test.ts
 
-      - name: Verify W03 traffic guard bindings
+      - name: Verify Content traffic guard bindings
         working-directory: workers/luck02-content
         run: |
           node - <<'NODE'
@@ -77,18 +78,18 @@ jobs:
           console.log(JSON.stringify({rateLimitBindings:[...names].sort()}))
           NODE
 
-      - name: Deploy W03 without migration execution
+      - name: Deploy Content Worker without migration execution
         working-directory: workers/luck02-content
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+        run: pnpm exec opennextjs-cloudflare build && pnpm exec wrangler@4.116.0 deploy --config wrangler.jsonc
 
       - name: Write deployment provenance
         run: |
           mkdir -p artifacts/mapping-0
           cat > artifacts/mapping-0/w03-content-deploy-provenance.txt <<EOF
-          workflow=W03 Content Runtime Deploy
+          workflow=Content Worker Runtime Deploy
           run_id=${GITHUB_RUN_ID}
           run_attempt=${GITHUB_RUN_ATTEMPT}
           source_sha=${{ inputs.source_sha }}
