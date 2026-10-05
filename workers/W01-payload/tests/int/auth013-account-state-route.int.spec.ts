@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => {
+  class MockW02PrincipalClientError extends Error {
+    constructor(
+      readonly status: number,
+      message: string,
+    ) {
+      super(message)
+    }
+  }
+
   class MockW02AuthClientError extends Error {
     constructor(
       readonly status: number,
@@ -11,28 +20,19 @@ const mocks = vi.hoisted(() => {
   }
 
   return {
-    getPayload: vi.fn(),
-    readVerifiedPayloadTokenVersion: vi.fn(),
-    validateSession: vi.fn(),
+    resolveCanonicalPrincipal: vi.fn(),
     transitionAccountState: vi.fn(),
+    MockW02PrincipalClientError,
     MockW02AuthClientError,
   }
 })
 
-vi.mock('payload', () => ({
-  getPayload: mocks.getPayload,
-}))
-
-vi.mock('@payload-config', () => ({
-  default: {},
-}))
-
-vi.mock('../../src/auth/payload-access-token.js', () => ({
-  readVerifiedPayloadTokenVersion: mocks.readVerifiedPayloadTokenVersion,
+vi.mock('../../src/auth/w02-principal-client.js', () => ({
+  resolveCanonicalPrincipal: mocks.resolveCanonicalPrincipal,
+  W02PrincipalClientError: mocks.MockW02PrincipalClientError,
 }))
 
 vi.mock('../../src/auth/w02-session-client.js', () => ({
-  validateSession: mocks.validateSession,
   transitionAccountState: mocks.transitionAccountState,
   W02AuthClientError: mocks.MockW02AuthClientError,
 }))
@@ -43,17 +43,14 @@ describe('AUTH-013 W01 public account-state route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    mocks.getPayload.mockResolvedValue({
-      auth: vi.fn().mockResolvedValue({
-        user: {
-          id: '7',
-          _sid: 'sid-7',
-        },
-      }),
+    mocks.resolveCanonicalPrincipal.mockResolvedValue({
+      userId: '7',
+      email: 'admin@example.test',
+      sessionId: 'sid-7',
+      accountState: 'ACTIVE',
+      accountStateVersion: 3,
+      layer: 'L8',
     })
-
-    mocks.readVerifiedPayloadTokenVersion.mockReturnValue(3)
-    mocks.validateSession.mockResolvedValue(true)
     mocks.transitionAccountState.mockResolvedValue({
       from: 'ACTIVE',
       to: 'RESTRICTED',
@@ -61,10 +58,8 @@ describe('AUTH-013 W01 public account-state route', () => {
     })
   })
 
-  it('denies requests without a verified Payload principal', async () => {
-    mocks.getPayload.mockResolvedValue({
-      auth: vi.fn().mockResolvedValue({ user: null }),
-    })
+  it('denies requests without a verified Better Auth principal', async () => {
+    mocks.resolveCanonicalPrincipal.mockResolvedValueOnce(null)
 
     const response = await POST(
       new Request('https://luckread.test/v1/users/42/account-state', {
@@ -80,18 +75,20 @@ describe('AUTH-013 W01 public account-state route', () => {
     )
 
     expect(response.status).toBe(401)
-    expect(mocks.validateSession).not.toHaveBeenCalled()
+    expect(mocks.resolveCanonicalPrincipal).toHaveBeenCalledTimes(1)
     expect(mocks.transitionAccountState).not.toHaveBeenCalled()
   })
 
-  it('denies requests whose authoritative session is no longer active', async () => {
-    mocks.validateSession.mockResolvedValue(false)
+  it('returns service unavailable when W02 principal resolution fails', async () => {
+    mocks.resolveCanonicalPrincipal.mockRejectedValueOnce(
+      new mocks.MockW02PrincipalClientError(503, 'internal details'),
+    )
 
     const response = await POST(
       new Request('https://luckread.test/v1/users/42/account-state', {
         method: 'POST',
         headers: {
-          Authorization: 'Bearer stale',
+          Cookie: 'better-auth.session_token=opaque-session',
           'If-Match': '"7"',
           'content-type': 'application/json',
         },
@@ -100,13 +97,9 @@ describe('AUTH-013 W01 public account-state route', () => {
       { params: Promise.resolve({ userId: '42' }) },
     )
 
-    expect(response.status).toBe(401)
+    expect(response.status).toBe(503)
+    expect((await response.json()).error.code).toBe('SERVICE_UNAVAILABLE')
     expect(mocks.transitionAccountState).not.toHaveBeenCalled()
-    expect(mocks.validateSession).toHaveBeenCalledWith({
-      sessionId: 'sid-7',
-      userId: '7',
-      tokenVersion: 3,
-    })
   })
 
   it('passes only the verified principal and canonical public fields to W02', async () => {
