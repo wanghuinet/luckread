@@ -5,6 +5,8 @@ const PAYLOAD_HASH_PREFIX = 'pbkdf2-sha256-v1:'
 const PACKED_PASSWORD_PREFIX = 'luckread-payload-pbkdf2-v1:'
 const PBKDF2_ITERATIONS = 600000
 const PBKDF2_KEY_LENGTH = 32
+const LEGACY_PBKDF2_ITERATIONS = 25000
+const LEGACY_PBKDF2_KEY_LENGTH = 512
 
 type Row = Record<string, unknown>
 type WhereClause = { field: string; value: unknown; operator?: string; connector?: string; mode?: string }
@@ -36,14 +38,20 @@ const unpackPassword = (value: string): { salt: string; hash: string } | null =>
   if (separator <= 0) return null
   const salt = packed.slice(0, separator)
   const hash = packed.slice(separator + 1)
-  return /^[0-9a-f]{64}$/i.test(salt) && /^pbkdf2-sha256-v1:[0-9a-f]{64}$/i.test(hash)
+  return /^[0-9a-f]{64}$/i.test(salt) &&
+    (/^pbkdf2-sha256-v1:[0-9a-f]{64}$/i.test(hash) || /^[0-9a-f]{1024}$/i.test(hash))
     ? { salt, hash }
     : null
 }
 
-const derive = (password: string, salt: string): Promise<Buffer> =>
+const derive = (
+  password: string,
+  salt: string,
+  iterations = PBKDF2_ITERATIONS,
+  keyLength = PBKDF2_KEY_LENGTH,
+): Promise<Buffer> =>
   new Promise((resolve, reject) => {
-    pbkdf2(password, salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH, 'sha256', (error, key) =>
+    pbkdf2(password, salt, iterations, keyLength, 'sha256', (error, key) =>
       error ? reject(error) : resolve(key),
     )
   })
@@ -63,8 +71,16 @@ export const verifyLuckReadPassword = async ({
 }): Promise<boolean> => {
   const packed = unpackPassword(hash)
   if (!packed) return false
-  const expected = Buffer.from(packed.hash.slice(PAYLOAD_HASH_PREFIX.length), 'hex')
-  const actual = await derive(password, packed.salt)
+  const isCurrent = packed.hash.startsWith(PAYLOAD_HASH_PREFIX)
+  const expectedHex = isCurrent ? packed.hash.slice(PAYLOAD_HASH_PREFIX.length) : packed.hash
+  if (!/^[0-9a-f]+$/i.test(expectedHex) || expectedHex.length % 2 !== 0) return false
+  const expected = Buffer.from(expectedHex, 'hex')
+  const actual = await derive(
+    password,
+    packed.salt,
+    isCurrent ? PBKDF2_ITERATIONS : LEGACY_PBKDF2_ITERATIONS,
+    isCurrent ? PBKDF2_KEY_LENGTH : LEGACY_PBKDF2_KEY_LENGTH,
+  )
   return expected.length === actual.length && timingSafeEqual(expected, actual)
 }
 
@@ -185,7 +201,8 @@ const selectUserByEmail = async (db: D1Database, email: string): Promise<Row | n
 
 const selectSession = async (db: D1Database, id: string): Promise<Row | null> =>
   db.prepare(
-    'SELECT s.id, s._parent_id, s.created_at, s.expires_at, u.account_state, u.email ' +
+    'SELECT s.id, s._parent_id, s.created_at, s.expires_at, s.created_at AS updatedAt, ' +
+      'NULL AS ipAddress, NULL AS userAgent, u.account_state, u.email ' +
       'FROM users_sessions s INNER JOIN users u ON u.id = s._parent_id WHERE s.id = ? LIMIT 1',
   ).bind(id).first<Row>()
 
@@ -194,12 +211,15 @@ const buildCredentialAccount = (row: Row): Row | null => {
   if (!AUTHENTICATABLE_STATES.has(String(row.account_state))) return null
   return {
     id: 'credential:' + String(row.id),
-    user_id: String(row.id),
-    account_id: String(row.id),
-    provider_id: 'credential',
+    userId: String(row.id),
+    accountId: String(row.id),
+    providerId: 'credential',
     password: packPassword(String(row.salt), String(row.hash)),
-    created_at: new Date(iso(row.created_at)),
-    updated_at: new Date(iso(row.updated_at)),
+    createdAt: new Date(iso(row.created_at)),
+    updatedAt: new Date(iso(row.updated_at)),
+    accountId: String(row.id),
+    providerId: 'credential',
+    userId: String(row.id),
   }
 }
 
