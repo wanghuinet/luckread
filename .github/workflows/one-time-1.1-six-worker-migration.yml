@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - migration/1.1-six-worker-20261005
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -16,7 +20,7 @@ jobs:
       - name: Checkout migration branch
         uses: actions/checkout@v4
         with:
-          ref: "${{ github.ref_name }}"
+          ref: "${{ github.head_ref || github.ref_name }}"
           fetch-depth: 0
 
       - name: Merge existing worker code into six new worker directories
@@ -78,4 +82,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "refactor(1.1): establish six-worker runtime layout [skip ci]"
-          git push origin "HEAD:${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.head_ref || github.ref_name }}"
