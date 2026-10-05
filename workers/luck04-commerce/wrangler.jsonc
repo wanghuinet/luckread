@@ -4,6 +4,12 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-09-30",
   "workers_dev": false,
+  "services": [
+    {
+      "binding": "W03_CONTENT_MODERATION",
+      "service": "luck02-content"
+    }
+  ],
   "ratelimits": [
     {
       "name": "SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER",
@@ -27,6 +33,12 @@
       "database_name": "luckread",
       "database_id": "2f80471e-3756-49f9-8db1-7707a433ad64",
       "migrations_dir": "migrations"
+    },
+    {
+      "binding": "D1_03",
+      "database_name": "secondary",
+      "database_id": "bda1d247-a371-4244-91ae-aef96034db7f",
+      "migrations_dir": "governance/migrations"
     }
   ]
 }
