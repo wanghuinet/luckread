@@ -53,7 +53,7 @@ export async function resolveCanonicalPrincipal(request: Request): Promise<Canon
     throw new W02PrincipalClientError(503, 'W02 authentication service is unavailable')
   }
 
-  const payload = await response.json().catch(() => null) as Partial<CanonicalPrincipal> | null
+  const payload = await response.json().catch((): null => null) as Partial<CanonicalPrincipal> | null
   if (
     !payload ||
     typeof payload.userId !== 'string' ||
