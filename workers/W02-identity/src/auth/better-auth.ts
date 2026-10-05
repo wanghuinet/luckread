@@ -1,3 +1,4 @@
+import { ensureBaseUserRole } from '../authz/role-assignment.js'
 import { betterAuth } from 'better-auth/minimal'
 import { bearer } from 'better-auth/plugins'
 
@@ -20,6 +21,15 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
       revokeSessionsOnPasswordReset: true,
       sendResetPassword: async () => {
         throw new Error('PASSWORD_RESET_DELIVERY_UNCONFIGURED')
+      },
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          after: async (user) => {
+            await ensureBaseUserRole(env.D1_01, String(user.id), new Date().toISOString())
+          },
+        },
       },
     },
     user: {
