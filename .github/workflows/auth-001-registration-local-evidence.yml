@@ -78,16 +78,29 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
 
+      - name: Install W02 identity dependencies
+        working-directory: workers/W02-identity
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply W02 identity migrations locally
+        working-directory: workers/W02-identity
+        run: pnpm exec wrangler d1 migrations apply luckread --local --config wrangler.jsonc
+
+      - name: Apply AUTH-001 governance schema to W02 local D1
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler d1 execute luckread --local --config ../W02-identity/wrangler.jsonc --file src/migrations/20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts
+
       - name: Apply exact W01 local migrations
         working-directory: workers/W01-payload
         run: pnpm payload migrate
 
-      - name: Apply already-admitted AUTH-013 D1-01 schema locally
+      - name: Apply already-admitted AUTH-013 D1-01 schema locally to W01 state
         working-directory: workers/W01-payload
         run: |
           set -euo pipefail
           pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
-
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
         env:
@@ -97,7 +110,26 @@ jobs:
           set -euo pipefail
           pnpm exec opennextjs-cloudflare build > auth-001-open-next-build.log 2>&1
 
-      - name: Start exact W01 local Worker runtime
+      - name: Start exact local W02 identity Worker
+        working-directory: workers/W02-identity
+        env:
+          NODE_ENV: development
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler dev --local --port 8788 --config wrangler.jsonc > w02-auth-preview.log 2>&1 &
+          echo $! > w02-auth-preview.pid
+          ready=0
+          for _ in $(seq 1 120); do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8788/ || true)
+            if [ "$code" != "000" ]; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat w02-auth-preview.log
+            exit 1
+          fi
+
+      - name: Start exact W01 local Worker runtime with connected W02 service binding
         working-directory: workers/W01-payload
         env:
           NODE_ENV: production
@@ -113,11 +145,16 @@ jobs:
             sleep 1
           done
           if [ "$ready" -ne 1 ]; then
+            cat ../W02-identity/w02-auth-preview.log
             cat auth-001-open-next-build.log
             cat auth-001-preview.log
             exit 1
           fi
-
+          if grep -q 'env.W02_AUTH (luckread-w02).*\[not connected\]' auth-001-preview.log; then
+            cat ../W02-identity/w02-auth-preview.log
+            cat auth-001-preview.log
+            exit 1
+          fi
       - name: Run AUTH-001 registration batch runtime evidence
         working-directory: workers/W01-payload
         env:
@@ -144,14 +181,15 @@ jobs:
           path: |
             artifacts/mapping-0/auth-001-runtime-local/
             workers/W01-payload/auth-001-open-next-build.log
+            workers/W02-identity/w02-auth-preview.log
             workers/W01-payload/auth-001-preview.log
           if-no-files-found: error
           retention-days: 30
 
       - name: Cleanup local runtime
         if: ${{ always() }}
-        working-directory: workers/W01-payload
         run: |
-          if [ -f auth-001-preview.pid ]; then kill "$(cat auth-001-preview.pid)" 2>/dev/null || true; fi
+          if [ -f workers/W02-identity/w02-auth-preview.pid ]; then kill "$(cat workers/W02-identity/w02-auth-preview.pid)" 2>/dev/null || true; fi
+          if [ -f workers/W01-payload/auth-001-preview.pid ]; then kill "$(cat workers/W01-payload/auth-001-preview.pid)" 2>/dev/null || true; fi
           pkill -TERM -x workerd 2>/dev/null || true
           pkill -TERM -x esbuild 2>/dev/null || true
