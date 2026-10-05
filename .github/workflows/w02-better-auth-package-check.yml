@@ -6,7 +6,7 @@ on:
       - migration/better-auth-w02-20261005
   pull_request:
     paths:
-      - 'workers/W02-identity/**'
+      - 'workers/luck01-identity/**'
       - '.github/workflows/w02-better-auth-package-check.yml'
   workflow_dispatch:
 
@@ -25,11 +25,11 @@ jobs:
         with:
           node-version: 24
       - name: Install W02 dependencies
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Verify Better Auth import
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         run: node --input-type=module -e "import('better-auth').then(() => console.log('better-auth import: OK'))"
       - name: Typecheck W02
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         run: npx tsc --noEmit -p tsconfig.json
