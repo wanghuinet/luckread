@@ -15,7 +15,10 @@ const makeDatabase = (
     envelope: FakeRow | null
     user: FakeRow | null
   },
-  options: { hideEnvelopeLookupByIdempotencyKey?: boolean } = {},
+  options: {
+    hideEnvelopeLookupByIdempotencyKey?: boolean
+    omitFinalizeBatchSelectResult?: boolean
+  } = {},
 ) => {
   const prepare = (sql: string): FakeStatement => {
     const statement: FakeStatement = {
@@ -78,15 +81,20 @@ const makeDatabase = (
           expiresAt: '2099-01-01T00:00:00.000Z',
           consentRecordId: 'consent-1',
         }
-        return [
-          { meta: { changes: 1 } },
-          { meta: { changes: 1 } },
-          {
-            results: [{
-              committed_response: state.envelope.committedResponse,
-            }],
-          },
-        ]
+        return options.omitFinalizeBatchSelectResult
+          ? [
+              { meta: { changes: 1 } },
+              { meta: { changes: 1 } },
+            ]
+          : [
+              { meta: { changes: 1 } },
+              { meta: { changes: 1 } },
+              {
+                results: [{
+                  committed_response: state.envelope.committedResponse,
+                }],
+              },
+            ]
       }
 
       return statements.map(() => ({ meta: { changes: 1 } }))
@@ -185,6 +193,43 @@ describe('W02 Better Auth registration runtime', () => {
     })
     expect(signUpEmail).toHaveBeenCalledOnce()
   })
+  it('finalizes from the envelope primary key when batch SELECT output is absent', async () => {
+    const state: { envelope: FakeRow | null; user: FakeRow | null } = {
+      envelope: null,
+      user: {
+        id: 'user-1',
+        email: 'user@example.com',
+        username: 'user1',
+        accountState: 'PENDING_VERIFICATION',
+        accountStateVersion: 1,
+      },
+    }
+    const signUpEmail = vi.fn().mockResolvedValue({
+      user: {
+        id: 'user-1',
+        email: 'user@example.com',
+        username: 'user1',
+        accountState: 'PENDING_VERIFICATION',
+        accountStateVersion: 1,
+      },
+    })
+
+    const result = await registerWithBetterAuth(
+      makeDatabase(state, {
+        hideEnvelopeLookupByIdempotencyKey: true,
+        omitFinalizeBatchSelectResult: true,
+      }),
+      { api: { signUpEmail } } as any,
+      input,
+    )
+
+    expect(result).toEqual({
+      userId: 'user-1',
+      accountState: 'PENDING_VERIFICATION',
+    })
+    expect(signUpEmail).toHaveBeenCalledOnce()
+  })
+
   it('replays a completed registration without invoking Better Auth again', async () => {
     const state: { envelope: FakeRow | null; user: FakeRow | null } = {
       envelope: {
