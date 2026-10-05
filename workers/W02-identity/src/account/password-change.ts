@@ -147,11 +147,16 @@ export async function changePasswordWithBetterAuth(
       session.sessionId,
       new Date().toISOString(),
     )
-  } catch {
-    throw new PasswordChangeServiceError(
-      503,
-      'SERVICE_UNAVAILABLE',
-      'Password session synchronization unavailable',
-    )
+  } catch (error) {
+    // Better Auth has already completed the password mutation. Native sessions
+    // that it revoked can no longer authenticate because principal resolution
+    // requires the corresponding native session row. Treat extension cleanup
+    // as best-effort so a successful password change is never reported as a
+    // failed credential operation.
+    console.error(JSON.stringify({
+      event: 'auth.password_change.session_extension_reconciliation_failure',
+      diagnosticCode: 'AUTH004_SESSION_EXTENSION_RECONCILIATION_FAILURE',
+      errorName: error instanceof Error ? error.name : typeof error,
+    }))
   }
 }
