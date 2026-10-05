@@ -107,8 +107,9 @@ async function getPendingRegistrationEnvelopes(
       'SELECT e.id, e.idempotency_key, e.committed_response, e.created_at, ' +
       'CAST(u.id AS TEXT) AS user_id, u.email, u.username, i.id AS identity_id ' +
       'FROM auth_registration_envelopes e ' +
-      'INNER JOIN users u ' +
+      'INNER JOIN "user" u ' +
       '  ON CAST(u.id AS TEXT) = CAST(json_extract(e.committed_response, \'$.userId\') AS TEXT) ' +
+      ' AND u.username IS NOT NULL ' +
       'LEFT JOIN auth_identities i ON i.user_id = CAST(u.id AS TEXT) ' +
       'LEFT JOIN auth_credentials ce ' +
       '  ON ce.identity_id = i.id AND ce.kind = \'email\' AND ce.active = 1 ' +
