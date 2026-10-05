@@ -88,6 +88,16 @@ jobs:
           set -euo pipefail
           pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
 
+      - name: Install W02 Better Auth dependencies
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Apply W02 Better Auth schema locally
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler d1 execute luckread --local --config ../W02-identity/wrangler.jsonc --file ../W02-identity/migrations/0005_better_auth_identity_core.sql
+
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
         env:
@@ -97,14 +107,14 @@ jobs:
           set -euo pipefail
           pnpm exec opennextjs-cloudflare build > auth-001-open-next-build.log 2>&1
 
-      - name: Start exact W01 local Worker runtime
+      - name: Start exact W01/W02 local Worker runtime
         working-directory: workers/W01-payload
         env:
           NODE_ENV: production
           PAYLOAD_SECRET: ignore
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --port 8787 --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" --var "CLOUDFLARE_ENV:development" > auth-001-preview.log 2>&1 &
+          pnpm exec wrangler dev --local --port 8787 --config wrangler.jsonc --config ../W02-identity/wrangler.jsonc --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" --var "CLOUDFLARE_ENV:development" > auth-001-preview.log 2>&1 &
           echo $! > auth-001-preview.pid
           ready=0
           for _ in $(seq 1 120); do
@@ -133,7 +143,7 @@ jobs:
         run: |
           echo "===== W01 OpenNext build log ====="
           tail -n 500 auth-001-open-next-build.log || true
-          echo "===== W01 local preview log ====="
+          echo "===== W01/W02 local preview log ====="
           tail -n 500 auth-001-preview.log || true
 
       - name: Upload same-SHA runtime evidence
