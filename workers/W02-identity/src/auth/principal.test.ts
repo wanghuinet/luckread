@@ -144,4 +144,21 @@ describe('Better Auth principal resolution', () => {
 
     expect(result?.tokenVersion).toBeUndefined()
   })
+
+  it('propagates session-state storage failures so the W02 boundary can return 503', async () => {
+    const db = {
+      prepare: vi.fn(() => {
+        throw new Error('d1 unavailable')
+      }),
+    }
+
+    await expect(
+      resolveBetterAuthPrincipal(
+        db as unknown as D1Database,
+        new Request('https://luckread-w02.internal/internal/auth/principal'),
+        'test-secret',
+        '2026-10-06T00:00:00.000Z',
+      ),
+    ).rejects.toThrow('d1 unavailable')
+  })
 })
