@@ -1,4 +1,4 @@
-import { createAdapterFactory } from 'better-auth/adapters'
+import { createAdapterFactory, type CustomAdapter, type ModelTarget } from 'better-auth/adapters'
 const PAYLOAD_HASH_PREFIX = 'pbkdf2-sha256-v1:'
 const PACKED_PASSWORD_PREFIX = 'luckread-payload-pbkdf2-v1:'
 const PBKDF2_ITERATIONS = 600000
@@ -253,8 +253,8 @@ const adapter = (db: D1Database) =>
       supportsNumericIds: true,
       transaction: false,
     },
-    adapter: () => ({
-      create: async ({ model, data }) => {
+    adapter: (): CustomAdapter => ({
+      create: async <T extends Record<string, any>>({ model, data }: ModelTarget & { data: T }) => {
         if (model === 'users') {
           const email = String(data.email ?? '').trim().toLowerCase()
           const username = typeof data.username === 'string' && data.username.trim()
@@ -299,7 +299,7 @@ const adapter = (db: D1Database) =>
         throw new Error('BETTER_AUTH_MODEL_CREATE_UNSUPPORTED:' + model)
       },
 
-      findOne: async ({ model, modelKey = model, where }) => {
+      findOne: async <T>({ model, modelKey = model, where }: ModelTarget & { where: any[] }) => {
         const clauses = where as WhereClause[]
 
         if (modelKey === 'account') {
@@ -344,7 +344,7 @@ const adapter = (db: D1Database) =>
         throw new Error('BETTER_AUTH_MODEL_FIND_ONE_UNSUPPORTED:' + modelKey)
       },
 
-      findMany: async ({ model, modelKey = model, where, limit, offset, sortBy }) => {
+      findMany: async <T>({ model, modelKey = model, where, limit, offset, sortBy }: ModelTarget & { where?: any[]; limit: number; offset?: number; sortBy?: { field: string; direction: 'asc' | 'desc' } }) => {
         const clauses = (where ?? []) as WhereClause[]
 
         if (modelKey === 'account') {
@@ -388,7 +388,7 @@ const adapter = (db: D1Database) =>
         return Number(row?.count ?? 0)
       },
 
-      update: async ({ model, modelKey = model, where, update }) => {
+      update: async <T>({ model, modelKey = model, where, update }: ModelTarget & { where: any[]; update: T }) => {
         const clauses = where as WhereClause[]
         if (!clauses.length) return null
 
@@ -440,7 +440,7 @@ const adapter = (db: D1Database) =>
         return null
       },
 
-      delete: async ({ model, modelKey = model, where }) => {
+      delete: async <_T>({ model, modelKey = model, where }: ModelTarget & { where: any[] }) => {
         const clauses = where as WhereClause[]
         if (!clauses.length) return
         if (modelKey === 'account') throw new Error('BETTER_AUTH_CREDENTIAL_ACCOUNT_DELETE_DISABLED')
@@ -449,7 +449,7 @@ const adapter = (db: D1Database) =>
         await db.prepare(sql).bind(...params).run()
       },
 
-      deleteMany: async ({ model, where }) => {
+      updateMany: async ({ model, where, update }: ModelTarget & { where: any[]; update: Record<string, any> }) => {
         const clauses = (where ?? []) as WhereClause[]
         if (!clauses.length) throw new Error('BETTER_AUTH_DESTRUCTIVE_EMPTY_DELETE_DISABLED')
         if (model === 'account') return 0
