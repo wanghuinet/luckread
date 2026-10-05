@@ -30,10 +30,10 @@ jobs:
         with:
           node-version: 24
       - name: Install W02 runtime dependencies
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Verify Better Auth package
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         run: node --input-type=module -e "import('better-auth').then(() => console.log('better-auth 1.7.7 import: OK'))"
       - name: Verify RoleAssignment migration artifacts
         run: |
@@ -41,8 +41,8 @@ jobs:
           node scripts/generate-role-version-migration.mjs
       - name: Assert generated migrations are committed
         run: |
-          git diff --exit-code -- workers/W02-identity/migrations/0001_role_assignments.sql
-          git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
+          git diff --exit-code -- workers/luck01-identity/migrations/0001_role_assignments.sql
+          git diff --exit-code -- workers/luck01-identity/migrations/0003_role_authorization_versions.sql
       - name: Validate Better Auth production secret
         env:
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
@@ -54,7 +54,7 @@ jobs:
           fi
 
       - name: Upload Better Auth production secret
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -64,7 +64,7 @@ jobs:
           printf '%s' "$BETTER_AUTH_SECRET" | npx --yes wrangler@4.116.0 secret put BETTER_AUTH_SECRET --config wrangler.jsonc
 
       - name: Deploy W02 with pinned Wrangler
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
