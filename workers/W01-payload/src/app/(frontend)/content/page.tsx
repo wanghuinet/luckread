@@ -3,8 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
-import PublicLanguageToggle from '../i18n/PublicLanguageToggle'
-import { getPublicCopy, readPublicLocaleCookie, type PublicLocale } from '../i18n/public-locale'
+import PublicLanguageToggle, { usePublicLocale } from '../i18n/PublicLanguageToggle'
+import { getPublicCopy, type PublicLocale } from '../i18n/public-locale'
 
 type ContentType = 'article' | 'post' | 'video'
 type ContentItem = {
@@ -27,12 +27,8 @@ type ContentApiResponse = {
 }
 
 export default function ContentBrowsePage() {
-  const [locale, setLocale] = useState<PublicLocale>('zh')
+  const locale = usePublicLocale()
   const copy = getPublicCopy(locale)
-
-  useEffect(() => {
-    setLocale(readPublicLocaleCookie())
-  }, [])
   const labels: Record<ContentType | 'all', string> = {
     all: copy.content.tabs.all,
     article: copy.content.tabs.article,
@@ -46,18 +42,6 @@ export default function ContentBrowsePage() {
   const [error, setError] = useState('')
   const requestIdRef = useRef(0)
   const abortControllerRef = useRef<AbortController | null>(null)
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void load()
-    }, 0)
-    return () => {
-      requestIdRef.current += 1
-      abortControllerRef.current?.abort()
-      abortControllerRef.current = null
-      window.clearTimeout(timer)
-    }
-  }, [contentType])
 
   async function load(cursor: string | null = null): Promise<void> {
     const requestId = ++requestIdRef.current
@@ -101,6 +85,18 @@ export default function ContentBrowsePage() {
       if (abortControllerRef.current === controller) abortControllerRef.current = null
     }
   }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void load()
+    }, 0)
+    return () => {
+      requestIdRef.current += 1
+      abortControllerRef.current?.abort()
+      abortControllerRef.current = null
+      window.clearTimeout(timer)
+    }
+  }, [load])
 
   return (
     <main className="content-browse">

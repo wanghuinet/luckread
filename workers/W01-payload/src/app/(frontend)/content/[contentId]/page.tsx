@@ -5,8 +5,8 @@ import ContentComments from './ContentComments'
 import { extractSocialTokens } from '../../../../social/social-token-parser.js'
 import { useEffect, useMemo, useState } from 'react'
 
-import PublicLanguageToggle from '../../i18n/PublicLanguageToggle'
-import { getPublicCopy, readPublicLocaleCookie, type PublicLocale } from '../../i18n/public-locale'
+import PublicLanguageToggle, { usePublicLocale } from '../../i18n/PublicLanguageToggle'
+import { getPublicCopy, type PublicLocale } from '../../i18n/public-locale'
 
 type ContentType = 'article' | 'post' | 'video'
 type Content = {
@@ -32,12 +32,8 @@ export default function ContentDetailPage({
 }: {
   params: Promise<{ contentId: string }>
 }) {
-  const [locale, setLocale] = useState<PublicLocale>('zh')
+  const locale = usePublicLocale()
   const copy = getPublicCopy(locale)
-
-  useEffect(() => {
-    setLocale(readPublicLocaleCookie())
-  }, [])
   const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
   const typeLabels: Record<ContentType, string> = {
     article: copy.content.tabs.article,
