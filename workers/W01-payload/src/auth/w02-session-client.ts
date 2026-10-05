@@ -143,6 +143,7 @@ export type BetterAuthPrincipalResult = {
   accountState: string
   accountStateVersion: number
   layer: string
+  tokenVersion?: number
 }
 
 export async function signInWithBetterAuth(body: {
@@ -245,6 +246,77 @@ export async function resolveBetterAuthPrincipal(token: string): Promise<BetterA
     typeof (payload as { layer?: unknown }).layer !== 'string'
   ) {
     throw new W02AuthClientError(401, 'authentication denied')
+  }
+
+  return payload as BetterAuthPrincipalResult
+}
+
+export async function resolveBetterAuthPrincipalThroughW02(
+  request: Request,
+): Promise<BetterAuthPrincipalResult> {
+  const service = await getW02Service()
+  const headers = new Headers()
+  const cookie = request.headers.get('cookie')
+  const authorization = request.headers.get('authorization')
+  if (cookie) {
+    headers.set('cookie', cookie)
+  } else if (authorization) {
+    headers.set('authorization', authorization)
+  }
+  for (const name of ['origin', 'referer', 'user-agent']) {
+    const value = request.headers.get(name)
+    if (value) headers.set(name, value)
+  }
+  headers.set('content-type', 'application/json')
+  headers.set('X-LuckRead-Caller', 'W01')
+
+  let response: Response
+  try {
+    response = await service.fetch(
+      new Request('https://luckread-w02.internal/internal/auth/principal', {
+        method: 'POST',
+        headers,
+        body: '{}',
+      }),
+    )
+  } catch {
+    throw new W02AuthClientError(503, 'W02 authentication service is unavailable')
+  }
+
+  let payload: unknown = null
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
+  }
+
+  if (response.status === 401) {
+    throw new W02AuthClientError(401, 'authentication denied')
+  }
+  if (!response.ok) {
+    throw new W02AuthClientError(503, 'authentication service unavailable')
+  }
+
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    (payload as { active?: unknown }).active !== true ||
+    typeof (payload as { userId?: unknown }).userId !== 'string' ||
+    typeof (payload as { email?: unknown }).email !== 'string' ||
+    typeof (payload as { sessionId?: unknown }).sessionId !== 'string' ||
+    typeof (payload as { accountState?: unknown }).accountState !== 'string' ||
+    typeof (payload as { accountStateVersion?: unknown }).accountStateVersion !== 'number' ||
+    typeof (payload as { layer?: unknown }).layer !== 'string' ||
+    (
+      (payload as { tokenVersion?: unknown }).tokenVersion !== undefined &&
+      (
+        typeof (payload as { tokenVersion?: unknown }).tokenVersion !== 'number' ||
+        !Number.isSafeInteger((payload as { tokenVersion?: number }).tokenVersion) ||
+        ((payload as { tokenVersion?: number }).tokenVersion ?? -1) < 0
+      )
+    )
+  ) {
+    throw new W02AuthClientError(503, 'invalid authentication service response')
   }
 
   return payload as BetterAuthPrincipalResult
