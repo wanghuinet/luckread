@@ -84,14 +84,16 @@ const normalizeEtag = (value: string): string => {
   return result
 }
 
-const profileResponse = async (profile: UserProfile, status = 200): Promise<Response> =>
-  Response.json(profile, {
+const profileResponse = async (profile: UserProfile, status = 200): Promise<Response> => {
+  const { updatedAt: _updatedAt, ...publicProfile } = profile
+  return Response.json(publicProfile, {
     status,
     headers: {
       'cache-control': 'no-store',
       ETag: await etagForProfile(profile),
     },
   })
+}
 
 const authenticate = async (
   db: D1Database,
