@@ -37,6 +37,7 @@ jobs:
     env:
       NODE_ENV: development
       PAYLOAD_SECRET: ignore
+      AUTH001_PERSIST_TO: ${{ github.workspace }}/workers/W01-payload/.wrangler/state
     steps:
       - name: Resolve exact source SHA
         id: source
@@ -86,7 +87,7 @@ jobs:
         working-directory: workers/W01-payload
         run: |
           set -euo pipefail
-          pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
+          pnpm exec wrangler d1 execute luckread --local --persist-to "$AUTH001_PERSIST_TO" --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
 
       - name: Install W02 Better Auth dependencies
         working-directory: workers/W02-identity
@@ -96,7 +97,7 @@ jobs:
         working-directory: workers/W01-payload
         run: |
           set -euo pipefail
-          pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file ../W02-identity/migrations/0005_better_auth_identity_core.sql
+          pnpm exec wrangler d1 execute luckread --local --persist-to "$AUTH001_PERSIST_TO" --config wrangler.jsonc --file ../W02-identity/migrations/0005_better_auth_identity_core.sql
 
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
@@ -113,7 +114,7 @@ jobs:
           NODE_ENV: production
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --port 8790 --config wrangler.jsonc --var "CLOUDFLARE_ENV:development" > ../W01-payload/auth-001-w02-preview.log 2>&1 &
+          pnpm exec wrangler dev --local --persist-to "$AUTH001_PERSIST_TO" --port 8790 --config wrangler.jsonc --var "CLOUDFLARE_ENV:development" > ../W01-payload/auth-001-w02-preview.log 2>&1 &
           echo $! > ../W01-payload/auth-001-w02-preview.pid
           ready=0
           for _ in $(seq 1 120); do
