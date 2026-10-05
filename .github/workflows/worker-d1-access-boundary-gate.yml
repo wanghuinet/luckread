@@ -5,14 +5,12 @@ on:
     branches: [main]
     paths:
       - 'workers/**'
-      - 'contracts/transport/worker-d1-access-boundary.v1.json'
       - 'scripts/verify-1.1-worker-d1-access-boundary.mjs'
       - '.github/workflows/worker-d1-access-boundary-gate.yml'
   pull_request:
     paths:
       - 'workers/**'
-      - 'contracts/transport/worker-d1-access-boundary.v1.json'
-      - 'scripts/verify-worker-d1-access-boundary.mjs'
+      - 'scripts/verify-1.1-worker-d1-access-boundary.mjs'
       - '.github/workflows/worker-d1-access-boundary-gate.yml'
   workflow_dispatch:
 
@@ -31,5 +29,5 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Verify Worker D1 access boundary
-        run: node scripts/verify-worker-d1-access-boundary.mjs
+      - name: Verify 1.1 Worker D1 access boundary
+        run: node scripts/verify-1.1-worker-d1-access-boundary.mjs
