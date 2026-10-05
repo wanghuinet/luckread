@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   wire:
-    if: github.head_ref == 'migration/1.1-six-worker-20261005'
+    if: github.ref_name == 'migration/1.1-six-worker-20261005' || github.head_ref == 'migration/1.1-six-worker-20261005'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
