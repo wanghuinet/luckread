@@ -1,6 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../auth/traffic-limit.js'
-import { getBetterAuthSession } from '../auth/better-auth.js'
+import { getBetterAuthSession } from '../auth/w02-auth-client'
 import { resolveGlobalLayer, W02AuthClientError } from '../auth/w02-identity-client.js'
 
 type W03ContentService = {
