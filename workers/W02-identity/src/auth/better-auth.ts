@@ -4,10 +4,12 @@ import { bearer } from 'better-auth/plugins'
 
 export interface BetterAuthEnv {
   D1_01: D1Database
+  BETTER_AUTH_SECRET?: string
 }
 
 export const createLuckReadAuth = (env: BetterAuthEnv) =>
   betterAuth({
+    secret: env.BETTER_AUTH_SECRET,
     // W02 is the platform identity authority. Better Auth uses native D1
     // persistence here; Payload is not an authentication/database adapter.
     database: env.D1_01,
