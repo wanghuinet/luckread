@@ -2,6 +2,7 @@ import priv004DevPolicy from '../../../../../../artifacts/mapping-0/priv004-appr
 import priv004ProdPolicy from '../../../../../../artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json'
 import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 import { registerWithBetterAuth, W02AuthClientError } from '../../../auth/w02-session-client.js'
+// AUTH-001 boundary: W01 is the public edge; W02 / Better Auth owns identity registration persistence.
 
 const SCOPE = 'ACCOUNT_REGISTRATION'
 const ENDPOINT = 'authRegister'
