@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
-import { getBetterAuthSession } from '@/auth/better-auth'
+import { getBetterAuthSession } from '@/auth/w02-auth-client'
 
 import { CreatorStudio } from './CreatorStudio'
 
