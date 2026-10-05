@@ -28,17 +28,17 @@
         "consentSchemaRef": "#/components/schemas/AuthRegistrationConsent"
       },
       "consistency": {
-        "registrationCommitAuthority": "W02_BETTER_AUTH",
+        "registrationCommitAuthority": "W01_PAYLOAD",
         "authoritativeCommitScope": [
-          "BETTER_AUTH_USER",
+          "ENT-USER",
           "ENT-CONSENT",
           "AUTH-001_REGISTRATION_ENVELOPE"
         ],
-        "completion": "AFTER_W02_BETTER_AUTH_USER_AND_CONSENT_COMMIT",
-        "identityCredentialMaterialization": "NATIVE_BETTER_AUTH",
-        "materializerAuthority": "NONE",
-        "materializationSource": "BETTER_AUTH_NATIVE_USER_ACCOUNT",
-        "recovery": "W02_REGISTRATION_RECONCILIATION",
+        "completion": "AFTER_W01_TRANSACTION_COMMIT",
+        "identityCredentialMaterialization": "EVENTUAL",
+        "materializerAuthority": "W02_D1-01",
+        "materializationSource": "AUTH-001_REGISTRATION_ENVELOPE + PAYLOAD_USERS_NATIVE_AUTH_SOURCE",
+        "recovery": "W02_SCHEDULED_RECONCILIATION",
         "crossWorkerTransaction": false,
         "crossD1Transaction": false,
         "registrationConsentBinding": {
@@ -63,12 +63,12 @@
         "scope": "N/A"
       },
       "resource": {
-        "class": "BOUNDED_COMPOSITION",
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
         "d1ReadMax": 2,
-        "d1WriteMax": 3,
+        "d1WriteMax": 1,
         "d1ReadRowsMax": 8,
         "d1WriteRowsMax": 4,
-        "rpcMax": 0,
+        "rpcMax": 1,
         "outboundMax": 0
       },
       "cache": {
