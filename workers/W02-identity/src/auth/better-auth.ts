@@ -1,5 +1,5 @@
 import { ensureBaseUserRole } from '../authz/role-assignment.js'
-import { betterAuth } from 'better-auth/minimal'
+import { betterAuth } from 'better-auth'
 import { bearer } from 'better-auth/plugins'
 
 export interface BetterAuthEnv {
