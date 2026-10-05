@@ -135,6 +135,24 @@ const getExistingEnvelope = async (
     .bind(idempotencyKey, SCOPE, ENDPOINT)
     .first<ExistingEnvelope>()
 
+const getEnvelopeById = async (
+  db: D1Database,
+  id: string,
+): Promise<ExistingEnvelope | null> =>
+  db
+    .prepare(
+      `SELECT id,
+              payload_hash AS payloadHash,
+              state,
+              committed_response AS committedResponse,
+              expires_at AS expiresAt,
+              consent_record_id AS consentRecordId
+         FROM auth_registration_envelopes
+        WHERE id = ?
+        LIMIT 1`,
+    )
+    .bind(id)
+    .first<ExistingEnvelope>()
 const getNativeUser = async (
   db: D1Database,
   email: string,
@@ -224,14 +242,7 @@ const finalizeRegistration = async (
       .bind(envelope.id),
   ])
 
-  const row = result[2]?.results?.[0] as { committed_response?: unknown } | undefined
-  const replay = typeof row?.committed_response === 'string'
-    ? parseReplay(row.committed_response)
-    : null
-
-  if (replay) return replay
-
-  const current = await getExistingEnvelope(db, input.idempotencyKey)
+  const current = await getEnvelopeById(db, envelope.id)
   const currentReplay = current ? parseReplay(current.committedResponse) : null
   if (currentReplay) return currentReplay
 
@@ -240,7 +251,6 @@ const finalizeRegistration = async (
     'registration completion was not committed',
   )
 }
-
 
 const markRegistrationFailed = async (db: D1Database, envelopeId: string, now: string) => {
   await db
@@ -349,20 +359,7 @@ const reserveEnvelope = async (
 
   // Read back by the newly generated primary key rather than the idempotency-key index.
   // This makes the post-reservation invariant independent of secondary-index visibility.
-  const reserved = await db
-    .prepare(
-      `SELECT id,
-              payload_hash AS payloadHash,
-              state,
-              committed_response AS committedResponse,
-              expires_at AS expiresAt,
-              consent_record_id AS consentRecordId
-         FROM auth_registration_envelopes
-        WHERE id = ?
-        LIMIT 1`,
-    )
-    .bind(envelopeId)
-    .first<ExistingEnvelope>()
+  const reserved = await getEnvelopeById(db, envelopeId)
 
   if (
     !reserved ||
