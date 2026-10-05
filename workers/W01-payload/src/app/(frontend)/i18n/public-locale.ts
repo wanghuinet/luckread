@@ -1,5 +1,3 @@
-import { useSyncExternalStore } from 'react'
-
 export type PublicLocale = 'zh' | 'en' | 'tw'
 
 export const PUBLIC_LOCALE_COOKIE = 'luckread-ui-locale'
@@ -232,22 +230,6 @@ const copy: Record<PublicLocale, Copy> = {
       tooManyReplies: '此留言已有回覆，暫不支援刪除。', conflict: '留言已被修改，請重新整理後再編輯。', loadError: '留言載入失敗', submitError: '留言提交失敗，請稍後再試。', likeError: '留言按讚失敗，請稍後再試。', deleteError: '留言刪除失敗，請稍後再試。', updateError: '留言修改失敗，請稍後再試。', networkError: '網路異常，請稍後再試。',
     },
   },
-}
-
-const localeListeners = new Set<() => void>()
-
-export const usePublicLocale = (): PublicLocale => useSyncExternalStore(
-  (onStoreChange) => {
-    localeListeners.add(onStoreChange)
-    return () => localeListeners.delete(onStoreChange)
-  },
-  readPublicLocaleCookie,
-  () => 'zh',
-)
-
-export const setPublicLocaleCookie = (locale: PublicLocale): void => {
-  if (typeof document === 'undefined') return
-  document.cookie = PUBLIC_LOCALE_COOKIE + '=' + locale + '; Path=/; Max-Age=31536000; SameSite=Lax'
 }
 
 export const getPublicCopy = (locale: PublicLocale): Copy => copy[locale]
