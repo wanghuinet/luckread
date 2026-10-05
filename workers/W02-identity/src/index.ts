@@ -77,12 +77,12 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/register') {
       const body = await readJsonBody<{
-        identityType?: unknown
-        identity?: unknown
-        credential?: unknown
-        username?: unknown
-        consent?: unknown
-        idempotencyKey?: unknown
+        identityType: unknown
+        identity: unknown
+        credential: unknown
+        username: unknown
+        consent: unknown
+        idempotencyKey: unknown
       }>(request)
 
       if (
