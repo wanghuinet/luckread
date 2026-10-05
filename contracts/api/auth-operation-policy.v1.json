@@ -124,7 +124,7 @@
         "state": "MISSING",
         "resource": "PASS",
         "cache": "PASS",
-        "antiAbuse": "PASS_PENDING_RUNTIME",
+        "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING",
         "consentContract": "CONTRACT_ADMITTED_PENDING_RUNTIME_EVIDENCE"
