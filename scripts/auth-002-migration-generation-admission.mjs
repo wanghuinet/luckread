@@ -18,7 +18,7 @@ if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.90.2') fail('W01 D1 ad
 if (!config.includes('sqliteD1Adapter')) fail('W01 sqliteD1Adapter is not configured')
 if (!config.includes('push: false')) fail('W01 push:false is required')
 if (!config.includes('migrationDir')) fail('W01 migrationDir is not configured')
-if (!users.includes('auth: true')) fail('W01 Users native auth is not enabled')
+if (!/auth\s*:\s*\{/.test(users)) fail('W01 Users native auth is not enabled')
 
 const migrationsDir = join(payloadRoot, 'src', 'migrations')
 if (!existsSync(migrationsDir)) {
