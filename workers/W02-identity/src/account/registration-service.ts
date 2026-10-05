@@ -529,7 +529,7 @@ export async function registerWithBetterAuth(
   }
 
   parsed.payloadHash = await sha256Hex(JSON.stringify(canonicalize(normalized)))
-  const identityLockKey = 'email:' + parsed.email
+  const identityLockKey = 'registration-identity:email:' + await sha256Hex(parsed.email)
   parsed.responseDigest = await sha256Hex(
     JSON.stringify(
       canonicalize({
