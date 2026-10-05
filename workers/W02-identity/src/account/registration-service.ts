@@ -38,6 +38,7 @@ type RegistrationPolicy = {
 
 type DatabaseEnv = {
   D1_01: D1Database
+  CLOUDFLARE_ENV?: string
 }
 
 export class RegistrationServiceError extends Error {
@@ -86,10 +87,11 @@ const isUniqueConstraintError = (error: unknown): boolean => {
   return /unique constraint|unique constraint failed|duplicate/i.test(message)
 }
 
-const resolveRegistrationPolicy = (now: Date): RegistrationPolicy => {
-  const environment =
-    process.env.CLOUDFLARE_ENV ??
-    (process.env.NODE_ENV === 'production' ? 'production' : 'development')
+const resolveRegistrationPolicy = (
+  now: Date,
+  runtimeEnvironment?: string,
+): RegistrationPolicy => {
+  const environment = runtimeEnvironment ?? 'production'
   const production = environment.toLowerCase() === 'production'
   const policy = production ? priv004ProdPolicy : priv004DevPolicy
 
@@ -473,7 +475,7 @@ export async function registerWithBetterAuth(
     )
   }
 
-  const policy = resolveRegistrationPolicy(now)
+  const policy = resolveRegistrationPolicy(now, env.CLOUDFLARE_ENV)
   const parsed = parseRegistrationInput(input, policy)
   const normalized = {
     identityType: 'email',
