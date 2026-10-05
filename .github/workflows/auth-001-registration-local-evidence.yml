@@ -5,20 +5,20 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/auth-001-registration-local-evidence.yml"
-      - "workers/W01-payload/src/app/auth/register/**"
-      - "workers/W01-payload/src/collections/Users.ts"
-      - "workers/W01-payload/src/migrations/**"
-      - "workers/W01-payload/src/payload.config.ts"
-      - "workers/W01-payload/scripts/auth-001-registration-runtime-evidence-local.mjs"
+      - "workers/luck02-content/src/app/auth/register/**"
+      - "workers/luck02-content/src/collections/Users.ts"
+      - "workers/luck02-content/src/migrations/**"
+      - "workers/luck02-content/src/payload.config.ts"
+      - "workers/luck02-content/scripts/auth-001-registration-runtime-evidence-local.mjs"
       - "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json"
   pull_request:
     paths:
       - ".github/workflows/auth-001-registration-local-evidence.yml"
-      - "workers/W01-payload/src/app/auth/register/**"
-      - "workers/W01-payload/src/collections/Users.ts"
-      - "workers/W01-payload/src/migrations/**"
-      - "workers/W01-payload/src/payload.config.ts"
-      - "workers/W01-payload/scripts/auth-001-registration-runtime-evidence-local.mjs"
+      - "workers/luck02-content/src/app/auth/register/**"
+      - "workers/luck02-content/src/collections/Users.ts"
+      - "workers/luck02-content/src/migrations/**"
+      - "workers/luck02-content/src/payload.config.ts"
+      - "workers/luck02-content/scripts/auth-001-registration-runtime-evidence-local.mjs"
       - "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json"
   workflow_dispatch:
     inputs:
@@ -37,7 +37,7 @@ jobs:
     env:
       NODE_ENV: development
       PAYLOAD_SECRET: ignore
-      AUTH001_PERSIST_TO: ${{ github.workspace }}/workers/W01-payload/.wrangler/state
+      AUTH001_PERSIST_TO: ${{ github.workspace }}/workers/luck02-content/.wrangler/state
     steps:
       - name: Resolve exact source SHA
         id: source
@@ -70,37 +70,37 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${{ steps.source.outputs.sha }}"
-          test -s workers/W01-payload/src/app/auth/register/route.ts
-          test -s workers/W01-payload/src/migrations/20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts
-          test -s workers/W01-payload/scripts/auth-001-registration-runtime-evidence-local.mjs
+          test -s workers/luck02-content/src/app/auth/register/route.ts
+          test -s workers/luck02-content/src/migrations/20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts
+          test -s workers/luck02-content/scripts/auth-001-registration-runtime-evidence-local.mjs
           test -z "$(git status --short)"
 
-      - name: Install W01 dependencies
-        working-directory: workers/W01-payload
+      - name: Install Content dependencies
+        working-directory: workers/luck02-content
         run: pnpm install --frozen-lockfile
 
-      - name: Apply exact W01 local migrations
-        working-directory: workers/W01-payload
+      - name: Apply exact Content local migrations
+        working-directory: workers/luck02-content
         run: pnpm payload migrate
 
       - name: Apply already-admitted AUTH-013 D1-01 schema locally
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: |
           set -euo pipefail
           pnpm exec wrangler d1 execute luckread --local --persist-to "$AUTH001_PERSIST_TO" --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
 
-      - name: Install W02 Better Auth dependencies
-        working-directory: workers/W02-identity
+      - name: Install Identity Better Auth dependencies
+        working-directory: workers/luck01-identity
         run: npm install --ignore-scripts --no-audit --no-fund
 
-      - name: Apply W02 Better Auth schema locally
-        working-directory: workers/W01-payload
+      - name: Apply Better Auth schema locally
+        working-directory: workers/luck02-content
         run: |
           set -euo pipefail
           pnpm exec wrangler d1 execute luckread --local --persist-to "$AUTH001_PERSIST_TO" --config wrangler.jsonc --file ../W02-identity/migrations/0005_better_auth_identity_core.sql
 
-      - name: Build exact W01 OpenNext worker
-        working-directory: workers/W01-payload
+      - name: Build exact Content OpenNext worker
+        working-directory: workers/luck02-content
         env:
           NODE_ENV: production
           PAYLOAD_SECRET: ignore
@@ -108,8 +108,8 @@ jobs:
           set -euo pipefail
           pnpm exec opennextjs-cloudflare build > auth-001-open-next-build.log 2>&1
 
-      - name: Start exact W02 local Worker runtime
-        working-directory: workers/W01-payload
+      - name: Start exact Identity local Worker runtime
+        working-directory: workers/luck02-content
         env:
           NODE_ENV: production
         run: |
@@ -127,8 +127,8 @@ jobs:
             exit 1
           fi
 
-      - name: Start exact W01 local Worker runtime
-        working-directory: workers/W01-payload
+      - name: Start exact Content local Worker runtime
+        working-directory: workers/luck02-content
         env:
           NODE_ENV: production
           PAYLOAD_SECRET: ignore
@@ -150,7 +150,7 @@ jobs:
           fi
 
       - name: Run AUTH-001 registration batch runtime evidence
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         env:
           AUTH001_BASE_URL: http://127.0.0.1:8787
         run: |
@@ -158,15 +158,15 @@ jobs:
           node --import=tsx/esm scripts/auth-001-registration-runtime-evidence-local.mjs
           test -s ../../artifacts/mapping-0/auth-001-runtime-local/runtime-result.json
 
-      - name: Dump W01 runtime log on evidence failure
+      - name: Dump local runtime logs on evidence failure
         if: ${{ failure() }}
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: |
-          echo "===== W01 OpenNext build log ====="
+          echo "===== Content OpenNext build log ====="
           tail -n 500 auth-001-open-next-build.log || true
-          echo "===== W01 local preview log ====="
+          echo "===== Content local preview log ====="
           tail -n 500 auth-001-preview.log || true
-          echo "===== W02 local preview log ====="
+          echo "===== Identity local preview log ====="
           tail -n 500 auth-001-w02-preview.log || true
 
       - name: Upload same-SHA runtime evidence
@@ -176,14 +176,14 @@ jobs:
           name: auth-001-registration-runtime-local-${{ steps.source.outputs.sha }}
           path: |
             artifacts/mapping-0/auth-001-runtime-local/
-            workers/W01-payload/auth-001-open-next-build.log
-            workers/W01-payload/auth-001-preview.log
+            workers/luck02-content/auth-001-open-next-build.log
+            workers/luck02-content/auth-001-preview.log
           if-no-files-found: error
           retention-days: 30
 
       - name: Cleanup local runtime
         if: ${{ always() }}
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: |
           if [ -f auth-001-preview.pid ]; then kill "$(cat auth-001-preview.pid)" 2>/dev/null || true; fi
           if [ -f auth-001-w02-preview.pid ]; then kill "$(cat auth-001-w02-preview.pid)" 2>/dev/null || true; fi
