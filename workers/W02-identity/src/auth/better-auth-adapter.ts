@@ -266,7 +266,7 @@ const adapter = (db: D1Database) =>
 
         if (model === 'users_sessions') {
           const userId = String(data._parent_id ?? '')
-          if (!/^\\d+$/.test(userId)) throw new Error('BETTER_AUTH_SESSION_USER_ID_INVALID')
+          if (!/^\d+$/.test(userId)) throw new Error('BETTER_AUTH_SESSION_USER_ID_INVALID')
           const id = String(data.id ?? data.token ?? crypto.randomUUID())
           const order = await db.prepare(
             'SELECT COALESCE(MAX(_order), -1) + 1 AS next_order FROM users_sessions WHERE _parent_id = ?',
@@ -342,7 +342,7 @@ const adapter = (db: D1Database) =>
           const params: unknown[] = []
           let sql = model === 'users'
             ? 'SELECT * FROM users' + buildWhere('users', clauses, params)
-            : 'SELECT s.id, s._parent_id, s.created_at, s.expires_at, u.account_state, u.email FROM users_sessions s INNER JOIN users u ON u.id = s._parent_id' +
+            : 'SELECT s.id, s._parent_id, s.created_at, s.expires_at, s.created_at AS updatedAt, NULL AS ipAddress, NULL AS userAgent, u.account_state, u.email FROM users_sessions s INNER JOIN users u ON u.id = s._parent_id' +
               buildWhere('users_sessions', clauses, params)
 
           const fields = model === 'users' ? USER_FIELDS : SESSION_FIELDS
