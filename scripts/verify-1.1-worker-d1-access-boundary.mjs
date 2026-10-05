@@ -7,8 +7,8 @@ const load = (relative) => JSON.parse(readFileSync(resolve(root, relative), 'utf
 const policy = {
   'luck01-identity': new Set(['D1-01']),
   'luck02-content': new Set(['D1-01', 'D1-02']), // D1-01 remains only for Payload/auth compatibility during migration.
-  'luck03-social': new Set(['D1-02']),
-  'luck04-commerce': new Set(['D1-01', 'D1-03']), // Transitional until Commerce/Governance data consolidation.
+  'luck03-social': new Set(['D1-02', 'D1-03']),
+  'luck04-commerce': new Set(['D1-01', 'D1-03', 'D1-04']), // Transitional until Commerce/Governance data consolidation.
   'luck05-creator': new Set(),
   'luck06-async': new Set(),
 }
