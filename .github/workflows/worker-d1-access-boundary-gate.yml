@@ -6,7 +6,7 @@ on:
     paths:
       - 'workers/**'
       - 'contracts/transport/worker-d1-access-boundary.v1.json'
-      - 'scripts/verify-worker-d1-access-boundary.mjs'
+      - 'scripts/verify-1.1-worker-d1-access-boundary.mjs'
       - '.github/workflows/worker-d1-access-boundary-gate.yml'
   pull_request:
     paths:
