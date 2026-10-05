@@ -15,7 +15,7 @@ describe('Better Auth password change boundary', () => {
     const route = read('src/app/auth/password/change/route.ts')
     expect(route).toContain("proxyBetterAuth")
     expect(route).toContain("'/change-password'")
-    expect(route).toContain('revokeOtherSessions: true')
+    expect(route).toMatch(/revokeOtherSessions:true/)
     expect(route).not.toContain('payload.login(')
     expect(route).not.toContain('payload.update(')
   })
