@@ -96,7 +96,7 @@ jobs:
         working-directory: workers/W01-payload
         run: |
           set -euo pipefail
-          pnpm exec wrangler d1 execute luckread --local --config ../W02-identity/wrangler.jsonc --file ../W02-identity/migrations/0005_better_auth_identity_core.sql
+          pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file ../W02-identity/migrations/0005_better_auth_identity_core.sql
 
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
@@ -107,14 +107,33 @@ jobs:
           set -euo pipefail
           pnpm exec opennextjs-cloudflare build > auth-001-open-next-build.log 2>&1
 
-      - name: Start exact W01/W02 local Worker runtime
+      - name: Start exact W02 local Worker runtime
+        working-directory: workers/W02-identity
+        env:
+          NODE_ENV: production
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler dev --local --port 8790 --config wrangler.jsonc --var "CLOUDFLARE_ENV:development" > ../W01-payload/auth-001-w02-preview.log 2>&1 &
+          echo $! > ../W01-payload/auth-001-w02-preview.pid
+          ready=0
+          for _ in $(seq 1 120); do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8790/ || true)
+            if [ "$code" != "000" ]; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat ../W01-payload/auth-001-w02-preview.log
+            exit 1
+          fi
+
+      - name: Start exact W01 local Worker runtime
         working-directory: workers/W01-payload
         env:
           NODE_ENV: production
           PAYLOAD_SECRET: ignore
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --port 8787 --config wrangler.jsonc --config ../W02-identity/wrangler.jsonc --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" --var "CLOUDFLARE_ENV:development" > auth-001-preview.log 2>&1 &
+          pnpm exec wrangler dev --local --port 8787 --config wrangler.jsonc --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" --var "CLOUDFLARE_ENV:development" > auth-001-preview.log 2>&1 &
           echo $! > auth-001-preview.pid
           ready=0
           for _ in $(seq 1 120); do
@@ -125,6 +144,7 @@ jobs:
           if [ "$ready" -ne 1 ]; then
             cat auth-001-open-next-build.log
             cat auth-001-preview.log
+            cat auth-001-w02-preview.log
             exit 1
           fi
 
@@ -143,8 +163,10 @@ jobs:
         run: |
           echo "===== W01 OpenNext build log ====="
           tail -n 500 auth-001-open-next-build.log || true
-          echo "===== W01/W02 local preview log ====="
+          echo "===== W01 local preview log ====="
           tail -n 500 auth-001-preview.log || true
+          echo "===== W02 local preview log ====="
+          tail -n 500 auth-001-w02-preview.log || true
 
       - name: Upload same-SHA runtime evidence
         if: ${{ always() }}
@@ -163,5 +185,6 @@ jobs:
         working-directory: workers/W01-payload
         run: |
           if [ -f auth-001-preview.pid ]; then kill "$(cat auth-001-preview.pid)" 2>/dev/null || true; fi
+          if [ -f auth-001-w02-preview.pid ]; then kill "$(cat auth-001-w02-preview.pid)" 2>/dev/null || true; fi
           pkill -TERM -x workerd 2>/dev/null || true
           pkill -TERM -x esbuild 2>/dev/null || true
