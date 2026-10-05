@@ -49,15 +49,15 @@ jobs:
           db = next(x for x in config['d1_databases'] if x['binding'] == 'D1_03')
           assert db['database_id'] == 'bda1d247-a371-4244-91ae-aef96034db7f'
           assert db['database_name'] == 'secondary'
-          assert Path('workers/luck04-commerce/migrations/0003_moderation_report_v1.sql').is_file()
+          assert Path('workers/luck04-commerce/governance/migrations/0003_moderation_report_v1.sql').is_file()
           print('REPORT_APPEAL_BINDING_SOURCE=PASS')
           PY
       - name: Validate migration locally
         run: |
           set -euo pipefail
-          sqlite3 /tmp/luckread-report.sqlite < workers/luck04-commerce/migrations/0001_audit_event.sql
-          sqlite3 /tmp/luckread-report.sqlite < workers/luck04-commerce/migrations/0002_moderation_queue_foundation.sql
-          sqlite3 /tmp/luckread-report.sqlite < workers/luck04-commerce/migrations/0003_moderation_report_v1.sql
+          sqlite3 /tmp/luckread-report.sqlite < workers/luck04-commerce/governance/migrations/0001_audit_event.sql
+          sqlite3 /tmp/luckread-report.sqlite < workers/luck04-commerce/governance/migrations/0002_moderation_queue_foundation.sql
+          sqlite3 /tmp/luckread-report.sqlite < workers/luck04-commerce/governance/migrations/0003_moderation_report_v1.sql
           sqlite3 -json /tmp/luckread-report.sqlite 'PRAGMA table_info("moderation_reports");' > /tmp/reports-schema.json
           sqlite3 -json /tmp/luckread-report.sqlite 'PRAGMA table_info("moderation_report_idempotency");' > /tmp/report-idem-schema.json
           python - <<'PY'
