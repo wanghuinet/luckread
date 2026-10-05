@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveGlobalLayer, type RoleAssignmentRecord } from './role-assignment.js'
+import { ensureBaseUserRole, resolveGlobalLayer, type RoleAssignmentRecord } from './role-assignment.js'
 
 const NOW = '2026-09-22T12:00:00.000Z'
 
@@ -146,5 +146,37 @@ describe('RoleAssignment global layer resolution', () => {
     ])
     await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW))
       .resolves.toEqual({ decision: 'DENY' })
+  })
+})
+
+
+describe('Base user role materialization', () => {
+  it('creates one deterministic global L1 role assignment', async () => {
+    const calls: Array<{ sql: string; args: unknown[] }> = []
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => ({
+          run: async () => {
+            calls.push({ sql, args })
+            return { meta: { changes: 1 } }
+          },
+        }),
+      }),
+    } as unknown as D1Database
+
+    await expect(ensureBaseUserRole(db, 'user-1', NOW)).resolves.toBeUndefined()
+    expect(calls).toHaveLength(1)
+    expect(calls[0].sql).toContain('INSERT OR IGNORE INTO role_assignments')
+    expect(calls[0].sql).toContain("'user', 'global'")
+    expect(calls[0].args).toEqual(['base-user-user-1', 'user-1', NOW, NOW, NOW])
+  })
+
+  it('rejects invalid subjects before persistence', async () => {
+    const db = {
+      prepare: () => {
+        throw new Error('persistence must not run')
+      },
+    } as unknown as D1Database
+    await expect(ensureBaseUserRole(db, '', NOW)).rejects.toThrow('invalid subject id')
   })
 })
