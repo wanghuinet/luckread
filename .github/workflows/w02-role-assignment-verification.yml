@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'workers/W02-identity/**'
+      - 'workers/luck01-identity/**'
       - 'contracts/authz/**'
       - 'contracts/entity/AUTHZ-role-assignment-authority.v1.json'
       - 'scripts/generate-role-assignment-migration.mjs'
@@ -13,7 +13,7 @@ on:
       - '.github/workflows/w02-role-assignment-verification.yml'
   pull_request:
     paths:
-      - 'workers/W02-identity/**'
+      - 'workers/luck01-identity/**'
       - 'contracts/authz/**'
       - 'contracts/entity/AUTHZ-role-assignment-authority.v1.json'
       - 'scripts/generate-role-assignment-migration.mjs'
@@ -40,19 +40,19 @@ jobs:
       - name: Install
         run: npm ci
       - name: Install W02 runtime dependencies
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Typecheck W02
-        run: npx tsc -p workers/W02-identity/tsconfig.json --noEmit
+        run: npx tsc -p workers/luck01-identity/tsconfig.json --noEmit
       - name: Verify generated migrations
         run: |
           node scripts/generate-role-assignment-migration.mjs
           node scripts/generate-role-version-migration.mjs
       - name: Assert generated migrations are committed
         run: |
-          git diff --exit-code -- workers/W02-identity/migrations/0001_role_assignments.sql
-          git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
+          git diff --exit-code -- workers/luck01-identity/migrations/0001_role_assignments.sql
+          git diff --exit-code -- workers/luck01-identity/migrations/0003_role_authorization_versions.sql
       - name: Verify role_version mutation trigger semantics
         run: node scripts/verify-role-version-mutation.mjs
       - name: Run W02 authorization and session tests
-        run: npx vitest run workers/W02-identity/src/authz/role-assignment.test.ts workers/W02-identity/src/authz/role-version.test.ts workers/W02-identity/src/authz/authorization-decision.test.ts workers/W02-identity/src/session/session-runtime.test.ts
+        run: npx vitest run workers/luck01-identity/src/authz/role-assignment.test.ts workers/luck01-identity/src/authz/role-version.test.ts workers/luck01-identity/src/authz/authorization-decision.test.ts workers/luck01-identity/src/session/session-runtime.test.ts
