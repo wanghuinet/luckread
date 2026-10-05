@@ -3,7 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route'
 
-import { getBetterAuthSession } from '@/auth/better-auth'
+import { getBetterAuthSession } from '@/auth/w02-auth-client'
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 
 const unauthorized = () => new Response(JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }), {
