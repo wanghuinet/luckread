@@ -75,7 +75,7 @@ jobs:
           if (config.services?.find(x => x.binding === 'W03_CONTENT_MODERATION')?.service !== 'luckread-w03') throw new Error('W06→W03 binding mismatch');
           console.log(JSON.stringify(d,null,2));
           NODE
-          test -f migrations/0002_moderation_queue_foundation.sql
+          test -f governance/migrations/0002_moderation_queue_foundation.sql
           test -z "$(git status --short)"
 
       - name: Local migration syntax and schema invariant check
@@ -85,8 +85,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y sqlite3
           rm -f /tmp/luckread-moderation.sqlite
-          sqlite3 /tmp/luckread-moderation.sqlite < migrations/0001_audit_event.sql
-          sqlite3 /tmp/luckread-moderation.sqlite < migrations/0002_moderation_queue_foundation.sql
+          sqlite3 /tmp/luckread-moderation.sqlite < governance/migrations/0001_audit_event.sql
+          sqlite3 /tmp/luckread-moderation.sqlite < governance/migrations/0002_moderation_queue_foundation.sql
           for table in moderation_cases moderation_decisions moderation_decision_idempotency moderation_txn_guard moderation_enforcement_outbox; do
             sqlite3 -cmd '.mode json' /tmp/luckread-moderation.sqlite "PRAGMA table_info(\"$table\");" > "/tmp/$table.json"
             test "$(node -e "const fs=require('fs'); const r=JSON.parse(fs.readFileSync('/tmp/$table.json')); console.log(r.length)")" -gt 0
