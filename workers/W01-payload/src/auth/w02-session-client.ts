@@ -327,7 +327,14 @@ export const transitionAccountState = (body: {
 export async function signOutThroughW02(request: Request): Promise<Response> {
   const service = await getW02Service()
   const headers = new Headers()
-  for (const name of ['cookie', 'authorization', 'origin', 'referer', 'user-agent']) {
+  const cookie = request.headers.get('cookie')
+  const authorization = request.headers.get('authorization')
+  if (cookie) {
+    headers.set('cookie', cookie)
+  } else if (authorization) {
+    headers.set('authorization', authorization)
+  }
+  for (const name of ['origin', 'referer', 'user-agent']) {
     const value = request.headers.get(name)
     if (value) headers.set(name, value)
   }
