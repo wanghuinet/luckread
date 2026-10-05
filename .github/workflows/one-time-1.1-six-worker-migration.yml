@@ -1,0 +1,81 @@
+name: one-time 1.1 six-worker migration
+
+on:
+  push:
+    branches:
+      - migration/1.1-six-worker-20261005
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: "${{ !contains(github.event.head_commit.message, '[skip ci]') }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout migration branch
+        uses: actions/checkout@v4
+        with:
+          ref: "${{ github.ref_name }}"
+          fetch-depth: 0
+
+      - name: Merge existing worker code into six new worker directories
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p workers/old1.0
+
+          copy_tree() {
+            local src="$1"
+            local dst="$2"
+            mkdir -p "$dst"
+            cp -a "$src"/. "$dst"/
+          }
+
+          copy_tree workers/W02-identity workers/luck01-identity
+          copy_tree workers/W01-payload workers/luck02-content
+          mkdir -p workers/luck02-content/src/content-domain
+          copy_tree workers/W03-content/src workers/luck02-content/src/content-domain/src
+          if [ -f workers/W03-content/README.md ]; then cp workers/W03-content/README.md workers/luck02-content/CONTENT-RUNTIME-README.md; fi
+
+          copy_tree workers/W05-social workers/luck03-social
+          mkdir -p workers/luck03-social/src/projection
+          copy_tree workers/W04-feed-search/src workers/luck03-social/src/projection
+          if [ -f workers/W04-feed-search/README.md ]; then cp workers/W04-feed-search/README.md workers/luck03-social/PROJECTION-README.md; fi
+
+          copy_tree workers/W07-subscription-commerce workers/luck04-commerce
+          mkdir -p workers/luck04-commerce/src/governance
+          copy_tree workers/W06-governance/src workers/luck04-commerce/src/governance
+          if [ -f workers/W06-governance/README.md ]; then cp workers/W06-governance/README.md workers/luck04-commerce/GOVERNANCE-README.md; fi
+
+          copy_tree workers/W08-creator workers/luck05-creator
+          copy_tree workers/W10-async workers/luck06-async
+
+          for dir in workers/W01-payload workers/W02-identity workers/W03-content workers/W04-feed-search workers/W05-social workers/W06-governance workers/W07-subscription-commerce workers/W08-creator workers/W09-platform workers/W10-async workers/W11-growth-campaign-analytics-operations workers/W12-external-developer-integration; do
+            if [ -d "$dir" ]; then
+              base="${dir##*/}"
+              git mv "$dir" "workers/old1.0/$base"
+            fi
+          done
+
+          python3 - <<'PY'
+          from pathlib import Path
+          replacements = {
+              'workers/luck01-identity/wrangler.jsonc': {'"name": "luckread-w02"': '"name": "luck01-identity"'},
+              'workers/luck02-content/wrangler.jsonc': {'"name": "luckread-w01-payload"': '"name": "luck02-content"'},
+              'workers/luck03-social/wrangler.jsonc': {'"name": "luckread-w05"': '"name": "luck03-social"'},
+              'workers/luck04-commerce/wrangler.jsonc': {'"name": "luckread-w07"': '"name": "luck04-commerce"'},
+          }
+          for name, mapping in replacements.items():
+              p = Path(name)
+              s = p.read_text()
+              for a, b in mapping.items(): s = s.replace(a, b)
+              p.write_text(s)
+          PY
+
+          git add workers .github/workflows/one-time-1.1-six-worker-migration.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "refactor(1.1): establish six-worker runtime layout [skip ci]"
+          git push origin "HEAD:${{ github.ref_name }}"
