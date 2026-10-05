@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { createWriteStream, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,8 +17,8 @@ const artifactDirPath = fileURLToPath(artifactDir)
 const w02LogPath = resolve(artifactDirPath, 'w02-auth-preview.log')
 let w02Process = null
 let w01Process = null
-let w02LogStream = null
-let w01LogStream = null
+let w02LogFd = null
+let w01LogFd = null
 const policy = JSON.parse(
   readFileSync(
     new URL('../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json', import.meta.url),
@@ -259,11 +259,11 @@ const installAndPrepareW02 = () => {
 }
 
 const startW02 = async () => {
-  w02LogStream = createWriteStream(w02LogPath, { flags: 'a' })
+  w02LogFd = openSync(w02LogPath, 'a')
   w02Process = spawn(
     'npx',
     ['--yes', 'wrangler@4.116.0', 'dev', '--local', '--port', '8788', '--config', 'wrangler.jsonc'],
-    { cwd: w02Dir, env: process.env, stdio: ['ignore', w02LogStream, w02LogStream] },
+    { cwd: w02Dir, env: process.env, stdio: ['ignore', w02LogFd, w02LogFd] },
   )
   await waitForPort('http://127.0.0.1:8788/')
 }
@@ -284,7 +284,7 @@ const restartW01 = async () => {
   }
 
   try { unlinkSync(resolve(w01Dir, 'auth-001-preview.log')) } catch {}
-  w01LogStream = createWriteStream(resolve(w01Dir, 'auth-001-preview.log'), { flags: 'a' })
+  w01LogFd = openSync(resolve(w01Dir, 'auth-001-preview.log'), 'a')
 
   w01Process = spawn(
     'pnpm',
@@ -300,7 +300,7 @@ const restartW01 = async () => {
       '--var',
       'CLOUDFLARE_ENV:development',
     ],
-    { cwd: w01Dir, env: process.env, stdio: ['ignore', w01LogStream, w01LogStream] },
+    { cwd: w01Dir, env: process.env, stdio: ['ignore', w01LogFd, w01LogFd] },
   )
 
   await waitForPort('http://127.0.0.1:8787/')
@@ -682,6 +682,10 @@ for (const required of [
   await cleanup()
   stopProcess(w01Process)
   stopProcess(w02Process)
-  if (w01LogStream) w01LogStream.end()
-  if (w02LogStream) w02LogStream.end()
+  if (w01LogFd !== null) {
+    try { closeSync(w01LogFd) } catch {}
+  }
+  if (w02LogFd !== null) {
+    try { closeSync(w02LogFd) } catch {}
+  }
 }
