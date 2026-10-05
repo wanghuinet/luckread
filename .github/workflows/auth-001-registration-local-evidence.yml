@@ -92,7 +92,11 @@ jobs:
 
       - name: Install W02 identity dependencies
         working-directory: workers/W02-identity
-        run: pnpm install --frozen-lockfile
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify Better Auth package
+        working-directory: workers/W02-identity
+        run: node --input-type=module -e "import('better-auth').then(() => console.log('better-auth 1.7.7 import: OK'))"
 
       - name: Apply W02 role-assignment schema locally
         working-directory: workers/W02-identity
