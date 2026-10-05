@@ -1,5 +1,7 @@
 import {
+  listSessions,
   resolveBetterAuthPrincipalThroughW02,
+  revokeOwnedSession,
   W02AuthClientError,
 } from '../../../../auth/w02-session-client.js'
 
