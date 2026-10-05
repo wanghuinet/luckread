@@ -148,7 +148,8 @@ const parseCommentPath = (pathname: string): string | null => {
 
 const socialHandler = {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const db = env.LUCKREAD_D1_MODE === 'new' ? (env.D1_03_TARGET ?? db) : db
+    const legacyDb = env.DB
+    const db = env.LUCKREAD_D1_MODE === 'new' ? (env.D1_03_TARGET ?? legacyDb) : legacyDb
     try {
       const url = new URL(request.url)
       await enforceRateLimit(request, env, request.method === 'GET' ? 'read:' + url.pathname.split('/').slice(0, 4).join('/') : 'write:' + url.pathname.split('/').slice(0, 4).join('/'))
