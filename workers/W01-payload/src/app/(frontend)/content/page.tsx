@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import PublicLanguageToggle from '../i18n/PublicLanguageToggle'
 import { getPublicCopy, usePublicLocale, type PublicLocale } from '../i18n/public-locale'
@@ -43,7 +43,7 @@ export default function ContentBrowsePage() {
   const requestIdRef = useRef(0)
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  const load = useCallback(async (cursor: string | null = null): Promise<void> => {
+  async function load(cursor: string | null = null): Promise<void> {
     const requestId = ++requestIdRef.current
     abortControllerRef.current?.abort()
     const controller = new AbortController()
@@ -84,7 +84,7 @@ export default function ContentBrowsePage() {
       setLoadingMore(false)
       if (abortControllerRef.current === controller) abortControllerRef.current = null
     }
-  }, [contentType, copy.content.error])
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -98,7 +98,8 @@ export default function ContentBrowsePage() {
     }
   }, [load])
 
-  return (    <main className="content-browse">
+  return (
+    <main className="content-browse">
       <header className="content-browse-top">
         <div>
           <p className="eyebrow">{copy.content.eyebrow}</p>
