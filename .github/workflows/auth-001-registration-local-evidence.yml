@@ -24,6 +24,11 @@ on:
       - "workers/W01-payload/src/migrations/**"
       - "workers/W01-payload/src/payload.config.ts"
       - "workers/W01-payload/scripts/auth-001-registration-runtime-evidence-local.mjs"
+      - "workers/W02-identity/src/auth/better-auth.ts"
+      - "workers/W02-identity/src/account/registration-runtime.ts"
+      - "workers/W02-identity/src/account/registration-runtime.test.ts"
+      - "workers/W02-identity/src/index.ts"
+      - "workers/W02-identity/migrations/**"
       - "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json"
   workflow_dispatch:
     inputs:
