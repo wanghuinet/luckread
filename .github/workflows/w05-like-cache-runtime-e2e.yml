@@ -231,7 +231,7 @@ jobs:
             ].map((v,i)=>i === 4 || i === 11 ? 'NULL' : q(v)).join(',') + ')'
           execFileSync(
             'npx',
-            ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME_W05,'--remote','--yes','--config','w05-source/workers/W05-social/wrangler.jsonc','--command',sql],
+            ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME_W05,'--remote','--yes','--config','w05-source/workers/luck03-social/wrangler.jsonc','--command',sql],
             { encoding:'utf8', env:process.env, maxBuffer:8*1024*1024 },
           )
           appendFileSync(process.env.GITHUB_ENV, 'LIKE_CACHE_TEST_CONTENT_ID=' + contentId + '\n')
@@ -269,7 +269,7 @@ jobs:
             [relationship,actor,'content',process.env.LIKE_CACHE_TEST_CONTENT_ID,now].map(q).join(',') + ')'
           execFileSync(
             'npx',
-            ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME_W05,'--remote','--yes','--config','w05-source/workers/W05-social/wrangler.jsonc','--command',sql],
+            ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME_W05,'--remote','--yes','--config','w05-source/workers/luck03-social/wrangler.jsonc','--command',sql],
             { encoding:'utf8', env:process.env, maxBuffer:8*1024*1024 },
           )
           console.log(JSON.stringify({seedActor:actor,relationship}))
@@ -356,7 +356,7 @@ jobs:
             [relationship,actor,'content',process.env.LIKE_CACHE_TEST_CONTENT_ID,now].map(q).join(',') + ')'
           execFileSync(
             'npx',
-            ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME_W05,'--remote','--yes','--config','w05-source/workers/W05-social/wrangler.jsonc','--command',sql],
+            ['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME_W05,'--remote','--yes','--config','w05-source/workers/luck03-social/wrangler.jsonc','--command',sql],
             { encoding:'utf8', env:process.env, maxBuffer:8*1024*1024 },
           )
           NODE
@@ -408,7 +408,7 @@ jobs:
             {encoding:'utf8',env:process.env,maxBuffer:8*1024*1024},
           )
 
-          run(process.env.DATABASE_NAME_W05,'w05-source/workers/W05-social/wrangler.jsonc',
+          run(process.env.DATABASE_NAME_W05,'w05-source/workers/luck03-social/wrangler.jsonc',
             'DELETE FROM interaction_likes WHERE target_id=' + q(contentId) + '; DELETE FROM contents WHERE id=' + q(contentId) + ';')
           run(process.env.DATABASE_NAME_W01,'deployed-source/workers/W01-payload/wrangler.jsonc',
             'DELETE FROM role_assignments WHERE id=' + q(roleId) + ' OR subject_id=' + q(userId) + ';' +
