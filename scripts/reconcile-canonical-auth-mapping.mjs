@@ -59,10 +59,10 @@ if (!Array.isArray(auth013EntityCatalog.records)) throw new Error('AUTH-013 enti
 const authRegisterPolicy = authOperationPolicy.operations?.find((record) => record?.operationId === 'authRegister')
 if (!authRegisterPolicy) throw new Error('AUTH-001 requires canonical authRegister operation policy')
 const consistency = authRegisterPolicy.consistency ?? {}
-if (consistency.identityCredentialMaterialization !== 'EVENTUAL') throw new Error('AUTH-001 requires EVENTUAL identity/credential materialization')
-if (consistency.materializerAuthority !== 'W02_D1-01') throw new Error('AUTH-001 materializer authority must be W02_D1-01')
-if (consistency.materializationSource !== 'AUTH-001_REGISTRATION_ENVELOPE + PAYLOAD_USERS_NATIVE_AUTH_SOURCE') throw new Error('AUTH-001 materialization source drift detected')
-if (consistency.recovery !== 'W02_SCHEDULED_RECONCILIATION') throw new Error('AUTH-001 recovery authority must remain W02 scheduled reconciliation')
+if (consistency.identityCredentialMaterialization !== 'NATIVE_BETTER_AUTH') throw new Error('AUTH-001 requires NATIVE_BETTER_AUTH identity/credential materialization')
+if (consistency.materializerAuthority !== 'NONE') throw new Error('AUTH-001 materializer authority must be NONE')
+if (consistency.materializationSource !== 'BETTER_AUTH_NATIVE_USER_ACCOUNT') throw new Error('AUTH-001 materialization source drift detected')
+if (consistency.recovery !== 'W02_REGISTRATION_RECONCILIATION') throw new Error('AUTH-001 recovery authority must remain W02 registration reconciliation')
 if (consistency.crossWorkerTransaction !== false || consistency.crossD1Transaction !== false) throw new Error('AUTH-001 cannot admit cross-worker/cross-D1 registration transaction')
 
 const auth013UserEntities = auth013EntityCatalog.records.filter((record) => record?.name === 'User' && record?.entityId === 'ENT-USER' && record?.status === 'VERIFIED')
@@ -136,7 +136,7 @@ for (const featureId of ['AUTH-001', 'AUTH-002', 'AUTH-010']) {
   addEvidenceRef(featureId, 'contracts/dto/auth-dto-contract.v1.json')
   if (featureId === 'AUTH-001') {
     addEvidenceRef(featureId, 'contracts/api/auth-operation-policy.v1.json')
-    addEvidenceRef(featureId, 'docs/change-control/CC-MAPPING-0-AUTH-001-EVENTUAL-MATERIALIZATION-ADMISSION-2026-09-28.md')
+    addEvidenceRef(featureId, 'docs/change-control/CC-1.1-ACCOUNT-CENTER-PAYLOAD-BOUNDARY-2026-10-05.md')
   }
 }
 
