@@ -109,13 +109,13 @@ jobs:
           pnpm exec opennextjs-cloudflare build > auth-001-open-next-build.log 2>&1
 
       - name: Start exact W02 local Worker runtime
-        working-directory: workers/W02-identity
+        working-directory: workers/W01-payload
         env:
           NODE_ENV: production
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --persist-to "$AUTH001_PERSIST_TO" --port 8790 --config wrangler.jsonc --var "CLOUDFLARE_ENV:development" > ../W01-payload/auth-001-w02-preview.log 2>&1 &
-          echo $! > ../W01-payload/auth-001-w02-preview.pid
+          pnpm exec wrangler dev --local --persist-to "$AUTH001_PERSIST_TO" --port 8790 --config ../W02-identity/wrangler.jsonc --var "CLOUDFLARE_ENV:development" > auth-001-w02-preview.log 2>&1 &
+          echo $! > auth-001-w02-preview.pid
           ready=0
           for _ in $(seq 1 120); do
             code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8790/ || true)
@@ -123,7 +123,7 @@ jobs:
             sleep 1
           done
           if [ "$ready" -ne 1 ]; then
-            cat ../W01-payload/auth-001-w02-preview.log
+            cat auth-001-w02-preview.log
             exit 1
           fi
 
