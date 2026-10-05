@@ -15,23 +15,19 @@
   "services": [
     {
       "binding": "W02_AUTH",
-      "service": "luckread-w02"
-    },
-    {
-      "binding": "W03_CONTENT",
-      "service": "luckread-w03"
+      "service": "luck01-identity"
     },
     {
       "binding": "W05_SOCIAL",
-      "service": "luckread-w05"
+      "service": "luck03-social"
     },
     {
       "binding": "W06_MODERATION",
-      "service": "luckread-w06"
+      "service": "luck04-commerce"
     },
     {
       "binding": "W07_SUBSCRIPTION",
-      "service": "luckread-w07"
+      "service": "luck04-commerce"
     }
   ],
   "d1_databases": [
@@ -40,6 +36,12 @@
       "database_id": "2f80471e-3756-49f9-8db1-7707a433ad64",
       "database_name": "luckread",
       "remote": true
+    },
+    {
+      "binding": "D1_02",
+      "database_id": "6c342634-97f6-4248-9f4a-85772af4f22c",
+      "database_name": "luckreadpro",
+      "migrations_dir": "content-domain/migrations"
     }
   ],
   "ratelimits": [
