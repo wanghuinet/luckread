@@ -36,7 +36,7 @@ env:
   WRANGLER_VERSION: 4.116.0
   EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
   EXPECTED_DB_NAME: luckreadpro
-  EXPECTED_WORKER: luckread-w05
+  EXPECTED_WORKER: luck03-social
   EXPECTED_BINDING: DB
   EXPECTED_BINDING_RUN: "36717067309"
   EXPECTED_BINDING_SOURCE_SHA: 72751a271946ba994e5f45e0d4cd1076cecc71a8
@@ -100,7 +100,7 @@ jobs:
           expected = {
               'runId': '36717067309',
               'sourceSha': '72751a271946ba994e5f45e0d4cd1076cecc71a8',
-              'worker': 'luckread-w05',
+              'worker': 'luck03-social',
               'd1DatabaseUuid': '6c342634-97f6-4248-9f4a-85772af4f22c',
               'confirmation': 'DEPLOY_W05_D1_02',
               'bindingVerified': True,
@@ -112,14 +112,14 @@ jobs:
           PY
 
       - name: Verify W05 D1-02 binding and migration source
-        working-directory: workers/W05-social
+        working-directory: workers/luck03-social
         run: |
           set -euo pipefail
           python - <<'PY'
           import json
           from pathlib import Path
           c = json.loads(Path('wrangler.jsonc').read_text())
-          if c.get('name') != 'luckread-w05':
+          if c.get('name') != 'luck03-social':
               raise SystemExit('W05 worker name mismatch')
           ds = c.get('d1_databases', [])
           if len(ds) != 1:
@@ -137,7 +137,7 @@ jobs:
           test -z "$(git status --short)"
 
       - name: Static migration invariant check
-        working-directory: workers/W05-social
+        working-directory: workers/luck03-social
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -167,7 +167,7 @@ jobs:
           PY
 
       - name: Capture controlled remote preflight
-        working-directory: workers/W05-social
+        working-directory: workers/luck03-social
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -208,7 +208,7 @@ jobs:
 
       - name: Apply SOCIAL-001 Follow migration remotely
         if: ${{ env.SKIP_MIGRATION != 'true' }}
-        working-directory: workers/W05-social
+        working-directory: workers/luck03-social
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -216,7 +216,7 @@ jobs:
         run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$DATABASE_NAME" --remote --config wrangler.jsonc
 
       - name: Capture and validate post-migration evidence
-        working-directory: workers/W05-social
+        working-directory: workers/luck03-social
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -278,7 +278,7 @@ jobs:
             indexesExact: true,
             physicalForeignKeys: 0,
             databaseUuid: '6c342634-97f6-4248-9f4a-85772af4f22c',
-            worker: 'luckread-w05',
+            worker: 'luck03-social',
             result: 'PASS',
           }
           fs.writeFileSync(dir + '/post-migration-summary.json', JSON.stringify(summary,null,2) + '\n')
