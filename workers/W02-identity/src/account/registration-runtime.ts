@@ -481,6 +481,21 @@ export async function registerWithBetterAuth(
       accountStateVersion: Number(result.user.accountStateVersion ?? 1),
     }
   } catch (error) {
+    console.error(JSON.stringify({
+      event: 'auth.register.better_auth_signup_failure',
+      diagnosticCode: 'AUTH001_BETTER_AUTH_SIGNUP_FAILURE',
+      envelopeId: envelope.id,
+      errorName: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500),
+      errorStatus:
+        typeof error === 'object' && error !== null && 'status' in error
+          ? Number((error as { status?: unknown }).status)
+          : null,
+      errorCode:
+        typeof error === 'object' && error !== null && 'code' in error
+          ? String((error as { code?: unknown }).code)
+          : null,
+    }))
     if (isUniqueConstraintError(error)) {
       await markRegistrationFailed(db, envelope.id, input.now)
       throw new RegistrationRuntimeError(
@@ -513,5 +528,11 @@ export async function registerWithBetterAuth(
     )
   }
 
+  console.error(JSON.stringify({
+    event: 'auth.register.better_auth_signup_succeeded',
+    diagnosticCode: 'AUTH001_BETTER_AUTH_SIGNUP_SUCCEEDED',
+    envelopeId: envelope.id,
+    userId: nativeUser.id,
+  }))
   return finalizeRegistration(db, input, envelope, nativeUser)
 }
