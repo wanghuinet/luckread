@@ -37,6 +37,7 @@ jobs:
     env:
       NODE_ENV: development
       PAYLOAD_SECRET: ignore
+      AUTH001_PERSIST_TO: ${{ github.workspace }}/workers/W01-payload/.wrangler/state
     steps:
       - name: Resolve exact source SHA
         id: source
@@ -82,11 +83,33 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm payload migrate
 
+      - name: Apply already-admitted RoleAssignment D1-01 schema locally
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler d1 execute luckread --local --persist-to "$AUTH001_PERSIST_TO" --config wrangler.jsonc --file ../W02-identity/migrations/0001_role_assignments.sql
+
+      - name: Apply already-admitted RoleAuthorizationVersion D1-01 schema locally
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler d1 execute luckread --local --persist-to "$AUTH001_PERSIST_TO" --config wrangler.jsonc --file ../W02-identity/migrations/0003_role_authorization_versions.sql
+
       - name: Apply already-admitted AUTH-013 D1-01 schema locally
         working-directory: workers/W01-payload
         run: |
           set -euo pipefail
-          pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
+          pnpm exec wrangler d1 execute luckread --local --persist-to "$AUTH001_PERSIST_TO" --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
+
+      - name: Install W02 Better Auth dependencies
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Apply W02 Better Auth schema locally
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler d1 execute luckread --local --persist-to "$AUTH001_PERSIST_TO" --config wrangler.jsonc --file ../W02-identity/migrations/0005_better_auth_identity_core.sql
 
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
@@ -97,6 +120,25 @@ jobs:
           set -euo pipefail
           pnpm exec opennextjs-cloudflare build > auth-001-open-next-build.log 2>&1
 
+      - name: Start exact W02 local Worker runtime
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: production
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler dev --local --persist-to "$AUTH001_PERSIST_TO" --port 8790 --config ../W02-identity/wrangler.jsonc --var "CLOUDFLARE_ENV:development" --var "BETTER_AUTH_SECRET:auth001-local-better-auth-secret-20261005-32bytes" > auth-001-w02-preview.log 2>&1 &
+          echo $! > auth-001-w02-preview.pid
+          ready=0
+          for _ in $(seq 1 120); do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8790/ || true)
+            if [ "$code" != "000" ]; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat auth-001-w02-preview.log
+            exit 1
+          fi
+
       - name: Start exact W01 local Worker runtime
         working-directory: workers/W01-payload
         env:
@@ -104,7 +146,7 @@ jobs:
           PAYLOAD_SECRET: ignore
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --port 8787 --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" --var "CLOUDFLARE_ENV:development" > auth-001-preview.log 2>&1 &
+          pnpm exec wrangler dev --local --port 8787 --config wrangler.jsonc --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" --var "CLOUDFLARE_ENV:development" > auth-001-preview.log 2>&1 &
           echo $! > auth-001-preview.pid
           ready=0
           for _ in $(seq 1 120); do
@@ -115,6 +157,7 @@ jobs:
           if [ "$ready" -ne 1 ]; then
             cat auth-001-open-next-build.log
             cat auth-001-preview.log
+            cat auth-001-w02-preview.log
             exit 1
           fi
 
@@ -135,6 +178,8 @@ jobs:
           tail -n 500 auth-001-open-next-build.log || true
           echo "===== W01 local preview log ====="
           tail -n 500 auth-001-preview.log || true
+          echo "===== W02 local preview log ====="
+          tail -n 500 auth-001-w02-preview.log || true
 
       - name: Upload same-SHA runtime evidence
         if: ${{ always() }}
@@ -153,5 +198,6 @@ jobs:
         working-directory: workers/W01-payload
         run: |
           if [ -f auth-001-preview.pid ]; then kill "$(cat auth-001-preview.pid)" 2>/dev/null || true; fi
+          if [ -f auth-001-w02-preview.pid ]; then kill "$(cat auth-001-w02-preview.pid)" 2>/dev/null || true; fi
           pkill -TERM -x workerd 2>/dev/null || true
           pkill -TERM -x esbuild 2>/dev/null || true

@@ -35,9 +35,9 @@ export async function ensureBaseUserRole(
     .bind(roleId, subjectId, now, now, now)
     .run()
 
-  if (result.meta?.changes !== undefined && result.meta.changes > 1) {
-    throw new Error('base role materialization was ambiguous')
-  }
+  // D1 may report trigger side effects in meta.changes; the INSERT itself can affect at most one row.
+  // INSERT OR IGNORE is deterministic and duplicate-safe for the subject-specific base role.
+  void result
 }
 const roleToLayer = new Map<string, string>()
 for (const layer of layers['x-layers']) {

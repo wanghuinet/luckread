@@ -1,6 +1,7 @@
 import { createLuckReadAuth } from './auth/better-auth.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { reconcileCompletedRegistrationMaterialization } from './account/registration-materializer.js'
+import { registerWithBetterAuth, RegistrationServiceError } from './account/registration-service.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
 import {
   AccountStateTransitionError,
@@ -28,6 +29,7 @@ interface Env {
   AUTH013_PROJECTION_QUEUE: Queue
   AUTH003_CREDENTIAL_HASH_KEY?: string
   AUTH003_CREDENTIAL_HASH_KEY_PREVIOUS?: string
+  BETTER_AUTH_SECRET: string
 }
 
 type ResolveLayerRequest = {
@@ -71,7 +73,63 @@ export default {
     const url = new URL(request.url)
 
     if (url.pathname === '/api/auth' || url.pathname.startsWith('/api/auth/')) {
-      return createLuckReadAuth({ D1_01: env.D1_01 }).handler(request)
+      return createLuckReadAuth({ D1_01: env.D1_01, BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET }).handler(request)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/register') {
+      const body = await readJsonBody<{
+        identityType: unknown
+        identity: unknown
+        credential: unknown
+        username: unknown
+        consent: unknown
+        idempotencyKey: unknown
+      }>(request)
+
+      if (
+        !body ||
+        typeof body.identityType !== 'string' ||
+        typeof body.identity !== 'string' ||
+        typeof body.credential !== 'string' ||
+        typeof body.username !== 'string' ||
+        typeof body.idempotencyKey !== 'string'
+      ) {
+        return json(
+          { error: { code: 'VALIDATION_FAILED', message: 'invalid registration request' } },
+          400,
+        )
+      }
+
+      try {
+        const result = await registerWithBetterAuth(
+          env,
+          body,
+          body.idempotencyKey,
+        )
+        return json(result, 201)
+      } catch (error) {
+        if (error instanceof RegistrationServiceError) {
+          return json(
+            {
+              error: {
+                code: error.code,
+                message: error.message,
+              },
+            },
+            error.status,
+          )
+        }
+
+        return json(
+          {
+            error: {
+              code: 'SERVICE_UNAVAILABLE',
+              message: 'Registration service unavailable',
+            },
+          },
+          503,
+        )
+      }
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/account/transition') {
@@ -157,7 +215,7 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/principal') {
       try {
-        const principal = await resolveBetterAuthPrincipal(env.D1_01, request)
+        const principal = await resolveBetterAuthPrincipal(env.D1_01, request, env.BETTER_AUTH_SECRET)
         if (!principal) return json({ active: false }, 401)
 
         return json({

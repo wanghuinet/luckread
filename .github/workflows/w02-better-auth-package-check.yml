@@ -30,3 +30,6 @@ jobs:
       - name: Verify Better Auth import
         working-directory: workers/W02-identity
         run: node --input-type=module -e "import('better-auth').then(() => console.log('better-auth import: OK'))"
+      - name: Typecheck W02
+        working-directory: workers/W02-identity
+        run: npx tsc --noEmit -p tsconfig.json

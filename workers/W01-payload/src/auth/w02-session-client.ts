@@ -32,6 +32,7 @@ export class W02AuthClientError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly code?: string,
   ) {
     super(message)
   }
@@ -73,6 +74,12 @@ async function callW02<T>(path: string, body: unknown): Promise<T> {
         ? (payload as W02ErrorPayload).error!.code!
         : 'SERVICE_UNAVAILABLE'
 
+    if (response.status === 422) {
+      throw new W02AuthClientError(422, 'validation failed', code)
+    }
+    if (response.status === 409) {
+      throw new W02AuthClientError(409, 'request conflicts with an in-progress operation', code)
+    }
     if (code === 'UNAUTHENTICATED') {
       throw new W02AuthClientError(401, 'authentication denied')
     }
@@ -101,6 +108,23 @@ async function callW02<T>(path: string, body: unknown): Promise<T> {
 
   return payload as T
 }
+
+export type BetterAuthRegistrationResult = {
+  userId: string
+  accountState: string
+}
+
+export const registerWithBetterAuth = (body: {
+  identityType: 'email'
+  identity: string
+  credential: string
+  username: string
+  consent: {
+    purpose: string
+    policyVersion: string
+  }
+  idempotencyKey: string
+}) => callW02<BetterAuthRegistrationResult>('/internal/auth/register', body)
 
 export type BetterAuthSignInResult = {
   token: string

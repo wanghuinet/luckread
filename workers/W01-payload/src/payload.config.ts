@@ -15,8 +15,6 @@ import { Media } from './collections/Media'
 import { authSessionStateSchemaHook } from './db/auth-session-state-schema'
 import { clampWorkerPbkdf2Iterations } from './runtime/pbkdf2-worker-compat'
 
-export const AUTH001_USER_CAPTURE_CONTEXT = '__luckreadAuth001UserCapture'
-
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 const realpath = (value: string) => (fs.existsSync(value) ? fs.realpathSync(value) : undefined)
@@ -107,36 +105,6 @@ export default buildConfig({
         options: { upsert: true },
       })
 
-    // AUTH-001 registration-only seam: Payload's native local strategy
-    // produces hash/salt before the adapter persistence boundary. Only a
-    // request-local capture context can divert that one User write.
-    const create = payload.db.create.bind(payload.db)
-    payload.db.create = async (args) => {
-      const requestContext =
-        args.req?.context ??
-        ('context' in args && args.context && typeof args.context === 'object'
-          ? (args.context as Record<string, unknown>)
-          : undefined)
-      const capture = requestContext?.[AUTH001_USER_CAPTURE_CONTEXT]
-      if (args.collection !== Users.slug || !capture || typeof capture !== 'object') {
-        return create(args)
-      }
-
-      const target = capture as { data?: Record<string, unknown> }
-      const data = args.data as Record<string, unknown>
-      if (
-        typeof data.email !== 'string' ||
-        typeof data.username !== 'string' ||
-        typeof data.hash !== 'string' ||
-        typeof data.salt !== 'string' ||
-        'password' in data
-      ) {
-        throw new Error('AUTH001_NATIVE_USER_PERSISTENCE_INTENT_INVALID')
-      }
-
-      target.data = { ...data }
-      return { ...data, id: 0 }
-    }
   },
   plugins: [
     r2Storage({

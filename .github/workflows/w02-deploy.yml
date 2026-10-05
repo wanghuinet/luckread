@@ -43,6 +43,26 @@ jobs:
         run: |
           git diff --exit-code -- workers/W02-identity/migrations/0001_role_assignments.sql
           git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
+      - name: Validate Better Auth production secret
+        env:
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ "${#BETTER_AUTH_SECRET}" -lt 32 ]; then
+            echo "BETTER_AUTH_SECRET must be at least 32 characters."
+            exit 1
+          fi
+
+      - name: Upload Better Auth production secret
+        working-directory: workers/W02-identity
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$BETTER_AUTH_SECRET" | npx --yes wrangler@4.116.0 secret put BETTER_AUTH_SECRET --config wrangler.jsonc
+
       - name: Deploy W02 with pinned Wrangler
         working-directory: workers/W02-identity
         env:

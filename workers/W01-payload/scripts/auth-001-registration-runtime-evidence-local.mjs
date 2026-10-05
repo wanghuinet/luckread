@@ -56,15 +56,32 @@ const responseJson = async (response) => {
 const request = async (idempotencyKey, body) => fetch(baseUrl + '/auth/register', { method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': idempotencyKey, connection: 'close' }, body: JSON.stringify(body) })
 
 const countsForEmail = async (email, username) => {
-  const user = await scalar('SELECT COUNT(*) AS c, MIN(id) AS id, MIN(hash) AS hash, MIN(salt) AS salt, MIN(account_state) AS account_state, MIN(account_state_version) AS account_state_version FROM users WHERE email = ? AND username = ?', email, username)
-  const consent = await scalar('SELECT COUNT(*) AS c, MIN(id) AS id FROM consents WHERE resource_id = CAST((SELECT MIN(id) FROM users WHERE email = ? AND username = ?) AS TEXT)', email, username)
-  return { users: Number(user && user.c || 0), userId: user && user.id != null ? String(user.id) : null, hash: user && typeof user.hash === 'string' ? user.hash : null, salt: user && typeof user.salt === 'string' ? user.salt : null, accountState: user && user.account_state || null, accountStateVersion: user && user.account_state_version != null ? Number(user.account_state_version) : null, consents: Number(consent && consent.c || 0), consentId: consent && consent.id || null }
+  const user = await scalar('SELECT COUNT(*) AS c, MIN(id) AS id, MIN(email_verified) AS email_verified, MIN(account_state) AS account_state, MIN(account_state_version) AS account_state_version FROM "user" WHERE email = ? AND username = ?', email, username)
+  const account = await scalar('SELECT COUNT(*) AS c, MIN(id) AS id, MIN(password) AS password, MIN(provider_id) AS provider_id FROM "account" WHERE user_id = CAST((SELECT MIN(id) FROM "user" WHERE email = ? AND username = ?) AS TEXT)', email, username)
+  const session = await scalar('SELECT COUNT(*) AS c FROM "session" WHERE user_id = CAST((SELECT MIN(id) FROM "user" WHERE email = ? AND username = ?) AS TEXT)', email, username)
+  const consent = await scalar('SELECT COUNT(*) AS c, MIN(id) AS id FROM consents WHERE resource_id = CAST((SELECT MIN(id) FROM "user" WHERE email = ? AND username = ?) AS TEXT)', email, username)
+  const legacy = await scalar('SELECT COUNT(*) AS c FROM users WHERE email = ? AND username = ?', email, username)
+  return {
+    users: Number(user && user.c || 0),
+    userId: user && user.id != null ? String(user.id) : null,
+    emailVerified: user && user.email_verified != null ? Number(user.email_verified) : null,
+    accountState: user && user.account_state || null,
+    accountStateVersion: user && user.account_state_version != null ? Number(user.account_state_version) : null,
+    accounts: Number(account && account.c || 0),
+    accountId: account && account.id != null ? String(account.id) : null,
+    accountPassword: account && typeof account.password === 'string' ? account.password : null,
+    accountProviderId: account && typeof account.provider_id === 'string' ? account.provider_id : null,
+    sessions: Number(session && session.c || 0),
+    consents: Number(consent && consent.c || 0),
+    consentId: consent && consent.id || null,
+    legacyUsers: Number(legacy && legacy.c || 0),
+  }
 }
 const envelopeForKey = async (idempotencyKey) => scalar('SELECT id, state, payload_hash, response_digest, committed_response, consent_record_id FROM auth_registration_envelopes WHERE idempotency_key = ? AND scope = ? AND endpoint = ? ORDER BY created_at DESC LIMIT 1', idempotencyKey, 'ACCOUNT_REGISTRATION', 'authRegister')
 
-const tableRows = { results: all("SELECT name, type FROM sqlite_master WHERE type IN ('table','index') AND name IN ('users','auth_registration_envelopes','consents') ORDER BY type,name") }
+const tableRows = { results: all("SELECT name, type FROM sqlite_master WHERE type IN ('table','index') AND name IN ('users','user','account','session','auth_registration_envelopes','consents') ORDER BY type,name") }
 const requiredObjects = new Set((tableRows.results || []).map((row) => String(row.type) + ':' + String(row.name)))
-for (const required of ['table:users', 'table:auth_registration_envelopes', 'table:consents']) if (!requiredObjects.has(required)) throw new Error('Required local D1 object missing: ' + required)
+for (const required of ['table:users', 'table:user', 'table:account', 'table:session', 'table:auth_registration_envelopes', 'table:consents']) if (!requiredObjects.has(required)) throw new Error('Required local D1 object missing: ' + required)
 
 const suffix = randomUUID().replaceAll('-', '').slice(0, 16)
 const email = 'auth001-runtime-' + suffix + '@luckread.local'
@@ -82,11 +99,13 @@ let triggerName = null
 
 const cleanup = async () => {
   if (triggerName) { runSql('DROP TRIGGER IF EXISTS ' + triggerName); triggerName = null }
-  runSql('DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email IN (?, ?))', email, concurrentEmail)
-  runSql('DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE ?)', 'auth001-rollback-' + suffix + '@luckread.local')
+  runSql('DELETE FROM role_authorization_versions WHERE subject_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-%-' + suffix + '@luckread.local')
+  runSql('DELETE FROM role_assignments WHERE subject_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-%-' + suffix + '@luckread.local')
+  runSql('DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-%-' + suffix + '@luckread.local')
   runSql('DELETE FROM auth_registration_envelopes WHERE idempotency_key IN (?, ?, ?, ?, ?)', keySuccess, keyRollback, keyConcurrentA, keyConcurrentB, keySameKey)
-  runSql('DELETE FROM users WHERE email IN (?, ?)', email, concurrentEmail)
-  runSql('DELETE FROM auth_registration_envelopes WHERE idempotency_key = ?', keyRollback)
+  runSql('DELETE FROM "session" WHERE user_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-%-' + suffix + '@luckread.local')
+  runSql('DELETE FROM "account" WHERE user_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE ?)', 'auth001-%-' + suffix + '@luckread.local')
+  runSql('DELETE FROM "user" WHERE email LIKE ?', 'auth001-%-' + suffix + '@luckread.local')
 }
 
 try {
@@ -97,11 +116,13 @@ try {
   const first = await responseJson(firstResponse)
   if (firstResponse.status !== 201) throw new Error('Registration failed: HTTP ' + firstResponse.status)
   const successRows = await countsForEmail(email, username)
-  if (successRows.users !== 1 || successRows.consents !== 1) throw new Error('Successful registration did not create exactly one User and one Consent')
+  if (successRows.users !== 1 || successRows.accounts !== 1 || successRows.consents !== 1) throw new Error('Successful registration did not create exactly one Better Auth User, one credential Account, and one Consent')
   if (!successRows.userId || successRows.accountState !== 'PENDING_VERIFICATION' || successRows.accountStateVersion !== 1) throw new Error('User lifecycle state/version is not canonical')
-  if (!successRows.hash || !successRows.salt) throw new Error('Native User hash/salt not persisted')
-  const columns = { results: all('PRAGMA table_info(users)') }
-  if (columns.results.some((column) => column.name === 'password')) throw new Error('Plaintext password column unexpectedly exists in User persistence')
+  if (successRows.emailVerified !== 0) throw new Error('Unexpected email verification state')
+  if (!successRows.accountPassword || successRows.accountPassword === password) throw new Error('Better Auth credential password was not persisted as a non-plaintext value')
+  if (!successRows.accountProviderId) throw new Error('Better Auth credential provider is missing')
+  if (successRows.sessions !== 0) throw new Error('Registration unexpectedly auto-created a session')
+  if (successRows.legacyUsers !== 0) throw new Error('W01 Payload Users table was unexpectedly written by Better Auth registration')
   const envelope = await envelopeForKey(keySuccess)
   if (!envelope || envelope.state !== 'COMPLETED') throw new Error('Completed registration envelope missing')
   const committedResponse = JSON.parse(String(envelope.committed_response))
@@ -128,14 +149,14 @@ try {
   if (reuseResponse.status !== 422 || !reuse.error || reuse.error.code !== 'IDEMPOTENCY_KEY_REUSE_CONFLICT') throw new Error('Idempotency key reuse conflict was not canonical')
 
   triggerName = 'auth001_evidence_fail_' + suffix
-  runSql('CREATE TRIGGER ' + triggerName + " BEFORE UPDATE ON auth_registration_envelopes BEGIN SELECT RAISE(ABORT, 'AUTH001_FORCED_ROLLBACK'); END")
+  runSql('CREATE TRIGGER ' + triggerName + " BEFORE INSERT ON auth_registration_envelopes BEGIN SELECT RAISE(ABORT, 'AUTH001_FORCED_RESERVATION_FAILURE'); END")
   const rollbackEmail = 'auth001-rollback-' + suffix + '@luckread.local'
   const rollbackUsername = 'auth001rb' + suffix
   const rollbackResponse = await request(keyRollback, { ...body, identity: rollbackEmail, username: rollbackUsername })
   const rollback = await responseJson(rollbackResponse)
   if (rollbackResponse.status !== 503) throw new Error('Forced rollback should fail closed with 503, got ' + rollbackResponse.status)
   const rollbackRows = await countsForEmail(rollbackEmail, rollbackUsername)
-  if (rollbackRows.users !== 0 || rollbackRows.consents !== 0) throw new Error('D1 batch rollback left a partial User or Consent record')
+  if (rollbackRows.users !== 0 || rollbackRows.accounts !== 0 || rollbackRows.consents !== 0 || rollbackRows.legacyUsers !== 0) throw new Error('Failed reservation left a partial Better Auth User, Account, Consent, or Payload User record')
   runSql('DROP TRIGGER IF EXISTS ' + triggerName); triggerName = null
 
   const concurrentBody = { ...body, identity: concurrentEmail, username: concurrentUsername, credential: password + '-concurrent' }
@@ -143,7 +164,7 @@ try {
   const statuses = pair.map((response) => response.status).sort((a, b) => a - b)
   if (statuses[0] !== 201 || statuses[1] !== 422) throw new Error('Concurrent duplicate identity did not produce exactly one success and one conflict: ' + statuses.join(','))
   const concurrentRows = await countsForEmail(concurrentEmail, concurrentUsername)
-  if (concurrentRows.users !== 1 || concurrentRows.consents !== 1) throw new Error('Concurrent duplicate identity produced more than one authoritative registration record')
+  if (concurrentRows.users !== 1 || concurrentRows.accounts !== 1 || concurrentRows.consents !== 1) throw new Error('Concurrent duplicate identity produced more than one authoritative registration record')
 
   const sameKeyEmail = 'auth001-same-key-' + suffix + '@luckread.local'
   const sameKeyUsername = 'auth001sk' + suffix
@@ -182,7 +203,7 @@ try {
   }
 
   const sameKeyRows = await countsForEmail(sameKeyEmail, sameKeyUsername)
-  if (sameKeyRows.users !== 1 || sameKeyRows.consents !== 1) {
+  if (sameKeyRows.users !== 1 || sameKeyRows.accounts !== 1 || sameKeyRows.consents !== 1) {
     throw new Error('Concurrent same Idempotency-Key produced more than one authoritative registration record')
   }
   if (
@@ -192,7 +213,7 @@ try {
     throw new Error('Concurrent same-key replay did not return the canonical committed User')
   }
 
-  const result = { status: 'PASS', evidenceType: 'AUTH-001_REGISTRATION_D1_BATCH_LOCAL_RUNTIME', runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_OPENNEXT_WORKER', assertions: { successfulRegistration: true, exactlyOneUser: true, exactlyOneConsent: true, accountStatePendingVerificationVersion1: true, nativeHashAndSaltPersisted: true, plaintextPasswordNotPersisted: true, responseDigestMatchesAdmittedCommitment: true, replayReturnsOriginalResponse: true, idempotencyKeyReuseConflictCanonical: true, forcedLaterStatementRollback: true, concurrentDuplicateIdentitySingleWinner: true, downstreamW02Mutation: false }, observed: { userId: String(first.userId), accountState: first.accountState, hashLength: String(successRows.hash).length, saltLength: String(successRows.salt).length, concurrentStatuses: pair.map((response) => response.status), sameKeyStatuses } }
+  const result = { status: 'PASS', evidenceType: 'AUTH-001_REGISTRATION_W02_BETTER_AUTH_LOCAL_RUNTIME', runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_W01_W02_OPENNEXT_WORKERS', assertions: { successfulRegistration: true, nativeBetterAuthUser: true, nativeCredentialAccount: true, exactlyOneConsent: true, accountStatePendingVerificationVersion1: true, credentialStoredNonPlaintext: true, autoSignInDisabled: true, payloadUsersTableUntouched: true, responseDigestMatchesAdmittedCommitment: true, replayReturnsOriginalResponse: true, idempotencyKeyReuseConflictCanonical: true, forcedReservationFailureFailClosed: true, concurrentDuplicateIdentitySingleWinner: true, downstreamLegacyMaterializerNotRequired: true }, observed: { userId: String(first.userId), accountState: first.accountState, accountPasswordLength: String(successRows.accountPassword).length, accountProviderId: successRows.accountProviderId, concurrentStatuses: pair.map((response) => response.status), sameKeyStatuses } }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))
 } finally {

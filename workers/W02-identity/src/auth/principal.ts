@@ -29,9 +29,10 @@ const toIso = (value: Date | string): string =>
 export async function resolveBetterAuthPrincipal(
   db: D1Database,
   request: Request,
+  betterAuthSecret: string,
   now = new Date().toISOString(),
 ): Promise<AuthenticatedPrincipal | null> {
-  const auth = createLuckReadAuth({ D1_01: db })
+  const auth = createLuckReadAuth({ D1_01: db, BETTER_AUTH_SECRET: betterAuthSecret })
 
   let result: AuthSession | null
   try {
