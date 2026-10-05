@@ -4,24 +4,23 @@ on:
   push:
     branches: [main]
     paths:
-      - 'workers/luck02-content/**'
       - 'workers/luck01-identity/**'
       - 'workers/luck02-content/**'
+      - 'workers/luck03-social/**'
       - 'workers/luck04-commerce/**'
-      - 'scripts/verify-1.1-worker-terminal-routing.mjs'
-      - 'scripts/verify-1.1-worker-terminal-routing.mjs'
-      - 'scripts/verify-1.1-worker-terminal-routing.mjs'
+      - 'workers/luck05-creator/**'
+      - 'workers/luck06-async/**'
       - 'scripts/verify-1.1-worker-terminal-routing.mjs'
   pull_request:
     paths:
-      - 'workers/W01-payload/**'
-      - 'workers/W02-identity/**'
-      - 'workers/W03-content/**'
-      - 'workers/W06-governance/**'
-      - 'contracts/transport/public-worker-terminal-routing.v1.json'
-      - 'contracts/transport/W01-W03-content-http-binding.v1.json'
-      - 'contracts/transport/W01-W06-moderation-http-binding.v1.json'
-      - 'scripts/verify-worker-terminal-routing.mjs'
+      - 'workers/luck01-identity/**'
+      - 'workers/luck02-content/**'
+      - 'workers/luck03-social/**'
+      - 'workers/luck04-commerce/**'
+      - 'workers/luck05-creator/**'
+      - 'workers/luck06-async/**'
+      - 'scripts/verify-1.1-worker-terminal-routing.mjs'
+      - '.github/workflows/worker-terminal-routing-gate.yml'
   workflow_dispatch:
 
 permissions:
@@ -39,5 +38,5 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Verify terminal routing contract
-        run: node scripts/verify-worker-terminal-routing.mjs
+      - name: Verify 1.1 six-worker terminal routing
+        run: node scripts/verify-1.1-worker-terminal-routing.mjs
