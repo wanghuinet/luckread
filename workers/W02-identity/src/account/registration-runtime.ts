@@ -349,11 +349,21 @@ const reserveEnvelope = async (
 
   const reserved = await getExistingEnvelope(db, input.idempotencyKey)
   if (!reserved) {
+    console.error(JSON.stringify({
+      event: 'auth.register.registration_reservation_missing',
+      diagnosticCode: 'AUTH001_REGISTRATION_RESERVATION_MISSING',
+    }))
     throw new RegistrationRuntimeError(
       'SERVICE_UNAVAILABLE',
       'registration reservation is unavailable',
     )
   }
+
+  console.error(JSON.stringify({
+    event: 'auth.register.registration_reservation_reserved',
+    diagnosticCode: 'AUTH001_REGISTRATION_RESERVATION_RESERVED',
+    state: reserved.state,
+  }))
 
   return reserved
 }
