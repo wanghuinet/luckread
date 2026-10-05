@@ -211,7 +211,7 @@ const hasConsent = async (db: D1Database, userId: string, policyVersion: string)
   )
 
 const completeEnvelope = async (
-  db: D1DatabaseLike,
+  db: D1Database,
   envelopeId: string,
   userId: string,
   consentRecordId: string,
