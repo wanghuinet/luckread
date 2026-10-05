@@ -1,0 +1,32 @@
+name: W02 Better Auth Package Check
+
+on:
+  push:
+    branches:
+      - migration/better-auth-w02-20261005
+  pull_request:
+    paths:
+      - 'workers/W02-identity/**'
+      - '.github/workflows/w02-better-auth-package-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install W02 dependencies
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Verify Better Auth import
+        working-directory: workers/W02-identity
+        run: node --input-type=module -e "import('better-auth').then(() => console.log('better-auth import: OK'))"
