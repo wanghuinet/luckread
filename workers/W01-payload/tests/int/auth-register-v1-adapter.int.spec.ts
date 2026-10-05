@@ -12,9 +12,18 @@ describe('versioned auth register adapter', () => {
     expect(route).toContain("export { POST } from '../../../../auth/register/route'")
     expect(route).not.toContain('getPayload(')
     expect(route).not.toContain('payload.create(')
-    expect(route).toContain('registerWithBetterAuth')
-    expect(route).toContain('validatePolicy(')
+    expect(route).not.toContain('registerWithBetterAuth')
     expect(route).not.toContain('auth_registration_envelopes')
+
+    const handler = readFileSync(
+      resolve(process.cwd(), 'src/app/auth/register/route.ts'),
+      'utf8',
+    )
+    expect(handler).toContain('registerWithBetterAuth')
+    expect(handler).toContain('validatePolicy(')
+    expect(handler).not.toContain('getPayload(')
+    expect(handler).not.toContain('payload.create(')
+    expect(handler).not.toContain('auth_registration_envelopes')
   })
 })
 
