@@ -35,9 +35,15 @@ export default async function CreatorCenterPage() {
     redirect('/login?returnTo=%2Fcreator-center')
   }
 
-  const profile = await profileResponse.json().catch(() => null) as CreatorProfile | null
+  let profile: CreatorProfile | null = null
+  try {
+    profile = await profileResponse.json() as CreatorProfile
+  } catch {
+    redirect('/login?returnTo=%2Fcreator-center')
+  }
+
   const userId =
-    typeof profile?.id === 'string' && profile.id.trim().length > 0
+    typeof profile.id === 'string' && profile.id.trim().length > 0
       ? profile.id
       : null
 
@@ -46,11 +52,11 @@ export default async function CreatorCenterPage() {
   }
 
   const displayName =
-    typeof profile?.displayName === 'string' && profile.displayName.trim()
+    typeof profile.displayName === 'string' && profile.displayName.trim()
       ? profile.displayName
-      : typeof profile?.username === 'string' && profile.username.trim()
+      : typeof profile.username === 'string' && profile.username.trim()
         ? profile.username
-        : typeof profile?.email === 'string' && profile.email.trim()
+        : typeof profile.email === 'string' && profile.email.trim()
           ? profile.email
           : '创作者'
 
