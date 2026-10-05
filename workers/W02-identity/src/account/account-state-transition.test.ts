@@ -413,7 +413,7 @@ function authorizationDb(
         bind() {
           return {
             first: async <T>() => {
-              if (sql.includes('FROM users')) {
+              if (sql.includes('FROM "user"')) {
                 return { accountState: state } as T
               }
               return null
