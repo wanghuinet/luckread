@@ -1,13 +1,9 @@
 import Link from 'next/link'
 import { cookies, headers } from 'next/headers'
-import { getPayload } from 'payload'
 import React from 'react'
 
-import config from '@payload-config'
-
 import { enforcePublicReadRateLimit } from '@/auth/traffic-limit'
-import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
-import { validateSession } from '@/auth/w02-session-client'
+import { callW02UserProfile } from '@/auth/w02-user-profile-client'
 
 import CreatorLanguageToggle from './creator-center/CreatorLanguageToggle'
 import { CreatorStudio } from './creator-center/CreatorStudio'
@@ -22,6 +18,13 @@ const CREATOR_CENTER_HOSTS = new Set(['mp.luckread.com'])
 export const dynamic = 'force-dynamic'
 
 type StudioLocale = 'zh-CN' | 'en-US'
+
+type CreatorProfile = {
+  id?: unknown
+  email?: unknown
+  username?: unknown
+  displayName?: unknown
+}
 
 const categoriesByLocale: Record<PublicLocale, string[]> = {
   zh: ['图文', '视频', '动态', '专栏', '创作者'],
@@ -42,21 +45,16 @@ export default async function HomePage() {
       headers: requestHeaders,
     })
     const authorization = request.headers.get('authorization')?.trim() || ''
-    const hasPayloadTokenCookie = request.headers.get('cookie')?.split(';').some((part) => {
+    const hasBetterAuthCookie = request.headers.get('cookie')?.split(';').some((part) => {
       const [name, ...value] = part.trim().split('=')
-      return name === 'payload-token' && value.join('=').trim().length > 0
+      return (
+        (name === 'better-auth.session_token' || name === '__Secure-better-auth.session_token') &&
+        value.join('=').trim().length > 0
+      )
     }) === true
     const hasAuthCredential =
       authorization.startsWith('Bearer ') ||
-      hasPayloadTokenCookie
-
-    let authenticatedUser: {
-      id?: string | number
-      _sid?: string
-      displayName?: unknown
-      username?: unknown
-      email?: unknown
-    } | null = null
+      hasBetterAuthCookie
 
     if (hasAuthCredential) {
       let edgeReadAllowed = true
@@ -68,44 +66,40 @@ export default async function HomePage() {
 
       if (edgeReadAllowed) {
         try {
-          const payload = await getPayload({ config })
-          const authResult = await payload.auth({
-            headers: request.headers,
-            canSetHeaders: false,
-          })
-          authenticatedUser = authResult.user as unknown as {
-            id?: string | number
-            _sid?: string
-            displayName?: unknown
-            username?: unknown
-            email?: unknown
-          } | null
+          const profileResponse = await callW02UserProfile(
+            request,
+            '/internal/account/profile',
+            'GET',
+          )
+
+          if (profileResponse.ok) {
+            let profile: CreatorProfile | null = null
+            try {
+              profile = await profileResponse.json() as CreatorProfile
+            } catch {
+              profile = null
+            }
+
+            const userId =
+              typeof profile?.id === 'string' && profile.id.trim().length > 0
+                ? profile.id
+                : null
+
+            if (userId) {
+              const displayName =
+                typeof profile?.displayName === 'string' && profile.displayName.trim()
+                  ? profile.displayName
+                  : typeof profile?.username === 'string' && profile.username.trim()
+                    ? profile.username
+                    : typeof profile?.email === 'string' && profile.email.trim()
+                      ? profile.email
+                      : '创作者'
+
+              return <CreatorStudio displayName={displayName} userId={userId} locale={locale} />
+            }
+          }
         } catch {
-          authenticatedUser = null
-        }
-      }
-    }
-
-    if (authenticatedUser?.id && typeof authenticatedUser._sid === 'string' && authenticatedUser._sid) {
-      const tokenVersion = readVerifiedPayloadTokenVersion(request)
-      if (tokenVersion !== null) {
-        const active = await validateSession({
-          sessionId: authenticatedUser._sid,
-          userId: String(authenticatedUser.id),
-          tokenVersion,
-        }).catch(() => false)
-
-        if (active) {
-          const displayName =
-            typeof authenticatedUser.displayName === 'string' && authenticatedUser.displayName.trim()
-              ? authenticatedUser.displayName
-              : typeof authenticatedUser.username === 'string' && authenticatedUser.username.trim()
-                ? authenticatedUser.username
-                : typeof authenticatedUser.email === 'string' && authenticatedUser.email.trim()
-                  ? authenticatedUser.email
-                  : '创作者'
-
-          return <CreatorStudio displayName={displayName} userId={String(authenticatedUser.id)} locale={locale} />
+          // W02 authentication failures keep the public creator landing page available.
         }
       }
     }
