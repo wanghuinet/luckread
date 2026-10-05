@@ -215,7 +215,7 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/principal') {
       try {
-        const principal = await resolveBetterAuthPrincipal(env.D1_01, request)
+        const principal = await resolveBetterAuthPrincipal(env.D1_01, request, env.BETTER_AUTH_SECRET)
         if (!principal) return json({ active: false }, 401)
 
         return json({
