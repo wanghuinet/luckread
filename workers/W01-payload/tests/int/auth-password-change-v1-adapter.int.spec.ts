@@ -20,7 +20,10 @@ describe('versioned auth password change adapter', () => {
 it('guards password changes before delegating to W02', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/app/auth/password/change/route.ts'), 'utf8')
   const guardIndex = route.indexOf('await enforceW01WriteRateLimit(request)')
-  const authorityIndex = route.indexOf('changePasswordThroughW02')
+  const authorityIndex = route.indexOf(
+    'await changePasswordThroughW02(',
+    route.indexOf('export async function POST'),
+  )
   expect(guardIndex).toBeGreaterThanOrEqual(0)
   expect(authorityIndex).toBeGreaterThanOrEqual(0)
   expect(guardIndex).toBeLessThan(authorityIndex)
