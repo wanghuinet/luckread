@@ -1,4 +1,5 @@
 import { betterAuth } from 'better-auth/minimal'
+import { bearer } from 'better-auth/plugins'
 
 export interface BetterAuthEnv {
   D1_01: D1Database
@@ -68,6 +69,7 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
       updateAge: 60 * 60 * 24,
       modelName: 'session',
     },
+    plugins: [bearer()],
     advanced: {
       database: {
         validateSchema: false,
