@@ -22,5 +22,5 @@ walk(parsed)
 if (!rows.some((row) => String(row.name) === 'email_verified')) {
   run(['--command', 'ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0;'])
 }
-run(['--command', readFileSync(migration, 'utf8')])
+run(['--file', migration])
 console.log(JSON.stringify({ result: 'APPLIED', target: remote ? 'REMOTE' : 'LOCAL', owner: 'W02', d1: 'D1-01', migration: '0002_better_auth_core.sql' }, null, 2))
