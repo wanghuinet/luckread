@@ -6,6 +6,7 @@ import {
   establishSessionFromAuthoritativeD1,
   validateAuthoritativeSession,
   refreshSessionFromAuthoritativeD1,
+  reconcileOrphanedSessionExtensions,
   type NativeSessionAuthority,
   type SessionRecord,
 } from './session-runtime.js'
@@ -104,6 +105,56 @@ describe('session runtime foundation', () => {
     expect(second).toEqual({ revoked: false })
   })
 })
+
+describe('password-change session extension reconciliation', () => {
+  it('revokes extensions whose native sessions were removed while preserving the current session', async () => {
+    let statement = ''
+    let bindings: unknown[] = []
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => ({
+          run: async () => {
+            statement = sql
+            bindings = args
+            return { meta: { changes: 2 } }
+          },
+        }),
+      }),
+    } as unknown as D1Database
+
+    await expect(
+      reconcileOrphanedSessionExtensions(
+        db,
+        'user-7',
+        'session-current',
+        NOW,
+      ),
+    ).resolves.toBe(2)
+
+    expect(statement).toContain('UPDATE auth_session_state')
+    expect(statement).toContain('NOT EXISTS')
+    expect(statement).toContain('FROM "session"')
+    expect(bindings).toEqual([
+      NOW,
+      NOW,
+      'user-7',
+      'session-current',
+      'session-current',
+    ])
+  })
+
+  it('fails closed on invalid reconciliation input', async () => {
+    await expect(
+      reconcileOrphanedSessionExtensions(
+        {} as D1Database,
+        '',
+        'session-current',
+        NOW,
+      ),
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  })
+})
+
 
 
 describe('authoritative session validation', () => {
