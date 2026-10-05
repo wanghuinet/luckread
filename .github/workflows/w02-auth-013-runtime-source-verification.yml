@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'workers/W02-identity/src/account/**'
+      - 'workers/luck01-identity/src/account/**'
       - 'contracts/state-machines/account.json'
-      - 'workers/W02-identity/wrangler.jsonc'
-      - 'workers/W02-identity/src/index.ts'
+      - 'workers/luck01-identity/wrangler.jsonc'
+      - 'workers/luck01-identity/src/index.ts'
       - '.github/workflows/w02-auth-013-runtime-source-verification.yml'
 
 jobs:
@@ -27,11 +27,11 @@ jobs:
         run: npm ci
 
       - name: Install W02 runtime dependencies
-        working-directory: workers/W02-identity
+        working-directory: workers/luck01-identity
         run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Typecheck W02
-        run: npx tsc -p workers/W02-identity/tsconfig.json --noEmit
+        run: npx tsc -p workers/luck01-identity/tsconfig.json --noEmit
 
       - name: Prepare AUTH-013 source evidence
         run: mkdir -p artifacts/mapping-0/auth-013-runtime-source
@@ -39,7 +39,7 @@ jobs:
       - name: Run AUTH-013 source tests
         run: |
           set -o pipefail
-          npx vitest run workers/W02-identity/src/account/account-state-transition.test.ts workers/W02-identity/src/account/publication-journal-publisher.test.ts 2>&1 | tee artifacts/mapping-0/auth-013-runtime-source/test-output.txt
+          npx vitest run workers/luck01-identity/src/account/account-state-transition.test.ts workers/luck01-identity/src/account/publication-journal-publisher.test.ts 2>&1 | tee artifacts/mapping-0/auth-013-runtime-source/test-output.txt
 
       - name: Capture AUTH-013 source provenance
         run: |
