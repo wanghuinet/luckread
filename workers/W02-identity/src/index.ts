@@ -1,6 +1,7 @@
 import { createLuckReadAuth } from './auth/better-auth.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { reconcileCompletedRegistrationMaterialization } from './account/registration-materializer.js'
+import { registerWithBetterAuth, RegistrationServiceError } from './account/registration-service.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
 import {
   AccountStateTransitionError,
