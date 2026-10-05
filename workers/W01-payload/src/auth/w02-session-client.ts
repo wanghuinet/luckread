@@ -102,6 +102,23 @@ async function callW02<T>(path: string, body: unknown): Promise<T> {
   return payload as T
 }
 
+export type BetterAuthRegistrationResult = {
+  userId: string
+  accountState: string
+}
+
+export const registerWithBetterAuth = (body: {
+  identityType: 'email'
+  identity: string
+  credential: string
+  username: string
+  consent: {
+    purpose: string
+    policyVersion: string
+  }
+  idempotencyKey: string
+}) => callW02<BetterAuthRegistrationResult>('/internal/auth/register', body)
+
 export type BetterAuthSignInResult = {
   token: string
   user: {
