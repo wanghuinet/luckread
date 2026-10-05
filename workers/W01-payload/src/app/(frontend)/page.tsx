@@ -65,6 +65,9 @@ export default async function HomePage() {
       }
 
       if (edgeReadAllowed) {
+        let creatorUserId: string | null = null
+        let creatorDisplayName = '创作者'
+
         try {
           const profileResponse = await callW02UserProfile(
             request,
@@ -80,26 +83,30 @@ export default async function HomePage() {
               profile = null
             }
 
-            const userId =
-              typeof profile?.id === 'string' && profile.id.trim().length > 0
-                ? profile.id
-                : null
-
-            if (userId) {
-              const displayName =
-                typeof profile?.displayName === 'string' && profile.displayName.trim()
+            if (typeof profile?.id === 'string' && profile.id.trim().length > 0) {
+              creatorUserId = profile.id
+              creatorDisplayName =
+                typeof profile.displayName === 'string' && profile.displayName.trim()
                   ? profile.displayName
-                  : typeof profile?.username === 'string' && profile.username.trim()
+                  : typeof profile.username === 'string' && profile.username.trim()
                     ? profile.username
-                    : typeof profile?.email === 'string' && profile.email.trim()
+                    : typeof profile.email === 'string' && profile.email.trim()
                       ? profile.email
                       : '创作者'
-
-              return <CreatorStudio displayName={displayName} userId={userId} locale={locale} />
             }
           }
         } catch {
           // W02 authentication failures keep the public creator landing page available.
+        }
+
+        if (creatorUserId) {
+          return (
+            <CreatorStudio
+              displayName={creatorDisplayName}
+              userId={creatorUserId}
+              locale={locale}
+            />
+          )
         }
       }
     }
