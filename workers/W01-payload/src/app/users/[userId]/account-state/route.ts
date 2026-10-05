@@ -1,4 +1,4 @@
-import { getBetterAuthSession } from '@/auth/better-auth'
+import { getBetterAuthSession } from '@/auth/w02-auth-client'
 import { transitionAccountState, W02AuthClientError } from '../../../../auth/w02-identity-client.js'
 
 const json = (body: unknown, status = 200) =>
