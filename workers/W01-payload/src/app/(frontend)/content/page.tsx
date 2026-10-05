@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
 import PublicLanguageToggle from '../i18n/PublicLanguageToggle'
-import { getPublicCopy, readPublicLocaleCookie, type PublicLocale } from '../i18n/public-locale'
+import { getPublicCopy, usePublicLocale, type PublicLocale } from '../i18n/public-locale'
 
 type ContentType = 'article' | 'post' | 'video'
 type ContentItem = {
@@ -27,7 +27,7 @@ type ContentApiResponse = {
 }
 
 export default function ContentBrowsePage() {
-  const [locale] = useState<PublicLocale>(() => readPublicLocaleCookie())
+  const locale = usePublicLocale()
   const copy = getPublicCopy(locale)
   const labels: Record<ContentType | 'all', string> = {
     all: copy.content.tabs.all,
