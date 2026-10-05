@@ -75,6 +75,62 @@ export default {
       return createLuckReadAuth({ D1_01: env.D1_01 }).handler(request)
     }
 
+    if (request.method === 'POST' && url.pathname === '/internal/auth/register') {
+      const body = await readJsonBody<{
+        identityType?: unknown
+        identity?: unknown
+        credential?: unknown
+        username?: unknown
+        consent?: unknown
+        idempotencyKey?: unknown
+      }>(request)
+
+      if (
+        !body ||
+        typeof body.identityType !== 'string' ||
+        typeof body.identity !== 'string' ||
+        typeof body.credential !== 'string' ||
+        typeof body.username !== 'string' ||
+        typeof body.idempotencyKey !== 'string'
+      ) {
+        return json(
+          { error: { code: 'VALIDATION_FAILED', message: 'invalid registration request' } },
+          400,
+        )
+      }
+
+      try {
+        const result = await registerWithBetterAuth(
+          env,
+          body,
+          body.idempotencyKey,
+        )
+        return json(result, 201)
+      } catch (error) {
+        if (error instanceof RegistrationServiceError) {
+          return json(
+            {
+              error: {
+                code: error.code,
+                message: error.message,
+              },
+            },
+            error.status,
+          )
+        }
+
+        return json(
+          {
+            error: {
+              code: 'SERVICE_UNAVAILABLE',
+              message: 'Registration service unavailable',
+            },
+          },
+          503,
+        )
+      }
+    }
+
     if (request.method === 'POST' && url.pathname === '/internal/account/transition') {
       const body = await readJsonBody<{
         subjectId?: unknown
