@@ -83,6 +83,7 @@ function walk(dir) {
   if (!fs.existsSync(dir)) return;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (['node_modules','.git','.next','dist','build'].includes(entry.name)) continue;
+    if (dir === path.join(root, 'workers') && entry.name === 'old1.0') continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) walk(full);
     else if (/\.(mjs|cjs|js|ts|tsx)$/.test(entry.name)) {
