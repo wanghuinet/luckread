@@ -66,6 +66,8 @@ export default async function HomePage() {
 
       if (edgeReadAllowed) {
         try {
+          let creatorStudio: React.ReactNode = null
+
           const profileResponse = await callW02UserProfile(
             request,
             '/internal/account/profile',
@@ -95,9 +97,13 @@ export default async function HomePage() {
                       ? profile.email
                       : '创作者'
 
-              return <CreatorStudio displayName={displayName} userId={userId} locale={locale} />
+              creatorStudio = (
+                <CreatorStudio displayName={displayName} userId={userId} locale={locale} />
+              )
             }
           }
+
+          if (creatorStudio) return creatorStudio
         } catch {
           // W02 authentication failures keep the public creator landing page available.
         }
