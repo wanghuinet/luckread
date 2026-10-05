@@ -324,6 +324,7 @@ export default {
           accountState: principal.accountState,
           accountStateVersion: principal.accountStateVersion,
           layer: principal.layer,
+          ...(principal.tokenVersion !== undefined ? { tokenVersion: principal.tokenVersion } : {}),
         })
       } catch {
         return json({ active: false }, 503)

@@ -11,30 +11,15 @@ const mocks = vi.hoisted(() => {
   }
 
   return {
-    getPayload: vi.fn(),
-    readVerifiedPayloadTokenVersion: vi.fn(),
+    resolveBetterAuthPrincipalThroughW02: vi.fn(),
     listSessions: vi.fn(),
     revokeOwnedSession: vi.fn(),
     MockW02AuthClientError,
   }
 })
 
-vi.mock('payload', () => ({
-  getPayload: mocks.getPayload,
-}))
-
-vi.mock('@payload-config', () => ({
-  default: {},
-}))
-
-vi.mock('../../src/auth/payload-access-token.js', () => ({
-  getPayloadAuthorizationHeader: vi.fn((request: Request) =>
-    request.headers.get('authorization'),
-  ),
-  readVerifiedPayloadTokenVersion: mocks.readVerifiedPayloadTokenVersion,
-}))
-
 vi.mock('../../src/auth/w02-session-client.js', () => ({
+  resolveBetterAuthPrincipalThroughW02: mocks.resolveBetterAuthPrincipalThroughW02,
   listSessions: mocks.listSessions,
   revokeOwnedSession: mocks.revokeOwnedSession,
   W02AuthClientError: mocks.MockW02AuthClientError,
@@ -49,7 +34,8 @@ function request(url: string, init: RequestInit = {}): Request {
   return new Request(url, {
     ...init,
     headers: {
-      authorization: 'Bearer payload-access-token',
+      cookie: 'better-auth.session_token=opaque-session',
+      authorization: 'Bearer compatibility-token',
       ...(init.headers ?? {}),
     },
   })
@@ -61,16 +47,16 @@ describe('STAGE_1 public session management route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    mocks.getPayload.mockResolvedValue({
-      auth: vi.fn().mockResolvedValue({
-        user: {
-          id: 'user-42',
-          _sid: 'session-current',
-        },
-      }),
+    mocks.resolveBetterAuthPrincipalThroughW02.mockResolvedValue({
+      active: true,
+      userId: 'user-42',
+      email: 'user-42@example.test',
+      sessionId: 'session-current',
+      accountState: 'ACTIVE',
+      accountStateVersion: 1,
+      layer: 'L2',
+      tokenVersion: 3,
     })
-
-    mocks.readVerifiedPayloadTokenVersion.mockReturnValue(3)
 
     mocks.listSessions.mockResolvedValue({
       items: [
@@ -88,9 +74,15 @@ describe('STAGE_1 public session management route', () => {
     mocks.revokeOwnedSession.mockResolvedValue({ revoked: true })
   })
 
-  it('requires an authenticated Payload principal and verified token version', async () => {
-    mocks.getPayload.mockResolvedValue({
-      auth: vi.fn().mockResolvedValue({ user: null }),
+  it('requires a native Better Auth principal with an active session extension', async () => {
+    mocks.resolveBetterAuthPrincipalThroughW02.mockResolvedValueOnce({
+      active: true,
+      userId: 'user-42',
+      email: 'user-42@example.test',
+      sessionId: 'session-current',
+      accountState: 'ACTIVE',
+      accountStateVersion: 1,
+      layer: 'L2',
     })
 
     const response = await GET(
@@ -103,7 +95,7 @@ describe('STAGE_1 public session management route', () => {
     expect(mocks.listSessions).not.toHaveBeenCalled()
   })
 
-  it('passes only the authenticated principal, cursor, and limit to W02', async () => {
+  it('passes only the W02-authenticated principal, cursor, and limit to W02', async () => {
     const response = await GET(
       request('https://luckread.test/auth/sessions?cursor=cursor-1&limit=20'),
       rootContext,
@@ -119,12 +111,13 @@ describe('STAGE_1 public session management route', () => {
           createdAt: '2026-10-02T00:00:00.000Z',
           expiresAt: '2026-10-03T00:00:00.000Z',
           lastSeenAt: '2026-10-02T01:00:00.000Z',
-        },
+          },
       ],
       nextCursor: 'cursor-next',
     })
 
-    expect(mocks.readVerifiedPayloadTokenVersion).toHaveBeenCalled()
+    expect(mocks.resolveBetterAuthPrincipalThroughW02).toHaveBeenCalledTimes(1)
+    expect(mocks.resolveBetterAuthPrincipalThroughW02.mock.calls[0][0]).toBeInstanceOf(Request)
     expect(mocks.listSessions).toHaveBeenCalledWith({
       userId: 'user-42',
       currentSessionId: 'session-current',
@@ -160,7 +153,7 @@ describe('STAGE_1 public session management route', () => {
     )
 
     expect(response.status).toBe(404)
-    expect(mocks.getPayload).not.toHaveBeenCalled()
+    expect(mocks.resolveBetterAuthPrincipalThroughW02).not.toHaveBeenCalled()
   })
 
   it('requires Idempotency-Key before revoking an owned session', async () => {
@@ -173,7 +166,7 @@ describe('STAGE_1 public session management route', () => {
 
     expect(response.status).toBe(400)
     expect((await response.json()).error.code).toBe('IDEMPOTENCY_KEY_REQUIRED')
-    expect(mocks.getPayload).not.toHaveBeenCalled()
+    expect(mocks.resolveBetterAuthPrincipalThroughW02).not.toHaveBeenCalled()
     expect(mocks.revokeOwnedSession).not.toHaveBeenCalled()
   })
 

@@ -1,12 +1,6 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
-import {
-  getPayloadAuthorizationHeader,
-  readVerifiedPayloadTokenVersion,
-} from '../../../../auth/payload-access-token.js'
 import {
   listSessions,
+  resolveBetterAuthPrincipalThroughW02,
   revokeOwnedSession,
   W02AuthClientError,
 } from '../../../../auth/w02-session-client.js'
@@ -40,40 +34,15 @@ const errorResponse = (status: number, code: string, message: string) =>
   )
 
 async function authenticate(request: Request): Promise<AuthenticatedSubject> {
-  const payload = await getPayload({ config })
-
-  let authResult: Awaited<ReturnType<typeof payload.auth>>
-  try {
-    authResult = await payload.auth({
-      headers: new Headers(
-        request.headers.get('Authorization')
-          ? request.headers
-          : {
-              ...(getPayloadAuthorizationHeader(request)
-                ? { Authorization: getPayloadAuthorizationHeader(request)! }
-                : {}),
-            },
-      ),
-      canSetHeaders: false,
-    })
-  } catch {
-    throw new W02AuthClientError(401, 'authentication failed')
-  }
-
-  const user = authResult.user as { id?: string | number; _sid?: string } | null
-  if (!user?.id || typeof user._sid !== 'string' || user._sid.length === 0) {
-    throw new W02AuthClientError(401, 'authentication required')
-  }
-
-  const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (tokenVersion === null) {
+  const principal = await resolveBetterAuthPrincipalThroughW02(request)
+  if (principal.tokenVersion === undefined) {
     throw new W02AuthClientError(401, 'authentication required')
   }
 
   return {
-    userId: String(user.id),
-    sessionId: user._sid,
-    tokenVersion,
+    userId: principal.userId,
+    sessionId: principal.sessionId,
+    tokenVersion: principal.tokenVersion,
   }
 }
 
