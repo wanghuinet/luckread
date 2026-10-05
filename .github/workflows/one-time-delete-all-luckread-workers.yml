@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: Type DELETE_ALL_LUCKREAD_WORKERS to delete all known LuckRead Worker scripts
+        description: Type DELETE_ALL_LUCKREAD_WORKERS
         required: true
         type: string
       force:
-        description: Force deletion even when other Workers reference a target Worker
+        description: Force-delete Workers with references
         required: true
         type: choice
         options:
@@ -19,15 +19,14 @@ on:
 permissions:
   contents: read
 
-env:
-  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
 jobs:
   delete:
-    if: ${{ inputs.confirm == 'DELETE_ALL_LUCKREAD_WORKERS' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm == 'DELETE_ALL_LUCKREAD_WORKERS' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     steps:
       - name: Validate Cloudflare credentials
         run: |
@@ -35,10 +34,11 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$CLOUDFLARE_API_TOKEN"
           printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | grep -Eq '^[A-Za-z0-9_-]{10,}$'
+          echo "Cloudflare credentials are present."
 
       - name: List current Worker scripts
         env:
-          EXPECTED_WORKERS: >-
+          EXPECTED_WORKERS: |
             luckread-w01-payload
             luckread-w02
             luckread-w03
@@ -61,12 +61,12 @@ jobs:
           set -euo pipefail
           curl --fail-with-body --silent --show-error             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts"             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             > /tmp/workers.json
           jq -e '.success == true' /tmp/workers.json >/dev/null
-          printf '%s\n' "$EXPECTED_WORKERS" | tr ' ' '\n' | awk 'NF' > /tmp/expected-workers.txt
-          jq -r '.result[].id' /tmp/workers.json | sort -u > /tmp/current-workers.txt
+          printf '%s\n' "$EXPECTED_WORKERS" | awk 'NF' | sort -u > /tmp/expected-workers.txt
+          jq -r '.result[]?.id' /tmp/workers.json | sort -u > /tmp/current-workers.txt
           echo "Matched LuckRead Worker scripts:"
-          comm -12 <(sort /tmp/expected-workers.txt) /tmp/current-workers.txt | tee /tmp/matched-workers.txt
+          comm -12 /tmp/expected-workers.txt /tmp/current-workers.txt | tee /tmp/matched-workers.txt
           echo "Known-but-missing Worker scripts:"
-          comm -23 <(sort /tmp/expected-workers.txt) /tmp/current-workers.txt || true
+          comm -23 /tmp/expected-workers.txt /tmp/current-workers.txt || true
 
       - name: Delete matched LuckRead Worker scripts
         run: |
@@ -76,22 +76,22 @@ jobs:
           while IFS= read -r worker; do
             [ -n "$worker" ] || continue
             echo "Deleting $worker"
-            encoded="$(python - <<'PY' "$worker"
-import sys, urllib.parse
-print(urllib.parse.quote(sys.argv[1], safe=''))
+            encoded="$(python - "$worker" <<'PY'
+import sys
+import urllib.parse
+print(urllib.parse.quote(sys.argv[1], safe=""))
 PY
 )"
-            code="$(curl --silent --show-error               -o "/tmp/delete-$deleted.json"               -w '%{http_code}'               -X DELETE               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$encoded?force=${{ inputs.force }}"               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               -H "Content-Type: application/json")"
+            code="$(curl --silent --show-error               -o "/tmp/delete-${deleted}.json"               -w '%{http_code}'               -X DELETE               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$encoded?force=${{ inputs.force }}"               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               -H "Content-Type: application/json")"
             if [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
               echo "DELETED $worker"
               deleted=$((deleted + 1))
             else
               echo "FAILED $worker HTTP $code"
-              cat "/tmp/delete-$deleted.json" || true
+              cat "/tmp/delete-${deleted}.json" || true
               failed=$((failed + 1))
             fi
           done < /tmp/matched-workers.txt
-
           echo "deleted=$deleted failed=$failed"
           if [ "$failed" -ne 0 ]; then
             exit 1
@@ -99,7 +99,7 @@ PY
 
       - name: Verify no known LuckRead Worker scripts remain
         env:
-          EXPECTED_WORKERS: >-
+          EXPECTED_WORKERS: |
             luckread-w01-payload
             luckread-w02
             luckread-w03
@@ -121,8 +121,9 @@ PY
         run: |
           set -euo pipefail
           curl --fail-with-body --silent --show-error             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts"             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             > /tmp/workers-after.json
-          jq -r '.result[].id' /tmp/workers-after.json | sort -u > /tmp/current-after.txt
-          printf '%s\n' "$EXPECTED_WORKERS" | tr ' ' '\n' | awk 'NF' | sort -u > /tmp/expected-workers.txt
+          jq -e '.success == true' /tmp/workers-after.json >/dev/null
+          jq -r '.result[]?.id' /tmp/workers-after.json | sort -u > /tmp/current-after.txt
+          printf '%s\n' "$EXPECTED_WORKERS" | awk 'NF' | sort -u > /tmp/expected-workers.txt
           remaining="$(comm -12 /tmp/expected-workers.txt /tmp/current-after.txt)"
           if [ -n "$remaining" ]; then
             echo "Remaining known LuckRead Worker scripts:"
