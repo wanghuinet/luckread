@@ -129,6 +129,13 @@ export default {
         return json(result, 201)
       } catch (error) {
         if (error instanceof RegistrationRuntimeError) {
+          console.error(JSON.stringify({
+            event: 'auth.register.registration_runtime_failure',
+            diagnosticCode: 'AUTH001_REGISTRATION_RUNTIME_ERROR',
+            registrationCode: error.code,
+            errorName: error.name,
+            errorMessage: error.message.slice(0, 300),
+          }))
           const status =
             error.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' ? 422 :
             error.code === 'IDEMPOTENCY_IN_PROGRESS' ? 409 :
