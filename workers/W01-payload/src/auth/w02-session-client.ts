@@ -32,6 +32,7 @@ export class W02AuthClientError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly code?: string,
   ) {
     super(message)
   }
@@ -80,10 +81,10 @@ async function callW02<T>(path: string, body: unknown): Promise<T> {
       throw new W02AuthClientError(400, 'invalid authentication request')
     }
     if (code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' || code === 'REGISTRATION_CONFLICT') {
-      throw new W02AuthClientError(422, 'registration could not be completed')
+      throw new W02AuthClientError(422, 'registration could not be completed', code)
     }
     if (code === 'IDEMPOTENCY_IN_PROGRESS' || code === 'REGISTRATION_RETRY_REQUIRED') {
-      throw new W02AuthClientError(409, 'registration is already in progress')
+      throw new W02AuthClientError(409, 'registration is already in progress', code)
     }
     if (code === 'PERMISSION_DENIED') {
       throw new W02AuthClientError(403, 'permission denied')
