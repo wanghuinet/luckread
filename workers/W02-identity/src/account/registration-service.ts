@@ -27,7 +27,6 @@ type ExistingEnvelope = {
   state: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
   committedResponse: string | null
   expiresAt: string
-  createdAt: string
   consentRecordId: string | null
 }
 
@@ -181,6 +180,27 @@ const parseRegistrationInput = (
   }
 }
 
+const parseProvisionalUserId = (value: string | null): string | null => {
+  if (!value) return null
+
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      (parsed as { provisional?: unknown }).provisional !== true ||
+      typeof (parsed as { userId?: unknown }).userId !== 'string' ||
+      (parsed as { userId: string }).userId.trim().length === 0
+    ) {
+      return null
+    }
+
+    return (parsed as { userId: string }).userId
+  } catch {
+    return null
+  }
+}
+
 const parseReplay = (value: string | null): RegistrationResult | null => {
   if (!value) return null
 
@@ -218,7 +238,6 @@ const readEnvelope = async (
           state,
           committed_response AS committedResponse,
           expires_at AS expiresAt,
-          created_at AS createdAt,
           consent_record_id AS consentRecordId
         FROM auth_registration_envelopes
         WHERE idempotency_key = ?
@@ -231,16 +250,16 @@ const readEnvelope = async (
     .bind(idempotencyKey, SCOPE, ENDPOINT)
     .first<ExistingEnvelope>()
 
-const readUserByEmail = async (
+const readUserById = async (
   db: D1Database,
-  email: string,
-): Promise<{ id: string; accountState: string; createdAt: string; username: string } | null> =>
+  userId: string,
+): Promise<{ id: string; accountState: string; email: string; username: string } | null> =>
   db
     .prepare(
-      'SELECT CAST(id AS TEXT) AS id, account_state AS accountState, created_at AS createdAt, username FROM "user" WHERE email = ? LIMIT 1',
+      'SELECT CAST(id AS TEXT) AS id, account_state AS accountState, email, username FROM "user" WHERE id = ? LIMIT 1',
     )
-    .bind(email)
-    .first<{ id: string; accountState: string; createdAt: string; username: string }>()
+    .bind(userId)
+    .first<{ id: string; accountState: string; email: string; username: string }>()
 
 const finalizeRegistration = async (
   db: D1Database,
@@ -325,7 +344,7 @@ const finalizeRegistration = async (
         `
           SELECT id, idempotency_key AS idempotencyKey, payload_hash AS payloadHash, state,
                  committed_response AS committedResponse, expires_at AS expiresAt,
-                 created_at AS createdAt, consent_record_id AS consentRecordId
+                 consent_record_id AS consentRecordId
           FROM auth_registration_envelopes
           WHERE id = ?
           LIMIT 1
@@ -510,30 +529,45 @@ export async function registerWithBetterAuth(
   }
 
   if (!reservation.fresh) {
-    const knownUser = await readUserByEmail(env.D1_01, parsed.email)
-    if (
-      knownUser &&
-      knownUser.username === parsed.username &&
-      Date.parse(knownUser.createdAt) >= Date.parse(envelope.createdAt)
-    ) {
-      if (
-        knownUser.accountState !== ACCOUNT_STATE &&
-        knownUser.accountState !== 'ACTIVE'
-      ) {
-        throw new RegistrationServiceError(
-          'REGISTRATION_RETRY_REQUIRED',
-          'The registration is not in a replayable state',
-          409,
-        )
-      }
-
-      return finalizeRegistration(env.D1_01, envelope, knownUser.id, policy, now)
+    const provisionalUserId = parseProvisionalUserId(envelope.committedResponse)
+    if (!provisionalUserId) {
+      throw new RegistrationServiceError(
+        'IDEMPOTENCY_IN_PROGRESS',
+        'A registration with this Idempotency-Key is already in progress',
+        409,
+      )
     }
 
-    throw new RegistrationServiceError(
-      'IDEMPOTENCY_IN_PROGRESS',
-      'A registration with this Idempotency-Key is already in progress',
-      409,
+    const provisionalUser = await readUserById(env.D1_01, provisionalUserId)
+    if (
+      !provisionalUser ||
+      provisionalUser.email !== parsed.email ||
+      provisionalUser.username !== parsed.username
+    ) {
+      throw new RegistrationServiceError(
+        'SERVICE_UNAVAILABLE',
+        'Registration recovery state is unavailable',
+        503,
+      )
+    }
+
+    if (
+      provisionalUser.accountState !== ACCOUNT_STATE &&
+      provisionalUser.accountState !== 'ACTIVE'
+    ) {
+      throw new RegistrationServiceError(
+        'REGISTRATION_RETRY_REQUIRED',
+        'The registration is not in a replayable state',
+        409,
+      )
+    }
+
+    return finalizeRegistration(
+      env.D1_01,
+      envelope,
+      provisionalUser.id,
+      policy,
+      now,
     )
   }
 
@@ -555,6 +589,22 @@ export async function registerWithBetterAuth(
     }
 
     createdUserId = String(result.user.id)
+
+    const provisionalResponse = JSON.stringify({
+      provisional: true,
+      userId: createdUserId,
+      accountState: ACCOUNT_STATE,
+    })
+    const bindResult = await env.D1_01
+      .prepare(
+        'UPDATE auth_registration_envelopes SET committed_response = ?, updated_at = ? WHERE id = ? AND state = \'IN_PROGRESS\'',
+      )
+      .bind(provisionalResponse, now.toISOString(), envelope.id)
+      .run()
+
+    if (bindResult.meta?.changes !== 1) {
+      throw new Error('AUTH001_PROVISIONAL_USER_BIND_FAILED')
+    }
   } catch (error) {
     const status =
       error &&
