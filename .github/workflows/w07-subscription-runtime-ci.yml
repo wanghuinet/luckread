@@ -4,19 +4,19 @@ on:
   pull_request:
     paths:
       - 'workers/luck04-commerce/**'
-      - 'workers/W01-payload/src/subscription/**'
-      - 'workers/W01-payload/src/app/api/v1/memberships/**'
-      - 'workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts'
-      - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/luck02-content/src/subscription/**'
+      - 'workers/luck02-content/src/app/api/v1/memberships/**'
+      - 'workers/luck02-content/tests/int/subscription-v1-adapter.int.spec.ts'
+      - 'workers/luck02-content/wrangler.jsonc'
       - '.github/workflows/w07-subscription-runtime-ci.yml'
   push:
     branches: [main]
     paths:
       - 'workers/luck04-commerce/**'
-      - 'workers/W01-payload/src/subscription/**'
-      - 'workers/W01-payload/src/app/api/v1/memberships/**'
-      - 'workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts'
-      - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/luck02-content/src/subscription/**'
+      - 'workers/luck02-content/src/app/api/v1/memberships/**'
+      - 'workers/luck02-content/tests/int/subscription-v1-adapter.int.spec.ts'
+      - 'workers/luck02-content/wrangler.jsonc'
 
 permissions:
   contents: read
@@ -35,10 +35,10 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
       - name: Install W01 test dependencies from committed lockfile
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Run Subscription runtime and adapter tests
-        working-directory: workers/W01-payload
+        working-directory: workers/luck02-content
         run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/luck04-commerce/src/subscription-runtime.test.ts ../../workers/luck04-commerce/src/d1-traffic-guard.test.ts tests/int/subscription-v1-adapter.int.spec.ts
       - name: Verify Subscription migration shape
         run: |
