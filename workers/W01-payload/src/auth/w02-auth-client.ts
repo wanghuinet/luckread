@@ -45,7 +45,27 @@ export async function proxyBetterAuthOperation(request: Request,path:string,meth
 export async function proxyW02Registration(request: Request):Promise<Response>{
   return send(request,'/internal/auth/register','POST',undefined,true)
 }
-type SessionPayload={user?:{id?:string;accountState?:unknown};session?:{id?:string}}|null
-export async function getBetterAuthSession(request:Request):Promise<SessionPayload>{return jsonCall<SessionPayload>(request,'/internal/auth/session','GET')}
-export async function listBetterAuthSessions(request:Request):Promise<Array<Record<string,unknown>>>{return jsonCall<Array<Record<string,unknown>>>(request,'/internal/auth/sessions','GET')}
+type BetterAuthSessionPayload = {
+  user?: {
+    id?: string
+    name?: string | null
+    email?: string | null
+    displayName?: string | null
+    accountState?: string | null
+  }
+  session?: { id?: string }
+} | null
+
+export type BetterAuthSessionItem = {
+  id: string
+  token: string
+  userAgent?: string | null
+  ipAddress?: string | null
+  createdAt: string
+  updatedAt?: string | null
+  expiresAt: string
+}
+
+export async function getBetterAuthSession(request:Request):Promise<BetterAuthSessionPayload>{return jsonCall<BetterAuthSessionPayload>(request,'/internal/auth/session','GET')}
+export async function listBetterAuthSessions(request:Request):Promise<BetterAuthSessionItem[]>{return jsonCall<BetterAuthSessionItem[]>(request,'/internal/auth/sessions','GET')}
 export async function revokeBetterAuthSession(request:Request,token:string):Promise<void>{await jsonCall<null>(request,'/internal/auth/sessions/revoke','POST',{token})}
