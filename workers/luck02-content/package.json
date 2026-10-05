@@ -1,5 +1,5 @@
 {
-  "name": "luckread-w01-payload",
+  "name": "luckread-luck02-content",
   "private": true,
   "version": "0.1.0",
   "description": "LuckRead W01 Payload runtime on Cloudflare D1/R2",
