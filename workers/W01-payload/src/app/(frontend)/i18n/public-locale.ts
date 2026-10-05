@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react'
+
 export type PublicLocale = 'zh' | 'en' | 'tw'
 
 export const PUBLIC_LOCALE_COOKIE = 'luckread-ui-locale'
@@ -231,6 +233,17 @@ const copy: Record<PublicLocale, Copy> = {
     },
   },
 }
+
+const localeListeners = new Set<() => void>()
+
+export const usePublicLocale = (): PublicLocale => useSyncExternalStore(
+  (onStoreChange) => {
+    localeListeners.add(onStoreChange)
+    return () => localeListeners.delete(onStoreChange)
+  },
+  readPublicLocaleCookie,
+  () => 'zh',
+)
 
 export const setPublicLocaleCookie = (locale: PublicLocale): void => {
   if (typeof document === 'undefined') return
