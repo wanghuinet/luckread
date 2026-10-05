@@ -43,6 +43,11 @@
       "binding": "DB",
       "database_id": "6c342634-97f6-4248-9f4a-85772af4f22c",
       "database_name": "luckreadpro"
+    },
+    {
+      "binding": "D1_03_TARGET",
+      "database_id": "bda1d247-a371-4244-91ae-aef96034db7f",
+      "database_name": "secondary"
     }
   ]
 }
