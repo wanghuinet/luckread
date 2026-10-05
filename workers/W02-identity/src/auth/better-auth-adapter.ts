@@ -450,10 +450,33 @@ const adapter = (db: D1Database) =>
       },
 
       updateMany: async ({ model, where, update }: ModelTarget & { where: any[]; update: Record<string, any> }) => {
+        const clauses = where as WhereClause[]
+        if (!clauses.length) throw new Error('BETTER_AUTH_DESTRUCTIVE_EMPTY_UPDATE_DISABLED')
+        if (model !== 'users' && model !== 'users_sessions') return 0
+
+        const setParts: string[] = []
+        const params: unknown[] = []
+        for (const [field, raw] of Object.entries(update)) {
+          const mapped = sqlField(model, field)
+          if (!mapped) continue
+          if (model === 'users' && !['display_name', 'username', 'bio', 'avatar', 'locale', 'timezone', 'account_state', 'account_state_version'].includes(field)) continue
+          if (model === 'users_sessions' && field !== 'expires_at') continue
+          setParts.push(mapped + ' = ?')
+          params.push(raw)
+        }
+        if (!setParts.length) return 0
+
+        const sql = 'UPDATE ' + model + ' SET ' + setParts.join(', ') + buildWhere(model, clauses, params)
+        const result = await db.prepare(sql).bind(...params).run()
+        return Number(result.meta?.changes ?? 0)
+      },
+
+      deleteMany: async ({ model, where }) => {
         const clauses = (where ?? []) as WhereClause[]
         if (!clauses.length) throw new Error('BETTER_AUTH_DESTRUCTIVE_EMPTY_DELETE_DISABLED')
         if (model === 'account') return 0
         if (model !== 'users' && model !== 'users_sessions') return 0
+
         const params: unknown[] = []
         const sql = 'DELETE FROM ' + model + buildWhere(model, clauses, params)
         const result = await db.prepare(sql).bind(...params).run()
