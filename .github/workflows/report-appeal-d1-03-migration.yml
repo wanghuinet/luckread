@@ -19,7 +19,7 @@ env:
   WRANGLER_VERSION: 4.116.0
   EXPECTED_DB_ID: bda1d247-a371-4244-91ae-aef96034db7f
   EXPECTED_DB_NAME: secondary
-  EXPECTED_WORKER: luckread-w06
+  EXPECTED_WORKER: luck04-commerce
   EXPECTED_BINDING: D1_03
 
 jobs:
@@ -44,20 +44,20 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          config = json.loads(Path('workers/W06-governance/wrangler.jsonc').read_text())
-          assert config['name'] == 'luckread-w06'
+          config = json.loads(Path('workers/luck04-commerce/wrangler.jsonc').read_text())
+          assert config['name'] == 'luck04-commerce'
           db = next(x for x in config['d1_databases'] if x['binding'] == 'D1_03')
           assert db['database_id'] == 'bda1d247-a371-4244-91ae-aef96034db7f'
           assert db['database_name'] == 'secondary'
-          assert Path('workers/W06-governance/migrations/0003_moderation_report_v1.sql').is_file()
+          assert Path('workers/luck04-commerce/migrations/0003_moderation_report_v1.sql').is_file()
           print('REPORT_APPEAL_BINDING_SOURCE=PASS')
           PY
       - name: Validate migration locally
         run: |
           set -euo pipefail
-          sqlite3 /tmp/luckread-report.sqlite < workers/W06-governance/migrations/0001_audit_event.sql
-          sqlite3 /tmp/luckread-report.sqlite < workers/W06-governance/migrations/0002_moderation_queue_foundation.sql
-          sqlite3 /tmp/luckread-report.sqlite < workers/W06-governance/migrations/0003_moderation_report_v1.sql
+          sqlite3 /tmp/luckread-report.sqlite < workers/luck04-commerce/migrations/0001_audit_event.sql
+          sqlite3 /tmp/luckread-report.sqlite < workers/luck04-commerce/migrations/0002_moderation_queue_foundation.sql
+          sqlite3 /tmp/luckread-report.sqlite < workers/luck04-commerce/migrations/0003_moderation_report_v1.sql
           sqlite3 -json /tmp/luckread-report.sqlite 'PRAGMA table_info("moderation_reports");' > /tmp/reports-schema.json
           sqlite3 -json /tmp/luckread-report.sqlite 'PRAGMA table_info("moderation_report_idempotency");' > /tmp/report-idem-schema.json
           python - <<'PY'
@@ -74,13 +74,13 @@ jobs:
           print('REPORT_APPEAL_MIGRATION_STATIC=PASS')
           PY
       - name: Apply report migration remotely
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
       - name: Verify remote schema
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
