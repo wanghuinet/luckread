@@ -77,7 +77,6 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const legacyDb = env.D1_01
-    const legacyDb = env.D1_01
     const commerceDb = env.LUCKREAD_D1_MODE === 'new' ? (env.D1_04_TARGET ?? legacyDb) : legacyDb
     try {
       await enforceRateLimit(request, env)
