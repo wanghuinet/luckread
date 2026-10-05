@@ -10,11 +10,6 @@ on:
       - "workers/W01-payload/src/migrations/**"
       - "workers/W01-payload/src/payload.config.ts"
       - "workers/W01-payload/scripts/auth-001-registration-runtime-evidence-local.mjs"
-      - "workers/W02-identity/src/auth/better-auth.ts"
-      - "workers/W02-identity/src/account/registration-runtime.ts"
-      - "workers/W02-identity/src/account/registration-runtime.test.ts"
-      - "workers/W02-identity/src/index.ts"
-      - "workers/W02-identity/migrations/**"
       - "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json"
   pull_request:
     paths:
@@ -24,11 +19,6 @@ on:
       - "workers/W01-payload/src/migrations/**"
       - "workers/W01-payload/src/payload.config.ts"
       - "workers/W01-payload/scripts/auth-001-registration-runtime-evidence-local.mjs"
-      - "workers/W02-identity/src/auth/better-auth.ts"
-      - "workers/W02-identity/src/account/registration-runtime.ts"
-      - "workers/W02-identity/src/account/registration-runtime.test.ts"
-      - "workers/W02-identity/src/index.ts"
-      - "workers/W02-identity/migrations/**"
       - "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json"
   workflow_dispatch:
     inputs:
@@ -82,100 +72,22 @@ jobs:
           test -s workers/W01-payload/src/app/auth/register/route.ts
           test -s workers/W01-payload/src/migrations/20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts
           test -s workers/W01-payload/scripts/auth-001-registration-runtime-evidence-local.mjs
-          test -s workers/W02-identity/src/auth/better-auth.ts
-          test -s workers/W02-identity/src/account/registration-runtime.ts
           test -z "$(git status --short)"
 
       - name: Install W01 dependencies
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
 
-      - name: Install W02 identity dependencies
-        working-directory: workers/W02-identity
-        run: npm install --ignore-scripts --no-audit --no-fund
-
-      - name: Verify Better Auth package
-        working-directory: workers/W02-identity
-        run: node --input-type=module -e "import('better-auth').then(() => console.log('better-auth 1.7.7 import: OK'))"
-
-      - name: Apply W02 role-assignment schema locally
-        working-directory: workers/W02-identity
-        run: pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file migrations/0001_role_assignments.sql
-
-      - name: Apply W02 Better Auth identity schema locally
-        working-directory: workers/W02-identity
-        run: pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file migrations/0005_better_auth_identity_core.sql
-
-      - name: Apply AUTH-001 governance schema to W02 local D1
-        working-directory: workers/W01-payload
-        run: |
-          set -euo pipefail
-          cat > /tmp/auth001-governance-schema.sql <<'SQL'
-          CREATE TABLE `auth_registration_envelopes` (
-            `id` text PRIMARY KEY NOT NULL,
-            `idempotency_key` text NOT NULL,
-            `active_key` text,
-            `scope` text NOT NULL,
-            `endpoint` text NOT NULL,
-            `payload_hash` text NOT NULL,
-            `state` text NOT NULL,
-            `response_digest` text,
-            `committed_response` text,
-            `expires_at` text NOT NULL,
-            `consent_record_id` text,
-            `updated_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
-            `created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
-          );
-          CREATE UNIQUE INDEX `auth_registration_envelopes_active_key_idx` ON `auth_registration_envelopes` (`active_key`);
-          CREATE INDEX `auth_registration_envelopes_idempotency_key_idx` ON `auth_registration_envelopes` (`idempotency_key`);
-          CREATE INDEX `auth_registration_envelopes_scope_endpoint_idx` ON `auth_registration_envelopes` (`scope`, `endpoint`);
-          CREATE INDEX `auth_registration_envelopes_payload_hash_idx` ON `auth_registration_envelopes` (`payload_hash`);
-          CREATE INDEX `auth_registration_envelopes_state_idx` ON `auth_registration_envelopes` (`state`);
-          CREATE INDEX `auth_registration_envelopes_expires_at_idx` ON `auth_registration_envelopes` (`expires_at`);
-          CREATE INDEX `auth_registration_envelopes_consent_record_id_idx` ON `auth_registration_envelopes` (`consent_record_id`);
-          CREATE TABLE `consents` (
-            `id` text PRIMARY KEY NOT NULL,
-            `actor_subject_id` text NOT NULL,
-            `owner_subject_id` text NOT NULL,
-            `resource_id` text NOT NULL,
-            `resource_type` text NOT NULL,
-            `purpose` text NOT NULL,
-            `state` text NOT NULL,
-            `policy_version` text NOT NULL,
-            `legal_basis` text NOT NULL,
-            `withdrawn_at` text,
-            `retention_class` text NOT NULL,
-            `retention_until` text NOT NULL,
-            `source_authority` text NOT NULL,
-            `legal_hold_ref` text,
-            `updated_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
-            `created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
-          );
-          CREATE INDEX `consents_actor_subject_id_idx` ON `consents` (`actor_subject_id`);
-          CREATE INDEX `consents_owner_subject_id_idx` ON `consents` (`owner_subject_id`);
-          CREATE INDEX `consents_resource_id_idx` ON `consents` (`resource_id`);
-          CREATE INDEX `consents_resource_type_idx` ON `consents` (`resource_type`);
-          CREATE INDEX `consents_purpose_idx` ON `consents` (`purpose`);
-          CREATE INDEX `consents_state_idx` ON `consents` (`state`);
-          CREATE INDEX `consents_policy_version_idx` ON `consents` (`policy_version`);
-          CREATE INDEX `consents_legal_basis_idx` ON `consents` (`legal_basis`);
-          CREATE INDEX `consents_withdrawn_at_idx` ON `consents` (`withdrawn_at`);
-          CREATE INDEX `consents_retention_class_idx` ON `consents` (`retention_class`);
-          CREATE INDEX `consents_retention_until_idx` ON `consents` (`retention_until`);
-          CREATE INDEX `consents_source_authority_idx` ON `consents` (`source_authority`);
-          CREATE INDEX `consents_legal_hold_ref_idx` ON `consents` (`legal_hold_ref`);
-          SQL
-          pnpm exec wrangler d1 execute luckread --local --config ../W02-identity/wrangler.jsonc --file /tmp/auth001-governance-schema.sql
-
       - name: Apply exact W01 local migrations
         working-directory: workers/W01-payload
         run: pnpm payload migrate
 
-      - name: Apply already-admitted AUTH-013 D1-01 schema locally to W01 state
+      - name: Apply already-admitted AUTH-013 D1-01 schema locally
         working-directory: workers/W01-payload
         run: |
           set -euo pipefail
           pnpm exec wrangler d1 execute luckread --local --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
+
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
         env:
@@ -185,26 +97,7 @@ jobs:
           set -euo pipefail
           pnpm exec opennextjs-cloudflare build > auth-001-open-next-build.log 2>&1
 
-      - name: Start exact local W02 identity Worker
-        working-directory: workers/W02-identity
-        env:
-          NODE_ENV: development
-        run: |
-          set -euo pipefail
-          pnpm exec wrangler dev --local --port 8788 --config wrangler.jsonc > w02-auth-preview.log 2>&1 &
-          echo $! > w02-auth-preview.pid
-          ready=0
-          for _ in $(seq 1 120); do
-            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8788/ || true)
-            if [ "$code" != "000" ]; then ready=1; break; fi
-            sleep 1
-          done
-          if [ "$ready" -ne 1 ]; then
-            cat w02-auth-preview.log
-            exit 1
-          fi
-
-      - name: Start exact W01 local Worker runtime with connected W02 service binding
+      - name: Start exact W01 local Worker runtime
         working-directory: workers/W01-payload
         env:
           NODE_ENV: production
@@ -220,16 +113,11 @@ jobs:
             sleep 1
           done
           if [ "$ready" -ne 1 ]; then
-            cat ../W02-identity/w02-auth-preview.log
             cat auth-001-open-next-build.log
             cat auth-001-preview.log
             exit 1
           fi
-          if grep -q 'env.W02_AUTH (luckread-w02).*\[not connected\]' auth-001-preview.log; then
-            cat ../W02-identity/w02-auth-preview.log
-            cat auth-001-preview.log
-            exit 1
-          fi
+
       - name: Run AUTH-001 registration batch runtime evidence
         working-directory: workers/W01-payload
         env:
@@ -245,8 +133,6 @@ jobs:
         run: |
           echo "===== W01 OpenNext build log ====="
           tail -n 500 auth-001-open-next-build.log || true
-          echo "===== W02 local preview log ====="
-          tail -n 500 ../W02-identity/w02-auth-preview.log || true
           echo "===== W01 local preview log ====="
           tail -n 500 auth-001-preview.log || true
 
@@ -258,15 +144,14 @@ jobs:
           path: |
             artifacts/mapping-0/auth-001-runtime-local/
             workers/W01-payload/auth-001-open-next-build.log
-            workers/W02-identity/w02-auth-preview.log
             workers/W01-payload/auth-001-preview.log
           if-no-files-found: error
           retention-days: 30
 
       - name: Cleanup local runtime
         if: ${{ always() }}
+        working-directory: workers/W01-payload
         run: |
-          if [ -f workers/W02-identity/w02-auth-preview.pid ]; then kill "$(cat workers/W02-identity/w02-auth-preview.pid)" 2>/dev/null || true; fi
-          if [ -f workers/W01-payload/auth-001-preview.pid ]; then kill "$(cat workers/W01-payload/auth-001-preview.pid)" 2>/dev/null || true; fi
+          if [ -f auth-001-preview.pid ]; then kill "$(cat auth-001-preview.pid)" 2>/dev/null || true; fi
           pkill -TERM -x workerd 2>/dev/null || true
           pkill -TERM -x esbuild 2>/dev/null || true
