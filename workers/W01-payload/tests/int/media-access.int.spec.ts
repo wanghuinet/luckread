@@ -188,7 +188,7 @@ describe('Media upload access', () => {
 it('guards creator media listing before W02 authentication and preserves fail-closed service errors', () => {
   const route = read('src/app/api/v1/media/route.ts')
   const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
-  const authIndex = route.indexOf('const authenticated = await authenticate(request)')
+  const authIndex = route.indexOf('authenticated = await authenticate(request)')
   expect(guardIndex).toBeGreaterThanOrEqual(0)
   expect(authIndex).toBeGreaterThanOrEqual(0)
   expect(guardIndex).toBeLessThan(authIndex)
