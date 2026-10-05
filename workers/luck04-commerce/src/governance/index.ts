@@ -14,6 +14,8 @@ import { createReport, ReportRuntimeError } from './report-runtime'
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
   D1_03: D1Database
+  D1_04_TARGET?: D1Database
+  LUCKREAD_D1_MODE?: string
   W03_CONTENT_MODERATION: Fetcher
   GOVERNANCE_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
   GOVERNANCE_READ_LIMITER?: RateLimitBinding
@@ -224,8 +226,11 @@ const errorResponse = (error: unknown, requestId?: string): Response => {
   return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Moderation service unavailable', details: {} }, requestId: requestId ?? crypto.randomUUID() }, 503)
 }
 
-export default {
+const governanceHandler = {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const legacyDb = env.D1_03
+    const legacyDb = env.D1_03
+    const governanceDb = env.LUCKREAD_D1_MODE === 'new' ? (env.D1_04_TARGET ?? legacyDb) : legacyDb
     try {
       await enforceRateLimit(request, env)
     } catch (error) {
@@ -237,7 +242,7 @@ export default {
     const url = new URL(request.url)
 
     if (url.pathname === '/health' && request.method === 'GET') {
-      return json({ service: 'W06', status: 'ok', auditPersistence: 'enabled', d1Binding: Boolean(env.D1_03), moderationRuntime: 'enabled' })
+      return json({ service: 'W06', status: 'ok', auditPersistence: 'enabled', d1Binding: Boolean(governanceDb), moderationRuntime: 'enabled' })
     }
 
     if (request.method === 'POST' && url.pathname === '/reports') {
@@ -265,7 +270,7 @@ export default {
           (description !== undefined && typeof description !== 'string') ||
           (evidenceRefs !== undefined && (!Array.isArray(evidenceRefs) || evidenceRefs.some((value) => typeof value !== 'string')))
         ) throw new ReportRuntimeError('VALIDATION_FAILED', 400)
-        const result = await createReport(env.D1_03, {
+        const result = await createReport(governanceDb, {
           actorUserId: principal.userId,
           targetType,
           targetId,
@@ -288,7 +293,7 @@ export default {
         requireModerationPermission('listModerationQueue', principal.layer)
         return json({
           ...(await listModerationQueue(
-            env.D1_03,
+            governanceDb,
             principal.userId,
             url.searchParams.get('cursor'),
             url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : null,
@@ -306,7 +311,7 @@ export default {
         const principal = requireW01Transport(request)
         requireModerationPermission('getModerationCase', principal.layer)
         return json({
-          ...(await getModerationCase(env.D1_03, principal.userId, decodeURIComponent(caseMatch[1]))),
+          ...(await getModerationCase(governanceDb, principal.userId, decodeURIComponent(caseMatch[1]))),
           requestId: principal.requestId,
         })
       } catch (error) {
@@ -320,7 +325,7 @@ export default {
         const principal = requireW01Transport(request)
         requireModerationPermission('decideModerationCase', principal.layer)
         const body = parseDecision(await request.json())
-        const result = await decideModerationCase(env.D1_03, env.W03_CONTENT_MODERATION, {
+        const result = await decideModerationCase(governanceDb, env.W03_CONTENT_MODERATION, {
           reviewerId: principal.userId,
           reviewerLayer: principal.layer,
           caseId: decodeURIComponent(decisionMatch[1]),
@@ -342,7 +347,7 @@ export default {
       catch { return json({ error: 'INVALID_AUDIT_EVENT' }, 400) }
       try {
         const event = buildAccountStateChangedAuditEvent(input)
-        await persistAuditEvent(env.D1_03, event)
+        await persistAuditEvent(governanceDb, event)
         return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId }, 201)
       } catch (error) {
         if (error instanceof Error && error.message.startsWith('INVALID_AUDIT_EVENT:')) return json({ error: 'INVALID_AUDIT_EVENT' }, 400)
@@ -355,7 +360,7 @@ export default {
 
   async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
     try {
-      await drainModerationOutbox(env.D1_03, env.W03_CONTENT_MODERATION, 10)
+      await drainModerationOutbox(governanceDb, env.W03_CONTENT_MODERATION, 10)
     } catch {
       // The next scheduled run retries durable outbox records.
     }
@@ -364,7 +369,7 @@ export default {
   async queue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
     for (const message of batch.messages) {
       try {
-        await consumeAccountStateChanged(env.D1_03, message.body)
+        await consumeAccountStateChanged(governanceDb, message.body)
         message.ack()
       } catch (error) {
         if (error instanceof Error && error.message === 'INVALID_AUTH_013_EVENT') {
