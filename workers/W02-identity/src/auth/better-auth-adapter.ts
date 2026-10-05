@@ -217,9 +217,6 @@ const buildCredentialAccount = (row: Row): Row | null => {
     password: packPassword(String(row.salt), String(row.hash)),
     createdAt: new Date(iso(row.created_at)),
     updatedAt: new Date(iso(row.updated_at)),
-    accountId: String(row.id),
-    providerId: 'credential',
-    userId: String(row.id),
   }
 }
 
@@ -317,7 +314,7 @@ const adapter = (db: D1Database) =>
           }
           const params: unknown[] = []
           const row = await db.prepare(
-            'SELECT s.id, s._parent_id, s.created_at, s.expires_at, u.account_state, u.email ' +
+            'SELECT s.id, s._parent_id, s.created_at, s.expires_at, s.created_at AS updatedAt, NULL AS ipAddress, NULL AS userAgent, u.account_state, u.email ' +
               'FROM users_sessions s INNER JOIN users u ON u.id = s._parent_id' +
               buildWhere('users_sessions', clauses, params) + ' LIMIT 1',
           ).bind(...params).first<Row>()
