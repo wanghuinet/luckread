@@ -1,0 +1,17 @@
+{
+  "name": "@luckread/w02-identity-auth",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "better-auth": "1.7.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "@cloudflare/workers-types": "5.20260914.1",
+    "typescript": "5.9.3"
+  }
+}
