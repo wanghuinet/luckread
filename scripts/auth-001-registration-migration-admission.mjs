@@ -44,7 +44,7 @@ if (registrations.filter((name) => name === migrationName).length !== 1) {
   process.exit(1)
 }
 
-const migrationDir = join(root, 'workers', 'W01-payload', 'src', 'migrations')
+const migrationDir = join(root, 'workers', 'luck02-content', 'src', 'migrations')
 const files = execFileSync(
   'find',
   [migrationDir, '-maxdepth', '1', '-type', 'f', '-name', '*.ts', '!', '-name', 'index.ts'],
