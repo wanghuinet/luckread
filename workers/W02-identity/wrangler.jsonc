@@ -3,6 +3,7 @@
   "name": "luckread-w02",
   "main": "src/index.ts",
   "compatibility_date": "2025-08-15",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "triggers": {
     "crons": [

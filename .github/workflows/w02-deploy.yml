@@ -29,6 +29,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Install W02 runtime dependencies
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Verify Better Auth package
+        working-directory: workers/W02-identity
+        run: node --input-type=module -e "import('better-auth').then(() => console.log('better-auth 1.7.7 import: OK'))"
       - name: Verify RoleAssignment migration artifacts
         run: |
           node scripts/generate-role-assignment-migration.mjs

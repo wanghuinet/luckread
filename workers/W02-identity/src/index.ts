@@ -1,3 +1,4 @@
+import { createLuckReadAuth } from './auth/better-auth.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { reconcileCompletedRegistrationMaterialization } from './account/registration-materializer.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
@@ -67,6 +68,10 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
+
+    if (url.pathname === '/api/auth' || url.pathname.startsWith('/api/auth/')) {
+      return createLuckReadAuth({ D1_01: env.D1_01 }).handler(request)
+    }
 
     if (request.method === 'POST' && url.pathname === '/internal/account/transition') {
       const body = await readJsonBody<{
