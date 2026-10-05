@@ -301,8 +301,8 @@ describe('AUTH-011 refresh runtime', () => {
   })
 
   it('denies when authoritative authorization rejects the account', async () => {
-    const db = refreshDb()
-    await expect(refreshSessionFromAuthoritativeD1(db, {
+    const fake = refreshDb()
+    await expect(refreshSessionFromAuthoritativeD1(fake.db, {
       refreshToken: 'v3.old',
       deviceId: 'device-a',
       now: NOW,
