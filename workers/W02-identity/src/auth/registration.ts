@@ -10,16 +10,6 @@ const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
 
 export type RegistrationEnv = BetterAuthEnv & { CLOUDFLARE_ENV?: string }
 
-type D1PreparedStatementLike = {
-  bind: (...args: unknown[]) => D1PreparedStatementLike
-  first: <T>() => Promise<T | null>
-  run: () => Promise<{ meta?: { changes?: number } }>
-}
-
-type D1DatabaseLike = {
-  prepare: (sql: string) => D1PreparedStatementLike
-  batch: (statements: D1PreparedStatementLike[]) => Promise<Array<{ meta?: { changes?: number } }>>
-}
 
 type RegistrationResponse = {
   userId: string
@@ -189,7 +179,7 @@ const validatePolicy = (now: Date, runtimeEnvironment: string) => {
 }
 
 const findUser = async (
-  db: D1DatabaseLike,
+  db: D1Database,
   email: string,
   username: string,
 ): Promise<{ id: string; accountState: string | null } | null> =>
@@ -203,7 +193,7 @@ const findUser = async (
     .bind(email, username)
     .first<{ id: string; accountState: string | null }>()
 
-const hasConsent = async (db: D1DatabaseLike, userId: string, policyVersion: string) =>
+const hasConsent = async (db: D1Database, userId: string, policyVersion: string) =>
   Boolean(
     (
       await db
