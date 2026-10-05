@@ -3,15 +3,21 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 
 import { buildPayloadAccessCookie, issuePayloadAccessToken } from '../../../auth/payload-access-token.js'
-import { establishSession, W02AuthClientError } from '../../../auth/w02-session-client.js'
+import {
+  establishSession,
+  resolveBetterAuthPrincipal,
+  signInWithBetterAuth,
+  W02AuthClientError,
+} from '../../../auth/w02-session-client.js'
 import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 
-const json = (body: unknown, status = 200) =>
+const json = (body: unknown, status = 200, headers: HeadersInit = {}) =>
   new Response(JSON.stringify(body), {
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
+      ...headers,
     },
   })
 
@@ -28,38 +34,6 @@ const errorResponse = (status: number, code: string, message: string) =>
     status,
   )
 
-const classifyPayloadLoginFailure = (error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error)
-  const normalized = message.toLowerCase()
-
-  if (/invalid (?:email|password|credentials)|incorrect password|invalid credentials|password.*(?:invalid|incorrect)/.test(normalized)) {
-    return 'CREDENTIAL_REJECTED'
-  }
-  if (/user.*(?:not found|does not exist)|(?:email|identity).*(?:not found|does not exist)/.test(normalized)) {
-    return 'IDENTITY_NOT_FOUND'
-  }
-  if (/(?:sqlite|d1|database|sql|constraint|column|table|migration)/.test(normalized)) {
-    return 'D1_RUNTIME_OR_SCHEMA'
-  }
-  if (/(?:argon|bcrypt|scrypt|pbkdf|password.*hash|hash.*password|crypto)/.test(normalized)) {
-    return 'PASSWORD_HASH_RUNTIME'
-  }
-  if (/(?:adapter|collection|payload.*auth|auth.*configuration|config)/.test(normalized)) {
-    return 'PAYLOAD_AUTH_RUNTIME'
-  }
-  return 'UNKNOWN'
-}
-
-const sanitizePayloadLoginMessage = (error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error)
-  return message
-    .replace(/Bearer\s+[A-Za-z0-9._~-]+/gi, 'Bearer [REDACTED]')
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[REDACTED_EMAIL]')
-    .replace(/(?:password|credential|token|secret)\s*[:=]\s*[^,;\s]+/gi, '$1=[REDACTED]')
-    .replace(/[A-Za-z0-9+/=_-]{48,}/g, '[REDACTED_LONG_VALUE]')
-    .slice(0, 240)
-}
-
 export async function POST(request: Request): Promise<Response> {
   try {
     const clientIp = request.headers.get('cf-connecting-ip')?.trim() || 'unknown'
@@ -68,8 +42,8 @@ export async function POST(request: Request): Promise<Response> {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
-  let body: { identity?: unknown; credential?: unknown; deviceId?: unknown }
 
+  let body: { identity?: unknown; credential?: unknown; deviceId?: unknown }
   try {
     body = (await request.json()) as { identity?: unknown; credential?: unknown; deviceId?: unknown }
   } catch {
@@ -78,7 +52,7 @@ export async function POST(request: Request): Promise<Response> {
 
   if (
     typeof body.identity !== 'string' ||
-    body.identity.length < 1 ||
+    body.identity.trim().length < 1 ||
     typeof body.credential !== 'string' ||
     body.credential.length < 1 ||
     typeof body.deviceId !== 'string' ||
@@ -88,82 +62,72 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(400, 'VALIDATION_FAILED', 'Invalid authentication request')
   }
 
-  const payload = await getPayload({ config })
-
-  const loginContext: { __luckreadNativeAuthToken?: unknown } = {}
-  let loginResult: Awaited<ReturnType<typeof payload.login>>
+  let nativeAuth
   try {
-    loginResult = await payload.login({
-      collection: 'users',
-      context: loginContext,
-      data: {
-        email: body.identity,
-        password: body.credential,
-      },
+    nativeAuth = await signInWithBetterAuth({
+      email: body.identity.trim().toLowerCase(),
+      password: body.credential,
     })
   } catch (error) {
-    console.error(
-      JSON.stringify({
-        event: 'auth.login.payload_failure',
-        diagnosticCode: 'AUTH002_PAYLOAD_LOGIN_FAILURE',
-        errorName: error instanceof Error ? error.name : typeof error,
-        failureClass: classifyPayloadLoginFailure(error),
-        message: sanitizePayloadLoginMessage(error),
-      }),
-    )
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
+    if (error instanceof W02AuthClientError) {
+      return errorResponse(
+        error.status,
+        error.status === 401 ? 'UNAUTHENTICATED' : error.status === 400 ? 'VALIDATION_FAILED' : 'SERVICE_UNAVAILABLE',
+        error.status === 401 ? 'Authentication denied' : 'Authentication service unavailable',
+      )
+    }
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
 
-  // Payload's native login result intentionally omits token when
-  // removeTokenFromResponses=true. The native afterLogin hook preserves that
-  // exact token only in this request-local context; re-authenticate it through
-  // Payload.auth() to obtain Payload's canonical _sid instead of guessing from
-  // sessions[] ordering.
-  const nativeAuthToken = loginContext.__luckreadNativeAuthToken
-  if (typeof nativeAuthToken !== 'string' || !loginResult.user?.id || !loginResult.exp) {
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication runtime is unavailable')
+  let principal
+  try {
+    principal = await resolveBetterAuthPrincipal(nativeAuth.token)
+  } catch (error) {
+    if (error instanceof W02AuthClientError) {
+      return errorResponse(
+        error.status,
+        error.status === 401 ? 'UNAUTHENTICATED' : error.status === 400 ? 'VALIDATION_FAILED' : 'SERVICE_UNAVAILABLE',
+        error.status === 401 ? 'Authentication denied' : 'Authentication service unavailable',
+      )
+    }
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
 
-  const authResult = await payload.auth({
-    headers: new Headers({
-      Authorization: 'Bearer ' + nativeAuthToken,
-    }),
-    canSetHeaders: false,
-  })
-
-  const nativeUser = authResult.user as (typeof loginResult.user & { _sid?: string }) | null
-  const nativeSid = nativeUser?._sid
-
-  if (!nativeSid || !nativeUser?.id) {
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Native session binding is unavailable')
-  }
+  const payload = await getPayload({ config })
 
   try {
     let session
     try {
       session = await establishSession({
-        sessionId: String(nativeSid),
-        userId: String(nativeUser.id),
+        sessionId: principal.sessionId,
+        userId: principal.userId,
         deviceId: body.deviceId,
       })
     } catch (error) {
       if (!(error instanceof W02AuthClientError) || error.status !== 503) throw error
       await new Promise((resolve) => setTimeout(resolve, 250))
       session = await establishSession({
-        sessionId: String(nativeSid),
-        userId: String(nativeUser.id),
+        sessionId: principal.sessionId,
+        userId: principal.userId,
         deviceId: body.deviceId,
       })
     }
 
     const access = await issuePayloadAccessToken({
       payloadSecret: payload.secret,
-      userId: String(nativeUser.id),
-      email: String(body.identity).toLowerCase().trim(),
-      sessionId: String(nativeSid),
+      userId: principal.userId,
+      email: principal.email.toLowerCase().trim(),
+      sessionId: principal.sessionId,
       expiresAt: session.nativeExpiresAt,
       tokenVersion: session.tokenVersion,
     })
+
+    const headers = new Headers({
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    })
+    if (nativeAuth.setCookie) headers.append('set-cookie', nativeAuth.setCookie)
+    headers.append('set-cookie', buildPayloadAccessCookie(access.token, access.expiresIn, request))
 
     return new Response(
       JSON.stringify({
@@ -174,11 +138,7 @@ export async function POST(request: Request): Promise<Response> {
       }),
       {
         status: 200,
-        headers: {
-          'content-type': 'application/json; charset=utf-8',
-          'cache-control': 'no-store',
-          'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request),
-        },
+        headers,
       },
     )
   } catch (error) {

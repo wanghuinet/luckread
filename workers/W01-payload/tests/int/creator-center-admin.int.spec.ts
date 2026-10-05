@@ -408,7 +408,7 @@ describe('Creator Center admin extension', () => {
     expect(css).toContain('.subscription-card')
   })
 
-  it('keeps frontend and Admin on the same Payload cookie session lifecycle', () => {
+  it('keeps the compatibility Payload cookie alongside the native auth session lifecycle', () => {
     const login = read('src/app/auth/login/route.ts')
     const refresh = read('src/app/auth/refresh/route.ts')
     const logout = read('src/app/auth/logout/route.ts')
@@ -419,7 +419,7 @@ describe('Creator Center admin extension', () => {
     const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
 
     expect(login).toContain('buildPayloadAccessCookie')
-    expect(login).toContain("'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request)")
+    expect(login).toContain("headers.append('set-cookie', buildPayloadAccessCookie(access.token, access.expiresIn, request))")
     expect(refresh).toContain('buildPayloadAccessCookie')
     expect(refresh).toContain("'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request)")
     expect(logout).toContain('buildPayloadClearCookie(request)')
