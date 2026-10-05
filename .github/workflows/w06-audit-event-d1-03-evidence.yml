@@ -33,7 +33,7 @@ jobs:
           node-version: 24
 
       - name: Verify W06 D1-03 binding
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         env:
           EXPECTED_DB_NAME: ${{ inputs.database_name }}
           EXPECTED_DB_ID: bda1d247-a371-4244-91ae-aef96034db7f
@@ -50,7 +50,7 @@ jobs:
           NODE
 
       - name: Capture remote D1-03 evidence
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -111,7 +111,7 @@ jobs:
           NODE
 
       - name: Validate remote evidence
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         run: |
           set -euo pipefail
           node - <<'NODE'
