@@ -49,5 +49,9 @@
       "database_id": "bda1d247-a371-4244-91ae-aef96034db7f",
       "database_name": "secondary"
     }
-  ]
+  ],
+  "vars": {
+    "LUCKREAD_D1_MODE": "legacy"
+  }
+
 }
