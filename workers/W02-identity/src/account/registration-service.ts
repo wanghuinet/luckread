@@ -227,22 +227,25 @@ const parseReplay = (value: string | null): RegistrationResult | null => {
   }
 }
 
+const envelopeSelect = `
+  SELECT
+    id,
+    idempotency_key AS idempotencyKey,
+    payload_hash AS payloadHash,
+    state,
+    committed_response AS committedResponse,
+    expires_at AS expiresAt,
+    consent_record_id AS consentRecordId
+  FROM auth_registration_envelopes
+`
+
 const readEnvelope = async (
   db: D1Database,
   idempotencyKey: string,
 ): Promise<ExistingEnvelope | null> =>
   db
     .prepare(
-      `
-        SELECT
-          id,
-          idempotency_key AS idempotencyKey,
-          payload_hash AS payloadHash,
-          state,
-          committed_response AS committedResponse,
-          expires_at AS expiresAt,
-          consent_record_id AS consentRecordId
-        FROM auth_registration_envelopes
+      envelopeSelect + `
         WHERE idempotency_key = ?
           AND scope = ?
           AND endpoint = ?
@@ -251,6 +254,23 @@ const readEnvelope = async (
       `,
     )
     .bind(idempotencyKey, SCOPE, ENDPOINT)
+    .first<ExistingEnvelope>()
+
+const readEnvelopeByActiveKey = async (
+  db: D1Database,
+  activeKey: string,
+): Promise<ExistingEnvelope | null> =>
+  db
+    .prepare(
+      envelopeSelect + `
+        WHERE active_key = ?
+          AND scope = ?
+          AND endpoint = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `,
+    )
+    .bind(activeKey, SCOPE, ENDPOINT)
     .first<ExistingEnvelope>()
 
 const readUserById = async (
@@ -369,6 +389,7 @@ const finalizeRegistration = async (
 const reserveRegistration = async (
   db: D1Database,
   idempotencyKey: string,
+  identityLockKey: string,
   payloadHash: string,
   responseDigest: string,
   now: Date,
@@ -394,7 +415,7 @@ const reserveRegistration = async (
     current && isExpired(current.expiresAt, now)
       ? db
           .prepare(
-            'DELETE FROM auth_registration_envelopes WHERE id = ? AND active_key = ? AND expires_at <= ?',
+            'DELETE FROM auth_registration_envelopes WHERE id = ? AND idempotency_key = ? AND expires_at <= ?',
           )
           .bind(current.id, idempotencyKey, now.toISOString())
       : null
@@ -417,7 +438,7 @@ const reserveRegistration = async (
       .bind(
         envelopeId,
         idempotencyKey,
-        idempotencyKey,
+        identityLockKey,
         SCOPE,
         ENDPOINT,
         payloadHash,
@@ -437,8 +458,26 @@ const reserveRegistration = async (
     }
   } catch (error) {
     if (isUniqueConstraintError(error)) {
-      const winner = await readEnvelope(db, idempotencyKey)
-      if (winner) return { envelope: winner, fresh: false }
+      const winner = await readEnvelopeByActiveKey(db, identityLockKey)
+      if (winner) {
+        if (winner.idempotencyKey !== idempotencyKey) {
+          throw new RegistrationServiceError(
+            'VALIDATION_FAILED',
+            'Registration could not be completed',
+            422,
+          )
+        }
+
+        if (winner.payloadHash !== payloadHash) {
+          throw new RegistrationServiceError(
+            'IDEMPOTENCY_KEY_REUSE_CONFLICT',
+            'Idempotency key cannot be reused with different input',
+            422,
+          )
+        }
+
+        return { envelope: winner, fresh: false }
+      }
     }
     throw new RegistrationServiceError(
       'SERVICE_UNAVAILABLE',
@@ -490,6 +529,7 @@ export async function registerWithBetterAuth(
   }
 
   parsed.payloadHash = await sha256Hex(JSON.stringify(canonicalize(normalized)))
+  const identityLockKey = 'email:' + parsed.email
   parsed.responseDigest = await sha256Hex(
     JSON.stringify(
       canonicalize({
@@ -507,6 +547,7 @@ export async function registerWithBetterAuth(
   const reservation = await reserveRegistration(
     env.D1_01,
     idempotencyKey,
+    identityLockKey,
     parsed.payloadHash,
     parsed.responseDigest,
     now,
