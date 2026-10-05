@@ -23,6 +23,8 @@ type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: bool
 
 interface Env {
   DB: D1Database
+  D1_03_TARGET?: D1Database
+  LUCKREAD_D1_MODE?: string
   AUTH013_W04_DERIVED_PROJECTION?: ProjectionKV
   SOCIAL_READ_LIMITER?: RateLimitBinding
   SOCIAL_WRITE_LIMITER?: RateLimitBinding
@@ -146,6 +148,7 @@ const parseCommentPath = (pathname: string): string | null => {
 
 const socialHandler = {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const db = env.LUCKREAD_D1_MODE === 'new' ? (env.D1_03_TARGET ?? db) : db
     try {
       const url = new URL(request.url)
       await enforceRateLimit(request, env, request.method === 'GET' ? 'read:' + url.pathname.split('/').slice(0, 4).join('/') : 'write:' + url.pathname.split('/').slice(0, 4).join('/'))
@@ -157,7 +160,7 @@ const socialHandler = {
         requireTransport(request)
         const shareId = decodePathPart(parts[3])
         if (shareId === null) return new Response(null, { status: 400 })
-        return json({ data: await resolveShare(env.DB, shareId), requestId: crypto.randomUUID() })
+        return json({ data: await resolveShare(db, shareId), requestId: crypto.randomUUID() })
       }
 
       if (url.pathname.startsWith('/internal/social/content/')) {
@@ -170,7 +173,7 @@ const socialHandler = {
         if (contentId === null) throw new ShareRuntimeError('VALIDATION_FAILED', 400)
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         return json({
-          data: await createShare(env.DB, actorUserId, contentId, idempotencyKey),
+          data: await createShare(db, actorUserId, contentId, idempotencyKey),
           requestId: crypto.randomUUID(),
         }, 201)
       }
@@ -196,7 +199,7 @@ const socialHandler = {
           if (typeof targetUserId !== 'string' || !targetUserId.trim()) {
             throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
           }
-          const relation = await setRelation(env.DB, actorUserId, targetUserId, relationType)
+          const relation = await setRelation(db, actorUserId, targetUserId, relationType)
           await invalidateRelationshipGraph(actorUserId, targetUserId)
           return json({
             data: relation,
@@ -211,7 +214,7 @@ const socialHandler = {
           if (!idempotencyKey || idempotencyKey.length > 256) {
             throw new BlockMuteRuntimeError('PRECONDITION_REQUIRED', 428)
           }
-          await removeRelation(env.DB, actorUserId, targetFromPath, relationType)
+          await removeRelation(db, actorUserId, targetFromPath, relationType)
           await invalidateRelationshipGraph(actorUserId, targetFromPath)
           return new Response(null, { status: 204 })
         }
@@ -256,7 +259,7 @@ const socialHandler = {
           throw new CommentRuntimeError('VALIDATION_FAILED', 400)
         }
 
-        const result = await updateComment(env.DB, actorUserId, commentId, {
+        const result = await updateComment(db, actorUserId, commentId, {
           body: bodyValue,
           ifMatch,
         })
@@ -286,7 +289,7 @@ const socialHandler = {
         requireInteractionLayer(request)
         const commentId = decodePathPart(commentIdParts[3])
         if (commentId === null) throw new CommentRuntimeError('VALIDATION_FAILED', 400)
-        await deleteComment(env.DB, actorUserId, commentId)
+        await deleteComment(db, actorUserId, commentId)
         return new Response(null, { status: 204 })
       }
 
@@ -300,7 +303,7 @@ const socialHandler = {
             throw new CommentRuntimeError('INVALID_CURSOR', 400)
           }
           const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
-          const page = await listComments(env.DB, commentContentId, cursor, limit, viewerUserId)
+          const page = await listComments(db, commentContentId, cursor, limit, viewerUserId)
           return json({ data: page, requestId: crypto.randomUUID() })
         }
 
@@ -330,7 +333,7 @@ const socialHandler = {
           throw new CommentRuntimeError('VALIDATION_FAILED', 400)
         }
 
-        const comment = await createComment(env.DB, viewerUserId, commentContentId, {
+        const comment = await createComment(db, viewerUserId, commentContentId, {
           body: bodyValue,
           parentId: parentId ?? null,
           idempotencyKey,
@@ -361,19 +364,19 @@ const socialHandler = {
 
         if (request.method === 'GET') {
           return json({
-            data: await getFavoriteStatus(env.DB, viewerUserId, target),
+            data: await getFavoriteStatus(db, viewerUserId, target),
             requestId: crypto.randomUUID(),
           })
         }
 
         if (request.method === 'POST') {
           return json({
-            data: await favorite(env.DB, viewerUserId, target),
+            data: await favorite(db, viewerUserId, target),
             requestId: crypto.randomUUID(),
           })
         }
 
-        await unfavorite(env.DB, viewerUserId, target)
+        await unfavorite(db, viewerUserId, target)
         return new Response(null, { status: 204 })
       }
 
@@ -390,7 +393,7 @@ const socialHandler = {
             }
           : await parseJsonTarget(request)
         if (request.method === 'GET') {
-          const result = await getLikeStatus(env.DB, viewerUserId, target)
+          const result = await getLikeStatus(db, viewerUserId, target)
           return json({ data: result, requestId: crypto.randomUUID() }, 200)
         }
 
@@ -400,10 +403,10 @@ const socialHandler = {
         }
 
         if (request.method === 'POST') {
-          const result = await like(env.DB, viewerUserId, target)
+          const result = await like(db, viewerUserId, target)
           return json({ data: result, requestId: crypto.randomUUID() }, 200)
         }
-        await unlike(env.DB, viewerUserId, target)
+        await unlike(db, viewerUserId, target)
         return new Response(null, { status: 204 })
       }
 
@@ -418,7 +421,7 @@ const socialHandler = {
           if (!idempotencyKey || idempotencyKey.length > 256) {
             throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
           }
-          const row = await follow(env.DB, viewerUserId, path.userId)
+          const row = await follow(db, viewerUserId, path.userId)
           await invalidateRelationshipGraph(viewerUserId, path.userId)
           return json({
             data: {
@@ -437,14 +440,14 @@ const socialHandler = {
           if (!idempotencyKey || idempotencyKey.length > 256) {
             throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
           }
-          await unfollow(env.DB, viewerUserId, path.userId)
+          await unfollow(db, viewerUserId, path.userId)
           await invalidateRelationshipGraph(viewerUserId, path.userId)
           return new Response(null, { status: 204 })
         }
 
         if (request.method === 'GET') {
           requireInteractionLayer(request)
-          const relationship = await getRelationshipGraph(env.DB, viewerUserId, path.userId)
+          const relationship = await getRelationshipGraph(db, viewerUserId, path.userId)
           return json({
             data: {
               following: relationship.following,
@@ -479,8 +482,8 @@ const socialHandler = {
       }
 
       const page = path.kind === 'followers'
-        ? await listFollowers(env.DB, path.userId, cursor, limit)
-        : await listFollowing(env.DB, path.userId, cursor, limit)
+        ? await listFollowers(db, path.userId, cursor, limit)
+        : await listFollowing(db, path.userId, cursor, limit)
 
       return json({
         data: page,
