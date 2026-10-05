@@ -3,8 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
-import PublicLanguageToggle from '../i18n/PublicLanguageToggle'
-import { getPublicCopy, usePublicLocale, type PublicLocale } from '../i18n/public-locale'
+import PublicLanguageToggle, { usePublicLocale } from '../i18n/PublicLanguageToggle'
+import { getPublicCopy, type PublicLocale } from '../i18n/public-locale'
 
 type ContentType = 'article' | 'post' | 'video'
 type ContentItem = {
