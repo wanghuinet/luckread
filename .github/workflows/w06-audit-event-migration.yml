@@ -50,7 +50,7 @@ jobs:
           echo "W06 source CI admission: SUCCESS for $SOURCE_SHA"
 
       - name: Verify W06 D1-03 binding and migration source
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         shell: bash
         env:
           EXPECTED_DB_NAME: ${{ inputs.database_name }}
@@ -74,7 +74,7 @@ jobs:
           test -z "$(git status --short)"
 
       - name: Local migration syntax and invariant check
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         shell: bash
         run: |
           set -euo pipefail
@@ -108,7 +108,7 @@ jobs:
           NODE
 
       - name: Preflight controlled remote target
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -125,14 +125,14 @@ jobs:
           NODE
 
       - name: Apply W06 AuditEvent migration remotely
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx --yes wrangler@4.116.0 d1 migrations apply "${{ inputs.database_name }}" --remote --config wrangler.jsonc
 
       - name: Capture post-migration D1-03 evidence
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
