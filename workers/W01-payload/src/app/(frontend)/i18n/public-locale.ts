@@ -232,4 +232,9 @@ const copy: Record<PublicLocale, Copy> = {
   },
 }
 
+export const setPublicLocaleCookie = (locale: PublicLocale): void => {
+  if (typeof document === 'undefined') return
+  document.cookie = PUBLIC_LOCALE_COOKIE + '=' + locale + '; Path=/; Max-Age=31536000; SameSite=Lax'
+}
+
 export const getPublicCopy = (locale: PublicLocale): Copy => copy[locale]
