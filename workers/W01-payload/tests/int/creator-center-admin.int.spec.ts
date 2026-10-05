@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
@@ -58,14 +58,17 @@ describe('Creator Center admin extension', () => {
     expect(audience.match(/response\.status === 401/g)?.length).toBe(2)
   })
 
-  it('uses the native Payload admin request principal instead of a second login/session system', () => {
-    const view = read('src/app/(payload)/v1beta/CreatorCenter.tsx')
+  it('does not retain the retired Payload Creator Center Admin entry', () => {
+    expect(existsSync(resolve(process.cwd(), 'src/app/(payload)/v1beta/CreatorCenter.tsx'))).toBe(false)
+    expect(existsSync(resolve(process.cwd(), 'src/app/(payload)/v1beta/CreatorCenterAction.tsx'))).toBe(false)
 
-    expect(view).toContain('AdminViewServerProps')
-    expect(view).toContain('initPageResult.req.user')
-    expect(view).not.toContain('sessionStorage')
-    expect(view).not.toContain('accessToken')
-    expect(view).not.toContain('refreshToken')
+    const config = read('src/payload.config.ts')
+    const importMap = read('src/app/(payload)/admin/importMap.js')
+
+    expect(config).not.toContain('CreatorCenterAction')
+    expect(config).not.toContain('creatorCenter:')
+    expect(importMap).not.toContain('CreatorCenterAction')
+    expect(importMap).not.toContain('/app/(payload)/v1beta/CreatorCenter')
   })
 
   it('redirects moderation auth expiry to admin login', () => {
