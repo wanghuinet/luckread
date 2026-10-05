@@ -278,7 +278,7 @@ describe('AUTH-011 refresh runtime', () => {
       email: 'user@example.com',
     })
 
-    await expect(refreshSessionFromAuthoritativeD1(db, {
+    await expect(refreshSessionFromAuthoritativeD1(fake.db, {
       refreshToken: 'v3.old',
       deviceId: 'device-a',
       now: NOW,
