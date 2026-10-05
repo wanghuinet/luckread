@@ -51,12 +51,18 @@ export const validateContentListQuery = (url: URL): URLSearchParams => {
   return query
 }
 
+const AUTHENTICATED_SESSION_COOKIE_NAMES = new Set([
+  'payload-token',
+  'better-auth.session_token',
+  '__Secure-better-auth.session_token',
+])
+
 export const hasAuthenticatedSessionCredential = (request: Request): boolean => {
   if (request.headers.get('Authorization')?.trim()) return true
 
   const cookieHeader = request.headers.get('cookie') ?? ''
   return cookieHeader.split(';').some((part) => {
     const [name, ...value] = part.trim().split('=')
-    return name === 'payload-token' && value.join('=').trim().length > 0
+    return AUTHENTICATED_SESSION_COOKIE_NAMES.has(name) && value.join('=').trim().length > 0
   })
 }
