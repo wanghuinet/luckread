@@ -234,13 +234,13 @@ const readEnvelope = async (
 const readUserByEmail = async (
   db: D1Database,
   email: string,
-): Promise<{ id: string; accountState: string } | null> =>
+): Promise<{ id: string; accountState: string; createdAt: string; username: string } | null> =>
   db
     .prepare(
-      'SELECT CAST(id AS TEXT) AS id, account_state AS accountState FROM "user" WHERE email = ? LIMIT 1',
+      'SELECT CAST(id AS TEXT) AS id, account_state AS accountState, created_at AS createdAt, username FROM "user" WHERE email = ? LIMIT 1',
     )
     .bind(email)
-    .first<{ id: string; accountState: string }>()
+    .first<{ id: string; accountState: string; createdAt: string; username: string }>()
 
 const finalizeRegistration = async (
   db: D1Database,
@@ -350,7 +350,7 @@ const reserveRegistration = async (
   payloadHash: string,
   responseDigest: string,
   now: Date,
-): Promise<ExistingEnvelope> => {
+): Promise<{ envelope: ExistingEnvelope; fresh: boolean }> => {
   const current = await readEnvelope(db, idempotencyKey)
   if (current && !isExpired(current.expiresAt, now)) {
     if (current.payloadHash !== payloadHash) {
@@ -361,7 +361,7 @@ const reserveRegistration = async (
       )
     }
 
-    return current
+    return { envelope: current, fresh: false }
   }
 
   const envelopeId = crypto.randomUUID()
@@ -416,7 +416,7 @@ const reserveRegistration = async (
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       const winner = await readEnvelope(db, idempotencyKey)
-      if (winner) return winner
+      if (winner) return { envelope: winner, fresh: false }
     }
     throw new RegistrationServiceError(
       'SERVICE_UNAVAILABLE',
@@ -433,7 +433,7 @@ const reserveRegistration = async (
       503,
     )
   }
-  return reserved
+  return { envelope: reserved, fresh: true }
 }
 
 export async function registerWithBetterAuth(
@@ -482,13 +482,14 @@ export async function registerWithBetterAuth(
     ),
   )
 
-  const envelope = await reserveRegistration(
+  const reservation = await reserveRegistration(
     env.D1_01,
     idempotencyKey,
     parsed.payloadHash,
     parsed.responseDigest,
     now,
   )
+  const envelope = reservation.envelope
 
   if (envelope.state === 'COMPLETED') {
     const replay = parseReplay(envelope.committedResponse)
@@ -508,20 +509,32 @@ export async function registerWithBetterAuth(
     )
   }
 
-  const knownUser = await readUserByEmail(env.D1_01, parsed.email)
-  if (knownUser) {
+  if (!reservation.fresh) {
+    const knownUser = await readUserByEmail(env.D1_01, parsed.email)
     if (
-      knownUser.accountState !== ACCOUNT_STATE &&
-      knownUser.accountState !== 'ACTIVE'
+      knownUser &&
+      knownUser.username === parsed.username &&
+      Date.parse(knownUser.createdAt) >= Date.parse(envelope.createdAt)
     ) {
-      throw new RegistrationServiceError(
-        'REGISTRATION_RETRY_REQUIRED',
-        'The registration is not in a replayable state',
-        409,
-      )
+      if (
+        knownUser.accountState !== ACCOUNT_STATE &&
+        knownUser.accountState !== 'ACTIVE'
+      ) {
+        throw new RegistrationServiceError(
+          'REGISTRATION_RETRY_REQUIRED',
+          'The registration is not in a replayable state',
+          409,
+        )
+      }
+
+      return finalizeRegistration(env.D1_01, envelope, knownUser.id, policy, now)
     }
 
-    return finalizeRegistration(env.D1_01, envelope, knownUser.id, policy, now)
+    throw new RegistrationServiceError(
+      'IDEMPOTENCY_IN_PROGRESS',
+      'A registration with this Idempotency-Key is already in progress',
+      409,
+    )
   }
 
   const auth = createLuckReadAuth({ D1_01: env.D1_01 })
