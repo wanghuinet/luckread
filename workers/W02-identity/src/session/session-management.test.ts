@@ -132,8 +132,8 @@ describe('AUTH-010 session revoke', () => {
     expect(batchCalls).toHaveLength(1)
     expect(batchCalls[0][0]).toContain('UPDATE auth_session_state')
     expect(batchCalls[0][0]).toContain('user_id = ?')
-    expect(batchCalls[0][1]).toContain('DELETE FROM users_sessions')
-    expect(batchCalls[0][1]).toContain('CAST(_parent_id AS TEXT) = ?')
+    expect(batchCalls[0][1]).toContain('DELETE FROM "session"')
+    expect(batchCalls[0][1]).toContain('CAST(user_id AS TEXT) = ?')
   })
 
   it('fails closed when target session is not owned', async () => {
