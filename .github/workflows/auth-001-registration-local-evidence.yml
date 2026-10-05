@@ -89,6 +89,12 @@ jobs:
           set -euo pipefail
           pnpm exec wrangler d1 execute luckread --local --persist-to "$AUTH001_PERSIST_TO" --config wrangler.jsonc --file ../W02-identity/migrations/0001_role_assignments.sql
 
+      - name: Apply already-admitted RoleAuthorizationVersion D1-01 schema locally
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler d1 execute luckread --local --persist-to "$AUTH001_PERSIST_TO" --config wrangler.jsonc --file ../W02-identity/migrations/0003_role_authorization_versions.sql
+
       - name: Apply already-admitted AUTH-013 D1-01 schema locally
         working-directory: workers/W01-payload
         run: |
