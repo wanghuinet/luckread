@@ -434,7 +434,7 @@ const adapter = (db: D1Database) =>
           const result = await db.prepare(sql).bind(...params).run()
           if (result.meta?.changes === 0) return null
           const id = whereValue(clauses, 'id', 'token')
-          return id === undefined || id === null ? null : selectSession(db, String(id)) as Promise<T | null>
+          return id === undefined || id === null ? null : (await selectSession(db, String(id))) as unknown as T
         }
 
         return null
