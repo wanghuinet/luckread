@@ -1,6 +1,8 @@
-import { execFileSync } from 'node:child_process'
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
+import { execFileSync, spawn } from 'node:child_process'
+import { createWriteStream, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const baseUrl = process.env.AUTH001_BASE_URL || 'http://127.0.0.1:8787'
 const runId = process.env.GITHUB_RUN_ID || 'local'
@@ -8,6 +10,13 @@ const artifactDir = new URL('../../../artifacts/mapping-0/auth-001-runtime-local
 mkdirSync(artifactDir, { recursive: true })
 
 const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+const scriptFile = fileURLToPath(import.meta.url)
+const w01Dir = dirname(scriptFile).replace(/\\scripts$/, '')
+const w02Dir = resolve(w01Dir, '../W02-identity')
+const w02LogPath = resolve(artifactDir, 'w02-auth-preview.log')
+let w02Process = null
+let w01Process = null
+let w02LogStream = null
 const policy = JSON.parse(
   readFileSync(
     new URL('../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json', import.meta.url),
@@ -155,6 +164,159 @@ const countsForEmail = async (email, username) => {
   }
 }
 
+
+const waitForPort = async (url, timeoutMs = 30000) => {
+  const started = Date.now()
+  while (Date.now() - started < timeoutMs) {
+    try {
+      const response = await fetch(url)
+      if (response.status >= 100) return
+    } catch {}
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 500))
+  }
+  throw new Error('Worker did not become reachable: ' + url)
+}
+
+const installAndPrepareW02 = () => {
+  execFileSync('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund'], {
+    cwd: w02Dir,
+    stdio: 'inherit',
+    env: process.env,
+  })
+
+  for (const migration of ['migrations/0001_role_assignments.sql', 'migrations/0005_better_auth_identity_core.sql']) {
+    execFileSync(
+      'npx',
+      ['--yes', 'wrangler@4.116.0', 'd1', 'execute', 'luckread', '--local', '--config', 'wrangler.jsonc', '--file', migration],
+      { cwd: w02Dir, stdio: 'inherit', env: process.env },
+    )
+  }
+
+  const governanceSql = `CREATE TABLE auth_registration_envelopes (
+    id text PRIMARY KEY NOT NULL,
+    idempotency_key text NOT NULL,
+    active_key text,
+    scope text NOT NULL,
+    endpoint text NOT NULL,
+    payload_hash text NOT NULL,
+    state text NOT NULL,
+    response_digest text,
+    committed_response text,
+    expires_at text NOT NULL,
+    consent_record_id text,
+    updated_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+    created_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
+  );
+  CREATE UNIQUE INDEX auth_registration_envelopes_active_key_idx ON auth_registration_envelopes(active_key);
+  CREATE INDEX auth_registration_envelopes_idempotency_key_idx ON auth_registration_envelopes(idempotency_key);
+  CREATE INDEX auth_registration_envelopes_scope_endpoint_idx ON auth_registration_envelopes(scope, endpoint);
+  CREATE INDEX auth_registration_envelopes_payload_hash_idx ON auth_registration_envelopes(payload_hash);
+  CREATE INDEX auth_registration_envelopes_state_idx ON auth_registration_envelopes(state);
+  CREATE INDEX auth_registration_envelopes_expires_at_idx ON auth_registration_envelopes(expires_at);
+  CREATE INDEX auth_registration_envelopes_consent_record_id_idx ON auth_registration_envelopes(consent_record_id);
+  CREATE TABLE consents (
+    id text PRIMARY KEY NOT NULL,
+    actor_subject_id text NOT NULL,
+    owner_subject_id text NOT NULL,
+    resource_id text NOT NULL,
+    resource_type text NOT NULL,
+    purpose text NOT NULL,
+    state text NOT NULL,
+    policy_version text NOT NULL,
+    legal_basis text NOT NULL,
+    withdrawn_at text,
+    retention_class text NOT NULL,
+    retention_until text NOT NULL,
+    source_authority text NOT NULL,
+    legal_hold_ref text,
+    updated_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+    created_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
+  );
+  CREATE INDEX consents_actor_subject_id_idx ON consents(actor_subject_id);
+  CREATE INDEX consents_owner_subject_id_idx ON consents(owner_subject_id);
+  CREATE INDEX consents_resource_id_idx ON consents(resource_id);
+  CREATE INDEX consents_resource_type_idx ON consents(resource_type);
+  CREATE INDEX consents_purpose_idx ON consents(purpose);
+  CREATE INDEX consents_state_idx ON consents(state);
+  CREATE INDEX consents_policy_version_idx ON consents(policy_version);
+  CREATE INDEX consents_legal_basis_idx ON consents(legal_basis);
+  CREATE INDEX consents_withdrawn_at_idx ON consents(withdrawn_at);
+  CREATE INDEX consents_retention_class_idx ON consents(retention_class);
+  CREATE INDEX consents_retention_until_idx ON consents(retention_until);
+  CREATE INDEX consents_source_authority_idx ON consents(source_authority);
+  CREATE INDEX consents_legal_hold_ref_idx ON consents(legal_hold_ref);
+`
+
+  const sqlPath = resolve(artifactDir, 'auth001-governance-schema.sql')
+  writeFileSync(sqlPath, governanceSql)
+  execFileSync(
+    'npx',
+    ['--yes', 'wrangler@4.116.0', 'd1', 'execute', 'luckread', '--local', '--config', resolve(w02Dir, 'wrangler.jsonc'), '--file', sqlPath],
+    { cwd: w01Dir, stdio: 'inherit', env: process.env },
+  )
+}
+
+const startW02 = async () => {
+  w02LogStream = createWriteStream(w02LogPath, { flags: 'a' })
+  w02Process = spawn(
+    'npx',
+    ['--yes', 'wrangler@4.116.0', 'dev', '--local', '--port', '8788', '--config', 'wrangler.jsonc'],
+    { cwd: w02Dir, env: process.env, stdio: ['ignore', w02LogStream, w02LogStream] },
+  )
+  await waitForPort('http://127.0.0.1:8788/')
+}
+
+const stopProcess = (processHandle) => {
+  if (!processHandle || processHandle.killed) return
+  try { processHandle.kill('SIGTERM') } catch {}
+}
+
+const restartW01 = async () => {
+  const pidFile = resolve(w01Dir, 'auth-001-preview.pid')
+  if (existsSync(pidFile)) {
+    try {
+      process.kill(Number(readFileSync(pidFile, 'utf8').trim()), 'SIGTERM')
+    } catch {}
+    try { unlinkSync(pidFile) } catch {}
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 1000))
+  }
+
+  try { unlinkSync(resolve(w01Dir, 'auth-001-preview.log')) } catch {}
+
+  w01Process = spawn(
+    'pnpm',
+    [
+      'exec',
+      'wrangler',
+      'dev',
+      '--local',
+      '--port',
+      '8787',
+      '--var',
+      'PAYLOAD_SECRET:auth001-local-evidence-secret-20260928',
+      '--var',
+      'CLOUDFLARE_ENV:development',
+    ],
+    { cwd: w01Dir, env: process.env, stdio: ['ignore', 'ignore', 'ignore'] },
+  )
+
+  await waitForPort('http://127.0.0.1:8787/')
+
+  const started = Date.now()
+  while (Date.now() - started < 30000) {
+    const log = existsSync(resolve(w01Dir, 'auth-001-preview.log'))
+      ? readFileSync(resolve(w01Dir, 'auth-001-preview.log'), 'utf8')
+      : ''
+    if (log.includes('env.W02_AUTH (luckread-w02)') && log.includes('[connected]')) return
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 500))
+  }
+
+  const log = existsSync(resolve(w01Dir, 'auth-001-preview.log'))
+    ? readFileSync(resolve(w01Dir, 'auth-001-preview.log'), 'utf8')
+    : ''
+  throw new Error('W01 W02_AUTH local service binding did not become connected\n' + log)
+}
+
 const envelopeForKey = async (idempotencyKey) =>
   scalar(
     W02_CONFIG,
@@ -267,7 +429,11 @@ const cleanup = async () => {
 }
 
 try {
+  installAndPrepareW02()
+  await startW02()
+  await restartW01()
   const health = await fetch(baseUrl + '/')
+
   if (health.status >= 500) throw new Error('Local W01 did not start cleanly: HTTP ' + health.status)
 
   const firstResponse = await request(keySuccess, body)
@@ -510,4 +676,7 @@ try {
   console.log(JSON.stringify(result, null, 2))
 } finally {
   await cleanup()
+  stopProcess(w01Process)
+  stopProcess(w02Process)
+  if (w02LogStream) w02LogStream.end()
 }
