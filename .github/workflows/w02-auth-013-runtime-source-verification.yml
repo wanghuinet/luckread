@@ -26,6 +26,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install W02 runtime dependencies
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
       - name: Typecheck W02
         run: npx tsc -p workers/W02-identity/tsconfig.json --noEmit
 
