@@ -11,12 +11,14 @@ mkdirSync(artifactDir, { recursive: true })
 
 const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
 const scriptFile = fileURLToPath(import.meta.url)
-const w01Dir = dirname(scriptFile).replace(/\\scripts$/, '')
+const w01Dir = resolve(dirname(scriptFile), '..')
 const w02Dir = resolve(w01Dir, '../W02-identity')
-const w02LogPath = resolve(artifactDir, 'w02-auth-preview.log')
+const artifactDirPath = fileURLToPath(artifactDir)
+const w02LogPath = resolve(artifactDirPath, 'w02-auth-preview.log')
 let w02Process = null
 let w01Process = null
 let w02LogStream = null
+let w01LogStream = null
 const policy = JSON.parse(
   readFileSync(
     new URL('../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json', import.meta.url),
@@ -247,7 +249,7 @@ const installAndPrepareW02 = () => {
   CREATE INDEX consents_legal_hold_ref_idx ON consents(legal_hold_ref);
 `
 
-  const sqlPath = resolve(artifactDir, 'auth001-governance-schema.sql')
+  const sqlPath = resolve(artifactDirPath, 'auth001-governance-schema.sql')
   writeFileSync(sqlPath, governanceSql)
   execFileSync(
     'npx',
@@ -282,6 +284,7 @@ const restartW01 = async () => {
   }
 
   try { unlinkSync(resolve(w01Dir, 'auth-001-preview.log')) } catch {}
+  w01LogStream = createWriteStream(resolve(w01Dir, 'auth-001-preview.log'), { flags: 'a' })
 
   w01Process = spawn(
     'pnpm',
@@ -297,7 +300,7 @@ const restartW01 = async () => {
       '--var',
       'CLOUDFLARE_ENV:development',
     ],
-    { cwd: w01Dir, env: process.env, stdio: ['ignore', 'ignore', 'ignore'] },
+    { cwd: w01Dir, env: process.env, stdio: ['ignore', w01LogStream, w01LogStream] },
   )
 
   await waitForPort('http://127.0.0.1:8787/')
@@ -678,5 +681,6 @@ try {
   await cleanup()
   stopProcess(w01Process)
   stopProcess(w02Process)
+  if (w01LogStream) w01LogStream.end()
   if (w02LogStream) w02LogStream.end()
 }
