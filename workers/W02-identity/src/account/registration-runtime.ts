@@ -324,6 +324,20 @@ const reserveEnvelope = async (
       throw new Error('AUTH001_REGISTRATION_RESERVATION_INCOMPLETE')
     }
   } catch (error) {
+    console.error(JSON.stringify({
+      event: 'auth.register.better_auth_signup_failure',
+      diagnosticCode: 'AUTH001_BETTER_AUTH_SIGNUP_FAILURE',
+      errorName: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
+      errorStatus:
+        typeof error === 'object' && error !== null && 'status' in error
+          ? Number((error as { status?: unknown }).status)
+          : null,
+      errorCode:
+        typeof error === 'object' && error !== null && 'code' in error
+          ? String((error as { code?: unknown }).code)
+          : null,
+    }))
     if (isUniqueConstraintError(error)) {
       throw new RegistrationRuntimeError(
         'IDEMPOTENCY_IN_PROGRESS',
