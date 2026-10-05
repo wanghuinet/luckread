@@ -10,10 +10,13 @@ type FakeStatement = {
   first: <T>() => Promise<T | null>
 }
 
-const makeDatabase = (state: {
-  envelope: FakeRow | null
-  user: FakeRow | null
-}) => {
+const makeDatabase = (
+  state: {
+    envelope: FakeRow | null
+    user: FakeRow | null
+  },
+  options: { hideEnvelopeLookupByIdempotencyKey?: boolean } = {},
+) => {
   const prepare = (sql: string): FakeStatement => {
     const statement: FakeStatement = {
       sql,
@@ -24,6 +27,12 @@ const makeDatabase = (state: {
       },
       async first<T>() {
         if (sql.includes('FROM auth_registration_envelopes')) {
+          if (
+            options.hideEnvelopeLookupByIdempotencyKey &&
+            sql.includes('WHERE idempotency_key = ?')
+          ) {
+            return null
+          }
           return state.envelope as T | null
         }
         if (sql.includes('FROM "user" WHERE email = ?')) {
@@ -143,6 +152,39 @@ describe('W02 Better Auth registration runtime', () => {
     })
   })
 
+  it('recovers when the reservation is not immediately visible through the idempotency-key index', async () => {
+    const state: { envelope: FakeRow | null; user: FakeRow | null } = {
+      envelope: null,
+      user: {
+        id: 'user-1',
+        email: 'user@example.com',
+        username: 'user1',
+        accountState: 'PENDING_VERIFICATION',
+        accountStateVersion: 1,
+      },
+    }
+    const signUpEmail = vi.fn().mockResolvedValue({
+      user: {
+        id: 'user-1',
+        email: 'user@example.com',
+        username: 'user1',
+        accountState: 'PENDING_VERIFICATION',
+        accountStateVersion: 1,
+      },
+    })
+
+    const result = await registerWithBetterAuth(
+      makeDatabase(state, { hideEnvelopeLookupByIdempotencyKey: true }),
+      { api: { signUpEmail } } as any,
+      input,
+    )
+
+    expect(result).toEqual({
+      userId: 'user-1',
+      accountState: 'PENDING_VERIFICATION',
+    })
+    expect(signUpEmail).toHaveBeenCalledOnce()
+  })
   it('replays a completed registration without invoking Better Auth again', async () => {
     const state: { envelope: FakeRow | null; user: FakeRow | null } = {
       envelope: {
