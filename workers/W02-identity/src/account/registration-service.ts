@@ -38,6 +38,7 @@ type RegistrationPolicy = {
 
 type DatabaseEnv = {
   D1_01: D1Database
+  BETTER_AUTH_SECRET: string
   CLOUDFLARE_ENV?: string
 }
 
@@ -573,7 +574,7 @@ export async function registerWithBetterAuth(
     )
   }
 
-  const auth = createLuckReadAuth({ D1_01: env.D1_01 })
+  const auth = createLuckReadAuth({ D1_01: env.D1_01, BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET })
 
   let createdUserId: string
   try {
