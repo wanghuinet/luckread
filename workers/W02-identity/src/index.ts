@@ -29,6 +29,7 @@ interface Env {
   AUTH013_PROJECTION_QUEUE: Queue
   AUTH003_CREDENTIAL_HASH_KEY?: string
   AUTH003_CREDENTIAL_HASH_KEY_PREVIOUS?: string
+  BETTER_AUTH_SECRET: string
 }
 
 type ResolveLayerRequest = {
@@ -72,7 +73,7 @@ export default {
     const url = new URL(request.url)
 
     if (url.pathname === '/api/auth' || url.pathname.startsWith('/api/auth/')) {
-      return createLuckReadAuth({ D1_01: env.D1_01 }).handler(request)
+      return createLuckReadAuth({ D1_01: env.D1_01, BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET }).handler(request)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/register') {
