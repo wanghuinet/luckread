@@ -289,8 +289,8 @@ describe('AUTH-011 refresh runtime', () => {
   })
 
   it('fails closed on wrong device binding before rotation', async () => {
-    const db = refreshDb()
-    await expect(refreshSessionFromAuthoritativeD1(db, {
+    const fake = refreshDb()
+    await expect(refreshSessionFromAuthoritativeD1(fake.db, {
       refreshToken: 'v3.old',
       deviceId: 'device-wrong',
       now: NOW,
@@ -313,9 +313,9 @@ describe('AUTH-011 refresh runtime', () => {
   })
 
   it('allows at most one concurrent rotation for the same predecessor', async () => {
-    const db = refreshDb()
+    const fake = refreshDb()
     const results = await Promise.allSettled([
-      refreshSessionFromAuthoritativeD1(db, {
+      refreshSessionFromAuthoritativeD1(fake.db, {
         refreshToken: 'v3.old',
         deviceId: 'device-a',
         now: NOW,
@@ -323,7 +323,7 @@ describe('AUTH-011 refresh runtime', () => {
         hashToken: async (value) => 'hash:' + value,
         resolveLayer: async () => ({ decision: 'ALLOW', layer: 'L2' }),
       }),
-      refreshSessionFromAuthoritativeD1(db, {
+      refreshSessionFromAuthoritativeD1(fake.db, {
         refreshToken: 'v3.old',
         deviceId: 'device-a',
         now: NOW,
