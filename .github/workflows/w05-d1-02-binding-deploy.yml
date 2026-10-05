@@ -21,7 +21,7 @@ permissions:
 
 env:
   EXPECTED_DB_UUID: 6c342634-97f6-4248-9f4a-85772af4f22c
-  EXPECTED_WORKER: luckread-w05
+  EXPECTED_WORKER: luck03-social
 
 jobs:
   deploy:
@@ -48,12 +48,12 @@ jobs:
       - name: Verify binding contract before deployment
         run: |
           set -euo pipefail
-          test -f workers/W05-social/wrangler.jsonc
-          jq -e --arg worker "$EXPECTED_WORKER" '.name == $worker' workers/W05-social/wrangler.jsonc >/dev/null
-          jq -e --arg db "$EXPECTED_DB_UUID"             '.d1_databases | length == 1 and .[0].binding == "DB" and .[0].database_id == $db'             workers/W05-social/wrangler.jsonc >/dev/null
+          test -f workers/luck03-social/wrangler.jsonc
+          jq -e --arg worker "$EXPECTED_WORKER" '.name == $worker' workers/luck03-social/wrangler.jsonc >/dev/null
+          jq -e --arg db "$EXPECTED_DB_UUID"             '.d1_databases | length == 1 and .[0].binding == "DB" and .[0].database_id == $db'             workers/luck03-social/wrangler.jsonc >/dev/null
 
       - name: Verify W05 traffic guard bindings
-        working-directory: workers/W05-social
+        working-directory: workers/luck03-social
         run: |
           node - <<'NODE'
           const fs=require('fs')
@@ -68,7 +68,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        working-directory: workers/W05-social
+        working-directory: workers/luck03-social
         run: |
           set -euo pipefail
           npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
