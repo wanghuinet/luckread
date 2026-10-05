@@ -114,6 +114,14 @@ export async function POST(request: Request): Promise<Response> {
     await enforceAuthRateLimit(request, 'AUTH_REGISTER_LIMITER', ['ip:' + clientIp])
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    console.error(
+      JSON.stringify({
+        event: 'auth.register.w01_rate_limit_failure',
+        diagnosticCode: 'AUTH001_W01_RATE_LIMIT_FAILURE',
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
+      }),
+    )
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
 
