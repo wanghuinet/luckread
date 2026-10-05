@@ -246,6 +246,17 @@ const finalizeRegistration = async (
   const currentReplay = current ? parseReplay(current.committedResponse) : null
   if (currentReplay) return currentReplay
 
+  console.error(JSON.stringify({
+    event: 'auth.register.registration_finalize_incomplete',
+    diagnosticCode: 'AUTH001_REGISTRATION_FINALIZE_INCOMPLETE',
+    envelopeId: envelope.id,
+    batchResultCount: result.length,
+    updateChanges: result[1]?.meta?.changes ?? null,
+    observedState: current?.state ?? null,
+    hasCommittedResponse: Boolean(current?.committedResponse),
+    hasConsentRecordId: Boolean(current?.consentRecordId),
+  }))
+
   throw new RegistrationRuntimeError(
     'SERVICE_UNAVAILABLE',
     'registration completion was not committed',
