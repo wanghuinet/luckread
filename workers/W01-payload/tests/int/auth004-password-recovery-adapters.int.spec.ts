@@ -2,6 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   getPayload: vi.fn(),
+  changePasswordThroughW02: vi.fn(),
+  W02PasswordClientError: class extends Error {
+    constructor(
+      readonly status: number,
+      readonly code: string,
+      message: string,
+    ) {
+      super(message)
+    }
+  },
 }))
 
 vi.mock('payload', () => ({
@@ -10,6 +20,11 @@ vi.mock('payload', () => ({
 
 vi.mock('@payload-config', () => ({
   default: {},
+}))
+
+vi.mock('@/auth/w02-password-client', () => ({
+  changePasswordThroughW02: mocks.changePasswordThroughW02,
+  W02PasswordClientError: mocks.W02PasswordClientError,
 }))
 
 import { POST as postPasswordChange } from '../../src/app/auth/password/change/route.js'
@@ -37,6 +52,7 @@ function jsonRequest(
 describe('AUTH-004 W01 Payload-native recovery adapters', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.changePasswordThroughW02.mockResolvedValue(undefined)
   })
 
   it('requires the contracted Idempotency-Key before password-change work', async () => {
@@ -50,19 +66,10 @@ describe('AUTH-004 W01 Payload-native recovery adapters', () => {
     expect(response.status).toBe(400)
     expect(await response.text()).toContain('IDEMPOTENCY_KEY_REQUIRED')
     expect(mocks.getPayload).not.toHaveBeenCalled()
+    expect(mocks.changePasswordThroughW02).not.toHaveBeenCalled()
   })
 
-  it('uses the verified Payload-native principal and delegates password change to native login/update', async () => {
-    const user = { id: 'user-7', email: 'User7@Example.com' }
-    const login = vi.fn().mockResolvedValue({ user })
-    const update = vi.fn().mockResolvedValue({ id: user.id })
-
-    mocks.getPayload.mockResolvedValue({
-      auth: vi.fn().mockResolvedValue({ user }),
-      login,
-      update,
-    })
-
+  it('delegates password change to the W02 Better Auth authority without trusting caller-supplied user identity', async () => {
     const response = await postPasswordChange(
       jsonRequest(
         'https://luckread.test/auth/password/change',
@@ -78,29 +85,20 @@ describe('AUTH-004 W01 Payload-native recovery adapters', () => {
     expect(response.status).toBe(204)
     expect(await response.text()).toBe('')
     expect(response.headers.get('cache-control')).toBe('no-store')
-    expect(login).toHaveBeenCalledWith({
-      collection: 'users',
-      data: {
-        email: user.email,
-        password: CURRENT_PASSWORD,
+    expect(mocks.getPayload).not.toHaveBeenCalled()
+    expect(mocks.changePasswordThroughW02).toHaveBeenCalledWith(
+      expect.any(Request),
+      {
+        currentPassword: CURRENT_PASSWORD,
+        newPassword: NEW_PASSWORD,
       },
-    })
-    expect(update).toHaveBeenCalledWith({
-      collection: 'users',
-      id: user.id,
-      data: { password: NEW_PASSWORD },
-      user,
-      overrideAccess: false,
-    })
+    )
   })
 
-  it('fails closed when Payload-native password update fails unexpectedly', async () => {
-    const user = { id: 'user-8', email: 'user8@example.com' }
-    mocks.getPayload.mockResolvedValue({
-      auth: vi.fn().mockResolvedValue({ user }),
-      login: vi.fn().mockResolvedValue({ user }),
-      update: vi.fn().mockRejectedValue(new Error('database exploded')),
-    })
+  it('fails closed when W02 password change service fails unexpectedly', async () => {
+    mocks.changePasswordThroughW02.mockRejectedValue(
+      new mocks.W02PasswordClientError(503, 'SERVICE_UNAVAILABLE', 'database exploded'),
+    )
 
     const response = await postPasswordChange(
       jsonRequest(
@@ -117,6 +115,7 @@ describe('AUTH-004 W01 Payload-native recovery adapters', () => {
     const body = await response.json()
     expect(body.error.code).toBe('SERVICE_UNAVAILABLE')
     expect(JSON.stringify(body)).not.toContain('database exploded')
+    expect(mocks.getPayload).not.toHaveBeenCalled()
   })
 
   it('keeps reset request enumeration-resistant and delegates to Payload forgotPassword', async () => {

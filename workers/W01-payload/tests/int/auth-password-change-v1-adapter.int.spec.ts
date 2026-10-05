@@ -17,11 +17,16 @@ describe('versioned auth password change adapter', () => {
 })
 
 
-it('guards password changes before Payload authentication', () => {
+it('guards password changes before delegating to W02', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/app/auth/password/change/route.ts'), 'utf8')
   const guardIndex = route.indexOf('await enforceW01WriteRateLimit(request)')
-  const authIndex = route.indexOf('const authResult = await payload.auth(')
+  const authorityIndex = route.indexOf(
+    'await changePasswordThroughW02(',
+    route.indexOf('export async function POST'),
+  )
   expect(guardIndex).toBeGreaterThanOrEqual(0)
-  expect(authIndex).toBeGreaterThanOrEqual(0)
-  expect(guardIndex).toBeLessThan(authIndex)
+  expect(authorityIndex).toBeGreaterThanOrEqual(0)
+  expect(guardIndex).toBeLessThan(authorityIndex)
+  expect(route).not.toContain("from 'payload'")
+  expect(route).not.toContain('payload.auth(')
 })

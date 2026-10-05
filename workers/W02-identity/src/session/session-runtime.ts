@@ -632,3 +632,41 @@ export async function refreshSessionFromAuthoritativeD1(
     email: context.email,
   }
 }
+export async function reconcileOrphanedSessionExtensions(
+  db: D1Database,
+  userId: string,
+  keepSessionId: string,
+  now: string,
+): Promise<number> {
+  if (typeof userId !== 'string' || userId.length < 1 || userId.length > 128) {
+    throw new SessionRuntimeError('INVALID_INPUT', 'userId is required')
+  }
+  if (typeof keepSessionId !== 'string' || keepSessionId.length > 128) {
+    throw new SessionRuntimeError('INVALID_INPUT', 'keepSessionId is invalid')
+  }
+  if (Number.isNaN(Date.parse(now))) {
+    throw new SessionRuntimeError('INVALID_INPUT', 'now is invalid')
+  }
+
+  try {
+    const result = await db.prepare(`
+      UPDATE auth_session_state
+         SET revoked_at = ?,
+             last_seen_at = ?,
+             token_version = token_version + 1
+       WHERE user_id = ?
+         AND revoked_at IS NULL
+         AND (CAST(session_id AS TEXT) <> ? OR ? = '')
+         AND NOT EXISTS (
+           SELECT 1
+             FROM "session" AS native_session
+            WHERE CAST(native_session.id AS TEXT) = CAST(auth_session_state.session_id AS TEXT)
+              AND CAST(native_session.user_id AS TEXT) = auth_session_state.user_id
+         )
+    `).bind(now, now, userId, keepSessionId, keepSessionId).run()
+
+    return Number(result.meta?.changes ?? 0)
+  } catch {
+    throw new SessionRuntimeError('CONFLICT', 'orphaned session reconciliation failed')
+  }
+}

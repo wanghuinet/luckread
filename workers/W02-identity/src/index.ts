@@ -21,6 +21,7 @@ import {
   revokeCurrentUserSession,
   SessionManagementError,
 } from './session/session-management.js'
+import { changePasswordWithBetterAuth, PasswordChangeServiceError } from './account/password-change.js'
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
 import {
   getAuthenticatedUserProfile,
@@ -183,6 +184,49 @@ export default {
         return await getPublicUserProfileByUsername(env.D1_01, username)
       } catch {
         return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Profile service unavailable' } }, 503)
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/password/change') {
+      const body = await readJsonBody<{
+        currentPassword?: unknown
+        newPassword?: unknown
+      }>(request)
+
+      if (!body || typeof body.currentPassword !== 'string' || typeof body.newPassword !== 'string') {
+        return json(
+          { error: { code: 'VALIDATION_FAILED', message: 'invalid password change request' } },
+          400,
+        )
+      }
+
+      try {
+        await changePasswordWithBetterAuth(
+          env.D1_01,
+          request,
+          env.BETTER_AUTH_SECRET,
+          {
+            currentPassword: body.currentPassword,
+            newPassword: body.newPassword,
+          },
+        )
+        return json({ changed: true })
+      } catch (error) {
+        if (error instanceof PasswordChangeServiceError) {
+          return json(
+            {
+              error: {
+                code: error.code,
+                message: error.message,
+              },
+            },
+            error.status,
+          )
+        }
+        return json(
+          { error: { code: 'SERVICE_UNAVAILABLE', message: 'Password change service unavailable' } },
+          503,
+        )
       }
     }
 

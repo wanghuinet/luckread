@@ -48,7 +48,7 @@ jobs:
         run: npm ci
 
       - name: Run W02 session runtime tests
-        run: npx vitest@3.2.4 run workers/W02-identity/src/session/session-runtime.test.ts
+        run: npx vitest@3.2.4 run workers/W02-identity/src/session/session-runtime.test.ts workers/W02-identity/src/account/password-change.test.ts
 
 
   credential-key-boundary:
