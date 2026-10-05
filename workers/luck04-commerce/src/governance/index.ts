@@ -229,7 +229,6 @@ const errorResponse = (error: unknown, requestId?: string): Response => {
 const governanceHandler = {
   async fetch(request: Request, env: Env): Promise<Response> {
     const legacyDb = env.D1_03
-    const legacyDb = env.D1_03
     const governanceDb = env.LUCKREAD_D1_MODE === 'new' ? (env.D1_04_TARGET ?? legacyDb) : legacyDb
     try {
       await enforceRateLimit(request, env)
