@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   wire:
-    if: "${{ !contains(github.event.pull_request.head.sha, '') && github.head_ref == 'migration/1.1-six-worker-20261005' }}"
+    if: github.head_ref == 'migration/1.1-six-worker-20261005'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
