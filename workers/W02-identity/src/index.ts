@@ -1,6 +1,5 @@
 import { createLuckReadAuth } from './auth/better-auth.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
-import { reconcileCompletedRegistrationMaterialization } from './account/registration-materializer.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
 import {
   AccountStateTransitionError,
@@ -21,6 +20,7 @@ import {
   SessionManagementError,
 } from './session/session-management.js'
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
+import { RegistrationRuntimeError, registerWithBetterAuth } from './account/registration-runtime.js'
 
 interface Env {
   D1_01: D1Database
@@ -74,6 +74,87 @@ export default {
       return createLuckReadAuth({ D1_01: env.D1_01 }).handler(request)
     }
 
+    if (request.method === 'POST' && url.pathname === '/internal/auth/register') {
+      const body = await readJsonBody<{
+        idempotencyKey?: unknown
+        payloadHash?: unknown
+        responseDigest?: unknown
+        email?: unknown
+        password?: unknown
+        username?: unknown
+        policy?: unknown
+        now?: unknown
+      }>(request)
+
+      if (
+        !body ||
+        typeof body.idempotencyKey !== 'string' ||
+        body.idempotencyKey.length === 0 ||
+        typeof body.payloadHash !== 'string' ||
+        body.payloadHash.length === 0 ||
+        typeof body.responseDigest !== 'string' ||
+        body.responseDigest.length === 0 ||
+        typeof body.email !== 'string' ||
+        typeof body.password !== 'string' ||
+        typeof body.username !== 'string' ||
+        !body.policy ||
+        typeof body.policy !== 'object' ||
+        typeof (body.policy as { policyVersion?: unknown }).policyVersion !== 'string' ||
+        typeof (body.policy as { retentionUntil?: unknown }).retentionUntil !== 'string' ||
+        typeof (body.policy as { sourceAuthority?: unknown }).sourceAuthority !== 'string' ||
+        (body.now !== undefined && typeof body.now !== 'string')
+      ) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid registration request' } }, 400)
+      }
+
+      try {
+        const result = await registerWithBetterAuth(
+          env.D1_01,
+          createLuckReadAuth({ D1_01: env.D1_01 }),
+          {
+            idempotencyKey: body.idempotencyKey,
+            payloadHash: body.payloadHash,
+            responseDigest: body.responseDigest,
+            email: body.email,
+            password: body.password,
+            username: body.username,
+            policy: {
+              policyVersion: (body.policy as { policyVersion: string }).policyVersion,
+              retentionUntil: (body.policy as { retentionUntil: string }).retentionUntil,
+              sourceAuthority: (body.policy as { sourceAuthority: string }).sourceAuthority,
+            },
+            now: typeof body.now === 'string' ? body.now : new Date().toISOString(),
+          },
+        )
+        return json(result, 201)
+      } catch (error) {
+        if (error instanceof RegistrationRuntimeError) {
+          const status =
+            error.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' ? 422 :
+            error.code === 'IDEMPOTENCY_IN_PROGRESS' ? 409 :
+            error.code === 'REGISTRATION_RETRY_REQUIRED' ? 409 :
+            error.code === 'REGISTRATION_CONFLICT' ? 422 :
+            503
+          return json({
+            error: {
+              code: status === 422 ? 'VALIDATION_FAILED' : status === 409 ? 'IDEMPOTENCY_IN_PROGRESS' : 'SERVICE_UNAVAILABLE',
+              message: status === 422
+                ? 'Registration could not be completed'
+                : status === 409
+                  ? 'A registration with this Idempotency-Key is already in progress'
+                  : 'registration service unavailable',
+            },
+          }, status)
+        }
+
+        console.error(JSON.stringify({
+          event: 'auth.register.w02_runtime_failure',
+          diagnosticCode: 'AUTH001_W02_REGISTRATION_RUNTIME_FAILURE',
+          errorName: error instanceof Error ? error.name : typeof error,
+        }))
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'registration service unavailable' } }, 503)
+      }
+    }
     if (request.method === 'POST' && url.pathname === '/internal/account/transition') {
       const body = await readJsonBody<{
         subjectId?: unknown
@@ -443,26 +524,5 @@ export default {
 
   async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
     await publishPendingAccountStateEvents(env)
-
-    try {
-      const report = await reconcileCompletedRegistrationMaterialization(env.D1_01, env)
-      if (report.failed.length > 0) {
-        console.error(JSON.stringify({
-          event: 'auth.register.materialization_partial_failure',
-          diagnosticCode: 'AUTH001_MATERIALIZATION_PARTIAL_FAILURE',
-          scanned: report.scanned,
-          materialized: report.materialized,
-          alreadyConverged: report.alreadyConverged,
-          failedCount: report.failed.length,
-          failureCodes: report.failed.map((entry) => entry.code),
-        }))
-      }
-    } catch (error) {
-      console.error(JSON.stringify({
-        event: 'auth.register.materialization_unavailable',
-        diagnosticCode: 'AUTH001_MATERIALIZATION_UNAVAILABLE',
-        errorName: error instanceof Error ? error.name : typeof error,
-      }))
-    }
   },
 }
