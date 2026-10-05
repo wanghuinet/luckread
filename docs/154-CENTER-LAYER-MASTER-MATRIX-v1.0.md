@@ -13,20 +13,20 @@
 
 | Center | Primary Authority | 主要体验职责 |
 |---|---|---|
-| 用户中心 | User / Identity | 账户、资料、安全、隐私、偏好 |
-| 个人内容空间 | Content / Social / Activity | 我的作品、草稿、收藏、历史、关注、评论 |
-| 创作者中心 | Creator / Content / Production | 创作、作品、素材、发布、粉丝、数据、商业化 |
+| 用户中心 | W02 Identity / Account / Better Auth | 账户、资料、安全、隐私、偏好；平台身份唯一入口 |
+| 个人内容空间 | W03 Content + W05 Social | 我的作品、草稿、收藏、历史、关注、评论 |
+| 创作者中心 | W08 Creator / Organization | 创作者身份、资格、工作空间、团队关系与经营入口 |
 | MCN中心 | MCN / Organization | 团队、成员、作品、经营、协作、收益 |
 | 商家中心 | Merchant / Commerce | 店铺、商品、订单、履约、经营 |
 | 广告主中心 | Advertising | Campaign、创意、预算、投放、归因 |
-| 开发者中心 | Open Platform | 应用、API、凭证、版本、Webhook、开发者经营 |
+| 开发者中心 | W12 External Developer / Integration | 应用、API、凭证、版本、Webhook、小游戏/外部集成 |
 | IP中心 | Content / IP Graph | IP、作品、角色、系列、关系、商业化 |
 | 版权/权益中心 | Rights | 权属、授权、地域、期限、争议、证据 |
-| 订单中心 | Commerce / Fulfillment | 订单、支付结果、权益、履约、售后 |
-| 收益/钱包中心 | Ledger / Settlement | 收益、余额、结算、提现、资金解释 |
+| 订单中心 | W07 Subscription / Commerce / Payment | 订单、支付结果、权益、履约、售后 |
+| 收益/钱包中心 | W07 Commerce / Financial Authority | 收益、余额、结算、提现、资金解释 |
 | 社区中心 | Social / Community | 社区、成员、主题、互动、治理入口 |
 | 消息中心 | Notification / IM | Inbox、会话、通知、任务消息 |
-| 安全中心 | Identity / Risk | 设备、会话、认证、恢复、安全告警 |
+| 安全中心 | W02 Identity / W06 Trust & Safety | 设备、会话、认证、恢复、安全告警 |
 | 审核治理中心 | Moderation / Risk / Rights | 审核、案件、证据、处罚、申诉、恢复 |
 | 数据/增长中心 | Analytics / Growth | 指标、诊断、实验、增长行动 |
 | 平台运营中心 | Platform Operations | 发布、健康、故障、容量、成本、审计 |
@@ -48,6 +48,21 @@ Center 禁止：
 - 绕过领域 API 直接读取/修改业务表；
 - 以缓存、搜索索引或统计结果覆盖权威状态；
 - 把多个 Domain 的责任重新合并为不可审计的“大中心服务”。
+
+
+
+## 3.1 1.1 Authority Alignment
+
+For 1.1, the User Center is explicitly separated from Payload:
+
+- **W02 / Better Auth** is the platform User Center authority.
+- **W08** is the Creator / Organization authority.
+- **W03 / Payload boundary** is the Content / Article / Media / Translation authority.
+- **W06** owns Rights / Trust & Safety / Governance.
+- **W07** owns Subscription / Commerce / Payment / Advertising.
+- **W12** owns external developer/integration execution.
+
+L1-L8 permissions are resolved through the canonical authorization contract. Centers compose and explain domain state; they do not create a second authority.
 
 ## 4. Global Experience Contract
 
