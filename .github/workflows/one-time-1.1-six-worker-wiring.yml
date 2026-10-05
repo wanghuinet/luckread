@@ -1,6 +1,8 @@
 name: one-time 1.1 six-worker wiring
 
 on:
+  push:
+    branches: [migration/1.1-six-worker-20261005]
   pull_request:
     types: [opened, synchronize]
     branches: [main]
