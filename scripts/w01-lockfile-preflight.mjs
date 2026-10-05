@@ -22,12 +22,12 @@ function run(command, args) {
   }
 }
 
-if (!existsSync(pkgPath)) fail('workers/W01-payload/package.json is missing')
+if (!existsSync(pkgPath)) fail('workers/luck02-content/package.json is missing')
 
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
-// Current W01 lock per workers/W01-payload/package.json (authoritative).
+// Current Content Worker lock per workers/luck02-content/package.json (authoritative).
 // The upstream Cloudflare-template observation (3.82.1 family) is recorded
-// separately in workers/W01-payload/PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md.
+// separately in workers/luck02-content/PAYLOAD-CLOUDFLARE-D1-UPSTREAM-MANIFEST.md.
 const required = {
   payload: '3.90.2',
   '@payloadcms/db-d1-sqlite': '3.90.2',
@@ -70,8 +70,8 @@ if (existsSync(lockPath)) {
 }
 
 console.log('BLOCKED: W01 pnpm-lock.yaml is missing.')
-console.log('Generate it only from workers/W01-payload with the controlled Node/pnpm toolchain:')
-console.log('  cd workers/W01-payload')
+console.log('Generate it only from workers/luck02-content with the controlled Node/pnpm toolchain:')
+console.log('  cd workers/luck02-content')
 console.log('  pnpm install --lockfile-only --ignore-workspace')
-console.log('Then commit workers/W01-payload/pnpm-lock.yaml and rerun the W01 schema evidence probe.')
+console.log('Then commit workers/luck02-content/pnpm-lock.yaml and rerun the Content Worker schema evidence probe.')
 process.exit(2)
