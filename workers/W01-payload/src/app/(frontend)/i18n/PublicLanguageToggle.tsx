@@ -3,8 +3,8 @@
 import { useState } from 'react'
 
 import {
-  PUBLIC_LOCALE_COOKIE,
   PUBLIC_LOCALES,
+  setPublicLocaleCookie,
   type PublicLocale,
 } from './public-locale'
 
@@ -14,8 +14,7 @@ export default function PublicLanguageToggle({ locale }: { locale: PublicLocale 
   function switchLocale(nextLocale: PublicLocale) {
     if (nextLocale === locale || pending) return
     setPending(true)
-    document.cookie =
-      PUBLIC_LOCALE_COOKIE + '=' + nextLocale + '; Path=/; Max-Age=31536000; SameSite=Lax'
+    setPublicLocaleCookie(nextLocale)
     window.location.reload()
   }
 
