@@ -1,8 +1,18 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+
+import {
+  TrafficLimitError,
+  enforcePublicReadRateLimit,
+  rateLimitResponse,
+} from '../auth/traffic-limit.js'
 import {
   resolveCanonicalPrincipal,
   W02PrincipalClientError,
 } from '../auth/w02-principal-client.js'
+
+type W03ContentService = {
+  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
+}
 
 export type ContentPrincipal = {
   userId: string
