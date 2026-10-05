@@ -21,9 +21,9 @@ env:
   WRANGLER_VERSION: 4.116.0
   EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
   EXPECTED_DB_NAME: luckreadpro
-  EXPECTED_WORKER: luckread-w03
+  EXPECTED_WORKER: luck02-content
   EXPECTED_BINDING: D1_02
-  MIGRATION_FILE: workers/W03-content/migrations/0003_creator_list_pagination_index.sql
+  MIGRATION_FILE: workers/luck02-content/migrations/0003_creator_list_pagination_index.sql
   INDEX_NAME: contents_owner_updated_at_id_idx
 
 jobs:
@@ -61,13 +61,13 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          config = json.loads(Path('workers/W03-content/wrangler.jsonc').read_text())
-          assert config['name'] == 'luckread-w03'
+          config = json.loads(Path('workers/luck02-content/wrangler.jsonc').read_text())
+          assert config['name'] == 'luck02-content'
           d1 = [x for x in config.get('d1_databases', []) if x.get('binding') == 'D1_02']
           assert len(d1) == 1
           assert d1[0]['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
-          assert Path('workers/W03-content/migrations/0003_creator_list_pagination_index.sql').is_file()
-          sql = Path('workers/W03-content/migrations/0003_creator_list_pagination_index.sql').read_text()
+          assert Path('workers/luck02-content/migrations/0003_creator_list_pagination_index.sql').is_file()
+          sql = Path('workers/luck02-content/migrations/0003_creator_list_pagination_index.sql').read_text()
           assert 'contents_owner_updated_at_id_idx' in sql
           print('W03_CREATOR_INDEX_SOURCE=PASS')
           PY
@@ -78,16 +78,16 @@ jobs:
           import sqlite3
           from pathlib import Path
           db = sqlite3.connect(':memory:')
-          schema = Path('workers/W03-content/migrations/0001_content_core.sql').read_text()
+          schema = Path('workers/luck02-content/migrations/0001_content_core.sql').read_text()
           db.executescript(schema)
-          db.executescript(Path('workers/W03-content/migrations/0003_creator_list_pagination_index.sql').read_text())
+          db.executescript(Path('workers/luck02-content/migrations/0003_creator_list_pagination_index.sql').read_text())
           row = db.execute("SELECT name, sql FROM sqlite_master WHERE type='index' AND name='contents_owner_updated_at_id_idx'").fetchone()
           assert row and 'owner_user_id' in row[1] and 'updated_at' in row[1] and 'id' in row[1]
           print('W03_CREATOR_INDEX_STATIC=PASS')
           PY
 
       - name: Capture remote preflight
-        working-directory: workers/W03-content
+        working-directory: workers/luck02-content
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -98,7 +98,7 @@ jobs:
           cat /tmp/w03-index-preflight.json
 
       - name: Apply W03 migration remotely
-        working-directory: workers/W03-content
+        working-directory: workers/luck02-content
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -106,7 +106,7 @@ jobs:
           npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
 
       - name: Verify remote index
-        working-directory: workers/W03-content
+        working-directory: workers/luck02-content
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
