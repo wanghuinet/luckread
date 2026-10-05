@@ -42,7 +42,7 @@ function dbFake(initial: SessionRecord | null) {
           return { meta: { changes: 1 } }
         }
 
-        if (sql.includes('DELETE FROM users_sessions')) {
+        if (sql.includes('DELETE FROM "session"')) {
           if (!nativeSessionPresent) return { meta: { changes: 0 } }
           nativeSessionPresent = false
           return { meta: { changes: 1 } }
@@ -216,8 +216,11 @@ describe('AUTH-011 refresh runtime', () => {
 
   function refreshDb(state = { ...refreshSession }) {
     let current = state
+    const queries: string[] = []
     const db = {
-      prepare: (sql: string) => ({
+      prepare: (sql: string) => {
+        queries.push(sql)
+        return {
         bind: (...args: unknown[]) => ({
           first: async <T>() => {
             if (sql.includes('FROM auth_session_state AS a')) {
@@ -245,14 +248,15 @@ describe('AUTH-011 refresh runtime', () => {
             return { meta: { changes: 0 } }
           },
         }),
-      }),
+        }
+      },
     }
-    return db as unknown as D1Database
+    return { db: db as unknown as D1Database, queries }
   }
 
   it('rotates the predecessor credential exactly once', async () => {
-    const db = refreshDb()
-    const result = await refreshSessionFromAuthoritativeD1(db, {
+    const fake = refreshDb()
+    const result = await refreshSessionFromAuthoritativeD1(fake.db, {
       refreshToken: 'v3.old',
       deviceId: 'device-a',
       now: NOW,
@@ -260,6 +264,9 @@ describe('AUTH-011 refresh runtime', () => {
       hashToken: async (value) => 'hash:' + value,
       resolveLayer: async () => ({ decision: 'ALLOW', layer: 'L2' }),
     })
+
+    expect(fake.queries.some((sql) => sql.includes('INNER JOIN "session" AS s'))).toBe(true)
+    expect(fake.queries.some((sql) => sql.includes('users_sessions'))).toBe(false)
 
     expect(result).toEqual({
       sessionId: 'sid-refresh',
@@ -271,7 +278,7 @@ describe('AUTH-011 refresh runtime', () => {
       email: 'user@example.com',
     })
 
-    await expect(refreshSessionFromAuthoritativeD1(db, {
+    await expect(refreshSessionFromAuthoritativeD1(fake.db, {
       refreshToken: 'v3.old',
       deviceId: 'device-a',
       now: NOW,
