@@ -2,7 +2,7 @@ import {
   getBetterAuthSession,
   listBetterAuthSessions,
   revokeBetterAuthSession,
-} from '../../../../auth/better-auth'
+} from '../../../../auth/w02-auth-client'
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
