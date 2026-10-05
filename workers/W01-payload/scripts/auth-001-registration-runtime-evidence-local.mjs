@@ -79,7 +79,7 @@ const countsForEmail = async (email, username) => {
 }
 const envelopeForKey = async (idempotencyKey) => scalar('SELECT id, state, payload_hash, response_digest, committed_response, consent_record_id FROM auth_registration_envelopes WHERE idempotency_key = ? AND scope = ? AND endpoint = ? ORDER BY created_at DESC LIMIT 1', idempotencyKey, 'ACCOUNT_REGISTRATION', 'authRegister')
 
-const tableRows = { results: all("SELECT name, type FROM sqlite_master WHERE type IN ('table','index') AND name IN ('users','auth_registration_envelopes','consents') ORDER BY type,name") }
+const tableRows = { results: all("SELECT name, type FROM sqlite_master WHERE type IN ('table','index') AND name IN ('users','user','account','session','auth_registration_envelopes','consents') ORDER BY type,name") }
 const requiredObjects = new Set((tableRows.results || []).map((row) => String(row.type) + ':' + String(row.name)))
 for (const required of ['table:user', 'table:account', 'table:session', 'table:auth_registration_envelopes', 'table:consents']) if (!requiredObjects.has(required)) throw new Error('Required local D1 object missing: ' + required)
 
@@ -166,7 +166,7 @@ try {
   const statuses = pair.map((response) => response.status).sort((a, b) => a - b)
   if (statuses[0] !== 201 || statuses[1] !== 422) throw new Error('Concurrent duplicate identity did not produce exactly one success and one conflict: ' + statuses.join(','))
   const concurrentRows = await countsForEmail(concurrentEmail, concurrentUsername)
-  if (concurrentRows.users !== 1 || concurrentRows.consents !== 1) throw new Error('Concurrent duplicate identity produced more than one authoritative registration record')
+  if (concurrentRows.users !== 1 || concurrentRows.accounts !== 1 || concurrentRows.consents !== 1) throw new Error('Concurrent duplicate identity produced more than one authoritative registration record')
 
   const sameKeyEmail = 'auth001-same-key-' + suffix + '@luckread.local'
   const sameKeyUsername = 'auth001sk' + suffix
@@ -205,7 +205,7 @@ try {
   }
 
   const sameKeyRows = await countsForEmail(sameKeyEmail, sameKeyUsername)
-  if (sameKeyRows.users !== 1 || sameKeyRows.consents !== 1) {
+  if (sameKeyRows.users !== 1 || sameKeyRows.accounts !== 1 || sameKeyRows.consents !== 1) {
     throw new Error('Concurrent same Idempotency-Key produced more than one authoritative registration record')
   }
   if (
