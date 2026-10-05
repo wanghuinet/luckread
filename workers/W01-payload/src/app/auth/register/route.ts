@@ -16,16 +16,22 @@ type RegistrationRequest = {
   consent?: unknown
 }
 
-const json = (body: unknown, status = 200) =>
+const json = (body: unknown, status = 200, headers: HeadersInit = {}) =>
   new Response(JSON.stringify(body), {
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
+      ...headers,
     },
   })
 
-const errorResponse = (status: number, code: string, message: string) =>
+const errorResponse = (
+  status: number,
+  code: string,
+  message: string,
+  headers: HeadersInit = {},
+) =>
   json(
     {
       error: {
@@ -36,6 +42,7 @@ const errorResponse = (status: number, code: string, message: string) =>
       requestId: crypto.randomUUID(),
     },
     status,
+    headers,
   )
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -110,24 +117,36 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     if (error instanceof W02AuthClientError) {
       const code =
-        error.status === 422
-          ? 'VALIDATION_FAILED'
-          : error.status === 409
+        error.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT'
+          ? 'IDEMPOTENCY_KEY_REUSE_CONFLICT'
+          : error.code === 'IDEMPOTENCY_IN_PROGRESS'
             ? 'IDEMPOTENCY_IN_PROGRESS'
-            : error.status === 400
-              ? 'VALIDATION_FAILED'
-              : 'SERVICE_UNAVAILABLE'
+            : error.code === 'REGISTRATION_RETRY_REQUIRED'
+              ? 'REGISTRATION_RETRY_REQUIRED'
+              : error.code === 'IDEMPOTENCY_KEY_REQUIRED'
+                ? 'IDEMPOTENCY_KEY_REQUIRED'
+                : error.status === 422 || error.status === 400
+                  ? 'VALIDATION_FAILED'
+                  : 'SERVICE_UNAVAILABLE'
+      const headers =
+        error.status === 409 ? { 'retry-after': '1' } : {}
       return errorResponse(
         error.status,
         code,
-        error.status === 422
-          ? 'Registration could not be completed'
-          : error.status === 409
+        code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT'
+          ? 'Idempotency key cannot be reused with different input'
+          : code === 'IDEMPOTENCY_IN_PROGRESS'
             ? 'A registration with this Idempotency-Key is already in progress'
-            : error.status === 400
-              ? 'Invalid registration request'
-              : 'Registration service unavailable',
-        error.status === 409 ? { 'retry-after': '1' } : {},
+            : code === 'REGISTRATION_RETRY_REQUIRED'
+              ? 'The prior registration attempt is not replayable'
+              : code === 'IDEMPOTENCY_KEY_REQUIRED'
+                ? 'Idempotency-Key is required'
+                : error.status === 422
+                  ? 'Registration could not be completed'
+                  : error.status === 400
+                    ? 'Invalid registration request'
+                    : 'Registration service unavailable',
+        headers,
       )
     }
 
