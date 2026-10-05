@@ -415,6 +415,7 @@ describe('Creator Center admin extension', () => {
     const accessToken = read('src/auth/payload-access-token.ts')
     const sessions = read('src/app/auth/sessions/[[...segments]]/route.ts')
     const usersMe = read('src/app/(payload)/api/users/me/route.ts')
+    const profileClient = read('src/auth/w02-user-profile-client.ts')
     const accountState = read('src/app/users/[userId]/account-state/route.ts')
     const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
 
@@ -426,7 +427,9 @@ describe('Creator Center admin extension', () => {
     expect(accessToken).toContain("return getCookieValue(request, 'payload-token')")
     expect(accessToken).toContain('export function getPayloadAuthorizationHeader')
     expect(sessions).toContain('getPayloadAuthorizationHeader(request)')
-    expect(usersMe).toContain('readVerifiedPayloadTokenVersion(request)')
+    expect(usersMe).toContain('callW02UserProfile')
+    expect(usersMe).toContain("'/internal/account/profile'")
+    expect(profileClient).toContain('W02_AUTH')
     expect(accountState).toContain('getPayloadAuthorizationHeader(request)')
     expect(loginForm).not.toContain("sessionStorage.setItem('luckread.accessToken'")
     expect(loginForm).not.toContain("sessionStorage.setItem('luckread.refreshToken'")
