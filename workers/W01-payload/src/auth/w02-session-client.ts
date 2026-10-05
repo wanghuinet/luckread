@@ -32,6 +32,7 @@ export class W02AuthClientError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly code?: string,
   ) {
     super(message)
   }
@@ -74,10 +75,10 @@ async function callW02<T>(path: string, body: unknown): Promise<T> {
         : 'SERVICE_UNAVAILABLE'
 
     if (response.status === 422) {
-      throw new W02AuthClientError(422, 'validation failed')
+      throw new W02AuthClientError(422, 'validation failed', code)
     }
     if (response.status === 409) {
-      throw new W02AuthClientError(409, 'request conflicts with an in-progress operation')
+      throw new W02AuthClientError(409, 'request conflicts with an in-progress operation', code)
     }
     if (code === 'UNAUTHENTICATED') {
       throw new W02AuthClientError(401, 'authentication denied')
