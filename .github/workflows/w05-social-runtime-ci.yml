@@ -3,7 +3,7 @@ name: W05 Social Runtime CI
 on:
   pull_request:
     paths:
-      - 'workers/W05-social/**'
+      - 'workers/luck03-social/**'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/followers/**'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/following/**'
       - 'workers/W01-payload/src/social/**'
@@ -36,7 +36,7 @@ on:
     branches:
       - main
     paths:
-      - 'workers/W05-social/**'
+      - 'workers/luck03-social/**'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/followers/**'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/following/**'
       - 'workers/W01-payload/src/app/api/v1/social/follows/**'
@@ -86,7 +86,7 @@ jobs:
 
       - name: Run W05 Social and W01 adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/luck03-social/src/follow-runtime.test.ts ../../workers/luck03-social/src/like-runtime.test.ts ../../workers/luck03-social/src/comment-runtime.test.ts ../../workers/luck03-social/src/favorite-runtime.test.ts ../../workers/luck03-social/src/share-runtime.test.ts ../../workers/luck03-social/src/block-policy.test.ts ../../workers/luck03-social/src/relationship-graph-runtime.test.ts ../../workers/luck03-social/src/block-mute-runtime.test.ts ../../workers/luck03-social/src/index.test.ts ../../workers/luck03-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts
 
       - name: Verify comment delete tombstone migration
         run: |
@@ -94,8 +94,8 @@ jobs:
           import sqlite3
           from pathlib import Path
           db = sqlite3.connect(':memory:')
-          base = Path('workers/W05-social/migrations/20261002_003_social_004_comments_v1.sql').read_text()
-          delete = Path('workers/W05-social/migrations/20261003_001_social_010_comment_delete_tombstone_v1.sql').read_text()
+          base = Path('workers/luck03-social/migrations/20261002_003_social_004_comments_v1.sql').read_text()
+          delete = Path('workers/luck03-social/migrations/20261003_001_social_010_comment_delete_tombstone_v1.sql').read_text()
           db.executescript(base)
           db.executescript(delete)
           states = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='social_comments'").fetchone()[0]
@@ -110,7 +110,7 @@ jobs:
           import sqlite3
           from pathlib import Path
           db = sqlite3.connect(':memory:')
-          sql = Path('workers/W05-social/migrations/20261002_006_social_009_block_mute_v1.sql').read_text()
+          sql = Path('workers/luck03-social/migrations/20261002_006_social_009_block_mute_v1.sql').read_text()
           db.executescript(sql)
           cols = db.execute('PRAGMA table_info("social_user_interactions")').fetchall()
           expected = ['relationship_id','actor_user_id','target_user_id','relation_type','created_at','updated_at']
@@ -129,7 +129,7 @@ jobs:
           import sqlite3
           from pathlib import Path
           db = sqlite3.connect(':memory:')
-          sql = Path('workers/W05-social/migrations/20261002_005_social_006_share_v1.sql').read_text()
+          sql = Path('workers/luck03-social/migrations/20261002_005_social_006_share_v1.sql').read_text()
           db.executescript(sql)
           cols = db.execute('PRAGMA table_info("social_share_links")').fetchall()
           if [r[1] for r in cols] != ['share_id','content_id','actor_user_id','idempotency_key','created_at']:
@@ -147,7 +147,7 @@ jobs:
           import sqlite3
           from pathlib import Path
           db = sqlite3.connect(':memory:')
-          sql = Path('workers/W05-social/migrations/20261002_004_social_005_favorite_v1.sql').read_text()
+          sql = Path('workers/luck03-social/migrations/20261002_004_social_005_favorite_v1.sql').read_text()
           db.executescript(sql)
           cols = db.execute('PRAGMA table_info("interaction_favorites")').fetchall()
           if [r[1] for r in cols] != ['relationship_id','actor_user_id','target_type','target_id','created_at']:
@@ -165,7 +165,7 @@ jobs:
           import sqlite3
           from pathlib import Path
           db = sqlite3.connect(':memory:')
-          sql = Path('workers/W05-social/migrations/20261002_002_social_003_like_v1.sql').read_text()
+          sql = Path('workers/luck03-social/migrations/20261002_002_social_003_like_v1.sql').read_text()
           db.executescript(sql)
           cols = db.execute('PRAGMA table_info("interaction_likes")').fetchall()
           if [r[1] for r in cols] != ['relationship_id','actor_user_id','target_type','target_id','created_at']:
@@ -183,7 +183,7 @@ jobs:
           import sqlite3
           from pathlib import Path
           db = sqlite3.connect(':memory:')
-          sql = Path('workers/W05-social/migrations/20261002_003_social_004_comments_v1.sql').read_text()
+          sql = Path('workers/luck03-social/migrations/20261002_003_social_004_comments_v1.sql').read_text()
           db.executescript(sql)
           cols = db.execute('PRAGMA table_info("social_comments")').fetchall()
           expected = ['id','content_id','author_user_id','parent_id','body','state','depth','idempotency_key','created_at','updated_at']
