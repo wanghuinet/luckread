@@ -1,74 +1,42 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
-
 import { buildPayloadClearCookie } from '../../../auth/payload-access-token.js'
-import { revokeSession, W02AuthClientError } from '../../../auth/w02-session-client.js'
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-    },
-  })
+import {
+  signOutThroughW02,
+  W02AuthClientError,
+} from '../../../auth/w02-session-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
-  json(
-    {
-      error: {
-        code,
-        message,
-        details: {},
-      },
+  new Response(
+    JSON.stringify({
+      error: { code, message, details: {} },
       requestId: crypto.randomUUID(),
+    }),
+    {
+      status,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+      },
     },
-    status,
   )
 
+const successResponse = (request: Request, nativeResponse?: Response): Response => {
+  const headers = new Headers({ 'cache-control': 'no-store' })
+  const setCookie = nativeResponse?.headers.get('set-cookie')
+  if (setCookie) headers.set('set-cookie', setCookie)
+  headers.append('set-cookie', buildPayloadClearCookie(request))
+  return new Response(null, { status: 204, headers })
+}
+
 export async function POST(request: Request): Promise<Response> {
-  const payload = await getPayload({ config })
-
-  let authResult: Awaited<ReturnType<typeof payload.auth>>
   try {
-    authResult = await payload.auth({
-      headers: request.headers,
-      canSetHeaders: false,
-    })
-  } catch {
+    const response = await signOutThroughW02(request)
+    if (response.ok) return successResponse(request, response)
+    if (response.status === 401) return successResponse(request)
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
-  }
-
-  const user = authResult.user as { id?: string | number; _sid?: string } | null
-  // authLogout is contractually idempotent: an already-revoked/expired current
-  // session is a successful no-op rather than an authentication failure.
-  if (!user?.id || !user._sid) {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'cache-control': 'no-store',
-        'set-cookie': buildPayloadClearCookie(request),
-      },
-    })
-  }
-
-  try {
-    // W02 owns both the extension revocation and the corresponding
-    // Payload-native session mutation in one authoritative D1 batch.
-    await revokeSession({ sessionId: user._sid })
   } catch (error) {
-    if (error instanceof W02AuthClientError) {
-      return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
+    if (error instanceof W02AuthClientError && error.status === 401) {
+      return successResponse(request)
     }
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
-
-  return new Response(null, {
-    status: 204,
-    headers: {
-      'cache-control': 'no-store',
-      'set-cookie': buildPayloadClearCookie(request),
-    },
-  })
 }
