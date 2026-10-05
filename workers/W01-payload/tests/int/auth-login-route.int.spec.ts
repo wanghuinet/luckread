@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => {
 
   return {
     getPayload: vi.fn(),
+    signInWithBetterAuth: vi.fn(),
+    resolveBetterAuthPrincipal: vi.fn(),
     establishSession: vi.fn(),
     issuePayloadAccessToken: vi.fn(),
     buildPayloadAccessCookie: vi.fn(),
@@ -28,6 +30,8 @@ vi.mock('@payload-config', () => ({
 }))
 
 vi.mock('../../src/auth/w02-session-client.js', () => ({
+  signInWithBetterAuth: mocks.signInWithBetterAuth,
+  resolveBetterAuthPrincipal: mocks.resolveBetterAuthPrincipal,
   establishSession: mocks.establishSession,
   W02AuthClientError: mocks.MockW02AuthClientError,
 }))
@@ -53,8 +57,33 @@ describe('AUTH-002 W01 login route', () => {
 
     mocks.getPayload.mockResolvedValue({
       secret: 'payload-secret',
-      login: vi.fn(),
-      auth: vi.fn(),
+    })
+
+    mocks.signInWithBetterAuth.mockResolvedValue({
+      token: 'better-auth-session-token-42',
+      user: {
+        id: 'user-42',
+        email: 'user42@example.com',
+      },
+      setCookie: 'luckread_session=better-auth-session-token-42; Path=/; HttpOnly',
+    })
+
+    mocks.resolveBetterAuthPrincipal.mockResolvedValue({
+      active: true,
+      userId: 'user-42',
+      email: 'user42@example.com',
+      sessionId: 'ba-session-42',
+      accountState: 'PENDING_VERIFICATION',
+      accountStateVersion: 1,
+      layer: 'L1',
+    })
+
+    mocks.establishSession.mockResolvedValue({
+      sessionId: 'ba-session-42',
+      refreshToken: 'v1.refresh-42',
+      tokenVersion: 1,
+      layer: 'L1',
+      nativeExpiresAt: '2026-10-12T02:00:00.000Z',
     })
 
     mocks.issuePayloadAccessToken.mockResolvedValue({
@@ -65,7 +94,7 @@ describe('AUTH-002 W01 login route', () => {
     mocks.buildPayloadAccessCookie.mockReturnValue('luckread_access=access-token; Path=/; HttpOnly')
   })
 
-  it('rejects malformed credentials and device ids before invoking Payload', async () => {
+  it('rejects malformed credentials and device ids before invoking any authentication authority', async () => {
     const response = await POST(
       jsonRequest({
         identity: '',
@@ -76,42 +105,11 @@ describe('AUTH-002 W01 login route', () => {
 
     expect(response.status).toBe(400)
     expect((await response.json()).error.code).toBe('VALIDATION_FAILED')
+    expect(mocks.signInWithBetterAuth).not.toHaveBeenCalled()
     expect(mocks.getPayload).not.toHaveBeenCalled()
   })
 
-  it('binds the native Payload session to W02 before issuing the public access token', async () => {
-    const payloadLogin = vi.fn().mockImplementation(async ({ context }) => {
-      context.__luckreadNativeAuthToken = 'native-token-42'
-      return {
-        user: {
-          id: 'user-42',
-          email: 'USER42@EXAMPLE.COM',
-        },
-        exp: 1770000000,
-      }
-    })
-    const payloadAuth = vi.fn().mockResolvedValue({
-      user: {
-        id: 'user-42',
-        email: 'USER42@EXAMPLE.COM',
-        _sid: 'native-sid-42',
-      },
-    })
-
-    mocks.getPayload.mockResolvedValue({
-      secret: 'payload-secret',
-      login: payloadLogin,
-      auth: payloadAuth,
-    })
-
-    mocks.establishSession.mockResolvedValue({
-      sessionId: 'native-sid-42',
-      refreshToken: 'v1.refresh-42',
-      tokenVersion: 1,
-      layer: 'L1',
-      nativeExpiresAt: '2026-10-02T02:00:00.000Z',
-    })
-
+  it('authenticates credentials in Better Auth, resolves the canonical principal in W02, and keeps the Payload token only as a compatibility projection', async () => {
     const response = await POST(
       jsonRequest({
         identity: 'USER42@EXAMPLE.COM',
@@ -128,26 +126,17 @@ describe('AUTH-002 W01 login route', () => {
       layer: 'L1',
     })
 
-    expect(payloadLogin).toHaveBeenCalledWith({
-      collection: 'users',
-      context: expect.objectContaining({
-        __luckreadNativeAuthToken: 'native-token-42',
-      }),
-      data: {
-        email: 'USER42@EXAMPLE.COM',
-        password: 'Correct-password-123!',
-      },
+    expect(mocks.signInWithBetterAuth).toHaveBeenCalledWith({
+      email: 'user42@example.com',
+      password: 'Correct-password-123!',
     })
 
-    expect(payloadAuth).toHaveBeenCalledWith({
-      headers: expect.any(Headers),
-      canSetHeaders: false,
-    })
-    const authHeaders = payloadAuth.mock.calls[0][0].headers as Headers
-    expect(authHeaders.get('authorization')).toBe('Bearer native-token-42')
+    expect(mocks.resolveBetterAuthPrincipal).toHaveBeenCalledWith(
+      'better-auth-session-token-42',
+    )
 
     expect(mocks.establishSession).toHaveBeenCalledWith({
-      sessionId: 'native-sid-42',
+      sessionId: 'ba-session-42',
       userId: 'user-42',
       deviceId: 'android-42',
     })
@@ -156,53 +145,25 @@ describe('AUTH-002 W01 login route', () => {
       payloadSecret: 'payload-secret',
       userId: 'user-42',
       email: 'user42@example.com',
-      sessionId: 'native-sid-42',
-      expiresAt: '2026-10-02T02:00:00.000Z',
+      sessionId: 'ba-session-42',
+      expiresAt: '2026-10-12T02:00:00.000Z',
       tokenVersion: 1,
     })
-    expect(mocks.buildPayloadAccessCookie).toHaveBeenCalledWith(
-      'access-token',
-      900,
-      expect.any(Request),
-    )
-    expect(response.headers.get('set-cookie')).toBe(
-      'luckread_access=access-token; Path=/; HttpOnly',
-    )
+
+    expect(mocks.getPayload).toHaveBeenCalledTimes(1)
+    expect(response.headers.get('set-cookie')).toContain('luckread_session=better-auth-session-token-42')
+    expect(response.headers.get('set-cookie')).toContain('luckread_access=access-token')
   })
 
-  it('maps authoritative W02 authentication denial to a stable 401 without minting access tokens', async () => {
-    const payloadLogin = vi.fn().mockImplementation(async ({ context }) => {
-      context.__luckreadNativeAuthToken = 'native-token-42'
-      return {
-        user: {
-          id: 'user-42',
-          email: 'user42@example.com',
-        },
-        exp: 1770000000,
-      }
-    })
-    const payloadAuth = vi.fn().mockResolvedValue({
-      user: {
-        id: 'user-42',
-        email: 'user42@example.com',
-        _sid: 'native-sid-42',
-      },
-    })
-
-    mocks.getPayload.mockResolvedValue({
-      secret: 'payload-secret',
-      login: payloadLogin,
-      auth: payloadAuth,
-    })
-
-    mocks.establishSession.mockRejectedValue(
+  it('maps Better Auth credential rejection to a stable 401 without establishing a session', async () => {
+    mocks.signInWithBetterAuth.mockRejectedValue(
       new mocks.MockW02AuthClientError(401, 'authentication denied'),
     )
 
     const response = await POST(
       jsonRequest({
         identity: 'user42@example.com',
-        credential: 'Wrong-or-rejected-password',
+        credential: 'Wrong-password-123!',
         deviceId: 'web-42',
       }),
     )
@@ -214,34 +175,26 @@ describe('AUTH-002 W01 login route', () => {
         message: 'Authentication denied',
       },
     })
+    expect(mocks.resolveBetterAuthPrincipal).not.toHaveBeenCalled()
+    expect(mocks.establishSession).not.toHaveBeenCalled()
     expect(mocks.issuePayloadAccessToken).not.toHaveBeenCalled()
-    expect(mocks.buildPayloadAccessCookie).not.toHaveBeenCalled()
   })
 
-  it('normalizes Payload login failures without exposing authentication material', async () => {
-    mocks.getPayload.mockResolvedValue({
-      secret: 'payload-secret',
-      login: vi.fn().mockRejectedValue(
-        new Error(
-          'invalid password for user42@example.com token=super-secret-token-01234567890123456789012345678901234567890123',
-        ),
-      ),
-      auth: vi.fn(),
-    })
+  it('fails closed when W02 cannot resolve the Better Auth principal', async () => {
+    mocks.resolveBetterAuthPrincipal.mockRejectedValue(
+      new mocks.MockW02AuthClientError(503, 'authentication service unavailable'),
+    )
 
     const response = await POST(
       jsonRequest({
         identity: 'user42@example.com',
-        credential: 'Wrong-password-123!',
+        credential: 'Correct-password-123!',
         deviceId: 'web-42',
       }),
     )
 
-    expect(response.status).toBe(401)
-    const body = await response.text()
-    expect(body).toContain('UNAUTHENTICATED')
-    expect(body).not.toContain('user42@example.com')
-    expect(body).not.toContain('super-secret-token')
+    expect(response.status).toBe(503)
     expect(mocks.establishSession).not.toHaveBeenCalled()
+    expect(mocks.issuePayloadAccessToken).not.toHaveBeenCalled()
   })
 })
