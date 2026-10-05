@@ -70,7 +70,7 @@ jobs:
           # Blueprint, Entity, and non-W06 authority-sensitive changes remain
           # rejected by the explicit allowlist below.
           changed_from_admitted="$(gh api "repos/$GITHUB_REPOSITORY/compare/$PREVIOUS_ADMITTED_SOURCE_SHA...$SOURCE_SHA" --jq '.files[]?.filename // empty')"
-          w06_delta="$(printf '%s\n' "$changed_from_admitted" | grep -E '^workers/W06-governance/|^\.github/workflows/w06-|^docs/change-control/CC-1\.8-MODERATION-IDEMPOTENCY-REPLAY-ORDER-2026-10-01\.md|^docs/change-control/CC-MAPPING-0-AUTH-013-W06-|^docs/MAPPING-0-CLOSURE-LEDGER\.md|^artifacts/mapping-0/w06-' || true)"
+          w06_delta="$(printf '%s\n' "$changed_from_admitted" | grep -E '^workers/luck04-commerce/|^\.github/workflows/w06-|^docs/change-control/CC-1\.8-MODERATION-IDEMPOTENCY-REPLAY-ORDER-2026-10-01\.md|^docs/change-control/CC-MAPPING-0-AUTH-013-W06-|^docs/MAPPING-0-CLOSURE-LEDGER\.md|^artifacts/mapping-0/w06-' || true)"
           test -n "$w06_delta" || {
             echo "No admitted W06 implementation/governance delta found between $PREVIOUS_ADMITTED_SOURCE_SHA and $SOURCE_SHA"
             exit 1
@@ -80,20 +80,20 @@ jobs:
 
           carry_forward_workflow auth-013-persistence-schema-evidence.yml "$PREVIOUS_PERSISTENCE_EVIDENCE_SOURCE_SHA"
 
-          # The source SHA is deployed only from workers/W06-governance. Repository
+          # The source SHA is deployed only from workers/luck04-commerce. Repository
           # history may contain unrelated main-branch changes; those changes are
           # not part of this Worker deployment and must not invalidate the W06
           # source admission. Authority-sensitive W06 paths are checked below by
           # the source CI and physical binding assertions.
       - name: Verify W06 physical binding configuration
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         run: |
           test -f wrangler.jsonc
           node - <<'NODE'
           const fs = require('fs')
           const text = fs.readFileSync('wrangler.jsonc', 'utf8')
           const required = [
-            '"name": "luckread-w06"',
+            '"name": "luck04-commerce"',
             '"binding": "D1_03"',
             '"database_id": "bda1d247-a371-4244-91ae-aef96034db7f"'
           ]
@@ -106,10 +106,10 @@ jobs:
         run: npm ci
 
       - name: TypeScript verification
-        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/index.ts
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/luck04-commerce/src/index.ts
 
       - name: Deploy W06 with pinned Wrangler
-        working-directory: workers/W06-governance
+        working-directory: workers/luck04-commerce
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -124,7 +124,7 @@ jobs:
           run_id=$GITHUB_RUN_ID
           run_attempt=$GITHUB_RUN_ATTEMPT
           source_sha=${{ inputs.source_sha }}
-          worker=luckread-w06
+          worker=luck04-commerce
           d1_binding=D1_03
           d1_database_uuid=bda1d247-a371-4244-91ae-aef96034db7f
           wrangler_version=4.116.0
