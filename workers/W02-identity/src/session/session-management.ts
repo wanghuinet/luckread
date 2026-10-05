@@ -142,7 +142,7 @@ export async function listCurrentUserSessions(
     SELECT
       EXISTS (
         SELECT 1
-        FROM users AS u
+        FROM "user" AS u
         WHERE CAST(u.id AS TEXT) = ?
           AND u.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')
           AND EXISTS (
@@ -158,12 +158,12 @@ export async function listCurrentUserSessions(
       ) AS permissionAllowed,
       EXISTS (
         SELECT 1
-        FROM users_sessions AS current_session
+        FROM "session" AS current_session
         INNER JOIN auth_session_state AS current_state
           ON CAST(current_state.session_id AS TEXT) = CAST(current_session.id AS TEXT)
-         AND current_state.user_id = CAST(current_session._parent_id AS TEXT)
+         AND current_state.user_id = CAST(current_session.user_id AS TEXT)
         WHERE CAST(current_session.id AS TEXT) = ?
-          AND CAST(current_session._parent_id AS TEXT) = ?
+          AND CAST(current_session.user_id AS TEXT) = ?
           AND current_state.token_version = ?
           AND current_state.revoked_at IS NULL
           AND current_session.expires_at > ?
@@ -207,11 +207,11 @@ export async function listCurrentUserSessions(
       s.created_at AS createdAt,
       s.expires_at AS expiresAt,
       a.last_seen_at AS lastSeenAt
-    FROM users_sessions AS s
+    FROM "session" AS s
     INNER JOIN auth_session_state AS a
       ON CAST(a.session_id AS TEXT) = CAST(s.id AS TEXT)
-     AND a.user_id = CAST(s._parent_id AS TEXT)
-    WHERE CAST(s._parent_id AS TEXT) = ?
+     AND a.user_id = CAST(s.user_id AS TEXT)
+    WHERE CAST(s.user_id AS TEXT) = ?
       AND a.revoked_at IS NULL
       AND s.created_at IS NOT NULL
       AND s.expires_at > ?
@@ -278,7 +278,7 @@ export async function revokeCurrentUserSession(
     SELECT
       EXISTS (
         SELECT 1
-        FROM users AS u
+        FROM "user" AS u
         WHERE CAST(u.id AS TEXT) = ?
           AND u.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')
           AND EXISTS (
@@ -294,12 +294,12 @@ export async function revokeCurrentUserSession(
       ) AS permissionAllowed,
       EXISTS (
         SELECT 1
-        FROM users_sessions AS current_session
+        FROM "session" AS current_session
         INNER JOIN auth_session_state AS current_state
           ON CAST(current_state.session_id AS TEXT) = CAST(current_session.id AS TEXT)
-         AND current_state.user_id = CAST(current_session._parent_id AS TEXT)
+         AND current_state.user_id = CAST(current_session.user_id AS TEXT)
         WHERE CAST(current_session.id AS TEXT) = ?
-          AND CAST(current_session._parent_id AS TEXT) = ?
+          AND CAST(current_session.user_id AS TEXT) = ?
           AND current_state.token_version = ?
           AND current_state.revoked_at IS NULL
           AND current_session.expires_at > ?
@@ -313,9 +313,9 @@ export async function revokeCurrentUserSession(
             target_extension.revoked_at IS NOT NULL
             OR EXISTS (
               SELECT 1
-              FROM users_sessions AS target_native
+              FROM "session" AS target_native
               WHERE CAST(target_native.id AS TEXT) = ?
-                AND CAST(target_native._parent_id AS TEXT) = ?
+                AND CAST(target_native.user_id AS TEXT) = ?
             )
           )
       ) AS targetOwned
@@ -362,7 +362,7 @@ export async function revokeCurrentUserSession(
            AND revoked_at IS NULL
       `).bind(now, now, input.targetSessionId, input.userId),
       db.prepare(`
-        DELETE FROM users_sessions
+        DELETE FROM "session"
          WHERE CAST(id AS TEXT) = ?
            AND CAST(_parent_id AS TEXT) = ?
       `).bind(input.targetSessionId, input.userId),
