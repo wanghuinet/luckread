@@ -589,22 +589,6 @@ export async function registerWithBetterAuth(
     }
 
     createdUserId = String(result.user.id)
-
-    const provisionalResponse = JSON.stringify({
-      provisional: true,
-      userId: createdUserId,
-      accountState: ACCOUNT_STATE,
-    })
-    const bindResult = await env.D1_01
-      .prepare(
-        'UPDATE auth_registration_envelopes SET committed_response = ?, updated_at = ? WHERE id = ? AND state = \'IN_PROGRESS\'',
-      )
-      .bind(provisionalResponse, now.toISOString(), envelope.id)
-      .run()
-
-    if (bindResult.meta?.changes !== 1) {
-      throw new Error('AUTH001_PROVISIONAL_USER_BIND_FAILED')
-    }
   } catch (error) {
     const status =
       error &&
@@ -633,6 +617,50 @@ export async function registerWithBetterAuth(
     throw new RegistrationServiceError(
       'SERVICE_UNAVAILABLE',
       'Registration service unavailable',
+      503,
+    )
+  }
+
+  const createdUser = await readUserById(env.D1_01, createdUserId)
+  if (
+    !createdUser ||
+    createdUser.email !== parsed.email ||
+    createdUser.username !== parsed.username
+  ) {
+    throw new RegistrationServiceError(
+      'VALIDATION_FAILED',
+      'Registration could not be completed',
+      422,
+    )
+  }
+
+  try {
+    const provisionalResponse = JSON.stringify({
+      provisional: true,
+      userId: createdUserId,
+      accountState: ACCOUNT_STATE,
+    })
+    const bindResult = await env.D1_01
+      .prepare(
+        'UPDATE auth_registration_envelopes SET committed_response = ?, updated_at = ? WHERE id = ? AND state = \'IN_PROGRESS\'',
+      )
+      .bind(provisionalResponse, now.toISOString(), envelope.id)
+      .run()
+
+    if (bindResult.meta?.changes !== 1) {
+      throw new Error('AUTH001_PROVISIONAL_USER_BIND_FAILED')
+    }
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: 'auth.register.better_auth_provisional_bind_failure',
+        diagnosticCode: 'AUTH001_PROVISIONAL_USER_BIND_FAILURE',
+        errorName: error instanceof Error ? error.name : typeof error,
+      }),
+    )
+    throw new RegistrationServiceError(
+      'SERVICE_UNAVAILABLE',
+      'Registration persistence is unavailable',
       503,
     )
   }
