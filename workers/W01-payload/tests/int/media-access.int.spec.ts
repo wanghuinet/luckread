@@ -153,10 +153,12 @@ describe('Media upload access', () => {
     const route = read('src/app/api/v1/media/route.ts')
 
     expect(route).toContain("export async function GET(request: Request)")
-    expect(route).toContain("await payload.auth({ headers: request.headers, canSetHeaders: false })")
-    expect(route).toContain('readVerifiedPayloadTokenVersion(request)')
-    expect(route).toContain('validateSession({')
+    expect(route).toContain('resolveBetterAuthPrincipalThroughW02(request)')
+    expect(route).toContain('principal.tokenVersion === undefined')
     expect(route).toContain("collection: 'media'")
+    expect(route).not.toContain("await payload.auth({")
+    expect(route).not.toContain('readVerifiedPayloadTokenVersion(request)')
+    expect(route).not.toContain('validateSession({')
     expect(route).toContain("ownerUserId: { equals: String(authenticated.user.id) }")
     expect(route).toContain("sort: '-createdAt'")
     expect(route).toContain('Math.min(Math.max(requestedLimit, 1), 50)')
@@ -183,7 +185,7 @@ describe('Media upload access', () => {
     expect(route).not.toContain('presigned')
   })
 
-it('guards creator media listing before Payload authentication', () => {
+it('guards creator media listing before W02 authentication and preserves fail-closed service errors', () => {
   const route = read('src/app/api/v1/media/route.ts')
   const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
   const authIndex = route.indexOf('const authenticated = await authenticate(request)')
@@ -192,6 +194,7 @@ it('guards creator media listing before Payload authentication', () => {
   expect(guardIndex).toBeLessThan(authIndex)
   expect(route).toContain('TrafficLimitError')
   expect(route).toContain('rateLimitResponse(request)')
+  expect(route).toContain("code: 'SERVICE_UNAVAILABLE'")
 })
 
 it('guards media detail reads before the Payload route', () => {
