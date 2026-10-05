@@ -281,7 +281,7 @@ jobs:
         run: |
           set -euo pipefail
           SQL="INSERT INTO contents (id,content_type,owner_user_id,creator_id,ip_id,state,version,revision,title,body_ref,media_refs_json,cover_ref,etag,created_at,updated_at) VALUES ('$CONTENT_ID','article','mod-e2e-owner-$GITHUB_RUN_ID',NULL,NULL,'PENDING_REVIEW',1,1,'Moderation E2E Fixture','r2://moderation-e2e/$GITHUB_RUN_ID','[]',NULL,'W/"1"','$NOW','$NOW');"
-          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-content/wrangler.jsonc --command "$SQL"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/luck02-content/wrangler.jsonc --command "$SQL"
 
       - name: Seed controlled moderation case in D1-03
         env:
@@ -339,7 +339,7 @@ jobs:
           CONTENT_REUSE_SQL="INSERT INTO contents (id,content_type,owner_user_id,creator_id,ip_id,state,version,revision,title,body_ref,media_refs_json,cover_ref,etag,created_at,updated_at) VALUES ('$CONTENT2_ID','article','mod-e2e-owner-$GITHUB_RUN_ID',NULL,NULL,'PENDING_REVIEW',1,1,'Moderation E2E Idempotency Reuse Fixture','r2://moderation-e2e/reuse/$GITHUB_RUN_ID','[]',NULL,'W/"1"','$NOW','$NOW');"
           CASE_REUSE_SQL="INSERT INTO moderation_cases (case_id,target_type,target_id,target_version,policy_version,state,priority,assigned_reviewer_id,current_decision_id,evidence_bundle_ref,version,created_at,updated_at) VALUES ('$CASE2_ID','content','$CONTENT2_ID',1,'moderation-v1.0','UNDER_REVIEW',80,NULL,NULL,'e2e/reuse/$GITHUB_RUN_ID',1,'$NOW','$NOW');"
           IDEM_REUSE_SQL="INSERT INTO moderation_decision_idempotency (id,reviewer_id,case_id,idempotency_key,request_hash,decision_id,response_status,response_json,created_at,expires_at) VALUES ('seed-idem-$GITHUB_RUN_ID','$MODERATION_AUTH_USER_ID','$CASE2_ID','$REUSE_KEY','seeded-hash-$GITHUB_RUN_ID','$REUSE_DECISION_ID',200,'{\"caseId\":\"$CASE2_ID\",\"decisionId\":\"$REUSE_DECISION_ID\",\"outcome\":\"APPROVED\",\"version\":2,\"effectiveAt\":\"$NOW\",\"requestId\":\"req_seed_reuse_$GITHUB_RUN_ID\"}','$NOW','$REUSE_EXPIRES_AT');"
-          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-content/wrangler.jsonc --command "$CONTENT_REUSE_SQL"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/luck02-content/wrangler.jsonc --command "$CONTENT_REUSE_SQL"
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/luck04-commerce/wrangler.jsonc --command "$CASE_REUSE_SQL"
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/luck04-commerce/wrangler.jsonc --command "$IDEM_REUSE_SQL"
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/luck04-commerce/wrangler.jsonc --command "SELECT reviewer_id,case_id,idempotency_key,request_hash,expires_at FROM moderation_decision_idempotency WHERE reviewer_id='$MODERATION_AUTH_USER_ID' AND case_id='$CASE2_ID' AND idempotency_key='$REUSE_KEY' LIMIT 1;" > /tmp/mod-idem-seed.json
@@ -361,7 +361,7 @@ jobs:
           echo "CASE2_ID=mod-e2e-stale-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
           echo "CONTENT2_ID=mod-e2e-stale-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
           SQL1="INSERT INTO contents (id,content_type,owner_user_id,creator_id,ip_id,state,version,revision,title,body_ref,media_refs_json,cover_ref,etag,created_at,updated_at) VALUES ('mod-e2e-stale-$GITHUB_RUN_ID','article','mod-e2e-owner-$GITHUB_RUN_ID',NULL,NULL,'PENDING_REVIEW',1,1,'Moderation E2E Stale Fixture','r2://moderation-e2e/stale/$GITHUB_RUN_ID','[]',NULL,'W/"1"','$NOW','$NOW');"
-          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-content/wrangler.jsonc --command "$SQL1"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/luck02-content/wrangler.jsonc --command "$SQL1"
           SQL2="INSERT INTO moderation_cases (case_id,target_type,target_id,target_version,policy_version,state,priority,assigned_reviewer_id,current_decision_id,evidence_bundle_ref,version,created_at,updated_at) VALUES ('mod-e2e-stale-$GITHUB_RUN_ID','content','mod-e2e-stale-$GITHUB_RUN_ID',1,'moderation-v1.0','UNDER_REVIEW',90,NULL,NULL,'e2e/stale/$GITHUB_RUN_ID',1,'$NOW','$NOW');"
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/luck04-commerce/wrangler.jsonc --command "$SQL2"
 
@@ -381,7 +381,7 @@ jobs:
           mkdir -p artifacts/mapping-0/moderation-runtime-e2e
           converged=0
           for attempt in $(seq 1 20); do
-            npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --json --config workers/W03-content/wrangler.jsonc --command "SELECT id,state,version,etag FROM contents WHERE id='$CONTENT_ID' LIMIT 1;" > /tmp/convergence-content.json
+            npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --json --config workers/luck02-content/wrangler.jsonc --command "SELECT id,state,version,etag FROM contents WHERE id='$CONTENT_ID' LIMIT 1;" > /tmp/convergence-content.json
             npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/luck04-commerce/wrangler.jsonc --command "SELECT outbox_id,status,attempts,last_error,delivered_at,next_attempt_at FROM moderation_enforcement_outbox WHERE case_id='$CASE_ID' ORDER BY created_at DESC LIMIT 1;" > /tmp/convergence-outbox.json
             if node - <<'NODE'
           const fs=require('fs');
@@ -411,7 +411,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/mapping-0/moderation-runtime-e2e
-          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --json --config workers/W03-content/wrangler.jsonc --command "SELECT id,state,version,etag FROM contents WHERE id IN ('$CONTENT_ID','mod-e2e-stale-$GITHUB_RUN_ID') ORDER BY id;" > artifacts/mapping-0/moderation-runtime-e2e/content-state.json
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --json --config workers/luck02-content/wrangler.jsonc --command "SELECT id,state,version,etag FROM contents WHERE id IN ('$CONTENT_ID','mod-e2e-stale-$GITHUB_RUN_ID') ORDER BY id;" > artifacts/mapping-0/moderation-runtime-e2e/content-state.json
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/luck04-commerce/wrangler.jsonc --command "SELECT case_id,state,version,current_decision_id FROM moderation_cases WHERE case_id IN ('$CASE_ID','mod-e2e-stale-$GITHUB_RUN_ID') ORDER BY case_id;" > artifacts/mapping-0/moderation-runtime-e2e/cases.json
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/luck04-commerce/wrangler.jsonc --command "SELECT decision_id,case_id,case_version,outcome,policy_version,reviewer_id,reviewer_layer FROM moderation_decisions WHERE case_id='$CASE_ID';" > artifacts/mapping-0/moderation-runtime-e2e/decision.json
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/luck04-commerce/wrangler.jsonc --command "SELECT outbox_id,decision_id,status,attempts,last_error,delivered_at FROM moderation_enforcement_outbox WHERE decision_id=(SELECT decision_id FROM moderation_decisions WHERE case_id='$CASE_ID');" > artifacts/mapping-0/moderation-runtime-e2e/outbox.json
@@ -459,7 +459,7 @@ jobs:
           CASE1="mod-e2e-$GITHUB_RUN_ID"
           CONTENT1="mod-e2e-$GITHUB_RUN_ID"
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/luck04-commerce/wrangler.jsonc --command "DELETE FROM moderation_enforcement_outbox WHERE decision_id IN (SELECT decision_id FROM moderation_decisions WHERE case_id LIKE 'mod-e2e-%'); DELETE FROM moderation_decision_idempotency WHERE case_id LIKE 'mod-e2e-%'; DELETE FROM moderation_decisions WHERE case_id LIKE 'mod-e2e-%'; DELETE FROM moderation_cases WHERE case_id LIKE 'mod-e2e-%';"
-          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-content/wrangler.jsonc --command "DELETE FROM contents WHERE id LIKE 'mod-e2e-%';"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/luck02-content/wrangler.jsonc --command "DELETE FROM contents WHERE id LIKE 'mod-e2e-%';"
           npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --yes --config workers/luck02-content/wrangler.jsonc --command "DELETE FROM role_assignments WHERE id LIKE 'MODERATION-E2E-ROLE-%' OR subject_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com');"
           npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --yes --config workers/luck02-content/wrangler.jsonc --command "DELETE FROM auth_session_state WHERE user_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT) IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT) IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com') OR CAST(owner_subject_id AS TEXT) IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM auth_registration_envelopes WHERE idempotency_key LIKE 'MODERATION-E2E-%-register'; DELETE FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com';"
 
