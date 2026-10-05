@@ -5,6 +5,8 @@ import { changeSubscriptionPlan, createSubscription, getSubscription, listSubscr
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
   D1_01: D1Database
+  D1_04_TARGET?: D1Database
+  LUCKREAD_D1_MODE?: string
   SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
   SUBSCRIPTION_READ_LIMITER?: RateLimitBinding
   SUBSCRIPTION_WRITE_LIMITER?: RateLimitBinding
@@ -74,6 +76,9 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const legacyDb = env.D1_01
+    const legacyDb = env.D1_01
+    const commerceDb = env.LUCKREAD_D1_MODE === 'new' ? (env.D1_04_TARGET ?? legacyDb) : legacyDb
     try {
       await enforceRateLimit(request, env)
       requireTransport(request)
@@ -87,28 +92,28 @@ export default {
         const idempotencyKey = validateIdempotencyKey(request.headers.get('Idempotency-Key'))
         const body = await readJson<{ planId?: unknown }>(request)
         if (typeof body.planId !== 'string') throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
-        const result = await createSubscription(env.D1_01, principal, { planId: body.planId, idempotencyKey })
+        const result = await createSubscription(commerceDb, principal, { planId: body.planId, idempotencyKey })
         return json({ data: result, requestId: crypto.randomUUID() }, 201, result.etag)
       }
       if (operation.operation === 'list') {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
         const requestedPage = parseBoundedPositiveInt(url.searchParams.get('page'), 1, 10000)
-        const result = await listSubscriptions(env.D1_01, principal, requestedLimit, requestedPage)
+        const result = await listSubscriptions(commerceDb, principal, requestedLimit, requestedPage)
         return json({ data: result, requestId: crypto.randomUUID() })
       }
       if (operation.operation === 'get') {
-        const result = await getSubscription(env.D1_01, principal, operation.subscriptionId)
+        const result = await getSubscription(commerceDb, principal, operation.subscriptionId)
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
       const ifMatch = validateIfMatch(request.headers.get('If-Match'))
       if (operation.operation === 'change-plan') {
         const body = await readJson<{ planId?: unknown }>(request)
         if (typeof body.planId !== 'string') throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
-        const result = await changeSubscriptionPlan(env.D1_01, principal, operation.subscriptionId, body.planId, ifMatch)
+        const result = await changeSubscriptionPlan(commerceDb, principal, operation.subscriptionId, body.planId, ifMatch)
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
-      const result = await transitionSubscription(env.D1_01, principal, operation.subscriptionId, operation.operation, ifMatch)
+      const result = await transitionSubscription(commerceDb, principal, operation.subscriptionId, operation.operation, ifMatch)
       return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
     } catch (error) {
       if (error instanceof SubscriptionRuntimeError) {
