@@ -322,3 +322,27 @@ export const transitionAccountState = (body: {
   reason: string
   expectedVersion: number
 }) => callW02<AccountStateTransitionResult>('/internal/account/transition', body)
+
+
+export async function signOutThroughW02(request: Request): Promise<Response> {
+  const service = await getW02Service()
+  const headers = new Headers()
+  for (const name of ['cookie', 'authorization', 'origin', 'referer', 'user-agent']) {
+    const value = request.headers.get(name)
+    if (value) headers.set(name, value)
+  }
+  headers.set('content-type', 'application/json')
+  headers.set('X-LuckRead-Caller', 'W01')
+
+  try {
+    return await service.fetch(
+      new Request('https://luckread-w02.internal/api/auth/sign-out', {
+        method: 'POST',
+        headers,
+        body: '{}',
+      }),
+    )
+  } catch {
+    throw new W02AuthClientError(503, 'W02 authentication service is unavailable')
+  }
+}
