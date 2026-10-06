@@ -1,7 +1,4 @@
-import {
-  invalidatePublicFollowers,
-  invalidatePublicFollowing,
-} from '../../../../../lib/public-response-cache.js'
+import { invalidatePublicRoute } from '../../../../../lib/public-response-cache.js'
 
 import {
   assertSocialTargetUserExists,
@@ -44,10 +41,10 @@ export async function POST(request: Request): Promise<Response> {
       body: { targetUserId },
     })
     if (response.ok) {
-      await invalidatePublicFollowers(request, principal.userId)
-      await invalidatePublicFollowing(request, principal.userId)
-      await invalidatePublicFollowers(request, targetUserId)
-      await invalidatePublicFollowing(request, targetUserId)
+      await invalidatePublicRoute(request, 'followers', '/api/v1/users/' + encodeURIComponent(principal.userId) + '/followers')
+      await invalidatePublicRoute(request, 'following', '/api/v1/users/' + encodeURIComponent(principal.userId) + '/following')
+      await invalidatePublicRoute(request, 'followers', '/api/v1/users/' + encodeURIComponent(targetUserId) + '/followers')
+      await invalidatePublicRoute(request, 'following', '/api/v1/users/' + encodeURIComponent(targetUserId) + '/following')
     }
     return response
   } catch (error) {
