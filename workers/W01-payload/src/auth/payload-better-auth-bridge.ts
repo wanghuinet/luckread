@@ -69,9 +69,14 @@ const verifySignature = async (secret: string, value: string, suppliedSignature:
 const validMethod = (value: unknown): value is PayloadBetterAuthBridgeClaims['method'] =>
   value === 'GET' || value === 'POST' || value === 'PATCH' || value === 'DELETE'
 
+type BridgeRequestLike = {
+  method: string
+  url: string
+}
+
 const validClaims = (
   value: unknown,
-  request: Request,
+  request: BridgeRequestLike,
   nowSeconds: number,
 ): value is PayloadBetterAuthBridgeClaims => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
@@ -131,7 +136,7 @@ export const createPayloadBetterAuthBridgeToken = async (
 export const verifyPayloadBetterAuthBridgeToken = async (
   payloadSecret: string,
   token: string,
-  request: Request,
+  request: BridgeRequestLike,
   now = new Date(),
 ): Promise<PayloadBetterAuthBridgeClaims | null> => {
   if (!payloadSecret || !token || token.length > MAX_TOKEN_LENGTH) return null
