@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://luckread.com/contracts/payload/upstream-product-immutability.v1.schema.json",
+  "$id": "https://luckread.com/contracts/v1/payload/upstream-product-immutability.v1.schema.json",
   "title": "LuckRead Upstream Product Immutability Contract v1",
   "type": "object",
   "additionalProperties": false,
