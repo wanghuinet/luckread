@@ -85,7 +85,7 @@ const requiredPrincipal = (request: Request): { userId: string; layer: string; r
 
 export const hasCreatorContentPermission = (layer: string, roles: readonly string[] = []): boolean => {
   if (!/^L[0-8]$/.test(layer)) return false
-  return roles.includes('creator')
+  return Number(layer.slice(1)) >= 3 && roles.includes('creator')
 }
 
 const requiredCreatorPrincipal = (request: Request): { userId: string; layer: string; roles: string[] } => {
