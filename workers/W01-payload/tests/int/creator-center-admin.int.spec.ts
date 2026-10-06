@@ -90,6 +90,7 @@ describe('Creator Center admin extension', () => {
     const updateRoute = read('src/app/(payload)/api/creator/contents/[contentId]/route.ts')
     const stateRoute = read('src/app/(payload)/api/creator/contents/[contentId]/state/route.ts')
     const preflightRoute = read('src/app/(payload)/api/creator/contents/[contentId]/preflight/route.ts')
+    const w03Index = read('../W03-content/src/index.ts')
 
     expect(view).toContain('<PublishComposer contentBasePath="/api/creator/contents" />')
     expect(publisher).toContain("contentBasePath = '/api/v1/contents'")
@@ -204,6 +205,9 @@ describe('Creator Center admin extension', () => {
     expect(preflightRoute).toContain('/internal/content/contents/')
     expect(preflightRoute).toContain('/preflight')
     expect(preflightRoute).toContain('/preflight')
+    expect(w03Index).toContain("if (etag) headers.set('ETag', etag)")
+    expect(contentClient).toContain("const etag = response.headers.get('ETag')")
+    expect(contentClient).toContain("responseHeaders.set('ETag', etag)")
   })
 
   it('exposes the creator-owned content management read slice', () => {
