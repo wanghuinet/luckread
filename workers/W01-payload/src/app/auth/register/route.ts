@@ -390,7 +390,6 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       }))
     }
     await releaseReservation()
-    await releaseReservation()
     console.error(JSON.stringify({
       event: 'auth.register.profile_projection_failure',
       diagnosticCode: 'AUTH001_PROFILE_PROJECTION_FAILURE',
