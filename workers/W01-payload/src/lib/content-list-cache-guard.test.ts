@@ -50,13 +50,9 @@ describe('content list cache guard', () => {
     )).toThrow(ContentListQueryError)
   })
 
-  it('detects Authorization, Payload, and Better Auth session credentials', () => {
+  it('detects current Authorization and Better Auth session credentials', () => {
     expect(hasAuthenticatedSessionCredential(
       new Request('https://luckread.com/api/v1/contents', { headers: { Authorization: 'Bearer token' } }),
-    )).toBe(true)
-
-    expect(hasAuthenticatedSessionCredential(
-      new Request('https://luckread.com/api/v1/contents', { headers: { cookie: 'payload-token=token' } }),
     )).toBe(true)
 
     expect(hasAuthenticatedSessionCredential(
@@ -66,6 +62,10 @@ describe('content list cache guard', () => {
     expect(hasAuthenticatedSessionCredential(
       new Request('https://luckread.com/api/v1/contents', { headers: { cookie: '__Secure-better-auth.session_token=token' } }),
     )).toBe(true)
+
+    expect(hasAuthenticatedSessionCredential(
+      new Request('https://luckread.com/api/v1/contents', { headers: { cookie: 'payload-token=retired' } }),
+    )).toBe(false)
 
     expect(hasAuthenticatedSessionCredential(
       new Request('https://luckread.com/api/v1/contents', { headers: { cookie: 'better-auth.session_token=' } }),
