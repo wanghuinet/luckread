@@ -95,8 +95,6 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
           : 'PENDING_VERIFICATION'
 
       setResult({ userId, accountState })
-
-      setResult(payload)
       setStatus('success')
       setEmail('')
       setUsername('')
