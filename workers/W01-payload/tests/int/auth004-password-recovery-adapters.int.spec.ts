@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   requestPasswordResetThroughW02: vi.fn(),
   resetPasswordThroughW02: vi.fn(),
   enforceAuthRateLimit: vi.fn(),
+  enforceW01WriteRateLimit: vi.fn(),
   W02PasswordClientError: class extends Error {
     constructor(
       readonly status: number,
@@ -38,6 +39,7 @@ vi.mock('@/auth/w02-password-recovery-client', () => ({
 
 vi.mock('@/auth/traffic-limit', () => ({
   enforceAuthRateLimit: mocks.enforceAuthRateLimit,
+  enforceW01WriteRateLimit: mocks.enforceW01WriteRateLimit,
   TrafficLimitError: class extends Error {},
   rateLimitResponse: vi.fn(),
 }))
@@ -70,6 +72,7 @@ describe('AUTH-004 W01 recovery adapters', () => {
     mocks.changePasswordThroughW02.mockResolvedValue(undefined)
     mocks.requestPasswordResetThroughW02.mockResolvedValue(undefined)
     mocks.enforceAuthRateLimit.mockResolvedValue(undefined)
+    mocks.enforceW01WriteRateLimit.mockResolvedValue(undefined)
     mocks.resetPasswordThroughW02.mockResolvedValue(undefined)
   })
 
