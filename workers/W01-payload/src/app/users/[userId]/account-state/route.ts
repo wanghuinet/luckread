@@ -39,8 +39,7 @@ export async function POST(request: Request, context: { params: Promise<{ userId
         targetUserId,
         to: body.to,
         reason: body.reason,
-        expectedVersion,
-      },
+      expectedVersion,
     })
     return json({ from: result.from, to: result.to, auditEventId: result.auditEventId })
   } catch (error) {
