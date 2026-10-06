@@ -168,7 +168,44 @@ export default {
           accountState: principal.accountState,
           accountStateVersion: principal.accountStateVersion,
           layer: principal.layer,
+          roles: principal.roles,
         })
+      } catch {
+        return json({ active: false }, 503)
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/admin/authorize') {
+      const body = await readJsonBody<{ userId?: unknown }>(request)
+      if (!body || typeof body.userId !== 'string' || body.userId.length === 0 || body.userId.length > 128) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid admin authorization request' } }, 400)
+      }
+
+      try {
+        const user = await env.D1_01
+          .prepare('SELECT account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? LIMIT 1')
+          .bind(body.userId)
+          .first<{ accountState?: string; accountStateVersion?: number }>()
+
+        if (!user) return json({ active: false }, 401)
+
+        const resolution = await resolveGlobalLayer(
+          env.D1_01,
+          body.userId,
+          typeof user.accountState === 'string' ? user.accountState : 'PENDING_VERIFICATION',
+          new Date().toISOString(),
+        )
+
+        const active = resolution.decision === 'ALLOW' && resolution.layer !== undefined
+        return json({
+          active,
+          userId: body.userId,
+          accountState: user.accountState ?? 'PENDING_VERIFICATION',
+          accountStateVersion: typeof user.accountStateVersion === 'number' ? user.accountStateVersion : 1,
+          layer: resolution.layer ?? null,
+          roles: resolution.roles ?? [],
+          adminAccess: resolution.layer === 'L7' || resolution.layer === 'L8',
+        }, active ? 200 : 401)
       } catch {
         return json({ active: false }, 503)
       }
