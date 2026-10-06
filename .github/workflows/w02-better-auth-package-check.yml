@@ -30,3 +30,6 @@ jobs:
       - name: Verify Better Auth import
         working-directory: workers/W02-identity
         run: node --input-type=module -e "import('better-auth').then(() => console.log('better-auth import: OK'))"
+      - name: Verify direct-D1 runtime entrypoint
+        working-directory: workers/W02-identity
+        run: node --input-type=module -e "const fs=require('fs'); const s=fs.readFileSync('src/auth/better-auth.ts','utf8'); if (s.includes('better-auth/minimal')) throw new Error('better-auth/minimal is forbidden for direct D1'); console.log('direct-D1 Better Auth entrypoint: OK')"
