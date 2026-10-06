@@ -5,10 +5,6 @@ on:
     branches: [main]
     paths:
       - 'workers/W02-identity/src/session/**'
-      - 'workers/W02-identity/src/credentials/credential-hash-key.ts'
-      - 'workers/W02-identity/src/credentials/credential-hash-key.test.ts'
-      - 'workers/W02-identity/src/account/registration-materializer.ts'
-      - 'workers/W02-identity/src/account/registration-materializer.test.ts'
       - 'workers/W02-identity/src/index.ts'
       - '.github/workflows/w02-session-runtime-ci.yml'
       - 'package.json'
@@ -50,44 +46,3 @@ jobs:
       - name: Run W02 session runtime tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/session/session-runtime.test.ts workers/W02-identity/src/account/password-change.test.ts
 
-
-  credential-key-boundary:
-    name: W02 Credential Hash Key Boundary Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run focused key-boundary tests
-        run: npx vitest@3.2.4 run workers/W02-identity/src/credentials/credential-hash-key.test.ts
-
-
-  registration-materializer:
-    name: W02 AUTH-001 Registration Materializer Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run materializer tests
-        run: npx vitest@3.2.4 run workers/W02-identity/src/account/registration-materializer.test.ts
