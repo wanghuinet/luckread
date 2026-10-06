@@ -141,7 +141,7 @@ jobs:
             if(reg.status!==201||typeof reg.data?.userId!=='string') throw new Error(key+' registration failed: '+JSON.stringify(reg.data))
             const userId=String(reg.data.userId)
             const now=new Date().toISOString()
-            d1("UPDATE "user" SET account_state='ACTIVE', account_state_version=COALESCE(account_state_version,0)+1 WHERE CAST(id AS TEXT)="+q(userId))
+            d1('UPDATE "user" SET account_state=\'ACTIVE\', account_state_version=COALESCE(account_state_version,0)+1 WHERE CAST(id AS TEXT)='+q(userId))
             d1("INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES ("+
               [roleId,userId,'creator','global',null,'ACTIVE',now,null,now,now].map((v,i)=>i===4?'NULL':q(v)).join(',')+")")
             const login=await post('/auth/login',{identity:email,credential:password,deviceId:'media-e2e-'+runId+'-'+key})
