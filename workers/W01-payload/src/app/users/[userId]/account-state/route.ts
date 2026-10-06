@@ -30,8 +30,18 @@ export async function POST(request: Request, context: { params: Promise<{ userId
   }
 
   let principal
-  try { principal = await getBetterAuthPrincipal(request) }
-  catch { return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required') }
+  try {
+    principal = await getBetterAuthPrincipal(request)
+  } catch (error) {
+    if (error instanceof W02AuthClientError) {
+      return errorResponse(
+        error.status === 401 ? 401 : 503,
+        error.status === 401 ? 'UNAUTHENTICATED' : 'SERVICE_UNAVAILABLE',
+        error.status === 401 ? 'Authentication required' : 'Authentication service unavailable',
+      )
+    }
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
+  }
 
   try {
     const result = await transitionAccountState(request, {
