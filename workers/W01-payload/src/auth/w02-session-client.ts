@@ -218,6 +218,7 @@ export async function resolveBetterAuthPrincipal(token: string): Promise<BetterA
       headers: {
         authorization: 'Bearer ' + token,
         'content-type': 'application/json',
+        'X-LuckRead-Caller': 'W01',
       },
       body: '{}',
     }),
