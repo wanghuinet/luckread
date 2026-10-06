@@ -42,11 +42,18 @@ const handler = async (
   // idempotency, consent, rate-limit, and Payload projection seams run.
   // Exposing Better Auth sign-up directly would create an identity without
   // the required W01 profile projection.
-  if (endpoint === 'sign-up/email') {
+  const canonicalW01AuthEndpoints = new Set([
+    'sign-up/email',
+    'change-password',
+    'request-password-reset',
+    'reset-password',
+  ])
+
+  if (canonicalW01AuthEndpoints.has(endpoint)) {
     return errorResponse(
       404,
       'NOT_FOUND',
-      'Direct account registration is not available at this endpoint',
+      'This authentication operation is not available at this endpoint',
     )
   }
 
