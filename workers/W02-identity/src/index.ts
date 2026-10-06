@@ -197,7 +197,8 @@ export default {
               createdAt?: unknown
               sessionId?: unknown
             }
-            return typeof parsed.createdAt === 'string' && typeof parsed.sessionId === 'string' ? parsed : null
+            if (typeof parsed.createdAt !== 'string' || typeof parsed.sessionId !== 'string') return null
+            return { createdAt: parsed.createdAt, sessionId: parsed.sessionId }
           } catch {
             return null
           }
