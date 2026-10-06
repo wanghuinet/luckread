@@ -210,6 +210,17 @@ describe('Creator Center admin extension', () => {
     expect(contentClient).toContain("responseHeaders.set('ETag', etag)")
   })
 
+  it('invalidates public content caches from creator mutations', () => {
+    const contentRoute = read('src/app/(payload)/api/creator/contents/[contentId]/route.ts')
+    const stateRoute = read('src/app/(payload)/api/creator/contents/[contentId]/state/route.ts')
+
+    for (const route of [contentRoute, stateRoute]) {
+      expect(route).toContain('invalidatePublicContentDetail')
+      expect(route).toContain('invalidatePublicContentList')
+      expect(route).toContain('if (response.ok)')
+    }
+  })
+
   it('exposes the creator-owned content management read slice', () => {
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const list = read('src/app/(payload)/v1beta/CreatorContentList.tsx')

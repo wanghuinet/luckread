@@ -1,4 +1,9 @@
 import {
+  invalidatePublicContentDetail,
+  invalidatePublicContentList,
+} from '../../../../../../../lib/public-response-cache.js'
+
+import {
   callW03Content,
   resolveCookieContentPrincipal,
   W03ContentClientError,
@@ -44,13 +49,18 @@ export async function POST(
       return errorResponse(400, 'VALIDATION_FAILED', 'Invalid content state request')
     }
 
-    return await callW03Content({
+    const response = await callW03Content({
       request,
       pathname: `/internal/content/contents/${encodeURIComponent(contentId)}/state`,
       method: 'POST',
       body,
       principal,
     })
+    if (response.ok) {
+      await invalidatePublicContentDetail(request, contentId)
+      await invalidatePublicContentList(request)
+    }
+    return response
   } catch (error) {
     if (error instanceof W03ContentClientError) {
       return errorResponse(error.status, error.code, 'Content service unavailable')
