@@ -206,13 +206,16 @@ it('guards creator media listing before W02 authentication and preserves fail-cl
   expect(route).toContain("code: 'SERVICE_UNAVAILABLE'")
 })
 
-it('guards media detail reads before the Payload route', () => {
+it('guards media detail reads before Better Auth and Payload Local API', () => {
   const route = read('src/app/api/v1/media/[mediaId]/route.ts')
   const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
-  const payloadIndex = route.indexOf('await payloadMediaGet(')
+  const authIndex = route.indexOf('const principal = await resolveBetterAuthPrincipalThroughW02(request)')
+  const payloadIndex = route.indexOf('const payload = await getPayload({ config })')
   expect(guardIndex).toBeGreaterThanOrEqual(0)
+  expect(authIndex).toBeGreaterThanOrEqual(0)
   expect(payloadIndex).toBeGreaterThanOrEqual(0)
-  expect(guardIndex).toBeLessThan(payloadIndex)
+  expect(guardIndex).toBeLessThan(authIndex)
+  expect(authIndex).toBeLessThan(payloadIndex)
   expect(route).toContain('TrafficLimitError')
 })
 
@@ -226,11 +229,12 @@ it('guards media creation before the Payload upload handler', () => {
   expect(guardIndex).toBeLessThan(payloadIndex)
 })
 
-it('guards media update and delete before the Payload handlers', () => {
+it('guards media update and delete before Better Auth and Payload Local API', () => {
   const route = read('src/app/api/v1/media/[mediaId]/route.ts')
   expect(route).toContain('await enforceW01WriteRateLimit(request)')
-  expect(route).toContain('return payloadMediaDelete')
-  expect(route).toContain('return payloadMediaPatch')
+  expect(route).toContain('resolveBetterAuthPrincipalThroughW02(request)')
+  expect(route).toContain('await payload.delete')
+  expect(route).toContain('await payload.update')
   const guards = [...route.matchAll(/await enforceW01WriteRateLimit\(request\)/g)]
   expect(guards.length).toBe(2)
 })
