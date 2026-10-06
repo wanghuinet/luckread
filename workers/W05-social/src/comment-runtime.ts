@@ -227,13 +227,16 @@ export async function createComment(
     ) {
       throw new CommentRuntimeError('CONFLICT', 409)
     }
+    if (validation.existing_state === 'AUTHOR_DELETED') {
+      throw new CommentRuntimeError('NOT_FOUND', 404)
+    }
     return {
       id: validation.existing_id,
       contentId: validation.existing_content_id ?? contentId,
       authorUserId: validation.existing_author_user_id ?? actor,
       parentId: validation.existing_parent_id,
       body: validation.existing_body ?? body,
-      state: validation.existing_state === 'AUTHOR_DELETED' ? 'PUBLISHED' : validation.existing_state ?? 'PUBLISHED',
+      state: validation.existing_state ?? 'PUBLISHED',
       depth: Number(validation.existing_depth ?? 0),
       createdAt: validation.existing_created_at ?? '',
       updatedAt: validation.existing_updated_at ?? validation.existing_created_at ?? '',
