@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Users } from '../../src/collections/Users'
+import { payloadAdminOnly } from '../../src/auth/payload-admin-access'
 
 describe('W01 Users collection contract', () => {
   it('declares the approved ENT-USER profile and preference fields', () => {
@@ -17,7 +18,10 @@ describe('W01 Users collection contract', () => {
       disableLocalStrategy: true,
       strategies: expect.arrayContaining([expect.objectContaining({ name: 'luckread-better-auth' })]),
     }))
-    expect(Users.access?.create?.({} as never)).toBe(false)
+    expect(Users.access?.create).toBe(false)
+    expect(Users.access?.read).toBe(payloadAdminOnly)
+    expect(Users.access?.update).toBe(payloadAdminOnly)
+    expect(Users.access?.delete).toBe(payloadAdminOnly)
 
     expect(fields).toEqual(
       expect.arrayContaining([
