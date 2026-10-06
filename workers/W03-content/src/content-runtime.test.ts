@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -29,6 +29,51 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('PUBLISHED', 'PENDING_REVIEW', 'CREATOR', true, 'other')).toBe(false)
   })
 
+
+  it('rejects creator edits while content is pending review', async () => {
+    const pendingReviewRow = {
+      id: 'content_review_123',
+      content_type: 'article',
+      owner_user_id: 'user_123',
+      creator_id: 'user_123',
+      ip_id: null,
+      state: 'PENDING_REVIEW',
+      version: 2,
+      revision: 2,
+      title: 'Submitted article',
+      body_ref: 'https://cdn.example.com/body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"2"',
+      created_at: '2026-10-02T12:00:00.000Z',
+      updated_at: '2026-10-02T12:01:00.000Z',
+    }
+
+    const db = {
+      prepare() {
+        return {
+          bind: () => ({
+            first: async () => pendingReviewRow,
+          }),
+        }
+      },
+    } as never
+
+    await expect(updateContent(
+      db,
+      'user_123',
+      'content_review_123',
+      {
+        contentType: 'article',
+        title: 'Edited while under review',
+        bodyRef: 'https://cdn.example.com/body-new.txt',
+        mediaRefs: [],
+        coverRef: null,
+      },
+      'W/"2"',
+      'update-review-1',
+    )).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
+  })
 
   it('requires at least one media reference for video content', () => {
     expect(() =>
