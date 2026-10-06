@@ -38,7 +38,7 @@ describe('AUTH-013 W01 public account-state route', () => {
   })
 
   it('denies requests without a Better Auth principal', async () => {
-    mocks.getBetterAuthPrincipal.mockRejectedValue(new Error('unauthenticated'))
+    mocks.getBetterAuthPrincipal.mockRejectedValue(new mocks.MockW02AuthClientError(401, 'unauthenticated'))
 
     const response = await POST(
       new Request('https://luckread.test/v1/users/42/account-state', {
