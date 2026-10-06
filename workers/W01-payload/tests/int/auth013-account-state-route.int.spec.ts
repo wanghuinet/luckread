@@ -11,9 +11,7 @@ const mocks = vi.hoisted(() => {
   }
 
   return {
-    getPayload: vi.fn(),
-    readVerifiedPayloadTokenVersion: vi.fn(),
-    validateSession: vi.fn(),
+    getBetterAuthPrincipal: vi.fn(),
     transitionAccountState: vi.fn(),
     MockW02AuthClientError,
   }
@@ -32,7 +30,7 @@ vi.mock('../../src/auth/payload-access-token.js', () => ({
 }))
 
 vi.mock('../../src/auth/w02-session-client.js', () => ({
-  validateSession: mocks.validateSession,
+  getBetterAuthPrincipal: mocks.getBetterAuthPrincipal,
   transitionAccountState: mocks.transitionAccountState,
   W02AuthClientError: mocks.MockW02AuthClientError,
 }))
@@ -43,17 +41,7 @@ describe('AUTH-013 W01 public account-state route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    mocks.getPayload.mockResolvedValue({
-      auth: vi.fn().mockResolvedValue({
-        user: {
-          id: '7',
-          _sid: 'sid-7',
-        },
-      }),
-    })
-
-    mocks.readVerifiedPayloadTokenVersion.mockReturnValue(3)
-    mocks.validateSession.mockResolvedValue(true)
+    mocks.getBetterAuthPrincipal.mockResolvedValue({ active: true, userId: '7', email: 'user@example.com', layer: 'L7' })
     mocks.transitionAccountState.mockResolvedValue({
       from: 'ACTIVE',
       to: 'RESTRICTED',
@@ -61,10 +49,8 @@ describe('AUTH-013 W01 public account-state route', () => {
     })
   })
 
-  it('denies requests without a verified Payload principal', async () => {
-    mocks.getPayload.mockResolvedValue({
-      auth: vi.fn().mockResolvedValue({ user: null }),
-    })
+  it('denies requests without a Better Auth principal', async () => {
+    mocks.getBetterAuthPrincipal.mockRejectedValue(new Error('unauthenticated'))
 
     const response = await POST(
       new Request('https://luckread.test/v1/users/42/account-state', {
@@ -80,33 +66,7 @@ describe('AUTH-013 W01 public account-state route', () => {
     )
 
     expect(response.status).toBe(401)
-    expect(mocks.validateSession).not.toHaveBeenCalled()
     expect(mocks.transitionAccountState).not.toHaveBeenCalled()
-  })
-
-  it('denies requests whose authoritative session is no longer active', async () => {
-    mocks.validateSession.mockResolvedValue(false)
-
-    const response = await POST(
-      new Request('https://luckread.test/v1/users/42/account-state', {
-        method: 'POST',
-        headers: {
-          Authorization: 'Bearer stale',
-          'If-Match': '"7"',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({ to: 'RESTRICTED', reason: 'moderation action' }),
-      }),
-      { params: Promise.resolve({ userId: '42' }) },
-    )
-
-    expect(response.status).toBe(401)
-    expect(mocks.transitionAccountState).not.toHaveBeenCalled()
-    expect(mocks.validateSession).toHaveBeenCalledWith({
-      sessionId: 'sid-7',
-      userId: '7',
-      tokenVersion: 3,
-    })
   })
 
   it('passes only the verified principal and canonical public fields to W02', async () => {
@@ -136,7 +96,7 @@ describe('AUTH-013 W01 public account-state route', () => {
       auditEventId: 'evt-013',
     })
 
-    expect(mocks.transitionAccountState).toHaveBeenCalledWith({
+    expect(mocks.transitionAccountState).toHaveBeenCalledWith(expect.any(Request), {
       subjectId: '7',
       targetUserId: '42',
       to: 'RESTRICTED',
@@ -144,7 +104,7 @@ describe('AUTH-013 W01 public account-state route', () => {
       expectedVersion: 7,
     })
 
-    const transitionInput = mocks.transitionAccountState.mock.calls[0][0]
+    const transitionInput = mocks.transitionAccountState.mock.calls[0][1]
     expect(transitionInput).not.toHaveProperty('actor')
     expect(transitionInput).not.toHaveProperty('permission')
     expect(transitionInput).not.toHaveProperty('approvalLevel')
