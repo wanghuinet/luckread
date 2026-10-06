@@ -73,7 +73,7 @@ jobs:
           test -n "$queue_id"
           consumers="$(curl -fsS --retry 3 --retry-all-errors "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$queue_id/consumers" "${AUTH[@]}")"
           echo "$consumers" | jq '.result'
-          consumer="$(jq -c 'if (.result|type)=="array" then .result[] else .result end | select(.script=="luckread-w04")' <<<"$consumers")"
+          consumer="$(jq -c 'if (.result|type)=="array" then .result[] else .result end | select((.script_name // .script)=="luckread-w04")' <<<"$consumers")"
           test -n "$consumer"
           echo "$consumer" | jq '{script_name, type, queue_name, dead_letter_queue, settings}'
           echo "$consumer" | jq -e --arg dlq "luckread-auth013-account-state-projection-dlq" '.dead_letter_queue==$dlq' >/dev/null
