@@ -106,6 +106,20 @@ export async function POST(request: Request): Promise<Response> {
     })
   }
 
+  let principal: Awaited<ReturnType<typeof resolveBetterAuthPrincipalThroughW02>>
+  try {
+    principal = await resolveBetterAuthPrincipalThroughW02(request)
+    if (!principal.active || principal.tokenVersion === undefined) {
+      throw new W02AuthClientError(401, 'authentication required')
+    }
+  } catch (error) {
+    if (error instanceof W02AuthClientError && error.status === 401) return unauthorized()
+    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
+      status: error instanceof W02AuthClientError ? error.status : 503,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    })
+  }
+
   let form: FormData
   try {
     form = await request.formData()
@@ -140,11 +154,6 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const principal = await resolveBetterAuthPrincipalThroughW02(request)
-    if (!principal.active || principal.tokenVersion === undefined) {
-      throw new W02AuthClientError(401, 'authentication required')
-    }
-
     const payload = await getPayload({ config })
     const result = await payload.create({
       collection: 'media',
