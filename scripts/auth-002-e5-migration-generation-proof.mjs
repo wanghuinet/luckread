@@ -39,7 +39,6 @@ const historicalConfig = show(baselineSha, 'workers/W01-payload/src/payload.conf
 const currentConfig = fs.readFileSync(path.join(root, 'src/payload.config.ts'), 'utf8')
 const currentAuthSchema = fs.readFileSync(path.join(root, 'src/db/auth-session-state-schema.ts'), 'utf8')
 const media = fs.readFileSync(path.join(root, 'src/collections/Media.ts'), 'utf8')
-const workerPbkdf2Compat = fs.readFileSync(path.join(root, 'src/runtime/pbkdf2-worker-compat.ts'), 'utf8')
 
 const setMigrationDir = (config, dir) => config.replace(
   "    migrationDir: path.resolve(dirname, 'migrations'),",
@@ -55,7 +54,6 @@ const writeFixture = (dir, config, users, includeAuthSchema) => {
   fs.writeFileSync(path.join(dir, 'collections/Users.ts'), users)
   fs.writeFileSync(path.join(dir, 'collections/Media.ts'), media)
   if (includeAuthSchema) fs.writeFileSync(path.join(dir, 'db/auth-session-state-schema.ts'), currentAuthSchema)
-  fs.writeFileSync(path.join(dir, 'runtime/pbkdf2-worker-compat.ts'), workerPbkdf2Compat)
 }
 
 writeFixture(stage1, setMigrationDir(historicalConfig, path.join(stage1, 'migrations')), historicalUsers, false)
