@@ -194,3 +194,25 @@ jobs:
               raise SystemExit('comment idempotency uniqueness boundary missing')
           print('SOCIAL_004_COMMENT_MIGRATION_STATIC=PASS')
           PY
+
+      - name: Verify comment edit idempotency migration shape
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          db.executescript(Path('workers/W05-social/migrations/20261002_003_social_004_comments_v1.sql').read_text())
+          db.executescript(Path('workers/W05-social/migrations/20261003_001_social_010_comment_delete_tombstone_v1.sql').read_text())
+          db.executescript(Path('workers/W05-social/migrations/20261006_001_social_012_comment_update_idempotency_v1.sql').read_text())
+          cols = db.execute('PRAGMA table_info("social_comment_mutation_idempotency")').fetchall()
+          expected = ['id','actor_user_id','operation_id','idempotency_key','request_hash','status','response_status','response_json','created_at','expires_at']
+          if [r[1] for r in cols] != expected:
+              raise SystemExit('unexpected comment edit idempotency schema')
+          indexes = {r[1]: r[2] for r in db.execute('PRAGMA index_list("social_comment_mutation_idempotency")').fetchall()}
+          if indexes.get('sqlite_autoindex_social_comment_mutation_idempotency_1') != 1:
+              raise SystemExit('comment edit idempotency uniqueness boundary missing')
+          guard_sql = db.execute('SELECT sql FROM sqlite_master WHERE type="table" AND name="social_comment_txn_guard"').fetchone()[0]
+          if 'successful = 1' not in guard_sql:
+              raise SystemExit('comment edit transaction guard missing')
+          print('SOCIAL_012_COMMENT_UPDATE_IDEMPOTENCY_MIGRATION_STATIC=PASS')
+          PY
