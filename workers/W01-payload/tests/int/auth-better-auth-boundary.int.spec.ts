@@ -39,8 +39,12 @@ describe('W01 Better Auth boundary', () => {
       resolve(process.cwd(), 'src/app/api/auth/[...segments]/route.ts'),
       'utf8',
     )
+    expect(route).toContain("canonicalW01AuthEndpoints")
     expect(route).toContain("endpoint === 'sign-up/email'")
-    expect(route).toContain("Direct account registration is not available at this endpoint")
+    expect(route).toContain("'change-password'")
+    expect(route).toContain("'request-password-reset'")
+    expect(route).toContain("'reset-password'")
+    expect(route).toContain("This authentication operation is not available at this endpoint")
     expect(route).toContain("'NOT_FOUND'")
     expect(route).toContain('idempotency')
     expect(route).toContain('Payload projection')
