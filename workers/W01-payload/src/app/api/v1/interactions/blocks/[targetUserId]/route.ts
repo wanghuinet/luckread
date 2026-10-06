@@ -1,3 +1,5 @@
+import { invalidatePublicRoute } from '../../../../../../lib/public-response-cache.js'
+
 import {
   callW05Social,
   resolveCookieSocialPrincipal,
@@ -22,12 +24,19 @@ export async function DELETE(
     if (!idempotencyKey || idempotencyKey.length > 256) {
       return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
     }
-    return await callW05Social({
+    const response = await callW05Social({
       request,
       pathname: '/internal/social/interactions/blocks/' + encodeURIComponent(targetUserId),
       method: 'DELETE',
       principal,
     })
+    if (response.ok) {
+      await invalidatePublicRoute(request, 'followers', '/api/v1/users/' + encodeURIComponent(principal.userId) + '/followers')
+      await invalidatePublicRoute(request, 'following', '/api/v1/users/' + encodeURIComponent(principal.userId) + '/following')
+      await invalidatePublicRoute(request, 'followers', '/api/v1/users/' + encodeURIComponent(targetUserId) + '/followers')
+      await invalidatePublicRoute(request, 'following', '/api/v1/users/' + encodeURIComponent(targetUserId) + '/following')
+    }
+    return response
   } catch (error) {
     if (error instanceof W05SocialClientError) return errorResponse(error.status, error.code, error.message)
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Social service unavailable')
