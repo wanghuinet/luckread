@@ -249,6 +249,15 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   let authPayload: unknown = null
   try { authPayload = await authResponse.json() } catch {}
   if (!authResponse.ok) {
+    const authError = isRecord(authPayload) && isRecord(authPayload.error)
+      ? authPayload.error
+      : null
+    console.error(JSON.stringify({
+      event: 'auth.register.better_auth_rejection',
+      status: authResponse.status,
+      code: typeof authError?.code === 'string' ? authError.code : 'UNKNOWN',
+      message: typeof authError?.message === 'string' ? authError.message : 'Unknown Better Auth rejection',
+    }))
     return errorResponse(
       authResponse.status >= 500 ? 503 : 422,
       authResponse.status >= 500 ? 'SERVICE_UNAVAILABLE' : 'VALIDATION_FAILED',
