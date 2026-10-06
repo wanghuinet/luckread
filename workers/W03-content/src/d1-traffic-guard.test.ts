@@ -40,6 +40,7 @@ describe('W03 D1 traffic guard', () => {
           'X-LuckRead-Correlation-Id': 'traffic-test',
           'X-LuckRead-Principal-User-Id': 'creator-1',
           'X-LuckRead-Principal-Layer': 'L3',
+          'X-LuckRead-Principal-Roles': 'creator',
           'Idempotency-Key': 'content-1',
           'content-type': 'application/json',
         },
