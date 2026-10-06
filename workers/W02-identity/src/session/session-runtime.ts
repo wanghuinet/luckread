@@ -150,46 +150,6 @@ export async function createSessionExtension(
   return { sessionId: session.sessionId, refreshToken }
 }
 
-export async function revokeSessionExtension(
-  db: D1Database,
-  sessionId: string,
-  now: string,
-): Promise<{ revoked: boolean }> {
-  if (!sessionId) throw new SessionRuntimeError('INVALID_INPUT', 'sessionId is required')
-
-  const extensionStatement = db
-    .prepare(`
-      UPDATE auth_session_state
-         SET revoked_at = ?,
-             last_seen_at = ?,
-             token_version = token_version + 1
-       WHERE session_id = ?
-         AND revoked_at IS NULL
-    `)
-    .bind(now, now, sessionId)
-
-  const nativeSessionStatement = db
-    .prepare('DELETE FROM "session" WHERE id = ?')
-    .bind(sessionId)
-
-  try {
-    const results = await db.batch([extensionStatement, nativeSessionStatement])
-    if (results.length !== 2) {
-      throw new SessionRuntimeError('CONFLICT', 'session revocation batch was incomplete')
-    }
-
-    // W02 owns the authoritative revocation mutation: the extension state and
-    // the corresponding Better Auth session are changed together.
-    const extensionChanged = results[0]?.meta?.changes === 1
-    const nativeSessionChanged = results[1]?.meta?.changes === 1
-    return { revoked: extensionChanged || nativeSessionChanged }
-  } catch (error) {
-    if (error instanceof SessionRuntimeError) throw error
-    throw new SessionRuntimeError('CONFLICT', 'session revocation failed')
-  }
-}
-
-
 import { ensureBaseUserRole, resolveGlobalLayer, type LayerResolution } from '../authz/role-assignment.js'
 
 type LayerResolver = (
