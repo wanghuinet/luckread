@@ -62,7 +62,7 @@ export async function POST(request: Request): Promise<Response> {
 
     if (targetType === 'creator' || targetType === 'profile') {
       try {
-        await assertSocialTargetUserExists(targetId as string)
+        await assertSocialTargetUserExists(request, targetId as string)
       } catch (error) {
         if (error instanceof W03ContentClientError) throw error
         if (error instanceof Error && 'status' in error && 'code' in error) {
