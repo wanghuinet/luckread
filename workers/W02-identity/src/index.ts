@@ -77,6 +77,12 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
 
+    if (url.pathname.startsWith('/internal/auth/')) {
+      if (request.headers.get('X-LuckRead-Caller') !== 'W01') {
+        return json({ error: { code: 'FORBIDDEN', message: 'internal authentication transport required' } }, 403)
+      }
+    }
+
     if (url.pathname === '/api/auth' || url.pathname.startsWith('/api/auth/')) {
       if (request.headers.get('X-LuckRead-Caller') !== 'W01') {
         return json({ error: { code: 'FORBIDDEN', message: 'authentication gateway required' } }, 403)

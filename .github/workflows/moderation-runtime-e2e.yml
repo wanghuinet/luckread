@@ -206,7 +206,10 @@ jobs:
 
               const establishResponse = await env.W02_AUTH.fetch(new Request(base + '/internal/auth/session/establish', {
                 method: 'POST',
-                headers: { 'content-type': 'application/json' },
+                headers: {
+                  'content-type': 'application/json',
+                  'X-LuckRead-Caller': 'W01',
+                },
                 body: JSON.stringify({
                   sessionId: String(session.id),
                   userId: env.USER_ID,
