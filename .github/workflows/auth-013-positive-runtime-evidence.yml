@@ -115,22 +115,22 @@ jobs:
 
               const db = env.D1_01
               const runId = env.RUN_ID
-              const userId = 910000000 + (Number(runId) % 50000000)
+              const userId = `auth013-positive-user-${runId}`
               const email = `auth013-positive-${runId}@invalid.local`
               const now = new Date().toISOString()
               const correlationId = `auth013-positive-${runId}`
               const causationId = `auth013-positive-${runId}`
 
-              const existing = await db.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first()
+              const existing = await db.prepare('SELECT id FROM "user" WHERE id = ?').bind(userId).first()
               if (existing) {
                 return json({ status: 'FAIL_CLOSED', reason: 'synthetic_user_id_already_exists', userId }, 409)
               }
 
               await db
                 .prepare(
-                  'INSERT INTO users (id, email, account_state, account_state_version) VALUES (?, ?, ?, ?)',
+                  'INSERT INTO "user" (id, name, email, email_verified, locale, timezone, account_state, account_state_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 )
-                .bind(userId, email, 'ACTIVE', 1)
+                .bind(userId, 'AUTH013 Positive Runtime', email, 1, 'en-US', 'UTC', 'ACTIVE', 1, now, now)
                 .run()
 
               try {
@@ -360,9 +360,9 @@ jobs:
           }
 
           await query(`DELETE FROM auth_013_publication_journal WHERE journal_id = ${sqlLiteral(ids.journalId)}`);
-          await query(`DELETE FROM users WHERE id = ${Number(ids.userId)}`);
+          await query(`DELETE FROM "user" WHERE id = ${sqlLiteral(ids.userId)}`);
 
-          const userRemaining = await query(`SELECT COUNT(*) AS count FROM users WHERE id = ${Number(ids.userId)}`);
+          const userRemaining = await query(`SELECT COUNT(*) AS count FROM "user" WHERE id = ${sqlLiteral(ids.userId)}`);
           const journalRemaining = await query(`SELECT COUNT(*) AS count FROM auth_013_publication_journal WHERE journal_id = ${sqlLiteral(ids.journalId)}`);
 
           if (Number(userRemaining[0]?.count ?? -1) !== 0) throw new Error('Synthetic user cleanup failed');
