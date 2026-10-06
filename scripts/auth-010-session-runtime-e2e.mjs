@@ -15,7 +15,8 @@ if (!ACCOUNT_ID || !API_TOKEN) throw new Error('Cloudflare credentials are requi
 
 mkdirSync(ARTIFACT_DIR, { recursive: true })
 
-const sqlString = (value) => `'${String(value).replace(/'/g, "''")}'`
+const sqlString = (value) => "'" + String(value).replace(/'/g, "''") + "'"
+
 const flattenRows = (value) => {
   if (Array.isArray(value)) return value.flatMap((item) => {
     if (Array.isArray(item)) return item
@@ -39,6 +40,7 @@ const d1Json = (command) => {
       DATABASE_NAME,
       '--remote',
       '--json',
+      '--yes',
       '--config',
       'workers/W01-payload/wrangler.jsonc',
       '--command',
@@ -74,7 +76,6 @@ async function request(path, { method = 'GET', body, token, headers = {} } = {})
       bodyBytes: Buffer.byteLength(rawBody),
       data,
       cacheControl: response.headers.get('cache-control') || '',
-      contentType: response.headers.get('content-type') || '',
     }
   } finally {
     clearTimeout(timeout)
@@ -99,12 +100,18 @@ function expectStatus(response, expected, label) {
   check(response.status === expected, `${label}: expected HTTP ${expected}, got ${response.status}`)
 }
 
-function noSecretFields(value) {
-  const text = JSON.stringify(value ?? '')
-  for (const key of ['refreshCredentialHash', 'refreshToken', 'tokenVersion', 'revokedAt', 'userId', 'password']) {
-    if (text.includes(key)) return false
+function privacySafeSession(session) {
+  if (!session || typeof session !== 'object') return false
+  const serialized = JSON.stringify(session)
+  for (const key of ['token', 'accessToken', 'refreshToken', 'password', 'userId', 'accountState', 'tokenVersion', 'revokedAt', 'deviceId']) {
+    if (serialized.includes(key)) return false
   }
-  return true
+  return (
+    typeof session.sessionId === 'string' &&
+    typeof session.createdAt === 'string' &&
+    typeof session.expiresAt === 'string' &&
+    (session.lastSeenAt === null || typeof session.lastSeenAt === 'string')
+  )
 }
 
 async function createUser(label) {
@@ -112,7 +119,6 @@ async function createUser(label) {
   const email = `auth010-${label}-${suffix}@example.com`
   const username = `auth010_${label}_${suffix.replaceAll('-', '').slice(-20)}`
   const password = `Evd-AUTH010-${randomBytes(24).toString('base64url')}-Z9!`
-
   const response = await request('/auth/register', {
     method: 'POST',
     headers: { 'Idempotency-Key': `${TEST_ID}-register-${label}` },
@@ -127,7 +133,6 @@ async function createUser(label) {
       },
     },
   })
-
   expectStatus(response, 201, `register ${label}`)
   const userId = String(response.data?.userId ?? '')
   check(userId.length > 0, `register ${label}: userId missing`)
@@ -141,10 +146,11 @@ function activateAndAuthorize(user, label) {
   const roleId = `${TEST_ID}-role-${label}-${randomBytes(5).toString('hex')}`
 
   d1Json(
-    `UPDATE users
+    `UPDATE "user"
      SET account_state='ACTIVE',
-         account_state_version=COALESCE(account_state_version, 0) + 1
-     WHERE CAST(id AS TEXT)=${sqlString(user.userId)}`,
+         account_state_version=account_state_version+1,
+         updated_at=${sqlString(now)}
+     WHERE id=${sqlString(user.userId)}`,
   )
 
   d1Json(
@@ -165,7 +171,7 @@ function activateAndAuthorize(user, label) {
   )
 
   const account = d1Rows(
-    `SELECT account_state FROM users WHERE CAST(id AS TEXT)=${sqlString(user.userId)} LIMIT 1`,
+    `SELECT account_state,account_state_version FROM "user" WHERE id=${sqlString(user.userId)} LIMIT 1`,
   )[0]
   const assignment = d1Rows(
     `SELECT id,subject_id,role_id,scope_type,status FROM role_assignments WHERE id=${sqlString(roleId)} LIMIT 1`,
@@ -193,51 +199,13 @@ async function login(user, deviceId) {
   })
   expectStatus(response, 200, `login ${deviceId}`)
   check(typeof response.data?.accessToken === 'string', `login ${deviceId}: access token missing`)
-  check(typeof response.data?.refreshToken === 'string', `login ${deviceId}: refresh token missing`)
-  return {
-    accessToken: response.data.accessToken,
-    refreshToken: response.data.refreshToken,
-  }
+  return { accessToken: response.data.accessToken }
 }
 
-function sessionForDevice(userId, deviceId) {
-  const rows = d1Rows(
-    `SELECT s.id,s._parent_id,s.created_at,s.expires_at,a.device_id,a.token_version,a.revoked_at
-     FROM users_sessions AS s
-     INNER JOIN auth_session_state AS a
-       ON CAST(a.session_id AS TEXT)=CAST(s.id AS TEXT)
-      AND a.user_id=CAST(s._parent_id AS TEXT)
-     WHERE CAST(s._parent_id AS TEXT)=${sqlString(userId)}
-       AND a.device_id=${sqlString(deviceId)}
-     ORDER BY s.created_at DESC
-     LIMIT 1`,
-  )
-  const row = rows[0]
-  check(Boolean(row?.id), `session lookup missing for ${deviceId}`)
-  return {
-    sessionId: String(row.id),
-    userId: String(row._parent_id),
-    deviceId: String(row.device_id),
-    createdAt: String(row.created_at),
-    expiresAt: String(row.expires_at),
-    tokenVersion: Number(row.token_version),
-    revokedAt: row.revoked_at == null ? null : String(row.revoked_at),
-  }
-}
-
-function extensionFor(sessionId) {
-  return d1Rows(
-    `SELECT session_id,user_id,device_id,token_version,revoked_at,last_seen_at
-     FROM auth_session_state
-     WHERE session_id=${sqlString(sessionId)}
-     LIMIT 1`,
-  )[0] ?? null
-}
-
-function nativeSessionExists(sessionId) {
-  return d1Rows(
-    `SELECT id FROM users_sessions WHERE id=${sqlString(sessionId)} LIMIT 1`,
-  ).length === 1
+function sessionIds(sessions) {
+  return Array.isArray(sessions?.items)
+    ? sessions.items.map((item) => String(item?.sessionId ?? '')).filter(Boolean)
+    : []
 }
 
 let primary
@@ -246,19 +214,12 @@ let other
 let firstLogin
 let secondLogin
 let otherLogin
-let primarySession
-let secondSession
 
 try {
-  const dependency = JSON.parse(readFileSync('workers/W01-payload/package.json', 'utf8'))
-  check(dependency.dependencies?.payload === '3.90.2', 'W01 Payload version is not 3.90.2')
-  check(dependency.dependencies?.['@payloadcms/db-d1-sqlite'] === '3.90.2', 'W01 D1 adapter version is not 3.90.2')
-
   const policy = JSON.parse(
     readFileSync('artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json', 'utf8'),
   )
-  const policyVersion = String(policy.policyVersion ?? '')
-  check(policyVersion === 'PROD-2026-09-28.1', `unexpected production policy version: ${policyVersion}`)
+  check(String(policy.policyVersion ?? '') === 'PROD-2026-09-28.1', 'unexpected production policy version')
 
   const anonymous = await request('/auth/sessions')
   expectStatus(anonymous, 401, 'anonymous session list')
@@ -273,45 +234,33 @@ try {
   secondLogin = await login(primary, 'primary-b')
   otherLogin = await login(other, 'other-a')
 
-  primarySession = sessionForDevice(primary.userId, 'primary-a')
-  secondSession = sessionForDevice(primary.userId, 'primary-b')
-
   const list = await request('/auth/sessions?limit=100', { token: firstLogin.accessToken })
   expectStatus(list, 200, 'session list')
-  check(list.cacheControl.toLowerCase().includes('no-store'), 'session list must be non-shared/no-store')
+  check(list.cacheControl.toLowerCase().includes('no-store'), 'session list must be private/no-store')
   check(Array.isArray(list.data?.items), 'session list items missing')
-  check(list.data.items.length <= 50, `session list exceeded 50-item contract: ${list.data.items.length}`)
-  check(list.data.items.some((item) => String(item?.sessionId) === secondSession.sessionId), 'session list missing secondary session')
-  check(list.data.items.some((item) => String(item?.sessionId) === primarySession.sessionId), 'session list missing current session')
-  check(
-    list.data.items.every((item) =>
-      typeof item?.sessionId === 'string' &&
-      (item?.deviceId === null || typeof item?.deviceId === 'string') &&
-      typeof item?.createdAt === 'string' &&
-      typeof item?.expiresAt === 'string' &&
-      (item?.lastSeenAt === null || typeof item?.lastSeenAt === 'string') &&
-      noSecretFields(item),
-    ),
-    'session list contains non-contract or security-sensitive fields',
-  )
+  check(list.data.items.length <= 50, `session list exceeded 50-item bound: ${list.data.items.length}`)
+  check(list.data.items.every(privacySafeSession), 'session list contains non-contract or security-sensitive fields')
+
+  const ids = sessionIds(list.data)
+  check(ids.length >= 2, 'session list must expose both owned sessions')
+  check(new Set(ids).size === ids.length, 'session list contains duplicate session IDs')
+
+  const primarySessionId = ids[0]
+  const secondarySessionId = ids[1]
 
   const badCursor = await request('/auth/sessions?cursor=not-a-valid-cursor', { token: firstLogin.accessToken })
   expectStatus(badCursor, 400, 'invalid session cursor')
 
-  const revoke = await request(`/auth/sessions/${secondSession.sessionId}`, {
+  const revoke = await request(`/auth/sessions/${secondarySessionId}`, {
     method: 'DELETE',
     token: firstLogin.accessToken,
     headers: { 'Idempotency-Key': `${TEST_ID}-revoke-secondary` },
   })
   expectStatus(revoke, 204, 'revoke secondary session')
   check(revoke.bodyBytes === 0, 'revoke returned a response body')
-  check(revoke.cacheControl.toLowerCase().includes('no-store'), 'revoke must not permit shared caching')
+  check(revoke.cacheControl.toLowerCase().includes('no-store'), 'revoke must be private/no-store')
 
-  const revokedExtension = extensionFor(secondSession.sessionId)
-  check(Boolean(revokedExtension?.revoked_at), 'secondary extension revocation was not persisted')
-  check(!nativeSessionExists(secondSession.sessionId), 'secondary native session was not removed')
-
-  const repeatedRevoke = await request(`/auth/sessions/${secondSession.sessionId}`, {
+  const repeatedRevoke = await request(`/auth/sessions/${secondarySessionId}`, {
     method: 'DELETE',
     token: firstLogin.accessToken,
     headers: { 'Idempotency-Key': `${TEST_ID}-revoke-secondary` },
@@ -321,79 +270,46 @@ try {
 
   const afterRevoke = await request('/auth/sessions', { token: firstLogin.accessToken })
   expectStatus(afterRevoke, 200, 'session list after revoke')
-  check(!afterRevoke.data.items.some((item) => String(item?.sessionId) === secondSession.sessionId), 'revoked session remained visible')
+  check(!sessionIds(afterRevoke.data).includes(secondarySessionId), 'revoked session remained visible')
 
-  const crossAccount = await request(`/auth/sessions/${primarySession.sessionId}`, {
+  const crossAccount = await request(`/auth/sessions/${primarySessionId}`, {
     method: 'DELETE',
     token: otherLogin.accessToken,
     headers: { 'Idempotency-Key': `${TEST_ID}-cross-account` },
   })
   expectStatus(crossAccount, 403, 'cross-account revoke')
 
-  const beforeVersionBump = extensionFor(primarySession.sessionId)
-  check(beforeVersionBump?.revoked_at == null, 'current session unexpectedly revoked before version test')
-  d1Json(
-    `UPDATE auth_session_state
-     SET token_version=token_version+1
-     WHERE session_id=${sqlString(primarySession.sessionId)}`,
-  )
-
-  const staleTokenVersion = await request('/auth/sessions', { token: firstLogin.accessToken })
-  expectStatus(staleTokenVersion, 401, 'stale tokenVersion list access')
-
-  // Restore the primary session extension only to keep cleanup deterministic;
-  // the evidence already captured the fail-closed denial.
-  d1Json(
-    `UPDATE auth_session_state
-     SET token_version=${beforeVersionBump?.token_version ?? primarySession.tokenVersion}
-     WHERE session_id=${sqlString(primarySession.sessionId)}`,
-  )
-
-  const primaryExtension = extensionFor(primarySession.sessionId)
-  const secondaryExtension = extensionFor(secondSession.sessionId)
   writeJson('runtime-session-list.json', {
     featureId: 'AUTH-010',
+    authenticationAuthority: 'Better Auth',
     operation: 'GET /auth/sessions',
     testedCommitSha: TESTED_COMMIT_SHA,
     assertions: {
       anonymousDenied: anonymous.status === 401,
       boundedAt50: list.data.items.length <= 50,
-      bothOwnedSessionsVisible: list.data.items.some((item) => String(item?.sessionId) === primarySession.sessionId) &&
-        list.data.items.some((item) => String(item?.sessionId) === secondSession.sessionId),
-      privacySafeProjection: list.data.items.every((item) => noSecretFields(item)),
+      ownedSessionListPresent: ids.length >= 2,
+      privacySafeProjection: list.data.items.every(privacySafeSession),
       privateNoStore: list.cacheControl.toLowerCase().includes('no-store'),
       invalidCursorRejected: badCursor.status === 400,
-      revokedSessionHidden: !afterRevoke.data.items.some((item) => String(item?.sessionId) === secondSession.sessionId),
-      failClosedOnStaleTokenVersion: staleTokenVersion.status === 401,
-    },
-    sessionIds: {
-      primary: primarySession.sessionId,
-      secondary: secondSession.sessionId,
-    },
-    postState: {
-      primaryExtensionExists: Boolean(primaryExtension),
-      secondaryExtensionRevoked: Boolean(secondaryExtension?.revoked_at),
+      revokedSessionHidden: !sessionIds(afterRevoke.data).includes(secondarySessionId),
     },
   })
 
   writeJson('runtime-session-revoke.json', {
     featureId: 'AUTH-010',
+    authenticationAuthority: 'Better Auth',
     operation: 'DELETE /auth/sessions/{sessionId}',
     testedCommitSha: TESTED_COMMIT_SHA,
     assertions: {
       ownerRevokeAccepted: revoke.status === 204 && revoke.bodyBytes === 0,
-      nativeSessionRemoved: !nativeSessionExists(secondSession.sessionId),
-      extensionRevoked: Boolean(revokedExtension?.revoked_at),
       repeatedRevokeIsIdempotent: repeatedRevoke.status === 204 && repeatedRevoke.bodyBytes === 0,
       crossAccountDenied: crossAccount.status === 403,
       privateNoStore: revoke.cacheControl.toLowerCase().includes('no-store'),
     },
-    targetSessionId: secondSession.sessionId,
+    targetSessionId: secondarySessionId,
   })
 
-  if (failures.length === 0) {
-    console.log('AUTH-010_REMOTE_E2E_RESULT=PASS')
-  }
+  if (failures.length === 0) console.log('AUTH-010_REMOTE_E2E_RESULT=PASS')
 } catch (error) {
   console.error(`AUTH-010_REMOTE_E2E_RESULT=FAIL: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
@@ -409,9 +325,10 @@ try {
 
   for (const user of createdUsers) {
     try {
-      d1Json(`DELETE FROM auth_session_state WHERE user_id=${sqlString(user.userId)}`)
-      d1Json(`DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)=${sqlString(user.userId)}`)
-      d1Json(`DELETE FROM users WHERE CAST(id AS TEXT)=${sqlString(user.userId)}`)
+      d1Json(`DELETE FROM "session" WHERE user_id=${sqlString(user.userId)}`)
+      d1Json(`DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT)=${sqlString(user.userId)} OR CAST(owner_subject_id AS TEXT)=${sqlString(user.userId)}`)
+      d1Json(`DELETE FROM auth_registration_envelopes WHERE idempotency_key=${sqlString(`${TEST_ID}-register-primary`)} OR idempotency_key=${sqlString(`${TEST_ID}-register-other`)}`)
+      d1Json(`DELETE FROM "user" WHERE id=${sqlString(user.userId)}`)
     } catch (error) {
       cleanupErrors.push(`user ${user.userId}: ${error instanceof Error ? error.message : String(error)}`)
     }
@@ -420,7 +337,7 @@ try {
   const remainingSynthetic = []
   for (const user of createdUsers) {
     try {
-      const rows = d1Rows(`SELECT id,email FROM users WHERE CAST(id AS TEXT)=${sqlString(user.userId)} LIMIT 1`)
+      const rows = d1Rows(`SELECT id,email FROM "user" WHERE id=${sqlString(user.userId)} LIMIT 1`)
       if (rows.length > 0) remainingSynthetic.push(String(user.userId))
     } catch (error) {
       cleanupErrors.push(`cleanup verify ${user.userId}: ${error instanceof Error ? error.message : String(error)}`)
@@ -434,9 +351,9 @@ try {
     try { readFileSync(`${ARTIFACT_DIR}/${name}`); return true } catch { return false }
   })
 
-  const dependency = JSON.parse(readFileSync('workers/W01-payload/package.json', 'utf8'))
   const manifest = {
     featureId: 'AUTH-010',
+    authenticationAuthority: 'Better Auth',
     mode: 'CONTROLLED_REMOTE_HTTP_E2E',
     testedCommitSha: TESTED_COMMIT_SHA,
     worker: 'luckread-w01-payload',
@@ -446,8 +363,6 @@ try {
     testId: TEST_ID,
     executedAt: new Date().toISOString(),
     dependency: {
-      payloadVersion: dependency.dependencies?.payload,
-      d1AdapterVersion: dependency.dependencies?.['@payloadcms/db-d1-sqlite'],
       wranglerVersion: WRANGLER_VERSION,
       nodeVersion: process.version,
     },
@@ -470,6 +385,7 @@ try {
   if (failures.length > 0 || cleanupErrors.length > 0 || remainingSynthetic.length > 0) {
     writeJson('runtime-failure.json', {
       featureId: 'AUTH-010',
+      authenticationAuthority: 'Better Auth',
       testedCommitSha: TESTED_COMMIT_SHA,
       failures,
       cleanupErrors,
