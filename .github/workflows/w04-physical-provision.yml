@@ -67,11 +67,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
-          AUTH=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
-          queues="$(curl -fsS --retry 3 --retry-all-errors "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues?per_page=100" "${AUTH[@]}")"
+          queues="$(curl -fsS --retry 3 --retry-all-errors "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues?per_page=100"             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")"
           queue_id="$(jq -r --arg q "luckread-auth013-account-state-projection" '.result[]? | select(.queue_name==$q) | .queue_id' <<<"$queues")"
           test -n "$queue_id"
-          consumers="$(curl -fsS --retry 3 --retry-all-errors "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$queue_id/consumers" "${AUTH[@]}")"
+          consumers="$(curl -fsS --retry 3 --retry-all-errors "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$queue_id/consumers"             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")"
           echo "$consumers" | jq '.result'
           consumer="$(jq -c 'if (.result|type)=="array" then .result[] else .result end | select((.script_name // .script)=="luckread-w04")' <<<"$consumers")"
           test -n "$consumer"
