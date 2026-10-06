@@ -226,7 +226,7 @@ jobs:
             status="$(curl --silent --show-error -o /tmp/media-delete.json -w '%{http_code}' -X DELETE -H "Authorization: Bearer $MEDIA_OWNER_TOKEN" -H "Idempotency-Key: MEDIA-E2E-$GITHUB_RUN_ID-DELETE" "$W01_BASE_URL/api/v1/media/$MEDIA_ID")"
             case "$status" in 2*) ;; 404) ;; *) echo "media delete failed: HTTP $status"; exit 1;; esac
           fi
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --command "DELETE FROM role_assignments WHERE id IN ('$MEDIA_OWNER_ROLE_ID','$MEDIA_OTHER_ROLE_ID'); DELETE FROM auth_session_state WHERE user_id IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID') OR CAST(owner_subject_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM auth_registration_envelopes WHERE idempotency_key IN ('$MEDIA_OWNER_REGISTER_KEY','$MEDIA_OTHER_REGISTER_KEY'); DELETE FROM users WHERE CAST(id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID');"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --command "DELETE FROM role_assignments WHERE id IN ('$MEDIA_OWNER_ROLE_ID','$MEDIA_OTHER_ROLE_ID'); DELETE FROM auth_session_state WHERE user_id IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID') OR CAST(owner_subject_id AS TEXT) IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM auth_registration_envelopes WHERE idempotency_key IN ('$MEDIA_OWNER_REGISTER_KEY','$MEDIA_OTHER_REGISTER_KEY'); DELETE FROM verification WHERE identifier IN (SELECT email FROM "user" WHERE id IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID')); DELETE FROM "session" WHERE user_id IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM account WHERE user_id IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID'); DELETE FROM "user" WHERE id IN ('$MEDIA_OWNER_USER_ID','$MEDIA_OTHER_USER_ID');"
 
       - name: Verify fixture cleanup
         if: always()
@@ -239,11 +239,11 @@ jobs:
           import {execFileSync} from 'node:child_process'
           const ids=[process.env.MEDIA_OWNER_USER_ID,process.env.MEDIA_OTHER_USER_ID]
           const q=v=>"'" + String(v).replaceAll("'","''") + "'"
-          const sql="SELECT (SELECT COUNT(*) FROM users WHERE CAST(id AS TEXT) IN ("+ids.map(q).join(',')+")) AS users_remaining, (SELECT COUNT(*) FROM media WHERE owner_user_id IN ("+ids.map(q).join(',')+")) AS media_remaining;"
+          const sql="SELECT (SELECT COUNT(*) FROM "user" WHERE id IN ("+ids.map(q).join(',')+")) AS users_remaining, (SELECT COUNT(*) FROM account WHERE user_id IN ("+ids.map(q).join(',')+")) AS accounts_remaining, (SELECT COUNT(*) FROM "session" WHERE user_id IN ("+ids.map(q).join(',')+")) AS sessions_remaining, (SELECT COUNT(*) FROM media WHERE owner_user_id IN ("+ids.map(q).join(',')+")) AS media_remaining;"
           const raw=execFileSync('npx',['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME,'--remote','--json','--yes','--config','deployed-source/workers/W01-payload/wrangler.jsonc','--command',sql],{encoding:'utf8',env:process.env})
           const value=JSON.parse(raw)
           const row=value?.[0]?.results?.[0]??value?.result?.results?.[0]??{}
-          if(Number(row.users_remaining)!==0||Number(row.media_remaining)!==0)throw new Error('fixture cleanup incomplete: '+JSON.stringify(row))
+          if(Number(row.users_remaining)!==0||Number(row.accounts_remaining)!==0||Number(row.sessions_remaining)!==0||Number(row.media_remaining)!==0)throw new Error('fixture cleanup incomplete: '+JSON.stringify(row))
           console.log('Media fixture cleanup PASS')
           NODE
 
