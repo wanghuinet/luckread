@@ -26,8 +26,7 @@
     "auth:session:schema:validate": "node scripts/auth-session-schema-evidence-validate.mjs",
     "auth:session:migration:admission": "node scripts/auth-002-migration-generation-admission.mjs",
     "feature:inventory": "node scripts/build-feature-inventory.mjs",
-    "feature:inventory:verify": "node scripts/build-feature-inventory.mjs && git diff --exit-code -- contracts/alignment/feature-inventory.v1.json",
-    "auth:better-auth:reconcile": "node scripts/auth-better-auth-user-reconciliation-check.mjs"
+    "feature:inventory:verify": "node scripts/build-feature-inventory.mjs && git diff --exit-code -- contracts/alignment/feature-inventory.v1.json"
   },
   "dependencies": {
     "@payloadcms/db-d1-sqlite": "3.87.1",
