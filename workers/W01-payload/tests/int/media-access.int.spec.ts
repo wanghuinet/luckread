@@ -60,7 +60,7 @@ describe('Media upload access', () => {
     expect(route).toContain('createPayloadBetterAuthBridgeToken')
     expect(route).toContain('createPayloadBetterAuthBridgeRequest')
     expect(route).toContain("path: '/api/media'")
-    expect(route).toContain('request.body')
+    expect(route).toContain('request,')
     expect(route).toContain("slug: ['media']")
     expect(route).not.toContain('request.formData()')
     expect(route).not.toContain('request.arrayBuffer()')
