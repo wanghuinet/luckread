@@ -123,11 +123,13 @@ describe('W03 content contract core', () => {
   })
 
   it('requires L3 or higher for creator content operations', () => {
-    expect(hasCreatorContentPermission('L3')).toBe(true)
-    expect(hasCreatorContentPermission('L8')).toBe(true)
-    expect(hasCreatorContentPermission('L2')).toBe(false)
-    expect(hasCreatorContentPermission('')).toBe(false)
-    expect(hasCreatorContentPermission('creator')).toBe(false)
+    expect(hasCreatorContentPermission('L3', ['creator'])).toBe(true)
+    expect(hasCreatorContentPermission('L8', ['creator'])).toBe(true)
+    expect(hasCreatorContentPermission('L4', ['mcn_admin'])).toBe(false)
+    expect(hasCreatorContentPermission('L7', ['admin'])).toBe(false)
+    expect(hasCreatorContentPermission('L2', ['creator'])).toBe(true)
+    expect(hasCreatorContentPermission('', ['creator'])).toBe(false)
+    expect(hasCreatorContentPermission('creator', ['creator'])).toBe(false)
   })
 
   it('validates creator content list filters', () => {
