@@ -368,8 +368,8 @@ describe('Creator Center admin extension', () => {
     const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
 
     expect(registerForm).toContain('<form aria-busy={status === \'submitting\'} className="registerForm" onSubmit={handleSubmit} noValidate>')
-    expect(registerForm).toContain("fetch('/api/v1/auth/register'")
-    expect(registerForm).not.toContain("fetch('/auth/register'")
+    expect(registerForm).toContain("fetch('/api/auth/sign-up/email'")
+    expect(registerForm).not.toContain("fetch('/api/v1/auth/register'")
     expect(loginForm).toContain('<form className="lr-auth-form" onSubmit={submit} aria-busy={busy}>')
     expect(loginForm).toContain('<div className="lr-error" role="alert" aria-live="assertive">{error}</div>')
     expect(loginForm).toContain('<button aria-busy={busy} disabled={busy} type="submit">')
@@ -411,7 +411,7 @@ describe('Creator Center admin extension', () => {
   it('keeps web authentication on the W02 Better Auth cookie session', () => {
     const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
     const registerForm = read('src/app/(frontend)/register/RegisterForm.tsx')
-    const authProxy = read('src/app/api/auth/[...path]/route.ts')
+    const authProxy = read('src/app/api/auth/[...segments]/route.ts')
     const contentClient = read('src/content/w03-content-client.ts')
 
     expect(loginForm).toContain("fetch('/api/auth/sign-in/email'")
