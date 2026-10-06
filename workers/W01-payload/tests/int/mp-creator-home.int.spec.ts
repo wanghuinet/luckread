@@ -17,7 +17,7 @@ describe('mp creator entry routing', () => {
     expect(page).not.toContain('await payload.auth(')
     expect(page).not.toContain('readVerifiedPayloadTokenVersion(request)')
     expect(page).not.toContain('validateSession(')
-    expect(page).toContain("if (active) {")
+    expect(page).toContain("if (principal.active) {")
     expect(page).toContain('<CreatorStudio displayName={displayName} userId={String(authenticatedUser.id)} locale={locale} />')
     expect(page).toContain('className="mp-entry-shell"')
     expect(page).not.toContain("redirect('/creator-center')")
