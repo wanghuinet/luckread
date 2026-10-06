@@ -13,6 +13,7 @@ type Item = {
   contentType: ContentType
   state: ContentState
   version: number
+  etag: string
   title: string
   mediaRefs?: string[]
   coverRef?: string | null
@@ -127,14 +128,14 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
     return () => window.removeEventListener('luckread:content-mutated', handleContentMutation)
   }, [load])
 
-  async function requestTransition(itemId: string, to: 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'RESTORED' | 'DRAFT', version: number) {
+  async function requestTransition(itemId: string, to: 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'RESTORED' | 'DRAFT', etag: string) {
     const response = await fetch(`/api/creator/contents/${encodeURIComponent(itemId)}/state`, {
       method: 'POST',
       credentials: 'include',
       headers: {
         accept: 'application/json',
         'content-type': 'application/json',
-        'If-Match': `W/"${version}"`,
+        'If-Match': etag,
         'Idempotency-Key': crypto.randomUUID(),
       },
       body: JSON.stringify({ to }),
@@ -146,7 +147,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
       throw new Error('AUTH_REQUIRED')
     }
     if (!response.ok) throw new Error(data?.error?.message || '内容状态更新失败')
-    return data as { version?: unknown }
+    return data as { version?: unknown; etag?: unknown }
   }
 
   async function transition(item: Item, to: 'PUBLISHED' | 'UNPUBLISHED' | 'ARCHIVED' | 'RESTORED' | 'DRAFT') {
@@ -166,7 +167,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
     setActionId(item.id)
     setError('')
     try {
-      await requestTransition(item.id, to, item.version)
+      await requestTransition(item.id, to, item.etag)
       await load()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : `${verb}失败`)
@@ -181,7 +182,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
     setActionId(item.id)
     setError('')
     try {
-      const result = await requestTransition(item.id, 'DRAFT', item.version)
+      const result = await requestTransition(item.id, 'DRAFT', item.etag)
       const nextVersion = typeof result.version === 'number' ? result.version : item.version + 1
       await load()
       window.location.assign(`/publish?draft=${encodeURIComponent(item.id)}&version=${nextVersion}`)
@@ -198,9 +199,9 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
     setActionId(item.id)
     setError('')
     try {
-      const unpublished = await requestTransition(item.id, 'UNPUBLISHED', item.version)
+      const unpublished = await requestTransition(item.id, 'UNPUBLISHED', item.etag)
       const unpublishedVersion = typeof unpublished.version === 'number' ? unpublished.version : item.version + 1
-      const draft = await requestTransition(item.id, 'DRAFT', unpublishedVersion)
+      const draft = await requestTransition(item.id, 'DRAFT', typeof unpublished.etag === 'string' ? unpublished.etag : `W/"${unpublishedVersion}"`)
       const draftVersion = typeof draft.version === 'number' ? draft.version : unpublishedVersion + 1
       await load()
       window.location.assign(`/publish?draft=${encodeURIComponent(item.id)}&version=${draftVersion}`)
