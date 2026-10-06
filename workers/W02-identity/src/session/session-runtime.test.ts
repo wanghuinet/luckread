@@ -205,6 +205,7 @@ describe('AUTH-011 refresh runtime', () => {
     sessionId: 'sid-refresh',
     userId: '42',
     deviceId: 'device-a',
+    accessToken: 'native-token-42',
     tokenVersion: 3,
     refreshCredentialHash: 'hash:v3.old',
     revokedAt: null,
