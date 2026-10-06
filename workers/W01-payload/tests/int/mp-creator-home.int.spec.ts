@@ -23,7 +23,7 @@ describe('mp creator entry routing', () => {
     expect(page).not.toContain("redirect('/creator-center')")
     expect(page).not.toContain("if (host === 'mp.luckread.com') {\n    redirect('/creator-center')")
     expect(creator).toContain("new Request('https://mp.luckread.com/creator-center'")
-    expect(creator).toContain('validateSession({')
+    expect(creator).toContain('getBetterAuthPrincipal(request)')
     expect(creator).toContain("redirect('/login?returnTo=%2Fcreator-center')")
   })
 
