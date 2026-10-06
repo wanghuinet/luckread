@@ -23,8 +23,8 @@ if (!queue) throw new Error('AUTH-013 projection queue not found')
 
 const consumerResponse = await api(`/queues/${queue.queue_id}/consumers`)
 const consumers = Array.isArray(consumerResponse.result) ? consumerResponse.result : [consumerResponse.result]
-const consumer = consumers.find((item) => item.script === 'luckread-w04')
-if (!consumer) throw new Error('W04 queue consumer not found')
+const consumer = consumers.find((item) => (item.script_name ?? item.script) === 'luckread-w04')
+if (!consumer) throw new Error('W04 queue consumer not found after deployment; inspect Queue consumer propagation')
 if (consumer.dead_letter_queue !== 'luckread-auth013-account-state-projection-dlq') {
   throw new Error('W04 DLQ binding mismatch')
 }
@@ -95,7 +95,7 @@ try {
     throw new Error('Older-version rejection or duplicate idempotency failed')
   }
 
-  console.log(JSON.stringify({
+  const evidence = {
     auth: 'AUTH-013',
     worker: 'W04',
     queue: queue.queue_name,
@@ -109,7 +109,9 @@ try {
       duplicateDeliveryIdempotent: true,
       nonResurrection: true,
     },
-  }, null, 2))
+  }
+  await (await import('node:fs/promises')).writeFile('auth013-w04-runtime-evidence.json', JSON.stringify(evidence, null, 2) + '\\n')
+  console.log(JSON.stringify(evidence, null, 2))
   console.log('AUTH-013 W04 runtime evidence PASS')
 } finally {
   await fetch(
