@@ -141,7 +141,7 @@ function activateAndAuthorize(user, label) {
   const roleId = `${TEST_ID}-role-${label}-${randomBytes(5).toString('hex')}`
 
   d1Json(
-    `UPDATE users
+    `UPDATE "user"
      SET account_state='ACTIVE',
          account_state_version=COALESCE(account_state_version, 0) + 1
      WHERE CAST(id AS TEXT)=${sqlString(user.userId)}`,
@@ -165,7 +165,7 @@ function activateAndAuthorize(user, label) {
   )
 
   const account = d1Rows(
-    `SELECT account_state FROM users WHERE CAST(id AS TEXT)=${sqlString(user.userId)} LIMIT 1`,
+    `SELECT account_state FROM "user" WHERE CAST(id AS TEXT)=${sqlString(user.userId)} LIMIT 1`,
   )[0]
   const assignment = d1Rows(
     `SELECT id,subject_id,role_id,scope_type,status FROM role_assignments WHERE id=${sqlString(roleId)} LIMIT 1`,
@@ -202,12 +202,12 @@ async function login(user, deviceId) {
 
 function sessionForDevice(userId, deviceId) {
   const rows = d1Rows(
-    `SELECT s.id,s._parent_id,s.created_at,s.expires_at,a.device_id,a.token_version,a.revoked_at
-     FROM users_sessions AS s
+    `SELECT s.id,s.user_id,s.created_at,s.expires_at,a.device_id,a.token_version,a.revoked_at
+     FROM "session" AS s
      INNER JOIN auth_session_state AS a
        ON CAST(a.session_id AS TEXT)=CAST(s.id AS TEXT)
-      AND a.user_id=CAST(s._parent_id AS TEXT)
-     WHERE CAST(s._parent_id AS TEXT)=${sqlString(userId)}
+      AND a.user_id=CAST(s.user_id AS TEXT)
+     WHERE CAST(s.user_id AS TEXT)=${sqlString(userId)}
        AND a.device_id=${sqlString(deviceId)}
      ORDER BY s.created_at DESC
      LIMIT 1`,
@@ -216,7 +216,7 @@ function sessionForDevice(userId, deviceId) {
   check(Boolean(row?.id), `session lookup missing for ${deviceId}`)
   return {
     sessionId: String(row.id),
-    userId: String(row._parent_id),
+    userId: String(row.user_id),
     deviceId: String(row.device_id),
     createdAt: String(row.created_at),
     expiresAt: String(row.expires_at),
@@ -236,7 +236,7 @@ function extensionFor(sessionId) {
 
 function nativeSessionExists(sessionId) {
   return d1Rows(
-    `SELECT id FROM users_sessions WHERE id=${sqlString(sessionId)} LIMIT 1`,
+    `SELECT id FROM "session" WHERE id=${sqlString(sessionId)} LIMIT 1`,
   ).length === 1
 }
 
@@ -410,8 +410,11 @@ try {
   for (const user of createdUsers) {
     try {
       d1Json(`DELETE FROM auth_session_state WHERE user_id=${sqlString(user.userId)}`)
-      d1Json(`DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)=${sqlString(user.userId)}`)
-      d1Json(`DELETE FROM users WHERE CAST(id AS TEXT)=${sqlString(user.userId)}`)
+      d1Json(`DELETE FROM auth_session_state WHERE user_id=${sqlString(user.userId)}`)
+      d1Json(`DELETE FROM verification WHERE identifier=(SELECT email FROM "user" WHERE CAST(id AS TEXT)=${sqlString(user.userId)})`)
+      d1Json(`DELETE FROM account WHERE user_id=${sqlString(user.userId)}`)
+      d1Json(`DELETE FROM "session" WHERE user_id=${sqlString(user.userId)}`)
+      d1Json(`DELETE FROM "user" WHERE CAST(id AS TEXT)=${sqlString(user.userId)}`)
     } catch (error) {
       cleanupErrors.push(`user ${user.userId}: ${error instanceof Error ? error.message : String(error)}`)
     }
@@ -420,7 +423,7 @@ try {
   const remainingSynthetic = []
   for (const user of createdUsers) {
     try {
-      const rows = d1Rows(`SELECT id,email FROM users WHERE CAST(id AS TEXT)=${sqlString(user.userId)} LIMIT 1`)
+      const rows = d1Rows(`SELECT id,email FROM "user" WHERE CAST(id AS TEXT)=${sqlString(user.userId)} LIMIT 1`)
       if (rows.length > 0) remainingSynthetic.push(String(user.userId))
     } catch (error) {
       cleanupErrors.push(`cleanup verify ${user.userId}: ${error instanceof Error ? error.message : String(error)}`)
