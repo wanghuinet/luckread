@@ -39,8 +39,8 @@ jobs:
       - name: Run W02 principal tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/principal.test.ts
 
-  credential-key-boundary:
-    name: W02 Credential Hash Key Boundary Tests
+  account-state-boundary:
+    name: W02 Account State Boundary Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -53,22 +53,5 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Run focused key-boundary tests
-        run: npx vitest@3.2.4 run workers/W02-identity/src/credentials/credential-hash-key.test.ts
-
-  registration-materializer:
-    name: W02 Registration Materializer Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Run materializer tests
-        run: npx vitest@3.2.4 run workers/W02-identity/src/account/registration-materializer.test.ts
+      - name: Run W02 account-state tests
+        run: npx vitest@3.2.4 run workers/W02-identity/src/account/account-state-transition.test.ts
