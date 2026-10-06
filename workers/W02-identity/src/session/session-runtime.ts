@@ -92,6 +92,15 @@ function assertNotExpired(expiresAt: string, now: string): void {
   }
 }
 
+function expiresInSeconds(expiresAt: string, now: string): number {
+  const expiresAtMs = Date.parse(expiresAt)
+  const nowMs = Date.parse(now)
+  if (!Number.isFinite(expiresAtMs) || !Number.isFinite(nowMs) || expiresAtMs <= nowMs) {
+    throw new SessionRuntimeError('UNAUTHENTICATED', 'session is expired')
+  }
+  return Math.max(0, Math.floor((expiresAtMs - nowMs) / 1000))
+}
+
 export async function createSessionExtension(
   db: D1Database,
   session: NativeSessionAuthority,
@@ -223,6 +232,7 @@ export async function establishAuthenticatedSession(
 
 type AuthoritativeSessionContext = {
   session: NativeSessionAuthority
+  accessToken: string
   accountState: string
 }
 
@@ -244,6 +254,7 @@ async function loadAuthoritativeLoginSession(
           CAST(s.user_id AS TEXT) AS userId,
           s.created_at AS createdAt,
           s.expires_at AS expiresAt,
+          s.token AS accessToken,
           u.account_state AS accountState
         FROM "session" AS s
         INNER JOIN "user" AS u
@@ -259,10 +270,17 @@ async function loadAuthoritativeLoginSession(
         userId: string
         createdAt: string
         expiresAt: string
+        accessToken: string
         accountState: string
       }>()
 
-    if (!row || typeof row.accountState !== 'string' || row.accountState.length === 0) {
+    if (
+      !row ||
+      typeof row.accessToken !== 'string' ||
+      row.accessToken.length === 0 ||
+      typeof row.accountState !== 'string' ||
+      row.accountState.length === 0
+    ) {
       throw new SessionRuntimeError('UNAUTHENTICATED', 'native session or account state unavailable')
     }
 
@@ -273,6 +291,7 @@ async function loadAuthoritativeLoginSession(
         createdAt: row.createdAt,
         expiresAt: row.expiresAt,
       },
+      accessToken: row.accessToken,
       accountState: row.accountState,
     }
   } catch (error) {
@@ -293,7 +312,7 @@ export async function establishSessionFromAuthoritativeD1(
     hashToken?: (token: string) => Promise<string>
     execute?: MutationOptions['execute']
   },
-): Promise<{ sessionId: string; refreshToken: string; tokenVersion: number; layer: string; nativeExpiresAt: string }> {
+): Promise<{ sessionId: string; refreshToken: string; tokenVersion: number; layer: string; nativeExpiresAt: string; expiresIn: number }> {
   const now = input.now ?? new Date().toISOString()
   const context = await loadAuthoritativeLoginSession(db, input.userId, input.sessionId)
   if (context.accountState !== 'PENDING_VERIFICATION' && context.accountState !== 'ACTIVE') {
@@ -319,6 +338,7 @@ export async function establishSessionFromAuthoritativeD1(
     ...extension,
     tokenVersion: 1,
     nativeExpiresAt: context.session.expiresAt,
+    expiresIn: expiresInSeconds(context.session.expiresAt, now),
   }
 }
 
@@ -387,6 +407,7 @@ async function loadAuthoritativeRefreshContext(
   refreshCredentialHash: string,
 ): Promise<{
   session: SessionRecord
+  accessToken: string
   accountState: string
   email: string
 }> {
@@ -403,6 +424,7 @@ async function loadAuthoritativeRefreshContext(
           a.revoked_at AS revokedAt,
           a.last_seen_at AS lastSeenAt,
           s.expires_at AS nativeExpiresAt,
+          s.token AS accessToken,
           u.account_state AS accountState,
           u.email AS email
         FROM auth_session_state AS a
@@ -422,6 +444,8 @@ async function loadAuthoritativeRefreshContext(
       !row ||
       typeof row.accountState !== 'string' ||
       row.accountState.length === 0 ||
+      typeof row.accessToken !== 'string' ||
+      row.accessToken.length === 0 ||
       typeof row.email !== 'string' ||
       row.email.length === 0
     ) {
@@ -430,6 +454,7 @@ async function loadAuthoritativeRefreshContext(
 
     return {
       session: row,
+      accessToken: row.accessToken,
       accountState: row.accountState,
       email: row.email,
     }
@@ -625,10 +650,12 @@ export async function refreshSessionFromAuthoritativeD1(
   return {
     sessionId: context.session.sessionId,
     userId: context.session.userId,
+    accessToken: context.accessToken,
     refreshToken: rotated.refreshToken,
     tokenVersion: context.session.tokenVersion,
     layer: layerResolution.layer,
     nativeExpiresAt: context.session.nativeExpiresAt,
+    expiresIn: expiresInSeconds(context.session.nativeExpiresAt, now),
     email: context.email,
   }
 }
