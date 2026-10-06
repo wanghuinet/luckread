@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  createPayloadBetterAuthBridgeRequest,
   createPayloadBetterAuthBridgeToken,
   verifyPayloadBetterAuthBridgeToken,
 } from './payload-better-auth-bridge.js'
@@ -32,6 +33,33 @@ describe('Payload Better Auth bridge', () => {
       method: 'POST',
       path: '/api/media',
     })
+  })
+
+  it('strips client authentication credentials before forwarding to Payload', async () => {
+    const token = await createPayloadBetterAuthBridgeToken(secret, {
+      sub: 'user_123',
+      email: 'user@example.com',
+      method: 'POST',
+      path: '/api/media',
+    }, now)
+
+    const source = new Request('https://luckread.com/api/v1/media', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer client-token',
+        cookie: 'better-auth.session_token=client-session',
+        'content-type': 'multipart/form-data; boundary=test',
+      },
+      body: 'streamed-body',
+    })
+    const forwarded = createPayloadBetterAuthBridgeRequest(source, '/api/media', token)
+
+    expect(forwarded.headers.get('authorization')).toBeNull()
+    expect(forwarded.headers.get('cookie')).toBeNull()
+    expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W01')
+    expect(forwarded.headers.get('X-LuckRead-Payload-Better-Auth')).toBe(token)
+    expect(forwarded.method).toBe('POST')
+    expect(await forwarded.text()).toBe('streamed-body')
   })
 
   it('rejects a token with a different method or path', async () => {
