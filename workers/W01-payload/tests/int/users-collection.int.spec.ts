@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Users } from '../../src/collections/Users'
 
 describe('W01 Users collection contract', () => {
-  it('declares the approved ENT-USER profile and preference fields', () => {
+  it('declares the approved ENT-USER profile and preference fields', async () => {
     const fields = Users.fields as Array<{
       name?: string
       type?: string
