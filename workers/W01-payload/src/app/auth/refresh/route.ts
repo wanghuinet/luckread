@@ -1,8 +1,3 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
-
-import { buildPayloadAccessCookie, issuePayloadAccessToken } from '../../../auth/payload-access-token.js'
 import { refreshSession, W02AuthClientError } from '../../../auth/w02-session-client.js'
 import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 
@@ -54,8 +49,6 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(400, 'VALIDATION_FAILED', 'Invalid refresh request')
   }
 
-  const payload = await getPayload({ config })
-
   let session
   try {
     session = await refreshSession({
@@ -75,20 +68,11 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const access = await issuePayloadAccessToken({
-      payloadSecret: payload.secret,
-      userId: session.userId,
-      email: session.email,
-      sessionId: session.sessionId,
-      expiresAt: session.nativeExpiresAt,
-      tokenVersion: session.tokenVersion,
-    })
-
     return new Response(
       JSON.stringify({
-        accessToken: access.token,
+        accessToken: session.accessToken,
         refreshToken: session.refreshToken,
-        expiresIn: access.expiresIn,
+        expiresIn: session.expiresIn,
         layer: session.layer,
       }),
       {
@@ -96,11 +80,8 @@ export async function POST(request: Request): Promise<Response> {
         headers: {
           'content-type': 'application/json; charset=utf-8',
           'cache-control': 'no-store',
-          'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request),
         },
       },
     )
-  } catch {
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Access-token issuance is unavailable')
   }
 }
