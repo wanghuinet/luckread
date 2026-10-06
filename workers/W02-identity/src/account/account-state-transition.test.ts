@@ -73,6 +73,9 @@ function fakeDb(
 
       if (statements.length === 3) {
         sessionRevocation = statements[2].args
+        if (statements[2].sql !== 'DELETE FROM "session" WHERE user_id = ?') {
+          throw new Error('account-state session invalidation must target Better Auth session table')
+        }
       }
 
       const journalArgs = journal.args as unknown[]
@@ -104,6 +107,16 @@ function fakeDb(
     sessionRevocation: () => sessionRevocation,
   }
 }
+
+describe('AUTH-013 Better Auth persistence boundary', () => {
+  it('uses the native Better Auth user and session tables', () => {
+    const source = readFileSync(new URL('./account-state-transition.ts', import.meta.url), 'utf8')
+    expect(source).toContain('FROM "user"')
+    expect(source).toContain('UPDATE "user"')
+    expect(source).toContain('DELETE FROM "session" WHERE user_id = ?')
+    expect(source).not.toContain('auth_session_state')
+  })
+})
 
 describe('AUTH-013 account-state transition kernel', () => {
   it('atomically advances Account State and creates the durable publication journal', async () => {
@@ -286,7 +299,7 @@ describe('AUTH-013 account-state transition kernel', () => {
 
     expect(result.accountStateVersion).toBe(3)
     expect(fake.row).toEqual({ state: 'DELETED', version: 3 })
-    expect(fake.sessionRevocation()).toEqual(['2026-09-24T12:00:00.000Z', '2026-09-24T12:00:00.000Z', '42'])
+    expect(fake.sessionRevocation()).toEqual(['42'])
   })
 
   it('atomically revokes active session extensions when a token-invalidating state is entered', async () => {
@@ -302,11 +315,7 @@ describe('AUTH-013 account-state transition kernel', () => {
     )
 
     expect(result.accountStateVersion).toBe(8)
-    expect(fake.sessionRevocation()).toEqual([
-      '2026-09-24T12:00:00.000Z',
-      '2026-09-24T12:00:00.000Z',
-      '42',
-    ])
+    expect(fake.sessionRevocation()).toEqual(['42'])
     expect(fake.batchCalls()).toBe(1)
   })
 
@@ -413,7 +422,7 @@ function authorizationDb(
         bind() {
           return {
             first: async <T>() => {
-              if (sql.includes('FROM users')) {
+              if (sql.includes('FROM "user"')) {
                 return { accountState: state } as T
               }
               return null

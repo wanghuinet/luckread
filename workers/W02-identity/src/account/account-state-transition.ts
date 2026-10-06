@@ -172,7 +172,7 @@ export async function authorizeAccountStateTransition(
 
   const current = await db
     .prepare(
-      'SELECT account_state AS accountState FROM users WHERE id = ? LIMIT 1',
+      'SELECT account_state AS accountState FROM "user" WHERE id = ? LIMIT 1',
     )
     .bind(input.targetUserId)
     .first<{ accountState: AccountState }>()
@@ -345,7 +345,7 @@ export async function applyAccountStateTransition(
 
   const updateStatement = db
     .prepare(
-      'UPDATE users SET account_state = ?, account_state_version = account_state_version + 1, updated_at = ? WHERE id = ? AND account_state = ? AND account_state_version = ?',
+      'UPDATE "user" SET account_state = ?, account_state_version = account_state_version + 1, updated_at = ? WHERE id = ? AND account_state = ? AND account_state_version = ?',
     )
     .bind(input.to, now, input.userId, from, input.expectedVersion)
 
@@ -374,9 +374,9 @@ export async function applyAccountStateTransition(
     statements.push(
       db
         .prepare(
-          'UPDATE auth_session_state SET revoked_at = COALESCE(revoked_at, ?), last_seen_at = ? WHERE user_id = ? AND revoked_at IS NULL',
+          'DELETE FROM "session" WHERE user_id = ?',
         )
-        .bind(now, now, input.userId),
+        .bind(input.userId),
     )
   }
 
