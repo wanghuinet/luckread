@@ -149,6 +149,42 @@ export default {
       }
     }
 
+    if (request.method === 'POST' && url.pathname === '/internal/auth/registration/rollback') {
+      const body = await readJsonBody<{ userId?: unknown; email?: unknown; username?: unknown }>(request)
+      if (!body || typeof body.userId !== 'string' || body.userId.length === 0 || body.userId.length > 128 ||
+          typeof body.email !== 'string' || body.email.length === 0 || typeof body.username !== 'string' || body.username.length === 0) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid registration rollback request' } }, 400)
+      }
+
+      try {
+        const row = await env.D1_01
+          .prepare('SELECT id, email, username, account_state AS accountState FROM "user" WHERE id = ? LIMIT 1')
+          .bind(body.userId)
+          .first<{ id: string; email: string; username: string | null; accountState: string }>()
+
+        if (!row) return json({ rolledBack: true })
+        if (row.email !== body.email.trim().toLowerCase() || String(row.username ?? '') !== body.username.trim() || row.accountState !== 'PENDING_VERIFICATION') {
+          return json({ error: { code: 'PRECONDITION_FAILED', message: 'registration rollback precondition failed' } }, 412)
+        }
+
+        const activeSession = await env.D1_01
+          .prepare('SELECT 1 AS present FROM "session" WHERE user_id = ? LIMIT 1')
+          .bind(body.userId)
+          .first<{ present: number }>()
+        if (activeSession) return json({ error: { code: 'PRECONDITION_FAILED', message: 'registration rollback cannot remove an active session' } }, 412)
+
+        await env.D1_01.batch([
+          env.D1_01.prepare('DELETE FROM role_assignments WHERE subject_id = ?').bind(body.userId),
+          env.D1_01.prepare('DELETE FROM "verification" WHERE identifier = ?').bind(body.email.trim().toLowerCase()),
+          env.D1_01.prepare('DELETE FROM "account" WHERE user_id = ?').bind(body.userId),
+          env.D1_01.prepare('DELETE FROM "user" WHERE id = ? AND account_state = ?').bind(body.userId, 'PENDING_VERIFICATION'),
+        ])
+
+        return json({ rolledBack: true })
+      } catch {
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'registration rollback unavailable' } }, 503)
+      }
+    }
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/revoke-by-id') {
       const body = await readJsonBody<{ sessionId?: unknown }>(request)
       if (!body || typeof body.sessionId !== 'string' || body.sessionId.length === 0 || body.sessionId.length > 128) {
