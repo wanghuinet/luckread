@@ -12,6 +12,7 @@ export const Users: CollectionConfig = {
     // Better Auth is the platform account/recovery authority in W02.
     // Payload remains a CMS/Admin integration boundary and accepts only the
     // signed Better Auth bridge for application-owned authenticated access.
+    disableLocalStrategy: true,
     removeTokenFromResponses: true,
     strategies: [payloadBetterAuthBridgeStrategy],
   },
