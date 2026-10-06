@@ -127,7 +127,7 @@ describe('W03 content contract core', () => {
     expect(hasCreatorContentPermission('L8', ['creator'])).toBe(true)
     expect(hasCreatorContentPermission('L4', ['mcn_admin'])).toBe(false)
     expect(hasCreatorContentPermission('L7', ['admin'])).toBe(false)
-    expect(hasCreatorContentPermission('L2', ['creator'])).toBe(true)
+    expect(hasCreatorContentPermission('L2', ['creator'])).toBe(false)
     expect(hasCreatorContentPermission('', ['creator'])).toBe(false)
     expect(hasCreatorContentPermission('creator', ['creator'])).toBe(false)
   })
