@@ -1,4 +1,3 @@
-import { buildPayloadClearCookie } from '../../../auth/payload-access-token.js'
 import {
   signOutThroughW02,
   W02AuthClientError,
@@ -19,11 +18,16 @@ const errorResponse = (status: number, code: string, message: string) =>
     },
   )
 
+const buildLegacyPayloadClearCookie = (request: Request): string => {
+  const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : ''
+  return `payload-token=; Path=/; HttpOnly${secure}; SameSite=Lax; Max-Age=0`
+}
+
 const successResponse = (request: Request, nativeResponse?: Response): Response => {
   const headers = new Headers({ 'cache-control': 'no-store' })
   const setCookie = nativeResponse?.headers.get('set-cookie')
   if (setCookie) headers.set('set-cookie', setCookie)
-  headers.append('set-cookie', buildPayloadClearCookie(request))
+  headers.append('set-cookie', buildLegacyPayloadClearCookie(request))
   return new Response(null, { status: 204, headers })
 }
 
