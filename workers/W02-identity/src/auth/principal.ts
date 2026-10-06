@@ -17,6 +17,7 @@ type AuthSession = {
 export type AuthenticatedPrincipal = {
   userId: string
   email: string
+  username?: string
   sessionId: string
   accountState: string
   accountStateVersion: number
@@ -70,6 +71,9 @@ export async function resolveBetterAuthPrincipal(
   return {
     userId: String(result.user.id),
     email: String(result.user.email),
+    username: typeof (result.user as { username?: unknown }).username === 'string'
+      ? (result.user as { username: string }).username
+      : undefined,
     sessionId: String(result.session.id),
     accountState,
     accountStateVersion,
