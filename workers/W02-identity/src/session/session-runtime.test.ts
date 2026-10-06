@@ -5,14 +5,15 @@ import {
   revokeSessionExtension,
   establishSessionFromAuthoritativeD1,
   validateAuthoritativeSession,
+  resolveAuthenticatedPrincipal,
   refreshSessionFromAuthoritativeD1,
-  type NativeSessionAuthority,
-  type SessionRecord,
+  type BetterAuthSession,
+  type SessionExtensionRecord,
 } from './session-runtime.js'
 
 const NOW = '2026-09-22T13:00:00.000Z'
 
-function nativeSession(overrides: Partial<NativeSessionAuthority> = {}): NativeSessionAuthority {
+function nativeSession(overrides: Partial<BetterAuthSession> = {}): BetterAuthSession {
   return {
     sessionId: 'sid-1',
     userId: '42',
@@ -22,7 +23,7 @@ function nativeSession(overrides: Partial<NativeSessionAuthority> = {}): NativeS
   }
 }
 
-function dbFake(initial: SessionRecord | null) {
+function dbFake(initial: SessionExtensionRecord | null) {
   let row = initial
   let nativeSessionPresent = Boolean(initial)
 
@@ -83,7 +84,7 @@ describe('session runtime foundation', () => {
     })).rejects.toThrow('deviceId')
   })
 
-  it('revokes extension state and the Payload-native session atomically', async () => {
+  it('revokes the subordinate extension state and Better Auth session together', async () => {
     const fake = dbFake({
       sessionId: 'sid-1',
       userId: '42',
@@ -107,7 +108,7 @@ describe('session runtime foundation', () => {
 
 
 describe('authoritative session validation', () => {
-  it('validates native session plus authoritative extension state', async () => {
+  it('validates the Better Auth session plus the subordinate extension state', async () => {
     let row: {
       sessionId: string
       userId: string
@@ -158,6 +159,30 @@ describe('authoritative session validation', () => {
     })).resolves.toEqual({ active: false })
   })
 })
+
+it('fails closed when the Better Auth session row is missing', async () => {
+    const db = {
+      prepare: () => ({
+        bind: () => ({
+          first: async <T>() => null as T | null,
+        }),
+      }),
+    } as unknown as D1Database
+
+    await expect(validateAuthoritativeSession(db, {
+      sessionId: 'sid-missing',
+      userId: '42',
+      tokenVersion: 1,
+      now: NOW,
+    })).resolves.toEqual({ active: false })
+
+    await expect(resolveAuthenticatedPrincipal(db, {
+      sessionId: 'sid-missing',
+      userId: '42',
+      tokenVersion: 1,
+      now: NOW,
+    })).resolves.toEqual({ active: false })
+  })
 
 describe('authenticated session orchestration', () => {
   it('requires an authoritative account state and binds an allowed layer before issuing refresh state', async () => {
