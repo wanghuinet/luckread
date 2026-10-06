@@ -4,10 +4,9 @@ import config from '@payload-config'
 
 import { resolveBetterAuthPrincipalThroughW02, W02AuthClientError } from '@/auth/w02-session-client'
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
-import { DELETE as payloadMediaDelete, GET as payloadMediaGet, PATCH as payloadMediaPatch } from '../../../../(payload)/api/[...slug]/route'
+import { GET as payloadMediaGet } from '../../../../(payload)/api/[...slug]/route'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaGet>[1]
-type PayloadPatchRouteContext = Parameters<typeof payloadMediaPatch>[1]
 
 type MediaDocument = {
   id?: string | number
