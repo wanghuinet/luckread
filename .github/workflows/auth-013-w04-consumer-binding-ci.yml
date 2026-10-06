@@ -47,72 +47,12 @@ jobs:
         working-directory: workers/W04-feed-search
         run: npx --yes wrangler@4.116.0 deploy
       - name: Verify live consumer and run controlled projection evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          AUTH=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
-          queues="$(curl -fsS --retry 3 --retry-all-errors "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues?per_page=100" "${AUTH[@]}")"
-          consumer="$(jq -c --arg q "luckread-auth013-account-state-projection" '.result[]? | select(.queue_name==$q) | .consumers[]? | select(.script_name=="luckread-w04" and .type=="worker" and .dead_letter_queue=="luckread-auth013-account-state-projection-dlq")' <<<"$queues")"
-          test -n "$consumer"
-          count="$(jq -r --arg q "luckread-auth013-account-state-projection" '.result[]? | select(.queue_name==$q) | .consumers_total_count' <<<"$queues")"
-          test "$count" = "1"
-          queue_id="$(jq -r --arg q "luckread-auth013-account-state-projection" '.result[]? | select(.queue_name==$q) | .queue_id' <<<"$queues")"
-          test -n "$queue_id"
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node scripts/auth013-w04-runtime-evidence.mjs
 
-          RESOURCE="usr_auth013_w04_runtime_${GITHUB_RUN_ID}"
-          KEY="auth013:projection:User:$RESOURCE"
-          ENCODED_KEY="$(jq -rn --arg k "$KEY" '$k|@uri')"
-          push() {
-            local version="$1" state="$2" event_id="$3"
-            local body
-            body="$(jq -n --arg r "$RESOURCE" --arg eid "$event_id" --arg s "$state" --argjson v "$version"               '{eventId:$eid,eventType:"identity.account_state_changed",schemaVersion:"1.0",producer:"W02",resourceType:"User",resourceId:$r,occurredAt:"2026-09-29T04:00:00.000Z",publishedAt:"2026-09-29T04:00:01.000Z",correlationId:"req_auth013_runtime",causationId:$eid,idempotencyKey:$eid,attempt:1,sourceVersion:$v,actor:{actorId:"operator_01",actorType:"user"},before:{accountState:"ACTIVE",accountStateVersion:(if $v > 1 then ($v-1) else 1 end)},after:{accountState:$s,accountStateVersion:$v},reason:"controlled AUTH-013 W04 runtime evidence"}')
-            curl -fsS --retry 3 --retry-all-errors -X POST               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/queues/$queue_id/messages"               "${AUTH[@]}" --data "$(jq -n --argjson b "$body" '{body:$b,content_type:"json"}')" >/dev/null
-          }
-          read_record() {
-            curl -fsS --retry 3 --retry-all-errors               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/32f7e407128a43d59720d5d46736e084/values/$ENCODED_KEY"               "${AUTH[@]}"
-          }
-
-          push 1 FROZEN "evt_${GITHUB_RUN_ID}_1"
-          for i in {1..12}; do record="$(read_record)" && echo "$record" | jq -e '.sourceVersion==1 and .state=="PURGED" and .deindex==true' >/dev/null && break || sleep 2; done
-          echo "$record" | jq -e '.sourceVersion==1 and .state=="PURGED" and .deindex==true' >/dev/null
-
-          push 2 RESTORED "evt_${GITHUB_RUN_ID}_2"
-          for i in {1..12}; do record="$(read_record)" && echo "$record" | jq -e '.sourceVersion==2 and .state=="ACTIVE" and .deindex==false' >/dev/null && break || sleep 2; done
-          echo "$record" | jq -e '.sourceVersion==2 and .state=="ACTIVE" and .deindex==false' >/dev/null
-
-          push 1 FROZEN "evt_${GITHUB_RUN_ID}_1_old"
-          push 2 RESTORED "evt_${GITHUB_RUN_ID}_2"
-          sleep 3
-          record="$(read_record)"
-          echo "$record" | jq -e --arg eid "evt_${GITHUB_RUN_ID}_2" '.sourceVersion==2 and .state=="ACTIVE" and .eventId==$eid' >/dev/null
-
-          cat > auth013-w04-runtime-evidence.json <<JSON
-          {
-            "schemaVersion": 1,
-            "auth": "AUTH-013",
-            "worker": "W04",
-            "commit": "$GITHUB_SHA",
-            "queue": "luckread-auth013-account-state-projection",
-            "queueId": "$queue_id",
-            "consumer": $consumer,
-            "consumerCount": $count,
-            "derivedDestination": {
-              "type": "cloudflare_kv",
-              "title": "globe",
-              "namespaceId": "32f7e407128a43d59720d5d46736e084",
-              "authority": "NONE"
-            },
-            "runtimeAssertions": {
-              "v1FrozenPurged": true,
-              "v2RestoredActive": true,
-              "olderVersionRejected": true,
-              "duplicateDeliveryIdempotent": true,
-              "nonResurrection": true
-            }
-          }
-          JSON
-          curl -fsS -X DELETE             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/32f7e407128a43d59720d5d46736e084/values/$ENCODED_KEY"             "${AUTH[@]}" >/dev/null
-          echo "AUTH-013 W04 runtime evidence PASS"
       - name: Upload runtime evidence
         uses: actions/upload-artifact@v4
         with:
