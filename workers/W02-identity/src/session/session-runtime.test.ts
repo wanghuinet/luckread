@@ -40,11 +40,6 @@ function dbFake(initial: SessionRecord | null) {
           return { meta: { changes: 1 } }
         }
 
-        if (sql.includes('DELETE FROM "session"')) {
-          if (!nativeSessionPresent) return { meta: { changes: 0 } }
-          nativeSessionPresent = false
-          return { meta: { changes: 1 } }
-        }
 
         return { meta: { changes: 0 } }
       }),
