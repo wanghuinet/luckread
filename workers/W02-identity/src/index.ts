@@ -176,36 +176,52 @@ export default {
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/admin/authorize') {
-      const body = await readJsonBody<{ userId?: unknown }>(request)
-      if (!body || typeof body.userId !== 'string' || body.userId.length === 0 || body.userId.length > 128) {
+      const body = await readJsonBody<{ userId?: unknown; email?: unknown }>(request)
+      if (
+        !body ||
+        (typeof body.userId !== 'string' || body.userId.length === 0 || body.userId.length > 128) &&
+        (typeof body.email !== 'string' || body.email.trim().length === 0 || body.email.length > 320)
+      ) {
         return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid admin authorization request' } }, 400)
       }
 
       try {
-        const user = await env.D1_01
-          .prepare('SELECT account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? LIMIT 1')
-          .bind(body.userId)
-          .first<{ accountState?: string; accountStateVersion?: number }>()
+        const lookup = typeof body.userId === 'string'
+          ? await env.D1_01
+              .prepare('SELECT id, account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? LIMIT 1')
+              .bind(body.userId)
+              .first<{ id: string; accountState?: string; accountStateVersion?: number }>()
+          : null
 
+        const emailLookup = !lookup && typeof body.email === 'string'
+          ? await env.D1_01
+              .prepare('SELECT id, account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE lower(email) = lower(?) LIMIT 1')
+              .bind(body.email.trim())
+              .first<{ id: string; accountState?: string; accountStateVersion?: number }>()
+          : null
+
+        const user = lookup ?? emailLookup
         if (!user) return json({ active: false }, 401)
 
+        const canonicalUserId = String(user.id)
         const resolution = await resolveGlobalLayer(
           env.D1_01,
-          body.userId,
+          canonicalUserId,
           typeof user.accountState === 'string' ? user.accountState : 'PENDING_VERIFICATION',
           new Date().toISOString(),
         )
 
         const active = resolution.decision === 'ALLOW' && resolution.layer !== undefined
+        const adminAccess = resolution.layer === 'L7' || resolution.layer === 'L8'
         return json({
           active,
-          userId: body.userId,
+          userId: canonicalUserId,
           accountState: user.accountState ?? 'PENDING_VERIFICATION',
           accountStateVersion: typeof user.accountStateVersion === 'number' ? user.accountStateVersion : 1,
           layer: resolution.layer ?? null,
           roles: resolution.roles ?? [],
-          adminAccess: resolution.layer === 'L7' || resolution.layer === 'L8',
-        }, active ? 200 : 401)
+          adminAccess,
+        }, active && adminAccess ? 200 : 403)
       } catch {
         return json({ active: false }, 503)
       }
