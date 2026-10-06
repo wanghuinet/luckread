@@ -44,6 +44,8 @@ export async function callW02BetterAuth(
 ): Promise<Response> {
   const service = await getW02Service()
   const headers = new Headers(request.headers)
+  headers.delete('host')
+  headers.delete('content-length')
   if (init.body !== undefined) headers.set('content-type', 'application/json; charset=utf-8')
   const response = await service.fetch(
     new Request(`https://luckread-w02.internal${path}`, {
