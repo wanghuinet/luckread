@@ -149,24 +149,24 @@ export const verifyPayloadBetterAuthBridgeToken = async (
 }
 
 const authenticatePayloadBetterAuthBridge: AuthStrategyFunction = async ({ headers, payload, req }) => {
-    if (headers.get(CALLER_HEADER) !== CALLER || !req) return { user: null }
-    const token = headers.get(BRIDGE_HEADER)
-    if (!token) return { user: null }
+  if (headers.get(CALLER_HEADER) !== CALLER || !req) return { user: null }
+  const token = headers.get(BRIDGE_HEADER)
+  if (!token) return { user: null }
 
-    const claims = await verifyPayloadBetterAuthBridgeToken(payload.secret, token, req)
-    if (!claims) return { user: null }
+  const claims = await verifyPayloadBetterAuthBridgeToken(payload.secret, token, req)
+  if (!claims) return { user: null }
 
-    const user = {
-      collection: 'users',
-      // Better Auth owns the UUID identity. Payload's generated legacy User
-      // type still models its D1-native numeric ID, while Media access stores
-      // this value as text and compares it canonically.
-      id: claims.sub as unknown as number,
-      email: claims.email,
-      _strategy: 'luckread-better-auth-bridge',
-    } as AuthStrategyResult['user']
+  const user = {
+    collection: 'users',
+    // Better Auth owns the UUID identity. Payload's generated legacy User
+    // type still models its D1-native numeric ID, while Media access stores
+    // this value as text and compares it canonically.
+    id: claims.sub as unknown as number,
+    email: claims.email,
+    _strategy: 'luckread-better-auth-bridge',
+  } as AuthStrategyResult['user']
 
-    return { user }
+  return { user }
 }
 
 export const payloadBetterAuthBridgeStrategy = {
