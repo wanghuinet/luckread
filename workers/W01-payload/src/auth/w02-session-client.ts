@@ -176,7 +176,7 @@ export const resolveBetterAuthPrincipal = async (request: Request): Promise<Bett
   return payload as BetterAuthPrincipal
 }
 
-export const authorizeAdminUser = async (userId: string) =>
+export const authorizeAdminUser = async (input: { userId?: string; email?: string }) =>
   callW02<{
     active: boolean
     userId: string
@@ -185,7 +185,7 @@ export const authorizeAdminUser = async (userId: string) =>
     layer: string | null
     roles: string[]
     adminAccess: boolean
-  }>('/internal/auth/admin/authorize', { userId })
+  }>('/internal/auth/admin/authorize', input)
 
 export type AccountStateTransitionResult = {
   from: string
