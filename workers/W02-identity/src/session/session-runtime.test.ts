@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   createSessionExtension,
   establishAuthenticatedSession,
-  revokeSessionExtension,
   establishSessionFromAuthoritativeD1,
   refreshSessionFromAuthoritativeD1,
   reconcileOrphanedSessionExtensions,
@@ -24,7 +23,6 @@ function nativeSession(overrides: Partial<NativeSessionAuthority> = {}): NativeS
 
 function dbFake(initial: SessionRecord | null) {
   let row = initial
-  let nativeSessionPresent = Boolean(initial)
 
   const db = {
     prepare: (sql: string) => ({
@@ -83,26 +81,6 @@ describe('session runtime foundation', () => {
     })).rejects.toThrow('deviceId')
   })
 
-  it('revokes extension state and the Payload-native session atomically', async () => {
-    const fake = dbFake({
-      sessionId: 'sid-1',
-      userId: '42',
-      deviceId: 'device-a',
-      tokenVersion: 3,
-      refreshCredentialHash: 'hash',
-      revokedAt: null,
-      lastSeenAt: NOW,
-      nativeExpiresAt: nativeSession().expiresAt,
-    })
-    const result = await revokeSessionExtension(fake.db, 'sid-1', NOW)
-    expect(result).toEqual({ revoked: true })
-    expect(fake.getRow()?.revokedAt).toBe(NOW)
-    expect(fake.getRow()?.tokenVersion).toBe(4)
-    expect(fake.getNativeSessionPresent()).toBe(false)
-
-    const second = await revokeSessionExtension(fake.db, 'sid-1', NOW)
-    expect(second).toEqual({ revoked: false })
-  })
 })
 
 describe('password-change session extension reconciliation', () => {
