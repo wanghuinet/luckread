@@ -63,7 +63,6 @@ export interface User {
   id: number
   identityId?: string | null
   username?: string | null
-  username?: string | null
   displayName?: string | null
   bio?: string | null
   avatar?: string | null
