@@ -10,7 +10,7 @@ const TEST_RUN_ID = String(process.env.GITHUB_RUN_ID || Date.now())
 const TESTED_COMMIT_SHA = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
 const WORKER_PATH = 'workers/W02-identity'
 const WRANGLER_VERSION = process.env.WRANGLER_VERSION || '4.116.0'
-const WRANGLER_CONFIG = 'workers/W01-payload/wrangler.jsonc'
+const WRANGLER_CONFIG = 'workers/W02-identity/wrangler.jsonc'
 const ARTIFACT_DIR = 'artifacts/evidence/auth-002/runtime'
 const GATE1_DIR = 'artifacts/evidence/auth-002/gate1'
 
@@ -456,7 +456,7 @@ try {
   )
   const extensionSchema = d1Rows('PRAGMA table_info("auth_session_state")')
   const migrations = d1Rows(
-    `SELECT id,name,batch FROM payload_migrations WHERE name IS NOT NULL ORDER BY id DESC LIMIT 20`,
+    `SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name LIMIT 50`,
   )
   const catalogNames = new Set(catalog.map((row) => String(row.name ?? '')))
   const requiredIndexes = [
@@ -482,7 +482,7 @@ try {
     requiredTables: ['user', 'session', 'account', 'verification', 'auth_session_state'],
     requiredIndexes,
     extensionColumns: extensionSchema.map((row) => String(row.name)),
-    recentMigrations: migrations.map((row) => ({ id: row.id, name: row.name, batch: row.batch })),
+    recentSchemaTables: migrations.map((row) => String(row.name)),
   }
   writeFileSync(`${GATE1_DIR}/schema.json`, `${JSON.stringify(gate1, null, 2)}\n`)
 
