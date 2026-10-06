@@ -15,6 +15,9 @@ export const Users: CollectionConfig = {
   // overrideAccess.
   access: {
     create: () => false,
+    read: payloadAdminOnly,
+    update: payloadAdminOnly,
+    delete: payloadAdminOnly,
     admin: payloadAdminOnly,
   },
   fields: [
