@@ -1,10 +1,5 @@
-import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../auth/traffic-limit.js'
-import { readVerifiedPayloadTokenVersion } from '../auth/payload-access-token.js'
-import { resolveAuthenticatedPrincipal, W02AuthClientError } from '../auth/w02-session-client.js'
+import { resolveBetterAuthPrincipal, W02AuthClientError } from '../auth/w02-auth-client.js'
 
 type W03ContentService = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
@@ -28,116 +23,59 @@ const errorResponse = (status: number, code: string, message: string) =>
   )
 
 async function getW03Service(): Promise<W03ContentService> {
-  const context = await getCloudflareContext({ async: true })
-  const service = (context.env as unknown as { W03_CONTENT?: W03ContentService }).W03_CONTENT
+  const { env } = await import('@opennextjs/cloudflare').then(({ getCloudflareContext }) =>
+    getCloudflareContext({ async: true }),
+  )
+  const service = (env as unknown as { W03_CONTENT?: W03ContentService }).W03_CONTENT
   if (!service) {
     throw new W03ContentClientError(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
   }
   return service
 }
 
-const getPayloadCookieToken = (request: Request): string | null => {
-  const cookieHeader = request.headers.get('cookie') ?? ''
-  const cookieName = 'payload-token'
-  for (const part of cookieHeader.split(';')) {
-    const [rawName, ...rawValue] = part.trim().split('=')
-    if (rawName !== cookieName || rawValue.length === 0) continue
-    try {
-      return decodeURIComponent(rawValue.join('='))
-    } catch {
-      return rawValue.join('=')
-    }
-  }
-  return null
-}
-
 export async function resolveContentPrincipal(request: Request): Promise<ContentPrincipal | Response> {
-  const authorization = request.headers.get('Authorization') ?? ''
-  if (!authorization.startsWith('Bearer ')) {
+  const authorization = request.headers.get('Authorization')?.trim() ?? ''
+  const cookie = request.headers.get('cookie')?.trim() ?? ''
+  if (!authorization.startsWith('Bearer ') && !cookie) {
     return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
   }
 
   try {
     await enforcePublicReadRateLimit(request)
+    const principal = await resolveBetterAuthPrincipal(request)
+    return {
+      userId: principal.userId,
+      layer: principal.layer,
+    }
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
-  }
-
-  const payload = await getPayload({ config })
-
-  let authResult: Awaited<ReturnType<typeof payload.auth>>
-  try {
-    authResult = await payload.auth({
-      headers: new Headers({ Authorization: authorization }),
-      canSetHeaders: false,
-    })
-  } catch {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
-  }
-
-  const user = authResult.user as ({ id?: unknown; _sid?: unknown } | null)
-  if (!user?.id || typeof user._sid !== 'string') {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-  }
-
-  const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (tokenVersion === null) {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-  }
-
-  try {
-    const session = await resolveAuthenticatedPrincipal({
-      sessionId: user._sid,
-      userId: String(user.id),
-      tokenVersion,
-    })
-    if (!session.active) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-    return { userId: String(user.id), layer: session.layer ?? null }
-  } catch (error) {
     if (error instanceof W02AuthClientError && error.status === 401) {
       return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
+    }
+    if (error instanceof W02AuthClientError && error.status === 403) {
+      return errorResponse(403, 'PERMISSION_DENIED', 'Permission denied')
     }
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
 }
 
 export async function resolveCookieContentPrincipal(request: Request): Promise<ContentPrincipal | Response> {
-  const authorization = request.headers.get('Authorization') ?? ''
-  if (authorization.startsWith('Bearer ')) {
-    return resolveContentPrincipal(request)
-  }
-
-  const token = getPayloadCookieToken(request)
-  if (!token) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-
-  const headers = new Headers(request.headers)
-  headers.set('Authorization', `Bearer ${token}`)
-  return resolveContentPrincipal(
-    new Request(request.url, {
-      method: 'GET',
-      headers,
-    }),
-  )
+  return resolveContentPrincipal(request)
 }
 
 export async function resolveOptionalContentPrincipal(
   request: Request,
 ): Promise<ContentPrincipal | Response | null> {
-  if (!request.headers.get('Authorization')) return null
-  return resolveContentPrincipal(request)
+  if (!request.headers.get('Authorization') && !request.headers.get('cookie')) return null
+  const result = await resolveContentPrincipal(request)
+  if (result instanceof Response && result.status === 401) return null
+  return result
 }
 
 export async function resolveOptionalCookieContentPrincipal(
   request: Request,
 ): Promise<ContentPrincipal | Response | null> {
-  const authorization = request.headers.get('Authorization') ?? ''
-  if (authorization.startsWith('Bearer ')) return resolveContentPrincipal(request)
-  if (!getPayloadCookieToken(request)) return null
-
-  const result = await resolveCookieContentPrincipal(request)
-  if (result instanceof Response && result.status === 401) return null
-  return result
+  return resolveOptionalContentPrincipal(request)
 }
 
 export async function callW03Content(input: {
