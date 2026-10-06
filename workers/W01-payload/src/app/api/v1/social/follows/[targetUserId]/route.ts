@@ -57,7 +57,7 @@ async function forward(
 
 export async function GET(
   request: Request,
-  context: { params: Promise<{ targetUserId: string }>,
+  context: { params: Promise<{ targetUserId: string }> },
 ) {
   return forward(request, context, 'GET')
 }
