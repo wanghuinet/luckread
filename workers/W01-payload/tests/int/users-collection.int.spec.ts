@@ -18,7 +18,7 @@ describe('W01 Users collection contract', () => {
       disableLocalStrategy: true,
       strategies: expect.arrayContaining([expect.objectContaining({ name: 'luckread-better-auth' })]),
     }))
-    expect(Users.access?.create).toBe(false)
+    expect(await Users.access?.create?.({} as never)).toBe(false)
     expect(Users.access?.read).toBe(payloadAdminOnly)
     expect(Users.access?.update).toBe(payloadAdminOnly)
     expect(Users.access?.delete).toBe(payloadAdminOnly)
