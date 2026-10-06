@@ -4,6 +4,7 @@ import type { AuthStrategy } from 'payload'
 type PrincipalResponse = { active?: boolean; userId?: string; email?: string; username?: string; layer?: string }
 type W02ServiceBinding = { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> }
 
+// Payload receives a projected Better Auth principal; it does not own credentials or sessions.
 export const betterAuthPayloadStrategy: AuthStrategy = {
   name: 'luckread-better-auth',
   authenticate: async ({ payload, headers }) => {
