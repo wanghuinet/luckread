@@ -1,6 +1,6 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getBetterAuthPrincipal } from '@/auth/w02-session-client'
+import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'
 
 import { CreatorStudio } from './CreatorStudio'
 
@@ -17,8 +17,11 @@ export default async function CreatorCenterPage() {
   let principal
   try {
     principal = await getBetterAuthPrincipal(request)
-  } catch {
-    redirect('/login?returnTo=%2Fcreator-center')
+  } catch (error) {
+    if (error instanceof W02AuthClientError && error.status === 401) {
+      redirect('/login?returnTo=%2Fcreator-center')
+    }
+    throw error
   }
 
   if (!principal.active) redirect('/login?returnTo=%2Fcreator-center')
