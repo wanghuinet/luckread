@@ -180,9 +180,9 @@ jobs:
             { encoding: 'utf8', env: process.env, maxBuffer: 8 * 1024 * 1024 },
           )
 
-          d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
-            'UPDATE users SET account_state=\'ACTIVE\', account_state_version=COALESCE(account_state_version,0)+1 WHERE CAST(id AS TEXT)=' + q(userId))
-          d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
+          d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W02-identity/wrangler.jsonc',
+            'UPDATE "user" SET account_state=\'ACTIVE\', account_state_version=COALESCE(account_state_version,0)+1 WHERE CAST(id AS TEXT)=' + q(userId))
+          d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W02-identity/wrangler.jsonc',
             'INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' +
             [roleId,userId,'creator','global',null,'ACTIVE',now,null,now,now].map((v,i)=>i === 4 ? 'NULL' : q(v)).join(',') + ')')
 
@@ -410,13 +410,13 @@ jobs:
 
           run(process.env.DATABASE_NAME_W05,'w05-source/workers/W05-social/wrangler.jsonc',
             'DELETE FROM interaction_likes WHERE target_id=' + q(contentId) + '; DELETE FROM contents WHERE id=' + q(contentId) + ';')
-          run(process.env.DATABASE_NAME_W01,'deployed-source/workers/W01-payload/wrangler.jsonc',
+          run(process.env.DATABASE_NAME_W01,'deployed-source/workers/W02-identity/wrangler.jsonc',
             'DELETE FROM role_assignments WHERE id=' + q(roleId) + ' OR subject_id=' + q(userId) + ';' +
             'DELETE FROM auth_session_state WHERE user_id=' + q(userId) + ';' +
-            'DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)=' + q(userId) + ';' +
+            'DELETE FROM "session" WHERE user_id=' + q(userId) + ';' +
             'DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT)=' + q(userId) + ' OR CAST(owner_subject_id AS TEXT)=' + q(userId) + ';' +
             'DELETE FROM auth_registration_envelopes WHERE idempotency_key=' + q(registerKey) + ';' +
-            'DELETE FROM users WHERE CAST(id AS TEXT)=' + q(userId) + ';')
+            'DELETE FROM "user" WHERE CAST(id AS TEXT)=' + q(userId) + ';')
           console.log(JSON.stringify({contentId,userId,cleanup:'COMPLETE'}))
           NODE
 
