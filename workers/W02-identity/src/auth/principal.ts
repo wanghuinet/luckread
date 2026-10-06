@@ -33,15 +33,10 @@ export async function resolveBetterAuthPrincipal(
 ): Promise<AuthenticatedPrincipal | null> {
   const auth = createLuckReadAuth({ D1_01: db })
 
-  let result: AuthSession | null
-  try {
-    result = await auth.api.getSession({
-      headers: request.headers,
-      query: {},
-    }) as AuthSession | null
-  } catch {
-    return null
-  }
+  const result = await auth.api.getSession({
+    headers: request.headers,
+    query: {},
+  }) as AuthSession | null
 
   if (!result?.user?.id || !result.session?.id) return null
 
