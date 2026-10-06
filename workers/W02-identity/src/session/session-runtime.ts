@@ -232,7 +232,6 @@ export async function establishAuthenticatedSession(
 
 type AuthoritativeSessionContext = {
   session: NativeSessionAuthority
-  accessToken: string
   accountState: string
 }
 
@@ -254,7 +253,6 @@ async function loadAuthoritativeLoginSession(
           CAST(s.user_id AS TEXT) AS userId,
           s.created_at AS createdAt,
           s.expires_at AS expiresAt,
-          s.token AS accessToken,
           u.account_state AS accountState
         FROM "session" AS s
         INNER JOIN "user" AS u
@@ -270,14 +268,11 @@ async function loadAuthoritativeLoginSession(
         userId: string
         createdAt: string
         expiresAt: string
-        accessToken: string
         accountState: string
       }>()
 
     if (
       !row ||
-      typeof row.accessToken !== 'string' ||
-      row.accessToken.length === 0 ||
       typeof row.accountState !== 'string' ||
       row.accountState.length === 0
     ) {
@@ -291,7 +286,6 @@ async function loadAuthoritativeLoginSession(
         createdAt: row.createdAt,
         expiresAt: row.expiresAt,
       },
-      accessToken: row.accessToken,
       accountState: row.accountState,
     }
   } catch (error) {
