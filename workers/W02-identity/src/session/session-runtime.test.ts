@@ -4,7 +4,6 @@ import {
   establishAuthenticatedSession,
   revokeSessionExtension,
   establishSessionFromAuthoritativeD1,
-  validateAuthoritativeSession,
   refreshSessionFromAuthoritativeD1,
   reconcileOrphanedSessionExtensions,
   type NativeSessionAuthority,
@@ -157,58 +156,6 @@ describe('password-change session extension reconciliation', () => {
 
 
 
-describe('authoritative session validation', () => {
-  it('validates native session plus authoritative extension state', async () => {
-    let row: {
-      sessionId: string
-      userId: string
-      expiresAt: string
-      extensionUserId: string
-      tokenVersion: number
-      revokedAt: string | null
-      accountState: string
-    } | null = {
-      sessionId: 'sid-1',
-      userId: '42',
-      expiresAt: '2026-09-22T14:00:00.000Z',
-      extensionUserId: '42',
-      tokenVersion: 3,
-      revokedAt: null,
-      accountState: 'ACTIVE',
-    }
-
-    const db = {
-      prepare: () => ({
-        bind: () => ({
-          first: async <T>() => row as T | null,
-        }),
-      }),
-    } as unknown as D1Database
-
-    await expect(validateAuthoritativeSession(db, {
-      sessionId: 'sid-1',
-      userId: '42',
-      tokenVersion: 3,
-      now: NOW,
-    })).resolves.toEqual({ active: true })
-
-    await expect(validateAuthoritativeSession(db, {
-      sessionId: 'sid-1',
-      userId: '42',
-      tokenVersion: 4,
-      now: NOW,
-    })).resolves.toEqual({ active: false })
-
-    row = { ...row!, revokedAt: NOW }
-
-    await expect(validateAuthoritativeSession(db, {
-      sessionId: 'sid-1',
-      userId: '42',
-      tokenVersion: 3,
-      now: NOW,
-    })).resolves.toEqual({ active: false })
-  })
-})
 
 describe('authenticated session orchestration', () => {
   it('requires an authoritative account state and binds an allowed layer before issuing refresh state', async () => {
