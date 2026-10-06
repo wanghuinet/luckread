@@ -318,7 +318,7 @@ export async function applyAccountStateTransition(
 
   const current = await db
     .prepare(
-      'SELECT account_state AS accountState, account_state_version AS accountStateVersion FROM users WHERE id = ? LIMIT 1',
+      'SELECT account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? LIMIT 1',
     )
     .bind(input.userId)
     .first<{ accountState: AccountState; accountStateVersion: number }>()
