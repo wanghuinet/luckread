@@ -120,7 +120,7 @@ describe('RoleAssignment global layer resolution', () => {
   it('resolves the canonical L1 user role for an unverified account', async () => {
     const { db } = fakeD1([assignment()])
     await expect(resolveGlobalLayer(db, 'user-1', 'PENDING_VERIFICATION', NOW))
-      .resolves.toEqual({ decision: 'ALLOW', layer: 'L1' })
+      .resolves.toEqual({ decision: 'ALLOW', layer: 'L1', roles: ['user'] })
   })
 
   it('fails before querying for blocked account states', async () => {
@@ -136,7 +136,7 @@ describe('RoleAssignment global layer resolution', () => {
       assignment({ id: 'self', subjectId: 'user-1', roleId: 'user' }),
     ])
     await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW))
-      .resolves.toEqual({ decision: 'ALLOW', layer: 'L1' })
+      .resolves.toEqual({ decision: 'ALLOW', layer: 'L1', roles: ['user'] })
   })
 
   it('returns DENY when no eligible global assignment exists', async () => {
