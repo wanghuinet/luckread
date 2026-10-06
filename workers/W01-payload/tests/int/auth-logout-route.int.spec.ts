@@ -21,10 +21,6 @@ vi.mock('../../src/auth/w02-session-client.js', () => ({
   W02AuthClientError: W02AuthClientErrorMock,
 }))
 
-vi.mock('../../src/auth/payload-access-token.js', () => ({
-  buildPayloadClearCookie: () => 'payload-token=; Path=/; Max-Age=0; HttpOnly',
-}))
-
 import { POST } from '../../src/app/auth/logout/route'
 
 describe('AUTH-002 /auth/logout W02 authority adapter', () => {
