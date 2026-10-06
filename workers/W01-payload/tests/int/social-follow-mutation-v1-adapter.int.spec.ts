@@ -23,6 +23,6 @@ describe('v1 follow mutation adapter', () => {
   })
 
   it('keeps target existence validation on follow creation', () => {
-    expect(route).toContain("if(method==='POST') await assertSocialTargetUserExists(targetUserId)")
+    expect(route).toContain("if(method==='POST') await assertSocialTargetUserExists(request, targetUserId)")
   })
 })

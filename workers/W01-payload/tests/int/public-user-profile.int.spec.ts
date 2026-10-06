@@ -81,8 +81,10 @@ describe('public creator profile', () => {
     expect(page).toContain("targetId: profile.id")
     expect(page).toContain("'Idempotency-Key': 'report:profile:' + profile.id + ':' + crypto.randomUUID()")
     expect(reportRoute).toContain("targetType === 'creator' || targetType === 'profile'")
-    expect(socialClient).toContain("collection: 'users'")
-    expect(socialClient).toContain('overrideAccess: true')
+    expect(socialClient).not.toContain("collection: 'users'")
+    expect(socialClient).not.toContain('getPayload')
+    expect(socialClient).toContain("callW02UserProfile")
+    expect(socialClient).toContain("'/internal/account/profile/by-id?id='")
   })
 
   it('uses bounded creator content reads and keeps type filtering cache-compatible', () => {

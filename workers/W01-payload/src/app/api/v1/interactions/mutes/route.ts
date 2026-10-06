@@ -30,7 +30,7 @@ export async function POST(request: Request): Promise<Response> {
     if (typeof targetUserId !== 'string' || !targetUserId.trim()) {
       return errorResponse(400, 'VALIDATION_FAILED', 'targetUserId is required')
     }
-    await assertSocialTargetUserExists(targetUserId)
+    await assertSocialTargetUserExists(request, targetUserId)
     return await callW05Social({
       request,
       pathname: '/internal/social/interactions/mutes',
