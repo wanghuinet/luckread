@@ -103,7 +103,7 @@ describe('comment runtime', () => {
     expect(d.prepare).toHaveBeenCalledTimes(1)
   })
 
-  it('replays a deleted comment idempotency key as the original published result', async () => {
+  it('does not disclose a deleted comment on idempotency replay', async () => {
     const d = db([{
       existing_id: 'c-deleted',
       existing_content_id: 'content-1',
@@ -122,11 +122,9 @@ describe('comment runtime', () => {
     await expect(createComment(d, 'user-1', 'content-1', {
       body: '已删除前的评论',
       idempotencyKey: 'same-key',
-    })).resolves.toMatchObject({
-      id: 'c-deleted',
-      contentId: 'content-1',
-      authorUserId: 'user-1',
-      state: 'PUBLISHED',
+    })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
     })
     expect(d.prepare).toHaveBeenCalledTimes(1)
   })
