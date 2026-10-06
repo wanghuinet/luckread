@@ -16,15 +16,18 @@ export type EstablishSessionResult = {
   tokenVersion: number
   layer: string
   nativeExpiresAt: string
+  expiresIn: number
 }
 
 export type RefreshSessionResult = {
   sessionId: string
   userId: string
+  accessToken: string
   refreshToken: string
   tokenVersion: number
   layer: string
   nativeExpiresAt: string
+  expiresIn: number
   email: string
 }
 
