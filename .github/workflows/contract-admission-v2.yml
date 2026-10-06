@@ -29,6 +29,18 @@ env:
   ADMISSION_MODE: ${{ github.event.inputs.admission_mode || 'DEVELOPMENT' }}
 
 jobs:
+  upstream-immutability:
+    name: Upstream Product Immutability Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - uses: actions/setup-node@v4
+        with: {node-version: 24}
+      - name: Verify Payload and Better Auth upstream immutability
+        run: node scripts/upstream-product-immutability-check.mjs
+
   contract:
     name: Contract Admission Gate
     runs-on: ubuntu-latest
@@ -187,7 +199,8 @@ jobs:
       - capability-graph-strict-downstream
       - alignment
       - mapping-zero-final
-    if: ${{ always() && needs.contract.result == 'success' && needs['contract-semantic'].result == 'success' && needs.feature-inventory.result == 'success' && needs.payload-reconciliation.result == 'success' && needs['capability-graph'].result == 'success' && needs['mapping-zero-final'].result == 'success' && (inputs.admission_mode != 'FULL' || (needs['capability-graph-strict-downstream'].result == 'success' && needs.alignment.result == 'success')) }}
+      - upstream-immutability
+    if: ${{ always() && needs.contract.result == 'success' && needs['contract-semantic'].result == 'success' && needs.feature-inventory.result == 'success' && needs.payload-reconciliation.result == 'success' && needs['capability-graph'].result == 'success' && needs['mapping-zero-final'].result == 'success' && needs['upstream-immutability'].result == 'success' && (inputs.admission_mode != 'FULL' || (needs['capability-graph-strict-downstream'].result == 'success' && needs.alignment.result == 'success')) }}
     steps:
       - uses: actions/checkout@v4
         with:

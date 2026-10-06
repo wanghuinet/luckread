@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/payload/upstream-product-immutability.v1.schema.json",
+  "title": "LuckRead Upstream Product Immutability Contract v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "status", "source", "products", "rules"],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "status": { "const": "ACTIVE" },
+    "source": { "type": "string", "minLength": 1 },
+    "products": {
+      "type": "array",
+      "const": [
+        { "name": "Payload", "package": "payload", "sourceAuthority": "upstream-npm" },
+        { "name": "Better Auth", "package": "better-auth", "sourceAuthority": "upstream-npm" }
+      ]
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["upstreamSourceImmutable", "allowedLuckReadChanges", "forbiddenMechanisms"],
+      "properties": {
+        "upstreamSourceImmutable": { "const": true },
+        "allowedLuckReadChanges": {
+          "type": "array",
+          "const": ["configuration", "integration", "adapter", "supported-extension", "LuckRead-owned-domain-code"]
+        },
+        "forbiddenMechanisms": {
+          "type": "array",
+          "const": ["source-modification", "fork", "vendoring", "patch-package", "monkey-patch", "local-file-dependency"]
+        }
+      }
+    }
+  }
+}
