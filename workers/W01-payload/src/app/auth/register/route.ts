@@ -236,8 +236,6 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   const consentRecordId = crypto.randomUUID()
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
   const committedAt = now.toISOString()
-  const committedResponse = JSON.stringify({ userId: '', accountState: ACCOUNT_STATE })
-
   try {
     const reservationStatements = []
     if (existing && isExpired(existing.expiresAt, now)) {
@@ -364,8 +362,8 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration identity is unavailable')
   }
 
-  const payload = await getPayload({ config })
   try {
+    const payload = await getPayload({ config })
     await payload.create({
       collection: 'users',
       data: {
@@ -391,6 +389,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         errorName: rollbackError instanceof Error ? rollbackError.name : typeof rollbackError,
       }))
     }
+    await releaseReservation()
     await releaseReservation()
     console.error(JSON.stringify({
       event: 'auth.register.profile_projection_failure',
@@ -485,20 +484,35 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     }
 
     return json(responseBody, 201)
-  }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    if (isUniqueConstraintError(error) && /auth_registration_envelopes|active_key/i.test(message)) {
-      return errorResponse(
-        409,
-        'IDEMPOTENCY_IN_PROGRESS',
-        'A registration with this Idempotency-Key is already in progress',
-        { 'retry-after': '1' },
-      )
-    }
-
     if (isUniqueConstraintError(error)) {
-      return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
+      await rollbackRegistrationUser(request, {
+        userId,
+        email: normalized.identity,
+        username: normalized.username,
+      }).catch((rollbackError) => {
+        console.error(JSON.stringify({
+          event: 'auth.register.rollback_failure',
+          diagnosticCode: 'AUTH001_ROLLBACK_FAILURE',
+          errorName: rollbackError instanceof Error ? rollbackError.name : typeof rollbackError,
+        }))
+      })
+      await releaseReservation()
+      return errorResponse(
+        /auth_registration_envelopes|active_key/i.test(message)
+          ? 409
+          : 422,
+        /auth_registration_envelopes|active_key/i.test(message)
+          ? 'IDEMPOTENCY_IN_PROGRESS'
+          : 'VALIDATION_FAILED',
+        /auth_registration_envelopes|active_key/i.test(message)
+          ? 'A registration with this Idempotency-Key is already in progress'
+          : 'Registration could not be completed',
+        /auth_registration_envelopes|active_key/i.test(message)
+          ? { 'retry-after': '1' }
+          : {},
+      )
     }
 
     try {
@@ -514,6 +528,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         errorName: rollbackError instanceof Error ? rollbackError.name : typeof rollbackError,
       }))
     }
+    await releaseReservation()
 
     console.error(
       JSON.stringify({
