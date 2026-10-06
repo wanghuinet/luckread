@@ -67,21 +67,30 @@ const requireTransport = (request: Request): void => {
   }
 }
 
-const requiredPrincipal = (request: Request): { userId: string; layer: string } => {
+const parsePrincipalRoles = (request: Request): string[] =>
+  [...new Set(
+    (request.headers.get('X-LuckRead-Principal-Roles') ?? '')
+      .split(',')
+      .map((role) => role.trim())
+      .filter(Boolean),
+  )]
+
+const requiredPrincipal = (request: Request): { userId: string; layer: string; roles: string[] } => {
   const userId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
   const layer = request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? ''
+  const roles = parsePrincipalRoles(request)
   if (!userId || !layer) throw new ContentRuntimeError('UNAUTHENTICATED', 401)
-  return { userId, layer }
+  return { userId, layer, roles }
 }
 
-export const hasCreatorContentPermission = (layer: string): boolean => {
+export const hasCreatorContentPermission = (layer: string, roles: readonly string[] = []): boolean => {
   if (!/^L[0-8]$/.test(layer)) return false
-  return Number(layer.slice(1)) >= 3
+  return roles.includes('creator')
 }
 
-const requiredCreatorPrincipal = (request: Request): { userId: string; layer: string } => {
+const requiredCreatorPrincipal = (request: Request): { userId: string; layer: string; roles: string[] } => {
   const principal = requiredPrincipal(request)
-  if (!hasCreatorContentPermission(principal.layer)) {
+  if (!hasCreatorContentPermission(principal.layer, principal.roles)) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   }
   return principal
