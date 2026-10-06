@@ -23,8 +23,8 @@ export async function GET(request: Request): Promise<Response> {
     const query = validateContentListQuery(url)
     const suffix = query.toString() ? `?${query.toString()}` : ''
 
-    // Never put an authenticated request into the shared public cache. This
-    // includes both the Payload auth cookie and Authorization credentials.
+    // Never put an authenticated request into the shared public cache.
+    // Better Auth session cookies and Authorization credentials are private.
     if (hasAuthenticatedSessionCredential(request)) {
       const principal = await resolveCookieContentPrincipal(request)
       if (principal instanceof Response) return principal
