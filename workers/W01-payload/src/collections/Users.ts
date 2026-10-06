@@ -1,7 +1,65 @@
-import type { CollectionConfig } from 'payload'
+import type { AuthStrategy, CollectionConfig } from 'payload'
 
-import { payloadAdminOnly } from '@/auth/payload-admin-access'
-import { betterAuthPayloadStrategy } from '@/auth/better-auth-payload-strategy'
+import { resolveBetterAuthPrincipal } from '@/auth/w02-auth-client'
+
+const betterAuthPayloadStrategy: AuthStrategy = {
+  name: 'luckread-better-auth',
+  authenticate: async ({ payload, headers }) => {
+    try {
+      const principal = await resolveBetterAuthPrincipal(
+        new Request('https://luckread-w01.internal/auth', {
+          headers: new Headers(headers),
+        }),
+      )
+
+      const byIdentity = await payload.find({
+        collection: 'users',
+        where: {
+          identityUserId: {
+            equals: principal.userId,
+          },
+        },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
+
+      const identityUser = byIdentity.docs[0]
+      if (identityUser) {
+        return {
+          user: {
+            collection: 'users',
+            ...(identityUser as Record<string, unknown>),
+          },
+        }
+      }
+
+      const byEmail = await payload.find({
+        collection: 'users',
+        where: {
+          email: {
+            equals: principal.email,
+          },
+        },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
+
+      const emailUser = byEmail.docs[0]
+      if (!emailUser) return { user: null }
+
+      return {
+        user: {
+          collection: 'users',
+          ...(emailUser as Record<string, unknown>),
+        },
+      }
+    } catch {
+      return { user: null }
+    }
+  },
+}
 
 export const Users: CollectionConfig = {
   slug: 'users',
@@ -11,19 +69,29 @@ export const Users: CollectionConfig = {
   auth: {
     disableLocalStrategy: true,
     strategies: [betterAuthPayloadStrategy],
-    forgotPassword: {},
-    removeTokenFromResponses: true,
-    },
-
-  // AUTH-001 contract: account registration is anonymous/public. Keep the
-  // public boundary limited to creation; read/update/delete remain protected
-  // by Payload's default authenticated access control until explicit rules
-  // are defined at the canonical API boundary.
+  },
   access: {
     create: () => true,
-    admin: payloadAdminOnly,
+    admin: async ({ req }) => {
+      try {
+        const principal = await resolveBetterAuthPrincipal(
+          new Request('https://luckread-w01.internal/admin', {
+            headers: new Headers(req.headers),
+          }),
+        )
+        return principal.layer === 'L7' || principal.layer === 'L8'
+      } catch {
+        return false
+      }
+    },
   },
   fields: [
+    {
+      name: 'identityUserId',
+      type: 'text',
+      unique: true,
+      index: true,
+    },
     {
       name: 'username',
       type: 'text',
