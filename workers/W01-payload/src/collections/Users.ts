@@ -15,12 +15,11 @@ export const Users: CollectionConfig = {
     removeTokenFromResponses: true,
     strategies: [payloadBetterAuthBridgeStrategy],
   },
-  // AUTH-001 contract: account registration is anonymous/public. Keep the
-  // public boundary limited to creation; read/update/delete remain protected
-  // by Payload's default authenticated access control until explicit rules
-  // are defined at the canonical API boundary.
+  // Better Auth is the sole platform account-creation authority in W02.
+  // Payload keeps this collection only as a CMS/Admin integration boundary;
+  // it must never create a second account authority through /api/users.
   access: {
-    create: () => true,
+    create: () => false,
     admin: payloadAdminOnly,
   },
   fields: [
