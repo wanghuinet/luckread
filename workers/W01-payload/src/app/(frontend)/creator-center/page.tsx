@@ -4,8 +4,6 @@ import { getPayload } from 'payload'
 
 import config from '@payload-config'
 
-import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
-import { validateSession } from '@/auth/w02-session-client'
 
 import { CreatorStudio } from './CreatorStudio'
 
@@ -34,24 +32,12 @@ export default async function CreatorCenterPage() {
 
   const user = authResult.user as unknown as ({
     id?: string | number
-    _sid?: string
     displayName?: unknown
     username?: unknown
     email?: unknown
   } | null)
 
-  const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (!user?.id || typeof user._sid !== 'string' || !user._sid || tokenVersion === null) {
-    redirect('/login?returnTo=%2Fcreator-center')
-  }
-
-  const active = await validateSession({
-    sessionId: user._sid,
-    userId: String(user.id),
-    tokenVersion,
-  }).catch(() => false)
-
-  if (!active) {
+  if (!user?.id) {
     redirect('/login?returnTo=%2Fcreator-center')
   }
 
