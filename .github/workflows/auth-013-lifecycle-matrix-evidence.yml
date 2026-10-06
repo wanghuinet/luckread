@@ -135,8 +135,8 @@ jobs:
                   const correlationId='auth013-full-matrix-'+i+'-'+uid
 
                   await db.prepare(
-                    'INSERT INTO users (id,email,username,account_state,account_state_version) VALUES (?,?,?,?,?)'
-                  ).bind(uid,email,username,rule.from,1).run()
+                    'INSERT INTO "user" (id,name,email,email_verified,username,locale,timezone,account_state,account_state_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+                  ).bind(String(uid),'AUTH013 Lifecycle Matrix',email,1,username,'en-US','UTC',rule.from,1,now,now).run()
                   created.push({uid:String(uid),sid})
 
                   await db.prepare(
@@ -162,7 +162,7 @@ jobs:
 
                   const out=await transition(db,input)
                   const after=await db.prepare(
-                    'SELECT account_state,account_state_version FROM users WHERE id=?'
+                    'SELECT account_state,account_state_version FROM "user" WHERE id=?'
                   ).bind(uid).first()
                   const session=await db.prepare(
                     'SELECT revoked_at FROM auth_session_state WHERE session_id=?'
@@ -208,8 +208,8 @@ jobs:
                 const negUid=baseUid+1000
                 const negSid='auth013-full-matrix-negative-session-'+negUid
                 await db.prepare(
-                  'INSERT INTO users (id,email,username,account_state,account_state_version) VALUES (?,?,?,?,?)'
-                ).bind(negUid,'auth013-negative-'+negUid+'@invalid.local','auth013-negative-'+negUid,'ACTIVE',1).run()
+                  'INSERT INTO "user" (id,name,email,email_verified,username,locale,timezone,account_state,account_state_version,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+                ).bind(String(negUid),'AUTH013 Lifecycle Negative','auth013-negative-'+negUid+'@invalid.local',1,'auth013-negative-'+negUid,'en-US','UTC','ACTIVE',1,now,now).run()
                 created.push({uid:String(negUid),sid:negSid})
                 await db.prepare(
                   'INSERT INTO auth_session_state (session_id,user_id,device_id,token_version,refresh_credential_hash,revoked_at,last_seen_at) VALUES (?,?,?,?,?,NULL,?)'
@@ -229,7 +229,7 @@ jobs:
                   permission:'user.ban'
                 })
                 const negRow=await db.prepare(
-                  'SELECT account_state,account_state_version FROM users WHERE id=?'
+                  'SELECT account_state,account_state_version FROM "user" WHERE id=?'
                 ).bind(negUid).first()
                 if(negative.ok || negRow?.account_state!=='ACTIVE' || Number(negRow?.account_state_version)!==1)
                   throw new Error('AUTH-013 negative approval assertion failed')
@@ -257,10 +257,10 @@ jobs:
                 for(const item of created) {
                   await db.prepare('DELETE FROM auth_session_state WHERE session_id=?').bind(item.sid).run()
                   await db.prepare('DELETE FROM auth_013_publication_journal WHERE resource_id=?').bind(item.uid).run()
-                  await db.prepare('DELETE FROM users WHERE id=?').bind(Number(item.uid)).run()
+                  await db.prepare('DELETE FROM "user" WHERE id=?').bind(String(item.uid)).run()
                 }
                 for(const item of created) {
-                  const cu=await db.prepare('SELECT COUNT(*) count FROM users WHERE id=?').bind(Number(item.uid)).first()
+                  const cu=await db.prepare('SELECT COUNT(*) count FROM "user" WHERE id=?').bind(String(item.uid)).first()
                   const cs=await db.prepare('SELECT COUNT(*) count FROM auth_session_state WHERE session_id=?').bind(item.sid).first()
                   const cj=await db.prepare('SELECT COUNT(*) count FROM auth_013_publication_journal WHERE resource_id=?').bind(item.uid).first()
                   if(Number(cu?.count??-1)!==0||Number(cs?.count??-1)!==0||Number(cj?.count??-1)!==0)
