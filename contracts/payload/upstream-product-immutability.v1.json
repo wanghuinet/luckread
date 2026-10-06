@@ -1,35 +1,35 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://luckread.com/contracts/v1/payload/upstream-product-immutability.v1.json",
-  "title": "LuckRead Upstream Product Immutability Contract v1",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["version", "status", "products", "rules"],
-  "properties": {
-    "version": { "const": "1.0.0" },
-    "status": { "const": "ACTIVE" },
-    "products": {
-      "type": "array",
-      "const": [
-        { "name": "Payload", "package": "payload", "sourceAuthority": "upstream-npm" },
-        { "name": "Better Auth", "package": "better-auth", "sourceAuthority": "upstream-npm" }
-      ]
+  "version": "1.0.0",
+  "status": "ACTIVE",
+  "source": "LuckRead architecture invariant: Payload and Better Auth are immutable upstream products",
+  "products": [
+    {
+      "name": "Payload",
+      "package": "payload",
+      "sourceAuthority": "upstream-npm"
     },
-    "rules": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["upstreamSourceImmutable", "allowedLuckReadChanges", "forbiddenMechanisms"],
-      "properties": {
-        "upstreamSourceImmutable": { "const": true },
-        "allowedLuckReadChanges": {
-          "type": "array",
-          "const": ["configuration", "integration", "adapter", "supported-extension", "LuckRead-owned-domain-code"]
-        },
-        "forbiddenMechanisms": {
-          "type": "array",
-          "const": ["source-modification", "fork", "vendoring", "patch-package", "monkey-patch", "local-file-dependency"]
-        }
-      }
+    {
+      "name": "Better Auth",
+      "package": "better-auth",
+      "sourceAuthority": "upstream-npm"
     }
+  ],
+  "rules": {
+    "upstreamSourceImmutable": true,
+    "allowedLuckReadChanges": [
+      "configuration",
+      "integration",
+      "adapter",
+      "supported-extension",
+      "LuckRead-owned-domain-code"
+    ],
+    "forbiddenMechanisms": [
+      "source-modification",
+      "fork",
+      "vendoring",
+      "patch-package",
+      "monkey-patch",
+      "local-file-dependency"
+    ]
   }
 }
