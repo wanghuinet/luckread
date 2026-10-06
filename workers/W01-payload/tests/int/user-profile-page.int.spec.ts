@@ -29,10 +29,10 @@ describe('user profile page', () => {
     expect(page).toContain('viewerUserId !== profile.id')
   })
 
-  it('uses the existing authenticated logout API and returns to the public homepage', () => {
+  it('uses the Better Auth logout API and returns to the public homepage', () => {
     const page = read('src/app/(frontend)/me/profile/page.tsx')
 
-    expect(page).toContain("fetch('/api/v1/auth/logout'")
+    expect(page).toContain("fetch('/api/auth/sign-out'")
     expect(page).toContain("method: 'POST'")
     expect(page).toContain("credentials: 'include'")
     expect(page).toContain("response.status !== 401")
