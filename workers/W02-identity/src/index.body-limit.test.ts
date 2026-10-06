@@ -27,4 +27,28 @@ describe('W02 internal JSON body boundary', () => {
       },
     })
   })
+
+  it('rejects an oversized internal profile update before authentication or persistence', async () => {
+    const response = await worker.fetch(
+      new Request('https://luckread-w02.internal/internal/account/profile', {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          'If-Match': 'W/"placeholder"',
+          'X-LuckRead-Caller': 'W01',
+        },
+        body: JSON.stringify({ bio: 'x'.repeat(64 * 1024) }),
+      }),
+      {} as never,
+      {} as never,
+    )
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      error: {
+        code: 'VALIDATION_FAILED',
+        message: 'Invalid profile update',
+      },
+    })
+  })
 })
