@@ -77,10 +77,9 @@ describe('Media upload access', () => {
   it('exposes media metadata through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
-    expect(route).toContain("from '../../../../(payload)/api/[...slug]/route'")
-    expect(route).toContain("slug: ['media', mediaId]")
-    expect(route).toContain("new URL('/api/media/' + encodeURIComponent(mediaId), request.url)")
-    expect(route).toContain('request.clone()')
+    expect(route).toContain('getPayload')
+    expect(route).toContain("collection: 'media'")
+    expect(route).toContain('payload.findByID')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
@@ -128,11 +127,9 @@ describe('Media upload access', () => {
   it('exposes owner-authorized media deletion through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
-    expect(route).toContain("DELETE as payloadMediaDelete")
-    expect(route).toContain('type PayloadDeleteRouteContext = Parameters<typeof payloadMediaDelete>[1]')
-    expect(route).toContain("new URL('/api/media/' + encodeURIComponent(mediaId), request.url)")
-    expect(route).toContain("slug: ['media', mediaId]")
-    expect(route).toContain('return payloadMediaDelete')
+    expect(route).toContain('await payload.delete')
+    expect(route).toContain('overrideAccess: false')
+    expect(route).toContain('user: { id: principal.userId }')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
@@ -153,11 +150,9 @@ describe('Media upload access', () => {
   it('exposes owner-authorized media metadata updates through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
-    expect(route).toContain("PATCH as payloadMediaPatch")
-    expect(route).toContain('type PayloadPatchRouteContext = Parameters<typeof payloadMediaPatch>[1]')
-    expect(route).toContain("new URL('/api/media/' + encodeURIComponent(mediaId), request.url)")
-    expect(route).toContain("slug: ['media', mediaId]")
-    expect(route).toContain('return payloadMediaPatch')
+    expect(route).toContain('await payload.update')
+    expect(route).toContain('overrideAccess: false')
+    expect(route).toContain('user: { id: principal.userId }')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
