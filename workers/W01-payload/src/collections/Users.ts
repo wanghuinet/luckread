@@ -9,12 +9,11 @@ export const Users: CollectionConfig = {
     useAsTitle: 'email',
   },
   auth: {
-    // Keep Payload's native authentication/recovery capability only for the
-    // Payload Admin and legacy recovery boundary. Normal account authority is W02.
-    forgotPassword: {},
+    // Better Auth is the platform account/recovery authority in W02.
+    // Payload remains a CMS/Admin integration boundary and accepts only the
+    // signed Better Auth bridge for application-owned authenticated access.
     removeTokenFromResponses: true,
     strategies: [payloadBetterAuthBridgeStrategy],
-    // AUTH-004 remains contract/evidence gated; native capability is the implementation baseline.
   },
   // AUTH-001 contract: account registration is anonymous/public. Keep the
   // public boundary limited to creation; read/update/delete remain protected
