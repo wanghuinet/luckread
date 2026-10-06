@@ -43,6 +43,12 @@ jobs:
         run: |
           git diff --exit-code -- workers/W02-identity/migrations/0001_role_assignments.sql
           git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
+      - name: Apply pending W02 D1 migrations
+        working-directory: workers/W02-identity
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 d1 migrations apply D1_01 --remote --config wrangler.jsonc
       - name: Deploy W02 with pinned Wrangler
         working-directory: workers/W02-identity
         env:
