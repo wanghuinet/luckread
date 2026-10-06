@@ -37,6 +37,8 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
       'https://luckread.com',
       'https://www.luckread.com',
       'https://mp.luckread.com',
+      'https://api.luckread.com',
+      'https://sso.luckread.com',
     ],
     emailAndPassword: {
       enabled: true,

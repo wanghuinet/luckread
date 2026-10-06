@@ -74,6 +74,21 @@ describe('W02 Better Auth password reset delivery', () => {
     )
   })
 
+  it('trusts every official public authentication origin', () => {
+    const auth = createLuckReadAuth({
+      D1_01: {} as D1Database,
+      BETTER_AUTH_SECRET: 'secret-secret-secret-secret-secret-secret',
+    }) as any
+
+    expect(auth.trustedOrigins).toEqual([
+      'https://luckread.com',
+      'https://www.luckread.com',
+      'https://mp.luckread.com',
+      'https://api.luckread.com',
+      'https://sso.luckread.com',
+    ])
+  })
+
   it('fails closed when Email Service is unavailable', async () => {
     const auth = createLuckReadAuth({
       D1_01: {} as D1Database,
