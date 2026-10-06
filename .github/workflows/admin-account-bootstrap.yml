@@ -63,18 +63,56 @@ jobs:
           console.log(JSON.stringify({id:user.id,email:user.email,username:user.username,account_state:user.account_state,account_state_version:user.account_state_version}))
           NODE
 
-      - name: Validate username uniqueness
+      - name: Resolve Better Auth admin identity
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc \
-            --command "SELECT id, username FROM users WHERE username='wanghui' AND id<>1;" > /tmp/admin-username-collision.json
           node --input-type=module - <<'NODE'
           import fs from 'node:fs'
-          const rows = JSON.parse(fs.readFileSync('/tmp/admin-username-collision.json','utf8'))?.[0]?.results ?? []
-          if (rows.length !== 0) throw new Error('username wanghui is already owned by another user')
+          const email = fs.readFileSync('/tmp/admin-user-email.txt','utf8').trim().replaceAll("'", "''")
+          fs.writeFileSync('/tmp/admin-better-auth-user-query.sql',
+            "SELECT u.id, u.email, u.username, u.account_state, a.id AS credential_account_id, " +
+            "CASE WHEN a.password IS NULL OR a.password = '' THEN 0 ELSE 1 END AS credential_password_present " +
+            "FROM \"user\" AS u LEFT JOIN \"account\" AS a " +
+            "ON a.user_id=u.id AND a.provider_id='credential' " +
+            "WHERE lower(u.email)=lower('" + email + "') LIMIT 1;"
+          )
           NODE
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc \
+            --file=/tmp/admin-better-auth-user-query.sql > /tmp/admin-better-auth-user.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs'
+          const rows = JSON.parse(fs.readFileSync('/tmp/admin-better-auth-user.json','utf8'))?.[0]?.results ?? []
+          if (rows.length !== 1) throw new Error('Better Auth user for the legacy admin email does not exist')
+          const user = rows[0]
+          if (typeof user.id !== 'string' || user.id.length < 1) throw new Error('Better Auth admin identity id is missing')
+          if (!user.credential_account_id || Number(user.credential_password_present) !== 1) {
+            throw new Error('Better Auth credential account/password is missing')
+          }
+          fs.writeFileSync('/tmp/better-auth-admin-user-id.txt', user.id)
+          console.log(JSON.stringify({
+            betterAuthUserId: user.id,
+            email: user.email,
+            accountState: user.account_state,
+            credentialPasswordPresent: true,
+          }))
+          NODE
+          echo "BETTER_AUTH_USER_ID=$(cat /tmp/better-auth-admin-user-id.txt)" >> "$GITHUB_ENV"
 
-      - name: Prepare native Payload password material
+      - name: Prepare Better Auth admin role binding
+        env:
+          BETTER_AUTH_USER_ID: ${{ env.BETTER_AUTH_USER_ID }}
+          ROLE_ASSIGNMENT_ID: admin-bootstrap-1-super-admin
+        run: |
+          set -euo pipefail
+          node scripts/admin-account-bootstrap.mjs
+          chmod 600 /tmp/luckread-admin-bootstrap.sql /tmp/luckread-admin-bootstrap-meta.json
+          cat /tmp/luckread-admin-bootstrap-meta.json
+
+      - name: Apply admin role binding
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config workers/W01-payload/wrangler.jsonc --file=/tmp/luckread-admin-bootstrap.sql
+
         env:
           ROLE_ASSIGNMENT_ID: admin-bootstrap-1-super-admin
         run: |
@@ -96,20 +134,16 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config workers/W01-payload/wrangler.jsonc \
             --command "DELETE FROM auth_session_state WHERE user_id='1';"
 
-      - name: Verify D1 result
+      - name: Verify Better Auth role binding
         run: |
           set -euo pipefail
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc \
-            --command "SELECT id,email,username,account_state,login_attempts,lock_until FROM users WHERE id=1;" > /tmp/admin-user-post.json
-          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc \
-            --command "SELECT id,subject_id,role_id,scope_type,status,valid_from,valid_until FROM role_assignments WHERE subject_id='1' AND role_id='super_admin' AND scope_type='global' AND status='ACTIVE';" > /tmp/admin-role-post.json
+            --command "SELECT id,subject_id,role_id,scope_type,status,valid_from,valid_until FROM role_assignments WHERE subject_id='$(cat /tmp/better-auth-admin-user-id.txt)' AND role_id='super_admin' AND scope_type='global' AND status='ACTIVE';" > /tmp/admin-role-post.json
           node --input-type=module - <<'NODE'
           import fs from 'node:fs'
-          const userRows = JSON.parse(fs.readFileSync('/tmp/admin-user-post.json','utf8'))?.[0]?.results ?? []
           const roleRows = JSON.parse(fs.readFileSync('/tmp/admin-role-post.json','utf8'))?.[0]?.results ?? []
-          if (userRows.length !== 1 || userRows[0].username !== 'wanghui' || userRows[0].account_state !== 'ACTIVE') throw new Error('post-update user verification failed')
-          if (roleRows.length < 1) throw new Error('L8 super_admin role assignment missing')
-          console.log(JSON.stringify({user:{id:userRows[0].id,username:userRows[0].username,account_state:userRows[0].account_state},activeSuperAdminAssignments:roleRows.length}))
+          if (roleRows.length < 1) throw new Error('L8 super_admin role assignment missing for Better Auth admin identity')
+          console.log(JSON.stringify({betterAuthUserId:roleRows[0].subject_id,activeSuperAdminAssignments:roleRows.length}))
           NODE
 
       - name: Verify production login without printing credentials
@@ -124,4 +158,4 @@ jobs:
       - name: Secure cleanup
         if: always()
         run: |
-          rm -f /tmp/luckread-admin-bootstrap.sql /tmp/luckread-admin-bootstrap-meta.json /tmp/admin-user-preflight.json /tmp/admin-username-collision.json /tmp/admin-user-post.json /tmp/admin-role-post.json
+          rm -f /tmp/luckread-admin-bootstrap.sql /tmp/luckread-admin-bootstrap-meta.json /tmp/admin-user-preflight.json /tmp/admin-user-email.txt /tmp/admin-better-auth-user-query.sql /tmp/admin-better-auth-user.json /tmp/better-auth-admin-user-id.txt /tmp/admin-role-post.json
