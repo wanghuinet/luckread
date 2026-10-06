@@ -77,10 +77,9 @@ describe('Media upload access', () => {
   it('exposes media metadata through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
-    expect(route).toContain("from '../../../../(payload)/api/[...slug]/route'")
-    expect(route).toContain("slug: ['media', mediaId]")
-    expect(route).toContain("new URL('/api/media/' + encodeURIComponent(mediaId), request.url)")
-    expect(route).toContain('request.clone()')
+    expect(route).toContain('getPayload')
+    expect(route).toContain("collection: 'media'")
+    expect(route).toContain('payload.findByID')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
@@ -111,14 +110,26 @@ describe('Media upload access', () => {
   })
 
 
+  it('uses the canonical Better Auth principal for media mutations', () => {
+    const route = read('src/app/api/v1/media/[mediaId]/route.ts')
+
+    expect(route).toContain('resolveBetterAuthPrincipalThroughW02(request)')
+    expect(route).toContain("if (!principal.active || principal.tokenVersion === undefined)")
+    expect(route).toContain("collection: 'media'")
+    expect(route).toContain('overrideAccess: false')
+    expect(route).toContain('user: { id: principal.userId }')
+    expect(route).toContain('await payload.delete')
+    expect(route).toContain('await payload.update')
+    expect(route).not.toContain('payloadMediaDelete')
+    expect(route).not.toContain('payloadMediaPatch')
+  })
+
   it('exposes owner-authorized media deletion through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
-    expect(route).toContain("DELETE as payloadMediaDelete")
-    expect(route).toContain('type PayloadDeleteRouteContext = Parameters<typeof payloadMediaDelete>[1]')
-    expect(route).toContain("new URL('/api/media/' + encodeURIComponent(mediaId), request.url)")
-    expect(route).toContain("slug: ['media', mediaId]")
-    expect(route).toContain('return payloadMediaDelete')
+    expect(route).toContain('await payload.delete')
+    expect(route).toContain('overrideAccess: false')
+    expect(route).toContain('user: { id: principal.userId }')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
@@ -139,11 +150,9 @@ describe('Media upload access', () => {
   it('exposes owner-authorized media metadata updates through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
-    expect(route).toContain("PATCH as payloadMediaPatch")
-    expect(route).toContain('type PayloadPatchRouteContext = Parameters<typeof payloadMediaPatch>[1]')
-    expect(route).toContain("new URL('/api/media/' + encodeURIComponent(mediaId), request.url)")
-    expect(route).toContain("slug: ['media', mediaId]")
-    expect(route).toContain('return payloadMediaPatch')
+    expect(route).toContain('await payload.update')
+    expect(route).toContain('overrideAccess: false')
+    expect(route).toContain('user: { id: principal.userId }')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
@@ -197,13 +206,16 @@ it('guards creator media listing before W02 authentication and preserves fail-cl
   expect(route).toContain("code: 'SERVICE_UNAVAILABLE'")
 })
 
-it('guards media detail reads before the Payload route', () => {
+it('guards media detail reads before Better Auth and Payload Local API', () => {
   const route = read('src/app/api/v1/media/[mediaId]/route.ts')
   const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
-  const payloadIndex = route.indexOf('await payloadMediaGet(')
+  const authIndex = route.indexOf('const principal = await resolveBetterAuthPrincipalThroughW02(request)')
+  const payloadIndex = route.indexOf('const payload = await getPayload({ config })')
   expect(guardIndex).toBeGreaterThanOrEqual(0)
+  expect(authIndex).toBeGreaterThanOrEqual(0)
   expect(payloadIndex).toBeGreaterThanOrEqual(0)
-  expect(guardIndex).toBeLessThan(payloadIndex)
+  expect(guardIndex).toBeLessThan(authIndex)
+  expect(authIndex).toBeLessThan(payloadIndex)
   expect(route).toContain('TrafficLimitError')
 })
 
@@ -217,11 +229,12 @@ it('guards media creation before the Payload upload handler', () => {
   expect(guardIndex).toBeLessThan(payloadIndex)
 })
 
-it('guards media update and delete before the Payload handlers', () => {
+it('guards media update and delete before Better Auth and Payload Local API', () => {
   const route = read('src/app/api/v1/media/[mediaId]/route.ts')
   expect(route).toContain('await enforceW01WriteRateLimit(request)')
-  expect(route).toContain('return payloadMediaDelete')
-  expect(route).toContain('return payloadMediaPatch')
+  expect(route).toContain('resolveBetterAuthPrincipalThroughW02(request)')
+  expect(route).toContain('await payload.delete')
+  expect(route).toContain('await payload.update')
   const guards = [...route.matchAll(/await enforceW01WriteRateLimit\(request\)/g)]
   expect(guards.length).toBe(2)
 })
