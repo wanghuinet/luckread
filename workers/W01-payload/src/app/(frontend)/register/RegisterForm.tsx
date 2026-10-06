@@ -9,7 +9,7 @@ type RegisterFormProps = {
 
 type RegistrationResponse = {
   userId: string
-  accountState: 'PENDING_VERIFICATION'
+  accountState: 'PENDING_VERIFICATION' | 'ACTIVE'
 }
 
 type ApiError = {
