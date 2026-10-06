@@ -46,7 +46,7 @@ describe('RoleAssignment global layer resolution', () => {
   it('resolves a valid global user role', async () => {
     const { db } = fakeD1([assignment()])
     await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW))
-      .resolves.toEqual({ decision: 'ALLOW', layer: 'L1' })
+      .resolves.toEqual({ decision: 'ALLOW', layer: 'L1', roles: ['user'] })
   })
 
   it('selects the highest numeric layer across multiple eligible global assignments', async () => {
@@ -56,7 +56,7 @@ describe('RoleAssignment global layer resolution', () => {
       assignment({ id: 'ra-admin', roleId: 'admin' }),
     ])
     await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW))
-      .resolves.toEqual({ decision: 'ALLOW', layer: 'L7' })
+      .resolves.toEqual({ decision: 'ALLOW', layer: 'L7', roles: ['admin', 'creator', 'user'] })
   })
 
   it('treats equal-layer global assignments as equivalent', async () => {
@@ -65,7 +65,7 @@ describe('RoleAssignment global layer resolution', () => {
       assignment({ id: 'ra-mcn-admin', roleId: 'mcn_admin' }),
     ])
     await expect(resolveGlobalLayer(db, 'user-1', 'ACTIVE', NOW))
-      .resolves.toEqual({ decision: 'ALLOW', layer: 'L4' })
+      .resolves.toEqual({ decision: 'ALLOW', layer: 'L4', roles: ['ip_principal', 'mcn_admin'] })
   })
 
   it('excludes organization and IP scoped assignments from global layer resolution', async () => {
