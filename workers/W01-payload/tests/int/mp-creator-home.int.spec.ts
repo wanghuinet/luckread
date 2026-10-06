@@ -18,7 +18,7 @@ describe('mp creator entry routing', () => {
     expect(page).not.toContain('readVerifiedPayloadTokenVersion(request)')
     expect(page).not.toContain('validateSession(')
     expect(page).toContain("if (principal.active) {")
-    expect(page).toContain('<CreatorStudio displayName={displayName} userId={String(authenticatedUser.id)} locale={locale} />')
+    expect(page).toContain('<CreatorStudio displayName={displayName} userId={principal.userId} locale={locale} />')
     expect(page).toContain('className="mp-entry-shell"')
     expect(page).not.toContain("redirect('/creator-center')")
     expect(page).not.toContain("if (host === 'mp.luckread.com') {\n    redirect('/creator-center')")
