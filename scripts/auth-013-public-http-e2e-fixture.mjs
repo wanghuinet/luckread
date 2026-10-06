@@ -20,8 +20,13 @@ const fixture = {
   operatorUsername: 'auth013-e2e-operator-' + fixtureNonce,
   targetEmail: 'auth013-e2e-target-' + fixtureNonce + '@luckread.test',
   targetUsername: 'auth013-e2e-target-' + fixtureNonce,
+  basicUserId: 'auth013-user-' + randomUUID(),
+  operatorUserId: 'auth013-user-' + randomUUID(),
+  targetUserId: 'auth013-user-' + randomUUID(),
   basicSessionId: 'auth013-basic-' + randomUUID(),
   operatorSessionId: 'auth013-operator-' + randomUUID(),
+  basicSessionToken: 'auth013-session-token-' + randomBytes(32).toString('base64url'),
+  operatorSessionToken: 'auth013-session-token-' + randomBytes(32).toString('base64url'),
   basicRoleId: randomUUID(),
   operatorRoleId: randomUUID(),
   basicDeviceId: 'auth013-basic-device-' + runId + '-' + attempt,
@@ -40,34 +45,35 @@ for (const [key, value] of Object.entries(fixture)) {
   if (key.toLowerCase().includes('token')) console.log('::add-mask::' + value)
 }
 
-const sql = `INSERT INTO users
-  (username, display_name, locale, timezone, email, account_state, account_state_version, created_at, updated_at)
+const sql = `INSERT INTO "user"
+  (id, name, email, email_verified, image, username, bio, locale, timezone, account_state, account_state_version, created_at, updated_at)
 VALUES
-  ('${esc(fixture.basicUsername)}', 'AUTH013 E2E Basic', 'en-US', 'UTC', '${esc(fixture.basicEmail)}', 'ACTIVE', 1, '${fixture.now}', '${fixture.now}'),
-  ('${esc(fixture.operatorUsername)}', 'AUTH013 E2E Operator', 'en-US', 'UTC', '${esc(fixture.operatorEmail)}', 'ACTIVE', 1, '${fixture.now}', '${fixture.now}'),
-  ('${esc(fixture.targetUsername)}', 'AUTH013 E2E Target', 'en-US', 'UTC', '${esc(fixture.targetEmail)}', 'ACTIVE', 1, '${fixture.now}', '${fixture.now}');
+  ('${esc(fixture.basicUserId)}', 'AUTH013 E2E Basic', '${esc(fixture.basicEmail)}', 1, NULL, '${esc(fixture.basicUsername)}', NULL, 'en-US', 'UTC', 'ACTIVE', 1, '${fixture.now}', '${fixture.now}'),
+  ('${esc(fixture.operatorUserId)}', 'AUTH013 E2E Operator', '${esc(fixture.operatorEmail)}', 1, NULL, '${esc(fixture.operatorUsername)}', NULL, 'en-US', 'UTC', 'ACTIVE', 1, '${fixture.now}', '${fixture.now}'),
+  ('${esc(fixture.targetUserId)}', 'AUTH013 E2E Target', '${esc(fixture.targetEmail)}', 1, NULL, '${esc(fixture.targetUsername)}', NULL, 'en-US', 'UTC', 'ACTIVE', 1, '${fixture.now}', '${fixture.now}');
 
-INSERT INTO users_sessions (_order, _parent_id, id, created_at, expires_at)
+INSERT INTO "session"
+  (id, expires_at, token, created_at, updated_at, ip_address, user_agent, user_id)
 VALUES
-  (1, (SELECT id FROM users WHERE email = '${esc(fixture.basicEmail)}'), '${esc(fixture.basicSessionId)}', '${fixture.now}', '${fixture.expires}'),
-  (1, (SELECT id FROM users WHERE email = '${esc(fixture.operatorEmail)}'), '${esc(fixture.operatorSessionId)}', '${fixture.now}', '${fixture.expires}');
+  ('${esc(fixture.basicSessionId)}', '${fixture.expires}', '${esc(fixture.basicSessionToken)}', '${fixture.now}', '${fixture.now}', NULL, 'AUTH013', '${esc(fixture.basicUserId)}'),
+  ('${esc(fixture.operatorSessionId)}', '${fixture.expires}', '${esc(fixture.operatorSessionToken)}', '${fixture.now}', '${fixture.now}', NULL, 'AUTH013', '${esc(fixture.operatorUserId)}');
 
 INSERT INTO role_assignments
   (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at)
 VALUES
-  ('${esc(fixture.basicRoleId)}', CAST((SELECT id FROM users WHERE email = '${esc(fixture.basicEmail)}') AS TEXT), 'user', 'global', NULL, 'ACTIVE', '${fixture.now}', NULL, '${fixture.now}', '${fixture.now}'),
-  ('${esc(fixture.operatorRoleId)}', CAST((SELECT id FROM users WHERE email = '${esc(fixture.operatorEmail)}') AS TEXT), 'operator', 'global', NULL, 'ACTIVE', '${fixture.now}', NULL, '${fixture.now}', '${fixture.now}');
+  ('${esc(fixture.basicRoleId)}', '${esc(fixture.basicUserId)}', 'user', 'global', NULL, 'ACTIVE', '${fixture.now}', NULL, '${fixture.now}', '${fixture.now}'),
+  ('${esc(fixture.operatorRoleId)}', '${esc(fixture.operatorUserId)}', 'operator', 'global', NULL, 'ACTIVE', '${fixture.now}', NULL, '${fixture.now}', '${fixture.now}');
 
 INSERT INTO auth_session_state
   (session_id, user_id, device_id, token_version, refresh_credential_hash, revoked_at, last_seen_at)
 VALUES
-  ('${esc(fixture.basicSessionId)}', CAST((SELECT id FROM users WHERE email = '${esc(fixture.basicEmail)}') AS TEXT), '${esc(fixture.basicDeviceId)}', 1, '${fixture.basicRefreshHash}', NULL, '${fixture.now}'),
-  ('${esc(fixture.operatorSessionId)}', CAST((SELECT id FROM users WHERE email = '${esc(fixture.operatorEmail)}') AS TEXT), '${esc(fixture.operatorDeviceId)}', 1, '${fixture.operatorRefreshHash}', NULL, '${fixture.now}');
+  ('${esc(fixture.basicSessionId)}', '${esc(fixture.basicUserId)}', '${esc(fixture.basicDeviceId)}', 1, '${fixture.basicRefreshHash}', NULL, '${fixture.now}'),
+  ('${esc(fixture.operatorSessionId)}', '${esc(fixture.operatorUserId)}', '${esc(fixture.operatorDeviceId)}', 1, '${fixture.operatorRefreshHash}', NULL, '${fixture.now}');
 `
 
 writeFileSync('/tmp/auth013-seed.sql', sql)
 console.log(JSON.stringify({
-  userIdAllocation: 'database_generated',
+  userIdAllocation: 'better_auth_fixture_defined',
   databaseMutationClass: 'controlled_synthetic_fixture_only',
   secretMaterialPersisted: 'sha256_refresh_hash_only',
 }, null, 2))
