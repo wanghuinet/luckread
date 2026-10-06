@@ -1,4 +1,4 @@
-import { proxyBetterAuth } from '../../../../auth/w02-session-client.js'
+import { proxyBetterAuth } from '../../../../../auth/w02-session-client.js'
 
 type PasswordResetRequest = { identifier?: unknown }
 

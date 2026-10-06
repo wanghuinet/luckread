@@ -272,7 +272,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         identityId: userId,
         email: normalized.identity,
         username: normalized.username,
-      },
+      } as never,
       overrideAccess: true,
       disableTransaction: true,
       req: request,

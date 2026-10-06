@@ -12,7 +12,7 @@ export default function AdminLoginPage() {
     event.preventDefault(); setBusy(true); setError('')
     try {
       const response = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'include', body: JSON.stringify({ identity: email.trim(), credential: password }) })
-      if (!response.ok) { const payload = await response.json().catch(() => null); setError(payload?.error?.message || 'Authentication failed'); return }
+      if (!response.ok) { const payload = await response.json().catch(() => null as { error?: { message?: string } } | null); setError(payload?.error?.message || 'Authentication failed'); return }
       window.location.assign('/admin')
     } catch { setError('Authentication service unavailable') } finally { setBusy(false) }
   }

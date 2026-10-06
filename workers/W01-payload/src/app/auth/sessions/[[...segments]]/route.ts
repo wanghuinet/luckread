@@ -27,10 +27,10 @@ export async function GET(
     return json({
       items: sessions.map((session) => ({
         sessionId: String(session.id ?? ''),
-        deviceId: null,
+        deviceId: null as string | null,
         createdAt: String(session.createdAt ?? ''),
         expiresAt: String(session.expiresAt ?? ''),
-        lastSeenAt: null,
+        lastSeenAt: null as string | null,
       })),
       nextCursor: null,
     })
