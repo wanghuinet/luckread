@@ -53,7 +53,13 @@ export async function POST(request: Request): Promise<Response> {
     )
   } catch (error) {
     if (error instanceof W02PasswordRecoveryClientError) {
-      return jsonError(error.status, error.code, error.message)
+      return jsonError(
+        error.status,
+        error.code,
+        error.status === 422
+          ? 'Password reset token is invalid or expired'
+          : 'Password recovery service unavailable',
+      )
     }
     return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password recovery service unavailable')
   }
