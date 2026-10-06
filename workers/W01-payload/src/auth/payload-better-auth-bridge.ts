@@ -160,9 +160,8 @@ export const verifyPayloadBetterAuthBridgeToken = async (
 
 const authenticatePayloadBetterAuthBridge: AuthStrategyFunction = async ({ headers, payload, req }) => {
   if (headers.get(CALLER_HEADER) !== CALLER || !req) return { user: null }
-  const token = headers.get(BRIDGE_HEADER)
-  if (!token) return { user: null }
 
+  const token = headers.get(BRIDGE_HEADER)
   if (token) {
     const claims = await verifyPayloadBetterAuthBridgeToken(payload.secret, token, req)
     if (!claims) return { user: null }
@@ -175,7 +174,7 @@ const authenticatePayloadBetterAuthBridge: AuthStrategyFunction = async ({ heade
       id: claims.sub as unknown as number,
       email: claims.email,
       _strategy: 'luckread-better-auth-bridge',
-    } as AuthStrategyResult['user']
+    } as unknown as AuthStrategyResult['user']
 
     return { user }
   }
@@ -203,7 +202,7 @@ const authenticatePayloadBetterAuthBridge: AuthStrategyFunction = async ({ heade
       id: principal.userId as unknown as number,
       email: principal.email,
       _strategy: 'luckread-better-auth-cookie',
-    } as AuthStrategyResult['user']
+    } as unknown as AuthStrategyResult['user']
 
     return { user }
   } catch {
