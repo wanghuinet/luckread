@@ -339,10 +339,12 @@ export async function establishSessionFromAuthoritativeD1(
 type AuthoritativeRefreshResult = {
   sessionId: string
   userId: string
+  accessToken: string
   refreshToken: string
   tokenVersion: number
   layer: string
   nativeExpiresAt: string
+  expiresIn: number
   email: string
 }
 
@@ -432,7 +434,7 @@ async function loadAuthoritativeRefreshContext(
         `,
       )
       .bind(refreshCredentialHash)
-      .first<SessionRecord & { accountState: string; email: string }>()
+      .first<SessionRecord & { accessToken: string; accountState: string; email: string }>()
 
     if (
       !row ||
