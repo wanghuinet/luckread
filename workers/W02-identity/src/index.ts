@@ -209,10 +209,8 @@ export default {
         }
       }
 
-      let body: unknown = null
-      try {
-        body = await request.json()
-      } catch {
+      const body = await readJsonBody<unknown>(request)
+      if (!body) {
         return json({ error: { code: 'VALIDATION_FAILED', message: 'Invalid profile update' } }, 400)
       }
 
