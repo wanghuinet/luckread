@@ -1,9 +1,9 @@
-name: W01 Auth Me Import Verification
+name: W01 Better Auth Boundary Verification
 
 on:
   push:
     branches:
-      - 'fix/w01-auth-me-imports-*'
+      - main
     paths:
       - 'workers/W01-payload/src/app/(payload)/api/users/me/route.ts'
       - 'workers/W01-payload/tests/int/users-me-route-import.int.spec.ts'
@@ -36,7 +36,7 @@ jobs:
         env:
           PAYLOAD_SECRET: luckread-auth-me-e2e-secret
         run: pnpm exec tsc --noEmit
-      - name: Verify auth me route imports
+      - name: Verify W02 Better Auth boundary
         working-directory: workers/W01-payload
         run: pnpm exec vitest run tests/int/users-me-route-import.int.spec.ts --config ./vitest.config.mts
       - name: Production build

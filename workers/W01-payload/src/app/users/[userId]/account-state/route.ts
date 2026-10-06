@@ -34,7 +34,7 @@ export async function POST(request: Request, context: { params: Promise<{ userId
   catch { return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required') }
 
   try {
-    const result = await transitionAccountState({
+    const result = await transitionAccountState(request, {
       request,
       body: {
         subjectId: principal.userId,
