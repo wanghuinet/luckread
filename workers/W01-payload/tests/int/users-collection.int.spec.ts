@@ -15,10 +15,10 @@ describe('W01 Users collection contract', () => {
     expect(Users.slug).toBe('users')
     expect(Users.auth).toEqual(
       expect.objectContaining({
-        forgotPassword: expect.any(Object),
         removeTokenFromResponses: true,
       }),
     )
+    expect(Users.auth).not.toHaveProperty('forgotPassword')
 
     expect(fields).toEqual(
       expect.arrayContaining([
