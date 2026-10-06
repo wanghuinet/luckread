@@ -35,6 +35,16 @@ interface Env {
   AUTH003_CREDENTIAL_HASH_KEY?: string
   AUTH003_CREDENTIAL_HASH_KEY_PREVIOUS?: string
   BETTER_AUTH_SECRET: string
+  EMAIL?: {
+    send(message: {
+      to: string
+      from: string
+      subject: string
+      html: string
+      text: string
+    }): Promise<unknown>
+  }
+  PASSWORD_RESET_FROM_EMAIL?: string
 }
 
 type ResolveLayerRequest = {
@@ -91,7 +101,12 @@ export default {
         return json({ error: { code: 'FORBIDDEN', message: 'authentication gateway required' } }, 403)
       }
 
-      return createLuckReadAuth({ D1_01: env.D1_01, BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET }).handler(request)
+      return createLuckReadAuth({
+        D1_01: env.D1_01,
+        BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
+        EMAIL: env.EMAIL,
+        PASSWORD_RESET_FROM_EMAIL: env.PASSWORD_RESET_FROM_EMAIL,
+      }).handler(request)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/register') {

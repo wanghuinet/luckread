@@ -7,6 +7,12 @@
     "nodejs_compat"
   ],
   "workers_dev": false,
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "allowed_sender_addresses": ["noreply@luckread.com"]
+    }
+  ],
   "triggers": {
     "crons": [
       "* * * * *"
@@ -33,6 +39,7 @@
     }
   ],
   "vars": {
-    "CLOUDFLARE_ENV": "production"
+    "CLOUDFLARE_ENV": "production",
+    "PASSWORD_RESET_FROM_EMAIL": "noreply@luckread.com"
   }
 }

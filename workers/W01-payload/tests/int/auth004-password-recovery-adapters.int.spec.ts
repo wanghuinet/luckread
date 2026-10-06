@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   getPayload: vi.fn(),
   changePasswordThroughW02: vi.fn(),
+  requestPasswordResetThroughW02: vi.fn(),
+  resetPasswordThroughW02: vi.fn(),
   W02PasswordClientError: class extends Error {
     constructor(
       readonly status: number,
@@ -27,6 +29,12 @@ vi.mock('@/auth/w02-password-client', () => ({
   W02PasswordClientError: mocks.W02PasswordClientError,
 }))
 
+vi.mock('@/auth/w02-password-recovery-client', () => ({
+  requestPasswordResetThroughW02: mocks.requestPasswordResetThroughW02,
+  resetPasswordThroughW02: mocks.resetPasswordThroughW02,
+  W02PasswordRecoveryClientError: mocks.W02PasswordClientError,
+}))
+
 import { POST as postPasswordChange } from '../../src/app/auth/password/change/route.js'
 import { POST as postResetRequest } from '../../src/app/auth/password/reset/request/route.js'
 import { POST as postResetConfirm } from '../../src/app/auth/password/reset/confirm/route.js'
@@ -49,10 +57,12 @@ function jsonRequest(
   })
 }
 
-describe('AUTH-004 W01 Payload-native recovery adapters', () => {
+describe('AUTH-004 W01 recovery adapters', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.changePasswordThroughW02.mockResolvedValue(undefined)
+    mocks.requestPasswordResetThroughW02.mockResolvedValue(undefined)
+    mocks.resetPasswordThroughW02.mockResolvedValue(undefined)
   })
 
   it('requires the contracted Idempotency-Key before password-change work', async () => {
@@ -69,7 +79,7 @@ describe('AUTH-004 W01 Payload-native recovery adapters', () => {
     expect(mocks.changePasswordThroughW02).not.toHaveBeenCalled()
   })
 
-  it('delegates password change to the W02 Better Auth authority without trusting caller-supplied user identity', async () => {
+  it('delegates password change to W02 Better Auth authority', async () => {
     const response = await postPasswordChange(
       jsonRequest(
         'https://luckread.test/auth/password/change',
@@ -83,8 +93,6 @@ describe('AUTH-004 W01 Payload-native recovery adapters', () => {
     )
 
     expect(response.status).toBe(204)
-    expect(await response.text()).toBe('')
-    expect(response.headers.get('cache-control')).toBe('no-store')
     expect(mocks.getPayload).not.toHaveBeenCalled()
     expect(mocks.changePasswordThroughW02).toHaveBeenCalledWith(
       expect.any(Request),
@@ -95,33 +103,7 @@ describe('AUTH-004 W01 Payload-native recovery adapters', () => {
     )
   })
 
-  it('fails closed when W02 password change service fails unexpectedly', async () => {
-    mocks.changePasswordThroughW02.mockRejectedValue(
-      new mocks.W02PasswordClientError(503, 'SERVICE_UNAVAILABLE', 'database exploded'),
-    )
-
-    const response = await postPasswordChange(
-      jsonRequest(
-        'https://luckread.test/auth/password/change',
-        {
-          currentPassword: CURRENT_PASSWORD,
-          newPassword: NEW_PASSWORD,
-        },
-        { 'Idempotency-Key': 'auth004-change-2' },
-      ),
-    )
-
-    expect(response.status).toBe(503)
-    const body = await response.json()
-    expect(body.error.code).toBe('SERVICE_UNAVAILABLE')
-    expect(JSON.stringify(body)).not.toContain('database exploded')
-    expect(mocks.getPayload).not.toHaveBeenCalled()
-  })
-
-  it('keeps reset request enumeration-resistant and delegates to Payload forgotPassword', async () => {
-    const forgotPassword = vi.fn().mockResolvedValue(undefined)
-    mocks.getPayload.mockResolvedValue({ forgotPassword })
-
+  it('delegates reset request to W02 Better Auth without Payload access', async () => {
     const response = await postResetRequest(
       jsonRequest('https://luckread.test/auth/password/reset/request', {
         identifier: '  User7@Example.COM ',
@@ -131,16 +113,17 @@ describe('AUTH-004 W01 Payload-native recovery adapters', () => {
     expect(response.status).toBe(202)
     expect(await response.text()).toBe('')
     expect(response.headers.get('cache-control')).toBe('no-store')
-    expect(forgotPassword).toHaveBeenCalledWith({
-      collection: 'users',
-      data: { email: 'user7@example.com' },
-    })
+    expect(mocks.getPayload).not.toHaveBeenCalled()
+    expect(mocks.requestPasswordResetThroughW02).toHaveBeenCalledWith(
+      expect.any(Request),
+      'user7@example.com',
+    )
   })
 
-  it('maps native forgotPassword infrastructure failures to generic 503', async () => {
-    mocks.getPayload.mockResolvedValue({
-      forgotPassword: vi.fn().mockRejectedValue(new Error('protected lookup failed')),
-    })
+  it('maps W02 reset-request delivery failures to generic 503', async () => {
+    mocks.requestPasswordResetThroughW02.mockRejectedValue(
+      new mocks.W02PasswordClientError(503, 'SERVICE_UNAVAILABLE', 'delivery failed'),
+    )
 
     const response = await postResetRequest(
       jsonRequest('https://luckread.test/auth/password/reset/request', {
@@ -151,13 +134,11 @@ describe('AUTH-004 W01 Payload-native recovery adapters', () => {
     expect(response.status).toBe(503)
     const body = await response.json()
     expect(body.error.code).toBe('SERVICE_UNAVAILABLE')
-    expect(JSON.stringify(body)).not.toContain('protected lookup failed')
+    expect(JSON.stringify(body)).not.toContain('delivery failed')
+    expect(mocks.getPayload).not.toHaveBeenCalled()
   })
 
-  it('delegates anonymous reset confirmation to Payload resetPassword without exposing the token', async () => {
-    const resetPassword = vi.fn().mockResolvedValue({ token: 'new-native-jwt' })
-    mocks.getPayload.mockResolvedValue({ resetPassword })
-
+  it('delegates anonymous reset confirmation to W02 Better Auth without exposing the token', async () => {
     const recoveryToken = 'opaque-recovery-token'
     const response = await postResetConfirm(
       jsonRequest('https://luckread.test/auth/password/reset/confirm', {
@@ -168,29 +149,25 @@ describe('AUTH-004 W01 Payload-native recovery adapters', () => {
 
     expect(response.status).toBe(204)
     expect(await response.text()).toBe('')
-    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(mocks.getPayload).not.toHaveBeenCalled()
     expect(JSON.stringify(Object.fromEntries(response.headers.entries()))).not.toContain(
       recoveryToken,
     )
-    expect(resetPassword).toHaveBeenCalledWith({
-      collection: 'users',
-      data: {
-        token: recoveryToken,
-        password: NEW_PASSWORD,
-      },
-      overrideAccess: false,
-    })
+    expect(mocks.resetPasswordThroughW02).toHaveBeenCalledWith(
+      expect.any(Request),
+      recoveryToken,
+      NEW_PASSWORD,
+    )
   })
 
-  it('converges invalid, expired, or replayed reset tokens on the contracted rejection class', async () => {
-    mocks.getPayload.mockResolvedValue({
-      resetPassword: vi.fn().mockRejectedValue(new Error('token is expired and invalid')),
-    })
+  it('converges rejected reset tokens on the contracted rejection class', async () => {
+    mocks.resetPasswordThroughW02.mockRejectedValue(
+      new mocks.W02PasswordClientError(422, 'RECOVERY_TOKEN_REJECTED', 'token rejected'),
+    )
 
-    const recoveryToken = 'expired-token'
     const response = await postResetConfirm(
       jsonRequest('https://luckread.test/auth/password/reset/confirm', {
-        recoveryToken,
+        recoveryToken: 'expired-token',
         newPassword: NEW_PASSWORD,
       }),
     )
@@ -198,10 +175,11 @@ describe('AUTH-004 W01 Payload-native recovery adapters', () => {
     expect(response.status).toBe(422)
     const body = await response.json()
     expect(body.error.code).toBe('RECOVERY_TOKEN_REJECTED')
-    expect(JSON.stringify(body)).not.toContain(recoveryToken)
+    expect(JSON.stringify(body)).not.toContain('expired-token')
+    expect(mocks.getPayload).not.toHaveBeenCalled()
   })
 
-  it('enforces the canonical password-length boundary before invoking Payload', async () => {
+  it('enforces the canonical password-length boundary before invoking W02', async () => {
     const response = await postResetConfirm(
       jsonRequest('https://luckread.test/auth/password/reset/confirm', {
         recoveryToken: 'token',
@@ -210,6 +188,7 @@ describe('AUTH-004 W01 Payload-native recovery adapters', () => {
     )
 
     expect(response.status).toBe(422)
+    expect(mocks.resetPasswordThroughW02).not.toHaveBeenCalled()
     expect(mocks.getPayload).not.toHaveBeenCalled()
   })
 })

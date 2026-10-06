@@ -1,6 +1,7 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
+import {
+  resetPasswordThroughW02,
+  W02PasswordRecoveryClientError,
+} from '@/auth/w02-password-recovery-client'
 
 type PasswordResetConfirmRequest = {
   recoveryToken?: unknown
@@ -44,23 +45,17 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(422, 'VALIDATION_FAILED', 'Invalid password reset request')
   }
 
-  const payload = await getPayload({ config })
-
   try {
-    // This route is anonymous/token-bound. Explicitly keep access checks
-    // enabled; the recovery token is the native Payload authorization boundary.
-    await payload.resetPassword({
-      collection: 'users',
-      data: {
-        token: body.recoveryToken,
-        password: body.newPassword,
-      },
-      overrideAccess: false,
-    })
-  } catch {
-    // Invalid, expired, wrong-purpose and replayed recovery tokens converge
-    // on the same client-visible class. Never echo the token or password.
-    return jsonError(422, 'RECOVERY_TOKEN_REJECTED', 'Password reset token is invalid or expired')
+    await resetPasswordThroughW02(
+      request,
+      body.recoveryToken,
+      body.newPassword,
+    )
+  } catch (error) {
+    if (error instanceof W02PasswordRecoveryClientError) {
+      return jsonError(error.status, error.code, error.message)
+    }
+    return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password recovery service unavailable')
   }
 
   return new Response(null, {

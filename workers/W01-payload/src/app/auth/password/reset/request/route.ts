@@ -1,6 +1,7 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
+import {
+  requestPasswordResetThroughW02,
+  W02PasswordRecoveryClientError,
+} from '@/auth/w02-password-recovery-client'
 
 type PasswordResetRequest = {
   identifier?: unknown
@@ -33,26 +34,15 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(422, 'VALIDATION_FAILED', 'Invalid password recovery request')
   }
 
-  const payload = await getPayload({ config })
-
   try {
-    // Payload's native forgotPassword flow deliberately fails silently when
-    // the account does not exist. The route returns the same 202 response in
-    // either case, preserving the contract's enumeration-resistant semantics.
-    await payload.forgotPassword({
-      collection: 'users',
-      data: {
-        email: body.identifier.trim().toLowerCase(),
-      },
-    })
-  } catch (error) {
-    console.error(
-      JSON.stringify({
-        event: 'auth.password_reset_request.native_failure',
-        diagnosticCode: 'AUTH004_PAYLOAD_FORGOT_PASSWORD_FAILURE',
-        errorName: error instanceof Error ? error.name : typeof error,
-      }),
+    await requestPasswordResetThroughW02(
+      request,
+      body.identifier.trim().toLowerCase(),
     )
+  } catch (error) {
+    if (error instanceof W02PasswordRecoveryClientError) {
+      return jsonError(error.status, error.code, error.message)
+    }
     return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password recovery service unavailable')
   }
 

@@ -40,7 +40,12 @@ const handler = async (
 
   if (
     request.method === 'POST' &&
-    (endpoint === 'sign-in/email' || endpoint === 'sign-up/email')
+    (
+      endpoint === 'sign-in/email' ||
+      endpoint === 'sign-up/email' ||
+      endpoint === 'request-password-reset' ||
+      endpoint === 'reset-password'
+    )
   ) {
     try {
       const clientIp =
@@ -48,9 +53,9 @@ const handler = async (
 
       await enforceAuthRateLimit(
         request,
-        endpoint === 'sign-in/email'
-          ? 'AUTH_LOGIN_LIMITER'
-          : 'AUTH_REGISTER_LIMITER',
+        endpoint === 'sign-up/email'
+          ? 'AUTH_REGISTER_LIMITER'
+          : 'AUTH_LOGIN_LIMITER',
         ['ip:' + clientIp],
       )
     } catch (error) {
