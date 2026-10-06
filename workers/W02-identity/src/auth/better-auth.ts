@@ -1,4 +1,5 @@
 import { ensureBaseUserRole } from '../authz/role-assignment.js'
+import { reconcileOrphanedSessionExtensions } from '../session/session-runtime.js'
 import { betterAuth } from 'better-auth'
 import { bearer } from 'better-auth/plugins'
 
