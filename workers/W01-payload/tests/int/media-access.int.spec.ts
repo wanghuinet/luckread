@@ -149,6 +149,14 @@ describe('Media upload access', () => {
   })
 
 
+  it('distinguishes unauthenticated requests from W02 authentication-service failures', () => {
+    const route = read('src/app/api/v1/media/route.ts')
+    expect(route).toContain("import { getBetterAuthPrincipal, W02AuthClientError }")
+    expect(route).toContain('error instanceof W02AuthClientError && error.status === 401')
+    expect(route).toContain("status: 503")
+    expect(route).toContain("code: 'SERVICE_UNAVAILABLE'")
+  })
+
   it('lists only the authenticated creator media through the stable v1 collection path', () => {
     const route = read('src/app/api/v1/media/route.ts')
 
@@ -187,7 +195,7 @@ describe('Media upload access', () => {
 it('guards creator media listing before Payload authentication', () => {
   const route = read('src/app/api/v1/media/route.ts')
   const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
-  const authIndex = route.indexOf('const authenticated = await authenticate(request)')
+  const authIndex = route.indexOf('authenticated = await authenticate(request)')
   expect(guardIndex).toBeGreaterThanOrEqual(0)
   expect(authIndex).toBeGreaterThanOrEqual(0)
   expect(guardIndex).toBeLessThan(authIndex)
