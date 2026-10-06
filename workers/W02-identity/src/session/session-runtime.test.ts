@@ -53,7 +53,6 @@ function dbFake(initial: SessionRecord | null) {
   return {
     db: db as unknown as D1Database,
     getRow: () => row,
-    getNativeSessionPresent: () => nativeSessionPresent,
   }
 }
 
