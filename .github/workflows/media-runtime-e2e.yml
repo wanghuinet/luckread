@@ -239,7 +239,7 @@ jobs:
           import {execFileSync} from 'node:child_process'
           const ids=[process.env.MEDIA_OWNER_USER_ID,process.env.MEDIA_OTHER_USER_ID]
           const q=v=>"'" + String(v).replaceAll("'","''") + "'"
-          const sql="SELECT (SELECT COUNT(*) FROM "user" WHERE id IN ("+ids.map(q).join(',')+")) AS users_remaining, (SELECT COUNT(*) FROM account WHERE user_id IN ("+ids.map(q).join(',')+")) AS accounts_remaining, (SELECT COUNT(*) FROM "session" WHERE user_id IN ("+ids.map(q).join(',')+")) AS sessions_remaining, (SELECT COUNT(*) FROM media WHERE owner_user_id IN ("+ids.map(q).join(',')+")) AS media_remaining;"
+          const sql=`SELECT (SELECT COUNT(*) FROM "user" WHERE id IN (${ids.map(q).join(',')})) AS users_remaining, (SELECT COUNT(*) FROM account WHERE user_id IN (${ids.map(q).join(',')})) AS accounts_remaining, (SELECT COUNT(*) FROM "session" WHERE user_id IN (${ids.map(q).join(',')})) AS sessions_remaining, (SELECT COUNT(*) FROM media WHERE owner_user_id IN (${ids.map(q).join(',')})) AS media_remaining;`
           const raw=execFileSync('npx',['--yes','wrangler@'+process.env.WRANGLER_VERSION,'d1','execute',process.env.DATABASE_NAME,'--remote','--json','--yes','--config','deployed-source/workers/W01-payload/wrangler.jsonc','--command',sql],{encoding:'utf8',env:process.env})
           const value=JSON.parse(raw)
           const row=value?.[0]?.results?.[0]??value?.result?.results?.[0]??{}
