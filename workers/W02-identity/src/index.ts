@@ -1,6 +1,5 @@
 import { createLuckReadAuth } from './auth/better-auth.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
-import { reconcileCompletedRegistrationMaterialization } from './account/registration-materializer.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
 import {
   AccountStateTransitionError,
@@ -14,8 +13,6 @@ interface Env {
   D1_01: D1Database
   AUTH013_QUEUE: Queue
   AUTH013_PROJECTION_QUEUE: Queue
-  AUTH003_CREDENTIAL_HASH_KEY?: string
-  AUTH003_CREDENTIAL_HASH_KEY_PREVIOUS?: string
 }
 
 type ResolveLayerRequest = {
@@ -237,26 +234,5 @@ export default {
 
   async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
     await publishPendingAccountStateEvents(env)
-
-    try {
-      const report = await reconcileCompletedRegistrationMaterialization(env.D1_01, env)
-      if (report.failed.length > 0) {
-        console.error(JSON.stringify({
-          event: 'auth.register.materialization_partial_failure',
-          diagnosticCode: 'AUTH001_MATERIALIZATION_PARTIAL_FAILURE',
-          scanned: report.scanned,
-          materialized: report.materialized,
-          alreadyConverged: report.alreadyConverged,
-          failedCount: report.failed.length,
-          failureCodes: report.failed.map((entry) => entry.code),
-        }))
-      }
-    } catch (error) {
-      console.error(JSON.stringify({
-        event: 'auth.register.materialization_unavailable',
-        diagnosticCode: 'AUTH001_MATERIALIZATION_UNAVAILABLE',
-        errorName: error instanceof Error ? error.name : typeof error,
-      }))
-    }
   },
 }
