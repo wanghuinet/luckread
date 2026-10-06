@@ -150,18 +150,12 @@ export const verifyPayloadBetterAuthBridgeToken = async (
 
 export const payloadBetterAuthBridgeStrategy: Strategy = {
   name: 'luckread-better-auth-bridge',
-  authenticate: async ({ headers, payload }) => {
-    if (headers.get(CALLER_HEADER) !== CALLER) return { user: null }
+  authenticate: async ({ headers, payload, req }) => {
+    if (headers.get(CALLER_HEADER) !== CALLER || !req) return { user: null }
     const token = headers.get(BRIDGE_HEADER)
     if (!token) return { user: null }
 
-    const request = new Request('https://luckread-w01.internal' + (headers.get('X-LuckRead-Payload-Path') || '/'))
-    const method = headers.get('X-LuckRead-Payload-Method')
-    if (method) {
-      Object.defineProperty(request, 'method', { value: method })
-    }
-
-    const claims = await verifyPayloadBetterAuthBridgeToken(payload.secret, token, request)
+    const claims = await verifyPayloadBetterAuthBridgeToken(payload.secret, token, req)
     if (!claims) return { user: null }
 
     return {
@@ -177,18 +171,10 @@ export const payloadBetterAuthBridgeStrategy: Strategy = {
 
 export const PAYLOAD_BETTER_AUTH_BRIDGE_HEADER = BRIDGE_HEADER
 export const PAYLOAD_BETTER_AUTH_BRIDGE_CALLER_HEADER = CALLER_HEADER
-export const PAYLOAD_BETTER_AUTH_BRIDGE_METHOD_HEADER = 'X-LuckRead-Payload-Method'
-export const PAYLOAD_BETTER_AUTH_BRIDGE_PATH_HEADER = 'X-LuckRead-Payload-Path'
 
-export const payloadBetterAuthBridgeHeaders = (
-  token: string,
-  method: PayloadBetterAuthBridgeClaims['method'],
-  path: string,
-): Headers => {
+export const payloadBetterAuthBridgeHeaders = (token: string): Headers => {
   const headers = new Headers()
   headers.set(BRIDGE_HEADER, token)
   headers.set(CALLER_HEADER, CALLER)
-  headers.set(PAYLOAD_BETTER_AUTH_BRIDGE_METHOD_HEADER, method)
-  headers.set(PAYLOAD_BETTER_AUTH_BRIDGE_PATH_HEADER, path)
   return headers
 }
