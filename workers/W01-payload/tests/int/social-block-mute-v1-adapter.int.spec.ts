@@ -29,8 +29,9 @@ describe('v1 block/mute adapters', () => {
     )
 
     for (const route of [blockCreate, blockDelete]) {
-      expect(route).toContain('invalidatePublicFollowers')
-      expect(route).toContain('invalidatePublicFollowing')
+      expect(route).toContain('invalidatePublicRoute')
+      expect(route).toContain("'followers'")
+      expect(route).toContain("'following'")
       expect(route).toContain('principal.userId')
       expect(route).toContain('targetUserId')
       expect(route).toContain('if (response.ok)')
