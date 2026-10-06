@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
+import { authorizeAdminUser } from '@/auth/w02-session-client'
 import { payloadAdminOnly } from '@/auth/payload-admin-access'
 
 export const Users: CollectionConfig = {
@@ -16,11 +17,25 @@ export const Users: CollectionConfig = {
     // AUTH-004 remains contract/evidence gated; native capability is the implementation baseline.
   },
   hooks: {
-    // Payload strips loginResult.token from Local API responses when
-    // removeTokenFromResponses=true. Preserve the native token only in the
-    // request-local context so the W01 adapter can immediately call payload.auth().
+    // Payload's native credential store is retained only as the Admin login
+    // adapter. Ordinary platform login is handled by Better Auth in W02.
+    // Fail closed before returning a native login result unless the canonical
+    // W02 role assignment is L7/L8.
     afterLogin: [
-      ({ req, token }) => {
+      async ({ req, token, user }) => {
+        const email = typeof user.email === 'string' ? user.email : undefined
+        const authorization = await authorizeAdminUser({
+          userId: String(user.id),
+          email,
+        })
+        if (
+          authorization.adminAccess !== true ||
+          (authorization.layer !== 'L7' && authorization.layer !== 'L8') ||
+          (!authorization.roles.includes('admin') && !authorization.roles.includes('super_admin'))
+        ) {
+          throw new Error('ADMIN_ROLE_REQUIRED')
+        }
+
         if (req.context && typeof token === 'string') {
           ;(req.context as Record<string, unknown>).__luckreadNativeAuthToken = token
         }
