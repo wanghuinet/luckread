@@ -1,4 +1,4 @@
-import type { Strategy } from 'payload'
+import type { AuthStrategyFunction, AuthStrategyResult } from 'payload'
 
 const BRIDGE_HEADER = 'X-LuckRead-Payload-Better-Auth'
 const CALLER_HEADER = 'X-LuckRead-Caller'
@@ -148,9 +148,7 @@ export const verifyPayloadBetterAuthBridgeToken = async (
   }
 }
 
-export const payloadBetterAuthBridgeStrategy: Strategy = {
-  name: 'luckread-better-auth-bridge',
-  authenticate: async ({ headers, payload, req }) => {
+const authenticatePayloadBetterAuthBridge: AuthStrategyFunction = async ({ headers, payload, req }) => {
     if (headers.get(CALLER_HEADER) !== CALLER || !req) return { user: null }
     const token = headers.get(BRIDGE_HEADER)
     if (!token) return { user: null }
@@ -158,15 +156,22 @@ export const payloadBetterAuthBridgeStrategy: Strategy = {
     const claims = await verifyPayloadBetterAuthBridgeToken(payload.secret, token, req)
     if (!claims) return { user: null }
 
-    return {
-      user: {
-        collection: 'users',
-        id: claims.sub,
-        email: claims.email,
-        _strategy: 'luckread-better-auth-bridge',
-      },
-    }
-  },
+    const user = {
+      collection: 'users',
+      // Better Auth owns the UUID identity. Payload's generated legacy User
+      // type still models its D1-native numeric ID, while Media access stores
+      // this value as text and compares it canonically.
+      id: claims.sub as unknown as number,
+      email: claims.email,
+      _strategy: 'luckread-better-auth-bridge',
+    } as AuthStrategyResult['user']
+
+    return { user }
+}
+
+export const payloadBetterAuthBridgeStrategy = {
+  name: 'luckread-better-auth-bridge',
+  authenticate: authenticatePayloadBetterAuthBridge,
 }
 
 export const PAYLOAD_BETTER_AUTH_BRIDGE_HEADER = BRIDGE_HEADER
