@@ -5,7 +5,7 @@ import config from '@payload-config'
 import priv004DevPolicy from '../../../../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'
 import priv004ProdPolicy from '../../../../../../artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json'
 import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
-import { proxyBetterAuth } from '../../../auth/w02-session-client.js'
+import { proxyBetterAuth, rollbackRegistrationUser } from '../../../auth/w02-session-client.js'
 
 const SCOPE = 'ACCOUNT_REGISTRATION'
 const ENDPOINT = 'authRegister'
@@ -272,12 +272,25 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         identityId: userId,
         email: normalized.identity,
         username: normalized.username,
-      } as never,
+      },
       overrideAccess: true,
       disableTransaction: true,
       req: request,
     })
   } catch (error) {
+    try {
+      await rollbackRegistrationUser(request, {
+        userId,
+        email: normalized.identity,
+        username: normalized.username,
+      })
+    } catch (rollbackError) {
+      console.error(JSON.stringify({
+        event: 'auth.register.rollback_failure',
+        diagnosticCode: 'AUTH001_ROLLBACK_FAILURE',
+        errorName: rollbackError instanceof Error ? rollbackError.name : typeof rollbackError,
+      }))
+    }
     console.error(JSON.stringify({
       event: 'auth.register.profile_projection_failure',
       diagnosticCode: 'AUTH001_PROFILE_PROJECTION_FAILURE',
@@ -475,6 +488,20 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
 
     if (isUniqueConstraintError(error)) {
       return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
+    }
+
+    try {
+      await rollbackRegistrationUser(request, {
+        userId,
+        email: normalized.identity,
+        username: normalized.username,
+      })
+    } catch (rollbackError) {
+      console.error(JSON.stringify({
+        event: 'auth.register.rollback_failure',
+        diagnosticCode: 'AUTH001_ROLLBACK_FAILURE',
+        errorName: rollbackError instanceof Error ? rollbackError.name : typeof rollbackError,
+      }))
     }
 
     console.error(
