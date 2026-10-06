@@ -130,11 +130,15 @@ export async function callW03Content(input: {
     }),
   )
 
+  const responseHeaders = new Headers({
+    'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
+  })
+  const etag = response.headers.get('ETag')
+  if (etag) responseHeaders.set('ETag', etag)
+
   return new Response(await response.arrayBuffer(), {
     status: response.status,
-    headers: {
-      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-    },
+    headers: responseHeaders,
   })
 }
