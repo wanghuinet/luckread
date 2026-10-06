@@ -1,16 +1,9 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
+import { callW02BetterAuth } from '../../../../auth/w02-auth-client.js'
 import { TrafficLimitError, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 
 type PasswordChangeRequest = {
   currentPassword?: unknown
   newPassword?: unknown
-}
-
-type AuthUser = {
-  id?: string | number
-  email?: string
 }
 
 const jsonError = (status: number, code: string, message: string) =>
@@ -34,11 +27,6 @@ const assertPasswordPolicy = (value: unknown): value is string => {
   return length >= 15 && length <= 128
 }
 
-const isValidationError = (error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error)
-  return /password|validation|invalid|credentials/i.test(message)
-}
-
 export async function POST(request: Request): Promise<Response> {
   if (!request.headers.get('Idempotency-Key')?.trim()) {
     return jsonError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key is required')
@@ -53,7 +41,7 @@ export async function POST(request: Request): Promise<Response> {
 
   let body: PasswordChangeRequest
   try {
-    body = (await request.json()) as PasswordChangeRequest
+    body = await request.json() as PasswordChangeRequest
   } catch {
     return jsonError(422, 'VALIDATION_FAILED', 'Invalid password change request')
   }
@@ -62,65 +50,31 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(422, 'VALIDATION_FAILED', 'Password does not satisfy the canonical length policy')
   }
 
-  const payload = await getPayload({ config })
-
-  const authResult = await payload.auth({
-    headers: request.headers,
-    canSetHeaders: false,
-  })
-
-  const user = authResult.user as AuthUser | null
-  if (!user?.id || typeof user.email !== 'string' || user.email.length === 0) {
-    return jsonError(401, 'UNAUTHENTICATED', 'Authentication required')
-  }
-
   try {
-    // Payload-native authentication is the credential verifier. No password
-    // material is logged or copied into custom persistence.
-    const verification = await payload.login({
-      collection: 'users',
-      data: {
-        email: user.email,
-        password: body.currentPassword,
+    const response = await callW02BetterAuth(request, '/api/auth/change-password', {
+      method: 'POST',
+      body: {
+        currentPassword: body.currentPassword,
+        newPassword: body.newPassword,
+        revokeOtherSessions: true,
       },
     })
 
-    if (String(verification.user?.id ?? '') !== String(user.id)) {
+    if (response.status === 401) {
       return jsonError(401, 'UNAUTHENTICATED', 'Authentication required')
     }
-  } catch {
-    return jsonError(401, 'UNAUTHENTICATED', 'Current password is invalid')
-  }
-
-  try {
-    // Passing the authenticated user is required so Payload retains the
-    // current session and invalidates the other native sessions.
-    await payload.update({
-      collection: 'users',
-      id: user.id,
-      data: { password: body.newPassword },
-      user,
-      overrideAccess: false,
-    })
-  } catch (error) {
-    if (isValidationError(error)) {
-      return jsonError(422, 'VALIDATION_FAILED', 'Password change was rejected')
+    if (response.status === 400 || response.status === 422) {
+      return jsonError(response.status, 'VALIDATION_FAILED', 'Password change request was rejected')
+    }
+    if (!response.ok) {
+      return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password change service unavailable')
     }
 
-    console.error(
-      JSON.stringify({
-        event: 'auth.password_change.native_failure',
-        diagnosticCode: 'AUTH004_PAYLOAD_PASSWORD_CHANGE_FAILURE',
-        errorName: error instanceof Error ? error.name : typeof error,
-      }),
-    )
+    return new Response(null, {
+      status: 204,
+      headers: { 'cache-control': 'no-store' },
+    })
+  } catch {
     return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password change service unavailable')
   }
-
-  return new Response(null, {
-    status: 204,
-    headers: {
-      'cache-control': 'no-store',
-    },
-  })
 }
