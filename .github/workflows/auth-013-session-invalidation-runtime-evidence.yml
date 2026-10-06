@@ -98,16 +98,17 @@ jobs:
 
               const db = env.D1_01
               const runId = env.RUN_ID
-              const userId = 920000000 + (Number(runId) % 50000000)
+              const userId = `auth013-session-user-${runId}`
               const email = `auth013-session-invalidation-${runId}@invalid.local`
               const sessionId = `auth013-session-${runId}`
               const deviceId = `auth013-device-${runId}`
               const refreshToken = `auth013-refresh-${runId}-secret`
+              const sessionToken = `auth013-session-token-${runId}-${crypto.randomUUID()}`
               const now = new Date().toISOString()
               const future = new Date(Date.now() + 60 * 60 * 1000).toISOString()
               const refreshCredentialHash = await hashToken(refreshToken)
 
-              const existingUser = await db.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first()
+              const existingUser = await db.prepare('SELECT id FROM "user" WHERE id = ?').bind(userId).first()
               if (existingUser) {
                 return json({ status: 'FAIL_CLOSED', reason: 'synthetic_user_id_already_exists', userId }, 409)
               }
@@ -119,16 +120,16 @@ jobs:
 
               await db
                 .prepare(
-                  'INSERT INTO users (id, email, account_state, account_state_version) VALUES (?, ?, ?, ?)',
+                  'INSERT INTO "user" (id, name, email, email_verified, locale, timezone, account_state, account_state_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 )
-                .bind(userId, email, 'ACTIVE', 1)
+                .bind(userId, 'AUTH013 Session Invalidation', email, 1, 'en-US', 'UTC', 'ACTIVE', 1, now, now)
                 .run()
 
               await db
                 .prepare(
-                  'INSERT INTO users_sessions (_order, _parent_id, id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)',
+                  'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, ip_address, user_agent, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                 )
-                .bind(0, userId, sessionId, now, future)
+                .bind(sessionId, future, sessionToken, now, now, null, 'AUTH013', userId)
                 .run()
 
               await db
@@ -153,7 +154,7 @@ jobs:
 
                 const state = await db
                   .prepare(
-                    'SELECT account_state, account_state_version FROM users WHERE id = ? LIMIT 1',
+                    'SELECT account_state, account_state_version FROM "user" WHERE id = ? LIMIT 1',
                   )
                   .bind(userId)
                   .first()
@@ -312,14 +313,16 @@ jobs:
 
           await query(`DELETE FROM auth_session_state WHERE session_id = ${sqlLiteral(result.sessionId)}`)
           await query(`DELETE FROM auth_013_publication_journal WHERE journal_id = ${sqlLiteral(result.transition.journalId)}`)
-          await query(`DELETE FROM users_sessions WHERE id = ${sqlLiteral(result.sessionId)}`)
-          await query(`DELETE FROM users WHERE id = ${Number(result.userId)}`)
+          await query(`DELETE FROM "session" WHERE id = ${sqlLiteral(result.sessionId)}`)
+          await query(`DELETE FROM "user" WHERE id = ${sqlLiteral(result.userId)}`)
 
-          const remaining = await query(`SELECT COUNT(*) AS count FROM users WHERE id = ${Number(result.userId)}`)
-          const sessionRemaining = await query(`SELECT COUNT(*) AS count FROM auth_session_state WHERE session_id = ${sqlLiteral(result.sessionId)}`)
+          const remaining = await query(`SELECT COUNT(*) AS count FROM "user" WHERE id = ${sqlLiteral(result.userId)}`)
+          const sessionRemaining = await query(`SELECT COUNT(*) AS count FROM "session" WHERE id = ${sqlLiteral(result.sessionId)}`)
+          const extensionRemaining = await query(`SELECT COUNT(*) AS count FROM auth_session_state WHERE session_id = ${sqlLiteral(result.sessionId)}`)
 
           if (Number(remaining[0]?.count ?? -1) !== 0) throw new Error('Synthetic user cleanup failed')
           if (Number(sessionRemaining[0]?.count ?? -1) !== 0) throw new Error('Synthetic session cleanup failed')
+          if (Number(extensionRemaining[0]?.count ?? -1) !== 0) throw new Error('Synthetic session extension cleanup failed')
 
           console.log(JSON.stringify({
             SYNTHETIC_USER_CLEANUP: 'PASS',
