@@ -51,12 +51,25 @@ export const validateContentListQuery = (url: URL): URLSearchParams => {
   return query
 }
 
+const AUTH_SESSION_COOKIE_NAMES = new Set([
+  // Better Auth's canonical session cookie plus secure-cookie variants.
+  'better-auth.session_token',
+  '__Secure-better-auth.session_token',
+  '__Host-better-auth.session_token',
+  // Retained only as a defensive compatibility guard for legacy clients.
+  'payload-token',
+])
+
 export const hasAuthenticatedSessionCredential = (request: Request): boolean => {
   if (request.headers.get('Authorization')?.trim()) return true
 
   const cookieHeader = request.headers.get('cookie') ?? ''
   return cookieHeader.split(';').some((part) => {
-    const [name, ...value] = part.trim().split('=')
-    return name === 'payload-token' && value.join('=').trim().length > 0
+    const separator = part.indexOf('=')
+    if (separator <= 0) return false
+
+    const name = part.slice(0, separator).trim()
+    const value = part.slice(separator + 1).trim()
+    return AUTH_SESSION_COOKIE_NAMES.has(name) && value.length > 0
   })
 }
