@@ -50,19 +50,14 @@ const handler = async (
     )
   }
 
-  if (
-    request.method === 'POST' &&
-    (endpoint === 'sign-in/email' || endpoint === 'sign-up/email')
-  ) {
+  if (request.method === 'POST' && endpoint === 'sign-in/email') {
     try {
       const clientIp =
         request.headers.get('cf-connecting-ip')?.trim() || 'unknown'
 
       await enforceAuthRateLimit(
         request,
-        endpoint === 'sign-in/email'
-          ? 'AUTH_LOGIN_LIMITER'
-          : 'AUTH_REGISTER_LIMITER',
+        'AUTH_LOGIN_LIMITER',
         ['ip:' + clientIp],
       )
     } catch (error) {
