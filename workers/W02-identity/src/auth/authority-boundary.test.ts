@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const sourceRoot = resolve(process.cwd(), 'src')
@@ -14,7 +14,7 @@ const collectSourceFiles = (directory: string): string[] => {
       continue
     }
 
-    if (entry.isFile() && /\\.(mjs|cjs|js|ts|tsx)$/.test(entry.name) && !entry.name.endsWith('.test.ts')) {
+    if (entry.isFile() && /\.(mjs|cjs|js|ts|tsx)$/.test(entry.name) && !entry.name.endsWith('.test.ts')) {
       files.push(fullPath)
     }
   }
@@ -25,11 +25,11 @@ const collectSourceFiles = (directory: string): string[] => {
 describe('W02 identity authority boundary', () => {
   it('does not use the legacy Payload users/users_sessions persistence from production source', () => {
     const forbiddenPatterns = [
-      /\\bFROM\\s+users\\b/i,
-      /\\bUPDATE\\s+users\\b/i,
-      /\\bDELETE\\s+FROM\\s+users\\b/i,
-      /\\bINSERT\\s+INTO\\s+users\\b/i,
-      /\\busers_sessions\\b/i,
+      /\bFROM\s+users\b/i,
+      /\bUPDATE\s+users\b/i,
+      /\bDELETE\s+FROM\s+users\b/i,
+      /\bINSERT\s+INTO\s+users\b/i,
+      /\busers_sessions\b/i,
     ]
 
     for (const file of collectSourceFiles(sourceRoot)) {
