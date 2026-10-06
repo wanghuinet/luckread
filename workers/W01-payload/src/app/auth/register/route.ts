@@ -223,8 +223,6 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   )
   const { env } = await getCloudflareContext({ async: true })
   const existing = await getExistingEnvelope(env.D1, idempotencyKey)
-  const payload = await getPayload({ config })
-
   if (existing && !isExpired(existing.expiresAt, now)) {
     if (existing.payloadHash !== payloadHash) return errorResponse(422, 'IDEMPOTENCY_KEY_REUSE_CONFLICT', 'Idempotency key cannot be reused with different input')
     if (existing.state === 'IN_PROGRESS') return errorResponse(409, 'IDEMPOTENCY_IN_PROGRESS', 'A registration with this Idempotency-Key is already in progress', { 'retry-after': '1' })
@@ -376,9 +374,9 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
           )
           VALUES (
             ?,
-            CAST((${userIdSubquery}) AS TEXT),
-            CAST((${userIdSubquery}) AS TEXT),
-            CAST((${userIdSubquery}) AS TEXT),
+            ?,
+            ?,
+            ?,
             'User',
             'ACCOUNT_REGISTRATION',
             'GRANTED',
@@ -392,8 +390,6 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       )
       .bind(
         consentRecordId,
-        String(userData.email),
-        String(userData.username),
         userId,
         userId,
         userId,
