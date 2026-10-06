@@ -2,6 +2,11 @@ import {
   requestPasswordResetThroughW02,
   W02PasswordRecoveryClientError,
 } from '@/auth/w02-password-recovery-client'
+import {
+  enforceAuthRateLimit,
+  TrafficLimitError,
+  rateLimitResponse,
+} from '@/auth/traffic-limit'
 
 type PasswordResetRequest = {
   identifier?: unknown
@@ -32,6 +37,14 @@ export async function POST(request: Request): Promise<Response> {
 
   if (typeof body.identifier !== 'string' || body.identifier.trim().length === 0) {
     return jsonError(422, 'VALIDATION_FAILED', 'Invalid password recovery request')
+  }
+
+  try {
+    const clientIp = request.headers.get('cf-connecting-ip')?.trim() || 'unknown'
+    await enforceAuthRateLimit(request, 'AUTH_LOGIN_LIMITER', ['ip:' + clientIp, 'purpose:password-reset'])
+  } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
+    return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password recovery service unavailable')
   }
 
   try {

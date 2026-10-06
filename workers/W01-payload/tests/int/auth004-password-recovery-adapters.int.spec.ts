@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   changePasswordThroughW02: vi.fn(),
   requestPasswordResetThroughW02: vi.fn(),
   resetPasswordThroughW02: vi.fn(),
+  enforceAuthRateLimit: vi.fn(),
   W02PasswordClientError: class extends Error {
     constructor(
       readonly status: number,
@@ -35,6 +36,12 @@ vi.mock('@/auth/w02-password-recovery-client', () => ({
   W02PasswordRecoveryClientError: mocks.W02PasswordClientError,
 }))
 
+vi.mock('@/auth/traffic-limit', () => ({
+  enforceAuthRateLimit: mocks.enforceAuthRateLimit,
+  TrafficLimitError: class extends Error {},
+  rateLimitResponse: vi.fn(),
+}))
+
 import { POST as postPasswordChange } from '../../src/app/auth/password/change/route.js'
 import { POST as postResetRequest } from '../../src/app/auth/password/reset/request/route.js'
 import { POST as postResetConfirm } from '../../src/app/auth/password/reset/confirm/route.js'
@@ -62,6 +69,7 @@ describe('AUTH-004 W01 recovery adapters', () => {
     vi.clearAllMocks()
     mocks.changePasswordThroughW02.mockResolvedValue(undefined)
     mocks.requestPasswordResetThroughW02.mockResolvedValue(undefined)
+    mocks.enforceAuthRateLimit.mockResolvedValue(undefined)
     mocks.resetPasswordThroughW02.mockResolvedValue(undefined)
   })
 
@@ -114,6 +122,11 @@ describe('AUTH-004 W01 recovery adapters', () => {
     expect(await response.text()).toBe('')
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(mocks.getPayload).not.toHaveBeenCalled()
+    expect(mocks.enforceAuthRateLimit).toHaveBeenCalledWith(
+      expect.any(Request),
+      'AUTH_LOGIN_LIMITER',
+      expect.arrayContaining(['purpose:password-reset']),
+    )
     expect(mocks.requestPasswordResetThroughW02).toHaveBeenCalledWith(
       expect.any(Request),
       'user7@example.com',
