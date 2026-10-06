@@ -232,6 +232,102 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     return errorResponse(409, 'REGISTRATION_RETRY_REQUIRED', 'The prior registration attempt is not replayable')
   }
 
+  const reservationId = crypto.randomUUID()
+  const consentRecordId = crypto.randomUUID()
+  const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
+  const committedAt = now.toISOString()
+  const committedResponse = JSON.stringify({ userId: '', accountState: ACCOUNT_STATE })
+
+  try {
+    const reservationStatements = []
+    if (existing && isExpired(existing.expiresAt, now)) {
+      reservationStatements.push(
+        env.D1
+          .prepare(
+            `DELETE FROM auth_registration_envelopes
+             WHERE id = ?
+               AND active_key = ?
+               AND expires_at <= ?`,
+          )
+          .bind(existing.id, idempotencyKey, now.toISOString()),
+      )
+    }
+    reservationStatements.push(
+      env.D1
+        .prepare(
+          `INSERT INTO auth_registration_envelopes (
+            id,
+            idempotency_key,
+            active_key,
+            scope,
+            endpoint,
+            payload_hash,
+            state,
+            response_digest,
+            committed_response,
+            expires_at,
+            consent_record_id,
+            updated_at,
+            created_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, 'IN_PROGRESS', ?, NULL, ?, ?, ?, ?)`,
+        )
+        .bind(
+          reservationId,
+          idempotencyKey,
+          idempotencyKey,
+          SCOPE,
+          ENDPOINT,
+          payloadHash,
+          responseDigest,
+          expiresAt,
+          consentRecordId,
+          committedAt,
+          committedAt,
+        ),
+    )
+    const result = await env.D1.batch(reservationStatements)
+    const insertIndex = reservationStatements.length - 1
+    if (
+      result.length !== reservationStatements.length ||
+      (existing && isExpired(existing.expiresAt, now) && result[0]?.meta?.changes !== 1) ||
+      result[insertIndex]?.meta?.changes !== 1
+    ) {
+      throw new Error('AUTH001_IDEMPOTENCY_RESERVATION_INCOMPLETE')
+    }
+  } catch (error) {
+    if (isUniqueConstraintError(error) && /auth_registration_envelopes|active_key/i.test(String(error instanceof Error ? error.message : error))) {
+      const current = await getExistingEnvelope(env.D1, idempotencyKey)
+      if (current && current.payloadHash !== payloadHash) {
+        return errorResponse(422, 'IDEMPOTENCY_KEY_REUSE_CONFLICT', 'Idempotency key cannot be reused with different input')
+      }
+      if (current?.state === 'IN_PROGRESS') {
+        return errorResponse(409, 'IDEMPOTENCY_IN_PROGRESS', 'A registration with this Idempotency-Key is already in progress', { 'retry-after': '1' })
+      }
+      if (current?.state === 'COMPLETED') {
+        const replay = parseReplay(current.committedResponse)
+        return replay ? json(replay, 201) : errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration replay record is unavailable')
+      }
+      return errorResponse(409, 'REGISTRATION_RETRY_REQUIRED', 'The prior registration attempt is not replayable')
+    }
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
+  }
+
+  const releaseReservation = async (): Promise<void> => {
+    try {
+      await env.D1
+        .prepare(`DELETE FROM auth_registration_envelopes WHERE id = ? AND state = 'IN_PROGRESS'`)
+        .bind(reservationId)
+        .run()
+    } catch (error) {
+      console.error(JSON.stringify({
+        event: 'auth.register.reservation_release_failure',
+        diagnosticCode: 'AUTH001_RESERVATION_RELEASE_FAILURE',
+        errorName: error instanceof Error ? error.name : typeof error,
+      }))
+    }
+  }
+
   let authResponse: Response
   try {
     authResponse = await proxyBetterAuth(request, '/sign-up/email', {
@@ -243,12 +339,14 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       },
     })
   } catch {
+    await releaseReservation()
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
 
   let authPayload: unknown = null
   try { authPayload = await authResponse.json() } catch {}
   if (!authResponse.ok) {
+    await releaseReservation()
     return errorResponse(
       authResponse.status >= 500 ? 503 : 422,
       authResponse.status >= 500 ? 'SERVICE_UNAVAILABLE' : 'VALIDATION_FAILED',
@@ -261,7 +359,10 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       ? (authPayload as { user?: { id?: unknown; email?: unknown; username?: unknown } }).user
       : undefined
   const userId = typeof betterAuthUser?.id === 'string' ? betterAuthUser.id : ''
-  if (!userId) return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration identity is unavailable')
+  if (!userId) {
+    await releaseReservation()
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration identity is unavailable')
+  }
 
   const payload = await getPayload({ config })
   try {
@@ -290,6 +391,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         errorName: rollbackError instanceof Error ? rollbackError.name : typeof rollbackError,
       }))
     }
+    await releaseReservation()
     console.error(JSON.stringify({
       event: 'auth.register.profile_projection_failure',
       diagnosticCode: 'AUTH001_PROFILE_PROJECTION_FAILURE',
@@ -298,107 +400,39 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
 
-  const consentRecordId = crypto.randomUUID()
-  const envelopeId = crypto.randomUUID()
-  const statements: Array<ReturnType<typeof env.D1.prepare>> = []
-  const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  const committedAt = now.toISOString()
+  const committedResponseFinal = JSON.stringify({ userId, accountState: ACCOUNT_STATE })
 
-  const committedResponse = JSON.stringify({ userId, accountState: ACCOUNT_STATE })
-
-  // Idempotency reservation is part of the same D1 batch. If a stale
-  // reservation exists, remove only that expired row first. The following
-  // plain UNIQUE insert is the concurrency gate: exactly one request can
-  // reserve active_key; the losing concurrent request receives the canonical
-  // 409 instead of updating the winner's reservation.
-  const expiredReservationCleanup =
-    existing && isExpired(existing.expiresAt, now)
-      ? env.D1
-          .prepare(
-            `
-              DELETE FROM auth_registration_envelopes
-              WHERE id = ?
-                AND active_key = ?
-                AND expires_at <= ?
-            `,
-          )
-          .bind(existing.id, idempotencyKey, now.toISOString())
-      : null
-
-  if (expiredReservationCleanup) {
-    statements.push(expiredReservationCleanup)
-  }
-
-  statements.push(
+  const statements = [
     env.D1
       .prepare(
-        `
-          INSERT INTO auth_registration_envelopes (
-            id,
-            idempotency_key,
-            active_key,
-            scope,
-            endpoint,
-            payload_hash,
-            state,
-            response_digest,
-            committed_response,
-            expires_at,
-            consent_record_id,
-            updated_at,
-            created_at
-          )
-          VALUES (?, ?, ?, ?, ?, ?, 'IN_PROGRESS', ?, NULL, ?, ?, ?, ?)
-        `,
-      )
-      .bind(
-        envelopeId,
-        idempotencyKey,
-        idempotencyKey,
-        SCOPE,
-        'authRegister',
-        payloadHash,
-        responseDigest,
-        expiresAt,
-        consentRecordId,
-        committedAt,
-        committedAt,
-      ),
-  )
-
-  statements.push(
-    env.D1
-      .prepare(
-        `
-          INSERT INTO consents (
-            id,
-            actor_subject_id,
-            owner_subject_id,
-            resource_id,
-            resource_type,
-            purpose,
-            state,
-            policy_version,
-            legal_basis,
-            retention_class,
-            retention_until,
-            source_authority
-          )
-          VALUES (
-            ?,
-            ?,
-            ?,
-            ?,
-            'User',
-            'ACCOUNT_REGISTRATION',
-            'GRANTED',
-            ?,
-            'CONSENT',
-            'LEGAL_AUDIT',
-            ?,
-            ?
-          )
-        `,
+        `INSERT INTO consents (
+          id,
+          actor_subject_id,
+          owner_subject_id,
+          resource_id,
+          resource_type,
+          purpose,
+          state,
+          policy_version,
+          legal_basis,
+          retention_class,
+          retention_until,
+          source_authority
+        )
+        VALUES (
+          ?,
+          ?,
+          ?,
+          ?,
+          'User',
+          'ACCOUNT_REGISTRATION',
+          'GRANTED',
+          ?,
+          'CONSENT',
+          'LEGAL_AUDIT',
+          ?,
+          ?
+        )`,
       )
       .bind(
         consentRecordId,
@@ -409,61 +443,38 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         policy.retentionUntil,
         policy.sourceAuthority,
       ),
-  )
-
-  statements.push(
     env.D1
       .prepare(
-        `
-          UPDATE auth_registration_envelopes
-          SET state = 'COMPLETED',
-              committed_response = ?,
-              updated_at = ?
-          WHERE id = ?
-            AND state = 'IN_PROGRESS'
-        `,
+        `UPDATE auth_registration_envelopes
+         SET state = 'COMPLETED',
+             committed_response = ?,
+             updated_at = ?
+         WHERE id = ?
+           AND state = 'IN_PROGRESS'`,
       )
-      .bind(
-        committedResponse,
-        now.toISOString(),
-        envelopeId,
-      ),
-  )
-
-  statements.push(
+      .bind(committedResponseFinal, now.toISOString(), reservationId),
     env.D1
       .prepare(
-        `
-          SELECT committed_response
-          FROM auth_registration_envelopes
-          WHERE id = ?
-          LIMIT 1
-        `,
+        `SELECT committed_response
+         FROM auth_registration_envelopes
+         WHERE id = ?
+         LIMIT 1`,
       )
-      .bind(envelopeId),
-  )
-
+      .bind(reservationId),
+  ]
 
   try {
     const batchResult = await env.D1.batch(statements)
-    const cleanupOffset = expiredReservationCleanup ? 1 : 0
-    const reservationIndex = cleanupOffset
-    const consentIndex = reservationIndex + 1
-    const completionIndex = consentIndex + 1
-    const responseIndex = completionIndex + 1
-
     if (
       batchResult.length !== statements.length ||
-      (cleanupOffset === 1 && batchResult[0]?.meta?.changes !== 1) ||
-      batchResult[reservationIndex]?.meta?.changes !== 1 ||
-      batchResult[consentIndex]?.meta?.changes !== 1 ||
-      batchResult[completionIndex]?.meta?.changes !== 1 ||
-      !batchResult[responseIndex]
+      batchResult[0]?.meta?.changes !== 1 ||
+      batchResult[1]?.meta?.changes !== 1 ||
+      !batchResult[2]
     ) {
       throw new Error('AUTH001_BATCH_RESULT_INCOMPLETE')
     }
 
-    const responseRow = batchResult[responseIndex]?.results?.[0] as { committed_response?: unknown } | undefined
+    const responseRow = batchResult[2]?.results?.[0] as { committed_response?: unknown } | undefined
     if (!responseRow || typeof responseRow.committed_response !== 'string') {
       throw new Error('AUTH001_COMMITTED_RESPONSE_UNAVAILABLE')
     }
@@ -474,6 +485,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     }
 
     return json(responseBody, 201)
+  }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (isUniqueConstraintError(error) && /auth_registration_envelopes|active_key/i.test(message)) {
