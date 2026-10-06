@@ -41,7 +41,7 @@ export const betterAuthPayloadStrategy: AuthStrategy = {
 
       const users = await payload.find({
         collection: 'users',
-        where: { email: { equals: principal.email } },
+        where: { identityId: { equals: principal.userId } },
         limit: 1,
         depth: 0,
         overrideAccess: true,

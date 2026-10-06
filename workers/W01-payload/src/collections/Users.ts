@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
+import { betterAuthPayloadStrategy } from '@/auth/better-auth-payload-strategy'
 import { payloadAdminOnly } from '@/auth/payload-admin-access'
 
 export const Users: CollectionConfig = {
@@ -7,24 +8,7 @@ export const Users: CollectionConfig = {
   admin: {
     useAsTitle: 'email',
   },
-  auth: {
-    // Use Payload's native authentication/recovery pipeline. Keep recovery
-    // policy at the collection boundary instead of introducing a parallel
-    // W02 password-recovery subsystem.
-    forgotPassword: {},
-    removeTokenFromResponses: true,
-    // AUTH-004 remains contract/evidence gated; native capability is the implementation baseline.
-  },
-  hooks: {
-    // Payload strips loginResult.token from Local API responses when
-    // removeTokenFromResponses=true. Preserve the native token only in the
-    // request-local context so the W01 adapter can immediately call payload.auth().
-    afterLogin: [
-      ({ req, token }) => {
-        if (req.context && typeof token === 'string') {
-          ;(req.context as Record<string, unknown>).__luckreadNativeAuthToken = token
-        }
-      },
+  auth: { disableLocalStrategy: true, strategies: [betterAuthPayloadStrategy] },
     ],
   },
   // AUTH-001 contract: account registration is anonymous/public. Keep the
@@ -36,6 +20,14 @@ export const Users: CollectionConfig = {
     admin: payloadAdminOnly,
   },
   fields: [
+    {
+      name: 'identityId',
+      type: 'text',
+      required: true,
+      unique: true,
+      index: true,
+      admin: { readOnly: true },
+    },
     {
       name: 'username',
       type: 'text',

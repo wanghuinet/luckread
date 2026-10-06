@@ -1,10 +1,11 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getPayload } from 'payload'
 
-import config, { AUTH001_USER_CAPTURE_CONTEXT } from '@payload-config'
+import config from '@payload-config'
 import priv004DevPolicy from '../../../../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'
 import priv004ProdPolicy from '../../../../../../artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json'
 import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
+import { proxyBetterAuth } from '../../../auth/w02-session-client.js'
 
 const SCOPE = 'ACCOUNT_REGISTRATION'
 const ENDPOINT = 'authRegister'
@@ -234,48 +235,57 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     return errorResponse(409, 'REGISTRATION_RETRY_REQUIRED', 'The prior registration attempt is not replayable')
   }
 
-  const capture: { data: Record<string, unknown> | null } = { data: null }
+  let authResponse: Response
+  try {
+    authResponse = await proxyBetterAuth(request, '/sign-up/email', {
+      body: {
+        email: normalized.identity,
+        name: normalized.username,
+        username: normalized.username,
+        password: normalized.credential,
+      },
+    })
+  } catch {
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
+  }
 
+  let authPayload: unknown = null
+  try { authPayload = await authResponse.json() } catch {}
+  if (!authResponse.ok) {
+    return errorResponse(
+      authResponse.status >= 500 ? 503 : 422,
+      authResponse.status >= 500 ? 'SERVICE_UNAVAILABLE' : 'VALIDATION_FAILED',
+      authResponse.status >= 500 ? 'Registration service unavailable' : 'Registration could not be completed',
+    )
+  }
+
+  const betterAuthUser =
+    authPayload && typeof authPayload === 'object'
+      ? (authPayload as { user?: { id?: unknown; email?: unknown; username?: unknown } }).user
+      : undefined
+  const userId = typeof betterAuthUser?.id === 'string' ? betterAuthUser.id : ''
+  if (!userId) return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration identity is unavailable')
+
+  const payload = await getPayload({ config })
   try {
     await payload.create({
       collection: 'users',
       data: {
+        identityId: userId,
         email: normalized.identity,
-        password: normalized.credential,
         username: normalized.username,
-      } as any,
+      },
       overrideAccess: true,
       disableTransaction: true,
       req: request,
-      context: {
-        [AUTH001_USER_CAPTURE_CONTEXT]: capture,
-      },
     })
   } catch (error) {
-    if (isUniqueConstraintError(error) || (error instanceof Error && /username|email/i.test(error.message))) {
-      return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
-    }
-
-    console.error(
-      JSON.stringify({
-        event: 'auth.register.native_validation_failure',
-        diagnosticCode: 'AUTH001_NATIVE_VALIDATION_FAILURE',
-        errorName: error instanceof Error ? error.name : typeof error,
-      }),
-    )
+    console.error(JSON.stringify({
+      event: 'auth.register.profile_projection_failure',
+      diagnosticCode: 'AUTH001_PROFILE_PROJECTION_FAILURE',
+      errorName: error instanceof Error ? error.name : typeof error,
+    }))
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
-  }
-
-  const userData = capture.data
-  if (
-    !userData ||
-    typeof userData.email !== 'string' ||
-    typeof userData.username !== 'string' ||
-    typeof userData.hash !== 'string' ||
-    typeof userData.salt !== 'string' ||
-    'password' in userData
-  ) {
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Native registration persistence intent is unavailable')
   }
 
   const consentRecordId = crypto.randomUUID()
@@ -284,19 +294,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
   const committedAt = now.toISOString()
 
-  const userIdSubquery = `
-    SELECT id
-    FROM users
-    WHERE email = ?
-      AND username = ?
-    LIMIT 1
-  `
-
-  const committedResponseSql = `
-    '{"userId":"' ||
-    CAST((${userIdSubquery}) AS TEXT) ||
-    '","accountState":"${ACCOUNT_STATE}"}'
-  `
+  const committedResponse = JSON.stringify({ userId, accountState: ACCOUNT_STATE })
 
   // Idempotency reservation is part of the same D1 batch. If a stale
   // reservation exists, remove only that expired row first. The following
@@ -362,37 +360,6 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     env.D1
       .prepare(
         `
-          INSERT INTO users (
-            email,
-            username,
-            salt,
-            hash,
-            display_name,
-            bio,
-            avatar,
-            locale,
-            timezone
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-      )
-      .bind(
-        String(userData.email),
-        String(userData.username),
-        String(userData.salt),
-        String(userData.hash),
-        typeof userData.displayName === 'string' ? userData.displayName : null,
-        typeof userData.bio === 'string' ? userData.bio : null,
-        typeof userData.avatar === 'string' ? userData.avatar : null,
-        typeof userData.locale === 'string' ? userData.locale : 'en-US',
-        typeof userData.timezone === 'string' ? userData.timezone : 'UTC',
-      ),
-  )
-
-  statements.push(
-    env.D1
-      .prepare(
-        `
           INSERT INTO consents (
             id,
             actor_subject_id,
@@ -427,10 +394,9 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         consentRecordId,
         String(userData.email),
         String(userData.username),
-        String(userData.email),
-        String(userData.username),
-        String(userData.email),
-        String(userData.username),
+        userId,
+        userId,
+        userId,
         policy.policyVersion,
         policy.retentionUntil,
         policy.sourceAuthority,
@@ -443,15 +409,14 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         `
           UPDATE auth_registration_envelopes
           SET state = 'COMPLETED',
-              committed_response = ${committedResponseSql},
+              committed_response = ?,
               updated_at = ?
           WHERE id = ?
             AND state = 'IN_PROGRESS'
         `,
       )
       .bind(
-        String(userData.email),
-        String(userData.username),
+        committedResponse,
         now.toISOString(),
         envelopeId,
       ),
@@ -475,8 +440,7 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     const batchResult = await env.D1.batch(statements)
     const cleanupOffset = expiredReservationCleanup ? 1 : 0
     const reservationIndex = cleanupOffset
-    const userIndex = reservationIndex + 1
-    const consentIndex = userIndex + 1
+    const consentIndex = reservationIndex + 1
     const completionIndex = consentIndex + 1
     const responseIndex = completionIndex + 1
 
@@ -484,7 +448,6 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
       batchResult.length !== statements.length ||
       (cleanupOffset === 1 && batchResult[0]?.meta?.changes !== 1) ||
       batchResult[reservationIndex]?.meta?.changes !== 1 ||
-      batchResult[userIndex]?.meta?.changes !== 1 ||
       batchResult[consentIndex]?.meta?.changes !== 1 ||
       batchResult[completionIndex]?.meta?.changes !== 1 ||
       !batchResult[responseIndex]
