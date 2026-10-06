@@ -5,58 +5,23 @@ import { payloadAdminOnly } from '@/auth/payload-admin-access'
 
 export const Users: CollectionConfig = {
   slug: 'users',
-  admin: {
-    useAsTitle: 'email',
+  admin: { useAsTitle: 'email' },
+  auth: {
+    disableLocalStrategy: true,
+    strategies: [betterAuthPayloadStrategy],
   },
-  auth: { disableLocalStrategy: true, strategies: [betterAuthPayloadStrategy] },
-    ],
-  },
-  // AUTH-001 contract: account registration is anonymous/public. Keep the
-  // public boundary limited to creation; read/update/delete remain protected
-  // by Payload's default authenticated access control until explicit rules
-  // are defined at the canonical API boundary.
   access: {
     create: () => true,
     admin: payloadAdminOnly,
   },
   fields: [
-    {
-      name: 'identityId',
-      type: 'text',
-      required: false,
-      unique: true,
-      index: true,
-      admin: { readOnly: true },
-    },
-    {
-      name: 'username',
-      type: 'text',
-      required: true,
-      unique: true,
-      index: true,
-    },
-    {
-      name: 'displayName',
-      type: 'text',
-    },
-    {
-      name: 'bio',
-      type: 'textarea',
-    },
-    {
-      name: 'avatar',
-      type: 'text',
-    },
-    {
-      name: 'locale',
-      type: 'text',
-      defaultValue: 'en-US',
-    },
-    {
-      name: 'timezone',
-      type: 'text',
-      defaultValue: 'UTC',
-    },
+    { name: 'identityId', type: 'text', required: false, unique: true, index: true, admin: { readOnly: true } },
+    { name: 'username', type: 'text', required: true, unique: true, index: true },
+    { name: 'displayName', type: 'text' },
+    { name: 'bio', type: 'textarea' },
+    { name: 'avatar', type: 'text' },
+    { name: 'locale', type: 'text', defaultValue: 'en-US' },
+    { name: 'timezone', type: 'text', defaultValue: 'UTC' },
   ],
   versions: false,
 }
