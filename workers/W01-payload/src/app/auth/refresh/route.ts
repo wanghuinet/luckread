@@ -67,8 +67,7 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
 
-  try {
-    return new Response(
+  return new Response(
       JSON.stringify({
         accessToken: session.accessToken,
         refreshToken: session.refreshToken,
@@ -83,5 +82,4 @@ export async function POST(request: Request): Promise<Response> {
         },
       },
     )
-  }
 }
