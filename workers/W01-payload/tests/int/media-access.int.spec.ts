@@ -197,6 +197,17 @@ describe('Media upload access', () => {
     expect(route).not.toContain('presigned')
   })
 
+it('does not parse or buffer media uploads before the Payload REST bridge', () => {
+  const route = read('src/app/api/v1/media/route.ts')
+  expect(route).toContain('request.body')
+  expect(route).toContain('createPayloadBetterAuthBridgeRequest')
+  expect(route).toContain('payloadMediaPost')
+  expect(route).not.toContain('request.formData()')
+  expect(route).not.toContain('request.arrayBuffer()')
+  expect(route).not.toContain('new File(')
+  expect(route).not.toContain('new Blob(')
+})
+
 it('registers the signed Better Auth bridge without disabling native admin auth', () => {
   const users = read('src/collections/Users.ts')
   expect(users).toContain("strategies: [payloadBetterAuthBridgeStrategy]")
