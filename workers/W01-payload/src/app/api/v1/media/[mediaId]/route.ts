@@ -1,10 +1,37 @@
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
+import {
+  DELETE as payloadMediaDelete,
+  GET as payloadMediaGet,
+  PATCH as payloadMediaPatch,
+} from '../../../../(payload)/api/[...slug]/route'
 
+import {
+  createPayloadBetterAuthBridgeRequest,
+  createPayloadBetterAuthBridgeToken,
+} from '@/auth/payload-better-auth-bridge'
 import { resolveBetterAuthPrincipalThroughW02, W02AuthClientError } from '@/auth/w02-session-client'
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 
+type PayloadGetRouteContext = Parameters<typeof payloadMediaGet>[1]
+type PayloadDeleteRouteContext = Parameters<typeof payloadMediaDelete>[1]
+type PayloadPatchRouteContext = Parameters<typeof payloadMediaPatch>[1]
+
+const createBridgedMediaRequest = async (request: Request, path: string): Promise<Request> => {
+  const principal = await resolveBetterAuthPrincipalThroughW02(request)
+  if (!principal.active || principal.tokenVersion === undefined) {
+    throw new W02AuthClientError(401, 'authentication required')
+  }
+  const payload = await getPayload({ config })
+  const token = await createPayloadBetterAuthBridgeToken(payload.secret, {
+    sub: principal.userId,
+    email: principal.email,
+    method: request.method as 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    path,
+  })
+  return createPayloadBetterAuthBridgeRequest(request, path, token)
+}
 type MediaDocument = {
   id?: string | number
   url?: string | null
@@ -72,26 +99,14 @@ export async function GET(
   const { mediaId } = await context.params
   if (!mediaId?.trim()) return new Response(null, { status: 404 })
 
+  let response: Response
   try {
-    const principal = await resolveBetterAuthPrincipalThroughW02(request)
-    if (!principal.active || principal.tokenVersion === undefined) {
-      throw new W02AuthClientError(401, 'authentication required')
+    const targetPath = '/api/media/' + encodeURIComponent(mediaId)
+    const forwarded = await createBridgedMediaRequest(request, targetPath)
+    const payloadContext: PayloadGetRouteContext = {
+      params: Promise.resolve({ slug: ['media', mediaId] }),
     }
-    const payload = await getPayload({ config })
-    const document = await payload.findByID({
-      collection: 'media',
-      id: mediaId,
-      depth: 0,
-      overrideAccess: false,
-      user: { id: principal.userId },
-    })
-    return new Response(JSON.stringify(withDeliveryStatus(document)), {
-      status: 200,
-      headers: {
-        'content-type': 'application/json; charset=utf-8',
-        'cache-control': 'private, no-store',
-      },
-    })
+    response = await payloadMediaGet(forwarded, payloadContext)
   } catch (error) {
     if (error instanceof W02AuthClientError && error.status === 401) {
       return new Response(JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }), {
@@ -99,17 +114,29 @@ export async function GET(
         headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
       })
     }
-    if (error instanceof W02AuthClientError) {
-      return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
-        status: error.status,
-        headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-      })
-    }
-    return new Response(JSON.stringify({ error: { code: 'MEDIA_NOT_FOUND', message: 'Media not found' } }), {
-      status: 404,
+    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
+      status: 503,
       headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
     })
   }
+
+  if (!response.ok) return response
+
+  let body: unknown
+  try {
+    body = await response.clone().json()
+  } catch {
+    return response
+  }
+
+  return new Response(JSON.stringify(withDeliveryStatus(body)), {
+    status: response.status,
+    headers: {
+      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+      'cache-control': 'private, no-store',
+      ...(response.headers.get('etag') ? { etag: response.headers.get('etag')! } : {}),
+    },
+  })
 }
 
 export async function DELETE(
@@ -138,18 +165,12 @@ export async function DELETE(
   }
 
   try {
-    const principal = await resolveBetterAuthPrincipalThroughW02(request)
-    if (!principal.active || principal.tokenVersion === undefined) {
-      throw new W02AuthClientError(401, 'authentication required')
+    const targetPath = '/api/media/' + encodeURIComponent(mediaId)
+    const forwarded = await createBridgedMediaRequest(request, targetPath)
+    const payloadContext: PayloadDeleteRouteContext = {
+      params: Promise.resolve({ slug: ['media', mediaId] }),
     }
-    const payload = await getPayload({ config })
-    await payload.delete({
-      collection: 'media',
-      id: mediaId,
-      overrideAccess: false,
-      user: { id: principal.userId },
-    })
-    return new Response(null, { status: 204 })
+    return payloadMediaDelete(forwarded, payloadContext)
   } catch (error) {
     if (error instanceof W02AuthClientError && error.status === 401) {
       return new Response(JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }), {
@@ -157,19 +178,12 @@ export async function DELETE(
         headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
       })
     }
-    if (error instanceof W02AuthClientError) {
-      return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
-        status: error.status,
-        headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-      })
-    }
-    return new Response(JSON.stringify({ error: { code: 'MEDIA_DELETE_FAILED', message: 'Media deletion failed' } }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
+      status: 503,
       headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
     })
   }
 }
-
 
 export async function PATCH(
   request: Request,
@@ -188,37 +202,13 @@ export async function PATCH(
     })
   }
 
-  let body: unknown
   try {
-    body = await request.json()
-  } catch {
-    return new Response(JSON.stringify({ error: { code: 'VALIDATION_FAILED', message: 'Invalid media update request' } }), {
-      status: 400,
-      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-    })
-  }
-
-  try {
-    const principal = await resolveBetterAuthPrincipalThroughW02(request)
-    if (!principal.active || principal.tokenVersion === undefined) {
-      throw new W02AuthClientError(401, 'authentication required')
+    const targetPath = '/api/media/' + encodeURIComponent(mediaId)
+    const forwarded = await createBridgedMediaRequest(request, targetPath)
+    const payloadContext: PayloadPatchRouteContext = {
+      params: Promise.resolve({ slug: ['media', mediaId] }),
     }
-    const payload = await getPayload({ config })
-    const result = await payload.update({
-      collection: 'media',
-      id: mediaId,
-      data: body as Record<string, unknown>,
-      overrideAccess: false,
-      user: { id: principal.userId },
-      depth: 0,
-    })
-    return Response.json(result, {
-      status: 200,
-      headers: {
-        'content-type': 'application/json; charset=utf-8',
-        'cache-control': 'no-store',
-      },
-    })
+    return payloadMediaPatch(forwarded, payloadContext)
   } catch (error) {
     if (error instanceof W02AuthClientError && error.status === 401) {
       return new Response(JSON.stringify({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }), {
@@ -226,14 +216,8 @@ export async function PATCH(
         headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
       })
     }
-    if (error instanceof W02AuthClientError) {
-      return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
-        status: error.status,
-        headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-      })
-    }
-    return new Response(JSON.stringify({ error: { code: 'MEDIA_UPDATE_FAILED', message: 'Media update failed' } }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
+      status: 503,
       headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
     })
   }
