@@ -8,7 +8,7 @@ const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID
 const TEST_RUN_ID = String(process.env.GITHUB_RUN_ID || Date.now())
 const TESTED_COMMIT_SHA = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
-const WORKER_PATH = 'workers/W01-payload'
+const WORKER_PATH = 'workers/W02-identity'
 const WRANGLER_VERSION = process.env.WRANGLER_VERSION || '4.116.0'
 const WRANGLER_CONFIG = 'workers/W01-payload/wrangler.jsonc'
 const ARTIFACT_DIR = 'artifacts/evidence/auth-002/runtime'
@@ -445,12 +445,11 @@ let logoutArtifact
 let extensionArtifact
 
 try {
-  if (dependency.dependencies?.payload !== '3.90.2' || dependency.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.90.2') {
-    throw new Error('W01 dependency contract mismatch')
+  if (dependency.dependencies?.['better-auth'] !== '1.7.7') {
+    throw new Error('W02 Better Auth dependency contract mismatch')
   }
   const lockText = readFileSync(`${WORKER_PATH}/pnpm-lock.yaml`, 'utf8')
-  if (!lockText.includes('payload:')) throw new Error('W01 lockfile missing Payload resolution')
-  if (!lockText.includes('@payloadcms/db-d1-sqlite')) throw new Error('W01 lockfile missing D1 adapter resolution')
+  if (!lockText.includes('better-auth')) throw new Error('W02 lockfile missing Better Auth resolution')
 
   const catalog = d1Rows(
     `SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE type IN ('table','index') ORDER BY type,name`,
@@ -760,8 +759,7 @@ try {
     repository: 'wanghuinet/luckread',
     testedCommitSha: TESTED_COMMIT_SHA,
     workerPath: WORKER_PATH,
-    payloadVersion: dependency.dependencies?.payload,
-    d1AdapterVersion: dependency.dependencies?.['@payloadcms/db-d1-sqlite'],
+    betterAuthVersion: dependency.dependencies?.['better-auth'],
     nodeVersion: process.version,
     lockfileReference: `${WORKER_PATH}/pnpm-lock.yaml`,
     gitVersion,
@@ -811,7 +809,7 @@ try {
     creationArtifact = {
       testId,
       operation: 'POST /auth/login',
-      nativeSidObserved: false,
+      betterAuthSessionObserved: false,
       userBindingObserved: false,
       createdAtObserved: false,
       expiresAtObserved: false,
