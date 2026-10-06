@@ -194,6 +194,10 @@ export const createPayloadBetterAuthBridgeRequest = (
   const target = new URL(targetPath, request.url)
   const headers = new Headers(request.headers)
   headers.delete('host')
+  // The signed bridge is the sole Payload identity for this internal hop.
+  // Do not forward client credentials that could select a different auth strategy.
+  headers.delete('authorization')
+  headers.delete('cookie')
   headers.set(BRIDGE_HEADER, token)
   headers.set(CALLER_HEADER, CALLER)
 
