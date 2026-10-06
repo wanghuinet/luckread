@@ -12,7 +12,6 @@ import { r2Storage } from '@payloadcms/storage-r2'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
-import { authSessionStateSchemaHook } from './db/auth-session-state-schema'
 import { clampWorkerPbkdf2Iterations } from './runtime/pbkdf2-worker-compat'
 
 export const AUTH001_USER_CAPTURE_CONTEXT = '__luckreadAuth001UserCapture'
@@ -90,7 +89,6 @@ export default buildConfig({
     binding: cloudflare.env.D1,
     push: false,
     migrationDir: path.resolve(dirname, 'migrations'),
-    beforeSchemaInit: [authSessionStateSchemaHook],
   }),
   logger: isProduction ? cloudflareLogger : undefined,
   onInit: async (payload: Payload) => {
