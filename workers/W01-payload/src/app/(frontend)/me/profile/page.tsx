@@ -76,7 +76,7 @@ export default function ProfilePage() {
     setLoggingOut(true)
     setError('')
     try {
-      const response = await fetch('/api/v1/auth/logout', {
+      const response = await fetch('/api/auth/sign-out', {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
