@@ -321,24 +321,6 @@ async function preparePositiveAuthSubject(user, label) {
 }
 
 async function login(user, deviceId) {
-  
-    testId,
-    operation: 'POST /api/users/login',
-    status: nativeResponse.status,
-    contentType: nativeResponse.contentType,
-    requestId: nativeResponse.requestId,
-    cfRay: nativeResponse.cfRay,
-    nativeLoginSuccess: nativeResponse.status === 200 && Boolean(nativeResponse.data?.user?.id),
-    tokenOmittedByCollectionPolicy: nativeResponse.status === 200 && !nativeResponse.data?.token,
-    errorCode: nativeResponse.data?.errors?.[0]?.name ?? nativeResponse.data?.error?.code ?? null,
-    errorMessage: typeof nativeResponse.data?.errors?.[0]?.message === 'string'
-      ? nativeResponse.data.errors[0].message.slice(0, 160)
-      : typeof nativeResponse.data?.error?.message === 'string'
-        ? nativeResponse.data.error.message.slice(0, 160)
-        : null,
-    secretsRedacted: true,
-    testedCommitSha: TESTED_COMMIT_SHA,
-  })
   const response = await request('/auth/login', {
     method: 'POST',
     body: { identity: user.email, credential: user.password, deviceId },
@@ -354,6 +336,7 @@ async function login(user, deviceId) {
     expiresIn: response.data.expiresIn,
   }
 }
+
 function loadSessionForUser(userId) {
   const rows = d1Rows(
     `SELECT id,user_id,created_at,expires_at FROM "session" WHERE CAST(user_id AS TEXT)=${sqlString(userId)} ORDER BY created_at DESC LIMIT 1`,
