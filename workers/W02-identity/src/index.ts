@@ -348,6 +348,7 @@ export default {
           sessionId: result.sessionId,
           refreshToken: result.refreshToken,
           tokenVersion: result.tokenVersion,
+          expiresIn: result.expiresIn,
           layer: result.layer,
           nativeExpiresAt: result.nativeExpiresAt,
         })
@@ -380,10 +381,12 @@ export default {
         return json({
           sessionId: result.sessionId,
           userId: result.userId,
+          accessToken: result.accessToken,
           refreshToken: result.refreshToken,
           tokenVersion: result.tokenVersion,
           layer: result.layer,
           nativeExpiresAt: result.nativeExpiresAt,
+          expiresIn: result.expiresIn,
           email: result.email,
         })
       } catch (error) {
