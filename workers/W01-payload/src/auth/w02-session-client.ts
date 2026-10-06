@@ -346,8 +346,6 @@ export const refreshSession = (body: {
 }) => callW02<RefreshSessionResult>('/internal/auth/session/refresh', body)
 
 
-export const revokeSession = (body: { sessionId: string }) =>
-  callW02<{ revoked: boolean }>('/internal/auth/session/revoke', body)
 
 export type AccountStateTransitionResult = {
   from: string
