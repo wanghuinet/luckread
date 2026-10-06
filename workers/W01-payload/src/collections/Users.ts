@@ -23,7 +23,7 @@ export const Users: CollectionConfig = {
     {
       name: 'identityId',
       type: 'text',
-      required: true,
+      required: false,
       unique: true,
       index: true,
       admin: { readOnly: true },
