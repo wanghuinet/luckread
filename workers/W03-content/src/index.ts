@@ -48,14 +48,14 @@ const enforceRateLimits = async (request: Request, env: Env, operation: string):
   }
 }
 
-const json = (body: unknown, status = 200) =>
-  Response.json(body, {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-    },
+const json = (body: unknown, status = 200, etag?: string) => {
+  const headers = new Headers({
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
   })
+  if (etag) headers.set('ETag', etag)
+  return Response.json(body, { status, headers })
+}
 
 const requireTransport = (request: Request): void => {
   if (
@@ -300,7 +300,7 @@ export default {
           requireIfMatch(request),
           requireIdempotency(request),
         )
-        return json(result)
+        return json(result, 200, result.etag)
       }
 
       if (request.method === 'POST' && path.id === undefined) {
@@ -323,7 +323,7 @@ export default {
           bodyRef: content.bodyRef,
           mediaRefs: content.mediaRefs,
           coverRef: content.coverRef,
-        }, 201)
+        }, 201, content.etag)
       }
 
       if (request.method === 'GET' && path.id) {
@@ -343,7 +343,7 @@ export default {
           mediaRefs: content.mediaRefs,
           coverRef: content.coverRef,
           updatedAt: content.updatedAt,
-        })
+        }, 200, content.etag)
       }
 
       if (request.method === 'PATCH' && path.id) {
@@ -364,7 +364,7 @@ export default {
           etag: content.etag,
           title: content.title,
           bodyRef: content.bodyRef,
-        })
+        }, 200, content.etag)
       }
 
       if (request.method === 'DELETE' && path.id) {
