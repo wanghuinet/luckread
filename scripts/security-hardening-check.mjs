@@ -73,6 +73,30 @@ if (fields) {
   }
 }
 
+const adminBootstrapScript = 'scripts/admin-account-bootstrap.mjs'
+const adminBootstrapWorkflow = '.github/workflows/admin-account-bootstrap.yml'
+if (fs.existsSync(path.join(root, adminBootstrapScript))) {
+  const source = fs.readFileSync(path.join(root, adminBootstrapScript), 'utf8')
+  for (const forbidden of ['LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD', 'password', 'hash', 'salt', 'UPDATE users', 'collection: \'users\'']) {
+    if (source.toLowerCase().includes(forbidden.toLowerCase())) {
+      fail(`admin bootstrap must not contain legacy Payload credential material or password writes: ${forbidden}`)
+    }
+  }
+  if (!source.includes('BETTER_AUTH_USER_ID')) fail('admin bootstrap must require BETTER_AUTH_USER_ID')
+  if (!source.includes('INSERT INTO role_assignments')) fail('admin bootstrap must remain role-binding only')
+}
+
+if (fs.existsSync(path.join(root, adminBootstrapWorkflow))) {
+  const source = fs.readFileSync(path.join(root, adminBootstrapWorkflow), 'utf8')
+  for (const forbidden of ['Apply account username/password', 'Prepare native Payload password material', 'hash=', 'salt=', 'UPDATE users SET']) {
+    if (source.toLowerCase().includes(forbidden.toLowerCase())) {
+      fail(`admin bootstrap workflow must not write legacy Payload credentials: ${forbidden}`)
+    }
+  }
+  if (!source.includes('BETTER_AUTH_USER_ID')) fail('admin bootstrap workflow must resolve Better Auth identity before role binding')
+  if (!source.includes('provider_id=\\'credential\\'')) fail('admin bootstrap workflow must verify the Better Auth credential account')
+}
+
 const roots = ['src','app','server','workers','packages','collections','payload','lib','routes'];
 const patterns = [
   { name: 'direct admin bypass', re: /(?:user|subject)\.role\s*(?:===|==)\s*['"](?:admin|super_admin)['"]/g },
