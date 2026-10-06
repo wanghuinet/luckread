@@ -1,18 +1,16 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getPayload } from 'payload'
 
-import config, { AUTH001_USER_CAPTURE_CONTEXT } from '@payload-config'
-import priv004DevPolicy from '../../../../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json'
-import priv004ProdPolicy from '../../../../../../artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json'
+import config from '@payload-config'
+import { callW02BetterAuth } from '../../../auth/w02-auth-client.js'
 import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 
 const SCOPE = 'ACCOUNT_REGISTRATION'
 const ENDPOINT = 'authRegister'
 const ACCOUNT_STATE = 'PENDING_VERIFICATION'
-const ACCOUNT_STATE_VERSION = 1
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
 
-type AuthRegisterRequest = {
+type RegistrationBody = {
   identityType?: unknown
   identity?: unknown
   credential?: unknown
@@ -25,33 +23,23 @@ type RegistrationResponse = {
   accountState: typeof ACCOUNT_STATE
 }
 
-type ExistingEnvelope = {
-  id: string
-  payloadHash: string
-  state: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
-  committedResponse?: { userId?: unknown; accountState?: unknown } | null
-  expiresAt: string
-}
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value)
+
+const errorResponse = (status: number, code: string, message: string, extraHeaders: Record<string, string> = {}) =>
+  Response.json(
+    { error: { code, message, details: {} }, requestId: crypto.randomUUID() },
+    {
+      status,
+      headers: { 'cache-control': 'no-store', ...extraHeaders },
+    },
+  )
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
-  new Response(JSON.stringify(body), {
+  Response.json(body, {
     status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-      ...headers,
-    },
+    headers: { 'cache-control': 'no-store', ...headers },
   })
-
-const errorResponse = (status: number, code: string, message: string, headers: Record<string, string> = {}) =>
-  json(
-    {
-      error: { code, message, details: {} },
-      requestId: crypto.randomUUID(),
-    },
-    status,
-    headers,
-  )
 
 const canonicalize = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(canonicalize)
@@ -70,98 +58,90 @@ const sha256Hex = async (value: string): Promise<string> => {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  !!value && typeof value === 'object' && !Array.isArray(value)
+const getDb = async () => (await getCloudflareContext({ async: true })).env.D1
 
-type D1Binding = Awaited<ReturnType<typeof getCloudflareContext>>['env']['D1']
+const getEnvelope = async (db: D1Database, key: string) =>
+  db.prepare(
+    `SELECT id, payload_hash AS payloadHash, state, committed_response AS committedResponse, expires_at AS expiresAt
+       FROM auth_registration_envelopes
+      WHERE idempotency_key = ? AND scope = ? AND endpoint = ?
+      ORDER BY created_at DESC LIMIT 1`,
+  ).bind(key, SCOPE, ENDPOINT).first<{
+    id: string
+    payloadHash: string
+    state: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
+    committedResponse: string | null
+    expiresAt: string
+  }>()
 
-const isExpired = (expiresAt: string, now: Date) => {
-  const value = Date.parse(expiresAt)
-  return !Number.isFinite(value) || value <= now.getTime()
-}
-
-const getExistingEnvelope = async (db: D1Binding, idempotencyKey: string): Promise<ExistingEnvelope | null> => {
-  return db
-    .prepare(
-      `
-        SELECT
-          id,
-          payload_hash AS payloadHash,
-          state,
-          committed_response AS committedResponse,
-          expires_at AS expiresAt
-        FROM auth_registration_envelopes
-        WHERE idempotency_key = ?
-          AND scope = ?
-          AND endpoint = ?
-        ORDER BY created_at DESC
-        LIMIT 1
-      `,
-    )
-    .bind(idempotencyKey, SCOPE, ENDPOINT)
-    .first<ExistingEnvelope>()
-}
-
-
-const parseReplay = (value: ExistingEnvelope['committedResponse']): RegistrationResponse | null => {
+const parseCommitted = (value: string | null): RegistrationResponse | null => {
   if (!value) return null
-
-  let parsed: unknown = value
-  if (typeof value === 'string') {
-    try {
-      parsed = JSON.parse(value)
-    } catch {
-      return null
-    }
-  }
-
-  if (
-    !parsed ||
-    typeof parsed !== 'object' ||
-    typeof (parsed as { userId?: unknown }).userId !== 'string' ||
-    (parsed as { accountState?: unknown }).accountState !== ACCOUNT_STATE
-  ) {
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>
+    if (typeof parsed.userId !== 'string' || parsed.accountState !== ACCOUNT_STATE) return null
+    return { userId: parsed.userId, accountState: ACCOUNT_STATE }
+  } catch {
     return null
   }
-
-  return {
-    userId: (parsed as { userId: string }).userId,
-    accountState: ACCOUNT_STATE,
-  }
 }
 
-const isUniqueConstraintError = (error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error)
-  return /unique constraint|unique constraint failed|duplicate/i.test(message)
-}
+const nativeUserByEmail = async (db: D1Database, email: string) =>
+  db.prepare(
+    `SELECT id, email, username, name, account_state AS accountState, account_state_version AS accountStateVersion
+       FROM "user" WHERE email = ? LIMIT 1`,
+  ).bind(email).first<{
+    id: string
+    email: string
+    username: string | null
+    name: string
+    accountState: string
+    accountStateVersion: number
+  }>()
 
-const validatePolicy = (now: Date) => {
-  const runtimeEnvironment = process.env.CLOUDFLARE_ENV ?? (process.env.NODE_ENV === 'production' ? 'production' : 'development')
-  const priv004Policy = runtimeEnvironment.toLowerCase() === 'production' ? priv004ProdPolicy : priv004DevPolicy
-  if (
-    priv004Policy.status !== 'APPROVED' ||
-    (runtimeEnvironment.toLowerCase() === 'production'
-      ? priv004Policy.environment !== 'PRODUCTION' || priv004Policy.usage.productionUse !== true
-      : priv004Policy.environment !== 'DEVELOPMENT' || priv004Policy.usage.productionUse !== false) ||
-    priv004Policy.rule.mode !== 'DURATION' ||
-    !Number.isSafeInteger(priv004Policy.rule.durationSeconds) ||
-    priv004Policy.rule.durationSeconds <= 0 ||
-    priv004Policy.scope.operationId !== ENDPOINT ||
-    priv004Policy.scope.purpose !== SCOPE
-  ) throw new Error('PRIV004_POLICY_NOT_ADMISSIBLE')
+const ensurePayloadProjection = async (
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  nativeUser: { id: string; email: string; username: string | null; name: string },
+): Promise<void> => {
+  const existingByIdentity = await payload.find({
+    collection: 'users',
+    where: { identityUserId: { equals: nativeUser.id } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  if (existingByIdentity.docs.length > 0) return
 
-  const effectiveFrom = Date.parse(priv004Policy.effectiveFrom)
-  const effectiveTo = priv004Policy.effectiveTo === null ? Number.POSITIVE_INFINITY : Date.parse(priv004Policy.effectiveTo)
-  if (!Number.isFinite(effectiveFrom) || (!Number.isFinite(effectiveTo) && effectiveTo !== Number.POSITIVE_INFINITY) || now.getTime() < effectiveFrom || now.getTime() > effectiveTo) {
-    throw new Error('PRIV004_POLICY_OUTSIDE_WINDOW')
+  const existingByEmail = await payload.find({
+    collection: 'users',
+    where: { email: { equals: nativeUser.email } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  const existing = existingByEmail.docs[0] as unknown as { id?: string | number } | undefined
+
+  if (existing?.id) {
+    await payload.update({
+      collection: 'users',
+      id: existing.id,
+      data: { identityUserId: nativeUser.id },
+      overrideAccess: true,
+      depth: 0,
+    })
+    return
   }
 
-  return {
-    policyVersion: priv004Policy.policyVersion,
-    retentionClass: 'LEGAL_AUDIT' as const,
-    retentionUntil: new Date(now.getTime() + priv004Policy.rule.durationSeconds * 1000).toISOString(),
-    sourceAuthority: priv004Policy.sourceAuthority,
-  }
+  await payload.create({
+    collection: 'users',
+    data: {
+      email: nativeUser.email,
+      username: nativeUser.username?.trim() || nativeUser.name,
+      displayName: nativeUser.name,
+      identityUserId: nativeUser.id,
+    },
+    overrideAccess: true,
+    disableTransaction: true,
+  })
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -173,359 +153,191 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
 
-const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
-  if (!idempotencyKey || idempotencyKey.length > 255) return errorResponse(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key is required')
-  let body: unknown
-  try { body = await request.json() } catch { return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body') }
-  if (!isRecord(body) || !isRecord(body.consent)) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid registration request')
+  const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+  if (!idempotencyKey || idempotencyKey.length > 255) {
+    return errorResponse(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key is required')
+  }
 
-  const identityType = body.identityType
-  const identity = body.identity
-  const credential = body.credential
-  const username = body.username
-  const consent = body.consent
+  let body: RegistrationBody
+  try {
+    body = await request.json() as RegistrationBody
+  } catch {
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
+  }
+
+  if (!isRecord(body.consent)) {
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid registration request')
+  }
+
+  const identity = typeof body.identity === 'string' ? body.identity.trim().toLowerCase() : ''
+  const credential = typeof body.credential === 'string' ? body.credential : ''
+  const username = typeof body.username === 'string' ? body.username.trim() : ''
   if (
-    identityType !== 'email' ||
-    typeof identity !== 'string' || identity.trim().length === 0 ||
-    typeof credential !== 'string' || credential.length === 0 ||
-    typeof username !== 'string' || username.trim().length === 0 || username.length > 128 ||
-    consent.purpose !== SCOPE ||
-    typeof consent.policyVersion !== 'string' || consent.policyVersion.length === 0 ||
-    Object.keys(consent).some((key) => !['purpose', 'policyVersion'].includes(key))
-  ) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid registration request')
+    body.identityType !== 'email' ||
+    !identity ||
+    credential.length < 15 ||
+    credential.length > 128 ||
+    !username ||
+    username.length > 128 ||
+    body.consent.purpose !== SCOPE ||
+    typeof body.consent.policyVersion !== 'string' ||
+    !body.consent.policyVersion
+  ) {
+    return errorResponse(422, 'VALIDATION_FAILED', 'Invalid registration request')
+  }
 
-  const now = new Date()
-  let policy: ReturnType<typeof validatePolicy>
-  try { policy = validatePolicy(now) } catch { return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration policy is unavailable') }
-  if (consent.policyVersion !== policy.policyVersion) return errorResponse(422, 'VALIDATION_FAILED', 'Consent policyVersion is not admitted for registration')
-
+  const db = await getDb()
   const normalized = {
     identityType: 'email',
-    identity: identity.trim().toLowerCase(),
+    identity,
     credential,
-    username: username.trim(),
-    consent: { purpose: SCOPE, policyVersion: consent.policyVersion },
+    username,
+    consent: {
+      purpose: SCOPE,
+      policyVersion: body.consent.policyVersion,
+    },
   }
   const payloadHash = await sha256Hex(JSON.stringify(canonicalize(normalized)))
-  const responseDigest = await sha256Hex(
-    JSON.stringify(
-      canonicalize({
-        schema: 'AUTH-001.response-digest.v1',
-        operationId: 'authRegister',
-        endpoint: '/auth/register',
-        idempotencyKey,
-        payloadHash,
-        status: 201,
-        accountState: ACCOUNT_STATE,
-      }),
-    ),
-  )
-  const { env } = await getCloudflareContext({ async: true })
-  const existing = await getExistingEnvelope(env.D1, idempotencyKey)
-  const payload = await getPayload({ config })
+  const now = new Date()
+  const existing = await getEnvelope(db, idempotencyKey)
 
-  if (existing && !isExpired(existing.expiresAt, now)) {
-    if (existing.payloadHash !== payloadHash) return errorResponse(422, 'IDEMPOTENCY_KEY_REUSE_CONFLICT', 'Idempotency key cannot be reused with different input')
-    if (existing.state === 'IN_PROGRESS') return errorResponse(409, 'IDEMPOTENCY_IN_PROGRESS', 'A registration with this Idempotency-Key is already in progress', { 'retry-after': '1' })
+  if (existing && Date.parse(existing.expiresAt) > now.getTime()) {
+    if (existing.payloadHash !== payloadHash) {
+      return errorResponse(422, 'IDEMPOTENCY_KEY_REUSE_CONFLICT', 'Idempotency key cannot be reused with different input')
+    }
+    if (existing.state === 'IN_PROGRESS') {
+      return errorResponse(409, 'IDEMPOTENCY_IN_PROGRESS', 'A registration with this Idempotency-Key is already in progress', { 'retry-after': '1' })
+    }
     if (existing.state === 'COMPLETED') {
-      const replay = parseReplay(existing.committedResponse)
+      const replay = parseCommitted(existing.committedResponse)
       return replay ? json(replay, 201) : errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration replay record is unavailable')
     }
-    return errorResponse(409, 'REGISTRATION_RETRY_REQUIRED', 'The prior registration attempt is not replayable')
   }
 
-  const capture: { data: Record<string, unknown> | null } = { data: null }
+  const envelopeId = crypto.randomUUID()
+  const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
+  try {
+    await db.prepare(
+      `INSERT INTO auth_registration_envelopes
+        (id, idempotency_key, active_key, scope, endpoint, payload_hash, state, expires_at, updated_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'IN_PROGRESS', ?, ?, ?)`,
+    ).bind(
+      envelopeId,
+      idempotencyKey,
+      idempotencyKey,
+      SCOPE,
+      ENDPOINT,
+      payloadHash,
+      expiresAt,
+      now.toISOString(),
+      now.toISOString(),
+    ).run()
+  } catch (error) {
+    const current = await getEnvelope(db, idempotencyKey)
+    if (current && current.payloadHash === payloadHash && current.state === 'COMPLETED') {
+      const replay = parseCommitted(current.committedResponse)
+      return replay ? json(replay, 201) : errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration replay record is unavailable')
+    }
+    return errorResponse(409, 'IDEMPOTENCY_IN_PROGRESS', 'A registration with this Idempotency-Key is already in progress', { 'retry-after': '1' })
+  }
+
+  let authResponse: Response
+  let nativeUser: { id: string; email: string; username: string | null; name: string } | null = null
 
   try {
-    await payload.create({
-      collection: 'users',
-      data: {
-        email: normalized.identity,
-        password: normalized.credential,
-        username: normalized.username,
-      } as any,
-      overrideAccess: true,
-      disableTransaction: true,
-      req: request,
-      context: {
-        [AUTH001_USER_CAPTURE_CONTEXT]: capture,
+    authResponse = await callW02BetterAuth(request, '/api/auth/sign-up/email', {
+      method: 'POST',
+      body: {
+        name: username,
+        email: identity,
+        password: credential,
+        username,
       },
     })
-  } catch (error) {
-    if (isUniqueConstraintError(error) || (error instanceof Error && /username|email/i.test(error.message))) {
-      return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
+
+    let authBody: unknown = null
+    try {
+      authBody = await authResponse.clone().json()
+    } catch {
+      authBody = null
     }
 
-    console.error(
-      JSON.stringify({
-        event: 'auth.register.native_validation_failure',
-        diagnosticCode: 'AUTH001_NATIVE_VALIDATION_FAILURE',
-        errorName: error instanceof Error ? error.name : typeof error,
-      }),
-    )
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
-  }
-
-  const userData = capture.data
-  if (
-    !userData ||
-    typeof userData.email !== 'string' ||
-    typeof userData.username !== 'string' ||
-    typeof userData.hash !== 'string' ||
-    typeof userData.salt !== 'string' ||
-    'password' in userData
-  ) {
-    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Native registration persistence intent is unavailable')
-  }
-
-  const consentRecordId = crypto.randomUUID()
-  const envelopeId = crypto.randomUUID()
-  const statements: Array<ReturnType<typeof env.D1.prepare>> = []
-  const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  const committedAt = now.toISOString()
-
-  const userIdSubquery = `
-    SELECT id
-    FROM users
-    WHERE email = ?
-      AND username = ?
-    LIMIT 1
-  `
-
-  const committedResponseSql = `
-    '{"userId":"' ||
-    CAST((${userIdSubquery}) AS TEXT) ||
-    '","accountState":"${ACCOUNT_STATE}"}'
-  `
-
-  // Idempotency reservation is part of the same D1 batch. If a stale
-  // reservation exists, remove only that expired row first. The following
-  // plain UNIQUE insert is the concurrency gate: exactly one request can
-  // reserve active_key; the losing concurrent request receives the canonical
-  // 409 instead of updating the winner's reservation.
-  const expiredReservationCleanup =
-    existing && isExpired(existing.expiresAt, now)
-      ? env.D1
-          .prepare(
-            `
-              DELETE FROM auth_registration_envelopes
-              WHERE id = ?
-                AND active_key = ?
-                AND expires_at <= ?
-            `,
-          )
-          .bind(existing.id, idempotencyKey, now.toISOString())
-      : null
-
-  if (expiredReservationCleanup) {
-    statements.push(expiredReservationCleanup)
-  }
-
-  statements.push(
-    env.D1
-      .prepare(
-        `
-          INSERT INTO auth_registration_envelopes (
-            id,
-            idempotency_key,
-            active_key,
-            scope,
-            endpoint,
-            payload_hash,
-            state,
-            response_digest,
-            committed_response,
-            expires_at,
-            consent_record_id,
-            updated_at,
-            created_at
-          )
-          VALUES (?, ?, ?, ?, ?, ?, 'IN_PROGRESS', ?, NULL, ?, ?, ?, ?)
-        `,
-      )
-      .bind(
-        envelopeId,
-        idempotencyKey,
-        idempotencyKey,
-        SCOPE,
-        'authRegister',
-        payloadHash,
-        responseDigest,
-        expiresAt,
-        consentRecordId,
-        committedAt,
-        committedAt,
-      ),
-  )
-
-  statements.push(
-    env.D1
-      .prepare(
-        `
-          INSERT INTO users (
-            email,
+    const candidateUser = isRecord(authBody) && isRecord(authBody.user) ? authBody.user : null
+    const candidateUserId = candidateUser && typeof candidateUser.id === 'string' ? candidateUser.id : null
+    nativeUser =
+      candidateUserId
+        ? {
+            id: candidateUserId,
+            email: identity,
             username,
-            salt,
-            hash,
-            display_name,
-            bio,
-            avatar,
-            locale,
-            timezone
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-      )
-      .bind(
-        String(userData.email),
-        String(userData.username),
-        String(userData.salt),
-        String(userData.hash),
-        typeof userData.displayName === 'string' ? userData.displayName : null,
-        typeof userData.bio === 'string' ? userData.bio : null,
-        typeof userData.avatar === 'string' ? userData.avatar : null,
-        typeof userData.locale === 'string' ? userData.locale : 'en-US',
-        typeof userData.timezone === 'string' ? userData.timezone : 'UTC',
-      ),
-  )
+            name: username,
+          }
+        : await nativeUserByEmail(db, identity)
 
-  statements.push(
-    env.D1
-      .prepare(
-        `
-          INSERT INTO consents (
-            id,
-            actor_subject_id,
-            owner_subject_id,
-            resource_id,
-            resource_type,
-            purpose,
-            state,
-            policy_version,
-            legal_basis,
-            retention_class,
-            retention_until,
-            source_authority
-          )
-          VALUES (
-            ?,
-            CAST((${userIdSubquery}) AS TEXT),
-            CAST((${userIdSubquery}) AS TEXT),
-            CAST((${userIdSubquery}) AS TEXT),
-            'User',
-            'ACCOUNT_REGISTRATION',
-            'GRANTED',
-            ?,
-            'CONSENT',
-            'LEGAL_AUDIT',
-            ?,
-            ?
-          )
-        `,
-      )
-      .bind(
-        consentRecordId,
-        String(userData.email),
-        String(userData.username),
-        String(userData.email),
-        String(userData.username),
-        String(userData.email),
-        String(userData.username),
-        policy.policyVersion,
-        policy.retentionUntil,
-        policy.sourceAuthority,
-      ),
-  )
-
-  statements.push(
-    env.D1
-      .prepare(
-        `
-          UPDATE auth_registration_envelopes
-          SET state = 'COMPLETED',
-              committed_response = ${committedResponseSql},
-              updated_at = ?
-          WHERE id = ?
-            AND state = 'IN_PROGRESS'
-        `,
-      )
-      .bind(
-        String(userData.email),
-        String(userData.username),
-        now.toISOString(),
-        envelopeId,
-      ),
-  )
-
-  statements.push(
-    env.D1
-      .prepare(
-        `
-          SELECT committed_response
-          FROM auth_registration_envelopes
-          WHERE id = ?
-          LIMIT 1
-        `,
-      )
-      .bind(envelopeId),
-  )
-
-
-  try {
-    const batchResult = await env.D1.batch(statements)
-    const cleanupOffset = expiredReservationCleanup ? 1 : 0
-    const reservationIndex = cleanupOffset
-    const userIndex = reservationIndex + 1
-    const consentIndex = userIndex + 1
-    const completionIndex = consentIndex + 1
-    const responseIndex = completionIndex + 1
-
-    if (
-      batchResult.length !== statements.length ||
-      (cleanupOffset === 1 && batchResult[0]?.meta?.changes !== 1) ||
-      batchResult[reservationIndex]?.meta?.changes !== 1 ||
-      batchResult[userIndex]?.meta?.changes !== 1 ||
-      batchResult[consentIndex]?.meta?.changes !== 1 ||
-      batchResult[completionIndex]?.meta?.changes !== 1 ||
-      !batchResult[responseIndex]
-    ) {
-      throw new Error('AUTH001_BATCH_RESULT_INCOMPLETE')
+    if (!nativeUser) {
+      await db.prepare(
+        `UPDATE auth_registration_envelopes SET state = 'FAILED', updated_at = ? WHERE id = ?`,
+      ).bind(new Date().toISOString(), envelopeId).run()
+      return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service did not return a usable account')
     }
 
-    const responseRow = batchResult[responseIndex]?.results?.[0] as { committed_response?: unknown } | undefined
-    if (!responseRow || typeof responseRow.committed_response !== 'string') {
-      throw new Error('AUTH001_COMMITTED_RESPONSE_UNAVAILABLE')
+    if (!authResponse.ok && authResponse.status !== 200 && authResponse.status !== 201) {
+      await db.prepare(
+        `UPDATE auth_registration_envelopes SET state = 'FAILED', updated_at = ? WHERE id = ?`,
+      ).bind(new Date().toISOString(), envelopeId).run()
+      const status = authResponse.status === 400 || authResponse.status === 422 || authResponse.status === 409 ? 422 : 503
+      return errorResponse(status, status === 422 ? 'VALIDATION_FAILED' : 'SERVICE_UNAVAILABLE', status === 422 ? 'Registration could not be completed' : 'Registration service unavailable')
     }
 
-    const responseBody = parseReplay(JSON.parse(responseRow.committed_response))
-    if (!responseBody) {
-      throw new Error('AUTH001_COMMITTED_RESPONSE_INVALID')
+    const payload = await getPayload({ config })
+    await ensurePayloadProjection(payload, nativeUser)
+
+    const consentRecordId = crypto.randomUUID()
+    await db.prepare(
+      `INSERT INTO consents
+        (id, actor_subject_id, owner_subject_id, resource_id, resource_type, purpose, state, policy_version, legal_basis, retention_class, retention_until, source_authority)
+       VALUES (?, ?, ?, ?, 'User', ?, 'GRANTED', ?, 'CONSENT', 'LEGAL_AUDIT', ?, 'W01')`,
+    ).bind(
+      consentRecordId,
+      nativeUser.id,
+      nativeUser.id,
+      nativeUser.id,
+      SCOPE,
+      body.consent.policyVersion,
+      expiresAt,
+    ).run()
+
+    const responseBody: RegistrationResponse = {
+      userId: nativeUser.id,
+      accountState: ACCOUNT_STATE,
     }
 
-    return json(responseBody, 201)
+    await db.prepare(
+      `UPDATE auth_registration_envelopes
+          SET state = 'COMPLETED', committed_response = ?, consent_record_id = ?, updated_at = ?
+        WHERE id = ? AND state = 'IN_PROGRESS'`,
+    ).bind(
+      JSON.stringify(responseBody),
+      consentRecordId,
+      new Date().toISOString(),
+      envelopeId,
+    ).run()
+
+    const headers: Record<string, string> = {}
+    const setCookie = authResponse.headers.get('set-cookie')
+    if (setCookie) headers['set-cookie'] = setCookie
+    return json(responseBody, 201, headers)
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    if (isUniqueConstraintError(error) && /auth_registration_envelopes|active_key/i.test(message)) {
-      return errorResponse(
-        409,
-        'IDEMPOTENCY_IN_PROGRESS',
-        'A registration with this Idempotency-Key is already in progress',
-        { 'retry-after': '1' },
-      )
+    await db.prepare(
+      `UPDATE auth_registration_envelopes SET state = 'FAILED', updated_at = ? WHERE id = ? AND state = 'IN_PROGRESS'`,
+    ).bind(new Date().toISOString(), envelopeId).run()
+    if (error instanceof Error && /unique|already exists|duplicate/i.test(error.message)) {
+      return errorResponse(422, 'VALIDATION_FAILED', 'Registration identity is already in use')
     }
-
-    if (isUniqueConstraintError(error)) {
-      return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')
-    }
-
-    console.error(
-      JSON.stringify({
-        event: 'auth.register.batch_failure',
-        diagnosticCode: 'AUTH001_D1_BATCH_FAILURE',
-        errorName: error instanceof Error ? error.name : typeof error,
-      }),
-    )
-
+    console.error(JSON.stringify({
+      event: 'auth.register.better_auth_failure',
+      errorName: error instanceof Error ? error.name : typeof error,
+    }))
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
 }
