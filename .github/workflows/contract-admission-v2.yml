@@ -199,7 +199,7 @@ jobs:
       - alignment
       - mapping-zero-final
       - repository-hygiene
-    if: ${{ always() && needs.contract.result == 'success' && needs['contract-semantic'].result == 'success' && needs.feature-inventory.result == 'success' && needs.payload-reconciliation.result == 'success' && needs['capability-graph'].result == 'success' && needs['mapping-zero-final'].result == 'success' && needs.repository-hygiene.result == 'success' && (inputs.admission_mode != 'FULL' || (needs['capability-graph-strict-downstream'].result == 'success' && needs.alignment.result == 'success')) }}
+    if: ${{ always() && needs.contract.result == 'success' && needs['contract-semantic'].result == 'success' && needs.feature-inventory.result == 'success' && needs.payload-reconciliation.result == 'success' && needs['capability-graph'].result == 'success' && needs['mapping-zero-final'].result == 'success' && needs['repository-hygiene'].result == 'success' && (inputs.admission_mode != 'FULL' || (needs['capability-graph-strict-downstream'].result == 'success' && needs.alignment.result == 'success')) }}
     steps:
       - uses: actions/checkout@v4
         with:
