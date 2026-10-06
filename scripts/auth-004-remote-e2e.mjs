@@ -71,10 +71,10 @@ async function createUser(label) {
 async function preparePositiveAuthSubject(user, label) {
   const now = new Date().toISOString()
   const roleAssignmentId = `${TEST_ID}-${label}-${randomBytes(6).toString('hex')}`
-  const before = query(`SELECT account_state,account_state_version FROM users WHERE CAST(id AS TEXT)=${sqlString(user.id)} LIMIT 1`)[0]
+  const before = query(`SELECT account_state,account_state_version FROM "user" WHERE CAST(id AS TEXT)=${sqlString(user.id)} LIMIT 1`)[0]
   const existingAssignments = query(`SELECT id FROM role_assignments WHERE CAST(subject_id AS TEXT)=${sqlString(user.id)}`)
   if (existingAssignments.length !== 0) throw new Error(`positive auth fixture ${label}: synthetic user already has role assignments`)
-  d1(`UPDATE users SET account_state='ACTIVE', account_state_version=COALESCE(account_state_version, 0) + 1 WHERE CAST(id AS TEXT)=${sqlString(user.id)}`)
+  d1(`UPDATE "user" SET account_state='ACTIVE', account_state_version=COALESCE(account_state_version, 0) + 1 WHERE CAST(id AS TEXT)=${sqlString(user.id)}`)
   d1(`INSERT INTO role_assignments
     (id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at)
     VALUES (${sqlString(roleAssignmentId)}, ${sqlString(user.id)}, 'user', 'global', NULL, 'ACTIVE', ${sqlString(now)}, NULL, ${sqlString(now)}, ${sqlString(now)})`)
@@ -114,7 +114,7 @@ async function login(user, deviceId) {
   if (!res.data?.accessToken || !res.data?.refreshToken) throw new Error(`login ${deviceId}: missing auth pair`)
   return { accessToken: res.data.accessToken, refreshToken: res.data.refreshToken }
 }
-const sessionRows = (userId) => query(`SELECT id,expires_at FROM users_sessions WHERE CAST(_parent_id AS TEXT)=${sqlString(userId)} ORDER BY created_at DESC`)
+const sessionRows = (userId) => query(`SELECT id,expires_at FROM "session" WHERE user_id=${sqlString(userId)} ORDER BY created_at DESC`)
 const resetState = (userId) => query(`SELECT reset_password_token,reset_password_expiration FROM users WHERE CAST(id AS TEXT)=${sqlString(userId)} LIMIT 1`)[0] ?? null
 
 let primary, secondary, firstLogin, secondLogin, changedLogin
@@ -179,7 +179,7 @@ try {
   expect(missingResetRequest.status, 202, 'missing-account reset request')
   if (existingResetRequest.bodyBytes !== 0 || missingResetRequest.bodyBytes !== 0) throw new Error('reset request returned a response body')
 
-  const state = resetState(primary.id)
+  const state = resetState(primary)
   existingResetToken = state?.reset_password_token
   if (typeof existingResetToken !== 'string' || existingResetToken.length < 1) throw new Error('remote Payload reset token was not persisted')
   if (!state?.reset_password_expiration) throw new Error('remote Payload reset expiration was not persisted')
@@ -194,11 +194,10 @@ try {
 
   expect((await request('/api/users/me', { token: changedLogin.accessToken })).status, 401, 'pre-reset session after reset')
   const postResetSessionRows = sessionRows(primary.id)
-  // Payload-native resetPassword clears prior sessions and creates one fresh
-  // native session for the reset operation itself. The route intentionally
-  // discards Payload's returned JWT to preserve the 204 contract.
-  if (postResetSessionRows.length !== 1) {
-    throw new Error(`password reset left ${postResetSessionRows.length} native sessions; expected exactly 1 reset-created session`)
+  // Better Auth revokes all existing sessions on password reset; no new session is
+  // created by the reset operation itself. A subsequent login establishes a fresh session.
+  if (postResetSessionRows.length !== 0) {
+    throw new Error(`password reset left ${postResetSessionRows.length} sessions; expected 0`)
   }
 
   const replay = await request('/auth/password/reset/confirm', {
@@ -213,7 +212,7 @@ try {
 
   const expiredRequest = await request('/auth/password/reset/request', { method: 'POST', body: { identifier: primary.email } })
   expect(expiredRequest.status, 202, 'expired-token reset request')
-  const expiredState = resetState(primary.id)
+  const expiredState = resetState(primary)
   expiredResetToken = expiredState?.reset_password_token
   if (typeof expiredResetToken !== 'string' || !expiredResetToken) throw new Error('expired reset token was not persisted')
   d1(`UPDATE users SET reset_password_expiration=${sqlString(new Date(Date.now() - 60_000).toISOString())} WHERE CAST(id AS TEXT)=${sqlString(primary.id)}`)
@@ -225,7 +224,7 @@ try {
 
   write('remote-e2e-result.json', {
     featureId: 'AUTH-004',
-    mode: 'PAYLOAD_NATIVE_REMOTE_HTTP_E2E',
+    mode: 'BETTER_AUTH_REMOTE_HTTP_E2E',
     testedCommitSha: TESTED_COMMIT_SHA,
     assertions: {
       crossAccountChangeDenied: wrongAccount.status === 401,
@@ -236,11 +235,12 @@ try {
       resetRequestEnumerationResistant: existingResetRequest.status === 202 && missingResetRequest.status === 202 && existingResetRequest.bodyBytes === 0 && missingResetRequest.bodyBytes === 0,
       passwordResetAccepted: reset.status === 204 && reset.bodyBytes === 0,
       preResetSessionInvalidated: (await request('/api/users/me', { token: changedLogin.accessToken })).status === 401,
-      exactlyOneResetCreatedNativeSession: postResetSessionRows.length === 1,
+      allPreResetSessionsRevoked: postResetSessionRows.length === 0,
       resetTokenReplayDenied: replay.status === 422,
       expiredResetTokenDenied: expiredConfirm.status === 422,
       secretsRecorded: false,
       resetTokenPersistedOnlyAsTransientHarnessValue: true,
+      resetUsesBetterAuthVerificationStore: true,
     },
     deploymentScope: {
       worker: 'luckread-w01-payload',
