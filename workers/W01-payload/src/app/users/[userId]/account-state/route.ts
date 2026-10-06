@@ -35,8 +35,6 @@ export async function POST(request: Request, context: { params: Promise<{ userId
 
   try {
     const result = await transitionAccountState(request, {
-      request,
-      body: {
         subjectId: principal.userId,
         targetUserId,
         to: body.to,
