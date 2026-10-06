@@ -4,16 +4,6 @@ import { FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-const deviceKey = 'luckread.deviceId'
-
-function getDeviceId() {
-  const existing = sessionStorage.getItem(deviceKey)
-  if (existing) return existing
-  const value = crypto.randomUUID()
-  sessionStorage.setItem(deviceKey, value)
-  return value
-}
-
 export default function LoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -27,18 +17,17 @@ export default function LoginForm() {
     setBusy(true)
 
     try {
-      const response = await fetch('/api/v1/auth/login', {
+      const response = await fetch('/api/auth/sign-in/email', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          identity: email.trim(),
-          credential: password,
-          deviceId: getDeviceId(),
+          email: email.trim().toLowerCase(),
+          password,
         }),
       })
       const data = await response.json().catch((): null => null)
 
-      if (!response.ok || !data?.accessToken || !data?.refreshToken) {
+      if (!response.ok) {
         setError(data?.error?.message || '登录失败，请检查账号和密码。')
         return
       }
