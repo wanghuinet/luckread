@@ -1,6 +1,4 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
+import { callW02BetterAuth } from '../../../../../auth/w02-auth-client.js'
 
 type PasswordResetRequest = {
   identifier?: unknown
@@ -24,7 +22,7 @@ const jsonError = (status: number, code: string, message: string) =>
 export async function POST(request: Request): Promise<Response> {
   let body: PasswordResetRequest
   try {
-    body = (await request.json()) as PasswordResetRequest
+    body = await request.json() as PasswordResetRequest
   } catch {
     return jsonError(422, 'VALIDATION_FAILED', 'Invalid password recovery request')
   }
@@ -33,33 +31,27 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(422, 'VALIDATION_FAILED', 'Invalid password recovery request')
   }
 
-  const payload = await getPayload({ config })
-
   try {
-    // Payload's native forgotPassword flow deliberately fails silently when
-    // the account does not exist. The route returns the same 202 response in
-    // either case, preserving the contract's enumeration-resistant semantics.
-    await payload.forgotPassword({
-      collection: 'users',
-      data: {
+    const response = await callW02BetterAuth(request, '/api/auth/request-password-reset', {
+      method: 'POST',
+      body: {
         email: body.identifier.trim().toLowerCase(),
+        redirectTo: new URL('/reset-password', request.url).toString(),
       },
     })
-  } catch (error) {
-    console.error(
-      JSON.stringify({
-        event: 'auth.password_reset_request.native_failure',
-        diagnosticCode: 'AUTH004_PAYLOAD_FORGOT_PASSWORD_FAILURE',
-        errorName: error instanceof Error ? error.name : typeof error,
-      }),
-    )
+
+    if (response.status === 400 || response.status === 422) {
+      return jsonError(422, 'VALIDATION_FAILED', 'Invalid password recovery request')
+    }
+    if (!response.ok) {
+      return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password recovery service unavailable')
+    }
+
+    return new Response(null, {
+      status: 202,
+      headers: { 'cache-control': 'no-store' },
+    })
+  } catch {
     return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password recovery service unavailable')
   }
-
-  return new Response(null, {
-    status: 202,
-    headers: {
-      'cache-control': 'no-store',
-    },
-  })
 }
