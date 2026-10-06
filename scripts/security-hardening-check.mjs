@@ -110,9 +110,9 @@ function walkW01Auth(dir) {
     if (!/\.(mjs|cjs|js|ts|tsx)$/.test(entry.name)) continue
     const source = fs.readFileSync(full, 'utf8')
     for (const [name, re] of [
-      ['Payload native auth call', /payload\\.(auth|login)\\s*\\(/],
+      ['Payload native auth call', /payload\.(auth|login)\s*\(/],
       ['Payload runtime auth import', /from ['"]payload['"]/],
-      ['Payload runtime loader in auth path', /getPayload\\s*\\(\\s*\\{\\s*config/],
+      ['Payload runtime loader in auth path', /getPayload\s*\(\s*\{\s*config/],
     ]) {
       if (re.test(source)) fail(`W01 normal auth path must not use Payload authentication: ${name}: ${full}`)
     }
