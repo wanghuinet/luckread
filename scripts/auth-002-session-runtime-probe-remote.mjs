@@ -8,9 +8,9 @@ const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID
 const TEST_RUN_ID = String(process.env.GITHUB_RUN_ID || Date.now())
 const TESTED_COMMIT_SHA = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
-const WORKER_PATH = 'workers/W01-payload'
+const WORKER_PATH = 'workers/W02-identity'
 const WRANGLER_VERSION = process.env.WRANGLER_VERSION || '4.116.0'
-const WRANGLER_CONFIG = 'workers/W01-payload/wrangler.jsonc'
+const WRANGLER_CONFIG = 'workers/W02-identity/wrangler.jsonc'
 const ARTIFACT_DIR = 'artifacts/evidence/auth-002/runtime'
 const GATE1_DIR = 'artifacts/evidence/auth-002/gate1'
 
@@ -127,15 +127,22 @@ async function createUser(label) {
   const email = `auth002-${label}-${suffix}@example.com`
   const username = `auth002_${label}_${suffix}`
   const password = `A2-${randomBytes(24).toString('base64url')}-Z9!`
-  const response = await request('/api/users', {
+  const response = await request('/auth/register', {
     method: 'POST',
-    body: { email, username, password },
+    headers: { 'Idempotency-Key': `${testId}-register-${label}` },
+    body: {
+      identityType: 'email',
+      identity: email,
+      credential: password,
+      username,
+      consent: { purpose: 'ACCOUNT_REGISTRATION', policyVersion: 'PROD-2026-09-28.1' },
+    },
   })
   if (!response.ok) {
     let orphanRecovered = false
     try {
       const rows = d1Rows(
-        `SELECT id,email FROM users WHERE email=${sqlString(email)} LIMIT 2`,
+        `SELECT id,email FROM "user" WHERE email=${sqlString(email)} LIMIT 2`,
       )
       if (rows.length === 1 && String(rows[0]?.email ?? '') === email) {
         context.createdUsers.push({ userId: String(rows[0].id), email })
@@ -148,7 +155,7 @@ async function createUser(label) {
     }
     writeJson('runtime-create-user-diagnostic.json', {
       testId,
-      operation: 'POST /api/users',
+      operation: 'POST /auth/register',
       label,
       status: response.status,
       contentType: response.contentType,
@@ -161,7 +168,7 @@ async function createUser(label) {
     })
     throw new Error(`createUser(${label}) failed with HTTP ${response.status}`)
   }
-  const userId = response.data?.doc?.id ?? response.data?.id
+  const userId = response.data?.userId
   if (userId === undefined || userId === null) throw new Error(`createUser(${label}) did not return a user id`)
   context.createdUsers.push({ userId: String(userId), email })
   return { userId: String(userId), email, password, username }
@@ -169,25 +176,22 @@ async function createUser(label) {
 
 async function captureUserAuthState(user, label) {
   const rows = d1Rows(
-    `SELECT id,email,
-      CASE WHEN hash IS NOT NULL AND length(hash) > 0 THEN 1 ELSE 0 END AS hash_present,
-      CASE WHEN salt IS NOT NULL AND length(salt) > 0 THEN 1 ELSE 0 END AS salt_present,
-      COALESCE(login_attempts, 0) AS login_attempts,
-      CASE WHEN lock_until IS NOT NULL THEN 1 ELSE 0 END AS lock_until_present
-     FROM users WHERE CAST(id AS TEXT)=${sqlString(user.userId)} LIMIT 1`,
+    `SELECT u.id,u.email,
+      CASE WHEN a.password IS NOT NULL AND length(a.password) > 0 THEN 1 ELSE 0 END AS password_present
+     FROM "user" AS u
+     LEFT JOIN "account" AS a
+       ON a.user_id=CAST(u.id AS TEXT) AND a.provider_id='credential'
+     WHERE CAST(u.id AS TEXT)=${sqlString(user.userId)} LIMIT 1`,
   )
   const row = rows[0]
   const artifact = {
     testId,
-    operation: 'remote D1 user auth state pre-login',
+    operation: 'remote D1 Better Auth credential state pre-login',
     label,
     userId: user.userId,
     userExists: Boolean(row?.id),
     emailMatches: String(row?.email ?? '') === user.email,
-    hashPresent: Number(row?.hash_present ?? 0) === 1,
-    saltPresent: Number(row?.salt_present ?? 0) === 1,
-    loginAttempts: Number(row?.login_attempts ?? 0),
-    lockUntilPresent: Number(row?.lock_until_present ?? 0) === 1,
+    credentialPasswordPresent: Number(row?.password_present ?? 0) === 1,
     secretValuesRedacted: true,
     testedCommitSha: TESTED_COMMIT_SHA,
   }
@@ -201,7 +205,7 @@ async function preparePositiveAuthSubject(user, label) {
 
   const before = d1Rows(
     `SELECT id,email,account_state,account_state_version
-     FROM users
+     FROM "user"
      WHERE CAST(id AS TEXT)=${sqlString(user.userId)}
      LIMIT 1`,
   )[0]
@@ -211,7 +215,7 @@ async function preparePositiveAuthSubject(user, label) {
   }
 
   d1Json(
-    `UPDATE users
+    `UPDATE "user"
        SET account_state='ACTIVE',
            account_state_version=COALESCE(account_state_version, 0) + 1
      WHERE CAST(id AS TEXT)=${sqlString(user.userId)}`,
@@ -262,7 +266,7 @@ async function preparePositiveAuthSubject(user, label) {
 
   const after = d1Rows(
     `SELECT id,email,account_state,account_state_version
-     FROM users
+     FROM "user"
      WHERE CAST(id AS TEXT)=${sqlString(user.userId)}
      LIMIT 1`,
   )[0]
@@ -317,32 +321,6 @@ async function preparePositiveAuthSubject(user, label) {
 }
 
 async function login(user, deviceId) {
-  const nativeResponse = await request('/api/users/login', {
-    method: 'POST',
-    body: { email: user.email, password: user.password },
-  })
-  writeJson('runtime-native-payload-login.json', {
-    testId,
-    operation: 'POST /api/users/login',
-    status: nativeResponse.status,
-    contentType: nativeResponse.contentType,
-    requestId: nativeResponse.requestId,
-    cfRay: nativeResponse.cfRay,
-    nativeLoginSuccess: nativeResponse.status === 200 && Boolean(nativeResponse.data?.user?.id),
-    tokenOmittedByCollectionPolicy: nativeResponse.status === 200 && !nativeResponse.data?.token,
-    errorCode: nativeResponse.data?.errors?.[0]?.name ?? nativeResponse.data?.error?.code ?? null,
-    errorMessage: typeof nativeResponse.data?.errors?.[0]?.message === 'string'
-      ? nativeResponse.data.errors[0].message.slice(0, 160)
-      : typeof nativeResponse.data?.error?.message === 'string'
-        ? nativeResponse.data.error.message.slice(0, 160)
-        : null,
-    secretsRedacted: true,
-    testedCommitSha: TESTED_COMMIT_SHA,
-  })
-  if (nativeResponse.status !== 200) {
-    throw new Error(`native Payload login failed: HTTP ${nativeResponse.status}`)
-  }
-
   const response = await request('/auth/login', {
     method: 'POST',
     body: { identity: user.email, credential: user.password, deviceId },
@@ -358,15 +336,16 @@ async function login(user, deviceId) {
     expiresIn: response.data.expiresIn,
   }
 }
+
 function loadSessionForUser(userId) {
   const rows = d1Rows(
-    `SELECT id,_parent_id,created_at,expires_at FROM users_sessions WHERE CAST(_parent_id AS TEXT)=${sqlString(userId)} ORDER BY created_at DESC LIMIT 1`,
+    `SELECT id,user_id,created_at,expires_at FROM "session" WHERE CAST(user_id AS TEXT)=${sqlString(userId)} ORDER BY created_at DESC LIMIT 1`,
   )
   const row = rows[0]
-  if (!row?.id) throw new Error(`native session row missing for user ${userId}`)
+  if (!row?.id) throw new Error(`Better Auth session row missing for user ${userId}`)
   const session = {
     sessionId: String(row.id),
-    userId: String(row._parent_id),
+    userId: String(row.user_id),
     createdAt: String(row.created_at),
     expiresAt: String(row.expires_at),
   }
@@ -387,7 +366,7 @@ async function getMe(token) {
 
 function updateNativeExpiry(sessionId, expiresAt) {
   d1Json(
-    `UPDATE users_sessions SET expires_at=${sqlString(expiresAt)} WHERE id=${sqlString(sessionId)}`,
+    `UPDATE "session" SET expires_at=${sqlString(expiresAt)} WHERE id=${sqlString(sessionId)}`,
   )
 }
 
@@ -425,17 +404,17 @@ async function cleanup() {
   for (const user of context.createdUsers) {
     try {
       const rows = d1Rows(
-        `SELECT id,email FROM users WHERE CAST(id AS TEXT)=${sqlString(user.userId)} LIMIT 1`,
+        `SELECT id,email FROM "user" WHERE CAST(id AS TEXT)=${sqlString(user.userId)} LIMIT 1`,
       )
       if (rows[0]?.email !== user.email) {
         context.cleanupErrors.push(`cleanup identity mismatch for user ${user.userId}`)
         continue
       }
       d1Json(`DELETE FROM auth_session_state WHERE user_id=${sqlString(user.userId)}`)
-      d1Json(
-        `DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT)=${sqlString(user.userId)}`,
-      )
-      d1Json(`DELETE FROM users WHERE CAST(id AS TEXT)=${sqlString(user.userId)}`)
+      d1Json(`DELETE FROM verification WHERE identifier=(SELECT email FROM "user" WHERE CAST(id AS TEXT)=${sqlString(user.userId)})`)
+      d1Json(`DELETE FROM account WHERE user_id=${sqlString(user.userId)}`)
+      d1Json(`DELETE FROM "session" WHERE user_id=${sqlString(user.userId)}`)
+      d1Json(`DELETE FROM "user" WHERE CAST(id AS TEXT)=${sqlString(user.userId)}`)
     } catch (error) {
       context.cleanupErrors.push(safeError(error))
     }
@@ -449,19 +428,18 @@ let logoutArtifact
 let extensionArtifact
 
 try {
-  if (dependency.dependencies?.payload !== '3.90.2' || dependency.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.90.2') {
-    throw new Error('W01 dependency contract mismatch')
+  if (dependency.dependencies?.['better-auth'] !== '1.7.7') {
+    throw new Error('W02 Better Auth dependency contract mismatch')
   }
   const lockText = readFileSync(`${WORKER_PATH}/pnpm-lock.yaml`, 'utf8')
-  if (!lockText.includes('payload:')) throw new Error('W01 lockfile missing Payload resolution')
-  if (!lockText.includes('@payloadcms/db-d1-sqlite')) throw new Error('W01 lockfile missing D1 adapter resolution')
+  if (!lockText.includes('better-auth')) throw new Error('W02 lockfile missing Better Auth resolution')
 
   const catalog = d1Rows(
     `SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE type IN ('table','index') ORDER BY type,name`,
   )
   const extensionSchema = d1Rows('PRAGMA table_info("auth_session_state")')
   const migrations = d1Rows(
-    `SELECT id,name,batch FROM payload_migrations WHERE name IS NOT NULL ORDER BY id DESC LIMIT 20`,
+    `SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name LIMIT 50`,
   )
   const catalogNames = new Set(catalog.map((row) => String(row.name ?? '')))
   const requiredIndexes = [
@@ -470,7 +448,7 @@ try {
     'auth_session_state_token_version_idx',
     'auth_session_state_revoked_at_idx',
   ]
-  for (const name of ['users', 'users_sessions', 'auth_session_state', ...requiredIndexes]) {
+  for (const name of ['user', 'session', 'account', 'verification', 'auth_session_state', ...requiredIndexes]) {
     if (!catalogNames.has(name)) throw new Error(`Gate-1 missing remote object: ${name}`)
   }
   const expectedColumns = ['session_id', 'user_id', 'device_id', 'token_version', 'refresh_credential_hash', 'revoked_at', 'last_seen_at']
@@ -484,10 +462,10 @@ try {
     environmentClass: 'CONTROLLED_REMOTE_D1',
     databaseName: DATABASE_NAME,
     testedCommitSha: TESTED_COMMIT_SHA,
-    requiredTables: ['users', 'users_sessions', 'auth_session_state'],
+    requiredTables: ['user', 'session', 'account', 'verification', 'auth_session_state'],
     requiredIndexes,
     extensionColumns: extensionSchema.map((row) => String(row.name)),
-    recentMigrations: migrations.map((row) => ({ id: row.id, name: row.name, batch: row.batch })),
+    recentSchemaTables: migrations.map((row) => String(row.name)),
   }
   writeFileSync(`${GATE1_DIR}/schema.json`, `${JSON.stringify(gate1, null, 2)}\n`)
 
@@ -509,8 +487,8 @@ try {
   creationArtifact = {
     testId,
     operation: 'POST /auth/login',
-    nativeSidObserved: true,
-    nativeSid: primarySession.sessionId,
+    betterAuthSessionObserved: true,
+    betterAuthSessionId: primarySession.sessionId,
     userBindingObserved: true,
     userId: primary.userId,
     createdAtObserved: true,
@@ -523,7 +501,7 @@ try {
 
   validationArtifact = {
     testId,
-    nativeSidValidation: primaryMe.ok ? 'PASS' : 'FAIL',
+    betterAuthSessionValidation: primaryMe.ok ? 'PASS' : 'FAIL',
     userBindingValidation: String(primaryMe.data?.user?.id ?? primaryMe.data?.id) === primary.userId ? 'PASS' : 'FAIL',
     expiryDecision: 'PENDING',
     authorizationDecision: primaryMe.ok ? 'ALLOW_VALID' : 'DENY',
@@ -584,7 +562,7 @@ try {
   logoutArtifact = {
     testId,
     logoutInvocation: logoutResponse.status === 204 ? 'PASS' : 'FAIL',
-    nativeSessionRemovalOrRevocation: postLogout.status === 401 ? 'REMOVED_OR_REVOKED' : 'STILL_AUTHORIZED',
+    betterAuthSessionRemovalOrRevocation: postLogout.status === 401 ? 'REMOVED_OR_REVOKED' : 'STILL_AUTHORIZED',
     postLogoutValidation: postLogout.status === 401 ? 'DENY' : 'ALLOW',
     secondLogoutStatus: secondLogout.status,
     idempotentSecondLogout: secondLogout.status === 204 || secondLogout.status === 401,
@@ -727,7 +705,7 @@ try {
   const missingExtensionCase = negativeCases.find((item) => item.case === 'missing extension state')
 
   extensionArtifact = {
-    nativeSid: primarySession.sessionId,
+    betterAuthSessionId: primarySession.sessionId,
     extensionLookupKey: String(primaryExtension.session_id),
     singleSessionIdentity: String(primaryExtension.session_id) === primarySession.sessionId,
     unsupportedDimensionsObserved: [
@@ -764,8 +742,7 @@ try {
     repository: 'wanghuinet/luckread',
     testedCommitSha: TESTED_COMMIT_SHA,
     workerPath: WORKER_PATH,
-    payloadVersion: dependency.dependencies?.payload,
-    d1AdapterVersion: dependency.dependencies?.['@payloadcms/db-d1-sqlite'],
+    betterAuthVersion: dependency.dependencies?.['better-auth'],
     nodeVersion: process.version,
     lockfileReference: `${WORKER_PATH}/pnpm-lock.yaml`,
     gitVersion,
@@ -815,7 +792,7 @@ try {
     creationArtifact = {
       testId,
       operation: 'POST /auth/login',
-      nativeSidObserved: false,
+      betterAuthSessionObserved: false,
       userBindingObserved: false,
       createdAtObserved: false,
       expiresAtObserved: false,
@@ -826,7 +803,7 @@ try {
   if (!validationArtifact) {
     validationArtifact = {
       testId,
-      nativeSidValidation: 'NOT_EXECUTED',
+      betterAuthSessionValidation: 'NOT_EXECUTED',
       userBindingValidation: 'NOT_EXECUTED',
       expiryDecision: 'NOT_EXECUTED',
       authorizationDecision: 'NOT_EXECUTED',
@@ -837,7 +814,7 @@ try {
     logoutArtifact = {
       testId,
       logoutInvocation: 'NOT_EXECUTED',
-      nativeSessionRemovalOrRevocation: 'NOT_EXECUTED',
+      betterAuthSessionRemovalOrRevocation: 'NOT_EXECUTED',
       postLogoutValidation: 'NOT_EXECUTED',
       idempotentSecondLogout: false,
       testedCommitSha: TESTED_COMMIT_SHA,
@@ -845,7 +822,7 @@ try {
   }
   if (!extensionArtifact) {
     extensionArtifact = {
-      nativeSid: '',
+      betterAuthSessionId: '',
       extensionLookupKey: '',
       singleSessionIdentity: false,
       unsupportedDimensionsObserved: false,
@@ -860,7 +837,6 @@ try {
   writeJson('extension-correlation.json', extensionArtifact)
 
   const allFiles = [
-    'runtime-native-payload-login.json',
     'runtime-dependency.json',
     'runtime-create-user-diagnostic.json',
     'runtime-session-creation.json',
@@ -879,7 +855,7 @@ try {
   if (!readJsonSafe('runtime-create-user-diagnostic.json')) {
     writeJson('runtime-create-user-diagnostic.json', {
       testId,
-      operation: 'POST /api/users',
+      operation: 'POST /auth/register',
       status: null,
       contentType: '',
       requestId: null,
