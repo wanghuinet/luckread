@@ -24,6 +24,9 @@ describe('mp creator entry routing', () => {
     expect(page).not.toContain("if (host === 'mp.luckread.com') {\n    redirect('/creator-center')")
     expect(creator).toContain("new Request('https://mp.luckread.com/creator-center'")
     expect(creator).toContain('getBetterAuthPrincipal(request)')
+    expect(creator).toContain("import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'")
+    expect(creator).toContain('error instanceof W02AuthClientError && error.status === 401')
+    expect(creator).toContain('throw error')
     expect(creator).toContain("redirect('/login?returnTo=%2Fcreator-center')")
   })
 
