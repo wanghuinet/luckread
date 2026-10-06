@@ -1,6 +1,4 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
+import { callW02BetterAuth } from '../../../../../auth/w02-auth-client.js'
 
 type PasswordResetConfirmRequest = {
   recoveryToken?: unknown
@@ -31,7 +29,7 @@ const assertPasswordPolicy = (value: unknown): value is string => {
 export async function POST(request: Request): Promise<Response> {
   let body: PasswordResetConfirmRequest
   try {
-    body = (await request.json()) as PasswordResetConfirmRequest
+    body = await request.json() as PasswordResetConfirmRequest
   } catch {
     return jsonError(422, 'VALIDATION_FAILED', 'Invalid password reset request')
   }
@@ -44,29 +42,27 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(422, 'VALIDATION_FAILED', 'Invalid password reset request')
   }
 
-  const payload = await getPayload({ config })
-
   try {
-    // This route is anonymous/token-bound. Explicitly keep access checks
-    // enabled; the recovery token is the native Payload authorization boundary.
-    await payload.resetPassword({
-      collection: 'users',
-      data: {
+    const response = await callW02BetterAuth(request, '/api/auth/reset-password', {
+      method: 'POST',
+      body: {
         token: body.recoveryToken,
-        password: body.newPassword,
+        newPassword: body.newPassword,
       },
-      overrideAccess: false,
+    })
+
+    if (response.status === 400 || response.status === 401 || response.status === 422) {
+      return jsonError(422, 'RECOVERY_TOKEN_REJECTED', 'Password reset token is invalid or expired')
+    }
+    if (!response.ok) {
+      return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password reset service unavailable')
+    }
+
+    return new Response(null, {
+      status: 204,
+      headers: { 'cache-control': 'no-store' },
     })
   } catch {
-    // Invalid, expired, wrong-purpose and replayed recovery tokens converge
-    // on the same client-visible class. Never echo the token or password.
-    return jsonError(422, 'RECOVERY_TOKEN_REJECTED', 'Password reset token is invalid or expired')
+    return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password reset service unavailable')
   }
-
-  return new Response(null, {
-    status: 204,
-    headers: {
-      'cache-control': 'no-store',
-    },
-  })
 }
