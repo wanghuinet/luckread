@@ -33,6 +33,15 @@ const PROFILE_FIELDS = new Set([
   'timezone',
 ])
 
+const PROFILE_FIELD_MAX_LENGTHS = {
+  username: 128,
+  displayName: 128,
+  bio: 4000,
+  avatar: 2048,
+  locale: 32,
+  timezone: 128,
+} as const
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
@@ -115,17 +124,20 @@ const authenticate = async (
   }
 }
 
-const validatePatch = (value: unknown): { ok: true; data: Record<string, string | null> } | { ok: false } => {
+export const validateUserProfilePatch = (value: unknown): { ok: true; data: Record<string, string | null> } | { ok: false } => {
   if (!isRecord(value)) return { ok: false }
   if (Object.keys(value).some((key) => !PROFILE_FIELDS.has(key))) return { ok: false }
   const data: Record<string, string | null> = {}
   for (const [field, raw] of Object.entries(value)) {
+    if (raw !== null && typeof raw !== 'string') return { ok: false }
+    if (typeof raw === 'string' && raw.length > PROFILE_FIELD_MAX_LENGTHS[field as keyof typeof PROFILE_FIELD_MAX_LENGTHS]) {
+      return { ok: false }
+    }
     if (field === 'username') {
-      if (typeof raw !== 'string' || raw.trim().length === 0 || raw.length > 128) return { ok: false }
+      if (raw === null || raw.trim().length === 0) return { ok: false }
       data.username = raw.trim()
       continue
     }
-    if (raw !== null && typeof raw !== 'string') return { ok: false }
     data[field] = typeof raw === 'string' ? raw : null
   }
   return Object.keys(data).length > 0 ? { ok: true, data } : { ok: false }
@@ -215,7 +227,7 @@ export async function updateAuthenticatedUserProfile(
   if (!userId) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
   const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
   if (!ifMatch) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match is required')
-  const parsed = validatePatch(body)
+  const parsed = validateUserProfilePatch(body)
   if (!parsed.ok) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid profile update')
   const current = await readUser(db, userId)
   if (!current) return errorResponse(404, 'RESOURCE_NOT_FOUND', 'User not found')
