@@ -224,7 +224,7 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
         credentials: 'include',
         headers: {
           accept: 'application/json',
-          'If-Match': `W/"${item.version}"`,
+          'If-Match': item.etag,
           'Idempotency-Key': crypto.randomUUID(),
         },
       })
