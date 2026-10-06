@@ -1,13 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 
+const mocks = vi.hoisted(() => ({
+  getSession: vi.fn().mockResolvedValue({
+    user: { id: 'u1', email: 'user@example.com', accountState: 'ACTIVE', accountStateVersion: 2 },
+    session: { id: 's1', expiresAt: new Date('2026-10-07T00:00:00.000Z') },
+  }),
+}))
+
 vi.mock('./better-auth.js', () => ({
   createLuckReadAuth: () => ({
-    api: {
-      getSession: vi.fn().mockResolvedValue({
-        user: { id: 'u1', email: 'user@example.com', accountState: 'ACTIVE', accountStateVersion: 2 },
-        session: { id: 's1', expiresAt: new Date('2026-10-07T00:00:00.000Z') },
-      }),
-    },
+    api: { getSession: mocks.getSession },
   }),
 }))
 
@@ -18,6 +20,18 @@ vi.mock('../authz/role-assignment.js', () => ({
 import { resolveBetterAuthPrincipal } from './principal.js'
 
 describe('W02 Better Auth principal authority', () => {
+  it('propagates Better Auth service failures to the W02 boundary', async () => {
+    mocks.getSession.mockRejectedValueOnce(new Error('D1 unavailable'))
+
+    await expect(
+      resolveBetterAuthPrincipal(
+        {} as D1Database,
+        new Request('https://luckread.test'),
+        '2026-10-06T20:00:00.000Z',
+      ),
+    ).rejects.toThrow('D1 unavailable')
+  })
+
   it('derives identity and session from Better Auth without a secondary session store', async () => {
     const db = {} as D1Database
     const result = await resolveBetterAuthPrincipal(db, new Request('https://luckread.test', {
