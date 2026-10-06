@@ -52,17 +52,14 @@ describe('Media upload access', () => {
 })
 
 
-  it('uploads media through the canonical Better Auth principal and Payload REST bridge', () => {
+  it('exposes the existing Payload/R2 upload handler through the stable v1 media path', () => {
     const route = read('src/app/api/v1/media/route.ts')
 
-    expect(route).toContain('resolveBetterAuthPrincipalThroughW02(request)')
-    expect(route).toContain('createPayloadBetterAuthBridgeToken')
-    expect(route).toContain('createPayloadBetterAuthBridgeRequest')
-    expect(route).toContain('payloadMediaPost')
-    expect(route).toContain("path: '/api/media'")
-    expect(route).not.toContain('request.formData()')
-    expect(route).not.toContain('arrayBuffer()')
-    expect(route).not.toContain('new Blob')
+    expect(route).toContain("import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route'")
+    expect(route).toContain("new URL('/api/media', request.url)")
+    expect(route).toContain('request.clone()')
+    expect(route).toContain("slug: ['media']")
+    expect(route).toContain('PayloadRouteContext')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
@@ -80,11 +77,9 @@ describe('Media upload access', () => {
   it('exposes media metadata through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
-    expect(route).toContain('createPayloadBetterAuthBridgeToken')
-    expect(route).toContain('createPayloadBetterAuthBridgeRequest')
-    expect(route).toContain('payloadMediaGet')
-    expect(route).toContain("targetPath = '/api/media/' + encodeURIComponent(mediaId)")
-    expect(route).not.toContain('request.formData()')
+    expect(route).toContain('getPayload')
+    expect(route).toContain("collection: 'media'")
+    expect(route).toContain('payload.findByID')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
@@ -119,20 +114,22 @@ describe('Media upload access', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
     expect(route).toContain('resolveBetterAuthPrincipalThroughW02(request)')
-    expect(route).toContain('createPayloadBetterAuthBridgeToken')
-    expect(route).toContain('createPayloadBetterAuthBridgeRequest')
-    expect(route).toContain('payloadMediaDelete')
-    expect(route).toContain('payloadMediaPatch')
-    expect(route).not.toContain('await payload.delete')
-    expect(route).not.toContain('await payload.update')
+    expect(route).toContain("if (!principal.active || principal.tokenVersion === undefined)")
+    expect(route).toContain("collection: 'media'")
+    expect(route).toContain('overrideAccess: false')
+    expect(route).toContain('user: { id: principal.userId }')
+    expect(route).toContain('await payload.delete')
+    expect(route).toContain('await payload.update')
+    expect(route).not.toContain('payloadMediaDelete')
+    expect(route).not.toContain('payloadMediaPatch')
   })
 
   it('exposes owner-authorized media deletion through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
-    expect(route).toContain('payloadMediaDelete')
-    expect(route).toContain('createPayloadBetterAuthBridgeRequest')
-    expect(route).toContain('return payloadMediaDelete')
+    expect(route).toContain('await payload.delete')
+    expect(route).toContain('overrideAccess: false')
+    expect(route).toContain('user: { id: principal.userId }')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
@@ -153,9 +150,9 @@ describe('Media upload access', () => {
   it('exposes owner-authorized media metadata updates through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
-    expect(route).toContain('payloadMediaPatch')
-    expect(route).toContain('createPayloadBetterAuthBridgeRequest')
-    expect(route).toContain('return payloadMediaPatch')
+    expect(route).toContain('await payload.update')
+    expect(route).toContain('overrideAccess: false')
+    expect(route).toContain('user: { id: principal.userId }')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
@@ -197,25 +194,6 @@ describe('Media upload access', () => {
     expect(route).not.toContain('presigned')
   })
 
-it('does not parse or buffer media uploads before the Payload REST bridge', () => {
-  const route = read('src/app/api/v1/media/route.ts')
-  expect(route).toContain('request.body')
-  expect(route).toContain('createPayloadBetterAuthBridgeRequest')
-  expect(route).toContain('payloadMediaPost')
-  expect(route).not.toContain('request.formData()')
-  expect(route).not.toContain('request.arrayBuffer()')
-  expect(route).not.toContain('new File(')
-  expect(route).not.toContain('new Blob(')
-})
-
-it('registers the signed Better Auth bridge without disabling native admin auth', () => {
-  const users = read('src/collections/Users.ts')
-  expect(users).toContain("strategies: [payloadBetterAuthBridgeStrategy]")
-  expect(users).toContain("import { payloadBetterAuthBridgeStrategy } from '@/auth/payload-better-auth-bridge'")
-  expect(users).toContain('removeTokenFromResponses: true')
-})
-
-
 it('guards creator media listing before W02 authentication and preserves fail-closed service errors', () => {
   const route = read('src/app/api/v1/media/route.ts')
   const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
@@ -228,11 +206,11 @@ it('guards creator media listing before W02 authentication and preserves fail-cl
   expect(route).toContain("code: 'SERVICE_UNAVAILABLE'")
 })
 
-it('guards media detail reads before Better Auth and Payload REST', () => {
+it('guards media detail reads before Better Auth and Payload Local API', () => {
   const route = read('src/app/api/v1/media/[mediaId]/route.ts')
   const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
   const authIndex = route.indexOf('const principal = await resolveBetterAuthPrincipalThroughW02(request)')
-  const payloadIndex = route.indexOf('await payloadMediaGet(')
+  const payloadIndex = route.indexOf('const payload = await getPayload({ config })')
   expect(guardIndex).toBeGreaterThanOrEqual(0)
   expect(authIndex).toBeGreaterThanOrEqual(0)
   expect(payloadIndex).toBeGreaterThanOrEqual(0)
@@ -251,13 +229,12 @@ it('guards media creation before the Payload upload handler', () => {
   expect(guardIndex).toBeLessThan(payloadIndex)
 })
 
-it('guards media update and delete before Better Auth and Payload REST', () => {
+it('guards media update and delete before Better Auth and Payload Local API', () => {
   const route = read('src/app/api/v1/media/[mediaId]/route.ts')
   expect(route).toContain('await enforceW01WriteRateLimit(request)')
   expect(route).toContain('resolveBetterAuthPrincipalThroughW02(request)')
-  expect(route).toContain('createPayloadBetterAuthBridgeRequest')
-  expect(route).toContain('return payloadMediaDelete')
-  expect(route).toContain('return payloadMediaPatch')
+  expect(route).toContain('await payload.delete')
+  expect(route).toContain('await payload.update')
   const guards = [...route.matchAll(/await enforceW01WriteRateLimit\(request\)/g)]
   expect(guards.length).toBe(2)
 })
