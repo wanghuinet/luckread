@@ -1,7 +1,7 @@
 import {
   invalidatePublicContentDetail,
   invalidatePublicContentList,
-} from '../../../../../../../../lib/public-response-cache.js'
+} from '../../../../../../../lib/public-response-cache.js'
 
 import {
   callW03Content,
