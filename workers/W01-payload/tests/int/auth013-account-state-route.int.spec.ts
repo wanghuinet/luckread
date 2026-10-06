@@ -17,18 +17,6 @@ const mocks = vi.hoisted(() => {
   }
 })
 
-vi.mock('payload', () => ({
-  getPayload: mocks.getPayload,
-}))
-
-vi.mock('@payload-config', () => ({
-  default: {},
-}))
-
-vi.mock('../../src/auth/payload-access-token.js', () => ({
-  readVerifiedPayloadTokenVersion: mocks.readVerifiedPayloadTokenVersion,
-}))
-
 vi.mock('../../src/auth/w02-session-client.js', () => ({
   getBetterAuthPrincipal: mocks.getBetterAuthPrincipal,
   transitionAccountState: mocks.transitionAccountState,
