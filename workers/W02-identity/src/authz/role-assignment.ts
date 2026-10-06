@@ -13,7 +13,7 @@ export type RoleAssignmentRecord = {
   updatedAt: string
 }
 
-export type LayerResolution = { decision: 'ALLOW' | 'DENY'; layer?: string }
+export type LayerResolution = { decision: 'ALLOW' | 'DENY'; layer?: string; roles?: string[] }
 
 export async function ensureBaseUserRole(
   db: D1Database,
@@ -78,6 +78,7 @@ export async function resolveGlobalLayer(
   const selected = eligible.reduce((current, next) =>
     Number(next.layer.slice(1)) > Number(current.layer.slice(1)) ? next : current,
   )
+  const roles = [...new Set(eligible.map(({ assignment }) => assignment.roleId))].sort()
 
-  return { decision: 'ALLOW', layer: selected.layer }
+  return { decision: 'ALLOW', layer: selected.layer, roles }
 }
