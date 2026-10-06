@@ -330,6 +330,10 @@ export default {
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/admin/authorize') {
+      if (request.headers.get('X-LuckRead-Caller') !== 'W01') {
+        return json({ allowed: false }, 403)
+      }
+
       const body = await readJsonBody<{ userId?: unknown }>(request)
       if (!body || typeof body.userId !== 'string' || body.userId.length < 1 || body.userId.length > 128) {
         return json({ allowed: false }, 400)

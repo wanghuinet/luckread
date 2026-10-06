@@ -55,7 +55,10 @@ async function callW02<T>(path: string, body: unknown): Promise<T> {
   const response = await service.fetch(
     new Request(`https://luckread-w02.internal${path}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': 'W01',
+      },
       body: JSON.stringify(body),
     }),
   )

@@ -34,6 +34,8 @@ export async function resolveCanonicalPrincipal(request: Request): Promise<Canon
   const headers = new Headers(request.headers)
   headers.delete('host')
   headers.delete('content-length')
+  // The caller identity is transport-owned; never trust a client-supplied value.
+  headers.set('X-LuckRead-Caller', 'W01')
 
   let response: Response
   try {
