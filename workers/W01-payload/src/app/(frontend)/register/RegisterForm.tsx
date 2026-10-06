@@ -58,26 +58,19 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
     setStatus('submitting')
 
     try {
-      const response = await fetch('/api/v1/auth/register', {
+      const response = await fetch('/api/auth/sign-up/email', {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'Idempotency-Key': crypto.randomUUID(),
-        },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          identityType: 'email',
-          identity: normalizedEmail,
-          credential: password,
+          name: normalizedUsername,
+          email: normalizedEmail,
+          password,
           username: normalizedUsername,
-          consent: {
-            purpose: 'ACCOUNT_REGISTRATION',
-            policyVersion,
-          },
         }),
       })
 
       const payload = (await response.json().catch((): null => null)) as
-        | RegistrationResponse
+        | { user?: { id?: unknown; name?: unknown; accountState?: unknown } }
         | ApiError
         | null
 
@@ -87,13 +80,20 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
         throw new Error(apiMessage || '注册暂时无法完成，请稍后重试。')
       }
 
-      if (
-        !payload ||
-        !('userId' in payload) ||
-        payload.accountState !== 'PENDING_VERIFICATION'
-      ) {
+      const userId =
+        payload && 'user' in payload && typeof payload.user?.id === 'string'
+          ? payload.user.id
+          : null
+      if (!userId) {
         throw new Error('注册结果无法确认，请稍后检查账号状态。')
       }
+
+      const accountState =
+        payload && 'user' in payload && payload.user?.accountState === 'ACTIVE'
+          ? 'ACTIVE'
+          : 'PENDING_VERIFICATION'
+
+      setResult({ userId, accountState })
 
       setResult(payload)
       setStatus('success')
