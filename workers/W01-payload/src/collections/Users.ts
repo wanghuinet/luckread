@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
+import { payloadBetterAuthBridgeStrategy } from '@/auth/payload-better-auth-bridge'
 import { payloadAdminOnly } from '@/auth/payload-admin-access'
 
 export const Users: CollectionConfig = {
@@ -12,6 +13,7 @@ export const Users: CollectionConfig = {
     // Payload Admin and legacy recovery boundary. Normal account authority is W02.
     forgotPassword: {},
     removeTokenFromResponses: true,
+    strategies: [payloadBetterAuthBridgeStrategy],
     // AUTH-004 remains contract/evidence gated; native capability is the implementation baseline.
   },
   // AUTH-001 contract: account registration is anonymous/public. Keep the
