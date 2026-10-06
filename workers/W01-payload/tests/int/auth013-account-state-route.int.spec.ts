@@ -57,6 +57,29 @@ describe('AUTH-013 W01 public account-state route', () => {
     expect(mocks.transitionAccountState).not.toHaveBeenCalled()
   })
 
+  it('preserves W02 authentication-service failure as 503', async () => {
+    mocks.getBetterAuthPrincipal.mockRejectedValue(new mocks.MockW02AuthClientError(503, 'service unavailable'))
+
+    const response = await POST(
+      new Request('https://luckread.test/v1/users/42/account-state', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer verified',
+          'If-Match': '"7"',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ to: 'RESTRICTED', reason: 'moderation action' }),
+      }),
+      { params: Promise.resolve({ userId: '42' }) },
+    )
+
+    expect(response.status).toBe(503)
+    expect(mocks.transitionAccountState).not.toHaveBeenCalled()
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    })
+  })
+
   it('passes only the verified principal and canonical public fields to W02', async () => {
     const response = await POST(
       new Request('https://luckread.test/v1/users/42/account-state', {
