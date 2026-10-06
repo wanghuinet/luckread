@@ -408,29 +408,40 @@ describe('Creator Center admin extension', () => {
     expect(css).toContain('.subscription-card')
   })
 
-  it('keeps frontend and Admin on the same Payload cookie session lifecycle', () => {
-    const login = read('src/app/auth/login/route.ts')
-    const refresh = read('src/app/auth/refresh/route.ts')
-    const logout = read('src/app/auth/logout/route.ts')
-    const accessToken = read('src/auth/payload-access-token.ts')
-    const sessions = read('src/app/auth/sessions/[[...segments]]/route.ts')
-    const usersMe = read('src/app/(payload)/api/users/me/route.ts')
-    const accountState = read('src/app/users/[userId]/account-state/route.ts')
+  it('keeps web authentication on the W02 Better Auth cookie session', () => {
     const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
+    const registerForm = read('src/app/(frontend)/register/RegisterForm.tsx')
+    const authProxy = read('src/app/api/auth/[...path]/route.ts')
+    const contentClient = read('src/content/w03-content-client.ts')
 
-    expect(login).toContain('buildPayloadAccessCookie')
-    expect(login).toContain("'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request)")
-    expect(refresh).toContain('buildPayloadAccessCookie')
-    expect(refresh).toContain("'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request)")
-    expect(logout).toContain('buildPayloadClearCookie(request)')
-    expect(accessToken).toContain("return getCookieValue(request, 'payload-token')")
-    expect(accessToken).toContain('export function getPayloadAuthorizationHeader')
-    expect(sessions).toContain('getPayloadAuthorizationHeader(request)')
-    expect(usersMe).toContain('readVerifiedPayloadTokenVersion(request)')
-    expect(accountState).toContain('getPayloadAuthorizationHeader(request)')
-    expect(loginForm).not.toContain("sessionStorage.setItem('luckread.accessToken'")
-    expect(loginForm).not.toContain("sessionStorage.setItem('luckread.refreshToken'")
-    expect(loginForm).not.toContain("sessionStorage.setItem('luckread.layer'")
+    expect(loginForm).toContain("fetch('/api/auth/sign-in/email'")
+    expect(loginForm).not.toContain('accessToken')
+    expect(loginForm).not.toContain('refreshToken')
+    expect(registerForm).toContain("fetch('/api/auth/sign-up/email'")
+    expect(registerForm).toContain('username: normalizedUsername')
+    expect(authProxy).toContain("https://luckread-w02.internal/api/auth/")
+    expect(authProxy).toContain('headers')
+    expect(contentClient).toContain('resolveBetterAuthPrincipal')
+    expect(contentClient).not.toContain('readVerifiedPayloadTokenVersion')
+    expect(contentClient).not.toContain("getPayloadCookieToken")
+  })
+
+  it('requires creator role for content write capability', () => {
+    const client = read('src/content/w03-content-client.ts')
+    const w03 = read('../../../W03-content/src/index.ts')
+
+    expect(client).toContain('X-LuckRead-Principal-Roles')
+    expect(w03).toContain("roles.includes('creator')")
+    expect(w03).toContain('Number(layer.slice(1)) >= 3')
+  })
+
+  it('gates Payload Admin with canonical W02 L7/L8 authorization', () => {
+    const adminAccess = read('src/auth/payload-admin-access.ts')
+    const users = read('src/collections/Users.ts')
+    expect(adminAccess).toContain('authorizeAdminUser')
+    expect(adminAccess).toContain("(principal.layer === 'L7' || principal.layer === 'L8')")
+    expect(users).toContain('authorizeAdminUser')
+    expect(users).toContain("throw new Error('ADMIN_ROLE_REQUIRED')")
   })
 
   it('keeps only native Payload import-map entries after moving creator UI to v1beta', () => {
