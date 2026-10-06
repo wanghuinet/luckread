@@ -58,7 +58,7 @@ describe('Creator Center admin extension', () => {
     expect(audience.match(/response\.status === 401/g)?.length).toBe(2)
   })
 
-  it('uses the native Payload admin request principal instead of a second login/session system', () => {
+  it('uses the W02-backed Payload admin request principal without a second login/session system', () => {
     const view = read('src/app/(payload)/v1beta/CreatorCenter.tsx')
 
     expect(view).toContain('AdminViewServerProps')
@@ -408,29 +408,14 @@ describe('Creator Center admin extension', () => {
     expect(css).toContain('.subscription-card')
   })
 
-  it('keeps frontend and Admin on the same Payload cookie session lifecycle', () => {
-    const login = read('src/app/auth/login/route.ts')
-    const refresh = read('src/app/auth/refresh/route.ts')
-    const logout = read('src/app/auth/logout/route.ts')
-    const accessToken = read('src/auth/payload-access-token.ts')
-    const sessions = read('src/app/auth/sessions/[[...segments]]/route.ts')
-    const usersMe = read('src/app/(payload)/api/users/me/route.ts')
-    const accountState = read('src/app/users/[userId]/account-state/route.ts')
-    const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
-
-    expect(login).toContain('buildPayloadAccessCookie')
-    expect(login).toContain("'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request)")
-    expect(refresh).toContain('buildPayloadAccessCookie')
-    expect(refresh).toContain("'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request)")
-    expect(logout).toContain('buildPayloadClearCookie(request)')
-    expect(accessToken).toContain("return getCookieValue(request, 'payload-token')")
-    expect(accessToken).toContain('export function getPayloadAuthorizationHeader')
-    expect(sessions).toContain('getPayloadAuthorizationHeader(request)')
-    expect(usersMe).toContain('readVerifiedPayloadTokenVersion(request)')
-    expect(accountState).toContain('getPayloadAuthorizationHeader(request)')
-    expect(loginForm).not.toContain("sessionStorage.setItem('luckread.accessToken'")
-    expect(loginForm).not.toContain("sessionStorage.setItem('luckread.refreshToken'")
-    expect(loginForm).not.toContain("sessionStorage.setItem('luckread.layer'")
+  it('keeps frontend and Admin on the same Better Auth/W02 session lifecycle', () => {
+    const authClient = read('src/auth/w02-session-client.ts')
+    const users = read('src/collections/Users.ts')
+    expect(authClient).toContain('getBetterAuthPrincipal')
+    expect(users).toContain('disableLocalStrategy: true')
+    expect(users).toContain("strategies: [betterAuthPayloadStrategy]")
+    expect(users).not.toContain('accessToken')
+    expect(users).not.toContain('refreshToken')
   })
 
   it('keeps only native Payload import-map entries after moving creator UI to v1beta', () => {
