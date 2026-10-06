@@ -5,6 +5,7 @@ type AuthSession = {
   user: {
     id: string
     email: string
+    username?: string | null
     accountState?: string | null
     accountStateVersion?: number | null
   }
@@ -71,9 +72,7 @@ export async function resolveBetterAuthPrincipal(
   return {
     userId: String(result.user.id),
     email: String(result.user.email),
-    username: typeof (result.user as { username?: unknown }).username === 'string'
-      ? (result.user as { username: string }).username
-      : undefined,
+    username: typeof result.user.username === 'string' ? result.user.username : undefined,
     sessionId: String(result.session.id),
     accountState,
     accountStateVersion,
