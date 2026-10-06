@@ -4,6 +4,10 @@ import config from '@payload-config'
 import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route'
 
 import {
+  createPayloadBetterAuthBridgeRequest,
+  createPayloadBetterAuthBridgeToken,
+} from '@/auth/payload-better-auth-bridge'
+import {
   resolveBetterAuthPrincipalThroughW02,
   W02AuthClientError,
 } from '@/auth/w02-session-client'
@@ -109,9 +113,42 @@ export async function POST(request: Request): Promise<Response> {
     })
   }
 
-  const target = new URL('/api/media', request.url)
-  const context: PayloadRouteContext = {
-    params: Promise.resolve({ slug: ['media'] }),
+  let principal: Awaited<ReturnType<typeof resolveBetterAuthPrincipalThroughW02>>
+  try {
+    principal = await resolveBetterAuthPrincipalThroughW02(request)
+    if (!principal.active || principal.tokenVersion === undefined) {
+      throw new W02AuthClientError(401, 'authentication required')
+    }
+  } catch (error) {
+    if (error instanceof W02AuthClientError && error.status === 401) return unauthorized()
+    return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media service unavailable' } }), {
+      status: error instanceof W02AuthClientError ? error.status : 503,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    })
   }
-  return payloadMediaPost(new Request(target, request.clone()), context)
+
+  try {
+    const payload = await getPayload({ config })
+    const token = await createPayloadBetterAuthBridgeToken(payload.secret, {
+      sub: principal.userId,
+      email: principal.email,
+      method: 'POST',
+      path: '/api/media',
+    })
+    const target = createPayloadBetterAuthBridgeRequest(
+      request,
+      '/api/media',
+      token,
+    )
+    const context: PayloadRouteContext = {
+      params: Promise.resolve({ slug: ['media'] }),
+    }
+    return payloadMediaPost(target, context)
+  } catch {
+    return new Response(JSON.stringify({ error: { code: 'MEDIA_UPLOAD_FAILED', message: 'Media upload failed' } }), {
+      status: 503,
+      headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    })
+  }
 }
+
