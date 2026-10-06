@@ -7,7 +7,7 @@ export const Users: CollectionConfig = {
   slug: 'users',
   admin: { useAsTitle: 'email' },
   auth: {
-    disableLocalStrategy: true,
+    disableLocalStrategy: { enableFields: true, optionalPassword: true },
     strategies: [betterAuthPayloadStrategy],
   },
   access: {
