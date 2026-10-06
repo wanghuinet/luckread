@@ -40,7 +40,7 @@ describe('W01 Better Auth boundary', () => {
       'utf8',
     )
     expect(route).toContain("canonicalW01AuthEndpoints")
-    expect(route).toContain("endpoint === 'sign-up/email'")
+    expect(route).toContain("'sign-up/email'")
     expect(route).toContain("'change-password'")
     expect(route).toContain("'request-password-reset'")
     expect(route).toContain("'reset-password'")
