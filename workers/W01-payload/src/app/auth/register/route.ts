@@ -255,8 +255,16 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     console.error(JSON.stringify({
       event: 'auth.register.better_auth_rejection',
       status: authResponse.status,
-      code: typeof authError?.code === 'string' ? authError.code : 'UNKNOWN',
-      message: typeof authError?.message === 'string' ? authError.message : 'Unknown Better Auth rejection',
+      code: typeof authError?.code === 'string'
+        ? authError.code
+        : isRecord(authPayload) && typeof authPayload.code === 'string'
+          ? authPayload.code
+          : 'UNKNOWN',
+      message: typeof authError?.message === 'string'
+        ? authError.message
+        : isRecord(authPayload) && typeof authPayload.message === 'string'
+          ? authPayload.message
+          : 'Unknown Better Auth rejection',
     }))
     return errorResponse(
       authResponse.status >= 500 ? 503 : 422,
