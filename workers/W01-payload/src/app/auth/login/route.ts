@@ -1,8 +1,3 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
-
-import { buildPayloadAccessCookie, issuePayloadAccessToken } from '../../../auth/payload-access-token.js'
 import {
   establishSession,
   resolveBetterAuthPrincipal,
@@ -93,8 +88,6 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Authentication service unavailable')
   }
 
-  const payload = await getPayload({ config })
-
   try {
     let session
     try {
@@ -113,27 +106,17 @@ export async function POST(request: Request): Promise<Response> {
       })
     }
 
-    const access = await issuePayloadAccessToken({
-      payloadSecret: payload.secret,
-      userId: principal.userId,
-      email: principal.email.toLowerCase().trim(),
-      sessionId: principal.sessionId,
-      expiresAt: session.nativeExpiresAt,
-      tokenVersion: session.tokenVersion,
-    })
-
     const headers = new Headers({
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
     })
     if (nativeAuth.setCookie) headers.append('set-cookie', nativeAuth.setCookie)
-    headers.append('set-cookie', buildPayloadAccessCookie(access.token, access.expiresIn, request))
 
     return new Response(
       JSON.stringify({
-        accessToken: access.token,
+        accessToken: nativeAuth.token,
         refreshToken: session.refreshToken,
-        expiresIn: access.expiresIn,
+        expiresIn: session.expiresIn,
         layer: session.layer,
       }),
       {
