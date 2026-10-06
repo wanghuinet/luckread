@@ -95,18 +95,24 @@ jobs:
 
       - name: Apply current W02 Better Auth schema migrations
         working-directory: workers/W02-identity
+        env:
+          AUTH001_PERSIST_TO: /tmp/luckread-auth001-state
         run: |
           set -euo pipefail
-          # 0002_auth_013_account_state.sql is a historical migration already
-          # applied to the legacy Payload `users` table. The current 1.1
-          # Better Auth authority is created by 0005 and owns account state
-          # on the `user` table, so a fresh Better Auth database must not
-          # execute the legacy Payload-table migration.
-          for migration in             0001_role_assignments.sql             0003_auth_013_publication_journal.sql             0003_role_authorization_versions.sql             0004_auth_003_credentials.sql             0005_better_auth_identity_core.sql
+          # 0002_auth_013_account_state.sql is historical for the legacy
+          # Payload users table. The current Better Auth baseline is owned by
+          # W02/0005, while W01's migration chain creates the shared auth
+          # registration envelope and profile projection tables.
+          for migration in \
+            0001_role_assignments.sql \
+            0003_auth_013_publication_journal.sql \
+            0003_role_authorization_versions.sql \
+            0004_auth_003_credentials.sql \
+            0005_better_auth_identity_core.sql
           do
-            npx --yes wrangler@4.116.0 d1 execute luckread --local --config wrangler.jsonc               --file "migrations/$migration"
+            npx --yes wrangler@4.116.0 d1 execute luckread --local --persist-to "$AUTH001_PERSIST_TO" --config wrangler.jsonc \
+              --file "migrations/$migration"
           done
-
       - name: Install W01 dependencies
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
@@ -177,11 +183,11 @@ jobs:
         working-directory: workers/W01-payload
         env:
           AUTH001_BASE_URL: http://127.0.0.1:8787
+          AUTH001_PERSIST_TO: /tmp/luckread-auth001-state
         run: |
           set -euo pipefail
           node --import=tsx/esm scripts/auth-001-registration-runtime-evidence-local.mjs
           test -s ../../artifacts/mapping-0/auth-001-runtime-local/runtime-result.json
-
       - name: Dump W01 runtime log on evidence failure
         if: ${{ failure() }}
         working-directory: workers/W01-payload
