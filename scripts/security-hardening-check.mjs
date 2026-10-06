@@ -97,6 +97,29 @@ if (fs.existsSync(path.join(root, adminBootstrapWorkflow))) {
   if (!source.includes("provider_id='credential'")) fail("admin bootstrap workflow must verify the Better Auth credential account")
 }
 
+const w01AuthRoot = path.join(root, 'workers/W01-payload/src/app/auth')
+function walkW01Auth(dir) {
+  if (!fs.existsSync(dir)) return
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (entry.name === 'password') continue
+      walkW01Auth(full)
+      continue
+    }
+    if (!/\.(mjs|cjs|js|ts|tsx)$/.test(entry.name)) continue
+    const source = fs.readFileSync(full, 'utf8')
+    for (const [name, re] of [
+      ['Payload native auth call', /payload\\.(auth|login)\\s*\\(/],
+      ['Payload runtime auth import', /from ['"]payload['"]/],
+      ['Payload runtime loader in auth path', /getPayload\\s*\\(\\s*\\{\\s*config/],
+    ]) {
+      if (re.test(source)) fail(`W01 normal auth path must not use Payload authentication: ${name}: ${full}`)
+    }
+  }
+}
+walkW01Auth(w01AuthRoot)
+
 const roots = ['src','app','server','workers','packages','collections','payload','lib','routes'];
 const patterns = [
   { name: 'direct admin bypass', re: /(?:user|subject)\.role\s*(?:===|==)\s*['"](?:admin|super_admin)['"]/g },
