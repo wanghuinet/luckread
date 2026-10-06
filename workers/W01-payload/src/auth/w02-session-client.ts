@@ -146,3 +146,11 @@ export async function revokeSessionById(request: Request, sessionId: string): Pr
   })
   if (!response.ok) throw new W02AuthClientError(response.status, 'session revoke failed')
 }
+
+export async function rollbackRegistrationUser(
+  request: Request,
+  body: { userId: string; email: string; username: string },
+): Promise<void> {
+  const response = await callW02('/internal/auth/registration/rollback', { request, body })
+  if (!response.ok) throw new W02AuthClientError(response.status, 'registration rollback failed')
+}
