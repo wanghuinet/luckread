@@ -3,15 +3,9 @@ name: Admin Account Bootstrap
 on:
   workflow_dispatch:
     inputs:
-      user_id:
-        description: Existing legacy Payload user id used only to locate the admin email
+      better_auth_user_id:
+        description: Existing Better Auth user id to receive the one-time super_admin role binding
         required: true
-        default: "1"
-        type: string
-      username:
-        description: Expected legacy admin username
-        required: true
-        default: "wanghui"
         type: string
       confirm:
         description: Type APPLY_WANGHUI_L8 to permit the one-time admin role binding
@@ -31,9 +25,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       DATABASE_NAME: luckread
-      USER_ID: ${{ inputs.user_id }}
-      USERNAME: ${{ inputs.username }}
-      LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD: ${{ secrets.LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD }}
+      BETTER_AUTH_USER_ID: ${{ inputs.better_auth_user_id }}
 
     steps:
       - name: Checkout exact main
@@ -46,62 +38,47 @@ jobs:
         with:
           node-version: 24
 
-      - name: Validate target and legacy profile preconditions
+      - name: Validate Better Auth target
         run: |
           set -euo pipefail
           test "$DATABASE_NAME" = "luckread"
-          test "$USER_ID" = "1"
-          test "$USERNAME" = "wanghui"
-          test -n "$LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD"
-
-          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc             --command "SELECT id, email, username, account_state, account_state_version FROM users WHERE id=1;" > /tmp/admin-user-preflight.json
-
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
           node --input-type=module - <<'NODE'
-          import fs from 'node:fs'
-          const rows = JSON.parse(fs.readFileSync('/tmp/admin-user-preflight.json','utf8'))?.[0]?.results ?? []
-          if (rows.length !== 1) throw new Error('legacy Payload user id 1 must exist exactly once')
-          const user = rows[0]
-          if (user.account_state !== 'ACTIVE') throw new Error('legacy Payload user id 1 is not ACTIVE')
-          if (typeof user.email !== 'string' || !user.email.includes('@')) throw new Error('legacy Payload admin email is missing')
-          fs.writeFileSync('/tmp/admin-user-email.txt', user.email)
-          console.log(JSON.stringify({
-            id: user.id,
-            email: user.email,
-            username: user.username,
-            accountState: user.account_state,
-            accountStateVersion: user.account_state_version,
-          }))
+          const id = process.env.BETTER_AUTH_USER_ID
+          if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id || '')) {
+            throw new Error('BETTER_AUTH_USER_ID has an invalid format')
+          }
           NODE
 
-      - name: Resolve Better Auth admin identity
+      - name: Preflight Better Auth identity
         run: |
           set -euo pipefail
           node --input-type=module - <<'NODE'
           import fs from 'node:fs'
-          const email = fs.readFileSync('/tmp/admin-user-email.txt','utf8').trim().replaceAll("'", "''")
-          fs.writeFileSync('/tmp/admin-better-auth-user-query.sql',
+          const id = process.env.BETTER_AUTH_USER_ID.replaceAll("'", "''")
+          fs.writeFileSync('/tmp/admin-better-auth-preflight.sql',
             "SELECT u.id, u.email, u.username, u.account_state, " +
             "a.id AS credential_account_id, " +
             "CASE WHEN a.password IS NULL OR a.password = '' THEN 0 ELSE 1 END AS credential_password_present " +
             "FROM \"user\" AS u LEFT JOIN \"account\" AS a " +
             "ON a.user_id=u.id AND a.provider_id='credential' " +
-            "WHERE lower(u.email)=lower('" + email + "') LIMIT 1;"
+            "WHERE u.id='" + id + "' LIMIT 1;"
           )
           NODE
 
-          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc             --file=/tmp/admin-better-auth-user-query.sql > /tmp/admin-better-auth-user.json
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc             --file=/tmp/admin-better-auth-preflight.sql > /tmp/admin-better-auth-preflight.json
 
           node --input-type=module - <<'NODE'
           import fs from 'node:fs'
-          const rows = JSON.parse(fs.readFileSync('/tmp/admin-better-auth-user.json','utf8'))?.[0]?.results ?? []
-          if (rows.length !== 1) throw new Error('Better Auth user for the legacy admin email does not exist')
+          const rows = JSON.parse(fs.readFileSync('/tmp/admin-better-auth-preflight.json','utf8'))?.[0]?.results ?? []
+          if (rows.length !== 1) throw new Error('Better Auth target user does not exist exactly once')
           const user = rows[0]
-          if (typeof user.id !== 'string' || user.id.length < 1) throw new Error('Better Auth admin identity id is missing')
-          if (user.account_state !== 'ACTIVE') throw new Error('Better Auth admin identity is not ACTIVE')
+          if (String(user.id) !== process.env.BETTER_AUTH_USER_ID) throw new Error('Better Auth target identity id mismatch')
+          if (user.account_state !== 'ACTIVE') throw new Error('Better Auth target identity is not ACTIVE')
           if (!user.credential_account_id || Number(user.credential_password_present) !== 1) {
             throw new Error('Better Auth credential account/password is missing')
           }
-          fs.writeFileSync('/tmp/better-auth-admin-user-id.txt', user.id)
           console.log(JSON.stringify({
             betterAuthUserId: user.id,
             email: user.email,
@@ -110,8 +87,6 @@ jobs:
             credentialPasswordPresent: true,
           }))
           NODE
-
-          echo "BETTER_AUTH_USER_ID=$(cat /tmp/better-auth-admin-user-id.txt)" >> "$GITHUB_ENV"
 
       - name: Prepare Better Auth admin role binding
         env:
@@ -131,7 +106,16 @@ jobs:
       - name: Verify Better Auth admin role binding
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc             --command "SELECT id,subject_id,role_id,scope_type,status,valid_from,valid_until FROM role_assignments WHERE subject_id='$(cat /tmp/better-auth-admin-user-id.txt)' AND role_id='super_admin' AND scope_type='global' AND status='ACTIVE';" > /tmp/admin-role-post.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs'
+          const id = process.env.BETTER_AUTH_USER_ID.replaceAll("'", "''")
+          fs.writeFileSync('/tmp/admin-role-post.sql',
+            "SELECT id,subject_id,role_id,scope_type,status,valid_from,valid_until " +
+            "FROM role_assignments WHERE subject_id='" + id + "' " +
+            "AND role_id='super_admin' AND scope_type='global' AND status='ACTIVE';"
+          )
+          NODE
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config workers/W01-payload/wrangler.jsonc             --file=/tmp/admin-role-post.sql > /tmp/admin-role-post.json
 
           node --input-type=module - <<'NODE'
           import fs from 'node:fs'
@@ -143,14 +127,7 @@ jobs:
           }))
           NODE
 
-      - name: Verify production Better Auth login without printing credentials
-        run: |
-          set -euo pipefail
-          ADMIN_EMAIL="$(cat /tmp/admin-user-email.txt)"
-          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' -X POST 'https://mp.luckread.com/auth/login' -H 'Content-Type: application/json' --data-raw "{\"identity\":$(printf '%s' "$ADMIN_EMAIL" | node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.stringify(s)))'),\"credential\":$(printf '%s' "$LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD" | node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.stringify(s)))'),\"deviceId\":\"admin-bootstrap-${GITHUB_RUN_ID}\"}")"
-          test "$status" = "200"
-
       - name: Secure cleanup
         if: always()
         run: |
-          rm -f /tmp/luckread-admin-bootstrap.sql /tmp/luckread-admin-bootstrap-meta.json             /tmp/admin-user-preflight.json /tmp/admin-user-email.txt             /tmp/admin-better-auth-user-query.sql /tmp/admin-better-auth-user.json             /tmp/better-auth-admin-user-id.txt /tmp/admin-role-post.json
+          rm -f /tmp/luckread-admin-bootstrap.sql /tmp/luckread-admin-bootstrap-meta.json             /tmp/admin-better-auth-preflight.sql /tmp/admin-better-auth-preflight.json             /tmp/admin-role-post.sql /tmp/admin-role-post.json
