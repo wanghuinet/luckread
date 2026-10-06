@@ -57,7 +57,7 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
           to: user.email,
           from,
           subject: 'LuckRead 密码重置',
-          text: '请使用以下链接重置你的 LuckRead 密码：\\n' + url + '\\n\\n如果这不是你的操作，请忽略此邮件。',
+          text: ['请使用以下链接重置你的 LuckRead 密码：', url, '', '如果这不是你的操作，请忽略此邮件。'].join('\n'),
           html: '<p>请使用以下链接重置你的 LuckRead 密码：</p><p><a href="' + escapedUrl + '">重置密码</a></p><p>如果这不是你的操作，请忽略此邮件。</p>',
         }).catch((error) => {
           console.error(JSON.stringify({
