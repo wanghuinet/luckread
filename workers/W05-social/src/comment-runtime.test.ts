@@ -507,7 +507,7 @@ describe('comment runtime', () => {
     await expect(updateComment(d, 'user-1', 'c1', {
       body: '越权修改',
       ifMatch: '"2026-10-02T00:01:00.000Z"',
-    })).rejects.toMatchObject({
+    }, 'comment-edit-forbidden')).rejects.toMatchObject({
       code: 'PERMISSION_DENIED',
       status: 403,
     })
@@ -530,7 +530,7 @@ describe('comment runtime', () => {
     await expect(updateComment(d, 'user-1', 'c1', {
       body: '旧版本修改',
       ifMatch: '"2026-10-02T00:01:00.000Z"',
-    })).rejects.toMatchObject({
+    }, 'comment-edit-stale')).rejects.toMatchObject({
       code: 'PRECONDITION_FAILED',
       status: 412,
     })
