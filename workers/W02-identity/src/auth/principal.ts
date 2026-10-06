@@ -21,6 +21,7 @@ export type AuthenticatedPrincipal = {
   accountState: string
   accountStateVersion: number
   layer: string
+  roles: string[]
 }
 
 const toIso = (value: Date | string): string =>
@@ -74,5 +75,6 @@ export async function resolveBetterAuthPrincipal(
     accountState,
     accountStateVersion,
     layer: layerResolution.layer,
+    roles: layerResolution.roles ?? [],
   }
 }
