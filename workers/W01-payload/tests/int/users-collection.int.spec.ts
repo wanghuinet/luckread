@@ -27,7 +27,7 @@ describe('W01 Users collection contract', () => {
 
     const config = readFileSync(resolve(process.cwd(), 'src/payload.config.ts'), 'utf8')
     expect(config).toContain("Component: '/auth/PayloadAdminLoginRedirect'")
-    expect(config).toContain("Component: '/auth/PayloadAdminLogoutButton'")
+    expect(config).toContain("Button: '/auth/PayloadAdminLogoutButton'")
 
     expect(fields).toEqual(
       expect.arrayContaining([
