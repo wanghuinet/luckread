@@ -38,6 +38,18 @@ const handler = async (
 
   if (!endpoint) return new Response(null, { status: 404 })
 
+  // Account creation must pass through W01 /auth/register so the
+  // idempotency, consent, rate-limit, and Payload projection seams run.
+  // Exposing Better Auth sign-up directly would create an identity without
+  // the required W01 profile projection.
+  if (endpoint === 'sign-up/email') {
+    return errorResponse(
+      404,
+      'NOT_FOUND',
+      'Direct account registration is not available at this endpoint',
+    )
+  }
+
   if (
     request.method === 'POST' &&
     (endpoint === 'sign-in/email' || endpoint === 'sign-up/email')
