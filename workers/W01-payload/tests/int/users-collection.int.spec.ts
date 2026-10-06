@@ -19,6 +19,8 @@ describe('W01 Users collection contract', () => {
       }),
     )
     expect(Users.auth).not.toHaveProperty('forgotPassword')
+    expect(Users.access?.create).toBeTypeOf('function')
+    expect(await Users.access.create({} as never)).toBe(false)
 
     expect(fields).toEqual(
       expect.arrayContaining([
