@@ -95,14 +95,16 @@ async function validateJsonDomain(domain) {
 
 async function checkUpstreamImmutabilityContract() {
   const rel = 'payload/upstream-product-immutability.v1.json'
-  const file = join(CONTRACTS_ROOT, rel)
-  const doc = await loadJson(file)
+  const schemaRel = 'payload/upstream-product-immutability.v1.schema.json'
+  const doc = await loadJson(join(CONTRACTS_ROOT, rel))
+  const schema = await loadJson(join(CONTRACTS_ROOT, schemaRel))
   if (!doc) return
-  if (doc.$id !== `${ID_PREFIX}payload/upstream-product-immutability.v1.json`) {
-    fail(`${rel}: $id is not canonical`)
+  if (!schema) return
+  if (schema.$schema !== 'https://json-schema.org/draft/2020-12/schema') {
+    fail(`${schemaRel}: must declare JSON Schema Draft 2020-12`)
   }
-  if (doc.$schema !== 'https://json-schema.org/draft/2020-12/schema') {
-    fail(`${rel}: must declare JSON Schema Draft 2020-12`)
+  if (schema.$id !== `${ID_PREFIX}payload/upstream-product-immutability.v1.schema.json`) {
+    fail(`${schemaRel}: $id is not canonical`)
   }
   if (doc.version !== '1.0.0' || doc.status !== 'ACTIVE') {
     fail(`${rel}: must be ACTIVE version 1.0.0`)
