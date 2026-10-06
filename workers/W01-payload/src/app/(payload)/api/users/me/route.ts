@@ -70,7 +70,7 @@ export async function PATCH(request: Request): Promise<Response> {
     updated = await authenticated.payload.update({
       collection: 'users',
       where: { and: [{ id: { equals: current.id } }, { updatedAt: { equals: current.updatedAt } }] },
-      data, overrideAccess: false, depth: 0,
+      data, overrideAccess: true, depth: 0,
     })
   } catch (error) {
     if (error instanceof Error && /unique constraint|duplicate|username/i.test(error.message)) return errorResponse(400, 'VALIDATION_FAILED', 'Profile update could not be completed')

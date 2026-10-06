@@ -50,7 +50,7 @@ export async function GET(request: Request): Promise<Response> {
       limit,
       page,
       depth: 0,
-      overrideAccess: false,
+      overrideAccess: true,
     })
 
     return new Response(JSON.stringify(result), {
