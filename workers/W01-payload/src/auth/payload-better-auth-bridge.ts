@@ -178,3 +178,21 @@ export const payloadBetterAuthBridgeHeaders = (token: string): Headers => {
   headers.set(CALLER_HEADER, CALLER)
   return headers
 }
+
+export const createPayloadBetterAuthBridgeRequest = (
+  request: Request,
+  targetPath: string,
+  token: string,
+): Request => {
+  const target = new URL(targetPath, request.url)
+  const headers = new Headers(request.headers)
+  headers.delete('host')
+  headers.set(BRIDGE_HEADER, token)
+  headers.set(CALLER_HEADER, CALLER)
+
+  return new Request(target, {
+    method: request.method,
+    headers,
+    body: request.method === 'GET' || request.method === 'HEAD' ? undefined : request.body,
+  })
+}
