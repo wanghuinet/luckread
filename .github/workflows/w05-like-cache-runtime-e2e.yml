@@ -181,7 +181,7 @@ jobs:
           )
 
           d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
-            'UPDATE users SET account_state=\'ACTIVE\', account_state_version=COALESCE(account_state_version,0)+1 WHERE CAST(id AS TEXT)=' + q(userId))
+             'UPDATE "user" SET account_state=\'ACTIVE\', account_state_version=account_state_version+1 WHERE id=' + q(userId))
           d1(process.env.DATABASE_NAME_W01, 'deployed-source/workers/W01-payload/wrangler.jsonc',
             'INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' +
             [roleId,userId,'creator','global',null,'ACTIVE',now,null,now,now].map((v,i)=>i === 4 ? 'NULL' : q(v)).join(',') + ')')
