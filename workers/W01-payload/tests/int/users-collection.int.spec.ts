@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { Users } from '../../src/collections/Users'
 
@@ -15,12 +17,17 @@ describe('W01 Users collection contract', () => {
     expect(Users.slug).toBe('users')
     expect(Users.auth).toEqual(
       expect.objectContaining({
+        disableLocalStrategy: true,
         removeTokenFromResponses: true,
       }),
     )
     expect(Users.auth).not.toHaveProperty('forgotPassword')
     expect(Users.access?.create).toBeTypeOf('function')
     expect(await Users.access.create({} as never)).toBe(false)
+
+    const config = readFileSync(resolve(process.cwd(), 'src/payload.config.ts'), 'utf8')
+    expect(config).toContain("Component: '/auth/PayloadAdminLoginRedirect'")
+    expect(config).toContain("Button: '/auth/PayloadAdminLogoutButton'")
 
     expect(fields).toEqual(
       expect.arrayContaining([
