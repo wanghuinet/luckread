@@ -322,10 +322,12 @@ describe('AUTH-011 refresh runtime', () => {
     expect(result).toEqual({
       sessionId: 'sid-refresh',
       userId: '42',
+      accessToken: 'native-token-42',
       refreshToken: 'v3.next',
       tokenVersion: 3,
       layer: 'L2',
       nativeExpiresAt: '2026-09-22T14:00:00.000Z',
+      expiresIn: 3600,
       email: 'user@example.com',
     })
 
@@ -406,6 +408,7 @@ describe('AUTH-002 native session binding boundaries', () => {
               userId: '42',
               createdAt: '2026-09-22T12:00:00.000Z',
               expiresAt: '2026-09-22T14:00:00.000Z',
+              accessToken: 'native-token-42',
               accountState: 'ACTIVE',
             } as T
           },
@@ -436,6 +439,7 @@ describe('AUTH-002 native session binding boundaries', () => {
       tokenVersion: 1,
       layer: 'L2',
       nativeExpiresAt: '2026-09-22T14:00:00.000Z',
+      expiresIn: 3600,
     })
   })
 
@@ -490,6 +494,7 @@ describe('AUTH-002 native session binding boundaries', () => {
             userId: '42',
             createdAt: '2026-09-22T10:00:00.000Z',
             expiresAt: '2026-09-22T12:59:59.000Z',
+            accessToken: 'expired-native-token',
             accountState: 'ACTIVE',
           } as T),
           run: async () => ({ meta: { changes: 0 } }),
