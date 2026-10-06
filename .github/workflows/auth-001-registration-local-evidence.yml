@@ -113,13 +113,15 @@ jobs:
 
       - name: Apply exact W01 local migrations
         working-directory: workers/W01-payload
+        env:
+          AUTH001_PERSIST_TO: /tmp/luckread-auth001-state
         run: pnpm payload migrate
 
       - name: Apply already-admitted AUTH-013 D1-01 schema locally
         working-directory: workers/W01-payload
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.116.0 d1 execute luckread --local --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
+          npx --yes wrangler@4.116.0 d1 execute luckread --local --persist-to /tmp/luckread-auth001-state --config wrangler.jsonc --file ../W02-identity/migrations/0002_auth_013_account_state.sql
 
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
