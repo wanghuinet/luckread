@@ -66,10 +66,44 @@ type RefreshSessionRequest = {
   now?: string
 }
 
+const MAX_INTERNAL_JSON_BYTES = 64 * 1024
+
 const readJsonBody = async <T>(request: Request): Promise<T | null> => {
+  const contentLength = request.headers.get('content-length')
+  if (contentLength) {
+    const declaredLength = Number(contentLength)
+    if (!Number.isSafeInteger(declaredLength) || declaredLength < 0 || declaredLength > MAX_INTERNAL_JSON_BYTES) {
+      return null
+    }
+  }
+
+  if (!request.body) return null
+
   try {
-    const body = await request.json<T>()
-    return body && typeof body === 'object' ? body : null
+    const reader = request.body.getReader()
+    const chunks: Uint8Array[] = []
+    let total = 0
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > MAX_INTERNAL_JSON_BYTES) {
+        await reader.cancel()
+        return null
+      }
+      chunks.push(value)
+    }
+
+    const bytes = new Uint8Array(total)
+    let offset = 0
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes))
+    return parsed && typeof parsed === 'object' ? parsed as T : null
   } catch {
     return null
   }
@@ -175,10 +209,8 @@ export default {
         }
       }
 
-      let body: unknown = null
-      try {
-        body = await request.json()
-      } catch {
+      const body = await readJsonBody<unknown>(request)
+      if (!body) {
         return json({ error: { code: 'VALIDATION_FAILED', message: 'Invalid profile update' } }, 400)
       }
 
