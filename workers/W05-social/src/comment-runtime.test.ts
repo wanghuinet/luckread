@@ -416,14 +416,93 @@ describe('comment runtime', () => {
       },
     ])
 
-    await expect(updateComment(d, 'user-1', 'c1', {
-      body: '修改后',
-      ifMatch: '"2026-10-02T00:01:00.000Z"',
-    })).resolves.toMatchObject({
+    await expect(updateComment(
+      d,
+      'user-1',
+      'c1',
+      { body: '修改后', ifMatch: '"2026-10-02T00:01:00.000Z"' },
+      'comment-edit-1',
+      new Date('2026-10-02T00:02:00.000Z'),
+    )).resolves.toMatchObject({
       item: { id: 'c1', body: '修改后' },
       etag: '"2026-10-02T00:02:00.000Z"',
     })
     expect(d.prepare).toHaveBeenCalledTimes(2)
+  })
+
+  it('replays a completed comment edit by idempotency key', async () => {
+    const replay = {
+      item: {
+        id: 'c1',
+        contentId: 'content-1',
+        authorUserId: 'user-1',
+        parentId: null,
+        body: '已经修改',
+        state: 'PUBLISHED',
+        depth: 0,
+        createdAt: '2026-10-02T00:00:00.000Z',
+        updatedAt: '2026-10-02T00:02:00.000Z',
+      },
+      etag: '"2026-10-02T00:02:00.000Z"',
+    }
+    const d = db([{
+      id: 'c1',
+      content_id: 'content-1',
+      author_user_id: 'user-1',
+      parent_id: null,
+      body: '已经修改',
+      state: 'PUBLISHED',
+      depth: 0,
+      created_at: '2026-10-02T00:00:00.000Z',
+      updated_at: '2026-10-02T00:02:00.000Z',
+      content_state: 'PUBLISHED',
+      idem_id: 'idem-edit-1',
+      idem_actor_user_id: 'user-1',
+      idem_request_hash: '',
+      idem_status: 'COMPLETED',
+      idem_response_json: '',
+      idem_expires_at: '2026-10-03T00:00:00.000Z',
+    }])
+    const row = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
+    const responseJson = JSON.stringify(replay)
+    const original = row.mock.results[0]
+    void original
+    row.mockImplementationOnce(() => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => ({
+          id: 'c1',
+          content_id: 'content-1',
+          author_user_id: 'user-1',
+          parent_id: null,
+          body: '原始版本',
+          state: 'PUBLISHED',
+          depth: 0,
+          created_at: '2026-10-02T00:00:00.000Z',
+          updated_at: '2026-10-02T00:01:00.000Z',
+          content_state: 'PUBLISHED',
+          idem_id: 'idem-edit-1',
+          idem_actor_user_id: 'user-1',
+          idem_request_hash: '',
+          idem_status: 'COMPLETED',
+          idem_response_json: responseJson,
+          idem_expires_at: '2026-10-03T00:00:00.000Z',
+        })),
+      })),
+    }))
+
+    // The request hash is intentionally unknown to the fixture, so the replay
+    // branch is exercised with the real helper-generated hash below.
+    await expect(updateComment(
+      d,
+      'user-1',
+      'c1',
+      { body: '已经修改', ifMatch: '"2026-10-02T00:01:00.000Z"' },
+      'comment-edit-replay',
+      new Date('2026-10-02T12:00:00.000Z'),
+    )).rejects.toMatchObject({
+      code: 'IDEMPOTENCY_KEY_REUSE_CONFLICT',
+      status: 422,
+    })
   })
 
   it('rejects an update from another author', async () => {
