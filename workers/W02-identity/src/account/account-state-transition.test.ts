@@ -108,6 +108,16 @@ function fakeDb(
   }
 }
 
+describe('AUTH-013 Better Auth persistence boundary', () => {
+  it('uses the native Better Auth user and session tables', () => {
+    const source = readFileSync(new URL('./account-state-transition.ts', import.meta.url), 'utf8')
+    expect(source).toContain('FROM "user"')
+    expect(source).toContain('UPDATE "user"')
+    expect(source).toContain('DELETE FROM "session" WHERE user_id = ?')
+    expect(source).not.toContain('auth_session_state')
+  })
+})
+
 describe('AUTH-013 account-state transition kernel', () => {
   it('atomically advances Account State and creates the durable publication journal', async () => {
     const fake = fakeDb({ state: 'ACTIVE', version: 7 })
