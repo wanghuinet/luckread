@@ -93,6 +93,38 @@ async function validateJsonDomain(domain) {
   return { byId, docs }
 }
 
+async function checkUpstreamImmutabilityContract() {
+  const rel = 'payload/upstream-product-immutability.v1.json'
+  const file = join(CONTRACTS_ROOT, rel)
+  const doc = await loadJson(file)
+  if (!doc) return
+  if (doc.$id !== `${ID_PREFIX}payload/upstream-product-immutability.v1.json`) {
+    fail(`${rel}: $id is not canonical`)
+  }
+  if (doc.$schema !== 'https://json-schema.org/draft/2020-12/schema') {
+    fail(`${rel}: must declare JSON Schema Draft 2020-12`)
+  }
+  if (doc.version !== '1.0.0' || doc.status !== 'ACTIVE') {
+    fail(`${rel}: must be ACTIVE version 1.0.0`)
+  }
+  const products = doc.products ?? []
+  const productPairs = products.map((p) => [p?.name, p?.package, p?.sourceAuthority])
+  const expected = [
+    ['Payload', 'payload', 'upstream-npm'],
+    ['Better Auth', 'better-auth', 'upstream-npm'],
+  ]
+  if (JSON.stringify(productPairs) !== JSON.stringify(expected)) {
+    fail(`${rel}: products must canonically identify Payload and Better Auth as upstream-npm`)
+  }
+  if (doc.rules?.upstreamSourceImmutable !== true) {
+    fail(`${rel}: upstreamSourceImmutable must be true`)
+  }
+  const forbidden = new Set(doc.rules?.forbiddenMechanisms ?? [])
+  for (const required of ['source-modification', 'fork', 'vendoring', 'patch-package', 'monkey-patch', 'local-file-dependency']) {
+    if (!forbidden.has(required)) fail(`${rel}: missing forbidden mechanism '${required}'`)
+  }
+}
+
 /* ------------------------------------------------------------------ common */
 async function checkCommon() {
   const { byId, docs } = await validateJsonDomain('common')
@@ -307,6 +339,8 @@ if (domain && !supported.includes(domain)) {
   console.error(`Unsupported Contract CI domain: ${domain} (supported: ${supported.join(', ')})`)
   process.exit(2)
 }
+
+await checkUpstreamImmutabilityContract()
 
 const common = runAll || domain === 'common' ? await checkCommon() : null
 const { enumValues } = runAll || domain === 'enums' ? await checkEnums() : { enumValues: {} }
