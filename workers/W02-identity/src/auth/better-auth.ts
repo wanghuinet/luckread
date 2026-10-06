@@ -2,9 +2,21 @@ import { ensureBaseUserRole } from '../authz/role-assignment.js'
 import { betterAuth } from 'better-auth'
 import { bearer } from 'better-auth/plugins'
 
+export interface PasswordResetEmailBinding {
+  send(message: {
+    to: string
+    from: string
+    subject: string
+    html: string
+    text: string
+  }): Promise<unknown>
+}
+
 export interface BetterAuthEnv {
   D1_01: D1Database
   BETTER_AUTH_SECRET: string
+  EMAIL?: PasswordResetEmailBinding
+  PASSWORD_RESET_FROM_EMAIL?: string
 }
 
 export const createLuckReadAuth = (env: BetterAuthEnv) =>
@@ -14,6 +26,11 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
     // persistence here; Payload is not an authentication/database adapter.
     database: env.D1_01,
     basePath: '/api/auth',
+    trustedOrigins: [
+      'https://luckread.com',
+      'https://www.luckread.com',
+      'https://mp.luckread.com',
+    ],
     emailAndPassword: {
       enabled: true,
       disableSignUp: false,
@@ -22,8 +39,28 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
       minPasswordLength: 15,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: async () => {
-        throw new Error('PASSWORD_RESET_DELIVERY_UNCONFIGURED')
+      sendResetPassword: async ({ user, url }) => {
+        if (!env.EMAIL) {
+          throw new Error('PASSWORD_RESET_DELIVERY_UNCONFIGURED')
+        }
+
+        const from = env.PASSWORD_RESET_FROM_EMAIL?.trim() || 'noreply@luckread.com'
+        const escapedUrl = url
+          .replaceAll('&', '&amp;')
+          .replaceAll('"', '&quot;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+
+        await env.EMAIL.send({
+          to: user.email,
+          from,
+          subject: 'LuckRead 密码重置',
+          text: '请使用以下链接重置你的 LuckRead 密码：
+' + url + '
+
+如果这不是你的操作，请忽略此邮件。',
+          html: '<p>请使用以下链接重置你的 LuckRead 密码：</p><p><a href="' + escapedUrl + '">重置密码</a></p><p>如果这不是你的操作，请忽略此邮件。</p>',
+        })
       },
     },
     databaseHooks: {
