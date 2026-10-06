@@ -54,7 +54,14 @@ export async function POST(request: Request, context: { params: Promise<{ userId
     return json({ from: result.from, to: result.to, auditEventId: result.auditEventId })
   } catch (error) {
     if (error instanceof W02AuthClientError) {
-      const status = error.status
+      const status =
+        error.status === 401 ? 401 :
+        error.status === 403 ? 403 :
+        error.status === 404 ? 404 :
+        error.status === 409 ? 409 :
+        error.status === 412 ? 412 :
+        error.status === 400 ? 400 :
+        503
       return errorResponse(
         status,
         status === 401 ? 'UNAUTHENTICATED' :
@@ -62,13 +69,15 @@ export async function POST(request: Request, context: { params: Promise<{ userId
         status === 404 ? 'NOT_FOUND' :
         status === 409 ? 'INVALID_STATE' :
         status === 412 ? 'PRECONDITION_FAILED' :
-        'VALIDATION_FAILED',
+        status === 400 ? 'VALIDATION_FAILED' :
+        'SERVICE_UNAVAILABLE',
+        status === 401 ? 'Authentication required' :
         status === 403 ? 'Permission denied' :
         status === 404 ? 'User account not found' :
         status === 409 ? 'Invalid account-state transition' :
         status === 412 ? 'Account-state precondition failed' :
         status === 400 ? 'Invalid account-state request' :
-        'Authentication required',
+        'Account-state service unavailable',
       )
     }
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Account-state service unavailable')
