@@ -428,7 +428,7 @@ describe('Creator Center admin extension', () => {
 
   it('requires creator role for content write capability', () => {
     const client = read('src/content/w03-content-client.ts')
-    const w03 = read('../../../W03-content/src/index.ts')
+    const w03 = read('../../W03-content/src/index.ts')
 
     expect(client).toContain('X-LuckRead-Principal-Roles')
     expect(w03).toContain("roles.includes('creator')")
