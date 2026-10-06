@@ -16,13 +16,13 @@ describe('v1 follow mutation adapter', () => {
   })
 
   it('enforces Idempotency-Key on follow and unfollow mutations', () => {
-    expect(route).toContain("method!=='GET'")
+    expect(route).toContain("method !== 'GET'")
     expect(route).toContain("request.headers.get('Idempotency-Key')")
     expect(route).toContain("'PRECONDITION_REQUIRED'")
     expect(route).toContain('idempotencyKey.length > 256')
   })
 
   it('keeps target existence validation on follow creation', () => {
-    expect(route).toContain("if(method==='POST') await assertSocialTargetUserExists(request, targetUserId)")
+    expect(route).toContain("if (method === 'POST') await assertSocialTargetUserExists(request, targetUserId)")
   })
 })
