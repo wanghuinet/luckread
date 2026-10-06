@@ -376,7 +376,7 @@ export async function applyAccountStateTransition(
         .prepare(
           'DELETE FROM "session" WHERE user_id = ?',
         )
-        .bind(now, now, input.userId),
+        .bind(input.userId),
     )
   }
 
