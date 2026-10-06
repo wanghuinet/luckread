@@ -90,14 +90,13 @@ jobs:
         working-directory: deployed-source/workers/W01-payload
         run: pnpm install --frozen-lockfile
 
-      - name: Verify admitted Payload baseline
-        working-directory: deployed-source/workers/W01-payload
+      - name: Verify admitted W02 Better Auth baseline
+        working-directory: deployed-source/workers/W02-identity
         run: |
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs'
           const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
-          if (pkg.dependencies?.payload !== '3.90.2') throw new Error('Payload version mismatch')
-          if (pkg.dependencies?.['@payloadcms/db-d1-sqlite'] !== '3.90.2') throw new Error('D1 adapter version mismatch')
+          if (pkg.dependencies?.['better-auth'] !== '1.7.7') throw new Error('Better Auth version mismatch')
           NODE
 
       - name: Generate isolated fixture
@@ -106,16 +105,16 @@ jobs:
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: node evidence-tooling/scripts/auth-013-public-http-e2e-fixture.mjs
 
-      - name: Preflight fixture identity and collision
+      - name: Preflight Better Auth fixture identity and collision
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W01-payload/wrangler.jsonc             --command "SELECT
-              (SELECT COUNT(*) FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}', '${AUTH013_OPERATOR_EMAIL}', '${AUTH013_TARGET_EMAIL}')) AS email_collision,
-              (SELECT COUNT(*) FROM users WHERE username IN ('${AUTH013_BASIC_USERNAME}', '${AUTH013_OPERATOR_USERNAME}', '${AUTH013_TARGET_USERNAME}')) AS username_collision,
-              (SELECT COUNT(*) FROM users_sessions WHERE id IN ('${AUTH013_BASIC_SESSION_ID}', '${AUTH013_OPERATOR_SESSION_ID}')) AS session_collision,
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W02-identity/wrangler.jsonc             --command "SELECT
+              (SELECT COUNT(*) FROM "user" WHERE email IN ('${AUTH013_BASIC_EMAIL}', '${AUTH013_OPERATOR_EMAIL}', '${AUTH013_TARGET_EMAIL}')) AS email_collision,
+              (SELECT COUNT(*) FROM "user" WHERE username IN ('${AUTH013_BASIC_USERNAME}', '${AUTH013_OPERATOR_USERNAME}', '${AUTH013_TARGET_USERNAME}')) AS username_collision,
+              (SELECT COUNT(*) FROM "session" WHERE id IN ('${AUTH013_BASIC_SESSION_ID}', '${AUTH013_OPERATOR_SESSION_ID}')) AS session_collision,
               (SELECT COUNT(*) FROM role_assignments WHERE id IN ('${AUTH013_BASIC_ROLE_ID}', '${AUTH013_OPERATOR_ROLE_ID}')) AS role_collision" > /tmp/auth013-preflight.json
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs'
@@ -132,16 +131,16 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --file=/tmp/auth013-seed.sql
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config deployed-source/workers/W02-identity/wrangler.jsonc --file=/tmp/auth013-seed.sql
           echo "AUTH013_FIXTURE_SEEDED=1" >> "$GITHUB_ENV"
 
-      - name: Resolve generated Payload user IDs
+      - name: Resolve Better Auth user IDs
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W01-payload/wrangler.jsonc             --command "SELECT id, email FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}', '${AUTH013_OPERATOR_EMAIL}', '${AUTH013_TARGET_EMAIL}') ORDER BY email" > /tmp/auth013-user-ids.json
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W02-identity/wrangler.jsonc             --command "SELECT id, email FROM \"user\" WHERE email IN ('${AUTH013_BASIC_EMAIL}', '${AUTH013_OPERATOR_EMAIL}', '${AUTH013_TARGET_EMAIL}') ORDER BY email" > /tmp/auth013-user-ids.json
           node --input-type=module <<'NODE'
           import { appendFileSync, readFileSync } from 'node:fs'
           const raw = JSON.parse(readFileSync('/tmp/auth013-user-ids.json', 'utf8'))
@@ -153,7 +152,7 @@ jobs:
           const target = byEmail.get(process.env.AUTH013_TARGET_EMAIL)
           if (!basic || !operator || !target || new Set([basic, operator, target]).size !== 3) throw new Error('fixture user id resolution failed')
           appendFileSync(process.env.GITHUB_ENV, `AUTH013_BASIC_USER_ID=${basic}\nAUTH013_OPERATOR_USER_ID=${operator}\nAUTH013_TARGET_USER_ID=${target}\n`)
-          console.log(JSON.stringify({ userIdAllocation: 'database_generated', resolved: true, secretMaterialIncluded: false }))
+          console.log(JSON.stringify({ userIdAllocation: 'better_auth_fixture_defined', resolved: true, secretMaterialIncluded: false }))
           NODE
 
       - name: Execute public transport E2E
@@ -168,7 +167,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc             --command "UPDATE auth_session_state
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config deployed-source/workers/W02-identity/wrangler.jsonc             --command "UPDATE auth_session_state
               SET revoked_at='${AUTH013_NOW}', last_seen_at='${AUTH013_NOW}', token_version=token_version+1
               WHERE session_id='${AUTH013_BASIC_SESSION_ID}' AND revoked_at IS NULL;"
 
@@ -206,17 +205,17 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W01-payload/wrangler.jsonc             --command "SELECT
-              (SELECT account_state FROM users WHERE id=${AUTH013_OPERATOR_USER_ID}) AS operator_state,
-              (SELECT account_state_version FROM users WHERE id=${AUTH013_OPERATOR_USER_ID}) AS operator_version,
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W02-identity/wrangler.jsonc             --command "SELECT
+              (SELECT account_state FROM "user" WHERE id=${AUTH013_OPERATOR_USER_ID}) AS operator_state,
+              (SELECT account_state_version FROM "user" WHERE id=${AUTH013_OPERATOR_USER_ID}) AS operator_version,
               (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id='${AUTH013_OPERATOR_USER_ID}') AS operator_journal_count,
-              (SELECT account_state FROM users WHERE id=${AUTH013_BASIC_USER_ID}) AS basic_state,
-              (SELECT account_state_version FROM users WHERE id=${AUTH013_BASIC_USER_ID}) AS basic_version,
+              (SELECT account_state FROM "user" WHERE id=${AUTH013_BASIC_USER_ID}) AS basic_state,
+              (SELECT account_state_version FROM "user" WHERE id=${AUTH013_BASIC_USER_ID}) AS basic_version,
               (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id='${AUTH013_BASIC_USER_ID}') AS basic_journal_count,
               (SELECT revoked_at FROM auth_session_state WHERE session_id='${AUTH013_BASIC_SESSION_ID}') AS basic_revoked_at,
               (SELECT token_version FROM auth_session_state WHERE session_id='${AUTH013_BASIC_SESSION_ID}') AS basic_token_version,
-              (SELECT account_state FROM users WHERE id=${AUTH013_TARGET_USER_ID}) AS target_state,
-              (SELECT account_state_version FROM users WHERE id=${AUTH013_TARGET_USER_ID}) AS target_version,
+              (SELECT account_state FROM "user" WHERE id=${AUTH013_TARGET_USER_ID}) AS target_state,
+              (SELECT account_state_version FROM "user" WHERE id=${AUTH013_TARGET_USER_ID}) AS target_version,
               (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id='${AUTH013_TARGET_USER_ID}') AS target_journal_count,
               (SELECT source_version FROM auth_013_publication_journal WHERE resource_id='${AUTH013_TARGET_USER_ID}' LIMIT 1) AS target_journal_version,
               (SELECT event_type FROM auth_013_publication_journal WHERE resource_id='${AUTH013_TARGET_USER_ID}' LIMIT 1) AS target_event_type" > /tmp/auth013-final.json
@@ -276,18 +275,21 @@ jobs:
           cat > /tmp/auth013-cleanup.sql <<SQL
           DELETE FROM auth_013_publication_journal
           WHERE resource_id IN (
-            SELECT CAST(id AS TEXT) FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}')
+            SELECT CAST(id AS TEXT) FROM "user" WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}')
           );
           DELETE FROM auth_session_state WHERE session_id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}');
-          DELETE FROM users_sessions WHERE id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}');
-          DELETE FROM role_assignments WHERE id IN ('${AUTH013_BASIC_ROLE_ID}','${AUTH013_OPERATOR_ROLE_ID}');
+          DELETE FROM "session" WHERE id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}');
+          DELETE FROM account WHERE user_id IN (
+            SELECT CAST(id AS TEXT) FROM "user" WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}')
+          );
+          DELETE FROM verification WHERE identifier IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}');
           DELETE FROM role_authorization_versions
           WHERE subject_id IN (
-            SELECT CAST(id AS TEXT) FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}')
+            SELECT CAST(id AS TEXT) FROM "user" WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}')
           );
-          DELETE FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}');
+          DELETE FROM "user" WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}');
           SQL
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config deployed-source/workers/W01-payload/wrangler.jsonc --file=/tmp/auth013-cleanup.sql
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --yes --config deployed-source/workers/W02-identity/wrangler.jsonc --file=/tmp/auth013-cleanup.sql
 
       - name: Verify fixture cleanup
         if: ${{ always() && env.AUTH013_FIXTURE_SEEDED == '1' }}
@@ -296,19 +298,23 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W01-payload/wrangler.jsonc             --command "SELECT
-              (SELECT COUNT(*) FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}')) AS users_remaining,
-              (SELECT COUNT(*) FROM users_sessions WHERE id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}')) AS sessions_remaining,
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 execute "${{ inputs.database_name }}" --remote --json --config deployed-source/workers/W02-identity/wrangler.jsonc             --command "SELECT
+              (SELECT COUNT(*) FROM \"user\" WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}')) AS users_remaining,
+              (SELECT COUNT(*) FROM \"session\" WHERE id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}')) AS sessions_remaining,
+              (SELECT COUNT(*) FROM account WHERE user_id IN (
+                SELECT CAST(id AS TEXT) FROM \"user\" WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}')
+              )) AS accounts_remaining,
+              (SELECT COUNT(*) FROM verification WHERE identifier IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}')) AS verifications_remaining,
               (SELECT COUNT(*) FROM auth_session_state WHERE session_id IN ('${AUTH013_BASIC_SESSION_ID}','${AUTH013_OPERATOR_SESSION_ID}')) AS extensions_remaining,
               (SELECT COUNT(*) FROM role_assignments WHERE id IN ('${AUTH013_BASIC_ROLE_ID}','${AUTH013_OPERATOR_ROLE_ID}')) AS roles_remaining,
               (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id IN (
-                SELECT CAST(id AS TEXT) FROM users WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}')
+                SELECT CAST(id AS TEXT) FROM \"user\" WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}')
               )) AS journals_remaining" > /tmp/auth013-cleanup-check.json
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs'
           const raw = JSON.parse(readFileSync('/tmp/auth013-cleanup-check.json', 'utf8'))
           const row = Array.isArray(raw) ? (raw[0]?.results?.[0] ?? {}) : (raw?.result?.results?.[0] ?? raw?.results?.[0] ?? {})
-          for (const key of ['users_remaining','sessions_remaining','extensions_remaining','roles_remaining','journals_remaining']) {
+          for (const key of ['users_remaining','sessions_remaining','accounts_remaining','verifications_remaining','extensions_remaining','roles_remaining','journals_remaining']) {
             if (Number(row[key] ?? -1) !== 0) throw new Error('cleanup incomplete: ' + key)
           }
           console.log('AUTH-013 fixture cleanup PASS')
