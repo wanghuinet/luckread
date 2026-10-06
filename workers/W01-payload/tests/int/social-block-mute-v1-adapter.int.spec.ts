@@ -18,6 +18,26 @@ describe('v1 block/mute adapters', () => {
     }
   })
 
+  it('invalidates public follow lists when block state changes', () => {
+    const blockCreate = readFileSync(
+      resolve(process.cwd(), 'src/app/api/v1/interactions/blocks/route.ts'),
+      'utf8',
+    )
+    const blockDelete = readFileSync(
+      resolve(process.cwd(), 'src/app/api/v1/interactions/blocks/[targetUserId]/route.ts'),
+      'utf8',
+    )
+
+    for (const route of [blockCreate, blockDelete]) {
+      expect(route).toContain('invalidatePublicRoute')
+      expect(route).toContain("'followers'")
+      expect(route).toContain("'following'")
+      expect(route).toContain('principal.userId')
+      expect(route).toContain('targetUserId')
+      expect(route).toContain('if (response.ok)')
+    }
+  })
+
   it('enforces idempotency preconditions on unblock and unmute', () => {
     for (const path of [
       'src/app/api/v1/interactions/blocks/[targetUserId]/route.ts',
