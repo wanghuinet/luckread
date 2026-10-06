@@ -62,7 +62,7 @@ jobs:
       - name: W02 typecheck and tests
         run: |
           npx --no-install tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W02-identity/src/index.ts
-          npx --yes vitest@3.2.4 run workers/W02-identity/src/authz/role-assignment.test.ts workers/W02-identity/src/session/session-runtime.test.ts workers/W02-identity/src/session/session-management.test.ts
+          npx --yes vitest@3.2.4 run workers/W02-identity/src/authz/role-assignment.test.ts workers/W02-identity/src/authz/role-version.test.ts workers/W02-identity/src/authz/authorization-decision.test.ts
 
       - name: Deploy W02
         working-directory: workers/W02-identity
