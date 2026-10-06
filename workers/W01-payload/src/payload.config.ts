@@ -74,6 +74,18 @@ const cloudflare = isWorkerRuntime
 export default buildConfig({
   admin: {
     user: Users.slug,
+    components: {
+      views: {
+        login: {
+          Component: '/auth/PayloadAdminLoginRedirect',
+          path: '/login',
+          exact: true,
+        },
+      },
+      logout: {
+        Button: '/auth/PayloadAdminLogoutButton',
+      },
+    },
     importMap: {
       baseDir: path.resolve(dirname),
     },
