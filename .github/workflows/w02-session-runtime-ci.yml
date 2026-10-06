@@ -12,10 +12,8 @@ on:
   pull_request:
     paths:
       - 'workers/W02-identity/src/session/**'
-      - 'workers/W02-identity/src/credentials/credential-hash-key.ts'
-      - 'workers/W02-identity/src/credentials/credential-hash-key.test.ts'
-      - 'workers/W02-identity/src/account/registration-materializer.ts'
-      - 'workers/W02-identity/src/account/registration-materializer.test.ts'
+      - 'workers/W02-identity/src/account/password-change.ts'
+      - 'workers/W02-identity/src/account/password-change.test.ts'
       - 'workers/W02-identity/src/index.ts'
       - '.github/workflows/w02-session-runtime-ci.yml'
       - 'package.json'
