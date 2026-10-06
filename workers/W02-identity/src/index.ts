@@ -188,15 +188,25 @@ export default {
       try {
         const lookup = typeof body.userId === 'string'
           ? await env.D1_01
-              .prepare('SELECT id, account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? LIMIT 1')
-              .bind(body.userId)
+              .prepare(
+                'SELECT id, account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? ' +
+                'UNION ALL ' +
+                'SELECT CAST(id AS TEXT) AS id, account_state AS accountState, account_state_version AS accountStateVersion FROM users WHERE CAST(id AS TEXT) = ? ' +
+                'LIMIT 1',
+              )
+              .bind(body.userId, body.userId)
               .first<{ id: string; accountState?: string; accountStateVersion?: number }>()
           : null
 
         const emailLookup = !lookup && typeof body.email === 'string'
           ? await env.D1_01
-              .prepare('SELECT id, account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE lower(email) = lower(?) LIMIT 1')
-              .bind(body.email.trim())
+              .prepare(
+                'SELECT id, account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE lower(email) = lower(?) ' +
+                'UNION ALL ' +
+                'SELECT CAST(id AS TEXT) AS id, account_state AS accountState, account_state_version AS accountStateVersion FROM users WHERE lower(email) = lower(?) ' +
+                'LIMIT 1',
+              )
+              .bind(body.email.trim(), body.email.trim())
               .first<{ id: string; accountState?: string; accountStateVersion?: number }>()
           : null
 
