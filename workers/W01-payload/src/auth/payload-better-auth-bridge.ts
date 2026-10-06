@@ -70,8 +70,8 @@ const validMethod = (value: unknown): value is PayloadBetterAuthBridgeClaims['me
   value === 'GET' || value === 'POST' || value === 'PATCH' || value === 'DELETE'
 
 type BridgeRequestLike = {
-  method: string
-  url: string
+  method?: string
+  url?: string
 }
 
 const validClaims = (
@@ -81,7 +81,11 @@ const validClaims = (
 ): value is PayloadBetterAuthBridgeClaims => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const claims = value as Partial<PayloadBetterAuthBridgeClaims>
+  const requestMethod = request.method ?? ''
+  const requestPath = typeof request.url === 'string' ? new URL(request.url).pathname : ''
   return (
+    !!requestMethod &&
+    !!requestPath &&
     claims.v === VERSION &&
     typeof claims.sub === 'string' &&
     /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(claims.sub) &&
@@ -90,9 +94,9 @@ const validClaims = (
     claims.email.length <= 320 &&
     claims.aud === AUDIENCE &&
     validMethod(claims.method) &&
-    claims.method === request.method &&
+    claims.method === requestMethod &&
     typeof claims.path === 'string' &&
-    claims.path === new URL(request.url).pathname &&
+    claims.path === requestPath &&
     claims.path.length > 0 &&
     claims.path.length <= 2048 &&
     typeof claims.iat === 'number' &&
