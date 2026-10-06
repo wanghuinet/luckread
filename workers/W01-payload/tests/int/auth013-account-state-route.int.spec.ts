@@ -80,6 +80,28 @@ describe('AUTH-013 W01 public account-state route', () => {
     })
   })
 
+  it('maps W02 transition service failure to service unavailable', async () => {
+    mocks.transitionAccountState.mockRejectedValue(new mocks.MockW02AuthClientError(503, 'service unavailable'))
+
+    const response = await POST(
+      new Request('https://luckread.test/v1/users/42/account-state', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer verified',
+          'If-Match': '"7"',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ to: 'RESTRICTED', reason: 'moderation action' }),
+      }),
+      { params: Promise.resolve({ userId: '42' }) },
+    )
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'SERVICE_UNAVAILABLE', message: 'Account-state service unavailable' },
+    })
+  })
+
   it('passes only the verified principal and canonical public fields to W02', async () => {
     const response = await POST(
       new Request('https://luckread.test/v1/users/42/account-state', {
