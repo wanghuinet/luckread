@@ -399,6 +399,16 @@ export const transitionAccountState = (body: {
 }) => callW02<AccountStateTransitionResult>('/internal/account/transition', body)
 
 
+export type PayloadAdminAuthorizationResult = {
+  allowed: boolean
+  layer?: string | null
+}
+
+export const authorizePayloadAdmin = (userId: string) =>
+  callW02<PayloadAdminAuthorizationResult>('/internal/auth/admin/authorize', { userId })
+
+
+
 export async function signOutThroughW02(request: Request): Promise<Response> {
   const service = await getW02Service()
   const headers = new Headers()
