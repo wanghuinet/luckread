@@ -73,8 +73,11 @@ async function callW02<T>(path: string, body: unknown): Promise<T> {
         ? (payload as W02ErrorPayload).error!.code!
         : 'SERVICE_UNAVAILABLE'
 
-    if (code === 'UNAUTHENTICATED') {
+    if (response.status === 401 || code === 'UNAUTHENTICATED') {
       throw new W02AuthClientError(401, 'authentication denied')
+    }
+    if (response.status === 403 || code === 'PERMISSION_DENIED') {
+      throw new W02AuthClientError(403, 'permission denied')
     }
     if (code === 'VALIDATION_FAILED' || code === 'INVALID_CURSOR') {
       throw new W02AuthClientError(400, 'invalid authentication request')
