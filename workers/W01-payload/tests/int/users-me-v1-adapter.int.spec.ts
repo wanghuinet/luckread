@@ -16,6 +16,12 @@ describe('versioned users/me adapter', () => {
   })
 })
 
+it('distinguishes unauthenticated profile access from W02 service failure', () => {
+  const route = readFileSync(resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'), 'utf8')
+  expect(route).toContain('error instanceof W02AuthClientError && error.status === 401')
+  expect(route).toContain("errorResponse(503, 'SERVICE_UNAVAILABLE'")
+})
+
 it('guards viewer profile reads before authentication', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'), 'utf8')
   const guardIndex = route.indexOf('await enforcePublicReadRateLimit(request)')
