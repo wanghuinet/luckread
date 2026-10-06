@@ -52,14 +52,20 @@ describe('Media upload access', () => {
 })
 
 
-  it('exposes the existing Payload/R2 upload handler through the stable v1 media path', () => {
+  it('uploads media through the canonical Better Auth principal and Payload Local API', () => {
     const route = read('src/app/api/v1/media/route.ts')
 
-    expect(route).toContain("import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route'")
-    expect(route).toContain("new URL('/api/media', request.url)")
-    expect(route).toContain('request.clone()')
-    expect(route).toContain("slug: ['media']")
-    expect(route).toContain('PayloadRouteContext')
+    expect(route).toContain('resolveBetterAuthPrincipalThroughW02(request)')
+    expect(route).toContain("if (!principal.active || principal.tokenVersion === undefined)")
+    expect(route).toContain('const payload = await getPayload({ config })')
+    expect(route).toContain("collection: 'media'")
+    expect(route).toContain('data,')
+    expect(route).toContain('file,')
+    expect(route).toContain('overrideAccess: false')
+    expect(route).toContain('user: { id: principal.userId }')
+    expect(route).not.toContain('payloadMediaPost')
+    expect(route).not.toContain("new URL('/api/media'")
+    expect(route).not.toContain('PayloadRouteContext')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
