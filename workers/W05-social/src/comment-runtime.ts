@@ -28,6 +28,149 @@ export type CommentPage = {
   hasMore: boolean
 }
 
+type CommentUpdateIdempotencyRow = {
+  idem_id: string | null
+  idem_actor_user_id: string | null
+  idem_request_hash: string | null
+  idem_status: 'IN_PROGRESS' | 'COMPLETED' | null
+  idem_response_json: string | null
+  idem_expires_at: string | null
+}
+
+const COMMENT_UPDATE_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
+const COMMENT_UPDATE_OPERATION = 'updateComment'
+
+const sha256Hex = async (value: string): Promise<string> => {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+const commentUpdateRequestHash = async (
+  actorUserId: string,
+  commentId: string,
+  body: string,
+  ifMatch: string,
+): Promise<string> => sha256Hex(JSON.stringify({
+  operationId: COMMENT_UPDATE_OPERATION,
+  actorUserId,
+  commentId,
+  body,
+  ifMatch,
+}))
+
+const parseCommentUpdateReplay = (value: string | null): { item: CommentItem; etag: string } => {
+  if (!value) throw new CommentRuntimeError('COMMENT_WRITE_FAILED', 500)
+  try {
+    const parsed = JSON.parse(value) as {
+      item?: Partial<CommentItem>
+      etag?: unknown
+    }
+    if (
+      !parsed.item ||
+      typeof parsed.item.id !== 'string' ||
+      typeof parsed.item.contentId !== 'string' ||
+      typeof parsed.item.authorUserId !== 'string' ||
+      (parsed.item.parentId !== null && typeof parsed.item.parentId !== 'string') ||
+      typeof parsed.item.body !== 'string' ||
+      !['PENDING', 'PUBLISHED', 'REJECTED'].includes(String(parsed.item.state)) ||
+      typeof parsed.item.depth !== 'number' ||
+      typeof parsed.item.createdAt !== 'string' ||
+      typeof parsed.item.updatedAt !== 'string' ||
+      typeof parsed.etag !== 'string'
+    ) {
+      throw new Error('invalid replay')
+    }
+    return { item: parsed.item as CommentItem, etag: parsed.etag }
+  } catch {
+    throw new CommentRuntimeError('COMMENT_WRITE_FAILED', 500)
+  }
+}
+
+const isActiveCommentUpdateIdempotency = (
+  row: CommentUpdateIdempotencyRow | null,
+  now: Date,
+): boolean => !!row?.idem_id && !!row.idem_expires_at && Date.parse(row.idem_expires_at) > now.getTime()
+
+const inspectCommentUpdateIdempotency = (
+  row: CommentUpdateIdempotencyRow | null,
+  actorUserId: string,
+  requestHash: string,
+  now: Date,
+): { replayed: boolean; response?: { item: CommentItem; etag: string } } => {
+  if (!isActiveCommentUpdateIdempotency(row, now)) return { replayed: false }
+  if (row?.idem_actor_user_id !== actorUserId || row.idem_request_hash !== requestHash) {
+    throw new CommentRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
+  }
+  if (row.idem_status === 'IN_PROGRESS') {
+    throw new CommentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
+  }
+  return { replayed: true, response: parseCommentUpdateReplay(row.idem_response_json) }
+}
+
+const isUniqueConstraint = (error: unknown): boolean =>
+  /unique constraint|constraint failed|UNIQUE constraint/i.test(error instanceof Error ? error.message : String(error))
+
+const isCommentUpdateGuardFailure = (error: unknown): boolean =>
+  /CHECK constraint failed: successful = 1/i.test(error instanceof Error ? error.message : String(error))
+
+const insertCommentUpdateIdempotency = (
+  db: D1Database,
+  actorUserId: string,
+  idempotencyKey: string,
+  requestHash: string,
+  responseJson: string,
+  createdAt: string,
+  expiresAt: string,
+): D1PreparedStatement =>
+  db.prepare(
+    `INSERT INTO social_comment_mutation_idempotency
+      (id, actor_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
+     VALUES (?, ?, ?, ?, ?, 'COMPLETED', 200, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(),
+    actorUserId,
+    COMMENT_UPDATE_OPERATION,
+    idempotencyKey,
+    requestHash,
+    responseJson,
+    createdAt,
+    expiresAt,
+  )
+
+const expireCommentUpdateIdempotency = (
+  db: D1Database,
+  actorUserId: string,
+  idempotencyKey: string,
+  nowIso: string,
+): D1PreparedStatement =>
+  db.prepare(
+    `DELETE FROM social_comment_mutation_idempotency
+      WHERE actor_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?`,
+  ).bind(actorUserId, COMMENT_UPDATE_OPERATION, idempotencyKey, nowIso)
+
+const commentUpdateAtomicGuard = (db: D1Database): D1PreparedStatement =>
+  db.prepare(
+    `INSERT OR REPLACE INTO social_comment_txn_guard(id, successful)
+     VALUES (1, changes())`,
+  )
+
+const batchCommentUpdate = async (
+  db: D1Database,
+  statements: D1PreparedStatement[],
+): Promise<void> => {
+  try {
+    await db.batch(statements)
+  } catch (error) {
+    if (isUniqueConstraint(error)) {
+      throw new CommentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
+    }
+    if (isCommentUpdateGuardFailure(error)) {
+      throw new CommentRuntimeError('PRECONDITION_FAILED', 412)
+    }
+    throw new CommentRuntimeError('COMMENT_WRITE_FAILED', 500)
+  }
+}
+
 const MAX_ID = 128
 const MAX_BODY = 10000
 const MAX_CURSOR = 2048
@@ -443,15 +586,28 @@ export async function updateComment(
   actorUserIdValue: string,
   commentIdValue: string,
   input: CommentUpdateInput,
+  idempotencyKeyValue: string,
+  now = new Date(),
 ): Promise<{ item: CommentItem; etag: string }> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const commentId = validateId(commentIdValue)
   const body = input.body.trim()
   const expectedUpdatedAt = parseIfMatch(input.ifMatch)
+  const idempotencyKey = idempotencyKeyValue.trim()
 
   if (!body || body.length > MAX_BODY) {
     throw new CommentRuntimeError('VALIDATION_FAILED', 400)
   }
+  if (!idempotencyKey || idempotencyKey.length > 256) {
+    throw new CommentRuntimeError('PRECONDITION_REQUIRED', 428)
+  }
+
+  const requestHash = await commentUpdateRequestHash(
+    actorUserId,
+    commentId,
+    body,
+    expectedUpdatedAt,
+  )
 
   const current = await db.prepare(
     `SELECT
@@ -464,12 +620,30 @@ export async function updateComment(
        c.depth,
        c.created_at,
        c.updated_at,
-       content.state AS content_state
+       content.state AS content_state,
+       i.id AS idem_id,
+       i.actor_user_id AS idem_actor_user_id,
+       i.request_hash AS idem_request_hash,
+       i.status AS idem_status,
+       i.response_json AS idem_response_json,
+       i.expires_at AS idem_expires_at
      FROM social_comments c
      JOIN contents content ON content.id = c.content_id
+     LEFT JOIN (
+       SELECT id, actor_user_id, request_hash, status, response_json, expires_at
+       FROM social_comment_mutation_idempotency
+       WHERE actor_user_id = ? AND operation_id = ? AND idempotency_key = ?
+       ORDER BY created_at DESC
+       LIMIT 1
+     ) i ON 1 = 1
      WHERE c.id = ?
      LIMIT 1`,
-  ).bind(commentId).first<{
+  ).bind(
+    actorUserId,
+    COMMENT_UPDATE_OPERATION,
+    idempotencyKey,
+    commentId,
+  ).first<{
     id: string
     content_id: string
     author_user_id: string
@@ -480,7 +654,27 @@ export async function updateComment(
     created_at: string
     updated_at: string
     content_state: string
+    idem_id: string | null
+    idem_actor_user_id: string | null
+    idem_request_hash: string | null
+    idem_status: 'IN_PROGRESS' | 'COMPLETED' | null
+    idem_response_json: string | null
+    idem_expires_at: string | null
   }>()
+
+  const idempotency: CommentUpdateIdempotencyRow | null = current?.idem_id
+    ? {
+        idem_id: current.idem_id,
+        idem_actor_user_id: current.idem_actor_user_id,
+        idem_request_hash: current.idem_request_hash,
+        idem_status: current.idem_status,
+        idem_response_json: current.idem_response_json,
+        idem_expires_at: current.idem_expires_at,
+      }
+    : null
+
+  const replay = inspectCommentUpdateIdempotency(idempotency, actorUserId, requestHash, now)
+  if (replay.replayed && replay.response) return replay.response
 
   if (!current || current.content_state !== 'PUBLISHED') {
     throw new CommentRuntimeError('NOT_FOUND', 404)
@@ -491,35 +685,64 @@ export async function updateComment(
   if (current.state !== 'PUBLISHED') {
     throw new CommentRuntimeError('INVALID_STATE', 409)
   }
-
   if (current.updated_at !== expectedUpdatedAt) {
     throw new CommentRuntimeError('PRECONDITION_FAILED', 412)
   }
 
-  const now = new Date().toISOString()
-  const updated = await db.prepare(
-    `UPDATE social_comments
-     SET body = ?, updated_at = ?
-     WHERE id = ?
-       AND author_user_id = ?
-       AND state = 'PUBLISHED'
-       AND updated_at = ?
-     RETURNING id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at`,
-  ).bind(body, now, commentId, actorUserId, expectedUpdatedAt).first<{
-    id: string
-    content_id: string
-    author_user_id: string
-    parent_id: string | null
-    body: string
-    state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
-    depth: number
-    created_at: string
-    updated_at: string
-  }>()
+  const updatedAt = now.toISOString()
+  const updated = {
+    id: current.id,
+    content_id: current.content_id,
+    author_user_id: current.author_user_id,
+    parent_id: current.parent_id,
+    body,
+    state: current.state,
+    depth: current.depth,
+    created_at: current.created_at,
+    updated_at: updatedAt,
+  }
+  const result = {
+    item: toCommentItem(updated),
+    etag: commentEtag(updatedAt),
+  }
+  const responseJson = JSON.stringify(result)
+  const expiresAt = new Date(now.getTime() + COMMENT_UPDATE_IDEMPOTENCY_TTL_MS).toISOString()
 
-  if (!updated) throw new CommentRuntimeError('PRECONDITION_FAILED', 412)
+  await batchCommentUpdate(db, [
+    expireCommentUpdateIdempotency(db, actorUserId, idempotencyKey, updatedAt),
+    insertCommentUpdateIdempotency(
+      db,
+      actorUserId,
+      idempotencyKey,
+      requestHash,
+      responseJson,
+      updatedAt,
+      expiresAt,
+    ),
+    db.prepare(
+      `UPDATE social_comments
+          SET body = ?, updated_at = ?
+        WHERE id = ?
+          AND author_user_id = ?
+          AND state = 'PUBLISHED'
+          AND updated_at = ?
+          AND EXISTS (
+            SELECT 1
+              FROM contents
+             WHERE contents.id = social_comments.content_id
+               AND contents.state = 'PUBLISHED'
+          )`,
+    ).bind(
+      body,
+      updatedAt,
+      commentId,
+      actorUserId,
+      expectedUpdatedAt,
+    ),
+    commentUpdateAtomicGuard(db),
+  ])
 
-  return { item: toCommentItem(updated), etag: commentEtag(updated.updated_at) }
+  return result
 }
 
 export async function listComments(
