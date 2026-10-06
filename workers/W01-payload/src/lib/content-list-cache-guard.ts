@@ -52,7 +52,6 @@ export const validateContentListQuery = (url: URL): URLSearchParams => {
 }
 
 const AUTHENTICATED_SESSION_COOKIE_NAMES = new Set([
-  'payload-token',
   'better-auth.session_token',
   '__Secure-better-auth.session_token',
 ])
