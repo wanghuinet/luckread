@@ -1,5 +1,3 @@
-import { jwtSign } from 'payload'
-
 const getCookieValue = (request: Request, name: string): string | null => {
   const cookieHeader = request.headers.get('cookie')
   if (!cookieHeader) return null
@@ -59,59 +57,5 @@ export function readVerifiedPayloadTokenVersion(request: Request): number | null
       : null
   } catch {
     return null
-  }
-}
-
-export function buildPayloadAccessCookie(token: string, maxAgeSeconds: number, request: Request): string {
-  const maxAge = Math.max(1, Math.floor(maxAgeSeconds))
-  const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : ''
-  return `payload-token=${encodeURIComponent(token)}; Path=/; HttpOnly${secure}; SameSite=Lax; Max-Age=${maxAge}`
-}
-
-export function buildPayloadClearCookie(request: Request): string {
-  const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : ''
-  return `payload-token=; Path=/; HttpOnly${secure}; SameSite=Lax; Max-Age=0`
-}
-
-export async function issuePayloadAccessToken(input: {
-  payloadSecret: string
-  userId: string
-  email: string
-  sessionId: string
-  expiresAt: string
-  tokenVersion: number
-  now?: string
-}): Promise<{ token: string; exp: number; expiresIn: number }> {
-  if (!input.payloadSecret) throw new Error('Payload secret is required')
-  if (!input.userId || !input.email || !input.sessionId) {
-    throw new Error('Payload access-token subject is incomplete')
-  }
-  if (!Number.isInteger(input.tokenVersion) || input.tokenVersion < 0) {
-    throw new Error('Payload access-token tokenVersion is invalid')
-  }
-
-  const nowSeconds = Math.floor(Date.parse(input.now ?? new Date().toISOString()) / 1000)
-  const exp = Math.floor(Date.parse(input.expiresAt) / 1000)
-
-  if (!Number.isFinite(nowSeconds) || !Number.isFinite(exp) || exp <= nowSeconds) {
-    throw new Error('Payload session expiry is invalid')
-  }
-
-  const result = await jwtSign({
-    fieldsToSign: {
-      id: input.userId,
-      collection: 'users',
-      email: input.email,
-      sid: input.sessionId,
-      tokenVersion: input.tokenVersion,
-    },
-    secret: input.payloadSecret,
-    tokenExpiration: Math.max(1, exp - nowSeconds),
-  })
-
-  return {
-    token: result.token,
-    exp: result.exp,
-    expiresIn: Math.max(0, result.exp - nowSeconds),
   }
 }
