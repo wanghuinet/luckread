@@ -32,6 +32,19 @@ describe('W01 Better Auth boundary', () => {
     mocks.enforceAuthRateLimit.mockResolvedValue(undefined)
   })
 
+  it('does not expose direct Better Auth signup without the W01 registration seam', () => {
+    const route = readFileSync(
+      resolve(process.cwd(), 'src/app/api/auth/[...segments]/route.ts'),
+      'utf8',
+    )
+    expect(route).toContain("endpoint === 'sign-up/email'")
+    expect(route).toContain("Direct account registration is not available at this endpoint")
+    expect(route).toContain("code: 'NOT_FOUND'")
+    expect(route).toContain("'/auth/register'")
+    expect(route).toContain('idempotency')
+    expect(route).toContain('Payload projection')
+  })
+
   it('proxies login credentials to W02 and does not require legacy device/session material', async () => {
     const upstream = new Response(JSON.stringify({ user: { id: 'u1' } }), {
       status: 200,
