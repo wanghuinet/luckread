@@ -431,6 +431,19 @@ describe('comment runtime', () => {
   })
 
   it('replays a completed comment edit by idempotency key', async () => {
+    const requestHash = JSON.stringify({
+      operationId: 'updateComment',
+      actorUserId: 'user-1',
+      commentId: 'c1',
+      body: '已经修改',
+      ifMatch: '2026-10-02T00:01:00.000Z',
+    })
+    const digest = await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(requestHash),
+    )
+    const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+
     const replay = {
       item: {
         id: 'c1',
@@ -450,48 +463,20 @@ describe('comment runtime', () => {
       content_id: 'content-1',
       author_user_id: 'user-1',
       parent_id: null,
-      body: '已经修改',
+      body: '原始版本',
       state: 'PUBLISHED',
       depth: 0,
       created_at: '2026-10-02T00:00:00.000Z',
-      updated_at: '2026-10-02T00:02:00.000Z',
+      updated_at: '2026-10-02T00:01:00.000Z',
       content_state: 'PUBLISHED',
       idem_id: 'idem-edit-1',
       idem_actor_user_id: 'user-1',
-      idem_request_hash: '',
+      idem_request_hash: hash,
       idem_status: 'COMPLETED',
-      idem_response_json: '',
+      idem_response_json: JSON.stringify(replay),
       idem_expires_at: '2026-10-03T00:00:00.000Z',
     }])
-    const row = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    const responseJson = JSON.stringify(replay)
-    const original = row.mock.results[0]
-    void original
-    row.mockImplementationOnce(() => ({
-      bind: vi.fn(() => ({
-        first: vi.fn(async () => ({
-          id: 'c1',
-          content_id: 'content-1',
-          author_user_id: 'user-1',
-          parent_id: null,
-          body: '原始版本',
-          state: 'PUBLISHED',
-          depth: 0,
-          created_at: '2026-10-02T00:00:00.000Z',
-          updated_at: '2026-10-02T00:01:00.000Z',
-          content_state: 'PUBLISHED',
-          idem_id: 'idem-edit-1',
-          idem_actor_user_id: 'user-1',
-          idem_request_hash: '',
-          idem_status: 'COMPLETED',
-          idem_response_json: responseJson,
-          idem_expires_at: '2026-10-03T00:00:00.000Z',
-        })),
-      })),
-    }))
 
-    // The request hash is intentionally unknown to the fixture, so the replay
-    // branch is exercised with the real helper-generated hash below.
     await expect(updateComment(
       d,
       'user-1',
@@ -499,11 +484,11 @@ describe('comment runtime', () => {
       { body: '已经修改', ifMatch: '"2026-10-02T00:01:00.000Z"' },
       'comment-edit-replay',
       new Date('2026-10-02T12:00:00.000Z'),
-    )).rejects.toMatchObject({
-      code: 'IDEMPOTENCY_KEY_REUSE_CONFLICT',
-      status: 422,
-    })
+    )).resolves.toEqual(replay)
+
+    expect(d.prepare).toHaveBeenCalledTimes(1)
   })
+
 
   it('rejects an update from another author', async () => {
     const d = db([{
