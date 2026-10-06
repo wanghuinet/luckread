@@ -135,6 +135,58 @@ export const resolveAuthenticatedPrincipal = async (body: {
 }) =>
   callW02<{ active: boolean; layer?: string }>('/internal/auth/session/principal', body)
 
+export type BetterAuthPrincipal = {
+  active: boolean
+  userId: string
+  email: string
+  sessionId: string
+  accountState: string
+  accountStateVersion: number
+  layer: string
+  roles: string[]
+}
+
+export const resolveBetterAuthPrincipal = async (request: Request): Promise<BetterAuthPrincipal> => {
+  const headers = new Headers()
+  const cookie = request.headers.get('cookie')
+  const authorization = request.headers.get('authorization')
+  if (cookie) headers.set('cookie', cookie)
+  if (authorization) headers.set('authorization', authorization)
+
+  const service = await getW02Service()
+  const response = await service.fetch(
+    new Request('https://luckread-w02.internal/internal/auth/principal', {
+      method: 'POST',
+      headers,
+    }),
+  )
+
+  let payload: BetterAuthPrincipal | { active?: boolean } | null = null
+  try {
+    payload = await response.json() as BetterAuthPrincipal | { active?: boolean }
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok || !payload || !('active' in payload) || payload.active !== true) {
+    const status = response.status === 401 ? 401 : response.status === 400 ? 400 : 503
+    throw new W02AuthClientError(status, 'Better Auth principal unavailable')
+  }
+
+  return payload as BetterAuthPrincipal
+}
+
+export const authorizeAdminUser = async (userId: string) =>
+  callW02<{
+    active: boolean
+    userId: string
+    accountState: string
+    accountStateVersion: number
+    layer: string | null
+    roles: string[]
+    adminAccess: boolean
+  }>('/internal/auth/admin/authorize', { userId })
+
 export type AccountStateTransitionResult = {
   from: string
   to: string
