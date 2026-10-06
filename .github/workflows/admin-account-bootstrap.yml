@@ -146,7 +146,8 @@ jobs:
       - name: Verify production Better Auth login without printing credentials
         run: |
           set -euo pipefail
-          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}'             -X POST 'https://mp.luckread.com/auth/login'             -H 'Content-Type: application/json'             --data-raw "{\"identity\":\"wanghui\",\"credential\":$(printf '%s' "$LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD" | node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.stringify(s)))'),\"deviceId\":\"admin-bootstrap-${GITHUB_RUN_ID}\"}")"
+          ADMIN_EMAIL="$(cat /tmp/admin-user-email.txt)"
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' -X POST 'https://mp.luckread.com/auth/login' -H 'Content-Type: application/json' --data-raw "{\"identity\":$(printf '%s' "$ADMIN_EMAIL" | node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.stringify(s)))'),\"credential\":$(printf '%s' "$LUCKREAD_ADMIN_BOOTSTRAP_PASSWORD" | node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.stringify(s)))'),\"deviceId\":\"admin-bootstrap-${GITHUB_RUN_ID}\"}")"
           test "$status" = "200"
 
       - name: Secure cleanup
