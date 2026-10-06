@@ -94,7 +94,7 @@ if (fs.existsSync(path.join(root, adminBootstrapWorkflow))) {
     }
   }
   if (!source.includes('BETTER_AUTH_USER_ID')) fail('admin bootstrap workflow must resolve Better Auth identity before role binding')
-  if (!source.includes('provider_id=\\'credential\\'')) fail('admin bootstrap workflow must verify the Better Auth credential account')
+  if (!source.includes("provider_id='credential'")) fail("admin bootstrap workflow must verify the Better Auth credential account")
 }
 
 const roots = ['src','app','server','workers','packages','collections','payload','lib','routes'];
