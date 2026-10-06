@@ -12,6 +12,15 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
     // persistence here; Payload is not an authentication/database adapter.
     database: env.D1_01,
     basePath: '/api/auth',
+    trustedOrigins: [
+      'https://luckread-w02.internal',
+      'https://luckread.com',
+      'https://www.luckread.com',
+      'https://mp.luckread.com',
+      'https://sso.luckread.com',
+      'http://127.0.0.1:8787',
+      'http://localhost:8787',
+    ],
     emailAndPassword: {
       enabled: true,
       disableSignUp: false,
