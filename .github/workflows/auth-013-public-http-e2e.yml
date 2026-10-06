@@ -310,7 +310,6 @@ jobs:
               (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id IN (
                 SELECT CAST(id AS TEXT) FROM \"user\" WHERE email IN ('${AUTH013_BASIC_EMAIL}','${AUTH013_OPERATOR_EMAIL}','${AUTH013_TARGET_EMAIL}')
               )) AS journals_remaining" > /tmp/auth013-cleanup-check.json
-              )) AS journals_remaining" > /tmp/auth013-cleanup-check.json
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs'
           const raw = JSON.parse(readFileSync('/tmp/auth013-cleanup-check.json', 'utf8'))
