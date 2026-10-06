@@ -21,10 +21,21 @@ const queues = await api('/queues?per_page=100')
 const queue = queues.result.find((item) => item.queue_name === 'luckread-auth013-account-state-projection')
 if (!queue) throw new Error('AUTH-013 projection queue not found')
 
-const consumerResponse = await api(`/queues/${queue.queue_id}/consumers`)
-const consumers = Array.isArray(consumerResponse.result) ? consumerResponse.result : [consumerResponse.result]
-const consumer = consumers.find((item) => (item.script_name ?? item.script) === 'luckread-w04')
-if (!consumer) throw new Error('W04 queue consumer not found after deployment; inspect Queue consumer propagation')
+async function getW04Consumer() {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const response = await api(`/queues/${queue.queue_id}/consumers`)
+    const list = Array.isArray(response.result) ? response.result : response.result ? [response.result] : []
+    const consumer = list.find((item) => (item.script_name ?? item.script) === 'luckread-w04')
+    if (consumer) {
+      if (list.length !== 1) throw new Error(`Expected one W04 consumer, found ${list.length}`)
+      return consumer
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+  }
+  throw new Error('W04 queue consumer not found after deployment; inspect Queue consumer propagation')
+}
+const consumer = await getW04Consumer()
+const consumers = [consumer]
 if (consumer.dead_letter_queue !== 'luckread-auth013-account-state-projection-dlq') {
   throw new Error('W04 DLQ binding mismatch')
 }
@@ -100,7 +111,7 @@ try {
     worker: 'W04',
     queue: queue.queue_name,
     queueId: queue.queue_id,
-    consumer: { script: consumer.script, type: consumer.type, deadLetterQueue: consumer.dead_letter_queue },
+    consumer: { scriptName: consumer.script_name ?? consumer.script, type: consumer.type, deadLetterQueue: consumer.dead_letter_queue },
     destination: { type: 'cloudflare_kv', title: 'globe', namespaceId, authority: 'NONE' },
     runtimeEvidence: {
       v1FrozenPurged: true,
@@ -110,7 +121,7 @@ try {
       nonResurrection: true,
     },
   }
-  await (await import('node:fs/promises')).writeFile('auth013-w04-runtime-evidence.json', JSON.stringify(evidence, null, 2) + '\\n')
+  await (await import('node:fs/promises')).writeFile('auth013-w04-runtime-evidence.json', JSON.stringify(evidence, null, 2) + '\n')
   console.log(JSON.stringify(evidence, null, 2))
   console.log('AUTH-013 W04 runtime evidence PASS')
 } finally {
