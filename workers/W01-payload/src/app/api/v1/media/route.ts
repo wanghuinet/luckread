@@ -3,7 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route'
 
-import { getBetterAuthPrincipal } from '@/auth/w02-session-client'
+import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaPost>[1]
@@ -14,13 +14,17 @@ const unauthorized = () => new Response(JSON.stringify({ error: { code: 'UNAUTHE
 })
 
 async function authenticate(request: Request) {
-  try {
-    const principal = await getBetterAuthPrincipal(request)
-    const payload = await getPayload({ config })
-    return { payload, userId: principal.userId }
-  } catch {
-    return null
-  }
+  const principal = await getBetterAuthPrincipal(request)
+  const payload = await getPayload({ config })
+  return { payload, userId: principal.userId }
+}
+
+const authenticateErrorResponse = (error: unknown): Response => {
+  if (error instanceof W02AuthClientError && error.status === 401) return unauthorized()
+  return new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Media authentication service unavailable' } }), {
+    status: 503,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+  })
 }
 export async function GET(request: Request): Promise<Response> {
   try {
@@ -33,8 +37,12 @@ export async function GET(request: Request): Promise<Response> {
     })
   }
 
-  const authenticated = await authenticate(request)
-  if (!authenticated) return unauthorized()
+  let authenticated: Awaited<ReturnType<typeof authenticate>>
+  try {
+    authenticated = await authenticate(request)
+  } catch (error) {
+    return authenticateErrorResponse(error)
+  }
 
   const url = new URL(request.url)
   const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '24', 10)
