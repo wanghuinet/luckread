@@ -35,17 +35,18 @@ export default async function HomePage() {
 
   if (CREATOR_CENTER_HOSTS.has(host)) {
     const request = new Request('https://mp.luckread.com/', { headers: requestHeaders })
+    let principal: Awaited<ReturnType<typeof getBetterAuthPrincipal>> | null = null
     try {
       await enforcePublicReadRateLimit(request)
-      const principal = await getBetterAuthPrincipal(request)
-      if (principal.active) {
-        const displayName =
-          typeof principal.username === 'string' && principal.username.trim()
-            ? principal.username
-            : principal.email
-        return <CreatorStudio displayName={displayName} userId={principal.userId} locale={locale} />
-      }
+      principal = await getBetterAuthPrincipal(request)
     } catch {}
+    if (principal?.active) {
+      const displayName =
+        typeof principal.username === 'string' && principal.username.trim()
+          ? principal.username
+          : principal.email
+      return <CreatorStudio displayName={displayName} userId={principal.userId} locale={locale} />
+    }
   }
 
   if (CREATOR_CENTER_HOSTS.has(host)) {
