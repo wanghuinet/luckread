@@ -6,6 +6,7 @@ const baseUrl = process.env.AUTH001_BASE_URL || 'http://127.0.0.1:8787'
 const artifactDir = new URL('../../../artifacts/mapping-0/auth-001-runtime-local/', import.meta.url)
 mkdirSync(artifactDir, { recursive: true })
 const runId = process.env.GITHUB_RUN_ID || 'local'
+const persistTo = process.env.AUTH001_PERSIST_TO?.trim()
 const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
 const policy = JSON.parse(readFileSync(new URL('../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json', import.meta.url), 'utf8'))
 if (policy.policyVersion !== 'DEV-2026-09-28.1') throw new Error('Unexpected development PRIV-004 policy version')
@@ -13,7 +14,8 @@ if (policy.policyVersion !== 'DEV-2026-09-28.1') throw new Error('Unexpected dev
 const escapeSql = (value) => "'" + String(value).replaceAll("'", "''") + "'"
 const renderSql = (sql, args) => { let index = 0; return sql.replaceAll('?', () => escapeSql(args[index++])) }
 const d1Json = (command) => {
-  const output = execFileSync('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', '--json', '--config', 'wrangler.jsonc', '--command', command], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 })
+  const args = ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', ...(persistTo ? ['--persist-to', persistTo] : []), '--json', '--config', 'wrangler.jsonc', '--command', command]
+  const output = execFileSync('pnpm', args, { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 })
   return JSON.parse(output)
 }
 const d1Rows = (command) => {
