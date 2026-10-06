@@ -16,6 +16,7 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
       enabled: true,
       disableSignUp: false,
       requireEmailVerification: false,
+      autoSignIn: false,
       minPasswordLength: 15,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
