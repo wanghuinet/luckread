@@ -52,18 +52,32 @@ describe('Media upload access', () => {
 })
 
 
-  it('exposes the existing Payload/R2 upload handler through the stable v1 media path', () => {
+  it('routes media upload through Better Auth while preserving Payload REST streaming', () => {
     const route = read('src/app/api/v1/media/route.ts')
 
     expect(route).toContain("import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route'")
-    expect(route).toContain("new URL('/api/media', request.url)")
-    expect(route).toContain('request.clone()')
+    expect(route).toContain('resolveBetterAuthPrincipalThroughW02(request)')
+    expect(route).toContain('createPayloadBetterAuthBridgeToken')
+    expect(route).toContain('createPayloadBetterAuthBridgeRequest')
+    expect(route).toContain("path: '/api/media'")
+    expect(route).toContain('request.body')
     expect(route).toContain("slug: ['media']")
-    expect(route).toContain('PayloadRouteContext')
+    expect(route).not.toContain('request.formData()')
+    expect(route).not.toContain('request.arrayBuffer()')
+    expect(route).not.toContain('new File(')
+    expect(route).not.toContain('new Blob(')
     expect(route).not.toContain('D1Database')
     expect(route).not.toContain('R2Bucket')
   })
 
+
+  it('registers the Better Auth Payload bridge without disabling native Payload admin auth', () => {
+    const users = read('src/collections/Users.ts')
+
+    expect(users).toContain("import { payloadBetterAuthBridgeStrategy } from '@/auth/payload-better-auth-bridge'")
+    expect(users).toContain('strategies: [payloadBetterAuthBridgeStrategy]')
+    expect(users).toContain('removeTokenFromResponses: true')
+  })
 
   it('requires an idempotency key for stable media creation', () => {
     const route = read('src/app/api/v1/media/route.ts')
