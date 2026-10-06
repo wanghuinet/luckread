@@ -25,8 +25,8 @@ export type PayloadBetterAuthBridgeClaims = {
 
 const base64UrlEncode = (value: Uint8Array): string =>
   btoa(String.fromCharCode(...value))
-    .replace(/\\+/g, '-')
-    .replace(/\\//g, '_')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
     .replace(/=+$/g, '')
 
 const base64UrlDecode = (value: string): Uint8Array => {
@@ -171,13 +171,6 @@ export const payloadBetterAuthBridgeStrategy: Strategy = {
 
 export const PAYLOAD_BETTER_AUTH_BRIDGE_HEADER = BRIDGE_HEADER
 export const PAYLOAD_BETTER_AUTH_BRIDGE_CALLER_HEADER = CALLER_HEADER
-
-export const payloadBetterAuthBridgeHeaders = (token: string): Headers => {
-  const headers = new Headers()
-  headers.set(BRIDGE_HEADER, token)
-  headers.set(CALLER_HEADER, CALLER)
-  return headers
-}
 
 export const createPayloadBetterAuthBridgeRequest = (
   request: Request,
