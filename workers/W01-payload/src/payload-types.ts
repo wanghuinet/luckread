@@ -62,6 +62,12 @@ export interface UserAuthOperations {
 export interface User {
   id: number
   identityId?: string | null
+  username?: string | null
+  displayName?: string | null
+  bio?: string | null
+  avatar?: string | null
+  locale?: string | null
+  timezone?: string | null
   updatedAt: string
   createdAt: string
   email: string

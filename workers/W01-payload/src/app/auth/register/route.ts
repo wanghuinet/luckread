@@ -10,7 +10,6 @@ import { proxyBetterAuth, rollbackRegistrationUser } from '../../../auth/w02-ses
 const SCOPE = 'ACCOUNT_REGISTRATION'
 const ENDPOINT = 'authRegister'
 const ACCOUNT_STATE = 'PENDING_VERIFICATION'
-const ACCOUNT_STATE_VERSION = 1
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
 
 type AuthRegisterRequest = {
