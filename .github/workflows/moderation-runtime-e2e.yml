@@ -134,7 +134,7 @@ jobs:
             echo "NATIVE_LOGIN_STATE_DIAGNOSTIC=SKIPPED_NO_USER_ID"
             exit 0
           fi
-          npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --json --config workers/W01-payload/wrangler.jsonc --command "SELECT (SELECT COUNT(*) FROM users_sessions WHERE CAST(_parent_id AS TEXT)='$MODERATION_AUTH_USER_ID') AS native_session_count, (SELECT COUNT(*) FROM auth_session_state WHERE user_id='$MODERATION_AUTH_USER_ID') AS auth_session_state_count, (SELECT COUNT(*) FROM role_assignments WHERE subject_id='$MODERATION_AUTH_USER_ID' AND status='ACTIVE') AS active_role_assignment_count;" > /tmp/native-login-state.json
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --json --config workers/W01-payload/wrangler.jsonc --command "SELECT (SELECT COUNT(*) FROM "session" WHERE CAST(_parent_id AS TEXT)='$MODERATION_AUTH_USER_ID') AS native_session_count, (SELECT COUNT(*) FROM auth_session_state WHERE user_id='$MODERATION_AUTH_USER_ID') AS auth_session_state_count, (SELECT COUNT(*) FROM role_assignments WHERE subject_id='$MODERATION_AUTH_USER_ID' AND status='ACTIVE') AS active_role_assignment_count;" > /tmp/native-login-state.json
           node -e "const r=require('/tmp/native-login-state.json'); const row=r[0]?.results?.[0]; if(!row) throw new Error('native login state diagnostic row missing'); console.log('NATIVE_LOGIN_STATE_DIAGNOSTIC=' + JSON.stringify({nativeSessionCount:Number(row.native_session_count),authSessionStateCount:Number(row.auth_session_state_count),activeRoleAssignmentCount:Number(row.active_role_assignment_count)}));"
 
       - name: Diagnose W02 establish through ephemeral binding harness
@@ -190,7 +190,7 @@ jobs:
               if (request.method !== 'POST' || new URL(request.url).pathname !== '/diagnose') return new Response(null, { status: 404 })
               if (request.headers.get('x-probe-token') !== env.PROBE_TOKEN) return json({ status: 'DENY' }, 403)
               const session = await env.D1_01.prepare(
-                'SELECT id FROM users_sessions WHERE CAST(_parent_id AS TEXT)=? ORDER BY created_at DESC LIMIT 1',
+                'SELECT id FROM "session" WHERE CAST(_parent_id AS TEXT)=? ORDER BY created_at DESC LIMIT 1',
               ).bind(env.USER_ID).first<{ id: string }>()
               if (!session?.id) return json({ status: 'NO_NATIVE_SESSION' }, 409)
 
@@ -466,8 +466,8 @@ jobs:
           CONTENT1="mod-e2e-$GITHUB_RUN_ID"
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W06" --remote --yes --config workers/W06-governance/wrangler.jsonc --command "DELETE FROM moderation_enforcement_outbox WHERE decision_id IN (SELECT decision_id FROM moderation_decisions WHERE case_id LIKE 'mod-e2e-%'); DELETE FROM moderation_decision_idempotency WHERE case_id LIKE 'mod-e2e-%'; DELETE FROM moderation_decisions WHERE case_id LIKE 'mod-e2e-%'; DELETE FROM moderation_cases WHERE case_id LIKE 'mod-e2e-%';"
           npx --yes wrangler@$WRANGLER_VERSION d1 execute "$DATABASE_NAME_W03" --remote --yes --config workers/W03-content/wrangler.jsonc --command "DELETE FROM contents WHERE id LIKE 'mod-e2e-%';"
-          npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --yes --config workers/W01-payload/wrangler.jsonc --command "DELETE FROM role_assignments WHERE id LIKE 'MODERATION-E2E-ROLE-%' OR subject_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com');"
-          npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --yes --config workers/W01-payload/wrangler.jsonc --command "DELETE FROM auth_session_state WHERE user_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM users_sessions WHERE CAST(_parent_id AS TEXT) IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT) IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com') OR CAST(owner_subject_id AS TEXT) IN (SELECT CAST(id AS TEXT) FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM auth_registration_envelopes WHERE idempotency_key LIKE 'MODERATION-E2E-%-register'; DELETE FROM users WHERE email LIKE 'moderation-e2e-MODL6-%@example.com';"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --yes --config workers/W01-payload/wrangler.jsonc --command "DELETE FROM role_assignments WHERE id LIKE 'MODERATION-E2E-ROLE-%' OR subject_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE 'moderation-e2e-MODL6-%@example.com');"
+          npx --yes wrangler@$WRANGLER_VERSION d1 execute luckread --remote --yes --config workers/W01-payload/wrangler.jsonc --command "DELETE FROM auth_session_state WHERE user_id IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM "session" WHERE CAST(_parent_id AS TEXT) IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM consents WHERE CAST(actor_subject_id AS TEXT) IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE 'moderation-e2e-MODL6-%@example.com') OR CAST(owner_subject_id AS TEXT) IN (SELECT CAST(id AS TEXT) FROM "user" WHERE email LIKE 'moderation-e2e-MODL6-%@example.com'); DELETE FROM auth_registration_envelopes WHERE idempotency_key LIKE 'MODERATION-E2E-%-register'; DELETE FROM "user" WHERE email LIKE 'moderation-e2e-MODL6-%@example.com';"
 
       - name: Upload moderation runtime evidence
         if: always()
