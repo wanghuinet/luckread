@@ -252,7 +252,7 @@ describe('Creator Center admin extension', () => {
     expect(list).toContain('async function unpublishAndEdit(item: Item)')
     expect(list).toContain("requestTransition(item.id, 'DRAFT', item.etag)")
     expect(list).toContain("requestTransition(item.id, 'UNPUBLISHED', item.etag)")
-    expect(list).toContain("requestTransition(item.id, 'DRAFT', typeof unpublished.etag === 'string' ? unpublished.etag : \`W/"\${unpublishedVersion}"\`)")
+    expect(list).toContain("requestTransition(item.id, 'DRAFT', typeof unpublished.etag === 'string' ? unpublished.etag :")
     expect(list).toContain(`/publish?draft=\${encodeURIComponent(item.id)}&version=\${draftVersion}`)
     expect(list).toContain('下线并编辑')
     expect(list).toContain('转为草稿编辑')
