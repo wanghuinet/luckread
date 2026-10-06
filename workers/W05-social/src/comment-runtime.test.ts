@@ -416,15 +416,79 @@ describe('comment runtime', () => {
       },
     ])
 
-    await expect(updateComment(d, 'user-1', 'c1', {
-      body: '修改后',
-      ifMatch: '"2026-10-02T00:01:00.000Z"',
-    })).resolves.toMatchObject({
+    await expect(updateComment(
+      d,
+      'user-1',
+      'c1',
+      { body: '修改后', ifMatch: '"2026-10-02T00:01:00.000Z"' },
+      'comment-edit-1',
+      new Date('2026-10-02T00:02:00.000Z'),
+    )).resolves.toMatchObject({
       item: { id: 'c1', body: '修改后' },
       etag: '"2026-10-02T00:02:00.000Z"',
     })
     expect(d.prepare).toHaveBeenCalledTimes(2)
   })
+
+  it('replays a completed comment edit by idempotency key', async () => {
+    const requestHash = JSON.stringify({
+      operationId: 'updateComment',
+      actorUserId: 'user-1',
+      commentId: 'c1',
+      body: '已经修改',
+      ifMatch: '2026-10-02T00:01:00.000Z',
+    })
+    const digest = await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(requestHash),
+    )
+    const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+
+    const replay = {
+      item: {
+        id: 'c1',
+        contentId: 'content-1',
+        authorUserId: 'user-1',
+        parentId: null,
+        body: '已经修改',
+        state: 'PUBLISHED',
+        depth: 0,
+        createdAt: '2026-10-02T00:00:00.000Z',
+        updatedAt: '2026-10-02T00:02:00.000Z',
+      },
+      etag: '"2026-10-02T00:02:00.000Z"',
+    }
+    const d = db([{
+      id: 'c1',
+      content_id: 'content-1',
+      author_user_id: 'user-1',
+      parent_id: null,
+      body: '原始版本',
+      state: 'PUBLISHED',
+      depth: 0,
+      created_at: '2026-10-02T00:00:00.000Z',
+      updated_at: '2026-10-02T00:01:00.000Z',
+      content_state: 'PUBLISHED',
+      idem_id: 'idem-edit-1',
+      idem_actor_user_id: 'user-1',
+      idem_request_hash: hash,
+      idem_status: 'COMPLETED',
+      idem_response_json: JSON.stringify(replay),
+      idem_expires_at: '2026-10-03T00:00:00.000Z',
+    }])
+
+    await expect(updateComment(
+      d,
+      'user-1',
+      'c1',
+      { body: '已经修改', ifMatch: '"2026-10-02T00:01:00.000Z"' },
+      'comment-edit-replay',
+      new Date('2026-10-02T12:00:00.000Z'),
+    )).resolves.toEqual(replay)
+
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+  })
+
 
   it('rejects an update from another author', async () => {
     const d = db([{
@@ -443,7 +507,7 @@ describe('comment runtime', () => {
     await expect(updateComment(d, 'user-1', 'c1', {
       body: '越权修改',
       ifMatch: '"2026-10-02T00:01:00.000Z"',
-    })).rejects.toMatchObject({
+    }, 'comment-edit-forbidden')).rejects.toMatchObject({
       code: 'PERMISSION_DENIED',
       status: 403,
     })
@@ -466,7 +530,7 @@ describe('comment runtime', () => {
     await expect(updateComment(d, 'user-1', 'c1', {
       body: '旧版本修改',
       ifMatch: '"2026-10-02T00:01:00.000Z"',
-    })).rejects.toMatchObject({
+    }, 'comment-edit-stale')).rejects.toMatchObject({
       code: 'PRECONDITION_FAILED',
       status: 412,
     })
