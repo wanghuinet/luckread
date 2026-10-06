@@ -1,3 +1,4 @@
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../auth/traffic-limit.js'
 import { resolveBetterAuthPrincipal, W02AuthClientError } from '../auth/w02-auth-client.js'
 
@@ -23,9 +24,7 @@ const errorResponse = (status: number, code: string, message: string) =>
   )
 
 async function getW03Service(): Promise<W03ContentService> {
-  const { env } = await import('@opennextjs/cloudflare').then(({ getCloudflareContext }) =>
-    getCloudflareContext({ async: true }),
-  )
+  const { env } = await getCloudflareContext({ async: true })
   const service = (env as unknown as { W03_CONTENT?: W03ContentService }).W03_CONTENT
   if (!service) {
     throw new W03ContentClientError(503, 'SERVICE_UNAVAILABLE', 'Content service unavailable')
