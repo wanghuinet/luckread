@@ -1,0 +1,153 @@
+name: SOCIAL-012 Comment Edit Idempotency D1-02 Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact 40-character source SHA containing the admitted migration
+        required: true
+        type: string
+      confirm:
+        description: Type APPLY_SOCIAL_012_MIGRATION to permit remote D1 mutation
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  EXPECTED_DB_ID: 6c342634-97f6-4248-9f4a-85772af4f22c
+  EXPECTED_DB_NAME: luckreadpro
+  EXPECTED_WORKER: luckread-w05
+  EXPECTED_BINDING: DB
+
+jobs:
+  migrate:
+    if: \${{ inputs.confirm == 'APPLY_SOCIAL_012_MIGRATION' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate source SHA
+        env:
+          SOURCE_SHA: \${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ inputs.source_sha }}
+          fetch-depth: 1
+
+      - name: Verify exact source SHA
+        env:
+          SOURCE_SHA: \${{ inputs.source_sha }}
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify W05 binding and migration source
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          config = json.loads(Path('workers/W05-social/wrangler.jsonc').read_text())
+          assert config['name'] == 'luckread-w05'
+          bindings = config.get('d1_databases', [])
+          assert len(bindings) == 1
+          assert bindings[0]['binding'] == 'DB'
+          assert bindings[0]['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
+          assert bindings[0]['database_name'] == 'luckreadpro'
+          migration = Path('workers/W05-social/migrations/20261006_001_social_012_comment_update_idempotency_v1.sql')
+          assert migration.is_file()
+          print('SOCIAL_012_BINDING_SOURCE=PASS')
+          PY
+
+      - name: Verify migration statically
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          db.executescript(Path('workers/W05-social/migrations/20261006_001_social_012_comment_update_idempotency_v1.sql').read_text())
+          cols = db.execute('PRAGMA table_info("social_comment_mutation_idempotency")').fetchall()
+          expected = ['id','actor_user_id','operation_id','idempotency_key','request_hash','status','response_status','response_json','created_at','expires_at']
+          if [r[1] for r in cols] != expected:
+              raise SystemExit('unexpected comment edit idempotency schema')
+          indexes = {r[1]: r[2] for r in db.execute('PRAGMA index_list("social_comment_mutation_idempotency")').fetchall()}
+          if indexes.get('sqlite_autoindex_social_comment_mutation_idempotency_1') != 1:
+              raise SystemExit('comment edit idempotency uniqueness constraint missing')
+          guard = db.execute('SELECT sql FROM sqlite_master WHERE type="table" AND name="social_comment_txn_guard"').fetchone()[0]
+          if 'successful = 1' not in guard:
+              raise SystemExit('comment edit transaction guard missing')
+          print('SOCIAL_012_MIGRATION_STATIC=PASS')
+          PY
+
+      - name: Capture controlled remote preflight
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+            --command 'SELECT name FROM sqlite_master WHERE type = "table" AND name IN ("social_comment_mutation_idempotency","social_comment_txn_guard") ORDER BY name;' \
+            > /tmp/social-012-tables.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc \
+            --command 'SELECT id,name,applied_at FROM d1_migrations ORDER BY id;' \
+            > /tmp/social-012-migrations.json
+          python - <<'PY'
+          import json
+          def rows(path):
+              data = json.load(open(path))
+              if isinstance(data, list):
+                  return [row for item in data for row in item.get('results', [])]
+              return data.get('results', [])
+          tables = {row['name'] for row in rows('/tmp/social-012-tables.json')}
+          migrations = {row['name'] for row in rows('/tmp/social-012-migrations.json')}
+          target = '20261006_001_social_012_comment_update_idempotency_v1'
+          expected_tables = {'social_comment_mutation_idempotency','social_comment_txn_guard'}
+          if target in migrations and tables != expected_tables:
+              raise SystemExit('fail-closed: migration history and target tables disagree')
+          if target not in migrations and tables:
+              raise SystemExit('fail-closed: target tables already exist without migration history')
+          print('SOCIAL_012_REMOTE_PREFLIGHT=PASS')
+          PY
+
+      - name: Apply SOCIAL-012 migration remotely
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.jsonc
+
+      - name: Verify remote schema
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("social_comment_mutation_idempotency");' > /tmp/social-012-schema.json
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$EXPECTED_DB_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("social_comment_txn_guard");' > /tmp/social-012-guard.json
+          python - <<'PY'
+          import json
+          def rows(path):
+              data = json.load(open(path))
+              if isinstance(data, list):
+                  return [row for item in data for row in item.get('results', [])]
+              return data.get('results', [])
+          cols = rows('/tmp/social-012-schema.json')
+          guard = rows('/tmp/social-012-guard.json')
+          expected = ['id','actor_user_id','operation_id','idempotency_key','request_hash','status','response_status','response_json','created_at','expires_at']
+          if [row.get('name') for row in cols] != expected:
+              raise SystemExit('remote comment edit idempotency schema mismatch')
+          if [row.get('name') for row in guard] != ['id','successful']:
+              raise SystemExit('remote comment edit transaction guard schema mismatch')
+          print('SOCIAL_012_REMOTE_SCHEMA=PASS')
+          PY
