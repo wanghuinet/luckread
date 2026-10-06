@@ -17,26 +17,38 @@ const profileResponse = async (user: Record<string, unknown>, status = 200) => {
 }
 
 async function authenticate(request: Request) {
-  try {
-    const principal = await getBetterAuthPrincipal(request)
-    const payload = await getPayload({ config })
-    const result = await payload.find({ collection: 'users', where: { identityId: { equals: principal.userId } }, limit: 1, depth: 0, overrideAccess: true })
-    const user = result.docs[0] as unknown as Record<string, unknown> | undefined
-    return user ? { payload, principal, user } : null
-  } catch { return null }
+  const principal = await getBetterAuthPrincipal(request)
+  const payload = await getPayload({ config })
+  const result = await payload.find({ collection: 'users', where: { identityId: { equals: principal.userId } }, limit: 1, depth: 0, overrideAccess: true })
+  const user = result.docs[0] as unknown as Record<string, unknown> | undefined
+  return user ? { payload, principal, user } : null
+}
+
+const authenticateErrorResponse = (error: unknown): Response => {
+  if (error instanceof W02AuthClientError && error.status === 401) return unauthorized()
+  return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile authentication service unavailable')
 }
 
 export async function GET(request: Request): Promise<Response> {
   try { await enforcePublicReadRateLimit(request) }
   catch (error) { if (error instanceof TrafficLimitError) return rateLimitResponse(request); return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile service unavailable') }
-  const authenticated = await authenticate(request)
-  return authenticated ? profileResponse(authenticated.user) : unauthorized()
+  try {
+    const authenticated = await authenticate(request)
+    return authenticated ? profileResponse(authenticated.user) : unauthorized()
+  } catch (error) {
+    return authenticateErrorResponse(error)
+  }
 }
 
 export async function PATCH(request: Request): Promise<Response> {
   try { await enforceW01WriteRateLimit(request) }
   catch (error) { if (error instanceof TrafficLimitError) return rateLimitResponse(request); return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile service unavailable') }
-  const authenticated = await authenticate(request)
+  let authenticated: Awaited<ReturnType<typeof authenticate>>
+  try {
+    authenticated = await authenticate(request)
+  } catch (error) {
+    return authenticateErrorResponse(error)
+  }
   if (!authenticated) return unauthorized()
 
   const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
