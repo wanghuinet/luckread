@@ -36,6 +36,7 @@ export default async function HomePage() {
   if (CREATOR_CENTER_HOSTS.has(host)) {
     const request = new Request('https://mp.luckread.com/', { headers: requestHeaders })
     try {
+      await enforcePublicReadRateLimit(request)
       const principal = await getBetterAuthPrincipal(request)
       if (principal.active) {
         const displayName =
