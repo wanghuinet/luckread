@@ -3,8 +3,6 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route'
 
-import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
-import { validateSession } from '@/auth/w02-session-client'
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaPost>[1]
@@ -16,24 +14,16 @@ const unauthorized = () => new Response(JSON.stringify({ error: { code: 'UNAUTHE
 
 async function authenticate(request: Request) {
   const payload = await getPayload({ config })
-  let authResult: Awaited<ReturnType<typeof payload.auth>>
   try {
-    authResult = await payload.auth({ headers: request.headers, canSetHeaders: false })
+    const authResult = await payload.auth({
+      headers: request.headers,
+      canSetHeaders: false,
+    })
+    const user = authResult.user as unknown as (Record<string, unknown> & { id?: string | number }) | null
+    return user?.id ? { payload, user } : null
   } catch {
     return null
   }
-
-  const user = authResult.user as unknown as ({ id?: string | number; _sid?: string } & Record<string, unknown>) | null
-  if (!user?.id || typeof user._sid !== 'string' || user._sid.length === 0) return null
-
-  const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (tokenVersion === null) return null
-  const active = await validateSession({
-    sessionId: user._sid,
-    userId: String(user.id),
-    tokenVersion,
-  }).catch(() => false)
-  return active ? { payload, user } : null
 }
 
 export async function GET(request: Request): Promise<Response> {
