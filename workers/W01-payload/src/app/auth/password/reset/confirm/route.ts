@@ -1,6 +1,4 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
+import { proxyBetterAuth } from '../../../../auth/w02-session-client.js'
 
 type PasswordResetConfirmRequest = {
   recoveryToken?: unknown
@@ -8,19 +6,10 @@ type PasswordResetConfirmRequest = {
 }
 
 const jsonError = (status: number, code: string, message: string) =>
-  new Response(
-    JSON.stringify({
-      error: { code, message, details: {} },
-      requestId: crypto.randomUUID(),
-    }),
-    {
-      status,
-      headers: {
-        'content-type': 'application/json; charset=utf-8',
-        'cache-control': 'no-store',
-      },
-    },
-  )
+  Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, {
+    status,
+    headers: { 'cache-control': 'no-store' },
+  })
 
 const assertPasswordPolicy = (value: unknown): value is string => {
   if (typeof value !== 'string') return false
@@ -30,9 +19,7 @@ const assertPasswordPolicy = (value: unknown): value is string => {
 
 export async function POST(request: Request): Promise<Response> {
   let body: PasswordResetConfirmRequest
-  try {
-    body = (await request.json()) as PasswordResetConfirmRequest
-  } catch {
+  try { body = await request.json() as PasswordResetConfirmRequest } catch {
     return jsonError(422, 'VALIDATION_FAILED', 'Invalid password reset request')
   }
 
@@ -44,29 +31,18 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(422, 'VALIDATION_FAILED', 'Invalid password reset request')
   }
 
-  const payload = await getPayload({ config })
-
   try {
-    // This route is anonymous/token-bound. Explicitly keep access checks
-    // enabled; the recovery token is the native Payload authorization boundary.
-    await payload.resetPassword({
-      collection: 'users',
-      data: {
-        token: body.recoveryToken,
-        password: body.newPassword,
-      },
-      overrideAccess: false,
+    const response = await proxyBetterAuth(request, '/reset-password', {
+      body: { token: body.recoveryToken, newPassword: body.newPassword },
     })
+    if (!response.ok) {
+      return new Response(null, {
+        status: response.status >= 500 ? 503 : 422,
+        headers: { 'cache-control': 'no-store' },
+      })
+    }
+    return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
   } catch {
-    // Invalid, expired, wrong-purpose and replayed recovery tokens converge
-    // on the same client-visible class. Never echo the token or password.
-    return jsonError(422, 'RECOVERY_TOKEN_REJECTED', 'Password reset token is invalid or expired')
+    return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password reset service unavailable')
   }
-
-  return new Response(null, {
-    status: 204,
-    headers: {
-      'cache-control': 'no-store',
-    },
-  })
 }

@@ -1,31 +1,16 @@
-import { getPayload } from 'payload'
+import { proxyBetterAuth } from '../../../../auth/w02-session-client.js'
 
-import config from '@payload-config'
-
-type PasswordResetRequest = {
-  identifier?: unknown
-}
+type PasswordResetRequest = { identifier?: unknown }
 
 const jsonError = (status: number, code: string, message: string) =>
-  new Response(
-    JSON.stringify({
-      error: { code, message, details: {} },
-      requestId: crypto.randomUUID(),
-    }),
-    {
-      status,
-      headers: {
-        'content-type': 'application/json; charset=utf-8',
-        'cache-control': 'no-store',
-      },
-    },
-  )
+  Response.json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, {
+    status,
+    headers: { 'cache-control': 'no-store' },
+  })
 
 export async function POST(request: Request): Promise<Response> {
   let body: PasswordResetRequest
-  try {
-    body = (await request.json()) as PasswordResetRequest
-  } catch {
+  try { body = await request.json() as PasswordResetRequest } catch {
     return jsonError(422, 'VALIDATION_FAILED', 'Invalid password recovery request')
   }
 
@@ -33,33 +18,19 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(422, 'VALIDATION_FAILED', 'Invalid password recovery request')
   }
 
-  const payload = await getPayload({ config })
-
   try {
-    // Payload's native forgotPassword flow deliberately fails silently when
-    // the account does not exist. The route returns the same 202 response in
-    // either case, preserving the contract's enumeration-resistant semantics.
-    await payload.forgotPassword({
-      collection: 'users',
-      data: {
+    const response = await proxyBetterAuth(request, '/request-password-reset', {
+      body: {
         email: body.identifier.trim().toLowerCase(),
+        redirectTo: 'https://luckread.com/reset-password',
       },
     })
-  } catch (error) {
-    console.error(
-      JSON.stringify({
-        event: 'auth.password_reset_request.native_failure',
-        diagnosticCode: 'AUTH004_PAYLOAD_FORGOT_PASSWORD_FAILURE',
-        errorName: error instanceof Error ? error.name : typeof error,
-      }),
-    )
+    if (response.ok) return new Response(null, { status: 202, headers: { 'cache-control': 'no-store' } })
+    return new Response(null, {
+      status: response.status >= 500 ? 503 : response.status,
+      headers: { 'cache-control': 'no-store' },
+    })
+  } catch {
     return jsonError(503, 'SERVICE_UNAVAILABLE', 'Password recovery service unavailable')
   }
-
-  return new Response(null, {
-    status: 202,
-    headers: {
-      'cache-control': 'no-store',
-    },
-  })
 }
