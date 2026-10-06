@@ -258,7 +258,7 @@ export default {
         const result = await updateComment(env.DB, actorUserId, commentId, {
           body: bodyValue,
           ifMatch,
-        })
+        }, idempotencyKey)
         return Response.json(
           { data: result.item, requestId: crypto.randomUUID() },
           {
