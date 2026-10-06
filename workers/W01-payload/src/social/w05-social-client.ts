@@ -1,7 +1,5 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
+import { callW02UserProfile, W02UserProfileClientError } from '../auth/w02-user-profile-client.js'
 import {
   resolveContentPrincipal,
   resolveCookieContentPrincipal,
@@ -41,20 +39,27 @@ export async function resolveOptionalCookieSocialPrincipal(
   return principal
 }
 
-export async function assertSocialTargetUserExists(targetUserId: string): Promise<void> {
+export async function assertSocialTargetUserExists(request: Request, targetUserId: string): Promise<void> {
   const normalized = targetUserId.trim()
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(normalized)) {
     throw new W05SocialClientError(400, 'VALIDATION_FAILED', 'Invalid target user id')
   }
 
-  const payload = await getPayload({ config })
-  const user = await payload.findByID({
-    collection: 'users',
-    id: normalized,
-    depth: 0,
-    overrideAccess: true,
-  })
-  if (!user) throw new W05SocialClientError(404, 'NOT_FOUND', 'Target user not found')
+  try {
+    const response = await callW02UserProfile(
+      request,
+      '/internal/account/profile/by-id?id=' + encodeURIComponent(normalized),
+      'GET',
+    )
+    if (response.status === 404) throw new W05SocialClientError(404, 'NOT_FOUND', 'Target user not found')
+    if (!response.ok) throw new W05SocialClientError(503, 'SERVICE_UNAVAILABLE', 'User service unavailable')
+  } catch (error) {
+    if (error instanceof W05SocialClientError) throw error
+    if (error instanceof W02UserProfileClientError) {
+      throw new W05SocialClientError(503, 'SERVICE_UNAVAILABLE', 'User service unavailable')
+    }
+    throw new W05SocialClientError(503, 'SERVICE_UNAVAILABLE', 'User service unavailable')
+  }
 }
 
 export async function callW05SocialPublic(input: {
