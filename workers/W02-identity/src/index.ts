@@ -78,6 +78,10 @@ export default {
     const url = new URL(request.url)
 
     if (url.pathname === '/api/auth' || url.pathname.startsWith('/api/auth/')) {
+      if (request.headers.get('X-LuckRead-Caller') !== 'W01') {
+        return json({ error: { code: 'FORBIDDEN', message: 'authentication gateway required' } }, 403)
+      }
+
       return createLuckReadAuth({ D1_01: env.D1_01, BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET }).handler(request)
     }
 

@@ -86,6 +86,9 @@ const handler = async (
     const headers = new Headers(request.headers)
     headers.delete('host')
     headers.delete('content-length')
+    // W02 Better Auth is internal to the W01 public gateway.
+    // Never trust a client-supplied caller identity.
+    headers.set('X-LuckRead-Caller', 'W01')
 
     const upstream = await service.fetch(
       new Request(upstreamUrl.toString(), {

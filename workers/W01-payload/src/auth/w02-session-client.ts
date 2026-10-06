@@ -160,7 +160,10 @@ export async function signInWithBetterAuth(body: {
   const response = await service.fetch(
     new Request('https://luckread-w02.internal/api/auth/sign-in/email', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': 'W01',
+      },
       body: JSON.stringify({
         email: body.email,
         password: body.password,
