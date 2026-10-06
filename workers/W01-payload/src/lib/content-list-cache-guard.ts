@@ -8,6 +8,10 @@ const RESOURCE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 const CONTENT_TYPES = new Set(['article', 'post', 'video'])
 const MAX_QUERY_LENGTH = 4096
 const MAX_CURSOR_LENGTH = 2048
+const AUTH_SESSION_COOKIE_NAMES = new Set([
+  'better-auth.session_token',
+  '__Secure-better-auth.session_token',
+])
 
 export const validateContentListQuery = (url: URL): URLSearchParams => {
   if (url.search.length > MAX_QUERY_LENGTH) {
@@ -57,6 +61,6 @@ export const hasAuthenticatedSessionCredential = (request: Request): boolean => 
   const cookieHeader = request.headers.get('cookie') ?? ''
   return cookieHeader.split(';').some((part) => {
     const [name, ...value] = part.trim().split('=')
-    return name === 'payload-token' && value.join('=').trim().length > 0
+    return AUTH_SESSION_COOKIE_NAMES.has(name) && value.join('=').trim().length > 0
   })
 }
