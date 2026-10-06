@@ -20,6 +20,7 @@ type ApiError = {
 }
 
 export default function RegisterForm({ policyVersion }: RegisterFormProps) {
+  void policyVersion
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
