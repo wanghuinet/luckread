@@ -6,8 +6,6 @@ import config from '@payload-config'
 
 import { etagForUserProfile, normalizeEtag, pickUserProfileSnapshot, PROFILE_MUTABLE_FIELDS } from '@/auth/user-profile-etag'
 import { invalidatePublicUserProfile, invalidatePublicUserProfileByUsername } from '@/lib/public-response-cache'
-import { readPayloadAccessToken, readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
-import { validateSession } from '@/auth/w02-session-client'
 
 const unauthorized = () =>
   new Response(
@@ -56,30 +54,16 @@ const profileResponse = async (user: Record<string, unknown>, status = 200) => {
 
 async function authenticate(request: Request) {
   const payload = await getPayload({ config })
-
-  let authResult: Awaited<ReturnType<typeof payload.auth>>
   try {
-    authResult = await payload.auth({
+    const authResult = await payload.auth({
       headers: request.headers,
       canSetHeaders: false,
     })
+    const user = authResult.user as unknown as (Record<string, unknown> & { id?: string | number }) | null
+    return user?.id ? { payload, user } : null
   } catch {
     return null
   }
-
-  const user = authResult.user as unknown as ({ id?: string | number; _sid?: string } & Record<string, unknown>) | null
-  if (!user?.id || typeof user._sid !== 'string' || user._sid.length === 0) return null
-
-  const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (tokenVersion === null) return null
-
-  const active = await validateSession({
-    sessionId: user._sid,
-    userId: String(user.id),
-    tokenVersion,
-  }).catch(() => false)
-
-  return active ? { payload, user } : null
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -89,8 +73,6 @@ export async function GET(request: Request): Promise<Response> {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile service unavailable')
   }
-
-  if (!readPayloadAccessToken(request)) return unauthorized()
 
   const authenticated = await authenticate(request)
   if (!authenticated) return unauthorized()
