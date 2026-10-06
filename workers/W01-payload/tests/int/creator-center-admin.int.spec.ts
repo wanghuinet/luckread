@@ -412,7 +412,7 @@ describe('Creator Center admin extension', () => {
     const authClient = read('src/auth/w02-session-client.ts')
     const users = read('src/collections/Users.ts')
     expect(authClient).toContain('getBetterAuthPrincipal')
-    expect(users).toContain('disableLocalStrategy: true')
+    expect(users).toContain('disableLocalStrategy: { enableFields: true, optionalPassword: true }')
     expect(users).toContain("strategies: [betterAuthPayloadStrategy]")
     expect(users).not.toContain('accessToken')
     expect(users).not.toContain('refreshToken')
