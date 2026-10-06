@@ -11,7 +11,6 @@ import {
 import {
   establishSessionFromAuthoritativeD1,
   refreshSessionFromAuthoritativeD1,
-  revokeSessionExtension,
 } from './session/session-runtime.js'
 import {
   listCurrentUserSessions,
@@ -496,24 +495,6 @@ export default {
       }
     }
 
-    if (request.method === 'POST' && url.pathname === '/internal/auth/session/revoke') {
-      const body = await readJsonBody<{ sessionId?: unknown }>(request)
-      if (!body || typeof body.sessionId !== 'string' || body.sessionId.length === 0) {
-        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid session revocation request' } }, 400)
-      }
-
-      try {
-        const result = await revokeSessionExtension(env.D1_01, body.sessionId, new Date().toISOString())
-        return json(result)
-      } catch {
-        return json({
-          error: {
-            code: 'SERVICE_UNAVAILABLE',
-            message: 'authentication service unavailable',
-          },
-        }, 503)
-      }
-    }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/list') {
       const body = await readJsonBody<{
