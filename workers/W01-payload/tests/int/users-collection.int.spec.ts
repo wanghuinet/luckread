@@ -14,7 +14,7 @@ describe('W01 Users collection contract', () => {
 
     expect(Users.slug).toBe('users')
     expect(Users.auth).toEqual(expect.objectContaining({
-      disableLocalStrategy: true,
+      disableLocalStrategy: { enableFields: true, optionalPassword: true },
       strategies: expect.arrayContaining([expect.objectContaining({ name: 'luckread-better-auth' })]),
     }))
 
