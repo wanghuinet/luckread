@@ -61,6 +61,7 @@ export interface UserAuthOperations {
 
 export interface User {
   id: number
+  identityId?: string | null
   updatedAt: string
   createdAt: string
   email: string
@@ -125,7 +126,7 @@ export interface PayloadMigration {
 }
 
 export interface UsersSelect<T extends boolean = true> {
-  updatedAt?: T; createdAt?: T; email?: T; resetPasswordToken?: T
+  identityId?: T; updatedAt?: T; createdAt?: T; email?: T; resetPasswordToken?: T
   resetPasswordExpiration?: T; salt?: T; hash?: T; loginAttempts?: T; lockUntil?: T
   sessions?: T | { id?: T; createdAt?: T; expiresAt?: T }
 }
