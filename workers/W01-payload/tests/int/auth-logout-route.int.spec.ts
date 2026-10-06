@@ -1,113 +1,56 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { getPayloadMock, revokeSessionMock, W02AuthClientErrorMock } = vi.hoisted(() => {
-  class W02AuthClientErrorMock extends Error {
-    constructor(
-      readonly status: number,
-      message: string,
-    ) {
-      super(message)
-    }
-  }
-
-  return {
-    getPayloadMock: vi.fn(),
-    revokeSessionMock: vi.fn(),
-    W02AuthClientErrorMock,
-  }
-})
-
-vi.mock('payload', () => ({
-  getPayload: getPayloadMock,
+const mocks = vi.hoisted(() => ({
+  callW02BetterAuth: vi.fn(),
+  enforceAuthRateLimit: vi.fn(),
+  TrafficLimitError: class extends Error {},
 }))
 
-vi.mock('@payload-config', () => ({
-  default: {},
+vi.mock('../../src/auth/w02-auth-client.js', () => ({
+  callW02BetterAuth: mocks.callW02BetterAuth,
 }))
 
-vi.mock('../../src/auth/w02-session-client.js', () => ({
-  revokeSession: revokeSessionMock,
-  W02AuthClientError: W02AuthClientErrorMock,
+vi.mock('../../src/auth/traffic-limit.js', () => ({
+  enforceAuthRateLimit: mocks.enforceAuthRateLimit,
+  TrafficLimitError: mocks.TrafficLimitError,
+  rateLimitResponse: vi.fn(),
 }))
 
 import { POST } from '../../src/app/auth/logout/route'
 
-function setup(user: { id?: string | number; _sid?: string } | null = { id: 'user-1', _sid: 'sid-1' }) {
-  const auth = vi.fn().mockResolvedValue({ user })
-  getPayloadMock.mockResolvedValue({ auth })
-  revokeSessionMock.mockResolvedValue({ revoked: true })
-  return { auth }
-}
-
-describe('AUTH-002 /auth/logout adapter', () => {
-  it('revokes the current native session and returns an empty 204 response', async () => {
-    setup()
-
-    const response = await POST(new Request('https://example.test/auth/logout', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer access-token' },
-    }))
-
-    expect(revokeSessionMock).toHaveBeenCalledWith({ sessionId: 'sid-1' })
-    expect(response.status).toBe(204)
-    expect(await response.text()).toBe('')
-    expect(response.headers.get('cache-control')).toBe('no-store')
+describe('Better Auth W01 logout proxy', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.enforceAuthRateLimit.mockResolvedValue(undefined)
   })
 
-  it('does not accept a client-supplied session identifier', async () => {
-    setup()
+  it('forwards the incoming Better Auth session request', async () => {
+    mocks.callW02BetterAuth.mockResolvedValue(new Response(null, { status: 204 }))
 
-    const response = await POST(new Request('https://example.test/auth/logout?sessionId=attacker-session', {
-      method: 'POST',
-      headers: {
-        Authorization: 'Bearer access-token',
-        'x-session-id': 'attacker-session',
-      },
-    }))
-
-    expect(revokeSessionMock).toHaveBeenCalledWith({ sessionId: 'sid-1' })
-    expect(response.status).toBe(204)
-  })
-
-  it('keeps logout idempotent when the current native session is already unavailable', async () => {
-    setup(null)
-
-    const response = await POST(new Request('https://example.test/auth/logout', {
-      method: 'POST',
-    }))
+    const response = await POST(
+      new Request('https://example.test/auth/logout', {
+        method: 'POST',
+        headers: { cookie: 'better-auth.session_token=session-1' },
+      }),
+    )
 
     expect(response.status).toBe(204)
-    expect(await response.text()).toBe('')
-    expect(revokeSessionMock).not.toHaveBeenCalled()
+    expect(mocks.callW02BetterAuth).toHaveBeenCalledWith(
+      expect.any(Request),
+      '/api/auth/sign-out',
+      { method: 'POST' },
+    )
   })
 
-  it('fails closed on an internal Payload authentication error', async () => {
-    const auth = vi.fn().mockRejectedValue(new Error('native auth unavailable'))
-    getPayloadMock.mockResolvedValue({ auth })
+  it('passes through Better Auth failures', async () => {
+    mocks.callW02BetterAuth.mockResolvedValue(
+      new Response(JSON.stringify({ error: { code: 'UNAUTHORIZED' } }), { status: 401 }),
+    )
 
-    const response = await POST(new Request('https://example.test/auth/logout', {
-      method: 'POST',
-    }))
+    const response = await POST(
+      new Request('https://example.test/auth/logout', { method: 'POST' }),
+    )
 
-    expect(response.status).toBe(503)
-    expect(revokeSessionMock).not.toHaveBeenCalled()
-  })
-
-  it('returns a generic service error when W02 revocation is unavailable', async () => {
-    setup()
-    revokeSessionMock.mockRejectedValueOnce(new W02AuthClientErrorMock(503, 'internal details'))
-
-    const response = await POST(new Request('https://example.test/auth/logout', {
-      method: 'POST',
-    }))
-
-    expect(response.status).toBe(503)
-    await expect(response.json()).resolves.toMatchObject({
-      error: {
-        code: 'SERVICE_UNAVAILABLE',
-      },
-    })
-    const body = await response.text().catch(() => '')
-    expect(body).not.toContain('internal details')
+    expect(response.status).toBe(401)
   })
 })
