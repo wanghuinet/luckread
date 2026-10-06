@@ -7,6 +7,7 @@ describe('homepage D1 guard', () => {
     const page = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/page.tsx'), 'utf8')
     expect(page).toContain('getBetterAuthPrincipal')
     expect(page).toContain('enforcePublicReadRateLimit')
+    expect(page).toContain('enforcePublicReadRateLimit')
     expect(page).not.toContain('payload.auth(')
     expect(page).not.toContain('payload-token')
     expect(page).not.toContain('readVerifiedPayloadTokenVersion')

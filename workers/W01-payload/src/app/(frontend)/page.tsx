@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { cookies, headers } from 'next/headers'
 import React from 'react'
 
+import { enforcePublicReadRateLimit } from '@/auth/traffic-limit'
 import { getBetterAuthPrincipal } from '@/auth/w02-session-client'
 
 import CreatorLanguageToggle from './creator-center/CreatorLanguageToggle'

@@ -24,9 +24,16 @@ export async function GET(
     if (!response.ok) return response
 
     const sessions = await response.json() as Array<Record<string, unknown>>
+    const currentResponse = await proxyBetterAuth(request, '/get-session', { method: 'GET' })
+    const currentPayload = currentResponse.ok
+      ? await currentResponse.json() as { session?: { id?: unknown } }
+      : null
+    const currentSessionId = typeof currentPayload?.session?.id === 'string' ? currentPayload.session.id : null
+
     return json({
       items: sessions.map((session) => ({
         sessionId: String(session.id ?? ''),
+        currentSessionId,
         deviceId: null as string | null,
         createdAt: String(session.createdAt ?? ''),
         expiresAt: String(session.expiresAt ?? ''),
