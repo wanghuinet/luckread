@@ -164,7 +164,7 @@ jobs:
           PAYLOAD_SECRET: ignore
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.116.0 dev --local --persist-to /tmp/luckread-auth001-state --port 8787 --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" --var "CLOUDFLARE_ENV:development" > auth-001-preview.log 2>&1 &
+          npx --yes wrangler@4.116.0 dev --local --persist-to /tmp/luckread-auth001-state --port 8787 --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" --var "CLOUDFLARE_ENV:development" --var "AUTH001_PERSIST_TO:/tmp/luckread-auth001-state" > auth-001-preview.log 2>&1 &
           sleep 5
           echo $! > auth-001-preview.pid
           ready=0
