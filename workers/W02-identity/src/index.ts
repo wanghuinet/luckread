@@ -3,6 +3,13 @@ import { resolveBetterAuthPrincipal } from './auth/principal.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { reconcileCompletedRegistrationMaterialization } from './account/registration-materializer.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
+import {
+  AccountStateTransitionError,
+  applyAccountStateTransition,
+  authorizeAccountStateTransition,
+  type AccountState,
+} from './account/account-state-transition.js'
+
 interface Env {
   D1_01: D1Database
   AUTH013_QUEUE: Queue
@@ -17,18 +24,6 @@ type ResolveLayerRequest = {
   now?: string
 }
 
-type EstablishSessionRequest = {
-  sessionId: string
-  userId: string
-  deviceId: string
-  now?: string
-}
-
-type RefreshSessionRequest = {
-  refreshToken: string
-  deviceId: string
-  now?: string
-}
 
 const readJsonBody = async <T>(request: Request): Promise<T | null> => {
   try {
@@ -145,6 +140,7 @@ export default {
           active: true,
           userId: principal.userId,
           email: principal.email,
+          username: principal.username,
           sessionId: principal.sessionId,
           accountState: principal.accountState,
           accountStateVersion: principal.accountStateVersion,
