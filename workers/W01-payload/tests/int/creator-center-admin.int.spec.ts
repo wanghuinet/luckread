@@ -427,7 +427,7 @@ describe('Creator Center admin extension', () => {
     expect(css).toContain('.subscription-card')
   })
 
-  it('keeps the compatibility Payload cookie alongside the native auth session lifecycle', () => {
+  it('uses Better Auth as the public authentication authority and keeps only legacy cookie cleanup', () => {
     const login = read('src/app/auth/login/route.ts')
     const refresh = read('src/app/auth/refresh/route.ts')
     const logout = read('src/app/auth/logout/route.ts')
@@ -438,13 +438,17 @@ describe('Creator Center admin extension', () => {
     const accountState = read('src/app/users/[userId]/account-state/route.ts')
     const loginForm = read('src/app/(frontend)/login/LoginForm.tsx')
 
-    expect(login).toContain('buildPayloadAccessCookie')
-    expect(login).toContain("headers.append('set-cookie', buildPayloadAccessCookie(access.token, access.expiresIn, request))")
-    expect(refresh).toContain('buildPayloadAccessCookie')
-    expect(refresh).toContain("'set-cookie': buildPayloadAccessCookie(access.token, access.expiresIn, request)")
-    expect(logout).toContain('buildPayloadClearCookie(request)')
+    expect(login).toContain('signInWithBetterAuth')
+    expect(login).toContain('accessToken: nativeAuth.token')
+    expect(login).not.toContain('issuePayloadAccessToken')
+    expect(login).not.toContain('buildPayloadAccessCookie')
+    expect(refresh).toContain('refreshSession')
+    expect(refresh).toContain('accessToken: session.accessToken')
+    expect(refresh).not.toContain('issuePayloadAccessToken')
+    expect(refresh).not.toContain('buildPayloadAccessCookie')
+    expect(logout).toContain('buildLegacyPayloadClearCookie')
+    expect(logout).not.toContain('buildPayloadClearCookie(')
     expect(accessToken).toContain("return getCookieValue(request, 'payload-token')")
-    expect(accessToken).toContain('export function getPayloadAuthorizationHeader')
     expect(sessions).toContain('resolveBetterAuthPrincipalThroughW02(request)')
     expect(sessions).not.toContain("from 'payload'")
     expect(sessions).not.toContain('@payload-config')
