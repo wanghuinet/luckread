@@ -331,6 +331,39 @@ export default {
       }
     }
 
+    if (request.method === 'POST' && url.pathname === '/internal/auth/admin/authorize') {
+      const body = await readJsonBody<{ userId?: unknown }>(request)
+      if (!body || typeof body.userId !== 'string' || body.userId.length < 1 || body.userId.length > 128) {
+        return json({ allowed: false }, 400)
+      }
+
+      try {
+        const row = await env.D1_01
+          .prepare(
+            'SELECT account_state AS accountState FROM users WHERE CAST(id AS TEXT) = ? LIMIT 1',
+          )
+          .bind(body.userId)
+          .first<{ accountState?: string }>()
+
+        if (!row || (row.accountState !== 'PENDING_VERIFICATION' && row.accountState !== 'ACTIVE')) {
+          return json({ allowed: false }, 200)
+        }
+
+        const layer = await resolveGlobalLayer(
+          env.D1_01,
+          body.userId,
+          row.accountState,
+        )
+
+        return json({
+          allowed: layer.decision === 'ALLOW' && (layer.layer === 'L7' || layer.layer === 'L8'),
+          layer: layer.layer ?? null,
+        })
+      } catch {
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'authorization service unavailable' } }, 503)
+      }
+    }
+
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/establish') {
       const body = await readJsonBody<EstablishSessionRequest>(request)
       if (
