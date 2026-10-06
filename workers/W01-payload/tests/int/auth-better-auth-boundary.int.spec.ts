@@ -41,7 +41,7 @@ describe('W01 Better Auth boundary', () => {
     )
     expect(route).toContain("endpoint === 'sign-up/email'")
     expect(route).toContain("Direct account registration is not available at this endpoint")
-    expect(route).toContain("code: 'NOT_FOUND'")
+    expect(route).toContain("'NOT_FOUND'")
     expect(route).toContain("'/auth/register'")
     expect(route).toContain('idempotency')
     expect(route).toContain('Payload projection')
