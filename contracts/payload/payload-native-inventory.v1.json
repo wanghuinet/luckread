@@ -10,6 +10,14 @@
       "auth": true,
       "fields": [
         {
+          "name": "identityId",
+          "type": "text",
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:identityId",
+          "classification": "PAYLOAD_CONFIG_DISCOVERED",
+          "required": false,
+          "unique": true
+        },
+        {
           "name": "username",
           "type": "text",
           "sourceRef": "workers/W01-payload/src/collections/Users.ts:field:username",
