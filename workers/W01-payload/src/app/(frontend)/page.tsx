@@ -6,8 +6,7 @@ import React from 'react'
 import config from '@payload-config'
 
 import { enforcePublicReadRateLimit } from '@/auth/traffic-limit'
-import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
-import { validateSession } from '@/auth/w02-session-client'
+import { resolveBetterAuthPrincipal } from '@/auth/w02-auth-client'
 
 import CreatorLanguageToggle from './creator-center/CreatorLanguageToggle'
 import { CreatorStudio } from './creator-center/CreatorStudio'
@@ -41,76 +40,21 @@ export default async function HomePage() {
     const request = new Request('https://mp.luckread.com/', {
       headers: requestHeaders,
     })
-    const authorization = request.headers.get('authorization')?.trim() || ''
-    const hasPayloadTokenCookie = request.headers.get('cookie')?.split(';').some((part) => {
-      const [name, ...value] = part.trim().split('=')
-      return name === 'payload-token' && value.join('=').trim().length > 0
-    }) === true
     const hasAuthCredential =
-      authorization.startsWith('Bearer ') ||
-      hasPayloadTokenCookie
-
-    let authenticatedUser: {
-      id?: string | number
-      _sid?: string
-      displayName?: unknown
-      username?: unknown
-      email?: unknown
-    } | null = null
+      request.headers.get('authorization')?.trim().startsWith('Bearer ') ||
+      Boolean(request.headers.get('cookie')?.trim())
 
     if (hasAuthCredential) {
-      let edgeReadAllowed = true
       try {
         await enforcePublicReadRateLimit(request)
+        const principal = await resolveBetterAuthPrincipal(request)
+        const displayName = principal.username?.trim() || principal.email || '创作者'
+        return <CreatorStudio displayName={displayName} userId={principal.userId} locale={locale} />
       } catch {
-        edgeReadAllowed = false
-      }
-
-      if (edgeReadAllowed) {
-        try {
-          const payload = await getPayload({ config })
-          const authResult = await payload.auth({
-            headers: request.headers,
-            canSetHeaders: false,
-          })
-          authenticatedUser = authResult.user as unknown as {
-            id?: string | number
-            _sid?: string
-            displayName?: unknown
-            username?: unknown
-            email?: unknown
-          } | null
-        } catch {
-          authenticatedUser = null
-        }
-      }
-    }
-
-    if (authenticatedUser?.id && typeof authenticatedUser._sid === 'string' && authenticatedUser._sid) {
-      const tokenVersion = readVerifiedPayloadTokenVersion(request)
-      if (tokenVersion !== null) {
-        const active = await validateSession({
-          sessionId: authenticatedUser._sid,
-          userId: String(authenticatedUser.id),
-          tokenVersion,
-        }).catch(() => false)
-
-        if (active) {
-          const displayName =
-            typeof authenticatedUser.displayName === 'string' && authenticatedUser.displayName.trim()
-              ? authenticatedUser.displayName
-              : typeof authenticatedUser.username === 'string' && authenticatedUser.username.trim()
-                ? authenticatedUser.username
-                : typeof authenticatedUser.email === 'string' && authenticatedUser.email.trim()
-                  ? authenticatedUser.email
-                  : '创作者'
-
-          return <CreatorStudio displayName={displayName} userId={String(authenticatedUser.id)} locale={locale} />
-        }
+        // Anonymous access falls through to the public Creator Studio entry.
       }
     }
   }
-
   if (CREATOR_CENTER_HOSTS.has(host)) {
     return (
       <div className="mp-entry-shell">
