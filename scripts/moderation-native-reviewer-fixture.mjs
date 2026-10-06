@@ -89,7 +89,7 @@ appendFileSync(process.env.GITHUB_ENV, 'MODERATION_ROLE_ID=' + roleId + '\n')
 
 const now = new Date().toISOString()
 d1Json(
-  'UPDATE users SET account_state=\'ACTIVE\', account_state_version=COALESCE(account_state_version,0)+1 WHERE CAST(id AS TEXT)=' + sqlString(userId),
+  'UPDATE "user" SET account_state=\'ACTIVE\', account_state_version=account_state_version+1 WHERE id=' + sqlString(userId),
 )
 d1Json(
   'INSERT INTO role_assignments (id,subject_id,role_id,scope_type,scope_id,status,valid_from,valid_until,created_at,updated_at) VALUES (' +
@@ -134,7 +134,7 @@ mkdirSync(artifactDir, { recursive: true })
 writeFileSync(
   artifactDir + '/native-reviewer.json',
   JSON.stringify({
-    authentication: 'Payload-native-register-login',
+    authentication: 'Better-Auth-register-login',
     reviewerLayer: 'L6',
     synthetic: true,
     secretMaterialIncluded: false,
