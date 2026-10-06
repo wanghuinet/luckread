@@ -42,9 +42,13 @@ describe('W01 Better Auth boundary', () => {
     expect(route).toContain("endpoint === 'sign-up/email'")
     expect(route).toContain("Direct account registration is not available at this endpoint")
     expect(route).toContain("'NOT_FOUND'")
-    expect(route).toContain("'/auth/register'")
     expect(route).toContain('idempotency')
     expect(route).toContain('Payload projection')
+    const denyIndex = route.indexOf("if (endpoint === 'sign-up/email')")
+    const upstreamIndex = route.indexOf("service.fetch(")
+    expect(denyIndex).toBeGreaterThanOrEqual(0)
+    expect(upstreamIndex).toBeGreaterThanOrEqual(0)
+    expect(denyIndex).toBeLessThan(upstreamIndex)
   })
 
   it('proxies login credentials to W02 and does not require legacy device/session material', async () => {
