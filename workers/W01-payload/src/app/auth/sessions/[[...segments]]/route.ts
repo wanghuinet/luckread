@@ -1,89 +1,15 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
-import {
-  getPayloadAuthorizationHeader,
-  readVerifiedPayloadTokenVersion,
-} from '../../../../auth/payload-access-token.js'
-import {
-  listSessions,
-  revokeOwnedSession,
-  W02AuthClientError,
-} from '../../../../auth/w02-session-client.js'
-
-type AuthenticatedSubject = {
-  userId: string
-  sessionId: string
-  tokenVersion: number
-}
+import { proxyBetterAuth, revokeSessionById, W02AuthClientError } from '../../../../auth/w02-session-client.js'
 
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-    },
-  })
+  Response.json(body, { status, headers: { 'cache-control': 'no-store' } })
 
-const errorResponse = (status: number, code: string, message: string) =>
-  json(
-    {
-      error: {
-        code,
-        message,
-        details: {},
-      },
-      requestId: crypto.randomUUID(),
-    },
-    status,
-  )
-
-async function authenticate(request: Request): Promise<AuthenticatedSubject> {
-  const payload = await getPayload({ config })
-
-  let authResult: Awaited<ReturnType<typeof payload.auth>>
-  try {
-    authResult = await payload.auth({
-      headers: new Headers(
-        request.headers.get('Authorization')
-          ? request.headers
-          : {
-              ...(getPayloadAuthorizationHeader(request)
-                ? { Authorization: getPayloadAuthorizationHeader(request)! }
-                : {}),
-            },
-      ),
-      canSetHeaders: false,
-    })
-  } catch {
-    throw new W02AuthClientError(401, 'authentication failed')
-  }
-
-  const user = authResult.user as { id?: string | number; _sid?: string } | null
-  if (!user?.id || typeof user._sid !== 'string' || user._sid.length === 0) {
-    throw new W02AuthClientError(401, 'authentication required')
-  }
-
-  const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (tokenVersion === null) {
-    throw new W02AuthClientError(401, 'authentication required')
-  }
-
-  return {
-    userId: String(user.id),
-    sessionId: user._sid,
-    tokenVersion,
-  }
-}
-
-function mapW02Error(error: unknown): Response {
+const mapError = (error: unknown): Response => {
   if (error instanceof W02AuthClientError) {
-    if (error.status === 401) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-    if (error.status === 403) return errorResponse(403, 'PERMISSION_DENIED', 'Permission denied')
-    if (error.status === 400) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid session request')
+    if (error.status === 401) return json({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }, 401)
+    if (error.status === 403) return json({ error: { code: 'PERMISSION_DENIED', message: 'Permission denied' } }, 403)
+    if (error.status === 400) return json({ error: { code: 'VALIDATION_FAILED', message: 'Invalid session request' } }, 400)
   }
-  return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Session service unavailable')
+  return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' } }, 503)
 }
 
 export async function GET(
@@ -93,32 +19,30 @@ export async function GET(
   const { segments = [] } = await context.params
   if (segments.length !== 0) return new Response(null, { status: 404 })
 
-  let subject: AuthenticatedSubject
   try {
-    subject = await authenticate(request)
-  } catch (error) {
-    return mapW02Error(error)
-  }
+    const response = await proxyBetterAuth(request, '/list-sessions', { method: 'GET' })
+    if (!response.ok) return response
 
-  const url = new URL(request.url)
-  const cursor = url.searchParams.get('cursor') ?? undefined
-  const rawLimit = url.searchParams.get('limit')
-  const limit = rawLimit === null ? undefined : Number(rawLimit)
+    const sessions = await response.json() as Array<Record<string, unknown>>
+    const currentResponse = await proxyBetterAuth(request, '/get-session', { method: 'GET' })
+    const currentPayload = currentResponse.ok
+      ? await currentResponse.json() as { session?: { id?: unknown } }
+      : null
+    const currentSessionId = typeof currentPayload?.session?.id === 'string' ? currentPayload.session.id : null
 
-  try {
-    const result = await listSessions({
-      userId: subject.userId,
-      currentSessionId: subject.sessionId,
-      tokenVersion: subject.tokenVersion,
-      cursor,
-      limit,
-    })
     return json({
-      ...result,
-      currentSessionId: subject.sessionId,
+      items: sessions.map((session) => ({
+        sessionId: String(session.id ?? ''),
+        currentSessionId,
+        deviceId: null as string | null,
+        createdAt: String(session.createdAt ?? ''),
+        expiresAt: String(session.expiresAt ?? ''),
+        lastSeenAt: null as string | null,
+      })),
+      nextCursor: null,
     })
   } catch (error) {
-    return mapW02Error(error)
+    return mapError(error)
   }
 }
 
@@ -131,30 +55,13 @@ export async function DELETE(
 
   const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   if (!idempotencyKey || idempotencyKey.length > 256) {
-    return errorResponse(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key is required')
-  }
-
-  let subject: AuthenticatedSubject
-  try {
-    subject = await authenticate(request)
-  } catch (error) {
-    return mapW02Error(error)
+    return json({ error: { code: 'IDEMPOTENCY_KEY_REQUIRED', message: 'Idempotency-Key is required' } }, 400)
   }
 
   try {
-    await revokeOwnedSession({
-      userId: subject.userId,
-      currentSessionId: subject.sessionId,
-      tokenVersion: subject.tokenVersion,
-      targetSessionId: segments[0],
-    })
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'cache-control': 'no-store',
-      },
-    })
+    await revokeSessionById(request, segments[0])
+    return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
   } catch (error) {
-    return mapW02Error(error)
+    return mapError(error)
   }
 }

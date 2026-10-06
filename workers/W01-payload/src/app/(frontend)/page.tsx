@@ -1,13 +1,9 @@
 import Link from 'next/link'
 import { cookies, headers } from 'next/headers'
-import { getPayload } from 'payload'
 import React from 'react'
 
-import config from '@payload-config'
-
 import { enforcePublicReadRateLimit } from '@/auth/traffic-limit'
-import { readVerifiedPayloadTokenVersion } from '@/auth/payload-access-token'
-import { validateSession } from '@/auth/w02-session-client'
+import { getBetterAuthPrincipal } from '@/auth/w02-session-client'
 
 import CreatorLanguageToggle from './creator-center/CreatorLanguageToggle'
 import { CreatorStudio } from './creator-center/CreatorStudio'
@@ -38,76 +34,18 @@ export default async function HomePage() {
   const copy = getPublicCopy(publicLocale)
 
   if (CREATOR_CENTER_HOSTS.has(host)) {
-    const request = new Request('https://mp.luckread.com/', {
-      headers: requestHeaders,
-    })
-    const authorization = request.headers.get('authorization')?.trim() || ''
-    const hasPayloadTokenCookie = request.headers.get('cookie')?.split(';').some((part) => {
-      const [name, ...value] = part.trim().split('=')
-      return name === 'payload-token' && value.join('=').trim().length > 0
-    }) === true
-    const hasAuthCredential =
-      authorization.startsWith('Bearer ') ||
-      hasPayloadTokenCookie
-
-    let authenticatedUser: {
-      id?: string | number
-      _sid?: string
-      displayName?: unknown
-      username?: unknown
-      email?: unknown
-    } | null = null
-
-    if (hasAuthCredential) {
-      let edgeReadAllowed = true
-      try {
-        await enforcePublicReadRateLimit(request)
-      } catch {
-        edgeReadAllowed = false
-      }
-
-      if (edgeReadAllowed) {
-        try {
-          const payload = await getPayload({ config })
-          const authResult = await payload.auth({
-            headers: request.headers,
-            canSetHeaders: false,
-          })
-          authenticatedUser = authResult.user as unknown as {
-            id?: string | number
-            _sid?: string
-            displayName?: unknown
-            username?: unknown
-            email?: unknown
-          } | null
-        } catch {
-          authenticatedUser = null
-        }
-      }
-    }
-
-    if (authenticatedUser?.id && typeof authenticatedUser._sid === 'string' && authenticatedUser._sid) {
-      const tokenVersion = readVerifiedPayloadTokenVersion(request)
-      if (tokenVersion !== null) {
-        const active = await validateSession({
-          sessionId: authenticatedUser._sid,
-          userId: String(authenticatedUser.id),
-          tokenVersion,
-        }).catch(() => false)
-
-        if (active) {
-          const displayName =
-            typeof authenticatedUser.displayName === 'string' && authenticatedUser.displayName.trim()
-              ? authenticatedUser.displayName
-              : typeof authenticatedUser.username === 'string' && authenticatedUser.username.trim()
-                ? authenticatedUser.username
-                : typeof authenticatedUser.email === 'string' && authenticatedUser.email.trim()
-                  ? authenticatedUser.email
-                  : '创作者'
-
-          return <CreatorStudio displayName={displayName} userId={String(authenticatedUser.id)} locale={locale} />
-        }
-      }
+    const request = new Request('https://mp.luckread.com/', { headers: requestHeaders })
+    let principal: Awaited<ReturnType<typeof getBetterAuthPrincipal>> | null = null
+    try {
+      await enforcePublicReadRateLimit(request)
+      principal = await getBetterAuthPrincipal(request)
+    } catch {}
+    if (principal?.active) {
+      const displayName =
+        typeof principal.username === 'string' && principal.username.trim()
+          ? principal.username
+          : principal.email
+      return <CreatorStudio displayName={displayName} userId={principal.userId} locale={locale} />
     }
   }
 

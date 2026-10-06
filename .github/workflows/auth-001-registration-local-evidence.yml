@@ -6,6 +6,16 @@ on:
     paths:
       - ".github/workflows/auth-001-registration-local-evidence.yml"
       - "workers/W01-payload/src/app/auth/register/**"
+      - "workers/W01-payload/src/auth/w02-session-client.ts"
+      - "workers/W02-identity/src/auth/**"
+      - "workers/W02-identity/src/authz/**"
+      - "workers/W02-identity/src/index.ts"
+      - "workers/W02-identity/migrations/0005_better_auth_identity_core.sql"
+      - "workers/W01-payload/src/auth/w02-session-client.ts"
+      - "workers/W02-identity/src/auth/**"
+      - "workers/W02-identity/src/authz/**"
+      - "workers/W02-identity/src/index.ts"
+      - "workers/W02-identity/migrations/0005_better_auth_identity_core.sql"
       - "workers/W01-payload/src/collections/Users.ts"
       - "workers/W01-payload/src/migrations/**"
       - "workers/W01-payload/src/payload.config.ts"
@@ -14,6 +24,11 @@ on:
   pull_request:
     paths:
       - ".github/workflows/auth-001-registration-local-evidence.yml"
+      kers/W01-payload/src/auth/w02-session-client.ts"
+      kers/W02-identity/src/auth/**"
+      kers/W02-identity/src/authz/**"
+      kers/W02-identity/src/index.ts"
+      kers/W02-identity/migrations/0005_better_auth_identity_core.sql"
       - "workers/W01-payload/src/app/auth/register/**"
       - "workers/W01-payload/src/collections/Users.ts"
       - "workers/W01-payload/src/migrations/**"
@@ -74,6 +89,14 @@ jobs:
           test -s workers/W01-payload/scripts/auth-001-registration-runtime-evidence-local.mjs
           test -z "$(git status --short)"
 
+      - name: Install W02 dependencies
+        working-directory: workers/W02-identity
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply exact W02 Better Auth migrations
+        working-directory: workers/W02-identity
+        run: pnpm exec wrangler d1 migrations apply luckread --local --config wrangler.jsonc
+
       - name: Install W01 dependencies
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
@@ -97,6 +120,25 @@ jobs:
           set -euo pipefail
           pnpm exec opennextjs-cloudflare build > auth-001-open-next-build.log 2>&1
 
+      - name: Start exact W02 local Worker runtime
+        working-directory: workers/W02-identity
+        env:
+          NODE_ENV: development
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --port 8788 --var "CLOUDFLARE_ENV:development" > auth-001-w02-preview.log 2>&1 &
+          echo $! > auth-001-w02-preview.pid
+          ready=0
+          for _ in $(seq 1 120); do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8788/api/auth/get-session || true)
+            if [ "$code" != "000" ]; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat auth-001-w02-preview.log
+            exit 1
+          fi
+
       - name: Start exact W01 local Worker runtime
         working-directory: workers/W01-payload
         env:
@@ -104,7 +146,8 @@ jobs:
           PAYLOAD_SECRET: ignore
         run: |
           set -euo pipefail
-          pnpm exec wrangler dev --local --port 8787 --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" --var "CLOUDFLARE_ENV:development" > auth-001-preview.log 2>&1 &
+          pnpm exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --port 8787 --var "PAYLOAD_SECRET:auth001-local-evidence-secret-20260928" --var "CLOUDFLARE_ENV:development" > auth-001-preview.log 2>&1 &
+          sleep 5
           echo $! > auth-001-preview.pid
           ready=0
           for _ in $(seq 1 120); do
@@ -145,6 +188,7 @@ jobs:
             artifacts/mapping-0/auth-001-runtime-local/
             workers/W01-payload/auth-001-open-next-build.log
             workers/W01-payload/auth-001-preview.log
+            workers/W02-identity/auth-001-w02-preview.log
           if-no-files-found: error
           retention-days: 30
 
@@ -153,5 +197,6 @@ jobs:
         working-directory: workers/W01-payload
         run: |
           if [ -f auth-001-preview.pid ]; then kill "$(cat auth-001-preview.pid)" 2>/dev/null || true; fi
+          if [ -f ../W02-identity/auth-001-w02-preview.pid ]; then kill "$(cat ../W02-identity/auth-001-w02-preview.pid)" 2>/dev/null || true; fi
           pkill -TERM -x workerd 2>/dev/null || true
           pkill -TERM -x esbuild 2>/dev/null || true

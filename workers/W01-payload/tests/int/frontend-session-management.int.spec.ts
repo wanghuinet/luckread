@@ -13,8 +13,9 @@ describe('frontend session management', () => {
     expect(page).toContain('currentSessionId')
     expect(page).toContain("credentials: 'include'")
     expect(page).toContain("cache: 'no-store'")
-    expect(route).toContain('currentSessionId: subject.sessionId')
-    expect(route).toContain('currentSessionId: subject.sessionId')
+    expect(route).toContain("'/get-session'")
+    expect(route).toContain('const currentSessionId =')
+    expect(route).toContain('currentSessionId,')
   })
 
   it('revokes only non-current sessions through the existing DELETE API with idempotency', () => {

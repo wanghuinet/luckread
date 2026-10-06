@@ -1,143 +1,66 @@
-import { getPayload } from 'payload'
-
-import config from '@payload-config'
-
-import {
-  getPayloadAuthorizationHeader,
-  readVerifiedPayloadTokenVersion,
-} from '../../../../auth/payload-access-token.js'
-import {
-  transitionAccountState,
-  validateSession,
-  W02AuthClientError,
-} from '../../../../auth/w02-session-client.js'
+import { getBetterAuthPrincipal, transitionAccountState, W02AuthClientError } from '../../../../auth/w02-session-client.js'
 
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'no-store',
-    },
-  })
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } })
 
 const errorResponse = (status: number, code: string, message: string) =>
-  json(
-    {
-      error: {
-        code,
-        message,
-        details: {},
-      },
-      requestId: crypto.randomUUID(),
-    },
-    status,
-  )
+  json({ error: { code, message, details: {} }, requestId: crypto.randomUUID() }, status)
 
-type AccountStateBody = {
-  to?: unknown
-  reason?: unknown
-}
+type AccountStateBody = { to?: unknown; reason?: unknown }
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ userId: string }> },
-): Promise<Response> {
+export async function POST(request: Request, context: { params: Promise<{ userId: string }> }): Promise<Response> {
   const { userId: targetUserId } = await context.params
-
-  if (!targetUserId || targetUserId.length > 128) {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid userId')
-  }
+  if (!targetUserId || targetUserId.length > 128) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid userId')
 
   const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
   let ifMatchValue = ifMatch
   if (ifMatchValue.startsWith('W/')) ifMatchValue = ifMatchValue.slice(2)
-  if (ifMatchValue.startsWith('"') && ifMatchValue.endsWith('"')) {
-    ifMatchValue = ifMatchValue.slice(1, -1)
-  }
+  if (ifMatchValue.startsWith('"') && ifMatchValue.endsWith('"')) ifMatchValue = ifMatchValue.slice(1, -1)
   const expectedVersion = Number(ifMatchValue)
   if (!ifMatch || !Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
     return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match is required')
   }
 
   let body: AccountStateBody
-  try {
-    body = (await request.json()) as AccountStateBody
-  } catch {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid request body')
+  try { body = await request.json() as AccountStateBody } catch {
+    return errorResponse(400, 'VALIDATION_FAILED', 'Invalid account-state transition request')
   }
-
-  if (
-    typeof body.to !== 'string' ||
-    typeof body.reason !== 'string' ||
-    body.reason.trim().length === 0 ||
-    body.reason.length > 2048
-  ) {
+  if (typeof body.to !== 'string' || typeof body.reason !== 'string' || body.reason.trim().length === 0 || body.reason.length > 2048) {
     return errorResponse(400, 'VALIDATION_FAILED', 'Invalid account-state transition request')
   }
 
-  const payload = await getPayload({ config })
-
-  let authResult: Awaited<ReturnType<typeof payload.auth>>
-  try {
-    authResult = await payload.auth({
-      headers: new Headers(
-        request.headers.get('Authorization')
-          ? request.headers
-          : {
-              ...(getPayloadAuthorizationHeader(request)
-                ? { Authorization: getPayloadAuthorizationHeader(request)! }
-                : {}),
-            },
-      ),
-      canSetHeaders: false,
-    })
-  } catch {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication failed')
-  }
-
-  const user = authResult.user as ({ id?: unknown; _sid?: unknown } | null)
-  if (!user?.id || typeof user._sid !== 'string') {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-  }
-
-  const tokenVersion = readVerifiedPayloadTokenVersion(request)
-  if (tokenVersion === null) {
-    return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-  }
+  let principal
+  try { principal = await getBetterAuthPrincipal(request) }
+  catch { return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required') }
 
   try {
-    const active = await validateSession({
-      sessionId: user._sid,
-      userId: String(user.id),
-      tokenVersion,
-    })
-    if (!active) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-
-    const result = await transitionAccountState({
-      subjectId: String(user.id),
-      targetUserId,
-      to: body.to,
-      reason: body.reason,
+    const result = await transitionAccountState(request, {
+        subjectId: principal.userId,
+        targetUserId,
+        to: body.to,
+        reason: body.reason,
       expectedVersion,
     })
-
-    return json({
-      from: result.from,
-      to: result.to,
-      auditEventId: result.auditEventId,
-    }, 200)
+    return json({ from: result.from, to: result.to, auditEventId: result.auditEventId })
   } catch (error) {
     if (error instanceof W02AuthClientError) {
-      if (error.status === 401) return errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')
-      if (error.status === 400) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid account-state transition request')
-      if (error.status === 403) return errorResponse(403, 'PERMISSION_DENIED', 'Permission denied')
-      if (error.status === 404) return errorResponse(404, 'NOT_FOUND', 'User account not found')
-      if (error.status === 409) return errorResponse(409, 'INVALID_STATE', 'Invalid account-state transition')
-      if (error.status === 412) return errorResponse(412, 'PRECONDITION_FAILED', 'Account-state precondition failed')
-      return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Account-state service unavailable')
+      const status = error.status
+      return errorResponse(
+        status,
+        status === 401 ? 'UNAUTHENTICATED' :
+        status === 403 ? 'PERMISSION_DENIED' :
+        status === 404 ? 'NOT_FOUND' :
+        status === 409 ? 'INVALID_STATE' :
+        status === 412 ? 'PRECONDITION_FAILED' :
+        'VALIDATION_FAILED',
+        status === 403 ? 'Permission denied' :
+        status === 404 ? 'User account not found' :
+        status === 409 ? 'Invalid account-state transition' :
+        status === 412 ? 'Account-state precondition failed' :
+        status === 400 ? 'Invalid account-state request' :
+        'Authentication required',
+      )
     }
-
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Account-state service unavailable')
   }
 }

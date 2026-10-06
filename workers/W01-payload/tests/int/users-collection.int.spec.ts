@@ -13,12 +13,10 @@ describe('W01 Users collection contract', () => {
     }>
 
     expect(Users.slug).toBe('users')
-    expect(Users.auth).toEqual(
-      expect.objectContaining({
-        forgotPassword: expect.any(Object),
-        removeTokenFromResponses: true,
-      }),
-    )
+    expect(Users.auth).toEqual(expect.objectContaining({
+      disableLocalStrategy: true,
+      strategies: expect.arrayContaining([expect.objectContaining({ name: 'luckread-better-auth' })]),
+    }))
 
     expect(fields).toEqual(
       expect.arrayContaining([

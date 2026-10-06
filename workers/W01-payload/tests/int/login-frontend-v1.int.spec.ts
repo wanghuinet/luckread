@@ -11,7 +11,10 @@ describe('login frontend', () => {
 
     expect(page).toContain("fetch('/api/v1/auth/login'")
     expect(page).not.toContain("fetch('/auth/login'")
-    expect(page).toContain('deviceId')
+    expect(page).not.toContain('deviceId')
+    expect(page).toContain("credentials: 'include'")
+    expect(page).not.toContain('accessToken')
+    expect(page).not.toContain('refreshToken')
     expect(page).toContain("router.push(returnTo)")
   })
 })

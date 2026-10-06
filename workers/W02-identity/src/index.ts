@@ -8,18 +8,6 @@ import {
   authorizeAccountStateTransition,
   type AccountState,
 } from './account/account-state-transition.js'
-import {
-  establishSessionFromAuthoritativeD1,
-  refreshSessionFromAuthoritativeD1,
-  revokeSessionExtension,
-  validateAuthoritativeSession,
-  resolveAuthenticatedPrincipal,
-} from './session/session-runtime.js'
-import {
-  listCurrentUserSessions,
-  revokeCurrentUserSession,
-  SessionManagementError,
-} from './session/session-management.js'
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
 
 interface Env {
@@ -33,19 +21,6 @@ interface Env {
 type ResolveLayerRequest = {
   subjectId: string
   accountState: string
-  now?: string
-}
-
-type EstablishSessionRequest = {
-  sessionId: string
-  userId: string
-  deviceId: string
-  now?: string
-}
-
-type RefreshSessionRequest = {
-  refreshToken: string
-  deviceId: string
   now?: string
 }
 
@@ -174,252 +149,71 @@ export default {
       }
     }
 
-    if (request.method === 'POST' && url.pathname === '/internal/auth/session/establish') {
-      const body = await readJsonBody<EstablishSessionRequest>(request)
-      if (
-        !body ||
-        typeof body.sessionId !== 'string' ||
-        typeof body.userId !== 'string' ||
-        typeof body.deviceId !== 'string'
-      ) {
-        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid session establishment request' } }, 400)
+    if (request.method === 'POST' && url.pathname === '/internal/auth/registration/rollback') {
+      const body = await readJsonBody<{ userId?: unknown; email?: unknown; username?: unknown }>(request)
+      if (!body || typeof body.userId !== 'string' || body.userId.length === 0 || body.userId.length > 128 ||
+          typeof body.email !== 'string' || body.email.length === 0 || typeof body.username !== 'string' || body.username.length === 0) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid registration rollback request' } }, 400)
       }
 
       try {
-        const result = await establishSessionFromAuthoritativeD1(env.D1_01, body)
-        return json({
-          sessionId: result.sessionId,
-          refreshToken: result.refreshToken,
-          tokenVersion: result.tokenVersion,
-          layer: result.layer,
-          nativeExpiresAt: result.nativeExpiresAt,
-        })
-      } catch (error) {
-        const code = error instanceof Error && 'code' in error
-          ? String((error as { code?: unknown }).code)
-          : 'UNAVAILABLE'
-        const status = code === 'UNAUTHENTICATED' ? 401 : code === 'INVALID_INPUT' ? 400 : 503
-        return json({
-          error: {
-            code: status === 401 ? 'UNAUTHENTICATED' : status === 400 ? 'VALIDATION_FAILED' : 'SERVICE_UNAVAILABLE',
-            message: status === 401 ? 'authentication denied' : status === 400 ? 'invalid session request' : 'authentication service unavailable',
-          },
-        }, status)
-      }
-    }
+        const row = await env.D1_01
+          .prepare('SELECT id, email, username, account_state AS accountState FROM "user" WHERE id = ? LIMIT 1')
+          .bind(body.userId)
+          .first<{ id: string; email: string; username: string | null; accountState: string }>()
 
-    if (request.method === 'POST' && url.pathname === '/internal/auth/session/refresh') {
-      const body = await readJsonBody<RefreshSessionRequest>(request)
-      if (
-        !body ||
-        typeof body.refreshToken !== 'string' ||
-        typeof body.deviceId !== 'string'
-      ) {
-        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid session refresh request' } }, 400)
-      }
+        if (!row) return json({ rolledBack: true })
+        if (row.email !== body.email.trim().toLowerCase() || String(row.username ?? '') !== body.username.trim() || row.accountState !== 'PENDING_VERIFICATION') {
+          return json({ error: { code: 'PRECONDITION_FAILED', message: 'registration rollback precondition failed' } }, 412)
+        }
 
-      try {
-        const result = await refreshSessionFromAuthoritativeD1(env.D1_01, body)
-        return json({
-          sessionId: result.sessionId,
-          userId: result.userId,
-          refreshToken: result.refreshToken,
-          tokenVersion: result.tokenVersion,
-          layer: result.layer,
-          nativeExpiresAt: result.nativeExpiresAt,
-          email: result.email,
-        })
-      } catch (error) {
-        const code = error instanceof Error && 'code' in error
-          ? String((error as { code?: unknown }).code)
-          : 'UNAVAILABLE'
-        const status = code === 'UNAUTHENTICATED' ? 401 : code === 'INVALID_INPUT' ? 400 : 503
-        return json({
-          error: {
-            code: status === 401 ? 'UNAUTHENTICATED' : status === 400 ? 'VALIDATION_FAILED' : 'SERVICE_UNAVAILABLE',
-            message: status === 401 ? 'authentication denied' : status === 400 ? 'invalid session request' : 'authentication service unavailable',
-          },
-        }, status)
-      }
-    }
+        const activeSession = await env.D1_01
+          .prepare('SELECT 1 AS present FROM "session" WHERE user_id = ? LIMIT 1')
+          .bind(body.userId)
+          .first<{ present: number }>()
+        if (activeSession) return json({ error: { code: 'PRECONDITION_FAILED', message: 'registration rollback cannot remove an active session' } }, 412)
 
-    if (request.method === 'POST' && url.pathname === '/internal/auth/session/principal') {
-      const body = await readJsonBody<{ sessionId?: unknown; userId?: unknown; tokenVersion?: unknown }>(request)
-      if (
-        !body ||
-        typeof body.sessionId !== 'string' ||
-        body.sessionId.length === 0 ||
-        typeof body.userId !== 'string' ||
-        body.userId.length === 0 ||
-        typeof body.tokenVersion !== 'number' ||
-        !Number.isSafeInteger(body.tokenVersion) ||
-        body.tokenVersion < 0
-      ) {
-        return json({ active: false }, 400)
-      }
+        await env.D1_01.batch([
+          env.D1_01.prepare('DELETE FROM role_assignments WHERE subject_id = ?').bind(body.userId),
+          env.D1_01.prepare('DELETE FROM "verification" WHERE identifier = ?').bind(body.email.trim().toLowerCase()),
+          env.D1_01.prepare('DELETE FROM "account" WHERE user_id = ?').bind(body.userId),
+          env.D1_01.prepare('DELETE FROM "user" WHERE id = ? AND account_state = ?').bind(body.userId, 'PENDING_VERIFICATION'),
+        ])
 
-      try {
-        const result = await resolveAuthenticatedPrincipal(env.D1_01, {
-          sessionId: body.sessionId,
-          userId: body.userId,
-          tokenVersion: body.tokenVersion,
-        })
-        return json(result, result.active ? 200 : 401)
+        return json({ rolledBack: true })
       } catch {
-        return json({ active: false }, 503)
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'registration rollback unavailable' } }, 503)
       }
     }
-
-    if (request.method === 'POST' && url.pathname === '/internal/auth/session/validate') {
-      const body = await readJsonBody<{ sessionId?: unknown; userId?: unknown; tokenVersion?: unknown }>(request)
-      if (
-        !body ||
-        typeof body.sessionId !== 'string' ||
-        body.sessionId.length === 0 ||
-        typeof body.userId !== 'string' ||
-        body.userId.length === 0 ||
-        typeof body.tokenVersion !== 'number' ||
-        !Number.isSafeInteger(body.tokenVersion) ||
-        body.tokenVersion < 0
-      ) {
-        return json({ active: false }, 400)
-      }
-
-      try {
-        const result = await validateAuthoritativeSession(env.D1_01, {
-          sessionId: body.sessionId,
-          userId: body.userId,
-          tokenVersion: body.tokenVersion,
-        })
-        return json(result)
-      } catch {
-        return json({ active: false }, 503)
-      }
-    }
-
-    if (request.method === 'POST' && url.pathname === '/internal/auth/session/revoke') {
+    if (request.method === 'POST' && url.pathname === '/internal/auth/session/revoke-by-id') {
       const body = await readJsonBody<{ sessionId?: unknown }>(request)
-      if (!body || typeof body.sessionId !== 'string' || body.sessionId.length === 0) {
+      if (!body || typeof body.sessionId !== 'string' || body.sessionId.length === 0 || body.sessionId.length > 128) {
         return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid session revocation request' } }, 400)
       }
 
       try {
-        const result = await revokeSessionExtension(env.D1_01, body.sessionId, new Date().toISOString())
-        return json(result)
+        const auth = createLuckReadAuth({ D1_01: env.D1_01 })
+        const current = await auth.api.getSession({ headers: request.headers, query: {} })
+        if (!current?.user?.id) {
+          return json({ error: { code: 'UNAUTHENTICATED', message: 'authentication required' } }, 401)
+        }
+
+        const target = await env.D1_01
+          .prepare('SELECT id, token, user_id AS userId FROM "session" WHERE id = ? LIMIT 1')
+          .bind(body.sessionId)
+          .first<{ id: string; token: string; userId: string }>()
+
+        if (!target || String(target.userId) !== String(current.user.id)) {
+          return json({ revoked: true })
+        }
+
+        await auth.api.revokeSession({
+          headers: request.headers,
+          body: { token: target.token },
+        })
+
+        return json({ revoked: true })
       } catch {
-        return json({
-          error: {
-            code: 'SERVICE_UNAVAILABLE',
-            message: 'authentication service unavailable',
-          },
-        }, 503)
-      }
-    }
-
-    if (request.method === 'POST' && url.pathname === '/internal/auth/session/list') {
-      const body = await readJsonBody<{
-        userId?: unknown
-        currentSessionId?: unknown
-        tokenVersion?: unknown
-        cursor?: unknown
-        limit?: unknown
-      }>(request)
-
-      if (
-        !body ||
-        typeof body.userId !== 'string' ||
-        typeof body.currentSessionId !== 'string' ||
-        typeof body.tokenVersion !== 'number' ||
-        (body.cursor !== undefined && typeof body.cursor !== 'string') ||
-        (body.limit !== undefined && typeof body.limit !== 'number')
-      ) {
-        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid session list request' } }, 400)
-      }
-
-      try {
-        const result = await listCurrentUserSessions(env.D1_01, {
-          userId: body.userId,
-          currentSessionId: body.currentSessionId,
-          tokenVersion: body.tokenVersion,
-          cursor: body.cursor,
-          limit: body.limit,
-        })
-        return json(result)
-      } catch (error) {
-        if (error instanceof SessionManagementError) {
-          const status =
-            error.code === 'UNAUTHENTICATED' ? 401 :
-            error.code === 'PERMISSION_DENIED' ? 403 :
-            error.code === 'INVALID_CURSOR' ? 400 :
-            error.code === 'INVALID_INPUT' ? 400 :
-            503
-          return json({
-            error: {
-              code:
-                status === 401 ? 'UNAUTHENTICATED' :
-                status === 403 ? 'PERMISSION_DENIED' :
-                status === 400 ? (error.code === 'INVALID_CURSOR' ? 'INVALID_CURSOR' : 'VALIDATION_FAILED') :
-                'SERVICE_UNAVAILABLE',
-              message:
-                status === 401 ? 'authentication denied' :
-                status === 403 ? 'permission denied' :
-                status === 400 ? 'invalid session list request' :
-                'session service unavailable',
-            },
-          }, status)
-        }
-        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'session service unavailable' } }, 503)
-      }
-    }
-
-    if (request.method === 'POST' && url.pathname === '/internal/auth/session/revoke-owned') {
-      const body = await readJsonBody<{
-        userId?: unknown
-        currentSessionId?: unknown
-        tokenVersion?: unknown
-        targetSessionId?: unknown
-      }>(request)
-
-      if (
-        !body ||
-        typeof body.userId !== 'string' ||
-        typeof body.currentSessionId !== 'string' ||
-        typeof body.tokenVersion !== 'number' ||
-        typeof body.targetSessionId !== 'string'
-      ) {
-        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid session revoke request' } }, 400)
-      }
-
-      try {
-        const result = await revokeCurrentUserSession(env.D1_01, {
-          userId: body.userId,
-          currentSessionId: body.currentSessionId,
-          tokenVersion: body.tokenVersion,
-          targetSessionId: body.targetSessionId,
-        })
-        return json(result)
-      } catch (error) {
-        if (error instanceof SessionManagementError) {
-          const status =
-            error.code === 'UNAUTHENTICATED' ? 401 :
-            error.code === 'PERMISSION_DENIED' ? 403 :
-            error.code === 'INVALID_INPUT' ? 400 :
-            503
-          return json({
-            error: {
-              code:
-                status === 401 ? 'UNAUTHENTICATED' :
-                status === 403 ? 'PERMISSION_DENIED' :
-                status === 400 ? 'VALIDATION_FAILED' :
-                'SERVICE_UNAVAILABLE',
-              message:
-                status === 401 ? 'authentication denied' :
-                status === 403 ? 'permission denied' :
-                status === 400 ? 'invalid session revoke request' :
-                'session service unavailable',
-            },
-          }, status)
-        }
         return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'session service unavailable' } }, 503)
       }
     }

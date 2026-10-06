@@ -1,5 +1,4 @@
 import fs from 'fs'
-import nodeCrypto from 'crypto'
 import path from 'path'
 import { sqliteD1Adapter } from '@payloadcms/db-d1-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
@@ -12,10 +11,6 @@ import { r2Storage } from '@payloadcms/storage-r2'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
-import { authSessionStateSchemaHook } from './db/auth-session-state-schema'
-import { clampWorkerPbkdf2Iterations } from './runtime/pbkdf2-worker-compat'
-
-export const AUTH001_USER_CAPTURE_CONTEXT = '__luckreadAuth001UserCapture'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -35,19 +30,6 @@ const isExplicitRemoteMigration = process.env.PAYLOAD_MIGRATION_REMOTE === 'true
 // process.argv-based detection fails in Next.js page-data collection workers.
 const isWorkerRuntime =
   typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers'
-
-// Cloudflare Workers rejects a single PBKDF2 derivation above 100000 iterations.
-// Payload 3.90.2's native local-auth path requests 600000 iterations. Keep the
-// native Payload auth/session/recovery pipeline intact, but clamp only the Worker
-// runtime crypto primitive to the platform ceiling. This is a compatibility seam,
-// not a second authentication implementation.
-if (isWorkerRuntime) {
-  const nativePbkdf2 = nodeCrypto.pbkdf2.bind(nodeCrypto)
-  nodeCrypto.pbkdf2 = ((...args: Parameters<typeof nodeCrypto.pbkdf2>) => {
-    args[2] = clampWorkerPbkdf2Iterations(args[2])
-    return nativePbkdf2(...args)
-  }) as typeof nodeCrypto.pbkdf2
-}
 
 const createLog =
   (level: string, fn: typeof console.log) => (objOrMsg: object | string, msg?: string) => {
@@ -90,7 +72,6 @@ export default buildConfig({
     binding: cloudflare.env.D1,
     push: false,
     migrationDir: path.resolve(dirname, 'migrations'),
-    beforeSchemaInit: [authSessionStateSchemaHook],
   }),
   logger: isProduction ? cloudflareLogger : undefined,
   onInit: async (payload: Payload) => {
@@ -107,36 +88,6 @@ export default buildConfig({
         options: { upsert: true },
       })
 
-    // AUTH-001 registration-only seam: Payload's native local strategy
-    // produces hash/salt before the adapter persistence boundary. Only a
-    // request-local capture context can divert that one User write.
-    const create = payload.db.create.bind(payload.db)
-    payload.db.create = async (args) => {
-      const requestContext =
-        args.req?.context ??
-        ('context' in args && args.context && typeof args.context === 'object'
-          ? (args.context as Record<string, unknown>)
-          : undefined)
-      const capture = requestContext?.[AUTH001_USER_CAPTURE_CONTEXT]
-      if (args.collection !== Users.slug || !capture || typeof capture !== 'object') {
-        return create(args)
-      }
-
-      const target = capture as { data?: Record<string, unknown> }
-      const data = args.data as Record<string, unknown>
-      if (
-        typeof data.email !== 'string' ||
-        typeof data.username !== 'string' ||
-        typeof data.hash !== 'string' ||
-        typeof data.salt !== 'string' ||
-        'password' in data
-      ) {
-        throw new Error('AUTH001_NATIVE_USER_PERSISTENCE_INTENT_INVALID')
-      }
-
-      target.data = { ...data }
-      return { ...data, id: 0 }
-    }
   },
   plugins: [
     r2Storage({
