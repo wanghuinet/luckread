@@ -135,7 +135,7 @@ jobs:
 
               try {
                 const existingUser = await db
-                  .prepare('SELECT id FROM users WHERE id = ?')
+                  .prepare('SELECT id FROM "user" WHERE id = ?')
                   .bind(testUserId)
                   .first<Record<string, unknown>>()
 
@@ -177,9 +177,9 @@ jobs:
 
                 await db
                   .prepare(
-                    'INSERT INTO users (id, email, account_state, account_state_version) VALUES (?, ?, ?, ?)',
+                    'INSERT INTO "user" (id, name, email, email_verified, locale, timezone, account_state, account_state_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                   )
-                  .bind(testUserId, testEmail, 'ACTIVE', 1)
+                  .bind(String(testUserId), 'E6 Role Assignment', testEmail, 1, 'en-US', 'UTC', 'ACTIVE', 1, now1, now1)
                   .run()
                 insertedUser = true
 
@@ -313,7 +313,7 @@ jobs:
 
                 if (insertedUser) {
                   await db
-                    .prepare('DELETE FROM users WHERE id = ?')
+                    .prepare('DELETE FROM "user" WHERE id = ?')
                     .bind(testUserId)
                     .run()
                 }
@@ -329,7 +329,7 @@ jobs:
                   .first<{ count: number }>()
 
                 const remainingUser = await db
-                  .prepare('SELECT COUNT(*) AS count FROM users WHERE id = ?')
+                  .prepare('SELECT COUNT(*) AS count FROM "user" WHERE id = ?')
                   .bind(testUserId)
                   .first<{ count: number }>()
 
