@@ -197,7 +197,10 @@ jobs:
               const base = 'https://luckread-w02.internal'
               const resolveResponse = await env.W02_AUTH.fetch(new Request(base + '/internal/authz/resolve-layer', {
                 method: 'POST',
-                headers: { 'content-type': 'application/json' },
+                headers: {
+                  'content-type': 'application/json',
+                  'X-LuckRead-Caller': 'W01',
+                },
                 body: JSON.stringify({ subjectId: env.USER_ID, accountState: 'ACTIVE' }),
               }))
               const resolveRaw = await resolveResponse.text()

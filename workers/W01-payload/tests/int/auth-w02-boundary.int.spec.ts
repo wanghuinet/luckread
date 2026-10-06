@@ -23,6 +23,9 @@ describe('W01 → W02 Better Auth gateway boundary', () => {
     expect(worker).toContain("request.headers.get('X-LuckRead-Caller') !== 'W01'")
     expect(worker).toContain("code: 'FORBIDDEN'")
     expect(worker).toContain("message: 'authentication gateway required'")
+    expect(worker).toContain("url.pathname.startsWith('/internal/account/')")
+    expect(worker).toContain("url.pathname.startsWith('/internal/authz/')")
+    expect(worker).toContain("message: 'internal worker transport required'")
   })
 })
 
