@@ -3,6 +3,12 @@ import { reconcileOrphanedSessionExtensions } from '../session/session-runtime.j
 import { betterAuth } from 'better-auth'
 import { bearer } from 'better-auth/plugins'
 
+const executionContexts = new WeakMap<Request, ExecutionContext>()
+
+export const bindExecutionContext = (request: Request, context: ExecutionContext): void => {
+  executionContexts.set(request, context)
+}
+
 export interface PasswordResetEmailBinding {
   send(message: {
     to: string
@@ -41,7 +47,7 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
       maxPasswordLength: 128,
       resetPasswordTokenExpiresIn: 60 * 60,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: async ({ user, url }) => {
+      sendResetPassword: async ({ user, url }, request) => {
         if (!env.EMAIL) {
           throw new Error('PASSWORD_RESET_DELIVERY_UNCONFIGURED')
         }
@@ -53,7 +59,7 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
           .replaceAll('<', '&lt;')
           .replaceAll('>', '&gt;')
 
-        void env.EMAIL.send({
+        const delivery = env.EMAIL.send({
           to: user.email,
           from,
           subject: 'LuckRead 密码重置',
@@ -66,6 +72,13 @@ export const createLuckReadAuth = (env: BetterAuthEnv) =>
             errorName: error instanceof Error ? error.name : typeof error,
           }))
         })
+
+        const executionContext = request ? executionContexts.get(request) : undefined
+        if (executionContext) {
+          executionContext.waitUntil(delivery)
+        } else {
+          void delivery
+        }
       },
       onPasswordReset: async ({ user }) => {
         try {

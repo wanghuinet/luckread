@@ -1,4 +1,4 @@
-import { createLuckReadAuth } from './auth/better-auth.js'
+import { bindExecutionContext, createLuckReadAuth } from './auth/better-auth.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { reconcileCompletedRegistrationMaterialization } from './account/registration-materializer.js'
 import { registerWithBetterAuth, RegistrationServiceError } from './account/registration-service.js'
@@ -84,7 +84,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 })
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, executionContext: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
 
     const isW01OnlyInternalRoute =
@@ -101,6 +101,7 @@ export default {
         return json({ error: { code: 'FORBIDDEN', message: 'authentication gateway required' } }, 403)
       }
 
+      bindExecutionContext(request, executionContext)
       return createLuckReadAuth({
         D1_01: env.D1_01,
         BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET,
