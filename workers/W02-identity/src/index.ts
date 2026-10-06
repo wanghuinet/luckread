@@ -371,7 +371,7 @@ export default {
       try {
         const row = await env.D1_01
           .prepare(
-            'SELECT account_state AS accountState FROM users WHERE CAST(id AS TEXT) = ? LIMIT 1',
+            'SELECT account_state AS accountState FROM "user" WHERE CAST(id AS TEXT) = ? LIMIT 1',
           )
           .bind(body.userId)
           .first<{ accountState?: string }>()
