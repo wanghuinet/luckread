@@ -111,6 +111,20 @@ describe('Media upload access', () => {
   })
 
 
+  it('uses the canonical Better Auth principal for media mutations', () => {
+    const route = read('src/app/api/v1/media/[mediaId]/route.ts')
+
+    expect(route).toContain('resolveBetterAuthPrincipalThroughW02(request)')
+    expect(route).toContain("if (!principal.active || principal.tokenVersion === undefined)")
+    expect(route).toContain("collection: 'media'")
+    expect(route).toContain('overrideAccess: false')
+    expect(route).toContain('user: { id: principal.userId }')
+    expect(route).toContain('await payload.delete')
+    expect(route).toContain('await payload.update')
+    expect(route).not.toContain('payloadMediaDelete')
+    expect(route).not.toContain('payloadMediaPatch')
+  })
+
   it('exposes owner-authorized media deletion through the stable v1 resource path', () => {
     const route = read('src/app/api/v1/media/[mediaId]/route.ts')
 
