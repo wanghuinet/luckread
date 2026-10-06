@@ -1,5 +1,5 @@
 {
-  "version": "1.4",
+  "version": "1.5",
   "status": "NOT_GREEN",
   "sourceOfTruth": "contracts/entity/entity-catalog.v1.json",
   "featureInventoryRef": "contracts/alignment/feature-inventory.v1.json",
@@ -8,6 +8,31 @@
       "entityId": "ENT-USER",
       "status": "VERIFIED",
       "fields": [
+        {
+          "fieldId": "ENT-USER-F-IDENTITY-ID",
+          "name": "identityId",
+          "type": "text",
+          "nullable": true,
+          "required": false,
+          "unique": true,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "INTERNAL_REFERENCE",
+          "status": "VERIFIED",
+          "payloadNative": true,
+          "sourceRef": "workers/W01-payload/src/collections/Users.ts",
+          "payloadConfigRef": "workers/W01-payload/src/collections/Users.ts:fields.identityId",
+          "apiExposure": "NONE",
+          "adminExposure": "YES_READ_ONLY",
+          "eventExposure": "NONE",
+          "migrationVersion": "20261005_BETTER_AUTH_IDENTITY_BINDING",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "workers/W01-payload/src/collections/Users.ts",
+            "workers/W01-payload/src/app/auth/register/route.ts",
+            "workers/W01-payload/src/auth/better-auth-payload-strategy.ts"
+          ]
+        },
         {
           "fieldId": "ENT-USER-F-USERNAME",
           "name": "username",
