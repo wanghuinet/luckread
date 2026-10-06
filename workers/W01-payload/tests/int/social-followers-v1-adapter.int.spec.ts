@@ -21,6 +21,19 @@ describe('v1 follower relationship adapters', () => {
     expect(route).not.toContain('social_follow_relationships')
   })
 
+  it('invalidates public follower and following caches after follow mutations', () => {
+    const route = readFileSync(
+      resolve(process.cwd(), 'src/app/api/v1/social/follows/[targetUserId]/route.ts'),
+      'utf8',
+    )
+
+    expect(route).toContain('invalidatePublicFollowing')
+    expect(route).toContain('invalidatePublicFollowers')
+    expect(route).toContain('if (response.ok && method !== \'GET\')')
+    expect(route).toContain('principal.userId')
+    expect(route).toContain('targetUserId')
+  })
+
   it('cancels stale follow-list requests and ignores aborted completions', () => {
     const view = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/users/[userId]/UserFollowList.tsx'), 'utf8')
     expect(view).toContain('activeRequestRef')
