@@ -1,11 +1,19 @@
-export type NativeSessionAuthority = {
+/**
+ * Compatibility bridge for the W01 Payload auth boundary.
+ *
+ * Better Auth owns the real identity/session lifecycle in W02. The
+ * auth_session_state row is subordinate extension state for device binding,
+ * refresh-credential rotation, and legacy W01 token compatibility; it must
+ * never become an independent session authority.
+ */
+export type BetterAuthSession = {
   sessionId: string
   userId: string
   createdAt: string
   expiresAt: string
 }
 
-export type SessionRecord = {
+export type SessionExtensionRecord = {
   sessionId: string
   userId: string
   deviceId: string
@@ -15,6 +23,11 @@ export type SessionRecord = {
   lastSeenAt: string | null
   nativeExpiresAt: string
 }
+
+// Compatibility aliases keep the existing W01-facing bridge API stable while
+// making the authority boundary explicit in new code.
+export type NativeSessionAuthority = BetterAuthSession
+export type SessionRecord = SessionExtensionRecord
 
 export class SessionRuntimeError extends Error {
   constructor(
@@ -74,7 +87,7 @@ function assertDeviceId(deviceId: string): void {
   }
 }
 
-function assertNativeSession(session: NativeSessionAuthority): void {
+function assertNativeSession(session: BetterAuthSession): void {
   if (!session || typeof session.sessionId !== 'string' || session.sessionId.length === 0) {
     throw new SessionRuntimeError('INVALID_INPUT', 'native session id is required')
   }
@@ -94,7 +107,7 @@ function assertNotExpired(expiresAt: string, now: string): void {
 
 export async function createSessionExtension(
   db: D1Database,
-  session: NativeSessionAuthority,
+  session: BetterAuthSession,
   deviceId: string,
   now: string,
   tokenVersion: number,
@@ -192,7 +205,7 @@ type LayerResolver = (
 
 export async function establishAuthenticatedSession(
   db: D1Database,
-  session: NativeSessionAuthority,
+  session: BetterAuthSession,
   deviceId: string,
   accountState: string,
   now: string,
@@ -222,7 +235,7 @@ export async function establishAuthenticatedSession(
 }
 
 type AuthoritativeSessionContext = {
-  session: NativeSessionAuthority
+  session: BetterAuthSession
   accountState: string
 }
 
@@ -332,7 +345,7 @@ type AuthoritativeRefreshResult = {
   email: string
 }
 
-function assertRefreshSessionUsable(session: SessionRecord, deviceId: string, now: string): void {
+function assertRefreshSessionUsable(session: SessionExtensionRecord, deviceId: string, now: string): void {
   if (session.deviceId !== deviceId) {
     throw new SessionRuntimeError('UNAUTHENTICATED', 'invalid refresh credential')
   }
@@ -347,7 +360,7 @@ function assertRefreshSessionUsable(session: SessionRecord, deviceId: string, no
 
 async function rotateLoadedRefreshCredential(
   db: D1Database,
-  session: SessionRecord,
+  session: SessionExtensionRecord,
   expectedRefreshCredentialHash: string,
   now: string,
   randomToken: () => string,
@@ -386,7 +399,7 @@ async function loadAuthoritativeRefreshContext(
   db: D1Database,
   refreshCredentialHash: string,
 ): Promise<{
-  session: SessionRecord
+  session: SessionExtensionRecord
   accountState: string
   email: string
 }> {
@@ -416,7 +429,7 @@ async function loadAuthoritativeRefreshContext(
         `,
       )
       .bind(refreshCredentialHash)
-      .first<SessionRecord & { accountState: string; email: string }>()
+      .first<SessionExtensionRecord & { accountState: string; email: string }>()
 
     if (
       !row ||
