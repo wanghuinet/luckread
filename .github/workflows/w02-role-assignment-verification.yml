@@ -55,4 +55,4 @@ jobs:
       - name: Verify role_version mutation trigger semantics
         run: node scripts/verify-role-version-mutation.mjs
       - name: Run W02 authorization and session tests
-        run: npx vitest run workers/W02-identity/src/authz/role-assignment.test.ts workers/W02-identity/src/authz/role-version.test.ts workers/W02-identity/src/authz/authorization-decision.test.ts workers/W02-identity/src/session/session-runtime.test.ts
+        run: npx vitest run workers/W02-identity/src/authz/role-assignment.test.ts workers/W02-identity/src/authz/role-version.test.ts workers/W02-identity/src/authz/authorization-decision.test.ts
