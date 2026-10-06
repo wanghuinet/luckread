@@ -1,10 +1,10 @@
-name: W02 Session Runtime CI
+name: W02 Better Auth Session CI
 
 on:
   push:
     branches: [main]
     paths:
-      - 'workers/W02-identity/src/session/**'
+      - 'workers/W02-identity/src/auth/**'
       - 'workers/W02-identity/src/credentials/credential-hash-key.ts'
       - 'workers/W02-identity/src/credentials/credential-hash-key.test.ts'
       - 'workers/W02-identity/src/account/registration-materializer.ts'
@@ -30,8 +30,8 @@ permissions:
   contents: read
 
 jobs:
-  session-runtime:
-    name: W02 Session Runtime Tests
+  better-auth-session:
+    name: W02 Better Auth Session Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -47,8 +47,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run W02 session runtime tests
-        run: npx vitest@3.2.4 run workers/W02-identity/src/session/session-runtime.test.ts
+      - name: Run W02 Better Auth authorization tests
+        run: npx vitest@3.2.4 run workers/W02-identity/src/authz/role-assignment.test.ts workers/W02-identity/src/authz/role-version.test.ts workers/W02-identity/src/authz/authorization-decision.test.ts
 
 
   credential-key-boundary:
