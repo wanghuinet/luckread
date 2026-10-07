@@ -2,6 +2,19 @@ import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 import { cachedPublicGet, invalidatePublicContentList, invalidatePublicUserProfileByUsername, publicCacheKey } from './public-response-cache.js'
 
 describe('public response cache', () => {
+  it('bypasses shared cache for an unregistered namespace', async () => {
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const response = await cachedPublicGet(
+      new Request('https://luckread.com/api/v1/example?secret=1'),
+      'unregistered-namespace',
+      loader,
+      30,
+    )
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(response.headers.get('X-LuckRead-Cache')).toBeNull()
+  })
+
   const cache = {
     match: vi.fn(),
     put: vi.fn(async () => undefined),
