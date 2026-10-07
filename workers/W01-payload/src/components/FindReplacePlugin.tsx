@@ -38,15 +38,15 @@ function FindReplacePanel({ disabled, value, updateDocument }: ArticleEditorPlug
     const normalize = (input: string) => caseSensitive ? input : input.toLocaleLowerCase()
     const needle = normalize(search)
     return value.blocks.reduce((total, block) => {
-      let count = countMatches(normalize(block.text), needle)
       if (block.type === 'table' && block.table) {
-        count += block.table.headers.reduce((sum, cell) => sum + countMatches(normalize(cell), needle), 0)
-        count += block.table.rows.reduce(
-          (sum, row) => sum + row.reduce((rowSum, cell) => rowSum + countMatches(normalize(cell), needle), 0),
-          0,
-        )
+        return total +
+          block.table.headers.reduce((sum, cell) => sum + countMatches(normalize(cell), needle), 0) +
+          block.table.rows.reduce(
+            (sum, row) => sum + row.reduce((rowSum, cell) => rowSum + countMatches(normalize(cell), needle), 0),
+            0,
+          )
       }
-      return total + count
+      return total + countMatches(normalize(block.text), needle)
     }, 0)
   }, [caseSensitive, search, value])
 
@@ -56,9 +56,6 @@ function FindReplacePanel({ disabled, value, updateDocument }: ArticleEditorPlug
       setMessage('请输入查找内容。')
       return
     }
-
-    const normalize = (input: string) => caseSensitive ? input : input.toLocaleLowerCase()
-    const needle = normalize(search)
 
     const nextBlocks = value.blocks.map((block) => {
       const nextText = replaceAllTextCaseAware(block.text, search, replacement, caseSensitive)
@@ -84,7 +81,7 @@ function FindReplacePanel({ disabled, value, updateDocument }: ArticleEditorPlug
       return
     }
 
-    if (nextBlocks.every((block) => normalize(block.text) === normalize(value.blocks.find((source) => source.id === block.id)?.text ?? ''))) {
+    if (JSON.stringify(nextBlocks) === JSON.stringify(value.blocks)) {
       setMessage('没有找到匹配内容。')
       return
     }
@@ -193,6 +190,14 @@ function replaceAllTextCaseAware(
 ): string {
   if (caseSensitive || !search) return replaceAllText(value, search, replacement)
 
+  const pattern = search.replace(/[.*+?^$\\{}()|[\\]\\]/g, '\\function replaceAllTextCaseAware(
+  value: string,
+  search: string,
+  replacement: string,
+  caseSensitive: boolean,
+): string {
+  if (caseSensitive || !search) return replaceAllText(value, search, replacement)
+
   const needle = search.toLocaleLowerCase()
   const source = value.toLocaleLowerCase()
   let output = ''
@@ -206,6 +211,8 @@ function replaceAllTextCaseAware(
   }
 
   return output + value.slice(cursor)
+}')
+  return value.replace(new RegExp(pattern, 'giu'), () => replacement)
 }
 
 export const findReplacePlugin = {
