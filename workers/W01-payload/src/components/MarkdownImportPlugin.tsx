@@ -39,6 +39,11 @@ function MarkdownImportPanel({
   function apply() {
     if (!result || result.unsupported.length) return
 
+    if (mode === 'append' && value.blocks.length + result.document.blocks.length > 200) {
+      setError('追加后正文区块将超过 200 个，本次不会导入。')
+      return
+    }
+
     const next = mode === 'replace'
       ? result.document
       : {
