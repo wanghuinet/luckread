@@ -5,6 +5,16 @@ import { resolve } from 'node:path'
 const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relativePath), 'utf8')
 
 describe('public content detail', () => {
+  it('renders structured math blocks with KaTeX instead of author HTML', () => {
+    const renderer = read('src/components/ArticleStructuredRenderer.tsx')
+
+    expect(renderer).toContain("import katex from 'katex'")
+    expect(renderer).toContain("block.type === 'math'")
+    expect(renderer).toContain('katex.renderToString(block.text')
+    expect(renderer).toContain('throwOnError: false')
+    expect(renderer).toContain('dangerouslySetInnerHTML={{ __html: html }}')
+  })
+
   it('renders all published video media references', () => {
     const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
 
