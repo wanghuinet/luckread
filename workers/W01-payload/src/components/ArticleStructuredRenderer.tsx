@@ -1,4 +1,13 @@
-import type { ArticleDocument } from '../lib/article-document.js'
+import Prism from 'prismjs'
+import 'prismjs/components/prism-bash.js'
+import 'prismjs/components/prism-css.js'
+import 'prismjs/components/prism-json.js'
+import 'prismjs/components/prism-markdown.js'
+import 'prismjs/components/prism-python.js'
+import 'prismjs/components/prism-sql.js'
+import 'prismjs/components/prism-typescript.js'
+
+import type { ArticleDocument, ArticleCodeLanguage } from '../lib/article-document.js'
 
 type Props = {
   document: ArticleDocument
@@ -35,6 +44,30 @@ export default function ArticleStructuredRenderer({ document }: Props) {
                 <li key={block.id + ':' + index}>{item}</li>
               ))}
             </ListTag>
+          )
+        }
+
+        if (block.type === 'code') {
+          const grammarKey: ArticleCodeLanguage | 'markup' =
+            block.language === 'html' ? 'markup' : (block.language ?? 'plaintext')
+          const grammar = grammarKey === 'plaintext'
+            ? null
+            : Prism.languages[grammarKey]
+          const highlighted = grammar
+            ? Prism.highlight(block.text, grammar, grammarKey)
+            : null
+
+          return (
+            <figure className="content-detail-article-code" key={block.id}>
+              <figcaption>{block.language ?? 'plaintext'}</figcaption>
+              <pre>
+                <code>
+                  {highlighted
+                    ? <span dangerouslySetInnerHTML={{ __html: highlighted }} />
+                    : block.text}
+                </code>
+              </pre>
+            </figure>
           )
         }
 
