@@ -84,7 +84,7 @@ export default function PublishComposer({
   const [humanConfirmed, setHumanConfirmed] = useState(false)
   const [preflightReport, setPreflightReport] = useState<PublishPreflightResult | null>(null)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'scheduled' | 'saving' | 'saved' | 'error'>('idle')
-  const autoSaveTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
+  const autoSaveTimerRef = useRef<number | null>(null)
   const autoSaveInFlightRef = useRef(false)
   const autoSaveLastSavedAtRef = useRef<number | null>(null)
   const autoSaveChangeTokenRef = useRef(0)
