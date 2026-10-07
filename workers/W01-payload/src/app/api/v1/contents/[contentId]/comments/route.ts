@@ -1,4 +1,5 @@
 import { cachedPublicGet } from '../../../../../../lib/public-response-cache.js'
+import { hasAuthenticatedSessionCredential } from '../../../../../../lib/content-list-cache-guard.js'
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../../auth/traffic-limit.js'
 
 import {
@@ -40,7 +41,7 @@ export async function GET(
     const viewer = await resolveOptionalCookieSocialPrincipal(request)
     if (viewer instanceof Response) return viewer
 
-    if (!viewer) {
+    if (!viewer && !hasAuthenticatedSessionCredential(request)) {
       await enforcePublicReadRateLimit(request)
       return await cachedPublicGet(
         request,
