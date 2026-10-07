@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import ContentComments from './ContentComments'
 import ArticleStructuredRenderer from '../../../../components/ArticleStructuredRenderer.js'
-import { tryDeserializeArticleDocument } from '../../../../lib/article-document.js'
+import { plainTextFromArticleDocument, tryDeserializeArticleDocument } from '../../../../lib/article-document.js'
 import { extractSocialTokens } from '../../../../social/social-token-parser.js'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -67,7 +67,8 @@ export default function ContentDetailPage({
     () => content?.contentType === 'article' && body ? tryDeserializeArticleDocument(body) : null,
     [content?.contentType, body],
   )
-  const socialTokens = useMemo(() => extractSocialTokens(body), [body])
+  const socialTokenBody = structuredArticle ? plainTextFromArticleDocument(structuredArticle) : body
+  const socialTokens = useMemo(() => extractSocialTokens(socialTokenBody), [socialTokenBody])
 
   useEffect(() => {
     let cancelled = false
