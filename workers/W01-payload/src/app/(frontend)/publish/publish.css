@@ -1424,3 +1424,25 @@
   cursor: not-allowed;
 }
 
+
+.lr-editor-markdown-export {
+  margin-top: 8px;
+}
+
+.lr-editor-markdown-export .lr-editor-plugin-actions {
+  justify-content: flex-start;
+}
+
+.lr-editor-markdown-export .lr-editor-plugin-panel {
+  margin-top: 8px;
+}
+
+.lr-editor-markdown-export .lr-editor-markdown-input {
+  min-height: 260px;
+}
+
+@media (max-width: 640px) {
+  .lr-editor-markdown-export .lr-editor-plugin-actions {
+    flex-direction: column;
+  }
+}
