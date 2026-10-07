@@ -272,6 +272,7 @@ export default {
         const relationship = await revokeContentRelationship(
           env.D1_02,
           principal.userId,
+          path.id,
           path.relationshipId,
           requireIdempotency(request),
         )
