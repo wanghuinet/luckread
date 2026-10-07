@@ -59,7 +59,18 @@ interface IdempotencyRow {
   idem_expires_at: string | null
 }
 
-interface MutationRow extends SeriesRow, ContentRow {
+interface MutationRow {
+  series_id: string
+  series_owner_user_id: string
+  series_state: SeriesState
+  series_version: number
+  series_etag: string
+  content_id: string
+  content_owner_user_id: string
+  content_slug: string
+  content_type: 'article' | 'post' | 'video'
+  content_state: string
+  content_title: string
   idem_id: string | null
   idem_owner_user_id: string | null
   idem_request_hash: string | null
@@ -216,8 +227,8 @@ const loadMutation = async (
 ): Promise<MutationRow | null> =>
   db.prepare(
     'SELECT ' +
-    's.id, s.owner_user_id, s.state, s.version, s.etag, ' +
-    'c.id AS id, c.owner_user_id, c.slug, c.content_type, c.state AS state, c.title, ' +
+    's.id AS series_id, s.owner_user_id AS series_owner_user_id, s.state AS series_state, s.version AS series_version, s.etag AS series_etag, ' +
+    'c.id AS content_id, c.owner_user_id AS content_owner_user_id, c.slug AS content_slug, c.content_type AS content_type, c.state AS content_state, c.title AS content_title, ' +
     'i.id AS idem_id, i.owner_user_id AS idem_owner_user_id, i.request_hash AS idem_request_hash, ' +
     'i.status AS idem_status, i.response_status AS idem_response_status, i.response_json AS idem_response_json, i.expires_at AS idem_expires_at, ' +
     'r.relationship_id AS membership_relationship_id, r.position AS membership_position, ' +
@@ -269,7 +280,7 @@ const toMember = (row: {
   contentSlug: row.content_slug,
   contentType: row.content_type,
   contentState: row.content_state,
-  title: row.title,
+  title: row.content_title,
   position: row.position,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -310,30 +321,30 @@ export async function attachSeriesMember(
     return replay.body as { member: SeriesMemberRecord; seriesVersion: number; seriesEtag: string }
   }
 
-  if (row.owner_user_id !== ownerUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
-  if (row.owner_user_id !== row.owner_user_id) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  if (row.series_owner_user_id !== ownerUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  if (row.series_owner_user_id !== row.series_owner_user_id) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   if (row.idem_owner_user_id && row.idem_owner_user_id !== ownerUserId) {
     throw new ContentRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
   }
-  assertSeriesEditable(row.state)
+  assertSeriesEditable(row.series_state)
   if (row.idem_request_hash && row.idem_request_hash !== hash) {
     throw new ContentRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
   }
-  assertEtag(row.etag, ifMatch)
+  assertEtag(row.series_etag, ifMatch)
   if (row.membership_relationship_id) throw new ContentRuntimeError('RELATIONSHIP_ALREADY_EXISTS', 409)
-  if (row.state === 'DELETED') throw new ContentRuntimeError('INVALID_STATE', 409)
+  if (row.series_state === 'DELETED') throw new ContentRuntimeError('INVALID_STATE', 409)
 
   const nowIso = now.toISOString()
-  const nextVersion = row.version + 1
+  const nextVersion = row.series_version + 1
   const seriesEtag = etagForVersion(nextVersion)
   const member: SeriesMemberRecord = {
     relationshipId: crypto.randomUUID(),
     seriesId,
     contentId,
-    contentSlug: row.slug,
+    contentSlug: row.content_slug,
     contentType: row.content_type,
-    contentState: row.state === 'DELETED' ? 'DELETED' : row.content_type,
-    title: row.title,
+    contentState: row.content_state,
+    title: row.content_title,
     position: row.next_position,
     createdAt: nowIso,
     updatedAt: nowIso,
@@ -363,8 +374,8 @@ export async function attachSeriesMember(
       nowIso,
       seriesId,
       ownerUserId,
-      row.version,
-      row.etag,
+      row.series_version,
+      row.series_etag,
     ),
     db.prepare(
       'INSERT INTO content_relationships ' +
@@ -494,20 +505,20 @@ export async function removeSeriesMember(
   if (!row.membership_relationship_id || row.membership_position === null) {
     throw new ContentRuntimeError('RELATIONSHIP_NOT_FOUND', 404)
   }
-  assertSeriesEditable(row.state)
-  assertEtag(row.etag, ifMatch)
+  assertSeriesEditable(row.series_state)
+  assertEtag(row.series_etag, ifMatch)
 
   const nowIso = now.toISOString()
-  const nextVersion = row.version + 1
+  const nextVersion = row.series_version + 1
   const seriesEtag = etagForVersion(nextVersion)
   const member = {
     relationshipId: row.membership_relationship_id,
     seriesId,
     contentId,
-    contentSlug: row.slug,
+    contentSlug: row.content_slug,
     contentType: row.content_type,
-    contentState: row.state,
-    title: row.title,
+    contentState: row.content_state,
+    title: row.content_title,
     position: row.membership_position,
     createdAt: row.membership_created_at ?? nowIso,
     updatedAt: nowIso,
@@ -524,7 +535,7 @@ export async function removeSeriesMember(
     db.prepare(
       'UPDATE content_series SET version = ?, etag = ?, updated_at = ? ' +
       'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
-    ).bind(nextVersion, seriesEtag, nowIso, seriesId, ownerUserId, row.version, row.etag),
+    ).bind(nextVersion, seriesEtag, nowIso, seriesId, ownerUserId, row.series_version, row.series_etag),
     atomicGuard(db),
   ])
 
@@ -568,8 +579,8 @@ export async function reorderSeriesMember(
   if (!row.membership_relationship_id || row.membership_position === null) {
     throw new ContentRuntimeError('RELATIONSHIP_NOT_FOUND', 404)
   }
-  assertSeriesEditable(row.state)
-  assertEtag(row.etag, ifMatch)
+  assertSeriesEditable(row.series_state)
+  assertEtag(row.series_etag, ifMatch)
 
   const rows = await db.prepare(
     'SELECT relationship_id, source_id, position, created_at, updated_at ' +
@@ -593,15 +604,15 @@ export async function reorderSeriesMember(
       relationshipId: row.membership_relationship_id,
       seriesId,
       contentId,
-      contentSlug: row.slug,
+      contentSlug: row.content_slug,
       contentType: row.content_type,
-      contentState: row.state,
-      title: row.title,
+      contentState: row.series_state,
+      title: row.content_title,
       position: currentIndex,
       createdAt: row.membership_created_at ?? now.toISOString(),
       updatedAt: row.membership_updated_at ?? now.toISOString(),
     }
-    return { member, seriesVersion: row.version, seriesEtag: row.etag }
+    return { member, seriesVersion: row.series_version, seriesEtag: row.series_etag }
   }
 
   const reordered = [...members]
@@ -610,7 +621,7 @@ export async function reorderSeriesMember(
   const newPositions = new Map(reordered.map((item, index) => [item.relationship_id, index]))
 
   const nowIso = now.toISOString()
-  const nextVersion = row.version + 1
+  const nextVersion = row.series_version + 1
   const seriesEtag = etagForVersion(nextVersion)
   const selectedPosition = newPositions.get(row.membership_relationship_id)
   if (selectedPosition === undefined) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
@@ -619,10 +630,10 @@ export async function reorderSeriesMember(
     relationshipId: row.membership_relationship_id,
     seriesId,
     contentId,
-    contentSlug: row.slug,
+    contentSlug: row.content_slug,
     contentType: row.content_type,
-    contentState: row.state,
-    title: row.title,
+    contentState: row.series_state,
+    title: row.content_title,
     position: selectedPosition,
     createdAt: row.membership_created_at ?? nowIso,
     updatedAt: nowIso,
@@ -654,7 +665,7 @@ export async function reorderSeriesMember(
     db.prepare(
       'UPDATE content_series SET version = ?, etag = ?, updated_at = ? ' +
       'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
-    ).bind(nextVersion, seriesEtag, nowIso, seriesId, ownerUserId, row.version, row.etag),
+    ).bind(nextVersion, seriesEtag, nowIso, seriesId, ownerUserId, row.series_version, row.series_etag),
     atomicGuard(db),
   )
 
