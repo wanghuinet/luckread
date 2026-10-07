@@ -274,6 +274,7 @@ export default {
               'content-type': 'application/json; charset=utf-8',
               'cache-control': 'no-store',
               ETag: result.etag,
+              'X-LuckRead-Content-Id': result.item.contentId,
             },
           },
         )
@@ -292,8 +293,11 @@ export default {
         requireInteractionLayer(request)
         const commentId = decodePathPart(commentIdParts[3])
         if (commentId === null) throw new CommentRuntimeError('VALIDATION_FAILED', 400)
-        await deleteComment(env.DB, actorUserId, commentId)
-        return new Response(null, { status: 204 })
+        const contentId = await deleteComment(env.DB, actorUserId, commentId)
+        return new Response(null, {
+          status: 204,
+          headers: { 'X-LuckRead-Content-Id': contentId },
+        })
       }
 
       const commentContentId = parseCommentPath(url.pathname)
