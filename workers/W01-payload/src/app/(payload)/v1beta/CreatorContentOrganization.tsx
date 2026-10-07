@@ -89,9 +89,6 @@ export default function CreatorContentOrganization({
   useEffect(() => {
     const controller = new AbortController()
     let cancelled = false
-    setLoading(true)
-    setError('')
-
     void Promise.all([
       readPage('series', controller.signal, loginPath),
       readPage('collections', controller.signal, loginPath),
@@ -99,6 +96,7 @@ export default function CreatorContentOrganization({
       .then(([series, collections]) => {
         if (cancelled) return
         setPages({ series, collections })
+        setError('')
       })
       .catch((cause: unknown) => {
         if (cancelled || controller.signal.aborted) return
