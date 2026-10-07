@@ -3,6 +3,7 @@ import {
   resolveCookieSocialPrincipal,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
+import { rememberPublicShareContentId } from '../../../../../../lib/public-response-cache.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -26,13 +27,26 @@ export async function POST(
       return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
     }
 
-    return await callW05Social({
+    const response = await callW05Social({
       request,
       pathname: '/internal/social/content/' + encodeURIComponent(contentId) + '/shares',
       method: 'POST',
       principal,
       body: { contentId },
     })
+    if (response.ok) {
+      try {
+        const payload = await response.clone().json() as {
+          data?: { shareId?: unknown; contentId?: unknown }
+        }
+        if (typeof payload.data?.shareId === 'string' && typeof payload.data?.contentId === 'string') {
+          await rememberPublicShareContentId(payload.data.shareId, payload.data.contentId)
+        }
+      } catch {
+        // Share creation is authoritative; cache metadata is best-effort.
+      }
+    }
+    return response
   } catch (error) {
     if (error instanceof W05SocialClientError) {
       return errorResponse(error.status, error.code, error.message)

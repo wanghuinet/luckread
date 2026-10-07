@@ -13,6 +13,8 @@ const CACHE_MISS_MAX_KEYS = 1024
 const DEFAULT_CONTENT_LIST_GENERATION = '0'
 const FOLLOW_LIST_GENERATION_VERSION = '1'
 const CONTENT_COMMENTS_GENERATION_VERSION = '1'
+const SHARE_DETAIL_VISIBILITY_GENERATION_VERSION = '1'
+const SHARE_DETAIL_CONTENT_MAPPING_TTL_SECONDS = 3600
 const CONTENT_LIST_GENERATION_KEY = new Request(
   `https://cache.luckread.internal/__content-list-generation?v=${CACHE_VERSION}`,
 )
@@ -97,6 +99,131 @@ const isValidContentListGeneration = (value: unknown): value is string =>
   typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value)
 
 
+
+const shareDetailIdentity = (request: Request): string | null => {
+  const match = new URL(request.url).pathname.match(
+    /^\/api\/v1\/shares\/([^/]+)$/,
+  )
+  if (!match) return null
+  try {
+    const shareId = decodeURIComponent(match[1]).trim()
+    if (!shareId || shareId.length > 128) return null
+    return shareId
+  } catch {
+    return null
+  }
+}
+
+const shareDetailContentMappingKey = (shareId: string): Request =>
+  new Request(
+    'https://cache.luckread.internal/__share-detail-content?v=1&share=' +
+      encodeURIComponent(shareId),
+    { method: 'GET' },
+  )
+
+const readShareDetailContentId = async (
+  cache: Cache,
+  shareId: string,
+): Promise<string | null> => {
+  try {
+    const marker = await cache.match(shareDetailContentMappingKey(shareId))
+    if (!marker) return null
+    const value = await marker.json() as { contentId?: unknown }
+    const contentId = typeof value.contentId === 'string' ? value.contentId.trim() : ''
+    return contentId && contentId.length <= 256 ? contentId : null
+  } catch {
+    return null
+  }
+}
+
+export const rememberPublicShareContentId = async (
+  shareIdValue: string,
+  contentIdValue: string,
+): Promise<void> => {
+  const shareId = shareIdValue.trim()
+  const contentId = contentIdValue.trim()
+  if (!shareId || shareId.length > 128 || !contentId || contentId.length > 256) return
+  const cache = (globalThis.caches as unknown as { default: Cache }).default
+  try {
+    await cache.put(
+      shareDetailContentMappingKey(shareId),
+      Response.json(
+        { contentId },
+        {
+          headers: {
+            'content-type': 'application/json; charset=utf-8',
+            'cache-control': 'public, max-age=0, s-maxage=' + SHARE_DETAIL_CONTENT_MAPPING_TTL_SECONDS,
+          },
+        },
+      ),
+    )
+  } catch {
+    // Cache metadata is best-effort. The share read remains authoritative.
+  }
+}
+
+const contentVisibilityGenerationKey = (contentId: string): Request =>
+  new Request(
+    'https://cache.luckread.internal/__content-visibility-generation?v=' +
+      SHARE_DETAIL_VISIBILITY_GENERATION_VERSION +
+      '&content=' + encodeURIComponent(contentId),
+    { method: 'GET' },
+  )
+
+const readContentVisibilityGeneration = async (
+  cache: Cache,
+  contentId: string,
+): Promise<string | null> => {
+  try {
+    const marker = await cache.match(contentVisibilityGenerationKey(contentId))
+    if (!marker) {
+      const generation = generateContentListGeneration()
+      try {
+        await cache.put(
+          contentVisibilityGenerationKey(contentId),
+          generationResponse(generation),
+        )
+      } catch {
+        return null
+      }
+      return generation
+    }
+
+    const value = await marker.json() as unknown
+    const generation = value && typeof value === 'object' && 'generation' in value
+      ? (value as { generation?: unknown }).generation
+      : null
+    return isValidContentListGeneration(generation) ? generation : null
+  } catch {
+    return null
+  }
+}
+
+export const invalidatePublicContentVisibility = async (contentIdValue: string): Promise<void> => {
+  const contentId = contentIdValue.trim()
+  if (!contentId || contentId.length > 256) return
+  const cache = (globalThis.caches as unknown as { default: Cache }).default
+  try {
+    await cache.put(
+      contentVisibilityGenerationKey(contentId),
+      generationResponse(generateContentListGeneration()),
+    )
+  } catch {
+    // Best-effort invalidation. Existing share cache entries remain unreachable
+    // once the generation marker is successfully bumped.
+  }
+}
+
+const readShareDetailGeneration = async (
+  cache: Cache,
+  request: Request,
+): Promise<string | null> => {
+  const shareId = shareDetailIdentity(request)
+  if (!shareId) return null
+  const contentId = await readShareDetailContentId(cache, shareId)
+  if (!contentId) return null
+  return readContentVisibilityGeneration(cache, contentId)
+}
 
 const contentCommentsIdentity = (request: Request): string | null => {
   const match = new URL(request.url).pathname.match(
@@ -305,7 +432,8 @@ export const publicCacheKey = (
   } else if (
     namespace === 'followers' ||
     namespace === 'following' ||
-    namespace === 'content-comments'
+    namespace === 'content-comments' ||
+    namespace === 'share-detail'
   ) {
     keyUrl.searchParams.set('g', generation)
   }
@@ -372,6 +500,10 @@ export const cachedPublicGet = async (
     generation = resolvedGeneration
   } else if (namespace === 'content-comments') {
     const resolvedGeneration = await readContentCommentsGeneration(cache, request)
+    if (!resolvedGeneration) return loader()
+    generation = resolvedGeneration
+  } else if (namespace === 'share-detail') {
+    const resolvedGeneration = await readShareDetailGeneration(cache, request)
     if (!resolvedGeneration) return loader()
     generation = resolvedGeneration
   }
