@@ -20,11 +20,12 @@ describe('article structured document', () => {
       { id: 'b', type: 'paragraph', text: '正文内容' },
       { id: 'c', type: 'bulletList', text: '第一项\n第二项' },
       { id: 'd', type: 'divider', text: '' },
+      { id: 'e', type: 'code', text: 'const answer = 42', language: 'javascript' },
     ]
 
     const restored = tryDeserializeArticleDocument(serializeArticleDocument(document))
     expect(restored).toEqual(document)
-    expect(plainTextFromArticleDocument(document)).toBe('第一节\n\n正文内容\n\n第一项\n\n第二项')
+    expect(plainTextFromArticleDocument(document)).toBe('第一节\n\n正文内容\n\n第一项\n\n第二项\n\nconst answer = 42')
   })
 
   it('round-trips image and gallery blocks and keeps media out of extracted text', () => {
