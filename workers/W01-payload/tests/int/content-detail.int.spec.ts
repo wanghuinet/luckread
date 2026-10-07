@@ -186,6 +186,8 @@ it('renders versioned structured article bodies instead of flattening them to pa
   expect(page).toContain('!structuredArticle')
   expect(renderer).toContain("block.type === 'heading'")
   expect(renderer).toContain("block.type === 'bulletList' || block.type === 'orderedList'")
+  expect(renderer).toContain("block.type === 'table'")
+  expect(renderer).toContain('content-detail-article-table')
   expect(renderer).toContain("block.type === 'code'")
   expect(renderer).toContain('Prism.highlight')
   expect(renderer).toContain("block.language === 'html'")
