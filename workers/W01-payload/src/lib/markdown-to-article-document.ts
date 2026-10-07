@@ -164,7 +164,7 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
         const mathMarkerMatch = raw.match(/^LUCKREADDISPLAYMATH(\d+)END$/)
         if (mathMarkerMatch) {
           const expression = prepared.expressions[Number(mathMarkerMatch[1])] ?? ''
-          const bounded = boundedText(expression, unsupported)
+          const bounded = boundedText(expression.trim(), unsupported)
           if (bounded) pushBlock(blocks, createArticleBlock('math', bounded))
           break
         }
