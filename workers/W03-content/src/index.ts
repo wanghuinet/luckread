@@ -45,6 +45,12 @@ import {
   removeSeriesMember,
   reorderSeriesMember,
 } from './content-series-members.js'
+import {
+  attachCollectionMember,
+  listCollectionMembers,
+  removeCollectionMember,
+  reorderCollectionMember,
+} from './content-collection-members.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
@@ -164,7 +170,7 @@ const decodePathSegment = (value: string): string => {
   }
 }
 
-const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string; collections?: boolean} | null => {
+const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string; collections?: boolean; collectionMembers?: boolean; collectionMemberContentId?: string} | null => {
   const parts = pathname.split('/').filter(Boolean)
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
     return {}
@@ -198,6 +204,12 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
   }
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'collections') {
     return { collections: true }
+  }
+  if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'collections' && parts[4] === 'members') {
+    return { id: decodePathSegment(parts[3]), collectionMembers: true }
+  }
+  if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'collections' && parts[4] === 'members') {
+    return { id: decodePathSegment(parts[3]), collectionMembers: true, collectionMemberContentId: decodePathSegment(parts[5]) }
   }
   if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'series' && parts[4] === 'members') {
     return { id: decodePathSegment(parts[3]), seriesMembers: true }
@@ -267,6 +279,71 @@ export default {
 
       requireTransport(request)
       const path = getPath(url.pathname)
+
+      if (path && path.collectionMembers && path.id && request.method === 'GET') {
+        const principal = requiredCreatorPrincipal(request)
+        const cursor = url.searchParams.get('cursor')
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const page = await listCollectionMembers(
+          env.D1_02,
+          principal.userId,
+          path.id,
+          cursor,
+          parseListLimit(url.searchParams.get('limit')),
+        )
+        return json({ data: page, schemaVersion: '1.0', requestId: crypto.randomUUID() })
+      }
+
+      if (path && path.collectionMembers && path.id && request.method === 'POST' && !path.collectionMemberContentId) {
+        const principal = requiredCreatorPrincipal(request)
+        return json({
+          data: await attachCollectionMember(
+            env.D1_02,
+            principal.userId,
+            path.id,
+            await parseBody(request),
+            requireIfMatch(request),
+            requireIdempotency(request),
+          ),
+          schemaVersion: '1.0',
+          requestId: crypto.randomUUID(),
+        }, 201)
+      }
+
+      if (path && path.collectionMembers && path.id && path.collectionMemberContentId && request.method === 'DELETE') {
+        const principal = requiredCreatorPrincipal(request)
+        return json({
+          data: await removeCollectionMember(
+            env.D1_02,
+            principal.userId,
+            path.id,
+            path.collectionMemberContentId,
+            requireIfMatch(request),
+            requireIdempotency(request),
+          ),
+          schemaVersion: '1.0',
+          requestId: crypto.randomUUID(),
+        })
+      }
+
+      if (path && path.collectionMembers && path.id && path.collectionMemberContentId && request.method === 'PATCH') {
+        const principal = requiredCreatorPrincipal(request)
+        const body = await parseBody(request)
+        if (!Number.isSafeInteger(body.position)) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        return json({
+          data: await reorderCollectionMember(
+            env.D1_02,
+            principal.userId,
+            path.id,
+            path.collectionMemberContentId,
+            Number(body.position),
+            requireIfMatch(request),
+            requireIdempotency(request),
+          ),
+          schemaVersion: '1.0',
+          requestId: crypto.randomUUID(),
+        })
+      }
 
       if (path && path.collections && request.method === 'POST' && path.id === undefined) {
         const principal = requiredCreatorPrincipal(request)
