@@ -133,7 +133,7 @@ export class ContentRuntimeError extends Error {
 }
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
-const EDITABLE_STATES = new Set<ContentState>(['DRAFT', 'REJECTED', 'PENDING_REVIEW', 'RESTORED'])
+const EDITABLE_STATES = new Set<ContentState>(['DRAFT', 'REJECTED', 'RESTORED'])
 const ALL_STATES: readonly ContentState[] = [
   'DRAFT','PENDING_REVIEW','REJECTED','APPROVED','SCHEDULED',
   'PUBLISHED','UNPUBLISHED','ARCHIVED','DELETED','RESTORED',
