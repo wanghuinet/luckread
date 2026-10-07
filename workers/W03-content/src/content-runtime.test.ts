@@ -19,6 +19,69 @@ describe('W03 content contract core', () => {
     })
   })
 
+  it('locks content edits while moderation review is pending', async () => {
+    const row = {
+      id: 'content_review_lock_123',
+      content_type: 'article',
+      owner_user_id: 'user_review_lock',
+      creator_id: 'user_review_lock',
+      ip_id: null,
+      state: 'PENDING_REVIEW',
+      version: 2,
+      revision: 2,
+      slug: 'review-lock',
+      title: 'Under review article',
+      body_ref: 'https://cdn.example.com/body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"2"',
+      created_at: '2026-10-07T12:00:00.000Z',
+      updated_at: '2026-10-07T12:01:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    let batchCalled = false
+    const db = {
+      prepare(query: string) {
+        return {
+          bind: () => ({
+            first: async () => query.includes('content_mutation_idempotency') ? null : row,
+          }),
+        }
+      },
+      batch: async () => {
+        batchCalled = true
+      },
+    } as never
+
+    await expect(
+      updateContent(
+        db,
+        'user_review_lock',
+        'content_review_lock_123',
+        {
+          contentType: 'article',
+          title: 'Attempted edit during review',
+          bodyRef: 'https://cdn.example.com/body-v2.txt',
+          mediaRefs: [],
+          coverRef: null,
+        },
+        'W/"2"',
+        'review-lock-idem',
+      ),
+    ).rejects.toMatchObject({
+      code: 'INVALID_STATE',
+      status: 409,
+    })
+
+    expect(batchCalled).toBe(false)
+  })
+
   it('allows only the contracted creator and moderator transitions', () => {
     expect(canTransitionContentState('DRAFT', 'PENDING_REVIEW', 'CREATOR', true)).toBe(true)
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true)).toBe(false)
