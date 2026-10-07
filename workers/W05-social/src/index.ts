@@ -241,62 +241,53 @@ export default {
         const commentId = decodePathPart(commentIdParts[3])
         if (commentId === null) throw new CommentRuntimeError('VALIDATION_FAILED', 400)
 
-        if (request.method !== 'PATCH') {
-          return new Response(null, { status: 405, headers: { Allow: 'PATCH' } })
-        }
+        if (request.method === 'PATCH') {
+          const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
+          if (!ifMatch || ifMatch.length > 256) {
+            throw new CommentRuntimeError('PRECONDITION_REQUIRED', 428)
+          }
 
-        const ifMatch = request.headers.get('If-Match')?.trim() ?? ''
-        if (!ifMatch || ifMatch.length > 256) {
-          throw new CommentRuntimeError('PRECONDITION_REQUIRED', 428)
-        }
+          let body: unknown
+          try { body = await request.json() } catch {
+            throw new CommentRuntimeError('VALIDATION_FAILED', 400)
+          }
+          if (!body || typeof body !== 'object' || Array.isArray(body)) {
+            throw new CommentRuntimeError('VALIDATION_FAILED', 400)
+          }
+          const bodyValue = (body as { body?: unknown }).body
+          if (typeof bodyValue !== 'string') {
+            throw new CommentRuntimeError('VALIDATION_FAILED', 400)
+          }
 
-        let body: unknown
-        try { body = await request.json() } catch {
-          throw new CommentRuntimeError('VALIDATION_FAILED', 400)
-        }
-        if (!body || typeof body !== 'object' || Array.isArray(body)) {
-          throw new CommentRuntimeError('VALIDATION_FAILED', 400)
-        }
-        const bodyValue = (body as { body?: unknown }).body
-        if (typeof bodyValue !== 'string') {
-          throw new CommentRuntimeError('VALIDATION_FAILED', 400)
-        }
-
-        const result = await updateComment(env.DB, actorUserId, commentId, {
-          body: bodyValue,
-          ifMatch,
-        })
-        return Response.json(
-          { data: result.item, requestId: crypto.randomUUID() },
-          {
-            status: 200,
-            headers: {
-              'content-type': 'application/json; charset=utf-8',
-              'cache-control': 'no-store',
-              ETag: result.etag,
-              'X-LuckRead-Content-Id': result.item.contentId,
+          const result = await updateComment(env.DB, actorUserId, commentId, {
+            body: bodyValue,
+            ifMatch,
+          })
+          return Response.json(
+            { data: result.item, requestId: crypto.randomUUID() },
+            {
+              status: 200,
+              headers: {
+                'content-type': 'application/json; charset=utf-8',
+                'cache-control': 'no-store',
+                ETag: result.etag,
+                'X-LuckRead-Content-Id': result.item.contentId,
+              },
             },
-          },
-        )
-      }
-
-            if (
-        commentIdParts.length === 4 &&
-        commentIdParts[0] === 'internal' &&
-        commentIdParts[1] === 'social' &&
-        commentIdParts[2] === 'comments'
-      ) {
-        if (request.method !== 'DELETE') {
-          return new Response(null, { status: 405, headers: { Allow: 'DELETE' } })
+          )
         }
-        const actorUserId = requirePrincipal(request)
-        requireInteractionLayer(request)
-        const commentId = decodePathPart(commentIdParts[3])
-        if (commentId === null) throw new CommentRuntimeError('VALIDATION_FAILED', 400)
-        const contentId = await deleteComment(env.DB, actorUserId, commentId)
+
+        if (request.method === 'DELETE') {
+          const contentId = await deleteComment(env.DB, actorUserId, commentId)
+          return new Response(null, {
+            status: 204,
+            headers: { 'X-LuckRead-Content-Id': contentId },
+          })
+        }
+
         return new Response(null, {
-          status: 204,
-          headers: { 'X-LuckRead-Content-Id': contentId },
+          status: 405,
+          headers: { Allow: 'PATCH, DELETE' },
         })
       }
 
