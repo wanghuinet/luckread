@@ -297,6 +297,32 @@ export const insertArticleBlockAfter = (
   }
 }
 
+export const insertArticleMediaBlockAfter = (
+  document: ArticleDocument,
+  index: number,
+  type: 'image' | 'gallery',
+  mediaRefs: string[],
+): ArticleDocument => {
+  if (index < -1 || index >= document.blocks.length || document.blocks.length >= ARTICLE_MAX_BLOCKS) {
+    return document
+  }
+
+  const block = createArticleMediaBlock(
+    type,
+    type === 'image' ? mediaRefs.slice(0, 1) : mediaRefs.slice(0, ARTICLE_MAX_MEDIA_PER_BLOCK),
+  )
+  const insertAt = index + 1
+
+  return {
+    ...document,
+    blocks: [
+      ...document.blocks.slice(0, insertAt),
+      block,
+      ...document.blocks.slice(insertAt),
+    ],
+  }
+}
+
 export const transformArticleBlock = (
   block: ArticleBlock,
   nextType: ArticleBlockType,
