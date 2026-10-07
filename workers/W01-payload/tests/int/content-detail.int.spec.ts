@@ -180,6 +180,7 @@ it('renders versioned structured article bodies instead of flattening them to pa
   const renderer = read('src/components/ArticleStructuredRenderer.tsx')
 
   expect(page).toContain("tryDeserializeArticleDocument(body)")
+  expect(page).toContain('plainTextFromArticleDocument(structuredArticle)')
   expect(page).toContain('ArticleStructuredRenderer')
   expect(page).toContain('<ArticleStructuredRenderer document={structuredArticle} />')
   expect(page).toContain('!structuredArticle')
