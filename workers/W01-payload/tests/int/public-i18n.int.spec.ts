@@ -36,14 +36,14 @@ describe('public frontend i18n', () => {
     expect(existsSync(resolve(process.cwd(), 'src/app/(frontend)/tw'))).toBe(false)
   })
 
-  it('keeps public content URLs unchanged for the first multilingual slice', () => {
+  it('keeps public content links on immutable slugs', () => {
     const browse = read('src/app/(frontend)/content/page.tsx')
     const feed = read('src/app/(frontend)/HomeContentFeed.tsx')
     const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     const detailPage = read('src/app/(frontend)/content/[contentId]/page.tsx')
 
     expect(browse).toContain("href={'/content/' + encodeURIComponent(item.slug || item.id)}")
-    expect(feed).toContain('href={`/content/${encodeURIComponent(item.id)}`}')
+    expect(feed).toContain('href={`/content/${encodeURIComponent(item.slug || item.id)}`}')
     expect(detail).toContain("fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`")
     expect(detailPage).toContain('alternates:')
     expect(detailPage).toContain('permanentRedirect')
