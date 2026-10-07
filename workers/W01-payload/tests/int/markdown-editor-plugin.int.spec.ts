@@ -88,13 +88,11 @@ describe('Markdown editor plugin', () => {
       '',
       '**\x60inline\x60**',
       '',
-      '| A | B |',
-      '| - | - |',
-      '| 1 | 2 |',
+      '<div>unsupported html</div>',
     ].join('\n'))
 
     expect(result.unsupported).toEqual(
-      expect.arrayContaining(['链接', '表格']),
+      expect.arrayContaining(['链接', 'HTML']),
     )
   })
 
