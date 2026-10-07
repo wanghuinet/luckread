@@ -4,6 +4,7 @@ import {
   hasAuthenticatedSessionCredential,
   validateContentListQuery,
 } from '../../../../lib/content-list-cache-guard.js'
+import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../auth/traffic-limit.js'
 
 import {
   callW03Content,
@@ -36,6 +37,7 @@ export async function GET(request: Request): Promise<Response> {
       })
     }
 
+    await enforcePublicReadRateLimit(request)
     return await cachedPublicGet(
       request,
       'content-list',
@@ -47,6 +49,7 @@ export async function GET(request: Request): Promise<Response> {
       30,
     )
   } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     if (error instanceof W03ContentClientError) return unavailable(error)
     if (error instanceof ContentListQueryError) {
       return unavailable(new W03ContentClientError(error.status, error.code, 'Invalid content query'))
