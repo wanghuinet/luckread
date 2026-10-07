@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import { computeAutoSaveDelay } from '../../../lib/content-autosave.js'
 import { articleDocumentFromBody, plainTextFromArticleDocument, serializeArticleDocument, createArticleDocument, tryDeserializeArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
 import ArticleStructuredEditor from '../../../components/ArticleStructuredEditor.js'
+import ArticleStructuredRenderer from '../../../components/ArticleStructuredRenderer.js'
 import { articleEditorPlugins } from '../../../components/article-editor-plugins.js'
 import { useRouter } from 'next/navigation'
 
@@ -824,48 +825,7 @@ export default function PublishComposer({
             <span className="lr-preview-type">{type === 'article' ? '文章' : type === 'post' ? '动态' : '视频'}</span>
             <h2>{title.trim() || '未填写标题'}</h2>
             {type === 'article' ? (
-              <div className="lr-article-preview-body">
-                {articleDocument.blocks.map((block) => {
-                  if (block.type === 'divider') return <hr key={block.id} />
-                  if (block.type === 'heading') {
-                    return block.level === 3
-                      ? <h4 key={block.id}>{block.text}</h4>
-                      : <h3 key={block.id}>{block.text}</h3>
-                  }
-                  if (block.type === 'quote') return <blockquote key={block.id}>{block.text}</blockquote>
-                  if (block.type === 'image') {
-                    return (
-                      <figure key={block.id}>
-                        <img alt={block.text || '文章图片'} loading="lazy" src={block.mediaRefs?.[0]} />
-                        {block.text ? <figcaption>{block.text}</figcaption> : null}
-                      </figure>
-                    )
-                  }
-                  if (block.type === 'gallery') {
-                    return (
-                      <figure key={block.id}>
-                        <div className="lr-article-gallery-preview">
-                          {(block.mediaRefs ?? []).map((ref) => (
-                            <img alt={block.text || '文章图库'} key={ref} loading="lazy" src={ref} />
-                          ))}
-                        </div>
-                        {block.text ? <figcaption>{block.text}</figcaption> : null}
-                      </figure>
-                    )
-                  }
-                  if (block.type === 'bulletList' || block.type === 'orderedList') {
-                    const ListTag = block.type === 'bulletList' ? 'ul' : 'ol'
-                    return (
-                      <ListTag key={block.id}>
-                        {block.text.split('\\n').map((item, itemIndex) =>
-                          item.trim() ? <li key={block.id + '-' + itemIndex}>{item.trim()}</li> : null,
-                        )}
-                      </ListTag>
-                    )
-                  }
-                  return <p key={block.id}>{block.text}</p>
-                })}
-              </div>
+              <ArticleStructuredRenderer document={articleDocument} />
             ) : (
               <p className="lr-preview-body">{body.trim() || '暂无正文'}</p>
             )}
