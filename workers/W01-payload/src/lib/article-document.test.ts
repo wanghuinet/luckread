@@ -9,6 +9,8 @@ import {
   normalizeArticleDocument,
   plainTextFromArticleDocument,
   mediaRefsFromArticleDocument,
+  hasArticleDocumentContent,
+  duplicateArticleBlock,
   serializeArticleDocument,
   tryDeserializeArticleDocument,
 } from './article-document.js'
@@ -103,6 +105,32 @@ describe('article structured document', () => {
       'https://media.example/1.jpg',
       'https://media.example/2.jpg',
     ])
+  })
+
+  it('detects meaningful article content before a destructive import', () => {
+    expect(hasArticleDocumentContent(createArticleDocument())).toBe(false)
+    expect(hasArticleDocumentContent(createArticleDocument('已有正文'))).toBe(true)
+
+    expect(hasArticleDocumentContent({
+      version: 2,
+      blocks: [createArticleMediaBlock('image', ['https://media.example/image.jpg'])],
+    })).toBe(true)
+  })
+
+  it('duplicates article blocks without sharing media arrays', () => {
+    const source = createArticleMediaBlock('gallery', [
+      'https://media.example/1.jpg',
+      'https://media.example/2.jpg',
+    ], '说明')
+
+    const duplicate = duplicateArticleBlock(source)
+
+    expect(duplicate).not.toBe(source)
+    expect(duplicate.id).not.toBe(source.id)
+    expect(duplicate.type).toBe(source.type)
+    expect(duplicate.text).toBe(source.text)
+    expect(duplicate.mediaRefs).toEqual(source.mediaRefs)
+    expect(duplicate.mediaRefs).not.toBe(source.mediaRefs)
   })
 
   it('strips control characters before persistence', () => {

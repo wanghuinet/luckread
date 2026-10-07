@@ -10,6 +10,7 @@ import { articleDocumentFromImportedDocument } from '../features/word-import/art
 
 type Props = {
   disabled?: boolean
+  onBeforeImport?: () => boolean
   onImport: (document: ArticleDocument) => void
 }
 
@@ -53,7 +54,7 @@ async function uploadImage(
   return url
 }
 
-export default function ArticleWordImportButton({ disabled = false, onImport }: Props) {
+export default function ArticleWordImportButton({ disabled = false, onBeforeImport, onImport }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
 
@@ -114,7 +115,10 @@ export default function ArticleWordImportButton({ disabled = false, onImport }: 
     <>
       <button
         disabled={disabled || busy}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => {
+          if (onBeforeImport && !onBeforeImport()) return
+          inputRef.current?.click()
+        }}
         type="button"
         title="从 Word 导入文章"
       >

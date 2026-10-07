@@ -166,6 +166,17 @@ describe('Creator Center admin extension', () => {
     expect(members).toContain('page.hasMore')
   })
 
+  it('exposes reusable structured block duplication in the editor', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const document = read('src/lib/article-document.ts')
+
+    expect(document).toContain('export const duplicateArticleBlock')
+    expect(editor).toContain('duplicateArticleBlock(source)')
+    expect(editor).toContain('aria-label="复制区块"')
+    expect(editor).toContain('onClick={() => duplicateBlock(index)}')
+    expect(editor).toContain('value.blocks.length >= ARTICLE_MAX_BLOCKS')
+  })
+
   it('registers Word import through the structured editor plugin registry', () => {
     const registry = read('src/components/article-editor-plugins.ts')
     const plugin = read('src/components/article-editor-word-import-plugin.tsx')
@@ -175,6 +186,9 @@ describe('Creator Center admin extension', () => {
     expect(plugin).toContain("id: 'word-import'")
     expect(plugin).toContain('Toolbar: WordImportToolbar')
     expect(plugin).toContain('onImport={updateDocument}')
+    expect(plugin).toContain('onBeforeImport={() => {')
+    expect(plugin).toContain('window.confirm')
+    expect(plugin).toContain('导入 Word 将替换当前文章内容')
     expect(editor).not.toContain("import ArticleWordImportButton from './ArticleWordImportButton.js'")
     expect(editor).not.toContain('<ArticleWordImportButton disabled={disabled} onImport={emit} />')
   })
@@ -185,7 +199,10 @@ describe('Creator Center admin extension', () => {
     const importer = read('src/components/ArticleWordImportButton.tsx')
     const adapter = read('src/features/word-import/article-document-adapter.ts')
     expect(plugin).toContain("import ArticleWordImportButton from './ArticleWordImportButton.js'")
-    expect(plugin).toContain('<ArticleWordImportButton disabled={disabled} onImport={updateDocument} />')
+    expect(plugin).toContain('<ArticleWordImportButton')
+    expect(plugin).toContain('disabled={disabled}')
+    expect(plugin).toContain('onBeforeImport={() => {')
+    expect(plugin).toContain('onImport={updateDocument}')
     expect(importer).toContain('accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"')
     expect(importer).toContain("fetch('/api/v1/media'")
     expect(importer).toContain("new Blob([bytes as BlobPart], { type: mimeType })")

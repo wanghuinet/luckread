@@ -15,6 +15,7 @@ import {
   type ArticleDocument,
   createArticleBlock,
   createArticleMediaBlock,
+  duplicateArticleBlock,
   mediaRefsFromArticleDocument,
   normalizeArticleDocument,
   plainTextFromArticleDocument,
@@ -127,6 +128,21 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     insertMedia,
   }
 
+  function duplicateBlock(index: number) {
+    if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
+    const source = value.blocks[index]
+    if (!source) return
+    const duplicate = duplicateArticleBlock(source)
+    emit({
+      ...value,
+      blocks: [
+        ...value.blocks.slice(0, index + 1),
+        duplicate,
+        ...value.blocks.slice(index + 1),
+      ],
+    })
+  }
+
   function removeBlock(index: number) {
     if (value.blocks.length === 1) return
     emit({
@@ -232,6 +248,14 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                   type="button"
                 >
                   ↓
+                </button>
+                <button
+                  aria-label="复制区块"
+                  disabled={disabled || value.blocks.length >= ARTICLE_MAX_BLOCKS}
+                  onClick={() => duplicateBlock(index)}
+                  type="button"
+                >
+                  复制
                 </button>
                 <button
                   aria-label="删除区块"

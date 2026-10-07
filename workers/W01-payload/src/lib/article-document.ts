@@ -196,6 +196,16 @@ export const mediaRefsFromArticleDocument = (document: ArticleDocument): string[
     ),
   )
 
+export const hasArticleDocumentContent = (document: ArticleDocument): boolean =>
+  Boolean(plainTextFromArticleDocument(document).trim()) ||
+  mediaRefsFromArticleDocument(document).length > 0
+
+export const duplicateArticleBlock = (block: ArticleBlock): ArticleBlock => ({
+  ...block,
+  id: crypto.randomUUID(),
+  ...(block.mediaRefs ? { mediaRefs: [...block.mediaRefs] } : {}),
+})
+
 export const articleDocumentFromBody = (raw: string): ArticleDocument => {
   const structured = tryDeserializeArticleDocument(raw)
   if (structured) return structured
