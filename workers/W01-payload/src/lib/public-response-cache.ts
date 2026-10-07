@@ -11,6 +11,7 @@ const CACHE_MISS_WINDOW_MS = 60_000
 const CACHE_MISS_LIMIT_PER_KEY = 5
 const CACHE_MISS_MAX_KEYS = 1024
 const DEFAULT_CONTENT_LIST_GENERATION = '0'
+const FOLLOW_LIST_GENERATION_VERSION = '1'
 const CONTENT_LIST_GENERATION_KEY = new Request(
   `https://cache.luckread.internal/__content-list-generation?v=${CACHE_VERSION}`,
 )
@@ -94,6 +95,102 @@ const generateContentListGeneration = (): string => crypto.randomUUID().replaceA
 const isValidContentListGeneration = (value: unknown): value is string =>
   typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value)
 
+
+const followListIdentity = (
+  request: Request,
+  namespace: string,
+): { direction: 'followers' | 'following'; userId: string } | null => {
+  if (namespace !== 'followers' && namespace !== 'following') return null
+  const match = new URL(request.url).pathname.match(
+    /^\/api\/v1\/users\/([^/]+)\/(followers|following)$/,
+  )
+  if (!match || match[2] !== namespace) return null
+  try {
+    const userId = decodeURIComponent(match[1]).trim()
+    if (!userId || userId.length > 256) return null
+    return {
+      direction: match[2] as 'followers' | 'following',
+      userId,
+    }
+  } catch {
+    return null
+  }
+}
+
+const followListGenerationKey = (
+  direction: 'followers' | 'following',
+  userId: string,
+): Request =>
+  new Request(
+    'https://cache.luckread.internal/__follow-list-generation?v=' +
+      FOLLOW_LIST_GENERATION_VERSION +
+      '&direction=' + encodeURIComponent(direction) +
+      '&user=' + encodeURIComponent(userId),
+    { method: 'GET' },
+  )
+
+const readFollowListGeneration = async (
+  cache: Cache,
+  request: Request,
+  namespace: string,
+): Promise<string | null> => {
+  const identity = followListIdentity(request, namespace)
+  if (!identity) return null
+  try {
+    const marker = await cache.match(
+      followListGenerationKey(identity.direction, identity.userId),
+    )
+    if (!marker) {
+      const generation = generateContentListGeneration()
+      try {
+        await cache.put(
+          followListGenerationKey(identity.direction, identity.userId),
+          generationResponse(generation),
+        )
+      } catch {
+        return null
+      }
+      return generation
+    }
+
+    const value = await marker.json() as unknown
+    const generation = value && typeof value === 'object' && 'generation' in value
+      ? (value as { generation?: unknown }).generation
+      : null
+    return isValidContentListGeneration(generation) ? generation : null
+  } catch {
+    return null
+  }
+}
+
+export const invalidatePublicFollowList = async (
+  direction: 'followers' | 'following',
+  userIdValue: string,
+): Promise<void> => {
+  const userId = userIdValue.trim()
+  if (!userId || userId.length > 256) return
+  const cache = (globalThis.caches as unknown as { default: Cache }).default
+  const generation = generateContentListGeneration()
+  try {
+    await cache.put(
+      followListGenerationKey(direction, userId),
+      generationResponse(generation),
+    )
+  } catch {
+    // Best-effort invalidation. Existing TTL continues to bound stale data.
+  }
+}
+
+export const invalidatePublicFollowListsForUsers = async (...userIds: string[]): Promise<void> => {
+  const normalizedIds = [...new Set(userIds.map((value) => value.trim()).filter(Boolean))]
+  await Promise.all(normalizedIds.flatMap((userId) => (
+    (['followers', 'following'] as const).map((direction) =>
+      invalidatePublicFollowList(direction, userId)
+    )
+  )))
+}
+
+
 const generationResponse = (generation: string): Response =>
   new Response(JSON.stringify({ generation }), {
     status: 200,
@@ -125,7 +222,7 @@ const readContentListGeneration = async (cache: Cache): Promise<string | null> =
 export const publicCacheKey = (
   request: Request,
   namespace: string,
-  contentListGeneration = DEFAULT_CONTENT_LIST_GENERATION,
+  generation = DEFAULT_CONTENT_LIST_GENERATION,
 ): Request => {
   const url = new URL(request.url)
   const query = normalizedQuery(url, namespace)
@@ -135,7 +232,9 @@ export const publicCacheKey = (
   keyUrl.searchParams.set('p', url.pathname)
   if (namespace === 'content-list') {
     keyUrl.searchParams.set('lang', normalizeLanguage(request))
-    keyUrl.searchParams.set('g', contentListGeneration)
+    keyUrl.searchParams.set('g', generation)
+  } else if (namespace === 'followers' || namespace === 'following') {
+    keyUrl.searchParams.set('g', generation)
   }
   if (query) keyUrl.searchParams.set('q', query)
   return new Request(keyUrl.toString(), { method: 'GET' })
@@ -189,13 +288,17 @@ export const cachedPublicGet = async (
 ): Promise<Response> => {
   if (!CACHE_QUERY_KEYS[namespace]) return loader()
   const cache = (globalThis.caches as unknown as { default: Cache }).default
-  let contentListGeneration = DEFAULT_CONTENT_LIST_GENERATION
+  let generation = DEFAULT_CONTENT_LIST_GENERATION
   if (namespace === 'content-list') {
     const resolvedGeneration = await readContentListGeneration(cache)
     if (!resolvedGeneration) return loader()
-    contentListGeneration = resolvedGeneration
+    generation = resolvedGeneration
+  } else if (namespace === 'followers' || namespace === 'following') {
+    const resolvedGeneration = await readFollowListGeneration(cache, request, namespace)
+    if (!resolvedGeneration) return loader()
+    generation = resolvedGeneration
   }
-  const key = publicCacheKey(request, namespace, contentListGeneration)
+  const key = publicCacheKey(request, namespace, generation)
   const keyString = key.url
 
   try {
