@@ -159,13 +159,13 @@ describe('Markdown editor plugin', () => {
     expect(registry).toContain(
       "import { markdownImportPlugin } from './MarkdownImportPlugin.js'",
     )
-    expect(registry).toContain("id: 'content.markdown-import'")
-    expect(registry).toContain("id: 'content.code-block'")
-    expect(registry).toContain("id: 'content.table-block'")
-    expect(registry).toContain("id: 'content.markdown-export'")
-    expect(registry).toContain("id: 'content.math-block'")
-    expect(registry).toContain("id: 'content.find-replace'")
-    expect(registry).toContain("id: 'content.outline'")
+    expect(registry).toContain('markdownImportPlugin')
+    expect(registry).toContain('markdownExportPlugin')
+    expect(registry).toContain('codeBlockPlugin')
+    expect(registry).toContain('tableBlockPlugin')
+    expect(registry).toContain('mathBlockPlugin')
+    expect(registry).toContain('findReplacePlugin')
+    expect(registry).toContain('articleOutlinePlugin')
     expect(plugin).toContain(
       "import { markdownToArticleDocument } from '../lib/markdown-to-article-document.js'",
     )
