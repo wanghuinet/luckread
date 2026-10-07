@@ -38,6 +38,7 @@ type UploadedAsset = {
 
 type ContentResponse = {
   id: string
+  slug?: string
   state: string
   version: number
   etag: string
