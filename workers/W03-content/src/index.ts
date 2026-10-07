@@ -130,28 +130,36 @@ const parseBody = async (request: Request): Promise<Record<string, unknown>> => 
   }
 }
 
+const decodePathSegment = (value: string): string => {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+}
+
 const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; revisionId?: string; rollback?: boolean} | null => {
   const parts = pathname.split('/').filter(Boolean)
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
     return {}
   }
   if (parts.length === 4 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
-    return { id: parts[3] }
+    return { id: decodePathSegment(parts[3]) }
   }
   if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'state') {
-    return { id: parts[3], state: true }
+    return { id: decodePathSegment(parts[3]), state: true }
   }
   if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'preflight') {
-    return { id: parts[3], preflight: true }
+    return { id: decodePathSegment(parts[3]), preflight: true }
   }
   if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'revisions') {
-    return { id: parts[3], revisions: true }
+    return { id: decodePathSegment(parts[3]), revisions: true }
   }
   if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'revisions') {
-    return { id: parts[3], revisions: true, revisionId: parts[5] }
+    return { id: decodePathSegment(parts[3]), revisions: true, revisionId: decodePathSegment(parts[5]) }
   }
   if (parts.length === 7 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'revisions' && parts[6] === 'rollback') {
-    return { id: parts[3], revisions: true, revisionId: parts[5], rollback: true }
+    return { id: decodePathSegment(parts[3]), revisions: true, revisionId: decodePathSegment(parts[5]), rollback: true }
   }
   return null
 }
@@ -265,6 +273,7 @@ export default {
           data: {
             items: page.items.map(item => ({
               id: item.id,
+              slug: item.slug,
               contentType: item.contentType,
               state: item.state,
               version: item.version,
@@ -380,6 +389,7 @@ export default {
         )
         return json({
           id: content.id,
+          slug: content.slug,
           creatorId: content.creatorId,
           contentType: content.contentType,
           state: content.state,
@@ -427,6 +437,7 @@ export default {
         )
         return json({
           id: content.id,
+          slug: content.slug,
           state: content.state,
           version: content.version,
           etag: content.etag,
