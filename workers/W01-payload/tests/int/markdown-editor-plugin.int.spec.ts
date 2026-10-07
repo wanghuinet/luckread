@@ -22,6 +22,10 @@ describe('Markdown editor plugin', () => {
       '2. B',
       '',
       '---',
+      '',
+      '\x60\x60\x60ts',
+      'const answer: number = 42',
+      '\x60\x60\x60',
     ].join('\n'))
 
     expect(result.unsupported).toEqual([])
@@ -35,6 +39,11 @@ describe('Markdown editor plugin', () => {
     ])
     expect(result.document.blocks[0]?.level).toBe(2)
     expect(result.document.blocks[3]?.text).toBe('第一项\n第二项')
+    expect(result.document.blocks[6]).toMatchObject({
+      type: 'code',
+      language: 'typescript',
+      text: 'const answer: number = 42',
+    })
     expect(result.document.version).toBe(2)
   })
 
@@ -55,7 +64,7 @@ describe('Markdown editor plugin', () => {
     const result = markdownToArticleDocument([
       '[保留链接地址](https://example.com)',
       '',
-      '\\x60code\\x60',
+      '**\x60inline\x60**',
       '',
       '| A | B |',
       '| - | - |',
@@ -79,6 +88,7 @@ describe('Markdown editor plugin', () => {
       "import { markdownImportPlugin } from './MarkdownImportPlugin.js'",
     )
     expect(registry).toContain("id: 'content.markdown-import'")
+    expect(registry).toContain("id: 'content.code-block'")
     expect(plugin).toContain(
       "import { markdownToArticleDocument } from '../lib/markdown-to-article-document.js'",
     )
