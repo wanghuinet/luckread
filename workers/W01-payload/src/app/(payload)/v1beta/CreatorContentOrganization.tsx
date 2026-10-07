@@ -178,7 +178,7 @@ export default function CreatorContentOrganization({
           description: form.description.trim(),
         }),
       })
-      const data = await response.json().catch((): null => null) as { error?: { message?: string } } | null
+      const data: { error?: { message?: string } } | null = await response.json().catch(() => null)
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
