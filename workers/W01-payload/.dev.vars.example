@@ -1,3 +1,6 @@
 # Local-only development variables.
 # Never commit real secrets.
 PAYLOAD_SECRET=replace-with-a-local-development-secret
+
+# Optional plugin trigger secret (local placeholder only)
+CRON_SECRET=replace-with-a-local-cron-secret
