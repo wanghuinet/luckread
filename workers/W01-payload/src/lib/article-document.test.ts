@@ -32,6 +32,15 @@ describe('article structured document', () => {
     expect(plainTextFromArticleDocument(document)).toBe('第一节\n\n正文内容\n\n第一项\n\n第二项\n\nconst answer = 42')
   })
 
+  it('persists a newly inserted table before any data rows are filled', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [createArticleTableBlock(['列 1', '列 2'], [['', '']])],
+    }
+
+    expect(() => serializeArticleDocument(document)).not.toThrow()
+  })
+
   it('round-trips structured table blocks and extracts tabular text', () => {
     const document = {
       version: 2 as const,
