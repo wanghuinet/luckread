@@ -56,6 +56,41 @@ describe('Word article document adapter', () => {
     expect(result.document.blocks[3]?.mediaRefs).toEqual(['https://cdn.example/image1.png'])
   })
 
+  it('keeps table images when the table layout is deliberately degraded', () => {
+    const document: ImportedDocument = {
+      blocks: [{
+        kind: 'table',
+        rows: [[{
+          blocks: [{
+            kind: 'paragraph',
+            inlines: [
+              { kind: 'text', text: '单元格', marks: [] },
+              {
+                kind: 'inlineImage',
+                image: {
+                  kind: 'image',
+                  mediaKey: 'media/table.png',
+                  mimeType: 'image/png',
+                  bytes: new Uint8Array([4, 5, 6]),
+                },
+              },
+            ],
+          }],
+        }]],
+      }],
+      warnings: [],
+      stats: baseStats(),
+    }
+
+    const result = articleDocumentFromImportedDocument(
+      document,
+      new Map([['media/table.png', 'https://cdn.example/table.png']]),
+    )
+
+    expect(result.document.blocks.map((block) => block.type)).toEqual(['paragraph', 'image'])
+    expect(result.document.blocks[1]?.mediaRefs).toEqual(['https://cdn.example/table.png'])
+  })
+
   it('maps tables to readable paragraphs and reports the controlled degradation', () => {
     const document: ImportedDocument = {
       blocks: [
