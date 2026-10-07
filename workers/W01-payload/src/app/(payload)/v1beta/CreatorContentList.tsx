@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import styles from './creator-center.module.css'
 import ContentRevisionHistory from './ContentRevisionHistory'
@@ -49,6 +49,7 @@ const typeLabels: Record<ContentType, string> = {
 export default function CreatorContentList({ loginPath = '/admin/login' }: { loginPath?: '/admin/login' | '/login' }) {
   const [status, setStatus] = useState<string>('')
   const [type, setType] = useState<string>('')
+  const [localFilter, setLocalFilter] = useState('')
   const [page, setPage] = useState<Page>({ items: [], nextCursor: null, hasMore: false })
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -57,6 +58,11 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
   const requestIdRef = useRef(0)
   const activeRequestRef = useRef<AbortController | null>(null)
   const [revisionTarget, setRevisionTarget] = useState<{ id: string; version: number } | null>(null)
+  const visibleItems = useMemo(() => {
+    const query = localFilter.trim().toLocaleLowerCase()
+    if (!query) return page.items
+    return page.items.filter((item) => item.title.toLocaleLowerCase().includes(query) || item.id.toLocaleLowerCase().includes(query))
+  }, [localFilter, page.items])
 
   const load = useCallback(async (cursor: string | null = null) => {
     activeRequestRef.current?.abort()
@@ -310,6 +316,14 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
           <option value="post">动态</option>
           <option value="video">视频</option>
         </select>
+        <input
+          aria-label="筛选已加载内容"
+          className={styles.filterSelect}
+          onChange={(event) => setLocalFilter(event.target.value)}
+          placeholder="筛选已加载内容（标题或 ID）"
+          type="search"
+          value={localFilter}
+        />
       </div>
 
       {revisionTarget ? (
@@ -340,11 +354,17 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
           <Link className={styles.secondaryButton} href="/publish">开始创作</Link>
         </div>
       ) : null}
+      {!loading && !error && page.items.length > 0 && visibleItems.length === 0 ? (
+        <div className={styles.contentManageEmpty}>
+          <strong>没有匹配的已加载内容</strong>
+          <span>当前筛选只作用于已经加载的内容；可清空筛选或继续加载更多。</span>
+        </div>
+      ) : null}
 
-      {!loading && !error && page.items.length > 0 ? (
+      {!loading && !error && visibleItems.length > 0 ? (
         <>
           <div className={styles.contentList}>
-            {page.items.map((item) => (
+            {visibleItems.map((item) => (
               <article className={styles.contentListItem} key={item.id}>
                 {(item.coverRef || item.mediaRefs?.length) ? (
                   <div className={styles.contentListThumb} aria-hidden="true">
