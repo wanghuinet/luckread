@@ -367,6 +367,16 @@ describe('1.1 content revision history', () => {
     expect(migration).toContain('legacy_backfill')
   })
 
+  it('keeps the rollback transport path under the revision contract', () => {
+    const index = readFileSync(resolve(process.cwd(), 'workers/W03-content/src/index.ts'), 'utf8')
+    const w01Detail = readFileSync(resolve(process.cwd(), 'workers/W01-payload/src/app/api/v1/contents/[contentId]/revisions/[revisionId]/route.ts'), 'utf8')
+    const w01Rollback = readFileSync(resolve(process.cwd(), 'workers/W01-payload/src/app/api/v1/contents/[contentId]/revisions/[revisionId]/rollback/route.ts'), 'utf8')
+    expect(index).toContain('/internal/content/contents/')
+    expect(index).toContain('/revisions/${encodeURIComponent(revisionId)}/rollback')
+    expect(w01Detail).not.toContain("method: 'POST'")
+    expect(w01Rollback).toContain('/revisions/' + ' + encodeURIComponent(revisionId) + ' + '/rollback')
+  })
+
   it('records create, update and rollback history after the authoritative CAS guard', () => {
     const runtime = readFileSync(
       resolve(process.cwd(), 'workers/W03-content/src/content-runtime.ts'),
