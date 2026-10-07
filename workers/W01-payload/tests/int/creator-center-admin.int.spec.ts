@@ -87,6 +87,23 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('resolveCoverRef(type, assets, coverRef)')
   })
 
+  it('exposes Series and Collection management through the Creator Studio content authority', () => {
+    const center = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
+    const organization = read('src/app/(payload)/v1beta/CreatorContentOrganization.tsx')
+
+    expect(center).toContain('CreatorContentOrganization')
+    expect(center).toContain('id="content-organization"')
+    expect(organization).toContain('/api/v1/series')
+    expect(organization).toContain('/api/v1/collections')
+    expect(organization).toContain("method: 'POST'")
+    expect(organization).toContain("method: 'DELETE'")
+    expect(organization).toContain("'If-Match': item.etag")
+    expect(organization).toContain("'Idempotency-Key': 'content-organization:")
+    expect(organization).not.toContain('content_series')
+    expect(organization).not.toContain('content_collections')
+    expect(organization).not.toContain('getPayload(')
+  })
+
   it('embeds the existing publisher with a scoped W03 content bridge', () => {
     const view = read('src/app/(frontend)/creator-center/CreatorStudio.tsx')
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
