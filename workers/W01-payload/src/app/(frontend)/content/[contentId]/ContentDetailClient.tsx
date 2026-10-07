@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import ContentComments from './ContentComments'
+import ArticleStructuredRenderer from '../../../../components/ArticleStructuredRenderer.js'
+import { tryDeserializeArticleDocument } from '../../../../lib/article-document.js'
 import { extractSocialTokens } from '../../../../social/social-token-parser.js'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -61,6 +63,10 @@ export default function ContentDetailPage({
   const [followRestricted, setFollowRestricted] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
+  const structuredArticle = useMemo(
+    () => content?.contentType === 'article' && body ? tryDeserializeArticleDocument(body) : null,
+    [content?.contentType, body],
+  )
   const socialTokens = useMemo(() => extractSocialTokens(body), [body])
 
   useEffect(() => {
@@ -464,7 +470,7 @@ export default function ContentDetailPage({
           </div>
         ) : null}
 
-        {content.contentType !== 'video' && (content.coverRef || content.mediaRefs?.length) ? (
+        {content.contentType !== 'video' && (content.coverRef || (content.mediaRefs?.length && !structuredArticle)) ? (
           <div className="content-detail-media">
             {content.coverRef ? (
               <img alt={content.title + ' ' + copy.detail.cover} loading="eager" src={content.coverRef} />
@@ -488,7 +494,9 @@ export default function ContentDetailPage({
         ) : null}
 
         <div className="content-detail-body">
-          {body ? (
+          {structuredArticle ? (
+            <ArticleStructuredRenderer document={structuredArticle} />
+          ) : body ? (
             splitBodyIntoParagraphs(body).map((paragraph, index) => (
               <p className="content-detail-paragraph" key={index}>{paragraph}</p>
             ))
