@@ -19,7 +19,7 @@ export async function GET(
       )
     }
 
-    const loadProfile = async (): Promise<Response> => {
+    const loadProfile = async (cacheControl: 'public' | 'private' = 'public'): Promise<Response> => {
       const payload = await getPayload({ config })
       const user = await payload.findByID({
         collection: 'users',
@@ -44,12 +44,12 @@ export async function GET(
         avatar: typeof publicUser.avatar === 'string' ? publicUser.avatar : null,
       }, {
         headers: {
-          'cache-control': 'public, max-age=30, stale-while-revalidate=120',
+          'cache-control': cacheControl === 'private' ? 'private, no-store' : 'public, max-age=30, stale-while-revalidate=120',
         },
       })
     }
 
-    if (hasAuthenticatedSessionCredential(request)) return await loadProfile()
+    if (hasAuthenticatedSessionCredential(request)) return await loadProfile('private')
     return await cachedPublicGet(request, 'user-profile', loadProfile, 30)
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
