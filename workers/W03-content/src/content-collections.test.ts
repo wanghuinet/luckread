@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { listCreatorCollection } from './content-collection.js'
+import { listCreatorCollections } from './content-collections.js'
 
 describe('W03 collection foundation', () => {
   it('defines authoritative collection persistence and lifecycle event triggers', () => {
@@ -19,7 +19,7 @@ describe('W03 collection foundation', () => {
     expect(migration).toContain("'collection.deleted'")
   })
 
-  it('lists creator-owned collection with one bounded D1 read and cursor pagination', async () => {
+  it('lists creator-owned collections with one bounded D1 read and cursor pagination', async () => {
     const queries: string[] = []
     const db = {
       prepare(query: string) {
@@ -35,7 +35,6 @@ describe('W03 collection foundation', () => {
                 id: 'collection_1',
                 owner_user_id: 'user_1',
                 creator_id: 'user_1',
-                ip_id: null,
                 state: 'DRAFT',
                 version: 1,
                 title: 'Collection 1',
@@ -51,7 +50,7 @@ describe('W03 collection foundation', () => {
       },
     } as never
 
-    const result = await listCreatorCollection(db, 'user_1', null, 10)
+    const result = await listCreatorCollections(db, 'user_1', null, 10)
     expect(queries).toHaveLength(1)
     expect(result).toMatchObject({
       items: [{
