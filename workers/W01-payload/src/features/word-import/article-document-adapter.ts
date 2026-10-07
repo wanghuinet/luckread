@@ -107,13 +107,45 @@ export const articleDocumentFromImportedDocument = (
       if (block.kind === 'table') {
         warnings.push('Word 表格已转为段落文本；当前结构化文章模型暂不持久化表格单元格布局。')
         for (const row of block.rows) {
+          const rowImages: string[] = []
           const rowText = row.map((cell) => {
             const text = cell.blocks
               .flatMap((cellBlock) => {
-                if (cellBlock.kind === 'paragraph') return [inlineText(cellBlock.inlines)]
-                if (cellBlock.kind === 'heading') return [inlineText(cellBlock.inlines)]
-                if (cellBlock.kind === 'list') return cellBlock.items.map((item) => inlineText(item.inlines))
-                if (cellBlock.kind === 'listItem') return [inlineText(cellBlock.inlines)]
+                if (cellBlock.kind === 'paragraph') {
+                  for (const key of collectInlineImages(cellBlock.inlines)) {
+                    const url = mediaRefs.get(key)
+                    if (url) rowImages.push(url)
+                  }
+                  return [inlineText(cellBlock.inlines)]
+                }
+                if (cellBlock.kind === 'heading') {
+                  for (const key of collectInlineImages(cellBlock.inlines)) {
+                    const url = mediaRefs.get(key)
+                    if (url) rowImages.push(url)
+                  }
+                  return [inlineText(cellBlock.inlines)]
+                }
+                if (cellBlock.kind === 'list') {
+                  for (const item of cellBlock.items) {
+                    for (const key of collectInlineImages(item.inlines)) {
+                      const url = mediaRefs.get(key)
+                      if (url) rowImages.push(url)
+                    }
+                  }
+                  return cellBlock.items.map((item) => inlineText(item.inlines))
+                }
+                if (cellBlock.kind === 'listItem') {
+                  for (const key of collectInlineImages(cellBlock.inlines)) {
+                    const url = mediaRefs.get(key)
+                    if (url) rowImages.push(url)
+                  }
+                  return [inlineText(cellBlock.inlines)]
+                }
+                if (cellBlock.kind === 'image') {
+                  const url = mediaRefs.get(cellBlock.mediaKey)
+                  if (url) rowImages.push(url)
+                  return []
+                }
                 return []
               })
               .map((value) => value.trim())
@@ -122,6 +154,9 @@ export const articleDocumentFromImportedDocument = (
             return text || ''
           }).join(' ｜ ').trim()
           appendParagraph(blocks, rowText)
+          for (const url of Array.from(new Set(rowImages))) {
+            blocks.push(createArticleMediaBlock('image', [url]))
+          }
         }
       }
     }
