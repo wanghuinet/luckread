@@ -276,7 +276,7 @@ const loadCollectionMutation = async (
     'i.id AS idem_id, i.owner_user_id AS idem_owner_user_id, i.request_hash AS idem_request_hash, ' +
     'i.status AS idem_status, i.response_status AS idem_response_status, i.response_json AS idem_response_json, ' +
     'i.expires_at AS idem_expires_at ' +
-    'FROM content_collection s ' +
+    'FROM content_collections s ' +
     'LEFT JOIN (SELECT id, owner_user_id, request_hash, status, response_status, response_json, expires_at ' +
     'FROM content_mutation_idempotency WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? ' +
     'ORDER BY created_at DESC LIMIT 1) i ON 1 = 1 ' +
@@ -348,7 +348,7 @@ export async function createCollection(
     expireIdempotency(db, ownerUserId, operationId, idempotencyKey, createdAt),
     insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(collection), createdAt, expiresAt),
     db.prepare(
-      'INSERT INTO content_collection ' +
+      'INSERT INTO content_collections ' +
       '(id, owner_user_id, creator_id, state, version, title, description, cover_ref, etag, created_at, updated_at) ' +
       "VALUES (?, ?, ?, 'DRAFT', 1, ?, ?, ?, ?, ?, ?)",
     ).bind(
@@ -369,7 +369,7 @@ export async function getCollection(
   assertResourceId(collectionId)
   const row = await db.prepare(
     'SELECT id, owner_user_id, creator_id, state, version, title, description, ' +
-    'cover_ref, etag, created_at, updated_at FROM content_collection WHERE id = ? AND owner_user_id = ?',
+    'cover_ref, etag, created_at, updated_at FROM content_collections WHERE id = ? AND owner_user_id = ?',
   ).bind(collectionId, principalUserId).first<CollectionRow>()
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
   return toCollection(row)
@@ -390,7 +390,7 @@ export async function listCreatorCollections(
   bindings.push(pageSize + 1)
   const rows = await db.prepare(
     'SELECT id, owner_user_id, creator_id, state, version, title, description, ' +
-    'cover_ref, etag, created_at, updated_at FROM content_collection ' +
+    'cover_ref, etag, created_at, updated_at FROM content_collections ' +
     'WHERE owner_user_id = ? ' + cursorClause +
     ' ORDER BY updated_at DESC, id DESC LIMIT ?',
   ).bind(...bindings).all<CollectionRow>()
@@ -459,7 +459,7 @@ export async function updateCollection(
     expireIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
     insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(updated), updatedAt, expiresAt),
     db.prepare(
-      'UPDATE content_collection SET title = ?, description = ?, cover_ref = ?, version = ?, etag = ?, updated_at = ? ' +
+      'UPDATE content_collections SET title = ?, description = ?, cover_ref = ?, version = ?, etag = ?, updated_at = ? ' +
       'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
     ).bind(
       updated.title, updated.description, updated.coverRef, updated.version, updated.etag,
@@ -507,7 +507,7 @@ export async function deleteCollection(
     expireIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
     insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 204, '', updatedAt, expiresAt),
     db.prepare(
-      "UPDATE content_collection SET state = 'DELETED', version = ?, etag = ?, updated_at = ? " +
+      "UPDATE content_collections SET state = 'DELETED', version = ?, etag = ?, updated_at = ? " +
       'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
     ).bind(
       nextVersion, etagForVersion(nextVersion), updatedAt,
