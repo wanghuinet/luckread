@@ -7,6 +7,7 @@ import CreatorContentList from '../../(payload)/v1beta/CreatorContentList'
 import CreatorCenterAssistant from '../../(payload)/v1beta/CreatorCenterAssistant'
 import CreatorAudienceSummary from '../../(payload)/v1beta/CreatorAudienceSummary'
 import CreatorAssetLibrary from '../../(payload)/v1beta/CreatorAssetLibrary'
+import CreatorContentOrganization from '../../(payload)/v1beta/CreatorContentOrganization'
 import CreatorModerationQueue from '../../(payload)/v1beta/CreatorModerationQueue'
 import PublishComposer from '../publish/PublishComposer'
 import '../publish/publish.css'
@@ -260,6 +261,10 @@ export function CreatorStudio({
                 <div className={styles.workspaceMainColumn}>
                   <section id="content" className={styles.dashboardCard}>
                     <CreatorContentList loginPath={adminMode ? '/admin/login' : '/login'} />
+                  </section>
+
+                  <section id="content-organization" className={styles.dashboardCard}>
+                    <CreatorContentOrganization loginPath={adminMode ? '/admin/login' : '/login'} />
                   </section>
 
                   <section id="publisher" className={styles.dashboardCard}>
