@@ -106,6 +106,20 @@ describe('Markdown editor plugin', () => {
     )
   })
 
+  it('registers the article outline plugin against stable block anchors', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const outline = read('src/components/ArticleOutlinePlugin.tsx')
+    const registry = read('src/components/article-editor-plugins.ts')
+    expect(editor).toContain("const blockDomId = (id: string): string => 'lr-article-block-' + encodeURIComponent(id)")
+    expect(editor).toContain('id={blockDomId(block.id)}')
+    expect(outline).toContain('function ArticleOutlinePanel(')
+    expect(outline).toContain('block.type === \'heading\'')
+    expect(outline).toContain('window.document.getElementById(blockDomId(block.id))')
+    expect(outline).toContain("id: 'content.outline'")
+    expect(registry).toContain("import { articleOutlinePlugin } from './ArticleOutlinePlugin.js'")
+    expect(registry).toContain('articleOutlinePlugin')
+  })
+
   it('registers the find and replace plugin without changing the document authority', () => {
     const plugin = read('src/components/FindReplacePlugin.tsx')
     const registry = read('src/components/article-editor-plugins.ts')
@@ -135,6 +149,7 @@ describe('Markdown editor plugin', () => {
     expect(registry).toContain("id: 'content.markdown-export'")
     expect(registry).toContain("id: 'content.math-block'")
     expect(registry).toContain("id: 'content.find-replace'")
+    expect(registry).toContain("id: 'content.outline'")
     expect(plugin).toContain(
       "import { markdownToArticleDocument } from '../lib/markdown-to-article-document.js'",
     )
