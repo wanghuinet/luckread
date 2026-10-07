@@ -110,7 +110,7 @@ describe('Creator Center admin extension', () => {
     const organization = read('src/app/(payload)/v1beta/CreatorContentOrganization.tsx')
     expect(organization).toContain("coverRef: form.coverRef.trim() ? form.coverRef.trim() : null")
     expect(organization).toContain("uploadOrganizationCover(event, 'create')")
-    expect(organization).toContain("onChange={(event) => setForm((current) => ({ ...current, coverRef: '' }))}")
+    expect(organization).toContain("setForm((current) => ({ ...current, coverRef: '' }))")
     expect(organization).toContain('disabled={!form.title.trim() || saving || coverUploading}')
   })
 
