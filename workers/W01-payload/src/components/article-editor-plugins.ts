@@ -1,5 +1,6 @@
 import type { ArticleEditorPlugin } from './ArticleEditorPlugin.js'
 import { codeBlockPlugin } from './CodeBlockPlugin.js'
+import { markdownExportPlugin } from './MarkdownExportPlugin.js'
 import { markdownImportPlugin } from './MarkdownImportPlugin.js'
 import { tableBlockPlugin } from './TableBlockPlugin.js'
 
@@ -11,6 +12,7 @@ import { tableBlockPlugin } from './TableBlockPlugin.js'
  */
 export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [
   markdownImportPlugin,
+  markdownExportPlugin,
   codeBlockPlugin,
   tableBlockPlugin,
 ]
