@@ -50,7 +50,7 @@ describe('W03 content contract core', () => {
       prepare(query: string) {
         return {
           bind: () => ({
-            first: async () => query.includes('content_mutation_idempotency') ? null : row,
+            first: async () => row,
           }),
         }
       },
