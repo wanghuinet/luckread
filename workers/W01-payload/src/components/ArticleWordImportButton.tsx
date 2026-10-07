@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 
 import type { ArticleDocument } from '../lib/article-document.js'
+import { collectImportedImages } from '../features/word-import/collect-images.js'
 import { parseDocx } from '../features/word-import/docx-parser.js'
 import { normalizeImportedDocument } from '../features/word-import/normalizer.js'
 import { articleDocumentFromImportedDocument } from '../features/word-import/article-document-adapter.js'
@@ -31,11 +32,12 @@ async function uploadImage(
   bytes: Uint8Array,
   filename: string,
   alt: string | undefined,
+  mimeType: string,
   idempotencyKey: string,
 ): Promise<string> {
   const form = new FormData()
   form.append('_payload', JSON.stringify({ alt: alt?.trim() || 'Imported Word image' }))
-  form.append('file', new Blob([bytes as BlobPart]), filename)
+  form.append('file', new Blob([bytes as BlobPart], { type: mimeType }), filename)
 
   const response = await fetch('/api/v1/media', {
     method: 'POST',
@@ -70,49 +72,30 @@ export default function ArticleWordImportButton({ disabled = false, onImport }: 
       const imported = normalizeImportedDocument(
         await parseDocx(await file.arrayBuffer(), { maxMediaBytes: MAX_MEDIA_BYTES }),
       )
-      const imageKeys = imported.blocks.flatMap((block) => {
-        if (block.kind === 'image') return [block.mediaKey]
-        if (block.kind === 'paragraph' || block.kind === 'heading' || block.kind === 'listItem') {
-          return block.inlines.filter((inline) => inline.kind === 'inlineImage').map((inline) => inline.image.mediaKey)
-        }
-        if (block.kind === 'list') {
-          return block.items.flatMap((item) => item.inlines.filter((inline) => inline.kind === 'inlineImage').map((inline) => inline.image.mediaKey))
-        }
-        return block.rows.flatMap((row) => row.flatMap(() => [] as string[]))
-      })
-      if (imageKeys.length > MAX_IMAGES) throw new Error('Word 文档中的图片不能超过 50 张')
+      const images = collectImportedImages(imported.blocks)
+      if (images.length > MAX_IMAGES) throw new Error('Word 文档中的图片不能超过 50 张')
 
       const mediaRefs = new Map<string, string>()
       const hashToUrl = new Map<string, string>()
       let mediaBytes = 0
-      for (const block of imported.blocks) {
-        const images = block.kind === 'image'
-          ? [block]
-          : block.kind === 'paragraph' || block.kind === 'heading' || block.kind === 'listItem'
-            ? block.inlines.filter((inline) => inline.kind === 'inlineImage').map((inline) => inline.image)
-            : block.kind === 'list'
-              ? block.items.flatMap((item) => item.inlines.filter((inline) => inline.kind === 'inlineImage').map((inline) => inline.image))
-              : block.kind === 'table'
-                ? []
-                : []
-        for (const image of images) {
-          mediaBytes += image.bytes.byteLength
-          if (mediaBytes > MAX_MEDIA_BYTES) throw new Error('Word 文档中的图片总大小不能超过 50 MB')
-          const hash = await sha256(image.bytes)
-          const existing = hashToUrl.get(hash)
-          if (existing) {
-            mediaRefs.set(image.mediaKey, existing)
-            continue
-          }
-          const url = await uploadImage(
-            image.bytes,
-            image.mediaKey.split('/').pop() || 'word-image',
-            image.alt,
-            'word-structured-import-' + hash,
-          )
-          hashToUrl.set(hash, url)
-          mediaRefs.set(image.mediaKey, url)
+      for (const image of images) {
+        mediaBytes += image.bytes.byteLength
+        if (mediaBytes > MAX_MEDIA_BYTES) throw new Error('Word 文档中的图片总大小不能超过 50 MB')
+        const hash = await sha256(image.bytes)
+        const existing = hashToUrl.get(hash)
+        if (existing) {
+          mediaRefs.set(image.mediaKey, existing)
+          continue
         }
+        const url = await uploadImage(
+          image.bytes,
+          image.mediaKey.split('/').pop() || 'word-image',
+          image.alt,
+          image.mimeType,
+          'word-structured-import-' + hash,
+        )
+        hashToUrl.set(hash, url)
+        mediaRefs.set(image.mediaKey, url)
       }
 
       const result = articleDocumentFromImportedDocument(imported, mediaRefs)
