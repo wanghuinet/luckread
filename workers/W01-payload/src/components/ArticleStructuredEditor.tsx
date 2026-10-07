@@ -61,7 +61,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     () => mediaAssets.filter((asset) => asset.mimeType.startsWith('image/')),
     [mediaAssets],
   )
-  const characterCount = useMemo(() => plainTextFromArticleDocument(value).length, [value])
+  const characterCount = useMemo(() => Array.from(plainTextFromArticleDocument(value)).length, [value])
 
   function emit(next: ArticleDocument) {
     const normalized = normalizeArticleDocument(next)
@@ -301,7 +301,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
               <span>{blockLabels[block.type]}</span>
               <div>
                 <span
-                  aria-label="拖动区块重新排序"
+                  aria-hidden="true"
                   className="lr-article-drag-handle"
                   draggable={!disabled}
                   title="拖动重新排序"
@@ -319,8 +319,6 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                     event.dataTransfer.effectAllowed = 'move'
                     event.dataTransfer.setData('text/plain', String(index))
                   }}
-                  role="button"
-                  tabIndex={disabled ? -1 : 0}
                 >
                   ⋮⋮
                 </span>
