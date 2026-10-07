@@ -1,5 +1,11 @@
 import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
-import { cachedPublicGet, invalidatePublicContentList, invalidatePublicUserProfileByUsername, publicCacheKey } from './public-response-cache.js'
+import {
+  cachedPublicGet,
+  invalidatePublicContentList,
+  invalidatePublicFollowList,
+  invalidatePublicUserProfileByUsername,
+  publicCacheKey,
+} from './public-response-cache.js'
 
 describe('public response cache', () => {
   it('bypasses shared cache for an unregistered namespace', async () => {
@@ -287,6 +293,46 @@ describe('public response cache', () => {
     expect(second.status).toBe(404)
     expect(loader).toHaveBeenCalledTimes(1)
     expect(second.headers.get('x-luckread-cache')).toBe('HIT')
+  })
+
+  it('uses a per-user generation for follow-list cache keys', async () => {
+    const cached = new Response(JSON.stringify({ data: 'cached' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__follow-list-generation') ? generationResponse('g0') : cached,
+    )
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const request = new Request('https://luckread.com/api/v1/users/u1/followers?limit=20')
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const response = await cachedPublicGet(request, 'followers', loader, 15)
+
+    expect(loader).not.toHaveBeenCalled()
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    expect(cache.match).toHaveBeenCalledWith(
+      new Request('https://cache.luckread.internal/__follow-list-generation?v=1&direction=followers&user=u1'),
+    )
+    expect(cache.match).toHaveBeenCalledWith(publicCacheKey(request, 'followers', 'g0'))
+  })
+
+  it('bumps the requested follow-list generation instead of deleting a single page', async () => {
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    await invalidatePublicFollowList('followers', 'u1')
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response]>
+    const generationWrite = putCalls.find(([request]) =>
+      request.url.includes('__follow-list-generation') &&
+      request.url.includes('direction=followers') &&
+      request.url.includes('user=u1'),
+    )
+    expect(generationWrite).toBeDefined()
+    const body = await generationWrite!.response.clone().json() as { generation?: unknown }
+    expect(typeof body.generation).toBe('string')
+    expect(body.generation).not.toBe('g0')
+    expect(cache.delete).not.toHaveBeenCalled()
   })
 
   it('invalidates the explicit username profile cache key', async () => {
