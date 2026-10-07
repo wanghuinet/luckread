@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -30,6 +32,28 @@ describe('W01 Better Auth boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.enforceAuthRateLimit.mockResolvedValue(undefined)
+  })
+
+  it('does not expose direct Better Auth signup without the W01 registration seam', () => {
+    const route = readFileSync(
+      resolve(process.cwd(), 'src/app/api/auth/[...segments]/route.ts'),
+      'utf8',
+    )
+    expect(route).toContain("canonicalW01AuthEndpoints")
+    expect(route).toContain("'sign-up/email'")
+    expect(route).toContain("'change-password'")
+    expect(route).toContain("'request-password-reset'")
+    expect(route).toContain("'reset-password'")
+    expect(route).toContain("This authentication operation is not available at this endpoint")
+    expect(route).toContain("'NOT_FOUND'")
+    expect(route).toContain('idempotency')
+    expect(route).toContain('Payload projection')
+    expect(route).not.toContain("AUTH_REGISTER_LIMITER")
+    const denyIndex = route.indexOf('canonicalW01AuthEndpoints.has(endpoint)')
+    const upstreamIndex = route.indexOf("service.fetch(")
+    expect(denyIndex).toBeGreaterThanOrEqual(0)
+    expect(upstreamIndex).toBeGreaterThanOrEqual(0)
+    expect(denyIndex).toBeLessThan(upstreamIndex)
   })
 
   it('proxies login credentials to W02 and does not require legacy device/session material', async () => {
