@@ -8,6 +8,7 @@ import {
   ARTICLE_MAX_BLOCK_TEXT,
   ARTICLE_TABLE_MAX_COLUMNS,
   ARTICLE_TABLE_MAX_ROWS,
+  ARTICLE_TABLE_MAX_CELL_TEXT,
   type ArticleBlock,
   type ArticleBlockType,
   type ArticleDocument,
@@ -296,7 +297,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                           <input
                             aria-label={'表头第 ' + (columnIndex + 1) + ' 列'}
                             disabled={disabled}
-                            maxLength={2_000}
+                            maxLength={ARTICLE_TABLE_MAX_CELL_TEXT}
                             onChange={(event) => {
                               const table = block.table
                               if (!table) return
@@ -319,7 +320,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                             <input
                               aria-label={'第 ' + (rowIndex + 1) + ' 行第 ' + (columnIndex + 1) + ' 列'}
                               disabled={disabled}
-                              maxLength={2_000}
+                              maxLength={ARTICLE_TABLE_MAX_CELL_TEXT}
                               onChange={(event) => {
                                 const table = block.table
                                 if (!table) return
