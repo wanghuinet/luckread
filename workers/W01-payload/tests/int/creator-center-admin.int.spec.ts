@@ -216,6 +216,14 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('plugins={articleEditorPlugins}')
   })
 
+  it('keeps structured article media reusable after draft restore or Word import', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    expect(editor).toContain('mediaRefsFromArticleDocument(value)')
+    expect(editor).toContain("id: 'article-document-media:' + url")
+    expect(editor).toContain("filename: '正文已关联图片'")
+    expect(editor).toContain("mimeType: 'image/*'")
+  })
+
   it('filters only already-loaded creator content without adding a search endpoint', () => {
     const list = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     expect(list).toContain('const [localFilter, setLocalFilter] = useState(\'\')')
