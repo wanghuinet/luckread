@@ -269,7 +269,7 @@ const toMember = (row: {
   content_slug: string
   content_type: 'article' | 'post' | 'video'
   content_state: string
-  title: string
+  content_title: string
   position: number
   created_at: string
   updated_at: string
@@ -322,8 +322,7 @@ export async function attachSeriesMember(
   }
 
   if (row.series_owner_user_id !== ownerUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
-  if (row.series_owner_user_id !== row.series_owner_user_id) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
-  if (row.idem_owner_user_id && row.idem_owner_user_id !== ownerUserId) {
+    if (row.idem_owner_user_id && row.idem_owner_user_id !== ownerUserId) {
     throw new ContentRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
   }
   assertSeriesEditable(row.series_state)
@@ -444,7 +443,7 @@ export async function listSeriesMembers(
     'JOIN contents c ON c.id = r.source_id ' +
     "WHERE r.source_type = 'content' AND r.target_type = 'series' AND r.relation_type = 'series-member' " +
     "AND r.target_id = ? AND r.status = 'ACTIVE' " +
-    + cursorClause +
+    cursorClause +
     'ORDER BY r.position ASC, r.relationship_id ASC LIMIT ?',
   ).bind(...bindings).all<{
     relationship_id: string
@@ -606,7 +605,7 @@ export async function reorderSeriesMember(
       contentId,
       contentSlug: row.content_slug,
       contentType: row.content_type,
-      contentState: row.series_state,
+      contentState: row.content_state,
       title: row.content_title,
       position: currentIndex,
       createdAt: row.membership_created_at ?? now.toISOString(),
