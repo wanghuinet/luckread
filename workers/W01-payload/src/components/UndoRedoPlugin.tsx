@@ -101,7 +101,7 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
   const clear = () => {
     pastRef.current = []
     futureRef.current = []
-    sync()
+    setVersion((count) => count + 1)
   }
 
   const pastCount = pastRef.current.length
