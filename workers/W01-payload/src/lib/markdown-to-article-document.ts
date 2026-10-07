@@ -196,10 +196,6 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
         break
       }
 
-      case 'table':
-        pushUnsupported(unsupported, '表格')
-        break
-
       case 'table': {
         const tableToken = token as unknown as {
           header: Array<{ text: string }>
