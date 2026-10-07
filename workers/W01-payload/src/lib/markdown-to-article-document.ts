@@ -134,9 +134,44 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
         pushBlock(blocks, createArticleBlock('divider'))
         break
 
-      case 'code':
-        pushUnsupported(unsupported, '代码块')
+      case 'code': {
+        const aliases: Record<string, 'plaintext' | 'javascript' | 'typescript' | 'python' | 'json' | 'bash' | 'sql' | 'css' | 'html' | 'markdown'> = {
+          js: 'javascript',
+          jsx: 'javascript',
+          ts: 'typescript',
+          tsx: 'typescript',
+          py: 'python',
+          sh: 'bash',
+          shell: 'bash',
+          yml: 'plaintext',
+          yaml: 'plaintext',
+          md: 'markdown',
+          text: 'plaintext',
+        }
+        const language = aliases[(token.lang ?? '').toLowerCase()]
+          ?? (token.lang ?? '').toLowerCase()
+        const supported = [
+          'plaintext',
+          'javascript',
+          'typescript',
+          'python',
+          'json',
+          'bash',
+          'sql',
+          'css',
+          'html',
+          'markdown',
+        ].includes(language)
+        if (!supported) {
+          pushUnsupported(unsupported, '代码语言：' + (token.lang ?? 'unknown'))
+          break
+        }
+        pushBlock(blocks, {
+          ...createArticleBlock('code', safeText(token.text)),
+          language: language as ArticleBlock['language'],
+        })
         break
+      }
 
       case 'table':
         pushUnsupported(unsupported, '表格')
