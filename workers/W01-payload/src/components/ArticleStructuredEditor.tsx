@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import type { ArticleEditorPlugin, ArticleEditorPluginContext, EditorMediaAsset } from './ArticleEditorPlugin.js'
 import {
   ARTICLE_MAX_BLOCKS,
   ARTICLE_MAX_BLOCK_TEXT,
@@ -13,18 +14,12 @@ import {
   plainTextFromArticleDocument,
 } from '../lib/article-document.js'
 
-type EditorMediaAsset = {
-  id: string
-  url: string
-  filename?: string
-  mimeType: string
-}
-
 type Props = {
   value: ArticleDocument
   disabled?: boolean
   mediaAssets?: EditorMediaAsset[]
   onChange: (value: ArticleDocument, plainText: string) => void
+  plugins?: readonly ArticleEditorPlugin[]
 }
 
 const blockLabels: Record<ArticleBlockType, string> = {
@@ -49,7 +44,7 @@ const updateBlock = (
   ),
 })
 
-export default function ArticleStructuredEditor({ value, disabled = false, mediaAssets = [], onChange }: Props) {
+export default function ArticleStructuredEditor({ value, disabled = false, mediaAssets = [], onChange, plugins = [] }: Props) {
   const imageAssets = useMemo(
     () => mediaAssets.filter((asset) => asset.mimeType.startsWith('image/')),
     [mediaAssets],
@@ -88,6 +83,24 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
       ...value,
       blocks: [...value.blocks, createArticleMediaBlock(type, type === 'image' ? refs.slice(0, 1) : refs.slice(0, 12))],
     })
+  }
+
+  const orderedPlugins = useMemo(
+    () => plugins
+      .filter((plugin) => plugin.id.trim())
+      .slice()
+      .sort((left, right) => (left.order ?? 0) - (right.order ?? 0) || left.id.localeCompare(right.id)),
+    [plugins],
+  )
+
+  const pluginContext: ArticleEditorPluginContext = {
+    value,
+    disabled,
+    plainText: plainTextFromArticleDocument(value),
+    mediaAssets,
+    updateDocument: emit,
+    addBlock,
+    insertMedia,
   }
 
   function removeBlock(index: number) {
@@ -132,6 +145,10 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
               {label}
             </button>
           ))}
+          {orderedPlugins.map((plugin) => {
+            const Toolbar = plugin.Toolbar
+            return Toolbar ? <Toolbar key={plugin.id + ':toolbar'} {...pluginContext} /> : null
+          })}
         </div>
       </div>
 
@@ -160,6 +177,10 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
         >
           插入全部图库（最多 12 个）
         </button>
+        {orderedPlugins.map((plugin) => {
+          const Panel = plugin.Panel
+          return Panel ? <Panel key={plugin.id + ':panel'} {...pluginContext} /> : null
+        })}
       </div>
 
       <div className="lr-article-editor-hint">
