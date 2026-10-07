@@ -12,7 +12,6 @@ export type ArticleDocumentHistory = {
 const snapshot = (document: ArticleDocument): string => JSON.stringify(document)
 
 export const createArticleDocumentHistory = (
-  document: ArticleDocument,
   limit = ARTICLE_DOCUMENT_HISTORY_LIMIT,
 ): ArticleDocumentHistory => ({
   past: [],
