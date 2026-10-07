@@ -1,3 +1,5 @@
+@import 'katex/dist/katex.min.css';
+
 :root {
   --lr-ink: #0b1220;
   --lr-muted: #617086;
@@ -1334,5 +1336,73 @@ main[style*="max-width"] p[style*="#666"] {
   .content-detail-article-table td {
     padding: 8px 10px;
     font-size: 12px;
+  }
+}
+
+
+.content-detail-article-math {
+  margin: 22px 0;
+  padding: 14px 10px;
+  overflow-x: auto;
+  border: 1px solid #e5eaf2;
+  border-radius: 12px;
+  background: #fbfdff;
+}
+
+.content-detail-article-math-expression {
+  min-width: max-content;
+  color: #172033;
+  text-align: center;
+  font-size: 1.05em;
+}
+
+.lr-article-block-math textarea {
+  min-height: 120px;
+  font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.lr-editor-math-panel {
+  width: 100%;
+}
+
+.lr-editor-math-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 11px;
+}
+
+.lr-editor-math-examples button {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid #dbe4ef;
+  border-radius: 7px;
+  background: #fff;
+  color: #526078;
+  font-size: 9px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.lr-editor-math-examples button:hover:not(:disabled) {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.lr-editor-math-examples button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .content-detail-article-math {
+    margin-inline: -3px;
+    border-radius: 9px;
+    padding: 11px 8px;
+  }
+
+  .content-detail-article-math-expression {
+    font-size: .96em;
   }
 }
