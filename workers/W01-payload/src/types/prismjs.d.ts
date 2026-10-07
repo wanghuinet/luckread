@@ -6,3 +6,5 @@ declare module 'prismjs' {
 
   export = Prism
 }
+
+declare module 'prismjs/components/*.js'
