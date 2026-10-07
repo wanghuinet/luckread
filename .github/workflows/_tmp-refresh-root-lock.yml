@@ -19,8 +19,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Refresh root package lock
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Rebuild root package lock
+        run: |
+          rm -f package-lock.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Commit root lockfile
         run: |
           set -euo pipefail
