@@ -84,5 +84,27 @@ jobs:
           assert "      30," in route
           assert "cache-control': 'private, no-store'" in media
           assert 'cachedPublicGet(' not in media
+
+          cache_boundary_routes = [
+            Path('workers/W01-payload/src/app/api/v1/contents/route.ts'),
+            Path('workers/W01-payload/src/app/api/v1/contents/[contentId]/route.ts'),
+            Path('workers/W01-payload/src/app/api/v1/contents/[contentId]/comments/route.ts'),
+            Path('workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts'),
+            Path('workers/W01-payload/src/app/api/v1/users/[userId]/followers/route.ts'),
+            Path('workers/W01-payload/src/app/api/v1/users/[userId]/following/route.ts'),
+            Path('workers/W01-payload/src/app/api/v1/users/[userId]/route.ts'),
+            Path('workers/W01-payload/src/app/api/v1/users/by-username/[username]/route.ts'),
+          ]
+          for cache_route in cache_boundary_routes:
+            source = cache_route.read_text()
+            assert 'enforcePublicReadRateLimit' in source, f'{cache_route} missing public-read edge rate limit'
+          for cache_route in [
+            cache_boundary_routes[1],
+            cache_boundary_routes[2],
+            cache_boundary_routes[3],
+            cache_boundary_routes[4],
+            cache_boundary_routes[5],
+          ]:
+            assert 'hasAuthenticatedSessionCredential' in cache_route.read_text(), f'{cache_route} missing authenticated cache bypass'
           print('1.1_P0_CACHE_BOUNDARY_STATIC=PASS')
           PY
