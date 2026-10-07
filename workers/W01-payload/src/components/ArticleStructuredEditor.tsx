@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react'
 import type { ArticleEditorPlugin, ArticleEditorPluginContext, EditorMediaAsset } from './ArticleEditorPlugin.js'
-import ArticleWordImportButton from './ArticleWordImportButton.js'
 import {
   ARTICLE_MAX_BLOCKS,
   ARTICLE_MAX_BLOCK_TEXT,
@@ -128,7 +127,6 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
           <span>{value.blocks.length} 个区块 · {characterCount} 字</span>
         </div>
         <div className="lr-article-editor-tools" role="toolbar" aria-label="添加正文区块">
-          <ArticleWordImportButton disabled={disabled} onImport={emit} />
           {([
             ['paragraph', '正文'],
             ['heading', '标题'],
