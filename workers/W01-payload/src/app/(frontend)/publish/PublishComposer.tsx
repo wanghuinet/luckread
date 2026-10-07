@@ -66,6 +66,18 @@ async function authorizedFetch(input: RequestInfo | URL, init: RequestInit = {})
 const isVideoAsset = (asset: UploadedAsset): boolean => asset.mimeType.startsWith('video/')
 const isImageAsset = (asset: UploadedAsset): boolean => asset.mimeType.startsWith('image/')
 
+const inferRestoredMediaType = (url: string, contentType: ContentType): string => {
+  if (contentType === 'article') return 'image/*'
+  const pathname = (() => {
+    try {
+      return new URL(url).pathname.toLowerCase()
+    } catch {
+      return url.toLowerCase()
+    }
+  })()
+  return /\.(?:mp4|webm|mov|m4v|avi|mkv)(?:$|[?#])/.test(pathname) ? 'video/*' : 'image/*'
+}
+
 const resolveCoverRef = (
   type: ContentType,
   assets: UploadedAsset[],
@@ -164,7 +176,7 @@ export default function PublishComposer({
           id: url,
           url,
           filename: '已关联媒体',
-          mimeType: 'application/octet-stream',
+          mimeType: inferRestoredMediaType(url, recovered.contentType ?? 'article'),
         })))
         setMessage(recovered.state === 'PENDING_REVIEW' ? '草稿已恢复，当前正在审核。' : '草稿已恢复。')
         restoreCompleteRef.current = true
