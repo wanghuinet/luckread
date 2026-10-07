@@ -16,6 +16,14 @@ describe('Creator Center admin extension', () => {
     expect(users).toContain('admin: payloadAdminOnly')
   })
 
+  it('makes the content version explicit inside the publish preview', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain('<strong>发布预览</strong>')
+    expect(publisher).toContain("aria-label={'预览版本 ' + draft.version}")
+    expect(publisher).toContain('版本 v{draft.version}')
+    expect(publisher).toContain('当前草稿版本')
+  })
+
   it('preserves the full publish return path when authentication expires', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     expect(publisher).toContain('const returnTo = window.location.pathname + window.location.search + window.location.hash')
