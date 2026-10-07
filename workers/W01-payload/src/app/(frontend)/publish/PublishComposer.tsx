@@ -810,7 +810,10 @@ export default function PublishComposer({
       {preview ? (
         <section className="lr-preview" aria-label="发布预览">
           <div className="lr-preview-heading">
-            <strong>发布预览</strong>
+            <div>
+              <strong>发布预览</strong>
+              {draft ? <span aria-label={'预览版本 ' + draft.version}>版本 v{draft.version}</span> : <span>当前草稿版本</span>}
+            </div>
             <button className="ghost" onClick={() => setPreview(false)} type="button">返回编辑</button>
           </div>
           <article className="lr-preview-card">
