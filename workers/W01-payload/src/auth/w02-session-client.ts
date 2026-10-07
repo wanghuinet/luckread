@@ -25,6 +25,12 @@ const forwardedHeaders = (input: Headers): Headers => {
   const headers = new Headers(input)
   headers.delete('host')
   headers.delete('content-length')
+
+  // X-LuckRead-* is reserved for server-to-server transport metadata.
+  // Never let a browser-supplied internal header cross the W01 → W02 boundary.
+  const reserved = Array.from(headers.keys()).filter((name) => name.toLowerCase().startsWith('x-luckread-'))
+  for (const name of reserved) headers.delete(name)
+
   return headers
 }
 
