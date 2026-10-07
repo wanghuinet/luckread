@@ -112,7 +112,7 @@ describe('Creator Center admin extension', () => {
     expect(organization).toContain("formData.append('file', file)")
     expect(organization).toContain("'/api/v1/media'")
     expect(organization).toContain("'Idempotency-Key': 'content-organization-cover-upload:'")
-    expect(organization).toContain("accept="image/*"")
+    expect(organization).toContain('accept="image/*"')
     expect(organization).toContain("coverRef: editForm.coverRef.trim() ? editForm.coverRef.trim() : null")
     expect(organization).toContain('清除封面')
     expect(organization).toContain('组织封面必须是图片文件。')
