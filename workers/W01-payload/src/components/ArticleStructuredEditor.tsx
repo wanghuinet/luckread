@@ -38,6 +38,7 @@ const blockLabels: Record<ArticleBlockType, string> = {
   gallery: '图库',
   code: '代码',
   table: '表格',
+  math: '公式',
 }
 
 const updateBlock = (
@@ -476,7 +477,9 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                     : block.type === 'quote' ? '输入引用内容…'
                       : block.type === 'bulletList' || block.type === 'orderedList'
                         ? '每行一个列表条目…'
-                        : '写下这一段内容…'
+                        : block.type === 'math'
+                          ? '输入 LaTeX，例如 \\frac{a}{b}…'
+                          : '写下这一段内容…'
                 }
                 rows={block.type === 'heading' ? 2 : block.type === 'quote' ? 4 : 5}
                 value={block.text}
