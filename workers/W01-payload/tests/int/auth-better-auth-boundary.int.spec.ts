@@ -34,6 +34,17 @@ describe('W01 Better Auth boundary', () => {
     mocks.enforceAuthRateLimit.mockResolvedValue(undefined)
   })
 
+  it('does not forward browser-supplied internal LuckRead transport headers to W02', () => {
+    const client = readFileSync(
+      resolve(process.cwd(), 'src/auth/w02-session-client.ts'),
+      'utf8',
+    )
+    expect(client).toContain("startsWith('x-luckread-')")
+    expect(client).toContain('headers.delete(name)')
+    expect(client).toContain("headers.delete('host')")
+    expect(client).toContain("headers.delete('content-length')")
+  })
+
   it('does not expose direct Better Auth signup without the W01 registration seam', () => {
     const route = readFileSync(
       resolve(process.cwd(), 'src/app/api/auth/[...segments]/route.ts'),
