@@ -41,6 +41,8 @@ const blockLabels: Record<ArticleBlockType, string> = {
   math: '公式',
 }
 
+const blockDomId = (id: string): string => 'lr-article-block-' + encodeURIComponent(id)
+
 const updateBlock = (
   document: ArticleDocument,
   index: number,
@@ -264,6 +266,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
               (dragOverIndex === index ? ' lr-article-block-drag-over' : '')
             }
             draggable={!disabled}
+            id={blockDomId(block.id)}
             key={block.id}
             onDragEnd={() => {
               setDraggingIndex(null)
