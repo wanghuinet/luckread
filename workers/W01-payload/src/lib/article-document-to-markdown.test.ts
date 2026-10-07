@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { articleDocumentToMarkdown } from './article-document-to-markdown.js'
 import { createArticleTableBlock } from './article-document.js'
+import { markdownToArticleDocument } from './markdown-to-article-document.js'
 
 describe('article document markdown serializer', () => {
   it('serializes structured blocks without using editor DOM', () => {
@@ -25,6 +26,36 @@ describe('article document markdown serializer', () => {
     expect(markdown).toContain('| 名称 | 状态 |')
     expect(markdown).toContain('| --- | --- |')
     expect(markdown).toContain('---')
+  })
+
+  it('round-trips core blocks through the Markdown parser', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [
+        { id: 'h', type: 'heading' as const, text: '标题', level: 2 as const },
+        { id: 'p', type: 'paragraph' as const, text: '正文' },
+        { id: 'c', type: 'code' as const, text: 'const x = 1', language: 'javascript' as const },
+        createArticleTableBlock(['A', 'B'], [['1', '2']]),
+      ],
+    }
+
+    const markdown = articleDocumentToMarkdown(document)
+    const imported = markdownToArticleDocument(markdown)
+
+    expect(imported.unsupported).toEqual([])
+    expect(imported.document.blocks.map((block) => block.type)).toEqual([
+      'heading',
+      'paragraph',
+      'code',
+      'table',
+    ])
+    expect(imported.document.blocks[2]).toMatchObject({
+      language: 'javascript',
+      text: 'const x = 1',
+    })
+    expect(imported.document.blocks[3]).toMatchObject({
+      table: { headers: ['A', 'B'], rows: [['1', '2']] },
+    })
   })
 
   it('escapes markdown table cell delimiters safely', () => {
