@@ -14,17 +14,28 @@ function MarkdownExportPanel({
   const [open, setOpen] = useState(false)
   const [markdown, setMarkdown] = useState('')
   const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState(false)
 
   function generate() {
     setMarkdown(articleDocumentToMarkdown(value))
     setCopied(false)
+    setCopyError(false)
     setOpen(true)
   }
 
   async function copy() {
-    if (!markdown || typeof navigator === 'undefined' || !navigator.clipboard) return
-    await navigator.clipboard.writeText(markdown)
-    setCopied(true)
+    if (!markdown || typeof navigator === 'undefined' || !navigator.clipboard) {
+      setCopyError(true)
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(markdown)
+      setCopied(true)
+      setCopyError(false)
+    } catch {
+      setCopied(false)
+      setCopyError(true)
+    }
   }
 
   return (
@@ -66,6 +77,7 @@ function MarkdownExportPanel({
               ×
             </button>
           </div>
+          {copyError ? <div className="lr-editor-plugin-error" role="alert">当前浏览器不允许访问剪贴板，请手动复制下方内容。</div> : null}
           <textarea
             aria-label="Markdown 导出内容"
             className="lr-editor-markdown-input"
