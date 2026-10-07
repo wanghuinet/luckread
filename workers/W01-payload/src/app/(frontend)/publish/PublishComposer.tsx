@@ -644,6 +644,7 @@ export default function PublishComposer({
           <strong>{stateLabel}</strong>
           <span>版本 {draft.version}</span>
         </div>
+      ) : null}
       {draft?.state === 'DRAFT' ? (
         <div className="lr-content-status" role="status" aria-live="polite">
           <span>自动保存</span>
@@ -655,7 +656,6 @@ export default function PublishComposer({
                     : '等待编辑'}
           </strong>
         </div>
-      ) : null}
       ) : null}
       {message ? <div className="lr-success" role="status">{message}</div> : null}
       {error ? <div className="lr-error" role="alert">{error}</div> : null}
