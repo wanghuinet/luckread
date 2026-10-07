@@ -115,6 +115,15 @@ describe('Creator Center admin extension', () => {
     expect(moderation).toContain('if (response.status === 401)')
   })
 
+  it('preserves the structured article document when switching content types away and back', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain('const existingArticleText = plainTextFromArticleDocument(articleDocument).trim()')
+    expect(publisher).toContain('const nextDocument = existingArticleText')
+    expect(publisher).toContain('  ? articleDocument')
+    expect(publisher).toContain('  : articleDocumentFromBody(body)')
+    expect(publisher).not.toContain('const nextDocument = articleDocumentFromBody(body)')
+  })
+
   it('hardens short-video media validation and cover selection', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
 
