@@ -96,7 +96,10 @@ export default function PublishComposer({
     let cancelled = false
     const controller = new AbortController()
     const draftId = new URL(window.location.href).searchParams.get('draft')?.trim()
-    if (!draftId) return
+    if (!draftId) {
+      restoreCompleteRef.current = true
+      return
+    }
 
     async function restoreDraft() {
       setBusy(true)
@@ -256,6 +259,7 @@ export default function PublishComposer({
     const saved = data as ContentResponse
     setDraft(saved)
     setSavedBody(body)
+    autoSaveLastSavedAtRef.current = Date.now()
     const nextUrl = new URL(window.location.href)
     nextUrl.searchParams.set('draft', saved.id)
     window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
