@@ -58,6 +58,27 @@ describe('Markdown editor plugin', () => {
     })
   })
 
+  it('keeps multiple display-math blocks isolated during import', () => {
+    const result = markdownToArticleDocument([
+      '$x$',
+      '',
+      '中间正文',
+      '',
+      '$',
+      '\\frac{a}{b}',
+      '$',
+    ].join('\\n'))
+
+    expect(result.unsupported).toEqual([])
+    expect(result.document.blocks.map((block) => block.type)).toEqual([
+      'math',
+      'paragraph',
+      'math',
+    ])
+    expect(result.document.blocks[0]?.text).toBe('x')
+    expect(result.document.blocks[2]?.text).toBe('\\frac{a}{b}')
+  })
+
   it('imports markdown tables into structured table blocks', () => {
     const result = markdownToArticleDocument([
       '| 名称 | 状态 |',
