@@ -13,6 +13,7 @@ import {
   duplicateArticleBlock,
   insertArticleBlockAfter,
   removeMediaRefFromArticleDocument,
+  reorderArticleMediaRef,
   transformArticleBlock,
   serializeArticleDocument,
   tryDeserializeArticleDocument,
@@ -221,6 +222,53 @@ describe('article structured document', () => {
     expect(next.blocks[1]?.type).toBe('image')
     expect(next.blocks[1]?.mediaRefs).toEqual(['https://media.example/2.jpg'])
     expect(document.blocks[0]?.mediaRefs).toEqual(['https://media.example/1.jpg'])
+  })
+
+  it('reorders gallery media without changing block identity or other content', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [
+        createArticleMediaBlock('gallery', [
+          'https://media.example/1.jpg',
+          'https://media.example/2.jpg',
+          'https://media.example/3.jpg',
+        ], '图库说明'),
+      ],
+    }
+
+    const next = reorderArticleMediaRef(document, 0, 2, 0)
+
+    expect(next).not.toBe(document)
+    expect(next.blocks[0]?.id).toBe(document.blocks[0]?.id)
+    expect(next.blocks[0]?.text).toBe('图库说明')
+    expect(next.blocks[0]?.mediaRefs).toEqual([
+      'https://media.example/3.jpg',
+      'https://media.example/1.jpg',
+      'https://media.example/2.jpg',
+    ])
+    expect(document.blocks[0]?.mediaRefs).toEqual([
+      'https://media.example/1.jpg',
+      'https://media.example/2.jpg',
+      'https://media.example/3.jpg',
+    ])
+  })
+
+  it('is a no-op for invalid gallery media reorder requests', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [
+        createArticleMediaBlock('image', ['https://media.example/1.jpg']),
+        createArticleMediaBlock('gallery', [
+          'https://media.example/2.jpg',
+          'https://media.example/3.jpg',
+        ]),
+      ],
+    }
+
+    expect(reorderArticleMediaRef(document, 0, 0, 1)).toBe(document)
+    expect(reorderArticleMediaRef(document, 1, -1, 1)).toBe(document)
+    expect(reorderArticleMediaRef(document, 1, 0, 2)).toBe(document)
+    expect(reorderArticleMediaRef(document, 1, 1, 1)).toBe(document)
   })
 
   it('is a no-op for an empty media reference', () => {
