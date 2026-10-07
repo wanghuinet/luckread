@@ -680,6 +680,7 @@ describe('W05 social comment transport', () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe('"2026-10-02T00:02:00.000Z"')
+    expect(response.headers.get('X-LuckRead-Content-Id')).toBe('content-1')
   })
 
   it('requires If-Match for comment updates', async () => {
@@ -711,11 +712,12 @@ describe('W05 social comment transport', () => {
       }),
       {
         DB: dbFor([
-          { id: 'comment-1', author_user_id: 'viewer-1', state: 'PUBLISHED', has_replies: 0 },
+          { id: 'comment-1', content_id: 'content-1', author_user_id: 'viewer-1', state: 'PUBLISHED', has_replies: 0 },
         ]),
       },
     )
     expect(response.status).toBe(204)
+    expect(response.headers.get('X-LuckRead-Content-Id')).toBe('content-1')
   })
 
   it('requires an idempotency key for comment deletion', async () => {
