@@ -645,6 +645,7 @@ describe('W05 social comment transport', () => {
           'X-LuckRead-Principal-User-Id': 'viewer-1',
           'X-LuckRead-Principal-Layer': 'L2',
           'If-Match': '"2026-10-02T00:01:00.000Z"',
+          'Idempotency-Key': 'comment-update-1',
           'content-type': 'application/json',
         },
         body: JSON.stringify({ body: '修改后的评论' }),
@@ -708,6 +709,7 @@ describe('W05 social comment transport', () => {
           ...commentHeaders,
           'X-LuckRead-Principal-User-Id': 'viewer-1',
           'X-LuckRead-Principal-Layer': 'L2',
+          'Idempotency-Key': 'comment-delete-1',
         },
       }),
       {
@@ -735,7 +737,7 @@ describe('W05 social comment transport', () => {
     expect(response.status).toBe(428)
   })
 
-  it('rejects non-DELETE comment item transport', async () => {
+  it('rejects unsupported comment item transport', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
         method: 'GET',
@@ -743,6 +745,7 @@ describe('W05 social comment transport', () => {
           ...commentHeaders,
           'X-LuckRead-Principal-User-Id': 'viewer-1',
           'X-LuckRead-Principal-Layer': 'L2',
+          'Idempotency-Key': 'comment-unsupported-1',
         },
       }),
       { DB: dbFor([]) },
