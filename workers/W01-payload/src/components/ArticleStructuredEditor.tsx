@@ -81,7 +81,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
       return
     }
     if (type === 'image' || type === 'gallery') {
-      const refs = mediaAssets.map((asset) => asset.url).filter(Boolean)
+      const refs = imageAssets.map((asset) => asset.url).filter(Boolean)
       if (type === 'image' && refs.length < 1) return
       if (type === 'gallery' && refs.length < 2) return
       emit({
@@ -98,7 +98,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
 
   function insertMedia(type: 'image' | 'gallery', assetUrls?: string[]) {
     if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
-    const refs = (assetUrls ?? mediaAssets.map((asset) => asset.url)).filter(Boolean)
+    const refs = (assetUrls ?? imageAssets.map((asset) => asset.url)).filter(Boolean)
     if (type === 'image' && refs.length < 1) return
     if (type === 'gallery' && refs.length < 2) return
     emit({
