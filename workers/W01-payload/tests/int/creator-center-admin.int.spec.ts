@@ -106,6 +106,16 @@ describe('Creator Center admin extension', () => {
     expect(members).not.toContain('limit=1000')
   })
 
+  it('paginates Creator Studio Series and Collection organization lists', () => {
+    const organization = read('src/app/(payload)/v1beta/CreatorContentOrganization.tsx')
+    expect(organization).toContain("const [loadingMore, setLoadingMore] = useState(false)")
+    expect(organization).toContain("if (cursor) params.set('cursor', cursor)")
+    expect(organization).toContain("async function loadMoreOrganizations()")
+    expect(organization).toContain("readPage(kind, controller.signal, loginPath, page.nextCursor)")
+    expect(organization).toContain('加载更多')
+    expect(organization).toContain('items: [...current[kind].items, ...next.items]')
+  })
+
   it('connects Creator Studio organizations to canonical member attach, reorder and remove APIs', () => {
     const organization = read('src/app/(payload)/v1beta/CreatorContentOrganization.tsx')
     const members = read('src/app/(payload)/v1beta/CreatorContentOrganizationMembers.tsx')
