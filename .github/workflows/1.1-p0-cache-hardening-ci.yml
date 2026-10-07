@@ -8,6 +8,8 @@ on:
       - 'workers/W01-payload/src/lib/public-response-cache.test.ts'
       - 'workers/W01-payload/src/lib/content-list-cache-guard.ts'
       - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
+      - 'workers/W01-payload/src/content/w03-content-client.ts'
+      - 'workers/W01-payload/src/content/w03-content-client.test.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
       - 'workers/W01-payload/src/app/api/v1/contents/[contentId]/comments/route.ts'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/route.ts'
@@ -74,6 +76,7 @@ jobs:
           comments = Path('workers/W01-payload/src/app/api/v1/contents/[contentId]/comments/route.ts').read_text()
           profile = Path('workers/W01-payload/src/app/api/v1/users/[userId]/route.ts').read_text()
           username = Path('workers/W01-payload/src/app/api/v1/users/by-username/[username]/route.ts').read_text()
+          w03_client = Path('workers/W01-payload/src/content/w03-content-client.ts').read_text()
           followers = Path('workers/W01-payload/src/app/api/v1/users/[userId]/followers/route.ts').read_text()
           following = Path('workers/W01-payload/src/app/api/v1/users/[userId]/following/route.ts').read_text()
           share = Path('workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts').read_text()
@@ -86,6 +89,8 @@ jobs:
           assert route.index('if (hasAuthenticatedSessionCredential(request))') < route.index('return await cachedPublicGet')
           assert 'resolveCookieContentPrincipal' in route
           assert 'invalidatePublicContentList' in route
+          assert 'hasAuthenticatedSessionCredential' in w03_client
+          assert 'if (!hasAuthenticatedSessionCredential(request)) return null' in w03_client
           assert 'invalidatePublicContentList' in detail
           assert 'await enforcePublicReadRateLimit(request)' in detail
           assert detail.index('await enforcePublicReadRateLimit(request)') < detail.index('return await cachedPublicGet')
