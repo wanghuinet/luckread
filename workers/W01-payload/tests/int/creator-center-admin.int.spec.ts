@@ -118,6 +118,15 @@ describe('Creator Center admin extension', () => {
     expect(members).toContain('page.hasMore')
   })
 
+  it('filters only already-loaded creator content without adding a search endpoint', () => {
+    const list = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
+    expect(list).toContain('const [localFilter, setLocalFilter] = useState(\'\')')
+    expect(list).toContain('const visibleItems = useMemo(() => {')
+    expect(list).toContain('筛选已加载内容（标题或 ID）')
+    expect(list).toContain('当前筛选只作用于已经加载的内容；可清空筛选或继续加载更多。')
+    expect(list).toContain('{visibleItems.map((item) => (')
+  })
+
   it('filters only already-loaded organization members and candidates', () => {
     const members = read('src/app/(payload)/v1beta/CreatorContentOrganizationMembers.tsx')
     expect(members).toContain("const [candidateFilter, setCandidateFilter] = useState('')")
