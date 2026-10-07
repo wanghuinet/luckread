@@ -76,6 +76,15 @@ const normalizeCodeLanguage = (value: unknown): ArticleCodeLanguage =>
     ? value as ArticleCodeLanguage
     : 'plaintext'
 
+const normalizeTableCell = (value: unknown): string => {
+  if (typeof value !== 'string') throw new Error('INVALID_ARTICLE_BLOCK')
+  const clean = stripUnsafeControls(value)
+  if (clean.length > ARTICLE_TABLE_MAX_CELL_TEXT) {
+    throw new Error('INVALID_ARTICLE_BLOCK')
+  }
+  return clean
+}
+
 const normalizeTable = (value: unknown): ArticleTable | undefined => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('INVALID_ARTICLE_BLOCK')
@@ -92,16 +101,12 @@ const normalizeTable = (value: unknown): ArticleTable | undefined => {
     throw new Error('INVALID_ARTICLE_BLOCK')
   }
 
-  const headers = candidate.headers.map((cell) =>
-    typeof cell === 'string' ? stripUnsafeControls(cell).slice(0, ARTICLE_TABLE_MAX_CELL_TEXT) : ''
-  )
+  const headers = candidate.headers.map(normalizeTableCell)
   const rows = candidate.rows.map((row) => {
     if (!Array.isArray(row) || row.length !== headers.length) {
       throw new Error('INVALID_ARTICLE_BLOCK')
     }
-    return row.map((cell) =>
-      typeof cell === 'string' ? stripUnsafeControls(cell).slice(0, ARTICLE_TABLE_MAX_CELL_TEXT) : ''
-    )
+    return row.map(normalizeTableCell)
   })
 
   return { headers, rows }
@@ -121,10 +126,8 @@ export const createArticleTableBlock = (
   }
 
   const table: ArticleTable = {
-    headers: headers.map((cell) => stripUnsafeControls(cell).slice(0, ARTICLE_TABLE_MAX_CELL_TEXT)),
-    rows: rows.map((row) =>
-      row.map((cell) => stripUnsafeControls(cell).slice(0, ARTICLE_TABLE_MAX_CELL_TEXT))
-    ),
+    headers: headers.map(normalizeTableCell),
+    rows: rows.map((row) => row.map(normalizeTableCell)),
   }
 
   return {
