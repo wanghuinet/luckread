@@ -6,11 +6,14 @@ import {
   ARTICLE_MAX_BLOCKS,
   ARTICLE_CODE_LANGUAGES,
   ARTICLE_MAX_BLOCK_TEXT,
+  ARTICLE_TABLE_MAX_COLUMNS,
+  ARTICLE_TABLE_MAX_ROWS,
   type ArticleBlock,
   type ArticleBlockType,
   type ArticleDocument,
   createArticleBlock,
   createArticleMediaBlock,
+  createArticleTableBlock,
   normalizeArticleDocument,
   plainTextFromArticleDocument,
 } from '../lib/article-document.js'
@@ -33,6 +36,7 @@ const blockLabels: Record<ArticleBlockType, string> = {
   image: '图片',
   gallery: '图库',
   code: '代码',
+  table: '表格',
 }
 
 const updateBlock = (
@@ -60,6 +64,13 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
 
   function addBlock(type: ArticleBlockType) {
     if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
+    if (type === 'table') {
+      emit({
+        ...value,
+        blocks: [...value.blocks, createArticleTableBlock()],
+      })
+      return
+    }
     if (type === 'image' || type === 'gallery') {
       const refs = mediaAssets.map((asset) => asset.url).filter(Boolean)
       if (type === 'image' && refs.length < 1) return
@@ -85,6 +96,20 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
       ...value,
       blocks: [...value.blocks, createArticleMediaBlock(type, type === 'image' ? refs.slice(0, 1) : refs.slice(0, 12))],
     })
+  }
+
+  function updateTable(index: number, table: NonNullable<ArticleBlock['table']>) {
+    if (
+      table.headers.length < 1 ||
+      table.headers.length > ARTICLE_TABLE_MAX_COLUMNS ||
+      table.rows.length > ARTICLE_TABLE_MAX_ROWS ||
+      table.rows.some((row) => row.length !== table.headers.length)
+    ) return
+
+    emit(updateBlock(value, index, {
+      table,
+      text: table.rows.map((row) => row.join('\t')).join('\n'),
+    }))
   }
 
   const orderedPlugins = useMemo(
@@ -260,6 +285,92 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                   rows={10}
                   value={block.text}
                 />
+              </div>
+            ) : block.type === 'table' ? (
+              <div className="lr-article-table-editor">
+                <table>
+                  <thead>
+                    <tr>
+                      {block.table?.headers.map((header, columnIndex) => (
+                        <th key={block.id + ':head:' + columnIndex}>
+                          <input
+                            aria-label={'表头第 ' + (columnIndex + 1) + ' 列'}
+                            disabled={disabled}
+                            maxLength={2_000}
+                            onChange={(event) => {
+                              const table = block.table
+                              if (!table) return
+                              const headers = table.headers.map((cell, index) =>
+                                index === columnIndex ? event.target.value : cell,
+                              )
+                              updateTable(index, { ...table, headers })
+                            }}
+                            value={header}
+                          />
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {block.table?.rows.map((row, rowIndex) => (
+                      <tr key={block.id + ':row:' + rowIndex}>
+                        {row.map((cell, columnIndex) => (
+                          <td key={block.id + ':cell:' + rowIndex + ':' + columnIndex}>
+                            <input
+                              aria-label={'第 ' + (rowIndex + 1) + ' 行第 ' + (columnIndex + 1) + ' 列'}
+                              disabled={disabled}
+                              maxLength={2_000}
+                              onChange={(event) => {
+                                const table = block.table
+                                if (!table) return
+                                const rows = table.rows.map((currentRow, currentRowIndex) =>
+                                  currentRowIndex === rowIndex
+                                    ? currentRow.map((currentCell, currentColumnIndex) =>
+                                        currentColumnIndex === columnIndex ? event.target.value : currentCell,
+                                      )
+                                    : currentRow,
+                                )
+                                updateTable(index, { ...table, rows })
+                              }}
+                              value={cell}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="lr-article-table-actions">
+                  <button
+                    disabled={disabled || !block.table || block.table.headers.length >= ARTICLE_TABLE_MAX_COLUMNS}
+                    onClick={() => {
+                      const table = block.table
+                      if (!table || table.headers.length >= ARTICLE_TABLE_MAX_COLUMNS) return
+                      updateTable(index, {
+                        headers: [...table.headers, '新列'],
+                        rows: table.rows.map((row) => [...row, '']),
+                      })
+                    }}
+                    type="button"
+                  >
+                    加一列
+                  </button>
+                  <button
+                    disabled={disabled || !block.table || block.table.rows.length >= ARTICLE_TABLE_MAX_ROWS}
+                    onClick={() => {
+                      const table = block.table
+                      if (!table || table.rows.length >= ARTICLE_TABLE_MAX_ROWS) return
+                      updateTable(index, {
+                        headers: [...table.headers],
+                        rows: [...table.rows, table.headers.map(() => '')],
+                      })
+                    }}
+                    type="button"
+                  >
+                    加一行
+                  </button>
+                </div>
               </div>
             ) : block.type === 'image' || block.type === 'gallery' ? (
               <div className="lr-article-media-block">
