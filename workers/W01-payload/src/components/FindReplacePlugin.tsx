@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ARTICLE_MAX_BLOCK_TEXT,
   ARTICLE_TABLE_MAX_CELL_TEXT,
@@ -32,6 +32,22 @@ function FindReplacePanel({ disabled, value, updateDocument }: ArticleEditorPlug
   const [replacement, setReplacement] = useState('')
   const [caseSensitive, setCaseSensitive] = useState(false)
   const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        setOpen(true)
+        return
+      }
+      if (event.key === 'Escape' && open) {
+        setOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [open])
 
   const matchCount = useMemo(() => {
     if (!search) return 0
