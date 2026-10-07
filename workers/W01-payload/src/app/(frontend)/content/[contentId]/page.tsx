@@ -113,5 +113,10 @@ export default async function ContentDetailPage({
     permanentRedirect('/content/' + encodeURIComponent(content.slug))
   }
 
-  return <ContentDetailClient params={Promise.resolve({ contentId: content.slug || contentId })} />
+  return (
+    <ContentDetailClient
+      initialContent={content}
+      params={Promise.resolve({ contentId: content.slug || contentId })}
+    />
+  )
 }
