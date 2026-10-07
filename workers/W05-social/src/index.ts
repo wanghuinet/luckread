@@ -13,6 +13,7 @@ import { getRelationshipGraph, invalidateRelationshipGraph, RelationshipGraphRun
 import {
   FollowRuntimeError,
   follow,
+  invalidateFollowListCountCache,
   listFollowers,
   listFollowing,
   parseFollowListLimit,
@@ -197,6 +198,9 @@ export default {
           }
           const relation = await setRelation(env.DB, actorUserId, targetUserId, relationType)
           await invalidateRelationshipGraph(actorUserId, targetUserId)
+          if (relationType === 'block') {
+            await invalidateFollowListCountCache(actorUserId, targetUserId)
+          }
           return json({
             data: relation,
             requestId: crypto.randomUUID(),
@@ -212,6 +216,9 @@ export default {
           }
           await removeRelation(env.DB, actorUserId, targetFromPath, relationType)
           await invalidateRelationshipGraph(actorUserId, targetFromPath)
+          if (relationType === 'block') {
+            await invalidateFollowListCountCache(actorUserId, targetFromPath)
+          }
           return new Response(null, { status: 204 })
         }
 
