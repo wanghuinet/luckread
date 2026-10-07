@@ -17,23 +17,23 @@ export type MarkdownImportResult = {
   unsupported: string[]
 }
 
-const INLINE_LINK_PATTERN = /!?\\[[^\\]]*\\]\\([^)]*\\)/
-const REFERENCE_LINK_PATTERN = /\\[[^\\]]+\\]\\[[^\\]]*\\]/
+const INLINE_LINK_PATTERN = new RegExp('!?\\[[^\\]]*\\]\\([^)]*\\)')
+const REFERENCE_LINK_PATTERN = new RegExp('\\[[^\\]]+\\]\\[[^\\]]*\\]')
 
 const stripInlineMarkdown = (value: string): string =>
   value
-    .replace(/<[^>]+>/g, '')
-    .replace(/!\\[([^\\]]*)\\]\\([^)]*\\)/g, '$1')
-    .replace(/\\[([^\\]]+)\\]\\([^)]*\\)/g, '$1')
-    .replace(/\\[([^\\]]+)\\]\\[[^\\]]*\\]/g, '$1')
-    .replace(/\\\\([\\\x60*_{}\\[\\]()#+.!<>-])/g, '$1')
-    .replace(/(^|\\s)(\\*\\*|__)(?=\\S)/g, '$1')
-    .replace(/(\\*\\*|__)(?=\\s|$)/g, '')
-    .replace(/(^|\\s)(\\*|_|~~)(?=\\S)/g, '$1')
-    .replace(/(\\*|_|~~)(?=\\s|$)/g, '')
-    .replace(/\x60/g, '')
-    .replace(/[ \\t]+\\n/g, '\\n')
-    .replace(/\\n{3,}/g, '\\n\\n')
+    .replace(new RegExp('<[^>]+>', 'g'), '')
+    .replace(new RegExp('!\\[([^\\]]*)\\]\\([^)]*\\)', 'g'), '$1')
+    .replace(new RegExp('\\[([^\\]]+)\\]\\([^)]*\\)', 'g'), '$1')
+    .replace(new RegExp('\\[([^\\]]+)\\]\\[[^\\]]*\\]', 'g'), '$1')
+    .replace(new RegExp('\\\\([\\\\\\x60*_{}\\[\\]()#+.!<>-])', 'g'), '$1')
+    .replace(new RegExp('(^|\\s)(\\*\\*|__)(?=\\S)', 'g'), '$1')
+    .replace(new RegExp('(\\*\\*|__)(?=\\s|$)', 'g'), '')
+    .replace(new RegExp('(^|\\s)(\\*|_|~~)(?=\\S)', 'g'), '$1')
+    .replace(new RegExp('(\\*|_|~~)(?=\\s|$)', 'g'), '')
+    .replace(new RegExp('\\x60', 'g'), '')
+    .replace(new RegExp('[ \\t]+\\n', 'g'), '\\n')
+    .replace(new RegExp('\\n{3,}', 'g'), '\\n\\n')
     .trim()
 
 const safeText = (value: string): string =>
@@ -45,6 +45,40 @@ const pushBlock = (blocks: ArticleBlock[], block: ArticleBlock): void => {
 
 const pushUnsupported = (unsupported: string[], kind: string): void => {
   if (!unsupported.includes(kind)) unsupported.push(kind)
+}
+
+const normalizeMarkdownCodeLanguage = (language: string | undefined): ArticleBlock['language'] => {
+  const normalized = (language ?? '').trim().toLowerCase()
+  const aliases: Record<string, NonNullable<ArticleBlock['language']>> = {
+    '': 'plaintext',
+    text: 'plaintext',
+    txt: 'plaintext',
+    yml: 'plaintext',
+    yaml: 'plaintext',
+    js: 'javascript',
+    jsx: 'javascript',
+    ts: 'typescript',
+    tsx: 'typescript',
+    py: 'python',
+    sh: 'bash',
+    shell: 'bash',
+    md: 'markdown',
+  }
+  const candidate = aliases[normalized] ?? normalized
+  return [
+    'plaintext',
+    'javascript',
+    'typescript',
+    'python',
+    'json',
+    'bash',
+    'sql',
+    'css',
+    'html',
+    'markdown',
+  ].includes(candidate as NonNullable<ArticleBlock['language']>)
+    ? candidate as NonNullable<ArticleBlock['language']>
+    : undefined
 }
 
 export const markdownToArticleDocument = (markdown: string): MarkdownImportResult => {
@@ -78,17 +112,18 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
       case 'heading': {
         const text = safeText(stripInlineMarkdown(token.text))
         if (!text) continue
-        pushBlock(blocks, createArticleBlock('heading', text))
-        const next = blocks[blocks.length - 1]
-        if (next?.type === 'heading') {
-          next.level = token.depth >= 3 ? 3 : 2
-        }
+        pushBlock(blocks, {
+          ...createArticleBlock('heading', text),
+          level: token.depth >= 3 ? 3 : 2,
+        })
         break
       }
 
       case 'paragraph': {
         const raw = token.text.trim()
-        const imageMatch = raw.match(/^!\\[([^\\]]*)\\]\\((https?:\\/\\/[^)\\s]+)(?:\\s+[^)]*)?\\)$/)
+        const imageMatch = raw.match(
+          new RegExp(/^!\[([^\]]*)\]\((https?:\\/\\/[^)\\s]+)(?:\\s+[^)]*)?\)$/),
+        )
         if (imageMatch) {
           pushBlock(
             blocks,
@@ -97,7 +132,7 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
           break
         }
 
-        if (/!\\[[^\\]]*\\]\\(/.test(raw)) {
+        if (new RegExp('!\\[[^\\]]*\\]\\(').test(raw)) {
           pushUnsupported(unsupported, '内嵌图片')
           continue
         }
@@ -121,7 +156,7 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
         const text = token.items
           .map((item) => safeText(stripInlineMarkdown(item.text)))
           .filter(Boolean)
-          .join('\\n')
+          .join('\n')
         if (!text) continue
         pushBlock(
           blocks,
@@ -135,40 +170,14 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
         break
 
       case 'code': {
-        const aliases: Record<string, 'plaintext' | 'javascript' | 'typescript' | 'python' | 'json' | 'bash' | 'sql' | 'css' | 'html' | 'markdown'> = {
-          js: 'javascript',
-          jsx: 'javascript',
-          ts: 'typescript',
-          tsx: 'typescript',
-          py: 'python',
-          sh: 'bash',
-          shell: 'bash',
-          yml: 'plaintext',
-          yaml: 'plaintext',
-          md: 'markdown',
-          text: 'plaintext',
-        }
-        const language = aliases[(token.lang ?? '').toLowerCase()]
-          ?? (token.lang ?? '').toLowerCase()
-        const supported = [
-          'plaintext',
-          'javascript',
-          'typescript',
-          'python',
-          'json',
-          'bash',
-          'sql',
-          'css',
-          'html',
-          'markdown',
-        ].includes(language)
-        if (!supported) {
+        const language = normalizeMarkdownCodeLanguage(token.lang)
+        if (!language) {
           pushUnsupported(unsupported, '代码语言：' + (token.lang ?? 'unknown'))
           break
         }
         pushBlock(blocks, {
           ...createArticleBlock('code', safeText(token.text)),
-          language: language as ArticleBlock['language'],
+          language,
         })
         break
       }
