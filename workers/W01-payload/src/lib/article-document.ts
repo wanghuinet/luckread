@@ -231,6 +231,44 @@ export const removeMediaRefFromArticleDocument = (
   return changed ? { ...document, blocks } : document
 }
 
+export const reorderArticleMediaRef = (
+  document: ArticleDocument,
+  blockIndex: number,
+  fromIndex: number,
+  toIndex: number,
+): ArticleDocument => {
+  const block = document.blocks[blockIndex]
+  if (
+    !block ||
+    block.type !== 'gallery' ||
+    !block.mediaRefs ||
+    block.mediaRefs.length < 2 ||
+    !Number.isInteger(fromIndex) ||
+    !Number.isInteger(toIndex) ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= block.mediaRefs.length ||
+    toIndex >= block.mediaRefs.length ||
+    fromIndex === toIndex
+  ) {
+    return document
+  }
+
+  const mediaRefs = [...block.mediaRefs]
+  const [moved] = mediaRefs.splice(fromIndex, 1)
+  if (!moved) return document
+  mediaRefs.splice(toIndex, 0, moved)
+
+  return {
+    ...document,
+    blocks: document.blocks.map((candidate, candidateIndex) =>
+      candidateIndex === blockIndex
+        ? { ...candidate, mediaRefs }
+        : candidate,
+    ),
+  }
+}
+
 export const hasArticleDocumentContent = (document: ArticleDocument): boolean =>
   Boolean(plainTextFromArticleDocument(document).trim()) ||
   mediaRefsFromArticleDocument(document).length > 0

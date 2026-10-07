@@ -995,6 +995,22 @@
   cursor: pointer;
 }
 
+.lr-article-media-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.lr-article-media-actions button {
+  width: auto;
+  margin-top: 0;
+  padding: 5px 8px;
+}
+
+.lr-article-media-actions button:last-child {
+  flex: 1 1 auto;
+}
+
 .lr-article-media-block figure button:hover:not(:disabled) {
   border-color: #bfdbfe;
   color: #1d4ed8;

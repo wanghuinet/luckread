@@ -198,6 +198,18 @@ describe('Creator Center admin extension', () => {
     expect(plugin).toContain('transformBlock: (index: number, type: ArticleBlockType) => void')
   })
 
+  it('exposes gallery media reorder controls', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const document = read('src/lib/article-document.ts')
+
+    expect(document).toContain('export const reorderArticleMediaRef')
+    expect(editor).toContain('reorderArticleMediaRef(value, blockIndex, mediaIndex, mediaIndex + direction)')
+    expect(editor).toContain("aria-label={'上移第 ' + String(mediaIndex + 1) + ' 张图片'}")
+    expect(editor).toContain("aria-label={'下移第 ' + String(mediaIndex + 1) + ' 张图片'}")
+    expect(editor).toContain('className="lr-article-media-actions"')
+    expect(editor).toContain('从正文移除')
+  })
+
   it('exposes contextual article block insertion', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const document = read('src/lib/article-document.ts')
