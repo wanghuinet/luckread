@@ -251,7 +251,7 @@ export default {
           await parseBody(request),
           requireIdempotency(request),
         )
-        return json({ data: series, requestId: crypto.randomUUID() }, 201)
+        return json({ data: series, schemaVersion: '1.0', requestId: crypto.randomUUID() }, 201)
       }
 
       if (path && path.series && request.method === 'GET' && path.id === undefined) {
@@ -264,12 +264,12 @@ export default {
           cursor,
           parseListLimit(url.searchParams.get('limit')),
         )
-        return json({ data: page, requestId: crypto.randomUUID() })
+        return json({ data: page, schemaVersion: '1.0', requestId: crypto.randomUUID() })
       }
 
       if (path && path.series && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
-        return json({ data: await getSeries(env.D1_02, principal.userId, path.id), requestId: crypto.randomUUID() })
+        return json({ data: await getSeries(env.D1_02, principal.userId, path.id), schemaVersion: '1.0', requestId: crypto.randomUUID() })
       }
 
       if (path && path.series && path.id && request.method === 'PATCH') {
@@ -283,6 +283,7 @@ export default {
             requireIfMatch(request),
             requireIdempotency(request),
           ),
+          schemaVersion: '1.0',
           requestId: crypto.randomUUID(),
         })
       }
