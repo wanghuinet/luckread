@@ -495,7 +495,10 @@ export default function PublishComposer({
       contentType: type,
       title: title.trim(),
       body,
-      mediaRefs: assets.map((asset) => asset.url),
+      mediaRefs: Array.from(new Set([
+        ...assets.map((asset) => asset.url),
+        ...(type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : []),
+      ])),
       coverRef: resolveCoverRef(
         type,
         assets,
