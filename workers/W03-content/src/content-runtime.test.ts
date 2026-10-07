@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, createContent, decodeCursor, encodeCursor, isState, listContents, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -529,4 +529,262 @@ describe('1.1 content revision history', () => {
       runtime.indexOf('atomicGuard(db)', rollbackIndex),
     )
   })
+})
+
+
+it('maps an authoritative D1 CAS guard failure to HTTP 412', async () => {
+  const row = {
+    id: 'content_cas_412_123',
+    content_type: 'article',
+    owner_user_id: 'user_cas_412',
+    creator_id: 'user_cas_412',
+    ip_id: null,
+    state: 'DRAFT',
+    version: 2,
+    revision: 2,
+    slug: 'cas-412',
+    title: 'CAS guard test',
+    body_ref: 'https://cdn.example.com/body.txt',
+    media_refs_json: '[]',
+    cover_ref: null,
+    etag: 'W/"2"',
+    created_at: '2026-10-07T12:00:00.000Z',
+    updated_at: '2026-10-07T12:01:00.000Z',
+    idem_id: null,
+    idem_owner_user_id: null,
+    idem_request_hash: null,
+    idem_status: null,
+    idem_response_status: null,
+    idem_response_json: null,
+    idem_expires_at: null,
+  }
+  const db = {
+    prepare() {
+      return { bind: (...bindings: unknown[]) => ({ first: async () => { expect(bindings).toContain('content_cas_412_123'); return row } }) }
+    },
+    batch: async () => { throw new Error('CHECK constraint failed: successful') },
+  } as never
+  await expect(updateContent(
+    db,
+    'user_cas_412',
+    'content_cas_412_123',
+    { contentType: 'article', title: 'Updated title', bodyRef: 'https://cdn.example.com/body-v2.txt', mediaRefs: [], coverRef: null },
+    'W/"2"',
+    'content-cas-412-idem',
+  )).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
+})
+
+it('does not misclassify unrelated UNIQUE violations as idempotency conflicts', async () => {
+  const row = {
+    id: 'content_unique_123',
+    content_type: 'article',
+    owner_user_id: 'user_unique',
+    creator_id: 'user_unique',
+    ip_id: null,
+    state: 'DRAFT',
+    version: 1,
+    revision: 1,
+    slug: 'unique-test',
+    title: 'Unique test',
+    body_ref: 'https://cdn.example.com/body.txt',
+    media_refs_json: '[]',
+    cover_ref: null,
+    etag: 'W/"1"',
+    created_at: '2026-10-07T12:00:00.000Z',
+    updated_at: '2026-10-07T12:00:00.000Z',
+    idem_id: null,
+    idem_owner_user_id: null,
+    idem_request_hash: null,
+    idem_status: null,
+    idem_response_status: null,
+    idem_response_json: null,
+    idem_expires_at: null,
+  }
+  const db = {
+    prepare() {
+      return { bind: (...bindings: unknown[]) => ({ first: async () => { expect(bindings).toContain('content_unique_123'); return row } }) }
+    },
+    batch: async () => { throw new Error('UNIQUE constraint failed: contents.body_ref') },
+  } as never
+  await expect(updateContent(
+    db,
+    'user_unique',
+    'content_unique_123',
+    { contentType: 'article', title: 'Updated title', bodyRef: 'https://cdn.example.com/body-v2.txt', mediaRefs: [], coverRef: null },
+    'W/"1"',
+    'content-unique-idem',
+  )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+})
+
+it('locks content edits while moderation review is pending', async () => {
+  const row = {
+    id: 'content_review_lock_123',
+    content_type: 'article',
+    owner_user_id: 'user_review_lock',
+    creator_id: 'user_review_lock',
+    ip_id: null,
+    state: 'PENDING_REVIEW',
+    version: 2,
+    revision: 2,
+    slug: 'review-lock',
+    title: 'Under review article',
+    body_ref: 'https://cdn.example.com/body.txt',
+    media_refs_json: '[]',
+    cover_ref: null,
+    etag: 'W/"2"',
+    created_at: '2026-10-07T12:00:00.000Z',
+    updated_at: '2026-10-07T12:01:00.000Z',
+    idem_id: null,
+    idem_owner_user_id: null,
+    idem_request_hash: null,
+    idem_status: null,
+    idem_response_status: null,
+    idem_response_json: null,
+    idem_expires_at: null,
+  }
+  let batchCalled = false
+  const db = {
+    prepare() {
+      return { bind: () => ({ first: async () => row }) }
+    },
+    batch: async () => { batchCalled = true },
+  } as never
+  await expect(updateContent(
+    db,
+    'user_review_lock',
+    'content_review_lock_123',
+    { contentType: 'article', title: 'Attempted edit during review', bodyRef: 'https://cdn.example.com/body-v2.txt', mediaRefs: [], coverRef: null },
+    'W/"2"',
+    'review-lock-idem',
+  )).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
+  expect(batchCalled).toBe(false)
+})
+
+it('returns 409 for an owned but invalid lifecycle transition', async () => {
+  const content = {
+    id: 'content_123',
+    content_type: 'article',
+    owner_user_id: 'user_123',
+    creator_id: 'user_123',
+    ip_id: null,
+    state: 'DRAFT',
+    version: 1,
+    revision: 1,
+    slug: 'draft-content-abcdef',
+    title: 'Draft content',
+    body_ref: 'https://cdn.example.com/body.json',
+    media_refs_json: '[]',
+    cover_ref: null,
+    etag: 'W/"1"',
+    created_at: '2026-10-07T00:00:00.000Z',
+    updated_at: '2026-10-07T00:00:00.000Z',
+  }
+  const db = {
+    prepare() { return { bind: () => ({ first: async () => content }) } },
+    batch: async () => { throw new Error('batch should not run for an invalid transition') },
+  } as never
+  await expect(transitionContentState(
+    db,
+    'user_123',
+    'L3',
+    'content_123',
+    'PUBLISHED',
+    undefined,
+    'W/"1"',
+    'transition-invalid-state',
+  )).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
+})
+
+it('blocks moderator layers from the generic state-transition path', async () => {
+  const db = {
+    prepare() { throw new Error('generic moderator transition must not reach D1') },
+  } as never
+  for (const layer of ['L6', 'L7', 'L8']) {
+    await expect(transitionContentState(
+      db,
+      'moderator_123',
+      layer,
+      'content_123',
+      'APPROVED',
+      undefined,
+      'W/"2"',
+      'moderation-bypass-test-' + layer,
+    )).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+  }
+})
+
+it('keeps create idempotency replay byte-stable across retry time', async () => {
+  const original = {
+    id: 'content_create_123',
+    contentType: 'article',
+    ownerUserId: 'user_123',
+    creatorId: 'user_123',
+    ipId: null,
+    state: 'DRAFT',
+    version: 1,
+    revision: 1,
+    slug: 'draft-content-abcdef',
+    title: 'Draft content',
+    bodyRef: 'https://cdn.example.com/body.json',
+    mediaRefs: [],
+    coverRef: null,
+    etag: 'W/"1"',
+    createdAt: '2026-10-07T07:00:00.000Z',
+    updatedAt: '2026-10-07T07:00:00.000Z',
+  }
+  const canonicalize = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(canonicalize)
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, nested]) => [key, canonicalize(nested)]),
+      )
+    }
+    return value
+  }
+  const hashInput = canonicalize({
+    operationId: 'createContent',
+    input: {
+      ownerUserId: 'user_123',
+      input: {
+        contentType: 'article',
+        title: 'Draft content',
+        bodyRef: 'https://cdn.example.com/body.json',
+        mediaRefs: [],
+        coverRef: null,
+      },
+    },
+  })
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(JSON.stringify(hashInput)),
+  )
+  const hashHex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+  const db = {
+    prepare() {
+      return {
+        bind: () => ({
+          first: async () => ({
+            idem_id: 'idem_123',
+            idem_owner_user_id: 'user_123',
+            idem_request_hash: hashHex,
+            idem_status: 'COMPLETED',
+            idem_response_status: 201,
+            idem_response_json: JSON.stringify(original),
+            idem_expires_at: '2026-10-08T07:00:00.000Z',
+          }),
+        }),
+      }
+    },
+    batch: async () => { throw new Error('batch should not run on an idempotency replay') },
+  } as never
+  const result = await createContent(
+    db,
+    'user_123',
+    { contentType: 'article', title: 'Draft content', bodyRef: 'https://cdn.example.com/body.json', mediaRefs: [], coverRef: null },
+    'create-key',
+    new Date('2026-10-07T08:00:00.000Z'),
+  )
+  expect(result).toEqual(original)
 })
