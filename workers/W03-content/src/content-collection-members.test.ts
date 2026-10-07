@@ -7,11 +7,11 @@ import { listCollectionMembers } from './content-collection-members.js'
 describe('W03 collection membership / ordering', () => {
   it('widens relationship authority for collection-member edges with unique order slots', () => {
     const migration = readFileSync(
-      resolve(process.cwd(), 'workers/W03-content/migrations/0008_collection_membership_ordering.sql'),
+      resolve(process.cwd(), 'workers/W03-content/migrations/0010_collection_membership_ordering.sql'),
       'utf8',
     )
-    expect(migration).toContain("target_type TEXT NOT NULL CHECK (target_type IN ('content', 'collection', 'collection'))")
-    expect(migration).toContain("relation_type TEXT NOT NULL CHECK (relation_type IN ('reference', 'collection-member'))")
+    expect(migration).toContain("target_type TEXT NOT NULL CHECK (target_type IN ('content', 'series', 'collection'))")
+    expect(migration).toContain("relation_type TEXT NOT NULL CHECK (relation_type IN ('reference', 'series-member', 'collection-member'))")
     expect(migration).toContain('position INTEGER')
     expect(migration).toContain('content_relationships_collection_position_unique_idx')
     expect(migration).toContain("'content.collection.attached'")
@@ -43,7 +43,7 @@ describe('W03 collection membership / ordering', () => {
                 content_slug: 'episode-2',
                 content_type: 'article',
                 content_state: 'PUBLISHED',
-                title: 'Episode 2',
+                content_title: 'Episode 2',
               }],
             }),
           }),
