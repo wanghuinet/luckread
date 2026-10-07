@@ -14,6 +14,13 @@ import {
   serializeArticleDocument,
   tryDeserializeArticleDocument,
 } from './article-document.js'
+import {
+  ARTICLE_DOCUMENT_HISTORY_LIMIT,
+  createArticleDocumentHistory,
+  recordArticleDocumentHistory,
+  redoArticleDocumentHistory,
+  undoArticleDocumentHistory,
+} from './article-document-history.js'
 
 describe('article structured document', () => {
   it('round-trips structured blocks without losing ordering or headings', () => {
@@ -131,6 +138,41 @@ describe('article structured document', () => {
     expect(duplicate.text).toBe(source.text)
     expect(duplicate.mediaRefs).toEqual(source.mediaRefs)
     expect(duplicate.mediaRefs).not.toBe(source.mediaRefs)
+  })
+
+  it('supports bounded undo and redo without sharing mutable document state', () => {
+    const first = createArticleDocument('第一版')
+    const second = { ...first, blocks: [{ ...first.blocks[0], text: '第二版' }] }
+    const third = { ...second, blocks: [{ ...second.blocks[0], text: '第三版' }] }
+
+    let history = createArticleDocumentHistory(2)
+    history = recordArticleDocumentHistory(history, first, second)
+    history = recordArticleDocumentHistory(history, second, third)
+
+    const undone = undoArticleDocumentHistory(history, third)
+    expect(undone.document?.blocks[0].text).toBe('第二版')
+
+    const redone = redoArticleDocumentHistory(undone.history, undone.document!)
+    expect(redone.document?.blocks[0].text).toBe('第三版')
+    expect(redone.history.future).toHaveLength(0)
+  })
+
+  it('caps article document history to the configured limit', () => {
+    let history = createArticleDocumentHistory(2)
+    const first = createArticleDocument()
+    const versions = ['2', '3', '4'].map((text) => ({
+      version: 2 as const,
+      blocks: [{ id: text, type: 'paragraph' as const, text }],
+    }))
+
+    let current = first
+    for (const next of versions) {
+      history = recordArticleDocumentHistory(history, current, next)
+      current = next
+    }
+
+    expect(history.past).toHaveLength(2)
+    expect(ARTICLE_DOCUMENT_HISTORY_LIMIT).toBeGreaterThanOrEqual(2)
   })
 
   it('strips control characters before persistence', () => {

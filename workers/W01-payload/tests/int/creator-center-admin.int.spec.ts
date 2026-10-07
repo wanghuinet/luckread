@@ -166,6 +166,23 @@ describe('Creator Center admin extension', () => {
     expect(members).toContain('page.hasMore')
   })
 
+  it('exposes bounded article editor undo and redo controls', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const history = read('src/lib/article-document-history.ts')
+
+    expect(history).toContain('ARTICLE_DOCUMENT_HISTORY_LIMIT = 30')
+    expect(history).toContain('recordArticleDocumentHistory')
+    expect(history).toContain('undoArticleDocumentHistory')
+    expect(history).toContain('redoArticleDocumentHistory')
+    expect(editor).toContain('historyState.past === 0')
+    expect(editor).toContain('historyState.future === 0')
+    expect(editor).toContain('applyHistory(\'undo\')')
+    expect(editor).toContain('applyHistory(\'redo\')')
+    expect(editor).toContain('Ctrl/Cmd+Z')
+    expect(editor).toContain('Ctrl/Cmd+Shift+Z / Ctrl+Y')
+    expect(editor).toContain('target.tagName === \'TEXTAREA\'')
+  })
+
   it('exposes reusable structured block duplication in the editor', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const document = read('src/lib/article-document.ts')
