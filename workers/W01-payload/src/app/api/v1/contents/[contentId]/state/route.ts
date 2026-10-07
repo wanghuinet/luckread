@@ -2,6 +2,7 @@ import {
   invalidatePublicContentComments,
   invalidatePublicContentDetail,
   invalidatePublicContentList,
+  invalidatePublicContentVisibility,
 } from '../../../../../../lib/public-response-cache.js'
 
 import {
@@ -47,6 +48,7 @@ export async function POST(
     })
     if (response.ok) {
       await invalidatePublicContentComments(contentId)
+      await invalidatePublicContentVisibility(contentId)
       await invalidatePublicContentDetail(request, contentId)
       await invalidatePublicContentList(request)
     }
