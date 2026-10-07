@@ -22,7 +22,7 @@ CREATE TABLE content_relationships_v2 (
     OR
     (relation_type = 'series-member' AND target_type = 'series' AND position IS NOT NULL AND position >= 0)
   ),
-  CHECK (source_id <> target_id)
+  CHECK (source_type <> target_type OR source_id <> target_id)
 );
 
 INSERT INTO content_relationships_v2 (
@@ -74,7 +74,10 @@ BEGIN
       ELSE 'content.relationship.created'
     END,
     NEW.source_id,
-    COALESCE((SELECT version FROM contents WHERE id = NEW.source_id), 1),
+    CASE WHEN NEW.relation_type = 'series-member'
+      THEN COALESCE((SELECT version FROM content_series WHERE id = NEW.target_id), 1)
+      ELSE COALESCE((SELECT version FROM contents WHERE id = NEW.source_id), 1)
+    END,
     json_object(
       'schemaVersion', '1.0',
       'relationshipId', NEW.relationship_id,
