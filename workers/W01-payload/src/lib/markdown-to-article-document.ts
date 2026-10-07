@@ -64,7 +64,7 @@ const prepareDisplayMath = (
   const expressions: string[] = []
   const markerPrefix = 'LUCKREADDISPLAYMATH'
   const markerSuffix = 'END'
-  const lines = source.split(/\\r?\\n/)
+  const lines = source.split(/\r?\n/)
   const output: string[] = []
   let markerIndex = 0
 
@@ -81,7 +81,7 @@ const prepareDisplayMath = (
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index] ?? ''
     const trimmed = line.trim()
-    const inlineMatch = trimmed.match(/^\\$\\$([^$]*)\\$\\$$/)
+    const inlineMatch = trimmed.match(/^\$\$([^$]*)\$\$$/)
 
     if (inlineMatch) {
       expressions.push(inlineMatch[1].trim())
@@ -89,13 +89,13 @@ const prepareDisplayMath = (
       continue
     }
 
-    if (/^\\$\\$\\s*$/.test(trimmed)) {
+    if (/^\$\$\s*$/.test(trimmed)) {
       let closeIndex = index + 1
-      while (closeIndex < lines.length && !/^\\$\\$\\s*$/.test((lines[closeIndex] ?? '').trim())) {
+      while (closeIndex < lines.length && !/^\$\$\s*$/.test((lines[closeIndex] ?? '').trim())) {
         closeIndex += 1
       }
       if (closeIndex < lines.length) {
-        expressions.push(lines.slice(index + 1, closeIndex).join('\\n').trim())
+        expressions.push(lines.slice(index + 1, closeIndex).join('\n').trim())
         output.push(nextMarker())
         index = closeIndex
         continue
@@ -105,7 +105,7 @@ const prepareDisplayMath = (
     output.push(line)
   }
 
-  return { markdown: output.join('\\n'), expressions }
+  return { markdown: output.join('\n'), expressions }
 }
 
 const normalizeMarkdownCodeLanguage = (language: string | undefined): ArticleBlock['language'] => {
