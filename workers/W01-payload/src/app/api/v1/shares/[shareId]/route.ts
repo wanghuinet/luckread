@@ -1,4 +1,4 @@
-import { cachedPublicGet } from '../../../../../lib/public-response-cache.js'
+import { cachedPublicGet, rememberPublicShareContentId } from '../../../../../lib/public-response-cache.js'
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../auth/traffic-limit.js'
 import { hasAuthenticatedSessionCredential } from '../../../../../lib/content-list-cache-guard.js'
 
@@ -32,11 +32,26 @@ export async function GET(
     return await cachedPublicGet(
       request,
       'share-detail',
-      () => callW05SocialPublic({
-        request,
-        pathname: '/internal/social/shares/' + encodeURIComponent(shareId),
-        method: 'GET',
-      }),
+      async () => {
+        const response = await callW05SocialPublic({
+          request,
+          pathname: '/internal/social/shares/' + encodeURIComponent(shareId),
+          method: 'GET',
+        })
+        if (response.ok) {
+          try {
+            const payload = await response.clone().json() as {
+              data?: { shareId?: unknown; contentId?: unknown }
+            }
+            if (typeof payload.data?.shareId === 'string' && typeof payload.data?.contentId === 'string') {
+              await rememberPublicShareContentId(payload.data.shareId, payload.data.contentId)
+            }
+          } catch {
+            // Cache metadata is best-effort; share resolution remains authoritative.
+          }
+        }
+        return response
+      },
       60,
     )
   } catch (error) {
