@@ -132,6 +132,19 @@ describe('Creator Center admin extension', () => {
     expect(members).toContain('page.hasMore')
   })
 
+  it('registers Word import through the structured editor plugin registry', () => {
+    const registry = read('src/components/article-editor-plugins.ts')
+    const plugin = read('src/components/article-editor-word-import-plugin.tsx')
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    expect(registry).toContain("import { articleWordImportPlugin } from './article-editor-word-import-plugin.js'")
+    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [articleWordImportPlugin]')
+    expect(plugin).toContain("id: 'word-import'")
+    expect(plugin).toContain('Toolbar: WordImportToolbar')
+    expect(plugin).toContain('onImport={updateDocument}')
+    expect(editor).not.toContain("import ArticleWordImportButton from './ArticleWordImportButton.js'")
+    expect(editor).not.toContain('<ArticleWordImportButton disabled={disabled} onImport={emit} />')
+  })
+
   it('makes Word import available in the Creator Studio structured article editor', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const importer = read('src/components/ArticleWordImportButton.tsx')
