@@ -243,7 +243,7 @@ const insertIdempotency = (
   db.prepare(
     'INSERT INTO content_mutation_idempotency ' +
     '(id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at) ' +
-    'VALUES (?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?)',
+    "VALUES (?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?)",
   ).bind(
     crypto.randomUUID(), ownerUserId, operationId, idempotencyKey, hash,
     status, body, nowIso, expiresAt,
