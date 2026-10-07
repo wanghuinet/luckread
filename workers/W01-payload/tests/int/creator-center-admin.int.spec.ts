@@ -194,7 +194,7 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('transformArticleBlock(source, type)')
     expect(editor).toContain('aria-label="区块类型"')
     expect(editor).toContain('onChange={(event) => transformBlock(index, event.target.value as ArticleBlockType)}')
-    expect(editor).toContain('window.confirm('转换为文字类区块将从正文结构中移除当前图片')
+    expect(editor).toContain("window.confirm('转换为文字类区块将从正文结构中移除当前图片")
     expect(plugin).toContain('transformBlock: (index: number, type: ArticleBlockType) => void')
   })
 
