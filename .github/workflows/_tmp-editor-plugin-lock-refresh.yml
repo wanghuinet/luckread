@@ -1,0 +1,35 @@
+name: _tmp-editor-plugin-lock-refresh
+
+on:
+  push:
+    branches:
+      - feat/1.1-editor-markdown-plugin-20261007
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.34.5 --activate
+
+      - name: Refresh W01 lockfile
+        working-directory: workers/W01-payload
+        run: pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile
+
+      - name: Commit lockfile
+        run: |
+          if git diff --quiet -- workers/W01-payload/pnpm-lock.yaml; then
+            echo "Lockfile already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add workers/W01-payload/pnpm-lock.yaml
+          git commit -m "chore(1.1): refresh editor plugin lockfile"
+          git push
