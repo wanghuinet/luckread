@@ -60,14 +60,14 @@ describe('Markdown editor plugin', () => {
 
   it('keeps multiple display-math blocks isolated during import', () => {
     const result = markdownToArticleDocument([
-      '$x$',
+      String.raw`$$x$$`,
       '',
       '中间正文',
       '',
-      '$',
-      '\\frac{a}{b}',
-      '$',
-    ].join('\\n'))
+      String.raw`$$`,
+      String.raw`\frac{a}{b}`,
+      String.raw`$$`,
+    ].join('\n'))
 
     expect(result.unsupported).toEqual([])
     expect(result.document.blocks.map((block) => block.type)).toEqual([
