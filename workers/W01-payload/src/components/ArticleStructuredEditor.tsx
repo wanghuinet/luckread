@@ -19,6 +19,7 @@ import {
   insertArticleBlockAfter,
   mediaRefsFromArticleDocument,
   removeMediaRefFromArticleDocument,
+  reorderArticleMediaRef,
   transformArticleBlock,
   normalizeArticleDocument,
   plainTextFromArticleDocument,
@@ -263,6 +264,10 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     emit(removeMediaRefFromArticleDocument(value, mediaRef))
   }
 
+  function moveMediaReference(blockIndex: number, mediaIndex: number, direction: -1 | 1) {
+    emit(reorderArticleMediaRef(value, blockIndex, mediaIndex, mediaIndex + direction))
+  }
+
   function moveBlock(index: number, direction: -1 | 1) {
     const target = index + direction
     if (target < 0 || target >= value.blocks.length) return
@@ -411,17 +416,46 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
             ) : block.type === 'image' || block.type === 'gallery' ? (
               <div className="lr-article-media-block">
                 <div className={block.type === 'gallery' ? 'lr-article-gallery-grid' : 'lr-article-image-single'}>
-                  {(block.mediaRefs ?? []).map((ref) => (
+                  {(block.mediaRefs ?? []).map((ref, mediaIndex) => (
                     <figure key={ref}>
                       <img alt={block.text || '文章图片'} loading="lazy" src={ref} />
-                      <button
-                        aria-label="移除正文图片"
-                        disabled={disabled}
-                        onClick={() => removeMediaReference(ref)}
-                        type="button"
-                      >
-                        从正文移除
-                      </button>
+                      {block.type === 'gallery' ? (
+                        <div className="lr-article-media-actions">
+                          <button
+                            aria-label={'上移第 ' + String(mediaIndex + 1) + ' 张图片'}
+                            disabled={disabled || mediaIndex === 0}
+                            onClick={() => moveMediaReference(index, mediaIndex, -1)}
+                            type="button"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            aria-label={'下移第 ' + String(mediaIndex + 1) + ' 张图片'}
+                            disabled={disabled || mediaIndex === (block.mediaRefs?.length ?? 0) - 1}
+                            onClick={() => moveMediaReference(index, mediaIndex, 1)}
+                            type="button"
+                          >
+                            ↓
+                          </button>
+                          <button
+                            aria-label="移除正文图片"
+                            disabled={disabled}
+                            onClick={() => removeMediaReference(ref)}
+                            type="button"
+                          >
+                            从正文移除
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          aria-label="移除正文图片"
+                          disabled={disabled}
+                          onClick={() => removeMediaReference(ref)}
+                          type="button"
+                        >
+                          从正文移除
+                        </button>
+                      )}
                     </figure>
                   ))}
                 </div>
