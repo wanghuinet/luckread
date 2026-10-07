@@ -451,8 +451,8 @@ const atomicGuard = (db: ContentD1): D1PreparedStatement =>
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
-const isUniqueConstraint = (error: unknown): boolean =>
-  /unique constraint|UNIQUE constraint/i.test(errorMessage(error))
+const isIdempotencyUniqueConstraint = (error: unknown): boolean =>
+  /unique constraint failed: content_mutation_idempotency\.|UNIQUE constraint failed: content_mutation_idempotency\./i.test(errorMessage(error))
 
 const isContentCasGuardFailure = (error: unknown): boolean =>
   /CHECK constraint failed: successful|content_txn_guard.*CHECK constraint/i.test(errorMessage(error))
@@ -464,7 +464,7 @@ const batchMutation = async (
   try {
     await db.batch(statements)
   } catch (error) {
-    if (isUniqueConstraint(error)) throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
+    if (isIdempotencyUniqueConstraint(error)) throw new ContentRuntimeError('IDEMPOTENCY_IN_PROGRESS', 409)
     if (isContentCasGuardFailure(error)) throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
     throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
