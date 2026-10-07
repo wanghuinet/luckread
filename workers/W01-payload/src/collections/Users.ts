@@ -10,8 +10,14 @@ export const Users: CollectionConfig = {
     disableLocalStrategy: true,
     strategies: [betterAuthPayloadStrategy],
   },
+  // Account creation is Better Auth/W02-owned. W01 only stores the
+  // corresponding profile projection, written by trusted internal flows with
+  // overrideAccess.
   access: {
-    create: () => true,
+    create: () => false,
+    read: payloadAdminOnly,
+    update: payloadAdminOnly,
+    delete: payloadAdminOnly,
     admin: payloadAdminOnly,
   },
   fields: [
