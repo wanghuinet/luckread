@@ -135,6 +135,7 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
 
       case 'paragraph': {
         const raw = token.text.trim()
+        const sourceRaw = (token as { raw?: string }).raw?.trim() ?? raw
         const imageMatch = raw.match(
           new RegExp('^!\\[([^\\]]*)\\]\\((https?:\\/\\/[^)\\s]+)(?:\\s+[^)]*)?\\)$'),
         )
@@ -146,7 +147,7 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
           break
         }
 
-        const mathMatch = raw.match(/^\\$\\$\\s*([\\s\\S]*?)\\s*\\$\\$/)
+        const mathMatch = sourceRaw.match(/^\\$\\$\\s*([\\s\\S]*?)\\s*\\$\\$/)
         if (mathMatch) {
           const expression = boundedText(mathMatch[1].trim(), unsupported)
           if (expression) {
