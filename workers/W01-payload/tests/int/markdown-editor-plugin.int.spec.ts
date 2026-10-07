@@ -49,7 +49,7 @@ describe('Markdown editor plugin', () => {
   })
 
   it('imports display math into a dedicated math block', () => {
-    const result = markdownToArticleDocument('$$\\n\\frac{a}{b}\\n$$')
+    const result = markdownToArticleDocument(['$', '\\frac{a}{b}', '$'].join('\\n'))
 
     expect(result.unsupported).toEqual([])
     expect(result.document.blocks[0]).toMatchObject({
