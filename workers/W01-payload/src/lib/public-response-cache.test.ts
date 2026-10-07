@@ -322,14 +322,15 @@ describe('public response cache', () => {
 
     await invalidatePublicFollowList('followers', 'u1')
 
-    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response]>
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
     const generationWrite = putCalls.find(([request]) =>
       request.url.includes('__follow-list-generation') &&
       request.url.includes('direction=followers') &&
       request.url.includes('user=u1'),
     )
     expect(generationWrite).toBeDefined()
-    const body = await generationWrite!.response.clone().json() as { generation?: unknown }
+    expect(generationWrite?.[1]).toBeInstanceOf(Response)
+    const body = await generationWrite?.[1]?.clone().json() as { generation?: unknown }
     expect(typeof body.generation).toBe('string')
     expect(body.generation).not.toBe('g0')
     expect(cache.delete).not.toHaveBeenCalled()
