@@ -90,7 +90,7 @@ export async function POST(
       principal,
     })
     if (response.ok) {
-      await invalidatePublicContentRelationships(request, contentId)
+      await invalidatePublicContentRelationships(contentId)
     }
     return response
   } catch (error) {
