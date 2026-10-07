@@ -511,7 +511,7 @@ export async function deleteSeries(
     expireIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
     insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 204, '', updatedAt, expiresAt),
     db.prepare(
-      'UPDATE content_series SET state = 'DELETED', version = ?, etag = ?, updated_at = ? ' +
+      "UPDATE content_series SET state = 'DELETED', version = ?, etag = ?, updated_at = ? ' +
       'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
     ).bind(
       nextVersion, etagForVersion(nextVersion), updatedAt,
