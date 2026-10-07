@@ -259,6 +259,40 @@ export const insertArticleBlockAfter = (
   }
 }
 
+export const transformArticleBlock = (
+  block: ArticleBlock,
+  nextType: ArticleBlockType,
+): ArticleBlock => {
+  if (block.type === nextType) return block
+
+  if (nextType === 'divider') {
+    return {
+      id: block.id,
+      type: 'divider',
+      text: '',
+    }
+  }
+
+  if (nextType === 'image' || nextType === 'gallery') {
+    const refs = block.mediaRefs ? [...block.mediaRefs] : []
+    if (nextType === 'image' && refs.length < 1) return block
+    if (nextType === 'gallery' && refs.length < 2) return block
+    return {
+      id: block.id,
+      type: nextType,
+      text: block.text,
+      mediaRefs: refs.slice(0, nextType === 'image' ? 1 : ARTICLE_MAX_MEDIA_PER_BLOCK),
+    }
+  }
+
+  return {
+    id: block.id,
+    type: nextType,
+    text: block.text,
+    ...(nextType === 'heading' ? { level: block.level ?? 2 } : {}),
+  }
+}
+
 export const articleDocumentFromBody = (raw: string): ArticleDocument => {
   const structured = tryDeserializeArticleDocument(raw)
   if (structured) return structured
