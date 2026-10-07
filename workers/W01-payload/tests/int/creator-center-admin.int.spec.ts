@@ -147,10 +147,11 @@ describe('Creator Center admin extension', () => {
 
   it('makes Word import available in the Creator Studio structured article editor', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const plugin = read('src/components/article-editor-word-import-plugin.tsx')
     const importer = read('src/components/ArticleWordImportButton.tsx')
     const adapter = read('src/features/word-import/article-document-adapter.ts')
-    expect(editor).toContain("import ArticleWordImportButton from './ArticleWordImportButton.js'")
-    expect(editor).toContain('<ArticleWordImportButton disabled={disabled} onImport={emit} />')
+    expect(plugin).toContain("import ArticleWordImportButton from './ArticleWordImportButton.js'")
+    expect(plugin).toContain('<ArticleWordImportButton disabled={disabled} onImport={updateDocument} />')
     expect(importer).toContain('accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"')
     expect(importer).toContain("fetch('/api/v1/media'")
     expect(importer).toContain("new Blob([bytes as BlobPart], { type: mimeType })")
@@ -177,7 +178,7 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain(".sort((left, right) => (left.order ?? 0) - (right.order ?? 0) || left.id.localeCompare(right.id))")
     expect(editor).toContain("<Toolbar key={plugin.id + ':toolbar'}")
     expect(editor).toContain('<Panel key={plugin.id + \':panel\'}')
-    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = []')
+    expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [articleWordImportPlugin]')
     expect(publisher).toContain('plugins={articleEditorPlugins}')
   })
 
