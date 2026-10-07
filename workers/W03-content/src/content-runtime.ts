@@ -153,6 +153,10 @@ const publicMessage = (code: string): string => {
     case 'SERVICE_UNAVAILABLE': return 'Content service unavailable'
     case 'PREFLIGHT_BLOCKED': return 'Publish preflight blocked submission'
     case 'RATE_LIMITED': return 'Rate limit exceeded'
+    case 'RELATIONSHIP_ALREADY_EXISTS': return 'Content relationship already exists'
+    case 'RELATIONSHIP_CONFLICT': return 'Content relationship conflict'
+    case 'RELATIONSHIP_NOT_FOUND': return 'Content relationship not found'
+    case 'RELATIONSHIP_NOT_ACTIVE': return 'Content relationship is not active'
     default: return 'Content request failed'
   }
 }

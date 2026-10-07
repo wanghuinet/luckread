@@ -19,6 +19,12 @@ import {
   type ContentD1,
 } from './content-runtime.js'
 import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
+import {
+  createContentRelationship,
+  listContentRelationships,
+  revokeContentRelationship,
+  type ContentRelationshipDirection,
+} from './content-relationships.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
@@ -138,7 +144,7 @@ const decodePathSegment = (value: string): string => {
   }
 }
 
-const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; revisionId?: string; rollback?: boolean} | null => {
+const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean} | null => {
   const parts = pathname.split('/').filter(Boolean)
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
     return {}
@@ -154,6 +160,12 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
   }
   if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'revisions') {
     return { id: decodePathSegment(parts[3]), revisions: true }
+  }
+  if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'relationships') {
+    return { id: decodePathSegment(parts[3]), relationships: true }
+  }
+  if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'relationships') {
+    return { id: decodePathSegment(parts[3]), relationships: true, relationshipId: decodePathSegment(parts[5]) }
   }
   if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'revisions') {
     return { id: decodePathSegment(parts[3]), revisions: true, revisionId: decodePathSegment(parts[5]) }
@@ -217,6 +229,56 @@ export default {
 
       requireTransport(request)
       const path = getPath(url.pathname)
+
+      if (path && path.relationships && path.id && request.method === 'GET' && !path.relationshipId) {
+        const directionParam = url.searchParams.get('direction')?.trim() || 'out'
+        if (!['out', 'in', 'both'].includes(directionParam)) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const cursor = url.searchParams.get('cursor')
+        if (cursor && cursor.length > 2048) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const page = await listContentRelationships(
+          env.D1_02,
+          path.id,
+          directionParam as ContentRelationshipDirection,
+          cursor,
+          parseListLimit(url.searchParams.get('limit')),
+        )
+        return json({
+          data: {
+            items: page.items,
+            nextCursor: page.nextCursor,
+            hasMore: page.hasMore,
+          },
+          requestId: crypto.randomUUID(),
+        })
+      }
+
+      if (path && path.relationships && path.id && request.method === 'POST' && !path.relationshipId) {
+        const principal = requiredCreatorPrincipal(request)
+        const body = await parseBody(request)
+        const relationship = await createContentRelationship(
+          env.D1_02,
+          principal.userId,
+          path.id,
+          body,
+          requireIdempotency(request),
+        )
+        return json({ data: relationship, requestId: crypto.randomUUID() }, 201)
+      }
+
+      if (path && path.relationships && path.id && path.relationshipId && request.method === 'DELETE') {
+        const principal = requiredCreatorPrincipal(request)
+        const relationshipId = path.relationshipId
+        const relationship = await revokeContentRelationship(
+          env.D1_02,
+          principal.userId,
+          path.id,
+          relationshipId,
+          requireIdempotency(request),
+        )
+        return json({ data: relationship, requestId: crypto.randomUUID() })
+      }
 
       if (path && path.revisions && path.id && request.method === 'GET' && !path.revisionId) {
         const principal = requiredCreatorPrincipal(request)

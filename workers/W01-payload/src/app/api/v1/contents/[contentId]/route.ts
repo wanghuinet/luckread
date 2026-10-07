@@ -4,6 +4,7 @@ import {
   invalidatePublicContentDetail,
   invalidatePublicContentList,
   invalidatePublicContentVisibility,
+  invalidatePublicContentRelationships,
 } from '../../../../../lib/public-response-cache.js'
 
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../auth/traffic-limit.js'
@@ -121,6 +122,7 @@ export async function DELETE(
     if (response.ok) {
       await invalidatePublicContentComments(contentId)
       await invalidatePublicContentVisibility(contentId)
+      await invalidatePublicContentRelationships(contentId)
       await invalidatePublicContentDetail(request, contentId)
       await invalidatePublicContentList(request)
     }
