@@ -63,7 +63,8 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     () => mediaAssets.filter((asset) => asset.mimeType.startsWith('image/')),
     [mediaAssets],
   )
-  const characterCount = useMemo(() => Array.from(plainTextFromArticleDocument(value)).length, [value])
+  const plainText = useMemo(() => plainTextFromArticleDocument(value), [value])
+  const characterCount = useMemo(() => Array.from(plainText).length, [plainText])
 
   function emit(next: ArticleDocument) {
     const normalized = normalizeArticleDocument(next)
@@ -136,7 +137,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
   const pluginContext: ArticleEditorPluginContext = {
     value,
     disabled,
-    plainText: plainTextFromArticleDocument(value),
+    plainText,
     mediaAssets,
     updateDocument: emit,
     addBlock,
