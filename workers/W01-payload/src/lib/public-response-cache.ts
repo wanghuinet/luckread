@@ -12,6 +12,7 @@ const CACHE_MISS_LIMIT_PER_KEY = 5
 const CACHE_MISS_MAX_KEYS = 1024
 const DEFAULT_CONTENT_LIST_GENERATION = '0'
 const FOLLOW_LIST_GENERATION_VERSION = '1'
+const CONTENT_COMMENTS_GENERATION_VERSION = '1'
 const CONTENT_LIST_GENERATION_KEY = new Request(
   `https://cache.luckread.internal/__content-list-generation?v=${CACHE_VERSION}`,
 )
@@ -95,6 +96,74 @@ const generateContentListGeneration = (): string => crypto.randomUUID().replaceA
 const isValidContentListGeneration = (value: unknown): value is string =>
   typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value)
 
+
+
+const contentCommentsIdentity = (request: Request): string | null => {
+  const match = new URL(request.url).pathname.match(
+    /^\/api\/v1\/contents\/([^/]+)\/comments$/,
+  )
+  if (!match) return null
+  try {
+    const contentId = decodeURIComponent(match[1]).trim()
+    if (!contentId || contentId.length > 256) return null
+    return contentId
+  } catch {
+    return null
+  }
+}
+
+const contentCommentsGenerationKey = (contentId: string): Request =>
+  new Request(
+    'https://cache.luckread.internal/__content-comments-generation?v=' +
+      CONTENT_COMMENTS_GENERATION_VERSION +
+      '&content=' + encodeURIComponent(contentId),
+    { method: 'GET' },
+  )
+
+const readContentCommentsGeneration = async (
+  cache: Cache,
+  request: Request,
+): Promise<string | null> => {
+  const contentId = contentCommentsIdentity(request)
+  if (!contentId) return null
+  try {
+    const marker = await cache.match(contentCommentsGenerationKey(contentId))
+    if (!marker) {
+      const generation = generateContentListGeneration()
+      try {
+        await cache.put(
+          contentCommentsGenerationKey(contentId),
+          generationResponse(generation),
+        )
+      } catch {
+        return null
+      }
+      return generation
+    }
+
+    const value = await marker.json() as unknown
+    const generation = value && typeof value === 'object' && 'generation' in value
+      ? (value as { generation?: unknown }).generation
+      : null
+    return isValidContentListGeneration(generation) ? generation : null
+  } catch {
+    return null
+  }
+}
+
+export const invalidatePublicContentComments = async (contentIdValue: string): Promise<void> => {
+  const contentId = contentIdValue.trim()
+  if (!contentId || contentId.length > 256) return
+  const cache = (globalThis.caches as unknown as { default: Cache }).default
+  try {
+    await cache.put(
+      contentCommentsGenerationKey(contentId),
+      generationResponse(generateContentListGeneration()),
+    )
+  } catch {
+    // Best-effort invalidation. The public cache TTL remains the fallback bound.
+  }
+}
 
 const followListIdentity = (
   request: Request,
@@ -233,7 +302,11 @@ export const publicCacheKey = (
   if (namespace === 'content-list') {
     keyUrl.searchParams.set('lang', normalizeLanguage(request))
     keyUrl.searchParams.set('g', generation)
-  } else if (namespace === 'followers' || namespace === 'following') {
+  } else if (
+    namespace === 'followers' ||
+    namespace === 'following' ||
+    namespace === 'content-comments'
+  ) {
     keyUrl.searchParams.set('g', generation)
   }
   if (query) keyUrl.searchParams.set('q', query)
@@ -295,6 +368,10 @@ export const cachedPublicGet = async (
     generation = resolvedGeneration
   } else if (namespace === 'followers' || namespace === 'following') {
     const resolvedGeneration = await readFollowListGeneration(cache, request, namespace)
+    if (!resolvedGeneration) return loader()
+    generation = resolvedGeneration
+  } else if (namespace === 'content-comments') {
+    const resolvedGeneration = await readContentCommentsGeneration(cache, request)
     if (!resolvedGeneration) return loader()
     generation = resolvedGeneration
   }
