@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import { computeAutoSaveDelay } from '../../../lib/content-autosave.js'
-import { articleDocumentFromBody, plainTextFromArticleDocument, mediaRefsFromArticleDocument, serializeArticleDocument, createArticleDocument, tryDeserializeArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
+import { articleDocumentFromBody, plainTextFromArticleDocument, mediaRefsFromArticleDocument, removeMediaRefFromArticleDocument, serializeArticleDocument, createArticleDocument, tryDeserializeArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
 import ArticleStructuredEditor from '../../../components/ArticleStructuredEditor.js'
 import ArticleStructuredRenderer from '../../../components/ArticleStructuredRenderer.js'
 import { articleEditorPlugins } from '../../../components/article-editor-plugins.js'
@@ -255,11 +255,22 @@ export default function PublishComposer({
   function removeAsset(id: string) {
     const removed = assets.find((asset) => asset.id === id)
     setAssets((current) => current.filter((asset) => asset.id !== id))
-    if (removed && coverRef.trim() === removed.url) {
-      const fallback = type === 'video'
-        ? assets.find((asset) => asset.id !== id && isImageAsset(asset))?.url ?? ''
-        : assets.find((asset) => asset.id !== id)?.url ?? ''
-      setCoverRef(fallback)
+    if (removed) {
+      const nextDocument = type === 'article'
+        ? removeMediaRefFromArticleDocument(articleDocument, removed.url)
+        : articleDocument
+      if (nextDocument !== articleDocument) {
+        setArticleDocument(nextDocument)
+        setBody(plainTextFromArticleDocument(nextDocument))
+        setPreflightReport(null)
+      }
+
+      if (coverRef.trim() === removed.url) {
+        const fallback = type === 'video'
+          ? assets.find((asset) => asset.id !== id && isImageAsset(asset))?.url ?? ''
+          : assets.find((asset) => asset.id !== id)?.url ?? ''
+        setCoverRef(fallback)
+      }
     }
     markDirty()
   }

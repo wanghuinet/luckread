@@ -166,6 +166,25 @@ describe('Creator Center admin extension', () => {
     expect(members).toContain('page.hasMore')
   })
 
+  it('synchronizes outer media removal with structured article references', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain('removeMediaRefFromArticleDocument')
+    expect(publisher).toContain('removeMediaRefFromArticleDocument(articleDocument, removed.url)')
+    expect(publisher).toContain('setArticleDocument(nextDocument)')
+    expect(publisher).toContain('setBody(plainTextFromArticleDocument(nextDocument))')
+    expect(publisher).toContain('setPreflightReport(null)')
+  })
+
+  it('keeps article media references aligned with editor removal actions', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const document = read('src/lib/article-document.ts')
+
+    expect(document).toContain('export const removeMediaRefFromArticleDocument')
+    expect(editor).toContain('removeMediaRefFromArticleDocument(value, mediaRef)')
+    expect(editor).toContain('aria-label="移除正文图片"')
+    expect(editor).toContain('onClick={() => removeMediaReference(ref)}')
+  })
+
   it('exposes contextual article block insertion', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const document = read('src/lib/article-document.ts')

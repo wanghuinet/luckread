@@ -12,6 +12,7 @@ import {
   hasArticleDocumentContent,
   duplicateArticleBlock,
   insertArticleBlockAfter,
+  removeMediaRefFromArticleDocument,
   serializeArticleDocument,
   tryDeserializeArticleDocument,
 } from './article-document.js'
@@ -197,6 +198,33 @@ describe('article structured document', () => {
     const document = createArticleDocument('正文')
     expect(insertArticleBlockAfter(document, 99)).toBe(document)
     expect(insertArticleBlockAfter(document, -2)).toBe(document)
+  })
+
+  it('removes a media reference without leaving invalid structured media blocks', () => {
+    const document = {
+      version: 2 as const,
+      blocks: [
+        createArticleMediaBlock('image', ['https://media.example/1.jpg'], '单图'),
+        createArticleMediaBlock('gallery', [
+          'https://media.example/1.jpg',
+          'https://media.example/2.jpg',
+        ], '图库'),
+      ],
+    }
+
+    const next = removeMediaRefFromArticleDocument(document, 'https://media.example/1.jpg')
+
+    expect(next).not.toBe(document)
+    expect(next.blocks[0]?.type).toBe('paragraph')
+    expect(next.blocks[0]?.text).toBe('单图')
+    expect(next.blocks[1]?.type).toBe('image')
+    expect(next.blocks[1]?.mediaRefs).toEqual(['https://media.example/2.jpg'])
+    expect(document.blocks[0]?.mediaRefs).toEqual(['https://media.example/1.jpg'])
+  })
+
+  it('is a no-op for an empty media reference', () => {
+    const document = createArticleDocument('正文')
+    expect(removeMediaRefFromArticleDocument(document, '   ')).toBe(document)
   })
 
   it('strips control characters before persistence', () => {
