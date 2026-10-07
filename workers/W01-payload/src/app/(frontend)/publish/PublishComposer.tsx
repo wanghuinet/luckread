@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import { computeAutoSaveDelay } from '../../../lib/content-autosave.js'
-import { articleDocumentFromBody, plainTextFromArticleDocument, serializeArticleDocument, createArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
+import { articleDocumentFromBody, plainTextFromArticleDocument, serializeArticleDocument, createArticleDocument, tryDeserializeArticleDocument, type ArticleDocument } from '../../../lib/article-document.js'
 import ArticleStructuredEditor from '../../../components/ArticleStructuredEditor.js'
 import { useRouter } from 'next/navigation'
 
@@ -130,11 +130,12 @@ export default function PublishComposer({
         setTitle(recovered.title ?? '')
         if ((recovered.contentType ?? 'article') === 'article') {
           const recoveredDocument = articleDocumentFromBody(recoveredBody)
+          const wasStructured = tryDeserializeArticleDocument(recoveredBody) !== null
           setArticleDocument(recoveredDocument)
           const recoveredPlainText = plainTextFromArticleDocument(recoveredDocument)
           setBody(recoveredPlainText)
           setSavedBody(recoveredPlainText)
-          setSavedArticleSerialized(serializeArticleDocument(recoveredDocument))
+          setSavedArticleSerialized(wasStructured ? serializeArticleDocument(recoveredDocument) : '')
         } else {
           setBody(recoveredBody)
           setSavedBody(recoveredBody)
