@@ -33,7 +33,7 @@ export async function GET(
     }
     return await callW03Content({
       request,
-      pathname: '/internal/content/collection/' + encodeURIComponent(collectionId) + '/members' + (url.search ? url.search : ''),
+      pathname: '/internal/content/collections/' + encodeURIComponent(collectionId) + '/members' + (url.search ? url.search : ''),
       method: 'GET',
       principal,
     })
@@ -55,7 +55,7 @@ export async function POST(
     if (mutationError) return mutationError
     return await callW03Content({
       request,
-      pathname: '/internal/content/collection/' + encodeURIComponent(collectionId) + '/members',
+      pathname: '/internal/content/collections/' + encodeURIComponent(collectionId) + '/members',
       method: 'POST',
       body: await request.json(),
       principal,
