@@ -48,6 +48,27 @@ describe('Markdown editor plugin', () => {
     expect(result.document.version).toBe(2)
   })
 
+  it('imports markdown tables into structured table blocks', () => {
+    const result = markdownToArticleDocument([
+      '| 名称 | 状态 |',
+      '| --- | --- |',
+      '| Markdown | 已完成 |',
+      '| Code | 进行中 |',
+    ].join('\n'))
+
+    expect(result.unsupported).toEqual([])
+    expect(result.document.blocks[0]).toMatchObject({
+      type: 'table',
+      table: {
+        headers: ['名称', '状态'],
+        rows: [
+          ['Markdown', '已完成'],
+          ['Code', '进行中'],
+        ],
+      },
+    })
+  })
+
   it('imports a standalone remote image as a media block', () => {
     const result = markdownToArticleDocument(
       '![封面](https://cdn.example.com/cover.webp)',
@@ -90,6 +111,7 @@ describe('Markdown editor plugin', () => {
     )
     expect(registry).toContain("id: 'content.markdown-import'")
     expect(registry).toContain("id: 'content.code-block'")
+    expect(registry).toContain("id: 'content.table-block'")
     expect(plugin).toContain(
       "import { markdownToArticleDocument } from '../lib/markdown-to-article-document.js'",
     )
