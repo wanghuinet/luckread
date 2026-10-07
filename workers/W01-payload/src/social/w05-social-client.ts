@@ -2,6 +2,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getPayload } from 'payload'
 
 import config from '@payload-config'
+import { hasAuthenticatedSessionCredential } from '../lib/content-list-cache-guard.js'
 import {
   resolveContentPrincipal,
   resolveCookieContentPrincipal,
@@ -34,7 +35,7 @@ export async function resolveCookieSocialPrincipal(request: Request): Promise<Co
 export async function resolveOptionalCookieSocialPrincipal(
   request: Request,
 ): Promise<ContentPrincipal | Response | null> {
-  if (!request.headers.get('Authorization') && !request.headers.get('cookie')) return null
+  if (!hasAuthenticatedSessionCredential(request)) return null
 
   const principal = await resolveCookieSocialPrincipal(request)
   if (principal instanceof Response && principal.status === 401) return null
