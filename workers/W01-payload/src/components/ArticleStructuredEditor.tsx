@@ -17,6 +17,7 @@ type EditorMediaAsset = {
   id: string
   url: string
   filename?: string
+  mimeType: string
 }
 
 type Props = {
@@ -49,6 +50,10 @@ const updateBlock = (
 })
 
 export default function ArticleStructuredEditor({ value, disabled = false, mediaAssets = [], onChange }: Props) {
+  const imageAssets = useMemo(
+    () => mediaAssets.filter((asset) => asset.mimeType.startsWith('image/')),
+    [mediaAssets],
+  )
   const characterCount = useMemo(() => plainTextFromArticleDocument(value).length, [value])
 
   function emit(next: ArticleDocument) {
@@ -133,11 +138,11 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
       <div className="lr-article-media-picker" aria-label="插入图片和图库">
         <div className="lr-article-media-picker-head">
           <strong>正文媒体</strong>
-          <span>{mediaAssets.length ? mediaAssets.length + ' 个已上传媒体' : '请先上传图片'}</span>
+          <span>{imageAssets.length ? imageAssets.length + ' 个可插入图片' : '请先上传图片'}</span>
         </div>
-        {mediaAssets.length ? (
+        {imageAssets.length ? (
           <div className="lr-article-media-picker-grid">
-            {mediaAssets.map((asset) => (
+            {imageAssets.map((asset) => (
               <div className="lr-article-media-picker-item" key={asset.id}>
                 <img alt={asset.filename ?? ''} loading="lazy" src={asset.url} />
                 <div>
@@ -149,8 +154,8 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
         ) : null}
         <button
           className="lr-article-gallery-button"
-          disabled={disabled || mediaAssets.length < 2}
-          onClick={() => insertMedia('gallery')}
+          disabled={disabled || imageAssets.length < 2}
+          onClick={() => insertMedia('gallery', imageAssets.map((asset) => asset.url))}
           type="button"
         >
           插入全部图库（最多 12 个）
