@@ -140,9 +140,13 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('<ArticleWordImportButton disabled={disabled} onImport={emit} />')
     expect(importer).toContain('accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"')
     expect(importer).toContain("fetch('/api/v1/media'")
+    expect(importer).toContain("new Blob([bytes as BlobPart], { type: mimeType })")
+    expect(importer).toContain('collectImportedImages(imported.blocks)')
+    expect(adapter).toContain('for (const url of Array.from(new Set(rowImages)))')
     expect(importer).toContain('articleDocumentFromImportedDocument')
     expect(adapter).toContain("createArticleMediaBlock('image'")
     expect(adapter).toContain('Word 表格已转为段落文本')
+    expect(adapter).toContain('for (const url of Array.from(new Set(rowImages)))')
   })
 
   it('exposes the editor plugin host and publish-time registry', () => {
