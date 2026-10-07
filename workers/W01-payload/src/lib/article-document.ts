@@ -206,6 +206,24 @@ export const duplicateArticleBlock = (block: ArticleBlock): ArticleBlock => ({
   ...(block.mediaRefs ? { mediaRefs: [...block.mediaRefs] } : {}),
 })
 
+export const insertArticleBlockAfter = (
+  document: ArticleDocument,
+  index: number,
+  type: ArticleBlockType = 'paragraph',
+): ArticleDocument => {
+  if (index < -1 || index >= document.blocks.length) return document
+  const block = createArticleBlock(type)
+  const insertAt = index + 1
+  return {
+    ...document,
+    blocks: [
+      ...document.blocks.slice(0, insertAt),
+      block,
+      ...document.blocks.slice(insertAt),
+    ],
+  }
+}
+
 export const articleDocumentFromBody = (raw: string): ArticleDocument => {
   const structured = tryDeserializeArticleDocument(raw)
   if (structured) return structured

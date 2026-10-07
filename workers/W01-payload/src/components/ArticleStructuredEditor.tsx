@@ -16,6 +16,7 @@ import {
   createArticleBlock,
   createArticleMediaBlock,
   duplicateArticleBlock,
+  insertArticleBlockAfter,
   mediaRefsFromArticleDocument,
   normalizeArticleDocument,
   plainTextFromArticleDocument,
@@ -207,6 +208,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     updateDocument: emit,
     addBlock,
     insertMedia,
+    insertBlockAfter,
   }
 
   function duplicateBlock(index: number) {
@@ -222,6 +224,11 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
         ...value.blocks.slice(index + 1),
       ],
     })
+  }
+
+  function insertBlockAfter(index: number) {
+    if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
+    emit(insertArticleBlockAfter(value, index, 'paragraph'))
   }
 
   function removeBlock(index: number) {
@@ -355,6 +362,14 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                   type="button"
                 >
                   复制
+                </button>
+                <button
+                  aria-label="在下方添加正文区块"
+                  disabled={disabled || value.blocks.length >= ARTICLE_MAX_BLOCKS}
+                  onClick={() => insertBlockAfter(index)}
+                  type="button"
+                >
+                  ＋
                 </button>
                 <button
                   aria-label="删除区块"
