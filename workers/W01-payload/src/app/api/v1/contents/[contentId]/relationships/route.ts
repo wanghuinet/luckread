@@ -3,6 +3,7 @@ import {
   invalidatePublicContentRelationships,
 } from '../../../../../lib/public-response-cache.js'
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../auth/traffic-limit.js'
+import { hasAuthenticatedSessionCredential } from '../../../../../lib/content-list-cache-guard.js'
 import {
   callW03Content,
   resolveCookieContentPrincipal,
@@ -45,6 +46,13 @@ export async function GET(
     }
 
     await enforcePublicReadRateLimit(request)
+    if (hasAuthenticatedSessionCredential(request)) {
+      return await callW03Content({
+        request,
+        pathname: relationshipPath(contentId) + (url.search ? url.search : ''),
+        method: 'GET',
+      })
+    }
     return await cachedPublicGet(
       request,
       'content-relationships',
