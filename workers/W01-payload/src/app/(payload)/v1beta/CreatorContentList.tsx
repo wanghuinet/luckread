@@ -215,6 +215,26 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
     }
   }
 
+  async function sharePublishedContent(item: Item) {
+    const sharePath = '/content/' + encodeURIComponent(item.slug || item.id)
+    const shareUrl = window.location.origin + sharePath
+    try {
+      if (typeof navigator.share === 'function') {
+        try {
+          await navigator.share({ title: item.title, url: shareUrl })
+          return
+        } catch (cause) {
+          if (cause instanceof DOMException && cause.name === 'AbortError') return
+        }
+      }
+      await navigator.clipboard.writeText(shareUrl)
+      setError('公开链接已复制。')
+      window.setTimeout(() => setError(''), 1800)
+    } catch {
+      setError('无法复制公开链接，请从地址栏复制当前页面地址。')
+    }
+  }
+
   async function deleteContent(item: Item) {
     if (!window.confirm('确定要删除“' + item.title + '”吗？删除后内容会进入已删除状态。')) return
 
@@ -375,6 +395,14 @@ export default function CreatorContentList({ loginPath = '/admin/login' }: { log
                       <Link className={styles.secondaryButton} href={`/content/${encodeURIComponent(item.slug || item.id)}`}>
                         查看内容
                       </Link>
+                      <button
+                        className={styles.secondaryButton}
+                        disabled={actionId !== null}
+                        onClick={() => void sharePublishedContent(item)}
+                        type="button"
+                      >
+                        分享
+                      </button>
                       <button
                         aria-busy={actionId === item.id}
                         className={styles.secondaryButton}

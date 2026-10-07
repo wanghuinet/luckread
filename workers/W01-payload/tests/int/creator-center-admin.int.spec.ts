@@ -32,6 +32,17 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("router.replace(loginPath + '?returnTo=' + encodeURIComponent(returnTo))")
   })
 
+  it('shares published creator content through the canonical public slug URL', () => {
+    const contentList = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
+    expect(contentList).toContain("const sharePath = '/content/' + encodeURIComponent(item.slug || item.id)")
+    expect(contentList).toContain("const shareUrl = window.location.origin + sharePath")
+    expect(contentList).toContain("typeof navigator.share === 'function'")
+    expect(contentList).toContain("await navigator.share({ title: item.title, url: shareUrl })")
+    expect(contentList).toContain('sharePublishedContent(item)')
+    expect(contentList).toContain('await navigator.clipboard.writeText(shareUrl)')
+    expect(contentList).toContain('公开链接已复制。')
+  })
+
   it('redirects creator content management auth expiry to admin login', () => {
     const contentList = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     expect(contentList).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
