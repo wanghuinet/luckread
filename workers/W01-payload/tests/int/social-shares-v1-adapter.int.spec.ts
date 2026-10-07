@@ -3,6 +3,15 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 describe('v1 share adapters', () => {
+  it('warms share-to-content mapping after successful share creation', () => {
+    const route = readFileSync(
+      resolve(process.cwd(), 'src/app/api/v1/content/[contentId]/shares/route.ts'),
+      'utf8',
+    )
+    expect(route).toContain('rememberPublicShareContentId')
+    expect(route).toContain('response.ok')
+  })
+
   it('forwards share creation to W05 with the authenticated principal', () => {
     const route = readFileSync(
       resolve(process.cwd(), 'src/app/api/v1/content/[contentId]/shares/route.ts'),
@@ -17,7 +26,7 @@ describe('v1 share adapters', () => {
     expect(route).not.toContain('social_share_links')
   })
 
-  it('forwards public share resolution without a viewer principal', () => {
+  it('forwards public share resolution and warms immutable share mapping', () => {
     const route = readFileSync(
       resolve(process.cwd(), 'src/app/api/v1/shares/[shareId]/route.ts'),
       'utf8',
@@ -25,6 +34,7 @@ describe('v1 share adapters', () => {
     expect(route).toContain('callW05SocialPublic')
     expect(route).toContain('/internal/social/shares/')
     expect(route).toContain('method: \'GET\'')
+    expect(route).toContain('rememberPublicShareContentId')
     expect(route).not.toContain('getPayload(')
   })
 })
