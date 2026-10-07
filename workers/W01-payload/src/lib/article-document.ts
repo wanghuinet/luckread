@@ -3,6 +3,9 @@ export const ARTICLE_MAX_BLOCKS = 200
 export const ARTICLE_MAX_BLOCK_TEXT = 20_000
 export const ARTICLE_MAX_MEDIA_PER_BLOCK = 12
 export const ARTICLE_MAX_SERIALIZED_BYTES = 256_000
+export const ARTICLE_TABLE_MAX_COLUMNS = 8
+export const ARTICLE_TABLE_MAX_ROWS = 50
+export const ARTICLE_TABLE_MAX_CELL_TEXT = 2_000
 
 export const ARTICLE_CODE_LANGUAGES = [
   'plaintext',
@@ -19,6 +22,11 @@ export const ARTICLE_CODE_LANGUAGES = [
 
 export type ArticleCodeLanguage = typeof ARTICLE_CODE_LANGUAGES[number]
 
+export type ArticleTable = {
+  headers: string[]
+  rows: string[][]
+}
+
 export type ArticleBlockType =
   | 'paragraph'
   | 'heading'
@@ -29,6 +37,7 @@ export type ArticleBlockType =
   | 'image'
   | 'gallery'
   | 'code'
+  | 'table'
 
 export type ArticleBlock = {
   id: string
@@ -37,6 +46,7 @@ export type ArticleBlock = {
   level?: 2 | 3
   language?: ArticleCodeLanguage
   mediaRefs?: string[]
+  table?: ArticleTable
 }
 
 export type ArticleDocument = {
@@ -55,6 +65,7 @@ const BLOCK_TYPES: readonly ArticleBlockType[] = [
   'image',
   'gallery',
   'code',
+  'table',
 ]
 
 const stripUnsafeControls = (value: string): string =>
@@ -64,6 +75,64 @@ const normalizeCodeLanguage = (value: unknown): ArticleCodeLanguage =>
   typeof value === 'string' && ARTICLE_CODE_LANGUAGES.includes(value as ArticleCodeLanguage)
     ? value as ArticleCodeLanguage
     : 'plaintext'
+
+const normalizeTable = (value: unknown): ArticleTable | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('INVALID_ARTICLE_BLOCK')
+  }
+  const candidate = value as Record<string, unknown>
+  if (!Array.isArray(candidate.headers) || !Array.isArray(candidate.rows)) {
+    throw new Error('INVALID_ARTICLE_BLOCK')
+  }
+  if (
+    candidate.headers.length < 1 ||
+    candidate.headers.length > ARTICLE_TABLE_MAX_COLUMNS ||
+    candidate.rows.length > ARTICLE_TABLE_MAX_ROWS
+  ) {
+    throw new Error('INVALID_ARTICLE_BLOCK')
+  }
+
+  const headers = candidate.headers.map((cell) =>
+    typeof cell === 'string' ? stripUnsafeControls(cell).slice(0, ARTICLE_TABLE_MAX_CELL_TEXT) : ''
+  )
+  const rows = candidate.rows.map((row) => {
+    if (!Array.isArray(row) || row.length !== headers.length) {
+      throw new Error('INVALID_ARTICLE_BLOCK')
+    }
+    return row.map((cell) =>
+      typeof cell === 'string' ? stripUnsafeControls(cell).slice(0, ARTICLE_TABLE_MAX_CELL_TEXT) : ''
+    )
+  })
+
+  return { headers, rows }
+}
+
+export const createArticleTableBlock = (
+  headers = ['列 1', '列 2'],
+  rows: string[][] = [['', '']],
+): ArticleBlock => {
+  if (
+    headers.length < 1 ||
+    headers.length > ARTICLE_TABLE_MAX_COLUMNS ||
+    rows.length > ARTICLE_TABLE_MAX_ROWS ||
+    rows.some((row) => row.length !== headers.length)
+  ) {
+    throw new Error('INVALID_ARTICLE_BLOCK')
+  }
+
+  const table: ArticleTable = {
+    headers: headers.map((cell) => stripUnsafeControls(cell).slice(0, ARTICLE_TABLE_MAX_CELL_TEXT)),
+    rows: rows.map((row) =>
+      row.map((cell) => stripUnsafeControls(cell).slice(0, ARTICLE_TABLE_MAX_CELL_TEXT))
+    ),
+  }
+
+  return {
+    id: crypto.randomUUID(),
+    type: 'table',
+    text: table.rows.map((row) => row.join('\t')).join('\n'),
+    table,
+  }
 
 const normalizeMediaRefs = (value: unknown, type: ArticleBlockType): string[] | undefined => {
   if (type !== 'image' && type !== 'gallery') return undefined
@@ -129,8 +198,12 @@ const normalizeBlock = (value: unknown, index: number): ArticleBlock => {
   const level = candidate.level === 3 ? 3 : 2
   const language = blockType === 'code' ? normalizeCodeLanguage(candidate.language) : undefined
   const mediaRefs = normalizeMediaRefs(candidate.mediaRefs, blockType)
+  const table = blockType === 'table' ? normalizeTable(candidate.table) : undefined
 
   if (blockType === 'gallery' && (!mediaRefs || mediaRefs.length < 2)) {
+    throw new Error('INVALID_ARTICLE_BLOCK')
+  }
+  if (blockType === 'table' && !table) {
     throw new Error('INVALID_ARTICLE_BLOCK')
   }
 
@@ -141,6 +214,7 @@ const normalizeBlock = (value: unknown, index: number): ArticleBlock => {
     ...(blockType === 'heading' ? { level } : {}),
     ...(blockType === 'code' ? { language } : {}),
     ...(mediaRefs ? { mediaRefs } : {}),
+    ...(table ? { table } : {}),
   }
 }
 
@@ -170,6 +244,7 @@ export const serializeArticleDocument = (document: ArticleDocument): string => {
       block.type === 'divider' ||
       block.type === 'image' ||
       block.type === 'gallery' ||
+      block.type === 'table' ||
       Boolean(block.text.trim()),
   )
   if (!persistableBlocks.some(
@@ -204,6 +279,11 @@ export const plainTextFromArticleDocument = (document: ArticleDocument): string 
   document.blocks
     .flatMap((block) => {
       if (block.type === 'divider') return ['']
+      if (block.type === 'table') {
+        const table = block.table
+        if (!table) return []
+        return [table.headers.join('\t'), ...table.rows.map((row) => row.join('\t'))]
+      }
       if (block.type === 'bulletList' || block.type === 'orderedList') {
         return block.text.split('\n').map((item) => item.trim()).filter(Boolean)
       }
