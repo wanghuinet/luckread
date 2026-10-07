@@ -354,7 +354,7 @@ export async function createSeries(
     db.prepare(
       'INSERT INTO content_series ' +
       '(id, owner_user_id, creator_id, ip_id, state, version, title, description, cover_ref, etag, created_at, updated_at) ' +
-      'VALUES (?, ?, ?, NULL, 'DRAFT', 1, ?, ?, ?, ?, ?, ?)',
+      "VALUES (?, ?, ?, NULL, 'DRAFT', 1, ?, ?, ?, ?, ?, ?)",
     ).bind(
       seriesId, ownerUserId, ownerUserId, normalized.title, normalized.description,
       normalized.coverRef, series.etag, createdAt, createdAt,
@@ -511,7 +511,7 @@ export async function deleteSeries(
     expireIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
     insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 204, '', updatedAt, expiresAt),
     db.prepare(
-      "UPDATE content_series SET state = 'DELETED', version = ?, etag = ?, updated_at = ? ' +
+      "UPDATE content_series SET state = 'DELETED', version = ?, etag = ?, updated_at = ? " +
       'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
     ).bind(
       nextVersion, etagForVersion(nextVersion), updatedAt,
