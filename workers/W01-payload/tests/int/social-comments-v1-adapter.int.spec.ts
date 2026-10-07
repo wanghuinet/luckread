@@ -11,6 +11,10 @@ describe('v1 comment adapters', () => {
     resolve(process.cwd(), 'src/app/api/v1/comments/[commentId]/route.ts'),
     'utf8',
   )
+  const socialClient = readFileSync(
+    resolve(process.cwd(), 'src/social/w05-social-client.ts'),
+    'utf8',
+  )
 
   it('routes public reads and authenticated creates through W05', () => {
     expect(route).toContain('callW05SocialPublic')
@@ -23,6 +27,12 @@ describe('v1 comment adapters', () => {
     expect(route).toContain("Idempotency-Key")
     expect(route).not.toContain('getPayload(')
     expect(route).not.toContain('social_comments')
+  })
+
+  it('keeps optional social auth aligned with the shared credential guard', () => {
+    expect(socialClient).toContain("hasAuthenticatedSessionCredential")
+    expect(socialClient).toContain("if (!hasAuthenticatedSessionCredential(request)) return null")
+    expect(socialClient).not.toContain("if (!request.headers.get('Authorization') && !request.headers.get('cookie')) return null")
   })
 
   it('keeps parentId and body in the create request only', () => {
