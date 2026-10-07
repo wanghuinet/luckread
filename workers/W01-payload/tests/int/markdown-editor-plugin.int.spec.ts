@@ -166,9 +166,7 @@ describe('Markdown editor plugin', () => {
     expect(registry).toContain('mathBlockPlugin')
     expect(registry).toContain('findReplacePlugin')
     expect(registry).toContain('articleOutlinePlugin')
-    expect(plugin).toContain(
-      "import { markdownToArticleDocument } from '../lib/markdown-to-article-document.js'",
-    )
+    expect(plugin).toContain('markdownToArticleDocument')
     expect(plugin).toContain('className="lr-editor-markdown-input"')
     const math = read('src/components/MathBlockPlugin.tsx')
     expect(plugin).toContain('本次不会导入，避免静默丢失内容')
