@@ -10,6 +10,8 @@ on:
       - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
       - 'workers/W01-payload/src/app/api/v1/comments/**'
+      - 'workers/W01-payload/src/app/api/v1/content/[contentId]/shares/route.ts'
+      - 'workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts'
       - 'workers/W01-payload/src/social/w05-social-client.ts'
       - 'workers/W01-payload/src/app/api/v1/media/[mediaId]/route.ts'
       - 'contracts/resource-budget/1.0-d1-traffic-guard.v1.json'
@@ -23,6 +25,8 @@ on:
       - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
       - 'workers/W01-payload/src/app/api/v1/comments/**'
+      - 'workers/W01-payload/src/app/api/v1/content/[contentId]/shares/route.ts'
+      - 'workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts'
       - 'workers/W01-payload/src/social/w05-social-client.ts'
       - 'workers/W01-payload/src/app/api/v1/media/[mediaId]/route.ts'
       - 'contracts/resource-budget/1.0-d1-traffic-guard.v1.json'
@@ -77,6 +81,15 @@ jobs:
           assert 'invalidatePublicContentComments' in state
           assert 'invalidatePublicContentComments' in detail
           assert 'invalidatePublicContentComments' in cache
+          assert 'invalidatePublicContentVisibility' in state
+          assert 'invalidatePublicContentVisibility' in detail
+          share_route = Path('workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts').read_text()
+          share_create_route = Path('workers/W01-payload/src/app/api/v1/content/[contentId]/shares/route.ts').read_text()
+          assert 'rememberPublicShareContentId' in share_route
+          assert 'rememberPublicShareContentId' in share_create_route
+          assert 'share-detail' in cache
+          assert '__share-detail-content' in cache
+          assert '__content-visibility-generation' in cache
           comments_route = Path('workers/W01-payload/src/app/api/v1/contents/[contentId]/comments/route.ts').read_text()
           comment_item_route = Path('workers/W01-payload/src/app/api/v1/comments/[commentId]/route.ts').read_text()
           assert 'invalidatePublicContentComments' in comments_route
