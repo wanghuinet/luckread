@@ -21,7 +21,13 @@ type Page = {
   items: ContentItem[]
 }
 
-export default function HomeContentFeed({ locale = 'zh' }: { locale?: PublicLocale }) {
+export default function HomeContentFeed({
+  locale = 'zh',
+  initialItems,
+}: {
+  locale?: PublicLocale
+  initialItems?: ContentItem[]
+}) {
   const copy = getPublicCopy(locale)
   const typeLabels: Record<ContentType, string> = {
     article: copy.content.tabs.article,
@@ -29,14 +35,17 @@ export default function HomeContentFeed({ locale = 'zh' }: { locale?: PublicLoca
     video: copy.content.tabs.video,
   }
 
-  const [items, setItems] = useState<ContentItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const hasInitialItems = Array.isArray(initialItems)
+  const [items, setItems] = useState<ContentItem[]>(initialItems ?? [])
+  const [loading, setLoading] = useState(!hasInitialItems)
   const [error, setError] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
   const requestIdRef = useRef(0)
   const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
+    if (hasInitialItems && retryKey === 0) return
+
     const controller = new AbortController()
     abortControllerRef.current?.abort()
     abortControllerRef.current = controller
@@ -75,7 +84,7 @@ export default function HomeContentFeed({ locale = 'zh' }: { locale?: PublicLoca
       if (abortControllerRef.current === controller) abortControllerRef.current = null
       window.clearTimeout(timer)
     }
-  }, [retryKey])
+  }, [hasInitialItems, retryKey])
 
   if (!loading && items.length === 0 && !error) return null
 
