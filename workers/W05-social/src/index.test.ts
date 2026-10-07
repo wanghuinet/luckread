@@ -645,6 +645,7 @@ describe('W05 social comment transport', () => {
           'X-LuckRead-Principal-User-Id': 'viewer-1',
           'X-LuckRead-Principal-Layer': 'L2',
           'If-Match': '"2026-10-02T00:01:00.000Z"',
+          'Idempotency-Key': 'comment-update-1',
           'content-type': 'application/json',
         },
         body: JSON.stringify({ body: '修改后的评论' }),
@@ -680,6 +681,7 @@ describe('W05 social comment transport', () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe('"2026-10-02T00:02:00.000Z"')
+    expect(response.headers.get('X-LuckRead-Content-Id')).toBe('content-1')
   })
 
   it('requires If-Match for comment updates', async () => {
@@ -707,15 +709,17 @@ describe('W05 social comment transport', () => {
           ...commentHeaders,
           'X-LuckRead-Principal-User-Id': 'viewer-1',
           'X-LuckRead-Principal-Layer': 'L2',
+          'Idempotency-Key': 'comment-delete-1',
         },
       }),
       {
         DB: dbFor([
-          { id: 'comment-1', author_user_id: 'viewer-1', state: 'PUBLISHED', has_replies: 0 },
+          { id: 'comment-1', content_id: 'content-1', author_user_id: 'viewer-1', state: 'PUBLISHED', has_replies: 0 },
         ]),
       },
     )
     expect(response.status).toBe(204)
+    expect(response.headers.get('X-LuckRead-Content-Id')).toBe('content-1')
   })
 
   it('requires an idempotency key for comment deletion', async () => {
@@ -733,7 +737,7 @@ describe('W05 social comment transport', () => {
     expect(response.status).toBe(428)
   })
 
-  it('rejects non-DELETE comment item transport', async () => {
+  it('rejects unsupported comment item transport', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/comments/comment-1', {
         method: 'GET',
@@ -741,6 +745,7 @@ describe('W05 social comment transport', () => {
           ...commentHeaders,
           'X-LuckRead-Principal-User-Id': 'viewer-1',
           'X-LuckRead-Principal-Layer': 'L2',
+          'Idempotency-Key': 'comment-unsupported-1',
         },
       }),
       { DB: dbFor([]) },

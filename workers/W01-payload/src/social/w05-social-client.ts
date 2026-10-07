@@ -135,6 +135,8 @@ export async function callW05Social(input: {
   })
   const etag = response.headers.get('etag')
   if (etag) responseHeaders.set('etag', etag)
+  const contentId = response.headers.get('X-LuckRead-Content-Id')
+  if (contentId) responseHeaders.set('X-LuckRead-Content-Id', contentId)
 
   return new Response(await response.arrayBuffer(), {
     status: response.status,

@@ -9,6 +9,7 @@ import {
   resolveOptionalCookieSocialPrincipal,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
+import { invalidatePublicContentComments } from '../../../../../../lib/public-response-cache.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -104,13 +105,15 @@ export async function POST(
       return errorResponse(400, 'VALIDATION_FAILED', 'Invalid comment request')
     }
 
-    return await callW05Social({
+    const response = await callW05Social({
       request,
       pathname: '/internal/social/contents/' + encodeURIComponent(contentId) + '/comments',
       method: 'POST',
       principal,
       body: { body, parentId: parentId ?? null },
     })
+    if (response.ok) await invalidatePublicContentComments(contentId)
+    return response
   } catch (error) {
     if (error instanceof W05SocialClientError) {
       return errorResponse(error.status, error.code, error.message)

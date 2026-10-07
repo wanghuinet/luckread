@@ -134,13 +134,14 @@ describe('comment runtime', () => {
   it('retries an author deletion tombstone after the parent content is unpublished', async () => {
     const d = db([{
       id: 'c-deleted',
+      content_id: 'content-1',
       author_user_id: 'user-1',
       state: 'AUTHOR_DELETED',
       content_state: 'DRAFT',
       has_replies: 0,
     }])
 
-    await expect(deleteComment(d, 'user-1', 'c-deleted')).resolves.toBeUndefined()
+    await expect(deleteComment(d, 'user-1', 'c-deleted')).resolves.toBe('content-1')
     expect(d.prepare).toHaveBeenCalledTimes(1)
   })
 
@@ -299,7 +300,7 @@ describe('comment runtime', () => {
 
   it('treats a concurrent deletion that already reached the tombstone as idempotent success', async () => {
     const d = db([
-      { id: 'c1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
+      { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
       { state: 'AUTHOR_DELETED' },
     ])
     const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
@@ -307,6 +308,7 @@ describe('comment runtime', () => {
       bind: vi.fn(() => ({
         first: vi.fn(async () => ({
           id: 'c1',
+          content_id: 'content-1',
           author_user_id: 'user-1',
           state: 'PUBLISHED',
           content_state: 'PUBLISHED',
@@ -323,7 +325,7 @@ describe('comment runtime', () => {
       })),
     }))
 
-    await expect(deleteComment(d, 'user-1', 'c1')).resolves.toBeUndefined()
+    await expect(deleteComment(d, 'user-1', 'c1')).resolves.toBe('content-1')
     expect(prepare).toHaveBeenCalledTimes(3)
   })
 
@@ -336,6 +338,7 @@ describe('comment runtime', () => {
       bind: vi.fn(() => ({
         first: vi.fn(async () => ({
           id: 'c1',
+          content_id: 'content-1',
           author_user_id: 'user-1',
           state: 'PUBLISHED',
           content_state: 'PUBLISHED',
@@ -356,18 +359,18 @@ describe('comment runtime', () => {
 
   it('deletes an owned leaf comment', async () => {
     const d = db([
-      { id: 'c1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
+      { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'PUBLISHED', has_replies: 0 },
     ])
-    await expect(deleteComment(d, 'user-1', 'c1')).resolves.toBeUndefined()
+    await expect(deleteComment(d, 'user-1', 'c1')).resolves.toBe('content-1')
     expect(d.prepare).toHaveBeenCalledTimes(2)
   })
 
   it('keeps author deletion idempotent for an existing tombstone', async () => {
     const d = db([
-      { id: 'c1', author_user_id: 'user-1', state: 'AUTHOR_DELETED', has_replies: 0 },
+      { id: 'c1', content_id: 'content-1', author_user_id: 'user-1', state: 'AUTHOR_DELETED', has_replies: 0 },
     ])
 
-    await expect(deleteComment(d, 'user-1', 'c1')).resolves.toBeUndefined()
+    await expect(deleteComment(d, 'user-1', 'c1')).resolves.toBe('content-1')
     expect(d.prepare).toHaveBeenCalledTimes(1)
   })
 

@@ -3,6 +3,23 @@ import {
   resolveCookieSocialPrincipal,
   W05SocialClientError,
 } from '../../../../../social/w05-social-client.js'
+import { invalidatePublicContentComments } from '../../../../../lib/public-response-cache.js'
+
+const finalizeCommentMutationResponse = async (response: Response): Promise<Response> => {
+  const contentId = response.headers.get('X-LuckRead-Content-Id')?.trim() ?? ''
+  if (response.ok && contentId) {
+    await invalidatePublicContentComments(contentId)
+  }
+  if (!contentId) return response
+
+  const headers = new Headers(response.headers)
+  headers.delete('X-LuckRead-Content-Id')
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  })
+}
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -47,13 +64,13 @@ export async function PATCH(
       return errorResponse(400, 'VALIDATION_FAILED', 'Comment body is required')
     }
 
-    return await callW05Social({
+    return await finalizeCommentMutationResponse(await callW05Social({
       request,
       pathname: '/internal/social/comments/' + encodeURIComponent(commentId),
       method: 'PATCH',
       principal,
       body: { body: bodyValue },
-    })
+    }))
   } catch (error) {
     if (error instanceof W05SocialClientError) {
       return errorResponse(error.status, error.code, error.message)
@@ -78,12 +95,12 @@ export async function DELETE(
       return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key required')
     }
 
-    return await callW05Social({
+    return await finalizeCommentMutationResponse(await callW05Social({
       request,
       pathname: '/internal/social/comments/' + encodeURIComponent(commentId),
       method: 'DELETE',
       principal,
-    })
+    }))
   } catch (error) {
     if (error instanceof W05SocialClientError) {
       return errorResponse(error.status, error.code, error.message)
