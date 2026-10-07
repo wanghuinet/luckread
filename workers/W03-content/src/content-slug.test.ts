@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { contentSlugFor, isContentSlug } from './content-slug.js'
 
 describe('content slug', () => {
-  it('keeps the slug stable when the title changes', () => {
+  it('derives a deterministic candidate slug from title and content id', () => {
     const id = '6f4dc6e8-4f5f-4e7e-9a6d-d2c1f931fabc'
     const first = contentSlugFor('Cloudflare 性能优化：缓存与 D1', id)
     const later = contentSlugFor('完全不同的新标题', id)
