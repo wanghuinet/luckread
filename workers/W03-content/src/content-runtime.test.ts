@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, transitionContentState, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -145,6 +145,55 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('DELETED', 'RESTORED', 'CREATOR', true)).toBe(true)
     expect(canTransitionContentState('RESTORED', 'DRAFT', 'CREATOR', true)).toBe(true)
     expect(canTransitionContentState('RESTORED', 'PENDING_REVIEW', 'CREATOR', true)).toBe(false)
+  })
+
+  it('returns 409 for an owned but invalid lifecycle transition', async () => {
+    const content = {
+      id: 'content_123',
+      content_type: 'article',
+      owner_user_id: 'user_123',
+      creator_id: 'user_123',
+      ip_id: null,
+      state: 'DRAFT',
+      version: 1,
+      revision: 1,
+      slug: 'draft-content-abcdef',
+      title: 'Draft content',
+      body_ref: 'https://cdn.example.com/body.json',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-07T00:00:00.000Z',
+      updated_at: '2026-10-07T00:00:00.000Z',
+    }
+    const db = {
+      prepare() {
+        return {
+          bind: () => ({
+            first: async () => content,
+          }),
+        }
+      },
+      batch: async () => {
+        throw new Error('batch should not run for an invalid transition')
+      },
+    } as never
+
+    await expect(
+      transitionContentState(
+        db,
+        'user_123',
+        'L3',
+        'content_123',
+        'PUBLISHED',
+        undefined,
+        'W/"1"',
+        'transition-invalid-state',
+      ),
+    ).rejects.toMatchObject({
+      code: 'INVALID_STATE',
+      status: 409,
+    })
   })
 
   it('keeps the D1 batch fail-closed CAS guard on every content mutation', () => {
