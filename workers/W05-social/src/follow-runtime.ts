@@ -30,6 +30,81 @@ const DEFAULT_LIMIT = 20
 const MAX_LIMIT = 50
 const MAX_CURSOR_LENGTH = 2048
 
+const FOLLOW_COUNT_CACHE_TTL_SECONDS = 5
+
+const getDefaultCache = (): Cache | null => {
+  if (typeof globalThis.caches === 'undefined') return null
+  return (globalThis.caches as unknown as { default?: Cache }).default ?? null
+}
+
+const followCountCacheKey = (direction: FollowListDirection, userIdValue: string): Request =>
+  new Request(
+    'https://cache.luckread.internal/__social-follow-count?v=1&direction=' +
+      encodeURIComponent(direction) +
+      '&user=' + encodeURIComponent(userIdValue),
+    { method: 'GET' },
+  )
+
+const readCachedFollowCount = async (
+  direction: FollowListDirection,
+  userIdValue: string,
+): Promise<number | null> => {
+  const cache = getDefaultCache()
+  if (!cache) return null
+  try {
+    const hit = await cache.match(followCountCacheKey(direction, userIdValue))
+    if (!hit) return null
+    const value = await hit.json() as { totalCount?: unknown }
+    return typeof value.totalCount === 'number' &&
+      Number.isSafeInteger(value.totalCount) &&
+      value.totalCount >= 0
+      ? value.totalCount
+      : null
+  } catch {
+    return null
+  }
+}
+
+const writeCachedFollowCount = async (
+  direction: FollowListDirection,
+  userIdValue: string,
+  totalCount: number,
+): Promise<void> => {
+  const cache = getDefaultCache()
+  if (!cache) return
+  try {
+    await cache.put(
+      followCountCacheKey(direction, userIdValue),
+      Response.json(
+        { totalCount },
+        {
+          headers: {
+            'content-type': 'application/json; charset=utf-8',
+            'cache-control': 'public, max-age=0, s-maxage=' + FOLLOW_COUNT_CACHE_TTL_SECONDS,
+          },
+        },
+      ),
+    )
+  } catch {
+    // Cache failure must never make the authoritative social read fail.
+  }
+}
+
+export const invalidateFollowListCountCache = async (...userIds: string[]): Promise<void> => {
+  const cache = getDefaultCache()
+  if (!cache) return
+  const normalizedIds = [...new Set(userIds.map((value) => value.trim()).filter(Boolean))]
+  await Promise.all(normalizedIds.flatMap((id) => (
+    (['followers', 'following'] as FollowListDirection[]).map(async (direction) => {
+      try {
+        await cache.delete(followCountCacheKey(direction, id))
+      } catch {
+        // Best-effort invalidation; D1 remains authoritative.
+      }
+    })
+  )))
+}
+
 const userId = (v: string) => {
   const id = v.trim()
   if (!id || id.length > 256) throw new FollowRuntimeError('VALIDATION_FAILED', 400)
@@ -132,26 +207,33 @@ async function listFollowRelations(
       ]
     : [ownerId, ownerId, ownerId, limit + 1]
 
-  const result = await db.prepare(statement).bind(...parameters).all<{
-    relationship_id: string
-    user_id: string
-    followed_at: string
-  }>()
+  const [result, cachedTotalCount] = await Promise.all([
+    db.prepare(statement).bind(...parameters).all<{
+      relationship_id: string
+      user_id: string
+      followed_at: string
+    }>(),
+    readCachedFollowCount(direction, ownerId),
+  ])
   const rows = result.results ?? []
   const hasMore = rows.length > limit
   const visibleRows = hasMore ? rows.slice(0, limit) : rows
 
-  // COUNT is deliberately a separate aggregate query. Embedding COUNT(*) as a
-  // correlated subquery in the page SELECT can re-scan the same relationship
-  // index for every returned row, multiplying D1 rows-read on hot accounts.
-  const countStatement = `SELECT COUNT(*) AS total_count
-    FROM social_follow_relationships rel_count
-    WHERE rel_count.${relationColumn} = ?
-      AND ${blockPredicate.replaceAll(`${itemColumn}`, `rel_count.${itemColumn}`)}`
-  const countResult = await db.prepare(countStatement)
-    .bind(ownerId, ownerId, ownerId)
-    .first<{ total_count: number }>()
-  const totalCount = Number(countResult?.total_count ?? 0)
+  let totalCount = cachedTotalCount
+  if (totalCount === null) {
+    // COUNT is deliberately a separate aggregate query. Embedding COUNT(*) as a
+    // correlated subquery in the page SELECT can re-scan the same relationship
+    // index for every returned row, multiplying D1 rows-read on hot accounts.
+    const countStatement = `SELECT COUNT(*) AS total_count
+      FROM social_follow_relationships rel_count
+      WHERE rel_count.${relationColumn} = ?
+        AND ${blockPredicate.replaceAll(`${itemColumn}`, `rel_count.${itemColumn}`)}`
+    const countResult = await db.prepare(countStatement)
+      .bind(ownerId, ownerId, ownerId)
+      .first<{ total_count: number }>()
+    totalCount = Number(countResult?.total_count ?? 0)
+    await writeCachedFollowCount(direction, ownerId, totalCount)
+  }
 
   const last = visibleRows.at(-1)
   return {
@@ -255,6 +337,7 @@ export async function follow(db: D1Database, followerUserId: string, targetUserI
   ).first<FollowRow>()
 
   if (!row) throw new FollowRuntimeError('RELATIONSHIP_BLOCKED', 409)
+  await invalidateFollowListCountCache(follower, target)
   return row
 }
 
@@ -262,6 +345,7 @@ export async function unfollow(db: D1Database, followerUserId: string, targetUse
   const follower=userId(followerUserId), target=userId(targetUserId)
   if (follower===target) throw new FollowRuntimeError('SELF_FOLLOW_NOT_ALLOWED',409)
   await db.prepare('DELETE FROM social_follow_relationships WHERE follower_user_id = ? AND target_user_id = ?').bind(follower,target).run()
+  await invalidateFollowListCountCache(follower, target)
 }
 
 export async function getFollowStatus(db: D1Database, followerUserId: string, targetUserId: string) {
