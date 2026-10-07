@@ -14,6 +14,7 @@ describe('v1 content relationship adapters', () => {
 
   it('keeps public relationship reads cache-first and authenticated writes outside shared cache', () => {
     expect(route).toContain("cachedPublicGet")
+    expect(route).toContain("hasAuthenticatedSessionCredential")
     expect(route).toContain("'content-relationships'")
     expect(route).toContain("enforcePublicReadRateLimit")
     expect(route).toContain("resolveCookieContentPrincipal")
