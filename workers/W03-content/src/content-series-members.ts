@@ -298,6 +298,7 @@ export async function attachSeriesMember(
   }
 
   if (row.series_owner_user_id !== ownerUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  if (row.content_owner_user_id !== row.series_owner_user_id) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
     if (row.idem_owner_user_id && row.idem_owner_user_id !== ownerUserId) {
     throw new ContentRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
   }
@@ -352,6 +353,7 @@ export async function attachSeriesMember(
       row.series_version,
       row.series_etag,
     ),
+    atomicGuard(db),
     db.prepare(
       'INSERT INTO content_relationships ' +
       '(relationship_id, source_type, source_id, target_type, target_id, relation_type, position, schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at) ' +
@@ -365,7 +367,6 @@ export async function attachSeriesMember(
       nowIso,
       nowIso,
     ),
-    atomicGuard(db),
   ])
 
   return response
@@ -505,12 +506,13 @@ export async function removeSeriesMember(
     expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
     insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(response), nowIso, expiresAt),
     db.prepare(
-      "UPDATE content_relationships SET status = 'REVOKED', updated_at = ? WHERE relationship_id = ? AND status = 'ACTIVE'",
-    ).bind(nowIso, row.membership_relationship_id),
-    db.prepare(
       'UPDATE content_series SET version = ?, etag = ?, updated_at = ? ' +
       'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
     ).bind(nextVersion, seriesEtag, nowIso, seriesId, ownerUserId, row.series_version, row.series_etag),
+    atomicGuard(db),
+    db.prepare(
+      "UPDATE content_relationships SET status = 'REVOKED', updated_at = ? WHERE relationship_id = ? AND status = 'ACTIVE'",
+    ).bind(nowIso, row.membership_relationship_id),
     atomicGuard(db),
   ])
 
@@ -607,7 +609,7 @@ export async function reorderSeriesMember(
     contentId,
     contentSlug: row.content_slug,
     contentType: row.content_type,
-    contentState: row.series_state,
+    contentState: row.content_state,
     title: row.content_title,
     position: selectedPosition,
     createdAt: row.membership_created_at ?? nowIso,
@@ -620,6 +622,11 @@ export async function reorderSeriesMember(
   const mutations: D1PreparedStatement[] = [
     expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
     insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(response), nowIso, expiresAt),
+    db.prepare(
+      'UPDATE content_series SET version = ?, etag = ?, updated_at = ? ' +
+      'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
+    ).bind(nextVersion, seriesEtag, nowIso, seriesId, ownerUserId, row.series_version, row.series_etag),
+    atomicGuard(db),
     db.prepare(
       'UPDATE content_relationships SET position = position + ? ' +
       "WHERE target_type = 'series' AND target_id = ? AND relation_type = 'series-member' AND status = 'ACTIVE'",
@@ -637,10 +644,6 @@ export async function reorderSeriesMember(
   }
 
   mutations.push(
-    db.prepare(
-      'UPDATE content_series SET version = ?, etag = ?, updated_at = ? ' +
-      'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
-    ).bind(nextVersion, seriesEtag, nowIso, seriesId, ownerUserId, row.series_version, row.series_etag),
     atomicGuard(db),
   )
 
