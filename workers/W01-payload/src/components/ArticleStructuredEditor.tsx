@@ -10,7 +10,7 @@ import {
   createArticleBlock,
   normalizeArticleDocument,
   plainTextFromArticleDocument,
-} from '../../../lib/article-document.js'
+} from '../lib/article-document.js'
 
 type Props = {
   value: ArticleDocument
