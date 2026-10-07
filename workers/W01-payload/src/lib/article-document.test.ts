@@ -68,7 +68,7 @@ describe('article structured document', () => {
     })).toThrow('INVALID_ARTICLE_DOCUMENT')
 
     expect(() => serializeArticleDocument({
-      version: 1,
+      version: 2,
       blocks: [{ id: 'empty', type: 'paragraph', text: '   ' }],
     })).toThrow('ARTICLE_DOCUMENT_EMPTY')
 
