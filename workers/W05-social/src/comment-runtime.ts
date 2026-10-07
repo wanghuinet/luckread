@@ -366,13 +366,14 @@ export async function deleteComment(
   db: D1Database,
   actorUserIdValue: string,
   commentIdValue: string,
-): Promise<void> {
+): Promise<string> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const commentId = validateId(commentIdValue)
 
   const row = await db.prepare(
     `SELECT
        c.id,
+       c.content_id,
        c.author_user_id,
        c.state,
        content.state AS content_state,
@@ -387,6 +388,7 @@ export async function deleteComment(
      LIMIT 1`,
   ).bind(commentId).first<{
     id: string
+    content_id: string
     author_user_id: string
     state: 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'AUTHOR_DELETED'
     content_state: string | null
@@ -397,7 +399,7 @@ export async function deleteComment(
   if (row.author_user_id !== actorUserId) {
     throw new CommentRuntimeError('PERMISSION_DENIED', 403)
   }
-  if (row.state === 'AUTHOR_DELETED') return
+  if (row.state === 'AUTHOR_DELETED') return row.content_id
   if (row.content_state !== 'PUBLISHED') {
     throw new CommentRuntimeError('NOT_FOUND', 404)
   }
@@ -430,9 +432,10 @@ export async function deleteComment(
           AND author_user_id = ?
         LIMIT 1`,
     ).bind(commentId, actorUserId).first<{ state: 'PUBLISHED' | 'AUTHOR_DELETED' | 'PENDING' | 'REJECTED' }>()
-    if (afterConflict?.state === 'AUTHOR_DELETED') return
+    if (afterConflict?.state === 'AUTHOR_DELETED') return row.content_id
     throw new CommentRuntimeError('COMMENT_HAS_REPLIES', 409)
   }
+  return row.content_id
 }
 
 export async function updateComment(
