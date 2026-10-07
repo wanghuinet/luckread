@@ -184,7 +184,7 @@ describe('Markdown editor plugin', () => {
     expect(history).toContain('pastRef.current')
     expect(history).toContain('futureRef.current')
     expect(history).toContain('updateDocument(document)')
-    expect(history).toContain("event.metaKey && event.ctrlKey")
+    expect(history).toContain("(!event.metaKey && !event.ctrlKey)")
     expect(history).toContain("event.key.toLowerCase()")
     expect(history).toContain("window.addEventListener('keydown', onKeyDown)")
     expect(history).toContain("id: 'content.undo-redo'")
