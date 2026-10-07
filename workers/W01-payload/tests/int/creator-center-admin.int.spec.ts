@@ -259,7 +259,7 @@ describe('Creator Center admin extension', () => {
     expect(list).toContain('转为草稿编辑')
     expect(list).toContain("window.addEventListener('luckread:content-mutated'")
     expect(list).toContain("window.removeEventListener('luckread:content-mutated'")
-    expect(list).toContain("href={\`/content/\${encodeURIComponent(item.id)}\`}")
+    expect(list).toContain("href={\`/content/\${encodeURIComponent(item.slug || item.id)}\`}")
     expect(list).toContain("item.state === 'APPROVED'")
     expect(list).toContain("transition(item, 'PUBLISHED')")
     expect(list).toContain('立即发布')
