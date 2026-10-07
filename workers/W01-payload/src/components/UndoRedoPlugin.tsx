@@ -116,6 +116,29 @@ function HistoryToolbar({ value, disabled, updateDocument }: ArticleEditorPlugin
   const pastCount = pastRef.current.length
   const futureCount = futureRef.current.length
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (disabled || (!event.metaKey && !event.ctrlKey)) return
+      const target = event.target
+      if (!(target instanceof HTMLElement) || !target.closest('.lr-article-block')) return
+
+      const key = event.key.toLowerCase()
+      if (key === 'z') {
+        event.preventDefault()
+        if (event.shiftKey) redo()
+        else undo()
+        return
+      }
+      if (key === 'y' && !event.shiftKey) {
+        event.preventDefault()
+        redo()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
+
   return (
     <div className="lr-editor-history-tools" role="group" aria-label="编辑历史">
       <button
