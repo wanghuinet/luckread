@@ -1,6 +1,7 @@
 'use client'
 
-import { ChangeEvent, useEffect, useState } from 'react'
+import { ChangeEvent, useEffect, useRef, useState } from 'react'
+import { computeAutoSaveDelay } from '../../../lib/content-autosave.js'
 import { useRouter } from 'next/navigation'
 
 type ContentType = 'article' | 'post' | 'video'
@@ -82,12 +83,21 @@ export default function PublishComposer({
   const [aiMode, setAiMode] = useState<AiMode>('none')
   const [humanConfirmed, setHumanConfirmed] = useState(false)
   const [preflightReport, setPreflightReport] = useState<PublishPreflightResult | null>(null)
-
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'scheduled' | 'saving' | 'saved' | 'error'>('idle')
+  const autoSaveTimerRef = useRef<number | null>(null)
+  const autoSaveInFlightRef = useRef(false)
+  const autoSaveLastSavedAtRef = useRef<number | null>(null)
+  const autoSaveChangeTokenRef = useRef(0)
+  const autoSaveDirtyRef = useRef(false)
+  const restoreCompleteRef = useRef(false)
   useEffect(() => {
     let cancelled = false
     const controller = new AbortController()
     const draftId = new URL(window.location.href).searchParams.get('draft')?.trim()
-    if (!draftId) return
+    if (!draftId) {
+      restoreCompleteRef.current = true
+      return
+    }
 
     async function restoreDraft() {
       setBusy(true)
@@ -124,6 +134,7 @@ export default function PublishComposer({
           mimeType: 'application/octet-stream',
         })))
         setMessage(recovered.state === 'PENDING_REVIEW' ? '草稿已恢复，当前正在审核。' : '草稿已恢复。')
+        restoreCompleteRef.current = true
       } catch (caught) {
         if (cancelled || controller.signal.aborted) return
         if (caught instanceof DOMException && caught.name === 'AbortError') return
@@ -181,6 +192,7 @@ export default function PublishComposer({
       const uploaded: UploadedAsset[] = []
       for (const file of selected.slice(0, remainingSlots)) uploaded.push(await uploadFile(file))
       setAssets((current) => [...current, ...uploaded])
+      markDirty()
       setMessage(`已上传 ${uploaded.length} 个媒体文件`)
       if (selected.length > remainingSlots) setError('已达到 12 个媒体文件上限，其余文件未上传。')
     } catch {
@@ -193,6 +205,7 @@ export default function PublishComposer({
 
   function removeAsset(id: string) {
     setAssets((current) => current.filter((asset) => asset.id !== id))
+    markDirty()
   }
 
   const reviewLocked = draft?.state === 'PENDING_REVIEW'
@@ -246,11 +259,93 @@ export default function PublishComposer({
     const saved = data as ContentResponse
     setDraft(saved)
     setSavedBody(body)
+    autoSaveLastSavedAtRef.current = Date.now()
     const nextUrl = new URL(window.location.href)
     nextUrl.searchParams.set('draft', saved.id)
     window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
     return saved
   }
+
+  function markDirty() {
+    if (!restoreCompleteRef.current) return
+    autoSaveChangeTokenRef.current += 1
+    autoSaveDirtyRef.current = true
+  }
+
+  function cancelPendingAutoSave() {
+    if (autoSaveTimerRef.current) {
+      window.clearTimeout(autoSaveTimerRef.current)
+      autoSaveTimerRef.current = null
+    }
+    autoSaveChangeTokenRef.current += 1
+  }
+
+  function scheduleAutoSave() {
+    if (autoSaveTimerRef.current) {
+      window.clearTimeout(autoSaveTimerRef.current)
+      autoSaveTimerRef.current = null
+    }
+    if (!restoreCompleteRef.current || !autoSaveDirtyRef.current || reviewLocked || !title.trim() || !body.trim()) {
+      setAutoSaveStatus('idle')
+      return
+    }
+
+    const changeToken = autoSaveChangeTokenRef.current
+    const delay = computeAutoSaveDelay(Date.now(), autoSaveLastSavedAtRef.current)
+    setAutoSaveStatus('scheduled')
+    autoSaveTimerRef.current = window.setTimeout(async () => {
+      autoSaveTimerRef.current = null
+      if (
+        changeToken !== autoSaveChangeTokenRef.current ||
+        autoSaveInFlightRef.current ||
+        busy ||
+        !autoSaveDirtyRef.current ||
+        !title.trim() ||
+        !body.trim() ||
+        reviewLocked
+      ) {
+        return
+      }
+
+      autoSaveInFlightRef.current = true
+      setAutoSaveStatus('saving')
+      try {
+        await persistDraft()
+        autoSaveLastSavedAtRef.current = Date.now()
+        if (changeToken === autoSaveChangeTokenRef.current) {
+          autoSaveDirtyRef.current = false
+          setAutoSaveStatus('saved')
+        }
+      } catch {
+        setAutoSaveStatus('error')
+      } finally {
+        autoSaveInFlightRef.current = false
+        if (
+          autoSaveDirtyRef.current &&
+          changeToken !== autoSaveChangeTokenRef.current &&
+          !reviewLocked
+        ) {
+          scheduleAutoSave()
+        }
+      }
+    }, delay)
+  }
+
+  const autoSaveSchedulerRef = useRef<() => void>(() => {})
+
+  useEffect(() => {
+    autoSaveSchedulerRef.current = scheduleAutoSave
+  }, [scheduleAutoSave])
+
+  useEffect(() => {
+    if (autoSaveDirtyRef.current) autoSaveSchedulerRef.current()
+    return () => {
+      if (autoSaveTimerRef.current) {
+        window.clearTimeout(autoSaveTimerRef.current)
+        autoSaveTimerRef.current = null
+      }
+    }
+  }, [title, body, type, assets, coverRef, busy])
 
   function startNewContent() {
     setDraft(null)
@@ -261,6 +356,10 @@ export default function PublishComposer({
     setCoverRef('')
     setPreview(false)
     setCopied(false)
+    cancelPendingAutoSave()
+    autoSaveDirtyRef.current = false
+    autoSaveLastSavedAtRef.current = null
+    setAutoSaveStatus('idle')
     const nextUrl = new URL(window.location.href)
     nextUrl.searchParams.delete('draft')
     window.history.replaceState(null, '', nextUrl.pathname + nextUrl.search + nextUrl.hash)
@@ -283,10 +382,14 @@ export default function PublishComposer({
   }
 
   async function runPreflight(): Promise<{ report: PublishPreflightResult; input: Record<string, unknown>; draft: ContentResponse }> {
+    if (autoSaveInFlightRef.current) throw new Error('自动保存正在进行，请稍后重试。')
     if (!title.trim() || !body.trim()) throw new Error('请先填写标题和正文。')
     if (type === 'video' && assets.length === 0) throw new Error('视频至少需要添加一个媒体文件。')
 
     const savedDraft = await persistDraft()
+    autoSaveDirtyRef.current = false
+    autoSaveLastSavedAtRef.current = Date.now()
+    setAutoSaveStatus('saved')
     const input = {
       contentType: type,
       title: title.trim(),
@@ -313,6 +416,7 @@ export default function PublishComposer({
 
 
   async function saveDraft() {
+    if (autoSaveInFlightRef.current) return
     setBusy(true); setError(''); setMessage('')
     try {
       if (!title.trim() || !body.trim()) {
@@ -323,7 +427,13 @@ export default function PublishComposer({
         setError('视频至少需要添加一个媒体文件。')
         return
       }
+      const savedChangeToken = autoSaveChangeTokenRef.current
       await persistDraft()
+      if (savedChangeToken === autoSaveChangeTokenRef.current) {
+        autoSaveDirtyRef.current = false
+        autoSaveLastSavedAtRef.current = Date.now()
+        setAutoSaveStatus('saved')
+      }
       window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
       setMessage('草稿已保存。')
     } catch (caught) {
@@ -342,6 +452,8 @@ export default function PublishComposer({
     if (!draft?.id || draft.state !== 'DRAFT') return
     if (!window.confirm('确定放弃这份草稿吗？此操作不可撤销。')) return
 
+    cancelPendingAutoSave()
+    autoSaveDirtyRef.current = false
     setBusy(true)
     setError('')
     setMessage('')
@@ -385,6 +497,7 @@ export default function PublishComposer({
   }
 
   async function submitForReview() {
+    cancelPendingAutoSave()
     setBusy(true); setError(''); setMessage('')
     try {
       const { report, input, draft: savedDraft } = await runPreflight()
@@ -413,6 +526,7 @@ export default function PublishComposer({
           ? { ...current, state: transition.to, version: transition.version, etag: transition.etag }
           : current,
       )
+      autoSaveDirtyRef.current = false
       window.dispatchEvent(new Event(CONTENT_MUTATED_EVENT))
       setMessage('发布前检查通过，已提交审核。审核通过后将进入正式发布状态。')
     } catch (caught) {
@@ -441,7 +555,7 @@ export default function PublishComposer({
             className={type === value ? 'active' : ''}
             key={value}
             disabled={busy || reviewLocked}
-            onClick={() => setType(value)}
+            onClick={() => { setType(value); markDirty() }}
             role="tab"
             type="button"
           >
@@ -455,7 +569,7 @@ export default function PublishComposer({
         <input
           maxLength={512}
           disabled={busy || reviewLocked}
-          onChange={(event) => setTitle(event.target.value)}
+          onChange={(event) => { setTitle(event.target.value); markDirty() }}
           placeholder={type === 'post' ? '这一刻想分享什么？' : '输入一个清晰、有吸引力的标题'}
           value={title}
         />
@@ -465,7 +579,7 @@ export default function PublishComposer({
         <span>{type === 'post' ? '正文' : type === 'video' ? '视频简介' : '正文'}</span>
         <textarea
           disabled={busy || reviewLocked}
-          onChange={(event) => setBody(event.target.value)}
+          onChange={(event) => { setBody(event.target.value); markDirty() }}
           placeholder="写下你的内容…"
           rows={14}
           value={body}
@@ -565,7 +679,7 @@ export default function PublishComposer({
         <span>封面引用（可选）</span>
         <input
           disabled={busy || reviewLocked}
-          onChange={(event) => setCoverRef(event.target.value)}
+          onChange={(event) => { setCoverRef(event.target.value); markDirty() }}
           placeholder="默认使用第一个媒体文件"
           value={coverRef}
         />
@@ -576,6 +690,18 @@ export default function PublishComposer({
           <span>当前状态</span>
           <strong>{stateLabel}</strong>
           <span>版本 {draft.version}</span>
+        </div>
+      ) : null}
+      {draft?.state === 'DRAFT' ? (
+        <div className="lr-content-status" role="status" aria-live="polite">
+          <span>自动保存</span>
+          <strong>
+            {autoSaveStatus === 'saving' ? '保存中…'
+              : autoSaveStatus === 'scheduled' ? '即将保存'
+                : autoSaveStatus === 'saved' ? '已保存'
+                  : autoSaveStatus === 'error' ? '保存失败'
+                    : '等待编辑'}
+          </strong>
         </div>
       ) : null}
       {message ? <div className="lr-success" role="status">{message}</div> : null}
@@ -637,10 +763,10 @@ export default function PublishComposer({
             放弃草稿
           </button>
         ) : null}
-        <button className="secondary" disabled={busy} onClick={saveDraft} type="button">
+        <button className="secondary" disabled={busy || autoSaveStatus === 'saving'} onClick={saveDraft} type="button">
           {busy ? '处理中…' : '保存草稿'}
         </button>
-        <button className="primary" disabled={busy || draft?.state === 'PENDING_REVIEW'} onClick={submitForReview} type="button">
+        <button className="primary" disabled={busy || autoSaveStatus === 'saving' || draft?.state === 'PENDING_REVIEW'} onClick={submitForReview} type="button">
           {busy ? '处理中…' : draft?.state === 'PENDING_REVIEW' ? '审核中…' : '提交发布'}
         </button>
       </div>
