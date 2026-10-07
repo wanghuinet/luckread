@@ -7,13 +7,7 @@ import type { Payload } from 'payload'
 import { fileURLToPath } from 'url'
 import { CloudflareContext, getCloudflareContext } from '@opennextjs/cloudflare'
 import { GetPlatformProxyOptions } from 'wrangler'
-import { payloadAdminOnly } from '@/auth/payload-admin-access'
 import { r2Storage } from '@payloadcms/storage-r2'
-import { importExportPlugin } from '@payloadcms/plugin-import-export'
-import { redirectsPlugin } from '@payloadcms/plugin-redirects'
-import { schedulePublicationPlugin } from '@focus-reactive/payload-plugin-scheduling'
-import { presetsPlugin } from '@focus-reactive/payload-plugin-presets'
-import { visualEditingPlugin } from '@focus-reactive/payload-plugin-visual-editing'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
@@ -96,59 +90,6 @@ export default buildConfig({
 
   },
   plugins: [
-    presetsPlugin({
-      mediaCollection: 'media',
-      overrides: {
-        access: {
-          create: payloadAdminOnly,
-          read: payloadAdminOnly,
-          update: payloadAdminOnly,
-          delete: payloadAdminOnly,
-        },
-      },
-    }),
-    redirectsPlugin({
-      redirectTypes: ['301', '302'],
-      overrides: {
-        access: {
-          read: () => true,
-          create: payloadAdminOnly,
-          update: payloadAdminOnly,
-          delete: payloadAdminOnly,
-        },
-      },
-    }),
-    importExportPlugin({
-      collections: [],
-      overrideExportCollection: ({ collection }) => ({
-        ...collection,
-        access: {
-          ...collection.access,
-          create: payloadAdminOnly,
-          read: payloadAdminOnly,
-          update: payloadAdminOnly,
-          delete: payloadAdminOnly,
-        },
-      }),
-      overrideImportCollection: ({ collection }) => ({
-        ...collection,
-        access: {
-          ...collection.access,
-          create: payloadAdminOnly,
-          read: payloadAdminOnly,
-          update: payloadAdminOnly,
-          delete: payloadAdminOnly,
-        },
-      }),
-    }),
-    schedulePublicationPlugin({
-      collections: [],
-      secret: process.env.CRON_SECRET || '',
-    }),
-    visualEditingPlugin({
-      skipCollections: ['users', 'media', 'presets', 'redirects', 'imports', 'exports'],
-      adminBasePath: '/admin',
-    }),
     r2Storage({
       bucket: cloudflare.env.R2,
       collections: { media: true },
