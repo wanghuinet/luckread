@@ -12,6 +12,7 @@ describe('article document markdown serializer', () => {
         { id: 'p', type: 'paragraph' as const, text: '正文 *不是格式*' },
         { id: 'q', type: 'quote' as const, text: '引用' },
         { id: 'c', type: 'code' as const, text: 'const answer = 42', language: 'javascript' as const },
+        { id: 'm', type: 'math' as const, text: '\\frac{a}{b}' },
         createArticleTableBlock(['名称', '状态'], [['Markdown', '已完成']]),
         { id: 'd', type: 'divider' as const, text: '' },
       ],
@@ -22,6 +23,8 @@ describe('article document markdown serializer', () => {
     expect(markdown).toContain('## 标题')
     expect(markdown).toContain('正文 \\*不是格式\\*')
     expect(markdown).toContain('> 引用')
+    expect(markdown).toContain('$')
+    expect(markdown).toContain('\\frac{a}{b}')
     expect(markdown).toContain('\x60\x60\x60javascript')
     expect(markdown).toContain('| 名称 | 状态 |')
     expect(markdown).toContain('| --- | --- |')
@@ -47,6 +50,7 @@ describe('article document markdown serializer', () => {
       'heading',
       'paragraph',
       'code',
+      'math',
       'table',
     ])
     expect(imported.document.blocks[2]).toMatchObject({
