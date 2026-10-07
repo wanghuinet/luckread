@@ -328,6 +328,7 @@ export default function CreatorContentOrganization({
                 organization={item}
               />
             ) : null}
+            </>
           ))}
         </div>
       ) : null}
