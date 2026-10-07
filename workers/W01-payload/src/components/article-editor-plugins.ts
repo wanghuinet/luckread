@@ -5,6 +5,7 @@ import { markdownImportPlugin } from './MarkdownImportPlugin.js'
 import { mathBlockPlugin } from './MathBlockPlugin.js'
 import { findReplacePlugin } from './FindReplacePlugin.js'
 import { articleOutlinePlugin } from './ArticleOutlinePlugin.js'
+import { copyPlainTextPlugin, writerStatsPlugin } from './WriterToolsPlugin.js'
 import { tableBlockPlugin } from './TableBlockPlugin.js'
 
 /**
@@ -21,4 +22,6 @@ export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [
   mathBlockPlugin,
   findReplacePlugin,
   articleOutlinePlugin,
+  writerStatsPlugin,
+  copyPlainTextPlugin,
 ]
