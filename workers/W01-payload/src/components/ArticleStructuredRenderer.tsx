@@ -1,3 +1,4 @@
+import katex from 'katex'
 import Prism from 'prismjs'
 import 'prismjs/components/prism-bash.js'
 import 'prismjs/components/prism-css.js'
@@ -77,6 +78,23 @@ export default function ArticleStructuredRenderer({ document }: Props) {
                   </tbody>
                 </table>
               </div>
+            </figure>
+          )
+        }
+
+        if (block.type === 'math') {
+          const html = katex.renderToString(block.text, {
+            displayMode: true,
+            throwOnError: false,
+            strict: 'warn',
+          })
+          return (
+            <figure className="content-detail-article-math" key={block.id}>
+              <div
+                aria-label="数学公式"
+                className="content-detail-article-math-expression"
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
             </figure>
           )
         }
