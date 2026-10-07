@@ -131,7 +131,7 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('plugins?: readonly ArticleEditorPlugin[]')
     expect(editor).toContain('const orderedPlugins = useMemo(')
     expect(editor).toContain(".sort((left, right) => (left.order ?? 0) - (right.order ?? 0) || left.id.localeCompare(right.id))")
-    expect(editor).toContain('<Toolbar key={plugin.id + \'":toolbar\'}')
+    expect(editor).toContain("<Toolbar key={plugin.id + ':toolbar'}")
     expect(editor).toContain('<Panel key={plugin.id + \':panel\'}')
     expect(registry).toContain('export const articleEditorPlugins: readonly ArticleEditorPlugin[] = []')
     expect(publisher).toContain('plugins={articleEditorPlugins}')
