@@ -154,7 +154,7 @@ describe('Creator Center admin extension', () => {
     expect(editor).toContain('draggable={!disabled}')
     expect(editor).toContain('event.dataTransfer.setData(\'text/plain\', String(index))')
     expect(editor).toContain('event.dataTransfer.dropEffect = \'move\'')
-    expect(editor).toContain('aria-label="拖动区块重新排序"')
+    expect(editor).toContain('aria-hidden="true"')
     expect(editor).toContain('className="lr-article-drag-handle"')
   })
 
