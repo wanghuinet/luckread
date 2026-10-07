@@ -224,7 +224,11 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
           ))}
           {orderedPlugins.map((plugin) => {
             const Toolbar = plugin.Toolbar
-            return Toolbar ? <Toolbar key={plugin.id + ':toolbar'} {...pluginContext} /> : null
+            return Toolbar ? (
+              <EditorPluginErrorBoundary key={plugin.id + ':toolbar'} pluginId={plugin.id}>
+                <Toolbar {...pluginContext} />
+              </EditorPluginErrorBoundary>
+            ) : null
           })}
         </div>
       </div>
@@ -256,7 +260,11 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
         </button>
         {orderedPlugins.map((plugin) => {
           const Panel = plugin.Panel
-          return Panel ? <Panel key={plugin.id + ':panel'} {...pluginContext} /> : null
+          return Panel ? (
+            <EditorPluginErrorBoundary key={plugin.id + ':panel'} pluginId={plugin.id}>
+              <Panel {...pluginContext} />
+            </EditorPluginErrorBoundary>
+          ) : null
         })}
       </div>
 
