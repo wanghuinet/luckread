@@ -102,7 +102,7 @@ const requireIdempotency = (request: Request): string => {
   return value
 }
 
-const parseListLimit = (value: string | null): number => {
+export const parseListLimit = (value: string | null): number => {
   if (value === null || value.trim() === '') return 20
   if (!/^(?:[1-9]|[1-4][0-9]|50)$/.test(value.trim())) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
