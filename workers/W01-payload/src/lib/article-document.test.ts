@@ -20,6 +20,17 @@ describe('article structured document', () => {
   it('round-trips structured blocks without losing ordering or headings', () => {
     const document = createArticleDocument()
     document.blocks = [
+      { id: 'math', type: 'math', text: '\\frac{a}{b}' },
+      { id: 'p', type: 'paragraph', text: '正文' },
+    ]
+
+    const restored = tryDeserializeArticleDocument(serializeArticleDocument(document))
+    expect(restored).toEqual(document)
+    expect(plainTextFromArticleDocument(document)).toBe('\\frac{a}{b}\\n\\n正文')
+  })
+
+    const document = createArticleDocument()
+    document.blocks = [
       { id: 'a', type: 'heading', text: '第一节', level: 2 },
       { id: 'b', type: 'paragraph', text: '正文内容' },
       { id: 'c', type: 'bulletList', text: '第一项\n第二项' },
