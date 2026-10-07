@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { ArticleDocument, ArticleEditorPluginContext } from './ArticleEditorPlugin.js'
+import type { ArticleEditorPluginContext } from './ArticleEditorPlugin.js'
+import type { ArticleDocument } from '../lib/article-document.js'
 
 const MAX_HISTORY_ENTRIES = 40
 const MAX_HISTORY_CHARS = 2_000_000
