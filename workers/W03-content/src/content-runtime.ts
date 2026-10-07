@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { contentSlugFor } from './content-slug.js'
+import { contentSlugFor, isContentSlug } from './content-slug.js'
 
 export type ContentState =
   | 'DRAFT'
@@ -224,6 +224,11 @@ const assertResourceId = (value: string): void => {
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value)) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
+}
+
+const assertContentReference = (value: string): void => {
+  if (/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value) || isContentSlug(value)) return
+  throw new ContentRuntimeError('VALIDATION_FAILED', 400)
 }
 
 export const validateInput = (input: unknown): ContentInput => {
