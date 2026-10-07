@@ -25,30 +25,6 @@ export interface SeriesMemberRecord {
   updatedAt: string
 }
 
-interface SeriesRow {
-  id: string
-  owner_user_id: string
-  state: SeriesState
-  version: number
-  etag: string
-}
-
-interface ContentRow {
-  id: string
-  owner_user_id: string
-  slug: string
-  content_type: 'article' | 'post' | 'video'
-  state: string
-  title: string
-}
-
-interface MembershipRow {
-  relationship_id: string
-  position: number
-  created_at: string
-  updated_at: string
-}
-
 interface IdempotencyRow {
   idem_id: string | null
   idem_owner_user_id: string | null
