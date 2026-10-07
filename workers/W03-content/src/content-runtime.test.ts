@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, transitionContentState, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -145,6 +145,32 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('DELETED', 'RESTORED', 'CREATOR', true)).toBe(true)
     expect(canTransitionContentState('RESTORED', 'DRAFT', 'CREATOR', true)).toBe(true)
     expect(canTransitionContentState('RESTORED', 'PENDING_REVIEW', 'CREATOR', true)).toBe(false)
+  })
+
+  it('blocks moderator layers from the generic state-transition path', async () => {
+    const db = {
+      prepare() {
+        throw new Error('generic moderator transition must not reach D1')
+      },
+    } as never
+
+    for (const layer of ['L6', 'L7', 'L8']) {
+      await expect(
+        transitionContentState(
+          db,
+          'moderator_123',
+          layer,
+          'content_123',
+          'APPROVED',
+          undefined,
+          'W/"2"',
+          'moderation-bypass-test-' + layer,
+        ),
+      ).rejects.toMatchObject({
+        code: 'PERMISSION_DENIED',
+        status: 403,
+      })
+    }
   })
 
   it('keeps the D1 batch fail-closed CAS guard on every content mutation', () => {
