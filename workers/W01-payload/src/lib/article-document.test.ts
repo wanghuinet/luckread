@@ -200,7 +200,7 @@ describe('article structured document', () => {
     expect(insertArticleBlockAfter(document, -2)).toBe(document)
   })
 
-  it('removes a media reference from every structured block without mutating the source', () => {
+  it('removes a media reference without leaving invalid structured media blocks', () => {
     const document = {
       version: 2 as const,
       blocks: [
@@ -215,7 +215,9 @@ describe('article structured document', () => {
     const next = removeMediaRefFromArticleDocument(document, 'https://media.example/1.jpg')
 
     expect(next).not.toBe(document)
-    expect(next.blocks[0]?.mediaRefs).toBeUndefined()
+    expect(next.blocks[0]?.type).toBe('paragraph')
+    expect(next.blocks[0]?.text).toBe('单图')
+    expect(next.blocks[1]?.type).toBe('image')
     expect(next.blocks[1]?.mediaRefs).toEqual(['https://media.example/2.jpg'])
     expect(document.blocks[0]?.mediaRefs).toEqual(['https://media.example/1.jpg'])
   })
