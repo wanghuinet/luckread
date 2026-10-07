@@ -4,6 +4,7 @@ import {
   ARTICLE_MAX_BLOCK_TEXT,
   createArticleBlock,
   createArticleMediaBlock,
+  createArticleTableBlock,
   normalizeArticleDocument,
   type ArticleBlock,
   type ArticleDocument,
@@ -198,6 +199,39 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
       case 'table':
         pushUnsupported(unsupported, '表格')
         break
+
+      case 'table': {
+        const tableToken = token as unknown as {
+          header: Array<{ text: string }>
+          rows: Array<Array<{ text: string }>>
+        }
+        const header = tableToken.header.map((cell) => stripInlineMarkdown(cell.text))
+        const rows = tableToken.rows.map((row) => row.map((cell) => stripInlineMarkdown(cell.text)))
+        const allCells = [header, ...rows]
+
+        if (!header.length || header.length > 8 || rows.length > 50 || rows.some((row) => row.length !== header.length)) {
+          pushUnsupported(unsupported, '表格尺寸超过当前编辑器限制')
+          break
+        }
+
+        if (allCells.some((row) =>
+          row.some((cell) => INLINE_LINK_PATTERN.test(cell) || REFERENCE_LINK_PATTERN.test(cell) || /!\\[[^\\]]*\\]\\(/.test(cell)),
+        )) {
+          pushUnsupported(unsupported, '表格内链接或图片')
+          break
+        }
+
+        const bounded = allCells.map((row) =>
+          row.map((cell) => boundedText(cell, unsupported)),
+        )
+        if (bounded.some((row) => row.some((cell) => cell === null))) break
+
+        pushBlock(blocks, createArticleTableBlock(
+          header,
+          rows,
+        ))
+        break
+      }
 
       case 'html':
         pushUnsupported(unsupported, 'HTML')
