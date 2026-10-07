@@ -1,7 +1,12 @@
 'use client'
 
 import { useMemo } from 'react'
-import type { ArticleEditorPlugin, ArticleEditorPluginContext, EditorMediaAsset } from './ArticleEditorPlugin.js'
+import {
+  type ArticleEditorPlugin,
+  type ArticleEditorPluginContext,
+  type EditorMediaAsset,
+  normalizeArticleEditorPlugins,
+} from './ArticleEditorPlugin.js'
 import {
   ARTICLE_MAX_BLOCKS,
   ARTICLE_MAX_BLOCK_TEXT,
@@ -86,10 +91,7 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
   }
 
   const orderedPlugins = useMemo(
-    () => plugins
-      .filter((plugin) => plugin.id.trim())
-      .slice()
-      .sort((left, right) => (left.order ?? 0) - (right.order ?? 0) || left.id.localeCompare(right.id)),
+    () => normalizeArticleEditorPlugins(plugins),
     [plugins],
   )
 
