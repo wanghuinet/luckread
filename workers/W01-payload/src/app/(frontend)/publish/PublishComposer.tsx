@@ -61,6 +61,20 @@ async function authorizedFetch(input: RequestInfo | URL, init: RequestInit = {})
   return response
 }
 
+const isVideoAsset = (asset: UploadedAsset): boolean => asset.mimeType.startsWith('video/')
+const isImageAsset = (asset: UploadedAsset): boolean => asset.mimeType.startsWith('image/')
+
+const resolveCoverRef = (
+  type: ContentType,
+  assets: UploadedAsset[],
+  explicitCoverRef: string,
+): string | null => {
+  const explicit = explicitCoverRef.trim()
+  if (explicit) return explicit
+  if (type === 'video') return assets.find(isImageAsset)?.url ?? null
+  return assets[0]?.url ?? null
+}
+
 type PublishComposerProps = {
   contentBasePath?: string
   initialType?: ContentType
@@ -208,6 +222,10 @@ export default function PublishComposer({
       const uploaded: UploadedAsset[] = []
       for (const file of selected.slice(0, remainingSlots)) uploaded.push(await uploadFile(file))
       setAssets((current) => [...current, ...uploaded])
+      if (!coverRef.trim() && type === 'video') {
+        const firstImage = uploaded.find(isImageAsset)
+        if (firstImage) setCoverRef(firstImage.url)
+      }
       markDirty()
       setMessage(`已上传 ${uploaded.length} 个媒体文件`)
       if (selected.length > remainingSlots) setError('已达到 12 个媒体文件上限，其余文件未上传。')
@@ -220,7 +238,14 @@ export default function PublishComposer({
   }
 
   function removeAsset(id: string) {
+    const removed = assets.find((asset) => asset.id === id)
     setAssets((current) => current.filter((asset) => asset.id !== id))
+    if (removed && coverRef.trim() === removed.url) {
+      const fallback = type === 'video'
+        ? assets.find((asset) => asset.id !== id && isImageAsset(asset))?.url ?? ''
+        : assets.find((asset) => asset.id !== id)?.url ?? ''
+      setCoverRef(fallback)
+    }
     markDirty()
   }
 
@@ -264,7 +289,7 @@ export default function PublishComposer({
       title: title.trim(),
       bodyRef,
       mediaRefs: assets.map((asset) => asset.url),
-      coverRef: coverRef.trim() || assets[0]?.url || null,
+      coverRef: resolveCoverRef(type, assets, coverRef),
     }
 
     const isUpdate = Boolean(draft?.id && draft.etag)
@@ -310,6 +335,10 @@ export default function PublishComposer({
       setBody(plainTextFromArticleDocument(articleDocument))
     }
     setType(nextType)
+    if (nextType === 'video' && !coverRef.trim()) {
+      const firstImage = assets.find(isImageAsset)
+      if (firstImage) setCoverRef(firstImage.url)
+    }
     setPreflightReport(null)
     markDirty()
   }
@@ -428,7 +457,7 @@ export default function PublishComposer({
   async function runPreflight(): Promise<{ report: PublishPreflightResult; input: Record<string, unknown>; draft: ContentResponse }> {
     if (autoSaveInFlightRef.current) throw new Error('自动保存正在进行，请稍后重试。')
     if (!title.trim() || !body.trim()) throw new Error('请先填写标题和正文。')
-    if (type === 'video' && assets.length === 0) throw new Error('视频至少需要添加一个媒体文件。')
+    if (type === 'video' && !assets.some(isVideoAsset)) throw new Error('短视频至少需要添加一个视频素材。')
 
     const savedDraft = await persistDraft()
     autoSaveDirtyRef.current = false
@@ -467,8 +496,8 @@ export default function PublishComposer({
         setError('请先填写标题和正文。')
         return
       }
-      if (type === 'video' && assets.length === 0) {
-        setError('视频至少需要添加一个媒体文件。')
+      if (type === 'video' && !assets.some(isVideoAsset)) {
+        setError('短视频至少需要添加一个视频素材。')
         return
       }
       const savedChangeToken = autoSaveChangeTokenRef.current
@@ -677,7 +706,18 @@ export default function PublishComposer({
                   <strong>{asset.filename ?? asset.id}</strong>
                   <span>{asset.mimeType}</span>
                 </div>
-                <button disabled={busy || reviewLocked} onClick={() => removeAsset(asset.id)} type="button">移除</button>
+                <div className="lr-asset-actions">
+                  {isImageAsset(asset) ? (
+                    <button
+                      disabled={busy || reviewLocked}
+                      onClick={() => { setCoverRef(asset.url); markDirty() }}
+                      type="button"
+                    >
+                      {coverRef.trim() === asset.url ? '当前封面' : '设为封面'}
+                    </button>
+                  ) : null}
+                  <button disabled={busy || reviewLocked} onClick={() => removeAsset(asset.id)} type="button">移除</button>
+                </div>
               </div>
             ))}
           </div>
@@ -736,11 +776,11 @@ export default function PublishComposer({
 
 
       <label className="lr-field">
-        <span>封面引用（可选）</span>
+        <span>{type === 'video' ? '短视频封面' : '封面引用'}（可选）</span>
         <input
           disabled={busy || reviewLocked}
           onChange={(event) => { setCoverRef(event.target.value); markDirty() }}
-          placeholder="默认使用第一个媒体文件"
+          placeholder={type === 'video' ? '默认使用第一张图片素材' : '默认使用第一个媒体文件'}
           value={coverRef}
         />
       </label>
@@ -822,9 +862,9 @@ export default function PublishComposer({
             ) : (
               <p className="lr-preview-body">{body.trim() || '暂无正文'}</p>
             )}
-            {coverRef.trim() || assets[0]?.url ? (
+            {resolveCoverRef(type, assets, coverRef) ? (
               <div className="lr-preview-cover">
-                <img alt="" loading="eager" src={coverRef.trim() || assets[0]?.url} />
+                <img alt="" loading="eager" src={resolveCoverRef(type, assets, coverRef) ?? undefined} />
               </div>
             ) : null}
             {assets.length ? (
