@@ -338,7 +338,7 @@ const insertRevision = (db: ContentD1, revision: ContentRevision): D1PreparedSta
   db.prepare(`INSERT INTO content_revisions
     (id, content_id, revision, content_version, actor_user_id, source_revision, operation,
      state, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
     revision.id, revision.contentId, revision.revision, revision.contentVersion,
     revision.actorUserId, revision.sourceRevision, revision.operation, revision.state,
     revision.slug, revision.title, revision.bodyRef, JSON.stringify(revision.mediaRefs), revision.coverRef,
