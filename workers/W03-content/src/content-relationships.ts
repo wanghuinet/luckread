@@ -401,11 +401,13 @@ export async function listContentRelationships(
 export async function revokeContentRelationship(
   db: ContentD1,
   ownerUserId: string,
+  sourceContentId: string,
   relationshipId: string,
   idempotencyKey: string,
   now = new Date(),
 ): Promise<ContentRelationship> {
   assertContentId(ownerUserId)
+  assertContentId(sourceContentId)
   assertContentId(relationshipId)
   if (!idempotencyKey || idempotencyKey.length > 256) {
     throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
@@ -433,8 +435,8 @@ export async function revokeContentRelationship(
          ORDER BY created_at DESC
          LIMIT 1
       ) i ON 1 = 1
-     WHERE r.relationship_id = ?`,
-  ).bind(ownerUserId, operationId, idempotencyKey, relationshipId).first<RevokeRelationshipQueryRow>()
+     WHERE r.relationship_id = ? AND r.source_id = ?`,
+  ).bind(ownerUserId, operationId, idempotencyKey, relationshipId, sourceContentId).first<RevokeRelationshipQueryRow>()
 
   if (!row) throw new ContentRuntimeError('RELATIONSHIP_NOT_FOUND', 404)
 
