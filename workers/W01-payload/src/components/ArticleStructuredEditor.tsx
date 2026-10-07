@@ -308,8 +308,26 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                             }}
                             value={header}
                           />
+                          <button
+                            aria-label={'删除第 ' + (columnIndex + 1) + ' 列'}
+                            disabled={disabled || !block.table || block.table.headers.length <= 1}
+                            onClick={() => {
+                              const table = block.table
+                              if (!table || table.headers.length <= 1) return
+                              updateTable(index, {
+                                headers: table.headers.filter((_, currentColumnIndex) => currentColumnIndex !== columnIndex),
+                                rows: table.rows.map((row) =>
+                                  row.filter((_, currentColumnIndex) => currentColumnIndex !== columnIndex),
+                                ),
+                              })
+                            }}
+                            type="button"
+                          >
+                            删列
+                          </button>
                         </th>
                       ))}
+                      <th aria-label="表格操作">操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -337,6 +355,23 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
                             />
                           </td>
                         ))}
+                        <td className="lr-article-table-row-actions">
+                          <button
+                            aria-label={'删除第 ' + (rowIndex + 1) + ' 行'}
+                            disabled={disabled}
+                            onClick={() => {
+                              const table = block.table
+                              if (!table) return
+                              updateTable(index, {
+                                headers: [...table.headers],
+                                rows: table.rows.filter((_, currentRowIndex) => currentRowIndex !== rowIndex),
+                              })
+                            }}
+                            type="button"
+                          >
+                            删行
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
