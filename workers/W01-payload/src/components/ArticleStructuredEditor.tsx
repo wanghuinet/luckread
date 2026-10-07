@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   type ArticleEditorPlugin,
   type ArticleEditorPluginContext,
@@ -20,6 +20,13 @@ import {
   normalizeArticleDocument,
   plainTextFromArticleDocument,
 } from '../lib/article-document.js'
+import {
+  createArticleDocumentHistory,
+  recordArticleDocumentHistory,
+  redoArticleDocumentHistory,
+  undoArticleDocumentHistory,
+  type ArticleDocumentHistory,
+} from '../lib/article-document-history.js'
 
 type Props = {
   value: ArticleDocument
@@ -52,6 +59,60 @@ const updateBlock = (
 })
 
 export default function ArticleStructuredEditor({ value, disabled = false, mediaAssets = [], onChange, plugins = [] }: Props) {
+  const editorRef = useRef<HTMLElement | null>(null)
+  const historyRef = useRef<ArticleDocumentHistory>(createArticleDocumentHistory())
+  const pendingHistorySnapshotRef = useRef<string | null>(null)
+  const lastDocumentSnapshotRef = useRef(JSON.stringify(value))
+  const [historyState, setHistoryState] = useState({ past: 0, future: 0 })
+
+  function syncHistoryState(history: ArticleDocumentHistory) {
+    historyRef.current = history
+    setHistoryState({ past: history.past.length, future: history.future.length })
+  }
+
+  useEffect(() => {
+    const currentSnapshot = JSON.stringify(value)
+    if (pendingHistorySnapshotRef.current === currentSnapshot) {
+      pendingHistorySnapshotRef.current = null
+      lastDocumentSnapshotRef.current = currentSnapshot
+      return
+    }
+    if (lastDocumentSnapshotRef.current !== currentSnapshot) {
+      historyRef.current = createArticleDocumentHistory()
+      setHistoryState({ past: 0, future: 0 })
+      lastDocumentSnapshotRef.current = currentSnapshot
+    }
+  }, [value])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || !editorRef.current?.contains(document.activeElement)) return
+      const target = event.target
+      if (target instanceof HTMLElement && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      )) return
+
+      const key = event.key.toLowerCase()
+      if (key !== 'z' && key !== 'y') return
+      const redo = key === 'y' || (key === 'z' && event.shiftKey)
+      if (redo ? historyRef.current.future.length === 0 : historyRef.current.past.length === 0) return
+
+      event.preventDefault()
+      const result = redo
+        ? redoArticleDocumentHistory(historyRef.current, value)
+        : undoArticleDocumentHistory(historyRef.current, value)
+      if (!result.document) return
+      pendingHistorySnapshotRef.current = JSON.stringify(result.document)
+      syncHistoryState(result.history)
+      onChange(result.document, plainTextFromArticleDocument(result.document))
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onChange, value])
+
   const imageAssets = useMemo(() => {
     const seenUrls = new Set<string>()
     const result: EditorMediaAsset[] = []
@@ -81,8 +142,28 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
 
   function emit(next: ArticleDocument) {
     const normalized = normalizeArticleDocument(next)
+    const currentSnapshot = JSON.stringify(value)
+    const nextSnapshot = JSON.stringify(normalized)
+    if (currentSnapshot === nextSnapshot) return
+    const nextHistory = recordArticleDocumentHistory(historyRef.current, value, normalized)
+    pendingHistorySnapshotRef.current = nextSnapshot
+    syncHistoryState(nextHistory)
+    lastDocumentSnapshotRef.current = nextSnapshot
     onChange(normalized, plainTextFromArticleDocument(normalized))
   }
+
+  function applyHistory(direction: 'undo' | 'redo') {
+    const result = direction === 'undo'
+      ? undoArticleDocumentHistory(historyRef.current, value)
+      : redoArticleDocumentHistory(historyRef.current, value)
+    if (!result.document) return
+    const nextSnapshot = JSON.stringify(result.document)
+    pendingHistorySnapshotRef.current = nextSnapshot
+    syncHistoryState(result.history)
+    lastDocumentSnapshotRef.current = nextSnapshot
+    onChange(result.document, plainTextFromArticleDocument(result.document))
+  }
+
 
   function addBlock(type: ArticleBlockType) {
     if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
@@ -160,13 +241,31 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
   }
 
   return (
-    <section className="lr-article-editor" aria-label="文章结构化正文编辑器">
+    <section ref={editorRef} className="lr-article-editor" aria-label="文章结构化正文编辑器">
       <div className="lr-article-editor-toolbar">
         <div>
           <strong>结构化正文</strong>
           <span>{value.blocks.length} 个区块 · {characterCount} 字</span>
         </div>
-        <div className="lr-article-editor-tools" role="toolbar" aria-label="添加正文区块">
+        <div className="lr-article-editor-tools" role="toolbar" aria-label="文章编辑操作">
+          <button
+            aria-label="撤销"
+            disabled={disabled || historyState.past === 0}
+            onClick={() => applyHistory('undo')}
+            title="撤销（Ctrl/Cmd+Z）"
+            type="button"
+          >
+            撤销
+          </button>
+          <button
+            aria-label="重做"
+            disabled={disabled || historyState.future === 0}
+            onClick={() => applyHistory('redo')}
+            title="重做（Ctrl/Cmd+Shift+Z / Ctrl+Y）"
+            type="button"
+          >
+            重做
+          </button>
           {([
             ['paragraph', '正文'],
             ['heading', '标题'],
