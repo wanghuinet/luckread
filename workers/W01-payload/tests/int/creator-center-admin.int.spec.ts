@@ -127,6 +127,12 @@ describe('Creator Center admin extension', () => {
     expect(list).toContain('{visibleItems.map((item) => (')
   })
 
+  it('displays the canonical zero-based member position rather than a paginated row index', () => {
+    const members = read('src/app/(payload)/v1beta/CreatorContentOrganizationMembers.tsx')
+    expect(members).toContain('<span>位置 {member.position + 1}</span>')
+    expect(members).not.toContain('<span>位置 {index + 1}</span>')
+  })
+
   it('filters only already-loaded organization members and candidates', () => {
     const members = read('src/app/(payload)/v1beta/CreatorContentOrganizationMembers.tsx')
     expect(members).toContain("const [candidateFilter, setCandidateFilter] = useState('')")
