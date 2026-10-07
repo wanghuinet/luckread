@@ -38,19 +38,33 @@ const handler = async (
 
   if (!endpoint) return new Response(null, { status: 404 })
 
-  if (
-    request.method === 'POST' &&
-    (endpoint === 'sign-in/email' || endpoint === 'sign-up/email')
-  ) {
+  // Account creation must pass through W01 /auth/register so the
+  // idempotency, consent, rate-limit, and Payload projection seams run.
+  // Exposing Better Auth sign-up directly would create an identity without
+  // the required W01 profile projection.
+  const canonicalW01AuthEndpoints = new Set([
+    'sign-up/email',
+    'change-password',
+    'request-password-reset',
+    'reset-password',
+  ])
+
+  if (canonicalW01AuthEndpoints.has(endpoint)) {
+    return errorResponse(
+      404,
+      'NOT_FOUND',
+      'This authentication operation is not available at this endpoint',
+    )
+  }
+
+  if (request.method === 'POST' && endpoint === 'sign-in/email') {
     try {
       const clientIp =
         request.headers.get('cf-connecting-ip')?.trim() || 'unknown'
 
       await enforceAuthRateLimit(
         request,
-        endpoint === 'sign-in/email'
-          ? 'AUTH_LOGIN_LIMITER'
-          : 'AUTH_REGISTER_LIMITER',
+        'AUTH_LOGIN_LIMITER',
         ['ip:' + clientIp],
       )
     } catch (error) {
