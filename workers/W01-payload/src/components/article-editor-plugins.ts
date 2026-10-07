@@ -9,6 +9,7 @@ import { copyPlainTextPlugin, writerStatsPlugin } from './WriterToolsPlugin.js'
 import { undoRedoPlugin } from './UndoRedoPlugin.js'
 import { mediaManagerPlugin } from './MediaManagerPlugin.js'
 import { tableBlockPlugin } from './TableBlockPlugin.js'
+import { wordImportPlugin } from './WordImportPlugin.js'
 
 /**
  * Publish-time editor extensions are registered here.
@@ -17,6 +18,7 @@ import { tableBlockPlugin } from './TableBlockPlugin.js'
  * editor context. Plugin metadata is intentionally not persisted into content.
  */
 export const articleEditorPlugins: readonly ArticleEditorPlugin[] = [
+  wordImportPlugin,
   markdownImportPlugin,
   markdownExportPlugin,
   codeBlockPlugin,
