@@ -6,7 +6,7 @@ const read = (relativePath: string) => readFileSync(resolve(process.cwd(), relat
 
 describe('public content detail', () => {
   it('renders all published video media references', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
 
     expect(page).toContain('content-detail-video-gallery')
     expect(page).toContain('content.mediaRefs.map((url, index)')
@@ -16,7 +16,7 @@ describe('public content detail', () => {
 })
 
   it('hydrates like state from the authenticated status API', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain('/api/v1/interactions/likes?targetType=content&targetId=')
     expect(page).toContain('likeData?.data?.liked')
     expect(page).toContain('likeData?.data?.likeCount')
@@ -26,7 +26,7 @@ describe('public content detail', () => {
   })
 
   it('hydrates favorite state from the authenticated status API', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain('/api/v1/interactions/bookmarks?targetType=content&targetId=')
     expect(page).toContain('bookmarkData?.data?.favorited')
     expect(page).toContain('setBookmarked(bookmarkData.data.favorited)')
@@ -36,7 +36,7 @@ describe('public content detail', () => {
   })
 
   it('surfaces normalized mention and hashtag tokens without creating a second taxonomy authority', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain("extractSocialTokens(body)")
     expect(page).toContain('copy.detail.tagAria')
     expect(page).toContain('content-detail-social-token')
@@ -45,7 +45,7 @@ describe('public content detail', () => {
   })
 
   it('connects the content detail page to the canonical report API', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain("fetch('/api/v1/reports'")
     expect(page).toContain("targetType: 'content'")
     expect(page).toContain('targetId: content.id')
@@ -57,7 +57,7 @@ describe('public content detail', () => {
   })
 
   it('uses the share-token API to generate a copyable content share link', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain('/api/v1/content/' )
     expect(page).toContain("'Idempotency-Key': 'social-share:' + crypto.randomUUID()")
     expect(page).toContain("window.location.origin + '/s/' + encodeURIComponent(shareId)")
@@ -69,7 +69,7 @@ describe('public content detail', () => {
   })
 
   it('hides self-follow on the viewer own content', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain("fetch('/api/v1/users/me'")
     expect(page).toContain("setViewerUserId(typeof viewerData?.id === 'string' ? viewerData.id : null)")
     expect(page).toContain('viewerUserId === content.creatorId')
@@ -77,7 +77,7 @@ describe('public content detail', () => {
   })
 
   it('connects the content detail page to author follow state and mutations', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain('creatorId?: string | null')
     expect(page).toContain('/api/v1/social/follows/')
     expect(page).toContain('followData?.data?.following')
@@ -99,7 +99,7 @@ describe('public content detail', () => {
   })
 
   it('redirects expired like and follow sessions back to login', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain("const returnTo = window.location.pathname + window.location.search + window.location.hash")
     expect(page).toContain("window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))")
     expect(page).not.toContain("请先登录后点赞。")
@@ -107,7 +107,7 @@ describe('public content detail', () => {
   })
 
   it('passes Block restriction into the comment interaction UI', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     const comments = read('src/app/(frontend)/content/[contentId]/ContentComments.tsx')
     expect(page).toContain('interactionRestricted={interactionRestricted}')
     expect(comments).toContain('interactionRestricted = false')
@@ -117,14 +117,14 @@ describe('public content detail', () => {
   })
 
   it('hides like when the content relationship is blocked', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain('interactionRestricted')
     expect(page).toContain('setInteractionRestricted(blocked || blockedBy)')
     expect(page).toContain('{!interactionRestricted ? (')
   })
 
   it('connects the content detail page to the authenticated like API', () => {
-    const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
+    const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     expect(page).toContain("fetch('/api/v1/interactions/likes'")
     expect(page).toContain("credentials: 'include'")
     expect(page).toContain("targetType: 'content'")
@@ -134,7 +134,7 @@ describe('public content detail', () => {
 
 
 it('links published content to the public author profile when creatorId is present', () => {
-  const page = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/content/[contentId]/page.tsx'), 'utf8')
+  const page = readFileSync(resolve(process.cwd(), 'src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx'), 'utf8')
   expect(page).toContain("href={'/users/' + encodeURIComponent(content.creatorId)}")
   expect(page).toContain('copy.detail.author')
 })
@@ -158,7 +158,18 @@ it('keeps arbitrary cookies from bypassing the public content cache', () => {
 })
 
 
-it('keeps public content metadata requests anonymous so signed-in browsers can use the shared cache', () => {
+it('uses a server-side canonical metadata wrapper for public content', () => {
   const page = read('src/app/(frontend)/content/[contentId]/page.tsx')
-  expect(page).toContain("fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`, {\n              credentials: 'omit',\n              headers: { accept: 'application/json' },\n              cache: 'no-store',\n              signal: controller.signal,\n            })")
+  expect(page).toContain('generateMetadata')
+  expect(page).toContain('alternates:')
+  expect(page).toContain('cachedPublicGet')
+  expect(page).toContain('permanentRedirect')
+  expect(page).toContain("PUBLIC_ORIGIN = 'https://luckread.com'")
+})
+
+it('keeps interactive content requests anonymous so signed-in browsers can use the shared cache', () => {
+  const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+  expect(page).toContain("credentials: 'omit'")
+  expect(page).toContain("headers: { accept: 'application/json' }")
+  expect(page).toContain("cache: 'no-store'")
 })
