@@ -20,6 +20,9 @@ on:
       - '.github/workflows/payload-foundation-ci.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   foundation:
     runs-on: ubuntu-latest
@@ -35,6 +38,20 @@ jobs:
 
       - name: Enable Corepack
         run: corepack enable
+
+      - name: Refresh W01 lockfile for plugin dependency pull
+        if: github.ref == 'refs/heads/fix/1.1-public-cache-boundary-hardening-20261007' && github.event_name == 'push' && github.event.head_commit.message != 'chore(1.1): refresh W01 plugin lockfile'
+        working-directory: workers/W01-payload
+        run: |
+          pnpm install --lockfile-only --ignore-scripts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore(1.1): refresh W01 plugin lockfile"
+          git push
 
       - name: Install W01 dependencies from committed lockfile
         working-directory: workers/W01-payload
