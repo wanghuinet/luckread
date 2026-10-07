@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import PublicLanguageToggle, { usePublicLocale } from '../i18n/PublicLanguageToggle'
 import { getPublicCopy, type PublicLocale } from '../i18n/public-locale'
@@ -30,6 +30,7 @@ type ContentApiResponse = {
 export default function ContentBrowsePage() {
   const locale = usePublicLocale()
   const copy = getPublicCopy(locale)
+  const contentLoadError = copy.content.error
   const labels: Record<ContentType | 'all', string> = {
     all: copy.content.tabs.all,
     article: copy.content.tabs.article,
@@ -44,7 +45,11 @@ export default function ContentBrowsePage() {
   const requestIdRef = useRef(0)
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  async function load(cursor: string | null = null): Promise<void> {
+  const load = useCallback(async (
+    cursor: string | null,
+    selectedType: ContentType | 'all',
+    fallbackError: string,
+  ): Promise<void> => {
     const requestId = ++requestIdRef.current
     abortControllerRef.current?.abort()
     const controller = new AbortController()
@@ -56,7 +61,7 @@ export default function ContentBrowsePage() {
     try {
       const params = new URLSearchParams({ limit: '18' })
       if (cursor) params.set('cursor', cursor)
-      if (contentType !== 'all') params.set('type', contentType)
+      if (selectedType !== 'all') params.set('type', selectedType)
 
       const response = await fetch('/api/v1/contents?' + params.toString(), {
         headers: { accept: 'application/json' },
@@ -65,7 +70,7 @@ export default function ContentBrowsePage() {
       })
       const data: ContentApiResponse = await response.json().catch((): null => null)
       if (!response.ok || !data?.data) {
-        throw new Error(data?.error?.message || copy.content.error)
+        throw new Error(data?.error?.message || fallbackError)
       }
 
       if (requestId !== requestIdRef.current) return
@@ -85,11 +90,11 @@ export default function ContentBrowsePage() {
       setLoadingMore(false)
       if (abortControllerRef.current === controller) abortControllerRef.current = null
     }
-  }
+  }, [])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void load()
+      void load(null, contentType, contentLoadError)
     }, 0)
     return () => {
       requestIdRef.current += 1
@@ -97,7 +102,7 @@ export default function ContentBrowsePage() {
       abortControllerRef.current = null
       window.clearTimeout(timer)
     }
-  }, [load])
+  }, [contentLoadError, contentType, load])
 
   return (
     <main className="content-browse">
@@ -150,7 +155,7 @@ export default function ContentBrowsePage() {
       {!loading && error ? (
         <div className="content-browse-state" role="status">
           <p>{error}</p>
-          <button className="button button-quiet" onClick={() => void load()} type="button">{copy.content.retry}</button>
+          <button className="button button-quiet" onClick={() => void load(null, contentType, contentLoadError)} type="button">{copy.content.retry}</button>
         </div>
       ) : null}
       {!loading && !error && page.items.length === 0 ? (
@@ -201,7 +206,7 @@ export default function ContentBrowsePage() {
                 aria-busy={loadingMore}
                 className="button button-quiet"
                 disabled={loadingMore}
-                onClick={() => void load(page.nextCursor)}
+                onClick={() => void load(page.nextCursor, contentType, contentLoadError)}
                 type="button"
               >
                 {loadingMore ? copy.content.loading : copy.content.more}
