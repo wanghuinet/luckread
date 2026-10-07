@@ -21,6 +21,7 @@ describe('v1 comment adapters', () => {
     expect(route).toContain('/internal/social/contents/')
     expect(route).toContain('/comments')
     expect(route).toContain("Idempotency-Key")
+    expect(route).toContain('invalidatePublicContentComments')
     expect(route).not.toContain('getPayload(')
     expect(route).not.toContain('social_comments')
   })
@@ -40,6 +41,8 @@ describe('v1 comment adapters', () => {
     expect(updateRoute).toContain('callW05Social')
     expect(updateRoute).toContain("method: 'DELETE'")
     expect(updateRoute).toContain('/internal/social/comments/')
+    expect(updateRoute).toContain('invalidatePublicContentComments')
+    expect(updateRoute).toContain('X-LuckRead-Content-Id')
     expect(updateRoute).not.toContain('social_comments')
   })
 
