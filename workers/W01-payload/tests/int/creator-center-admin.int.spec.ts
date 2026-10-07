@@ -106,6 +106,18 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('resolveCoverRef(type, assets, coverRef)')
   })
 
+  it('paginates organization members from the canonical cursor response', () => {
+    const members = read('src/app/(payload)/v1beta/CreatorContentOrganizationMembers.tsx')
+    expect(members).toContain('const [memberCursor, setMemberCursor] = useState<string | null>(null)')
+    expect(members).toContain('const [memberHasMore, setMemberHasMore] = useState(false)')
+    expect(members).toContain("const params = new URLSearchParams({ limit: '50' })")
+    expect(members).toContain("if (cursor) params.set('cursor', cursor)")
+    expect(members).toContain('async function loadMoreMembers()')
+    expect(members).toContain('加载更多成员')
+    expect(members).toContain('page.nextCursor')
+    expect(members).toContain('page.hasMore')
+  })
+
   it('exposes canonical public actions for organization members', () => {
     const members = read('src/app/(payload)/v1beta/CreatorContentOrganizationMembers.tsx')
     expect(members).toContain("member.contentSlug || member.contentId")
