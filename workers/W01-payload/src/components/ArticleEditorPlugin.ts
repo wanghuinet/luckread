@@ -18,6 +18,7 @@ export type ArticleEditorPluginContext = {
   addBlock: (type: ArticleBlockType) => void
   insertMedia: (type: 'image' | 'gallery', assetUrls?: string[]) => void
   insertBlockAfter: (index: number) => void
+  transformBlock: (index: number, type: ArticleBlockType) => void
 }
 
 export type ArticleEditorPlugin = {
