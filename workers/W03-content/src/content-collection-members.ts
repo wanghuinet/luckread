@@ -203,15 +203,15 @@ const loadMutation = async (
 ): Promise<MutationRow | null> =>
   db.prepare(
     'SELECT ' +
-    'c.id AS collection_id, c.owner_user_id AS collection_owner_user_id, c.state AS collection_state, c.version AS collection_version, c.etag AS collection_etag, ' +
+    'coll.id AS collection_id, coll.owner_user_id AS collection_owner_user_id, coll.state AS collection_state, coll.version AS collection_version, coll.etag AS collection_etag, ' +
     'c.id AS content_id, c.owner_user_id AS content_owner_user_id, c.slug AS content_slug, c.content_type AS content_type, c.state AS content_state, c.title AS content_title, ' +
     'i.id AS idem_id, i.owner_user_id AS idem_owner_user_id, i.request_hash AS idem_request_hash, ' +
     'i.status AS idem_status, i.response_status AS idem_response_status, i.response_json AS idem_response_json, i.expires_at AS idem_expires_at, ' +
     'r.relationship_id AS membership_relationship_id, r.position AS membership_position, ' +
     'r.created_at AS membership_created_at, r.updated_at AS membership_updated_at, ' +
     'COALESCE((SELECT MAX(r2.position) + 1 FROM content_relationships r2 ' +
-    "WHERE r2.target_id = c.id AND r2.target_type = 'collection' AND r2.relation_type = 'collection-member' AND r2.status = 'ACTIVE'), 0) AS next_position " +
-    'FROM content_collection s ' +
+    "WHERE r2.target_id = coll.id AND r2.target_type = 'collection' AND r2.relation_type = 'collection-member' AND r2.status = 'ACTIVE'), 0) AS next_position " +
+    'FROM content_collections coll ' +
     'JOIN contents c ON c.id = ? ' +
     'LEFT JOIN (' +
       'SELECT id, owner_user_id, request_hash, status, response_status, response_json, expires_at ' +
@@ -220,9 +220,9 @@ const loadMutation = async (
       'ORDER BY created_at DESC LIMIT 1' +
     ') i ON 1 = 1 ' +
     'LEFT JOIN content_relationships r ON ' +
-      "r.source_type = 'content' AND r.source_id = c.id AND r.target_type = 'collection' AND r.target_id = c.id " +
+      "r.source_type = 'content' AND r.source_id = c.id AND r.target_type = 'collection' AND r.target_id = coll.id " +
       "AND r.relation_type = 'collection-member' AND r.status = 'ACTIVE' " +
-    'WHERE c.id = ? AND c.owner_user_id = ?',
+    'WHERE coll.id = ? AND coll.owner_user_id = ?',
   ).bind(
     contentId,
     ownerUserId,
@@ -342,7 +342,7 @@ export async function attachCollectionMember(
       expiresAt,
     ),
     db.prepare(
-      'UPDATE content_collection SET version = ?, etag = ?, updated_at = ? ' +
+      'UPDATE content_collections SET version = ?, etag = ?, updated_at = ? ' +
       'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
     ).bind(
       nextVersion,
@@ -401,7 +401,7 @@ export async function listCollectionMembers(
   }
 
   const collection = await db.prepare(
-    'SELECT id, version, etag FROM content_collection WHERE id = ? AND owner_user_id = ?',
+    'SELECT id, version, etag FROM content_collections WHERE id = ? AND owner_user_id = ?',
   ).bind(collectionId, ownerUserId).first<{ id: string; version: number; etag: string }>()
   if (!collection) throw new ContentRuntimeError('NOT_FOUND', 404)
 
@@ -506,7 +506,7 @@ export async function removeCollectionMember(
     expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
     insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(response), nowIso, expiresAt),
     db.prepare(
-      'UPDATE content_collection SET version = ?, etag = ?, updated_at = ? ' +
+      'UPDATE content_collections SET version = ?, etag = ?, updated_at = ? ' +
       'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
     ).bind(nextVersion, collectionEtag, nowIso, collectionId, ownerUserId, row.collection_version, row.collection_etag),
     atomicGuard(db),
@@ -623,7 +623,7 @@ export async function reorderCollectionMember(
     expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
     insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(response), nowIso, expiresAt),
     db.prepare(
-      'UPDATE content_collection SET version = ?, etag = ?, updated_at = ? ' +
+      'UPDATE content_collections SET version = ?, etag = ?, updated_at = ? ' +
       'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
     ).bind(nextVersion, collectionEtag, nowIso, collectionId, ownerUserId, row.collection_version, row.collection_etag),
     atomicGuard(db),
