@@ -1,4 +1,4 @@
-import mammoth from 'mammoth'
+import * as mammoth from 'mammoth'
 import {
   ARTICLE_MAX_BLOCKS,
   ARTICLE_MAX_BLOCK_TEXT,
@@ -6,10 +6,8 @@ import {
   ARTICLE_TABLE_MAX_COLUMNS,
   ARTICLE_TABLE_MAX_ROWS,
   createArticleBlock,
-  createArticleDocument,
   createArticleTableBlock,
   type ArticleBlock,
-  type ArticleDocument,
 } from './article-document.js'
 
 const MAX_WORD_BYTES = 10 * 1024 * 1024
