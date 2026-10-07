@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, decodeCursor, encodeCursor, isState, listContents, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, createContent, decodeCursor, encodeCursor, isState, listContents, transitionContentState, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -408,6 +408,38 @@ describe('W03 content contract core', () => {
       createdAt: '2026-10-07T07:00:00.000Z',
       updatedAt: '2026-10-07T07:00:00.000Z',
     }
+
+    const canonicalize = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(canonicalize)
+      if (value && typeof value === 'object') {
+        return Object.fromEntries(
+          Object.entries(value as Record<string, unknown>)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, nested]) => [key, canonicalize(nested)]),
+        )
+      }
+      return value
+    }
+
+    const hashInput = canonicalize({
+      operationId: 'createContent',
+      input: {
+        ownerUserId: 'user_123',
+        input: {
+          contentType: 'article',
+          title: 'Draft content',
+          bodyRef: 'https://cdn.example.com/body.json',
+          mediaRefs: [],
+          coverRef: null,
+        },
+      },
+    })
+    const digest = await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(JSON.stringify(hashInput)),
+    )
+    const hashHex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+
     const db = {
       prepare() {
         return {
@@ -415,7 +447,7 @@ describe('W03 content contract core', () => {
             first: async () => ({
               idem_id: 'idem_123',
               idem_owner_user_id: 'user_123',
-              idem_request_hash: 'will-be-replaced',
+              idem_request_hash: hashHex,
               idem_status: 'COMPLETED',
               idem_response_status: 201,
               idem_response_json: JSON.stringify(original),
@@ -429,58 +461,19 @@ describe('W03 content contract core', () => {
       },
     } as never
 
-    const result = await import('./content-runtime.js').then(async ({ createContent }) => {
-      const hash = await crypto.subtle.digest(
-        'SHA-256',
-        new TextEncoder().encode(JSON.stringify({
-          operationId: 'createContent',
-          input: {
-            ownerUserId: 'user_123',
-            input: {
-              contentType: 'article',
-              title: 'Draft content',
-              bodyRef: 'https://cdn.example.com/body.json',
-              mediaRefs: [],
-              coverRef: null,
-            },
-          },
-        })),
-      )
-      const hashHex = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('')
-      ;(db.prepare('unused').bind().first as unknown as () => Promise<unknown>)
-      return createContent(
-        {
-          prepare(query: string) {
-            return {
-              bind: () => ({
-                first: async () => ({
-                  idem_id: 'idem_123',
-                  idem_owner_user_id: 'user_123',
-                  idem_request_hash: hashHex,
-                  idem_status: 'COMPLETED',
-                  idem_response_status: 201,
-                  idem_response_json: JSON.stringify(original),
-                  idem_expires_at: '2026-10-08T07:00:00.000Z',
-                }),
-              }),
-            }
-          },
-          batch: async () => {
-            throw new Error('batch should not run on an idempotency replay')
-          },
-        } as never,
-        'user_123',
-        {
-          contentType: 'article',
-          title: 'Draft content',
-          bodyRef: 'https://cdn.example.com/body.json',
-          mediaRefs: [],
-          coverRef: null,
-        },
-        'create-key',
-        new Date('2026-10-07T08:00:00.000Z'),
-      )
-    })
+    const result = await createContent(
+      db,
+      'user_123',
+      {
+        contentType: 'article',
+        title: 'Draft content',
+        bodyRef: 'https://cdn.example.com/body.json',
+        mediaRefs: [],
+        coverRef: null,
+      },
+      'create-key',
+      new Date('2026-10-07T08:00:00.000Z'),
+    )
 
     expect(result).toEqual(original)
   })
