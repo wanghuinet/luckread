@@ -415,7 +415,7 @@ export async function listSeriesMembers(
   const rows = await db.prepare(
     'SELECT r.relationship_id, r.position, r.created_at, r.updated_at, ' +
     'r.target_id AS series_id, c.id AS content_id, c.slug AS content_slug, ' +
-    'c.content_type, c.state AS content_state, c.title ' +
+    'c.content_type, c.state AS content_state, c.title AS content_title ' +
     'FROM content_relationships r ' +
     'JOIN contents c ON c.id = r.source_id ' +
     "WHERE r.source_type = 'content' AND r.target_type = 'series' AND r.relation_type = 'series-member' " +
