@@ -24,6 +24,8 @@ describe('public content type filter', () => {
 
     expect(page).toContain("params.set('type', contentType)")
     expect(page).toContain("void load()")
+    expect(page).toContain('const load = useCallback(async')
+    expect(page).toContain('}, [contentType, copy.content.error])')
     expect(route).toContain('validateContentListQuery')
     expect(route).toContain('validateContentListQuery')
   })
