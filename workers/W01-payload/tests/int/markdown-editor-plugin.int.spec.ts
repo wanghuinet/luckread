@@ -110,6 +110,7 @@ describe('Markdown editor plugin', () => {
     expect(registry).toContain("id: 'content.markdown-import'")
     expect(registry).toContain("id: 'content.code-block'")
     expect(registry).toContain("id: 'content.table-block'")
+    expect(registry).toContain("id: 'content.markdown-export'")
     expect(plugin).toContain(
       "import { markdownToArticleDocument } from '../lib/markdown-to-article-document.js'",
     )
