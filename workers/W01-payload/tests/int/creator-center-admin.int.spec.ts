@@ -138,7 +138,7 @@ describe('Creator Center admin extension', () => {
     const adapter = read('src/features/word-import/article-document-adapter.ts')
     expect(editor).toContain("import ArticleWordImportButton from './ArticleWordImportButton.js'")
     expect(editor).toContain('<ArticleWordImportButton disabled={disabled} onImport={emit} />')
-    expect(importer).toContain("accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"")
+    expect(importer).toContain('accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"')
     expect(importer).toContain("fetch('/api/v1/media'")
     expect(importer).toContain('articleDocumentFromImportedDocument')
     expect(adapter).toContain("createArticleMediaBlock('image'")
