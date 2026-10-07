@@ -10,7 +10,7 @@ type MediaBlockInfo = {
   caption: string
 }
 
-function MediaManagerPanel({ value, disabled, updateDocument }: ArticleEditorPluginContext) {
+function MediaManagerPanel({ value, disabled, mediaAssets, updateDocument }: ArticleEditorPluginContext) {
   const [open, setOpen] = useState(false)
   const mediaBlocks = useMemo<MediaBlockInfo[]>(
     () => value.blocks.flatMap((block, blockIndex) => {
@@ -53,6 +53,13 @@ function MediaManagerPanel({ value, disabled, updateDocument }: ArticleEditorPlu
     const block = value.blocks[blockIndex]
     if (!block || block.type !== 'gallery' || !block.mediaRefs || block.mediaRefs.length <= 2) return
     updateRefs(blockIndex, block.mediaRefs.filter((_, index) => index !== refIndex))
+  }
+
+  function addRef(blockIndex: number, url: string) {
+    const block = value.blocks[blockIndex]
+    if (!block || block.type !== 'gallery' || !block.mediaRefs) return
+    if (!url || block.mediaRefs.includes(url) || block.mediaRefs.length >= 12) return
+    updateRefs(blockIndex, [...block.mediaRefs, url])
   }
 
   if (!open) {
@@ -128,6 +135,25 @@ function MediaManagerPanel({ value, disabled, updateDocument }: ArticleEditorPlu
                 </div>
               ))}
             </div>
+            {media.type === 'gallery' ? (
+              <div className="lr-editor-media-manager-add">
+                <span>添加已有图片</span>
+                <div>
+                  {mediaAssets
+                    .filter((asset) => asset.mimeType.startsWith('image/') && !media.refs.includes(asset.url))
+                    .map((asset) => (
+                      <button
+                        key={asset.id}
+                        disabled={disabled || media.refs.length >= 12}
+                        onClick={() => addRef(media.blockIndex, asset.url)}
+                        type="button"
+                      >
+                        + {asset.filename ?? '图片'}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            ) : null}
           </section>
         ))}
       </div>
