@@ -232,9 +232,7 @@ export default function CreatorContentOrganization({
           coverRef: item.coverRef ?? null,
         }),
       })
-      const data = await response.json().catch((): null) as {
-        error?: { message?: string }
-      } | null
+      const data: { error?: { message?: string } } | null = await response.json().catch(() => null)
       if (response.status === 401) {
         redirectToLogin(loginPath)
         return
