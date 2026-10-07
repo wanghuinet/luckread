@@ -423,6 +423,8 @@ export default {
           body,
           requireIfMatch(request),
           requireIdempotency(request),
+          new Date(),
+          request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
         )
         return json({
           id: content.id,
