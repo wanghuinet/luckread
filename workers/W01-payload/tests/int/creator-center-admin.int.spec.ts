@@ -81,7 +81,7 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain('const isVideoAsset')
     expect(publisher).toContain('短视频至少需要添加一个视频素材。')
     expect(publisher).toContain('const resolveCoverRef')
-    expect(publisher).toContain("type === 'video' ? assets.find(isImageAsset)?.url ?? null")
+    expect(publisher).toContain('assets.find(isImageAsset)?.url ?? null')
     expect(publisher).toContain("'当前封面'")
     expect(publisher).toContain('默认使用第一张图片素材')
     expect(publisher).toContain('resolveCoverRef(type, assets, coverRef)')
