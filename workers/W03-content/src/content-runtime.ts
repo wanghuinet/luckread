@@ -464,7 +464,7 @@ export async function getContent(
   contentId: string,
   principalUserId: string | null,
 ): Promise<ContentRecord> {
-  assertResourceId(contentId)
+  assertContentReference(contentId)
   const row = await db.prepare(
     `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
             slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
@@ -491,7 +491,7 @@ export async function listContentRevisions(
   const cursorBindings = decoded ? [decoded.updatedAt, decoded.updatedAt, decoded.id] : []
   const rows = await db.prepare(`
     SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
-           r.source_revision, r.operation, r.state, r.title, r.body_ref,
+           r.source_revision, r.operation, r.state, r.slug, r.title, r.body_ref,
            r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
       FROM content_revisions r
       JOIN contents c ON c.id = r.content_id
@@ -515,7 +515,7 @@ export async function getContentRevision(
   assertResourceId(revisionId)
   const row = await db.prepare(`
     SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
-           r.source_revision, r.operation, r.state, r.title, r.body_ref,
+           r.source_revision, r.operation, r.state, r.slug, r.title, r.body_ref,
            r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
       FROM content_revisions r
       JOIN contents c ON c.id = r.content_id
@@ -566,7 +566,7 @@ export async function listCreatorContents(
   }
   const rows = await db.prepare(
     `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
-            title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
+            slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
       ORDER BY updated_at DESC, id DESC
@@ -615,7 +615,7 @@ export async function listContents(
 
   const rows = await db.prepare(
     `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, version, revision,
-            title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
+            slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
       ORDER BY updated_at DESC, id DESC
