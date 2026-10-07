@@ -37,7 +37,7 @@ describe('public content detail', () => {
 
   it('surfaces normalized mention and hashtag tokens without creating a second taxonomy authority', () => {
     const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
-    expect(page).toContain("extractSocialTokens(body)")
+    expect(page).toContain("extractSocialTokens(socialTokenBody)")
     expect(page).toContain('copy.detail.tagAria')
     expect(page).toContain('content-detail-social-token')
     expect(page).not.toContain('hashtags/resolve')
@@ -172,4 +172,26 @@ it('keeps interactive content requests anonymous so signed-in browsers can use t
   expect(page).toContain("credentials: 'omit'")
   expect(page).toContain("headers: { accept: 'application/json' }")
   expect(page).toContain("cache: 'no-store'")
+})
+
+
+it('renders versioned structured article bodies instead of flattening them to paragraphs', () => {
+  const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+  const renderer = read('src/components/ArticleStructuredRenderer.tsx')
+
+  expect(page).toContain("tryDeserializeArticleDocument(body)")
+  expect(page).toContain('plainTextFromArticleDocument(structuredArticle)')
+  expect(page).toContain('ArticleStructuredRenderer')
+  expect(page).toContain('<ArticleStructuredRenderer document={structuredArticle} />')
+  expect(page).toContain('!structuredArticle')
+  expect(renderer).toContain("block.type === 'heading'")
+  expect(renderer).toContain("block.type === 'bulletList' || block.type === 'orderedList'")
+  expect(renderer).toContain("block.type === 'gallery'")
+  expect(renderer).toContain('content-detail-article-gallery')
+})
+
+it('keeps legacy plain-text article bodies on the backward-compatible renderer', () => {
+  const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+  expect(page).toContain('splitBodyIntoParagraphs(body)')
+  expect(page).toContain('content-detail-paragraph')
 })
