@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   follow,
   getFollowStatus,
+  invalidateFollowListCountCache,
   listFollowers,
   listFollowing,
   parseFollowListLimit,
@@ -22,6 +23,25 @@ const db = (
     })),
   }))
   return { prepare } as unknown as D1Database
+}
+
+const installCache = (store = new Map<string, Response>()) => {
+  const cache = {
+    match: vi.fn(async (request: Request) => store.get(request.url)?.clone()),
+    put: vi.fn(async (request: Request, response: Response) => {
+      store.set(request.url, response.clone())
+    }),
+    delete: vi.fn(async (request: Request) => store.delete(request.url)),
+  }
+  Object.defineProperty(globalThis, 'caches', {
+    configurable: true,
+    value: { default: cache },
+  })
+  return cache
+}
+
+const uninstallCache = () => {
+  Reflect.deleteProperty(globalThis, 'caches')
 }
 
 describe('follow runtime', () => {
@@ -160,6 +180,41 @@ describe('follow runtime', () => {
       hasMore: true,
     })
     expect(result.nextCursor).toEqual(expect.any(String))
+  })
+
+  it('uses a cached aggregate count without a second D1 query', async () => {
+    const store = new Map<string, Response>([
+      [
+        'https://cache.luckread.internal/__social-follow-count?v=1&direction=followers&user=u9',
+        Response.json({ totalCount: 17 }),
+      ],
+    ])
+    const cache = installCache(store)
+    try {
+      const d = db([], [{
+        results: [{
+          relationship_id: 'r1',
+          user_id: 'u8',
+          followed_at: '2026-10-02T00:00:00.000Z',
+        }],
+      }])
+      const result = await listFollowers(d, 'u9', null, 20)
+      expect(result.totalCount).toBe(17)
+      expect(d.prepare).toHaveBeenCalledTimes(1)
+      expect(cache.match).toHaveBeenCalled()
+    } finally {
+      uninstallCache()
+    }
+  })
+
+  it('invalidates both follow count directions for affected users', async () => {
+    const cache = installCache()
+    try {
+      await invalidateFollowListCountCache('u1', 'u2')
+      expect(cache.delete).toHaveBeenCalledTimes(4)
+    } finally {
+      uninstallCache()
+    }
   })
 
   it('lists following relationships', async () => {
