@@ -269,11 +269,12 @@ export default {
 
       if (path && path.relationships && path.relationshipId && request.method === 'DELETE') {
         const principal = requiredCreatorPrincipal(request)
+        const relationshipId = path.relationshipId
         const relationship = await revokeContentRelationship(
           env.D1_02,
           principal.userId,
           path.id,
-          path.relationshipId,
+          relationshipId,
           requireIdempotency(request),
         )
         return json({ data: relationship, requestId: crypto.randomUUID() })
