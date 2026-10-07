@@ -2,7 +2,7 @@ import type {
   ArticleEditorPlugin,
   ArticleEditorPluginContext,
 } from './ArticleEditorPlugin.js'
-import { createArticleTableBlock } from '../lib/article-document.js'
+import { ARTICLE_MAX_BLOCKS, createArticleTableBlock } from '../lib/article-document.js'
 
 function TableBlockToolbar({
   disabled,
@@ -14,7 +14,7 @@ function TableBlockToolbar({
       className="lr-editor-plugin-button"
       disabled={disabled}
       onClick={() => {
-        if (value.blocks.length >= 200) return
+        if (value.blocks.length >= ARTICLE_MAX_BLOCKS) return
         updateDocument({
           ...value,
           blocks: [...value.blocks, createArticleTableBlock()],
