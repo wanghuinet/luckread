@@ -38,6 +38,7 @@ export type ArticleBlockType =
   | 'gallery'
   | 'code'
   | 'table'
+  | 'math'
 
 export type ArticleBlock = {
   id: string
@@ -66,6 +67,7 @@ const BLOCK_TYPES: readonly ArticleBlockType[] = [
   'gallery',
   'code',
   'table',
+  'math',
 ]
 
 const stripUnsafeControls = (value: string): string =>
