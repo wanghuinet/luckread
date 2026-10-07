@@ -8,6 +8,7 @@ import { getBetterAuthPrincipal } from '@/auth/w02-session-client'
 import CreatorLanguageToggle from './creator-center/CreatorLanguageToggle'
 import { CreatorStudio } from './creator-center/CreatorStudio'
 import HomeContentFeed from './HomeContentFeed'
+import { GET as getPublicContents } from '../api/v1/contents/route'
 import PublicLanguageToggle from './i18n/PublicLanguageToggle'
 import { getPublicCopy, normalizePublicLocale, type PublicLocale } from './i18n/public-locale'
 import './styles.css'
@@ -18,6 +19,40 @@ const CREATOR_CENTER_HOSTS = new Set(['mp.luckread.com'])
 export const dynamic = 'force-dynamic'
 
 type StudioLocale = 'zh-CN' | 'en-US'
+
+type InitialHomeContentItem = {
+  id: string
+  slug?: string
+  contentType: 'article' | 'post' | 'video'
+  title: string
+  mediaRefs?: string[]
+  coverRef?: string | null
+  updatedAt?: string
+}
+
+type InitialHomeContentResponse = {
+  data?: { items?: InitialHomeContentItem[] }
+}
+
+async function loadInitialHomeContent(requestHeaders: Headers): Promise<InitialHomeContentItem[] | undefined> {
+  const publicHeaders = new Headers()
+  const acceptLanguage = requestHeaders.get('accept-language')
+  const clientIp = requestHeaders.get('cf-connecting-ip')
+  if (acceptLanguage) publicHeaders.set('accept-language', acceptLanguage)
+  if (clientIp) publicHeaders.set('cf-connecting-ip', clientIp)
+
+  try {
+    const request = new Request('https://luckread.com/api/v1/contents?limit=6', {
+      headers: publicHeaders,
+    })
+    const response = await getPublicContents(request)
+    if (!response.ok) return undefined
+    const data = await response.json().catch((): null => null) as InitialHomeContentResponse | null
+    return Array.isArray(data?.data?.items) ? data.data.items : undefined
+  } catch {
+    return undefined
+  }
+}
 
 const categoriesByLocale: Record<PublicLocale, string[]> = {
   zh: ['图文', '视频', '动态', '专栏', '创作者'],
@@ -105,6 +140,8 @@ export default async function HomePage() {
     )
   }
 
+  const initialHomeContent = await loadInitialHomeContent(requestHeaders)
+
   return (
     <div className="home-shell">
       <header className="site-header">
@@ -174,7 +211,7 @@ export default async function HomePage() {
           <p className="section-description">{copy.home.exploreDescription}</p>
         </section>
 
-        <HomeContentFeed locale={publicLocale} />
+        <HomeContentFeed locale={publicLocale} initialItems={initialHomeContent} />
 
         <section className="highlight-grid" aria-label={copy.home.highlightAria}>
           {copy.home.highlight.map((item, index) => (

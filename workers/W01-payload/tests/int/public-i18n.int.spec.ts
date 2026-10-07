@@ -26,7 +26,9 @@ describe('public frontend i18n', () => {
 
     expect(toggle).toContain('PUBLIC_LOCALES.map')
     expect(home).toContain('<PublicLanguageToggle locale={publicLocale} />')
-    expect(home).toContain('<HomeContentFeed locale={publicLocale} />')
+    expect(home).toContain('<HomeContentFeed locale={publicLocale} initialItems={initialHomeContent} />')
+    expect(home).toContain('loadInitialHomeContent(requestHeaders)')
+    expect(home).toContain("publicHeaders.set('accept-language', acceptLanguage)")
     expect(browse).toContain('<PublicLanguageToggle locale={locale} />')
     expect(detail).toContain('<PublicLanguageToggle locale={locale} />')
     expect(detail).toContain('locale={locale}')
@@ -44,6 +46,7 @@ describe('public frontend i18n', () => {
 
     expect(browse).toContain("href={'/content/' + encodeURIComponent(item.slug || item.id)}")
     expect(feed).toContain('href={`/content/${encodeURIComponent(item.slug || item.id)}`}')
+    expect(feed).toContain('if (hasInitialItems && retryKey === 0) return')
     expect(detail).toContain("fetch(`/api/v1/contents/${encodeURIComponent(contentId)}`")
     expect(detailPage).toContain('alternates:')
     expect(detailPage).toContain('permanentRedirect')
