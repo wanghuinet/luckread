@@ -50,6 +50,20 @@ describe('Creator Center admin extension', () => {
     expect(contentList).toContain("if (response.status === 401)")
   })
 
+  it('keeps creator content loader identity aligned with its auth redirect dependency', () => {
+    const list = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
+    expect(list).toContain('const load = useCallback(async (cursor: string | null = null) => {')
+    expect(list).toContain('}, [loginPath, status, type])')
+  })
+
+  it('only advances the saved article snapshot after the content write succeeds', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain('let nextSavedArticleSerialized: string | null = null')
+    expect(publisher).toContain('nextSavedArticleSerialized = serialized')
+    expect(publisher).not.toContain('bodyRef = (await uploadFile(bodyFile)).url\n        setSavedArticleSerialized(serialized)')
+    expect(publisher).toContain('if (nextSavedArticleSerialized !== null) setSavedArticleSerialized(nextSavedArticleSerialized)')
+  })
+
   it('cancels stale creator content list requests', () => {
     const list = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     expect(list).toContain('const activeRequestRef = useRef<AbortController | null>(null)')
