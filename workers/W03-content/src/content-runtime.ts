@@ -722,7 +722,7 @@ export async function createContent(
       `INSERT INTO contents
         (id, content_type, owner_user_id, creator_id, ip_id, state, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
        VALUES (?, ?, ?, ?, NULL, 'DRAFT', 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
-    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, responseBody.etag, createdAt, createdAt),
+    ).bind(contentId, normalized.contentType, ownerUserId, ownerUserId, slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.etag, createdAt, createdAt),
     atomicGuard(db),
     insertRevision(db, {
       id: crypto.randomUUID(),
@@ -737,8 +737,8 @@ export async function createContent(
       title: normalized.title,
       bodyRef: normalized.bodyRef,
       mediaRefs: normalized.mediaRefs,
-      coverRef: responseBody.coverRef,
-      etag: responseBody.etag,
+      coverRef: createdContent.coverRef,
+      etag: createdContent.etag,
       reason: null,
       correlationId: normalizeCorrelationId(correlationId),
       createdAt,
