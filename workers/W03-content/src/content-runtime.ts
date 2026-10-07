@@ -894,6 +894,26 @@ export async function rollbackContentRevision(
       correlationId: normalizedCorrelationId,
       createdAt: updatedAt,
     }),
+    db.prepare(`INSERT INTO content_outbox_events
+      (event_id, operation_id, event_type, content_id, aggregate_version, payload_json, created_at, published_at)
+     VALUES (?, 'rollbackContentRevision', 'content.revision.rolled_back', ?, ?, ?, ?, NULL)`).bind(
+      crypto.randomUUID(),
+      content.id,
+      nextVersion,
+      JSON.stringify({
+        schemaVersion: '1.0',
+        producer: 'W03',
+        contentId: content.id,
+        sourceRevision: source.revision,
+        resultingRevision: nextRevision,
+        contentVersion: nextVersion,
+        actorUserId: principalUserId,
+        reason: reason?.trim() || null,
+        correlationId: normalizedCorrelationId,
+        idempotencyKey,
+      }),
+      updatedAt,
+    ),
   ])
   return result
 }
