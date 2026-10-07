@@ -78,6 +78,20 @@ describe('W03 content relationship foundation', () => {
     })
   })
 
+  it('keeps create and revoke mutations behind idempotency and the D1 fail-closed guard', () => {
+    const runtime = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/src/content-relationships.ts'),
+      'utf8',
+    )
+    expect(runtime).toContain('export async function createContentRelationship')
+    expect(runtime).toContain('export async function revokeContentRelationship')
+    expect(runtime).toContain('Idempotency-Key')
+    expect(runtime).toContain('content_txn_guard')
+    expect(runtime).toContain('INSERT OR REPLACE INTO content_txn_guard')
+    expect(runtime).toContain('WHERE r.relationship_id = ? AND r.source_id = ?')
+    expect(runtime).toContain("relationshipHash(operationId, { ownerUserId, relationshipId })")
+  })
+
   it('keeps relationship transport behind W01 caller authentication', async () => {
     const db = {
       prepare() {
