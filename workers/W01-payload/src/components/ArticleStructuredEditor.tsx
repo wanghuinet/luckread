@@ -15,6 +15,7 @@ import {
   type ArticleDocument,
   createArticleBlock,
   createArticleMediaBlock,
+  mediaRefsFromArticleDocument,
   normalizeArticleDocument,
   plainTextFromArticleDocument,
 } from '../lib/article-document.js'
@@ -50,10 +51,31 @@ const updateBlock = (
 })
 
 export default function ArticleStructuredEditor({ value, disabled = false, mediaAssets = [], onChange, plugins = [] }: Props) {
-  const imageAssets = useMemo(
-    () => mediaAssets.filter((asset) => asset.mimeType.startsWith('image/')),
-    [mediaAssets],
-  )
+  const imageAssets = useMemo(() => {
+    const seenUrls = new Set<string>()
+    const result: EditorMediaAsset[] = []
+
+    for (const asset of mediaAssets) {
+      const url = asset.url.trim()
+      if (!url || !asset.mimeType.startsWith('image/') || seenUrls.has(url)) continue
+      seenUrls.add(url)
+      result.push(asset)
+    }
+
+    for (const ref of mediaRefsFromArticleDocument(value)) {
+      const url = ref.trim()
+      if (!url || seenUrls.has(url)) continue
+      seenUrls.add(url)
+      result.push({
+        id: 'article-document-media:' + url,
+        url,
+        filename: '正文已关联图片',
+        mimeType: 'image/*',
+      })
+    }
+
+    return result
+  }, [mediaAssets, value])
   const characterCount = useMemo(() => plainTextFromArticleDocument(value).length, [value])
 
   function emit(next: ArticleDocument) {
