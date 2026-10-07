@@ -48,6 +48,16 @@ describe('Markdown editor plugin', () => {
     expect(result.document.version).toBe(2)
   })
 
+  it('imports display math into a dedicated math block', () => {
+    const result = markdownToArticleDocument('$\\n\\frac{a}{b}\\n$')
+
+    expect(result.unsupported).toEqual([])
+    expect(result.document.blocks[0]).toMatchObject({
+      type: 'math',
+      text: '\\frac{a}{b}',
+    })
+  })
+
   it('imports markdown tables into structured table blocks', () => {
     const result = markdownToArticleDocument([
       '| 名称 | 状态 |',
@@ -111,10 +121,15 @@ describe('Markdown editor plugin', () => {
     expect(registry).toContain("id: 'content.code-block'")
     expect(registry).toContain("id: 'content.table-block'")
     expect(registry).toContain("id: 'content.markdown-export'")
+    expect(registry).toContain("id: 'content.math-block'")
     expect(plugin).toContain(
       "import { markdownToArticleDocument } from '../lib/markdown-to-article-document.js'",
     )
     expect(plugin).toContain('className="lr-editor-markdown-input"')
+    const math = read('src/components/MathBlockPlugin.tsx')
     expect(plugin).toContain('本次不会导入，避免静默丢失内容')
+    expect(math).toContain("import { createArticleBlock } from '../lib/article-document.js'")
+    expect(math).toContain("id: 'content.math-block'")
+    expect(math).toContain('KaTeX')
   })
 })
