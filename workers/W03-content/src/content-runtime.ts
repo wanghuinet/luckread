@@ -462,6 +462,54 @@ export async function getContent(
   return toContent(row)
 }
 
+export async function listContentRevisions(
+  db: ContentD1,
+  principalUserId: string,
+  contentId: string,
+  cursor: string | null,
+  limit: number,
+): Promise<{ items: ContentRevision[]; nextCursor: string | null; hasMore: boolean }> {
+  assertResourceId(principalUserId)
+  assertResourceId(contentId)
+  const pageSize = revisionPageSize(limit)
+  const decoded = cursor ? decodeCursor(cursor) : null
+  const cursorClause = decoded ? 'AND (r.created_at < ? OR (r.created_at = ? AND r.id < ?))' : ''
+  const cursorBindings = decoded ? [decoded.updatedAt, decoded.updatedAt, decoded.id] : []
+  const rows = await db.prepare(`
+    SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
+           r.source_revision, r.operation, r.state, r.title, r.body_ref,
+           r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
+      FROM content_revisions r
+      JOIN contents c ON c.id = r.content_id
+     WHERE r.content_id = ? AND c.owner_user_id = ? ${cursorClause}
+     ORDER BY r.created_at DESC, r.id DESC
+     LIMIT ?`).bind(contentId, principalUserId, ...cursorBindings, pageSize + 1).all<ContentRevisionRow>()
+  const hasMore = rows.results.length > pageSize
+  const page = rows.results.slice(0, pageSize).map(toRevision)
+  const last = page.at(-1)
+  return { items: page, hasMore, nextCursor: hasMore && last ? encodeCursor(last.createdAt, last.id) : null }
+}
+
+export async function getContentRevision(
+  db: ContentD1,
+  principalUserId: string,
+  contentId: string,
+  revisionId: string,
+): Promise<ContentRevision> {
+  assertResourceId(principalUserId)
+  assertResourceId(contentId)
+  assertResourceId(revisionId)
+  const row = await db.prepare(`
+    SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
+           r.source_revision, r.operation, r.state, r.title, r.body_ref,
+           r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
+      FROM content_revisions r
+      JOIN contents c ON c.id = r.content_id
+     WHERE r.id = ? AND r.content_id = ? AND c.owner_user_id = ?`).bind(revisionId, contentId, principalUserId).first<ContentRevisionRow>()
+  if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
+  return toRevision(row)
+}
+
 export function validateListFilters(statusValue: string | null, typeValue: string | null): {
   status?: ContentState
   contentType?: ContentType
