@@ -30,6 +30,7 @@ type ContentApiResponse = {
 export default function ContentBrowsePage() {
   const locale = usePublicLocale()
   const copy = getPublicCopy(locale)
+  const contentLoadError = copy.content.error
   const labels: Record<ContentType | 'all', string> = {
     all: copy.content.tabs.all,
     article: copy.content.tabs.article,
@@ -65,7 +66,7 @@ export default function ContentBrowsePage() {
       })
       const data: ContentApiResponse = await response.json().catch((): null => null)
       if (!response.ok || !data?.data) {
-        throw new Error(data?.error?.message || copy.content.error)
+        throw new Error(data?.error?.message || contentLoadError)
       }
 
       if (requestId !== requestIdRef.current) return
@@ -85,7 +86,7 @@ export default function ContentBrowsePage() {
       setLoadingMore(false)
       if (abortControllerRef.current === controller) abortControllerRef.current = null
     }
-  }, [contentType, copy.content.error])
+  }, [contentLoadError, contentType])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
