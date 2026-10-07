@@ -1,4 +1,6 @@
 import { cachedPublicGet } from '../../../../../lib/public-response-cache.js'
+import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../auth/traffic-limit.js'
+import { hasAuthenticatedSessionCredential } from '../../../../../lib/content-list-cache-guard.js'
 
 import {
   callW05SocialPublic,
@@ -18,6 +20,14 @@ export async function GET(
   try {
     const { shareId } = await context.params
     if (!shareId?.trim()) return errorResponse(400, 'VALIDATION_FAILED', 'Invalid share id')
+    await enforcePublicReadRateLimit(request)
+    if (hasAuthenticatedSessionCredential(request)) {
+      return await callW05SocialPublic({
+        request,
+        pathname: '/internal/social/shares/' + encodeURIComponent(shareId),
+        method: 'GET',
+      })
+    }
 
     return await cachedPublicGet(
       request,
@@ -30,6 +40,7 @@ export async function GET(
       60,
     )
   } catch (error) {
+    if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     if (error instanceof W05SocialClientError) {
       return errorResponse(error.status, error.code, error.message)
     }
