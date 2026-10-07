@@ -166,6 +166,18 @@ describe('Creator Center admin extension', () => {
     expect(members).toContain('page.hasMore')
   })
 
+  it('exposes contextual article block insertion', () => {
+    const editor = read('src/components/ArticleStructuredEditor.tsx')
+    const document = read('src/lib/article-document.ts')
+    const plugin = read('src/components/ArticleEditorPlugin.ts')
+
+    expect(document).toContain('export const insertArticleBlockAfter')
+    expect(editor).toContain('insertArticleBlockAfter(value, index, \'paragraph\')')
+    expect(editor).toContain('aria-label="在下方添加正文区块"')
+    expect(editor).toContain('onClick={() => insertBlockAfter(index)}')
+    expect(plugin).toContain('insertBlockAfter: (index: number) => void')
+  })
+
   it('exposes bounded article editor undo and redo controls', () => {
     const editor = read('src/components/ArticleStructuredEditor.tsx')
     const history = read('src/lib/article-document-history.ts')
