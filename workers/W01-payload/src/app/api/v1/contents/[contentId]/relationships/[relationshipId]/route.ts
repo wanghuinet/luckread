@@ -40,7 +40,7 @@ export async function DELETE(
       principal,
     })
     if (response.ok) {
-      await invalidatePublicContentRelationships(request, contentId)
+      await invalidatePublicContentRelationships(contentId)
     }
     return response
   } catch (error) {
