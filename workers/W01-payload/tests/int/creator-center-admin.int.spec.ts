@@ -121,6 +121,15 @@ describe('Creator Center admin extension', () => {
     expect(moderation).toContain('if (response.status === 401)')
   })
 
+  it('restores media type hints so restored video drafts remain publishable', () => {
+    const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
+    expect(publisher).toContain('const inferRestoredMediaType = (url: string, contentType: ContentType): string => {')
+    expect(publisher).toContain("if (contentType === 'article') return 'image/*'")
+    expect(publisher).toContain("/\\.(?:mp4|webm|mov|m4v|avi|mkv)(?:$|[?#])/.test(pathname)")
+    expect(publisher).toContain('mimeType: inferRestoredMediaType(url, recovered.contentType ?? \'article\')')
+    expect(publisher).not.toContain("mimeType: 'application/octet-stream'")
+  })
+
   it('preserves the structured article document when switching content types away and back', () => {
     const publisher = read('src/app/(frontend)/publish/PublishComposer.tsx')
     expect(publisher).toContain('const existingArticleText = plainTextFromArticleDocument(articleDocument).trim()')
