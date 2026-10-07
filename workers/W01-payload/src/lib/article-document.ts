@@ -255,6 +255,7 @@ export const serializeArticleDocument = (document: ArticleDocument): string => {
     (block) =>
       block.type === 'image' ||
       block.type === 'gallery' ||
+      block.type === 'table' ||
       (block.type !== 'divider' && Boolean(block.text.trim())),
   )) {
     throw new Error('ARTICLE_DOCUMENT_EMPTY')
