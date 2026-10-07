@@ -206,29 +206,8 @@ function replaceAllTextCaseAware(
 ): string {
   if (caseSensitive || !search) return replaceAllText(value, search, replacement)
 
-  const pattern = search.replace(/[.*+?^$\\{}()|[\\]\\]/g, '\\function replaceAllTextCaseAware(
-  value: string,
-  search: string,
-  replacement: string,
-  caseSensitive: boolean,
-): string {
-  if (caseSensitive || !search) return replaceAllText(value, search, replacement)
-
-  const needle = search.toLocaleLowerCase()
-  const source = value.toLocaleLowerCase()
-  let output = ''
-  let cursor = 0
-  let index = source.indexOf(needle)
-
-  while (index !== -1) {
-    output += value.slice(cursor, index) + replacement
-    cursor = index + search.length
-    index = source.indexOf(needle, cursor)
-  }
-
-  return output + value.slice(cursor)
-}')
-  return value.replace(new RegExp(pattern, 'giu'), () => replacement)
+  const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return value.replace(new RegExp(escaped, 'giu'), () => replacement)
 }
 
 export const findReplacePlugin = {
