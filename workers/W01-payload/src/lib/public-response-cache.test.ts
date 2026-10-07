@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 import {
   cachedPublicGet,
+  invalidatePublicContentComments,
   invalidatePublicContentList,
   invalidatePublicFollowList,
   invalidatePublicUserProfileByUsername,
@@ -293,6 +294,45 @@ describe('public response cache', () => {
     expect(second.status).toBe(404)
     expect(loader).toHaveBeenCalledTimes(1)
     expect(second.headers.get('x-luckread-cache')).toBe('HIT')
+  })
+
+  it('uses a per-content generation for comment-list cache keys', async () => {
+    const cached = new Response(JSON.stringify({ data: 'cached' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-comments-generation') ? generationResponse('g0') : cached,
+    )
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const request = new Request('https://luckread.com/api/v1/contents/content-1/comments?limit=20')
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const response = await cachedPublicGet(request, 'content-comments', loader, 10)
+
+    expect(loader).not.toHaveBeenCalled()
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    expect(cache.match).toHaveBeenCalledWith(
+      new Request('https://cache.luckread.internal/__content-comments-generation?v=1&content=content-1'),
+    )
+    expect(cache.match).toHaveBeenCalledWith(publicCacheKey(request, 'content-comments', 'g0'))
+  })
+
+  it('bumps the requested content comment generation', async () => {
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    await invalidatePublicContentComments('content-1')
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const generationWrite = putCalls.find(([request]) =>
+      request.url.includes('__content-comments-generation') &&
+      request.url.includes('content=content-1'),
+    )
+    expect(generationWrite).toBeDefined()
+    expect(generationWrite?.[1]).toBeInstanceOf(Response)
+    const body = await generationWrite?.[1]?.clone().json() as { generation?: unknown }
+    expect(typeof body.generation).toBe('string')
+    expect(cache.delete).not.toHaveBeenCalled()
   })
 
   it('uses a per-user generation for follow-list cache keys', async () => {
