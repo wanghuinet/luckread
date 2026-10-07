@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { contentSlugFor } from './content-slug.js'
+
 export type ContentState =
   | 'DRAFT'
   | 'PENDING_REVIEW'
@@ -31,6 +33,7 @@ export interface ContentRecord {
   state: ContentState
   version: number
   revision: number
+  slug: string
   title: string
   bodyRef: string
   mediaRefs: string[]
@@ -52,6 +55,7 @@ export interface ContentRevision {
   sourceRevision: number | null
   operation: ContentRevisionOperation
   state: ContentState
+  slug: string
   title: string
   bodyRef: string
   mediaRefs: string[]
@@ -76,6 +80,7 @@ interface ContentRow {
   state: ContentState
   version: number
   revision: number
+  slug: string
   title: string
   body_ref: string
   media_refs_json: string
@@ -95,6 +100,7 @@ interface ContentRevisionRow {
   source_revision: number | null
   operation: ContentRevisionOperation
   state: ContentState
+  slug: string
   title: string
   body_ref: string
   media_refs_json: string
@@ -176,6 +182,7 @@ const toContent = (row: ContentRow): ContentRecord => ({
   state: row.state,
   version: row.version,
   revision: row.revision,
+  slug: row.slug,
   title: row.title,
   bodyRef: row.body_ref,
   mediaRefs: JSON.parse(row.media_refs_json || '[]') as string[],
@@ -191,6 +198,7 @@ export const publicContent = (content: ContentRecord) => ({
   state: content.state,
   version: content.version,
   etag: content.etag,
+  slug: content.slug,
   title: content.title,
   bodyRef: content.bodyRef,
   mediaRefs: content.mediaRefs,
@@ -301,6 +309,7 @@ const toRevision = (row: ContentRevisionRow): ContentRevision => ({
   sourceRevision: row.source_revision,
   operation: row.operation,
   state: row.state,
+  slug: row.slug,
   title: row.title,
   bodyRef: row.body_ref,
   mediaRefs: JSON.parse(row.media_refs_json || '[]') as string[],
@@ -350,7 +359,7 @@ const loadMutationRow = async (
   const row = await db.prepare(
     `SELECT
         c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state, c.version, c.revision,
-        c.title, c.body_ref, c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at,
+        c.slug, c.title, c.body_ref, c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at,
         i.id AS idem_id,
         i.owner_user_id AS idem_owner_user_id,
         i.request_hash AS idem_request_hash,
