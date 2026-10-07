@@ -289,7 +289,7 @@ export default function PublishComposer({
       autoSaveTimerRef.current = null
     }
     if (!restoreCompleteRef.current || !autoSaveDirtyRef.current || reviewLocked || !title.trim() || !body.trim()) {
-      if (!autoSaveDirtyRef.current) setAutoSaveStatus('idle')
+      setAutoSaveStatus('idle')
       return
     }
 
@@ -382,6 +382,7 @@ export default function PublishComposer({
   }
 
   async function runPreflight(): Promise<{ report: PublishPreflightResult; input: Record<string, unknown>; draft: ContentResponse }> {
+    if (autoSaveInFlightRef.current) throw new Error('自动保存正在进行，请稍后重试。')
     if (!title.trim() || !body.trim()) throw new Error('请先填写标题和正文。')
     if (type === 'video' && assets.length === 0) throw new Error('视频至少需要添加一个媒体文件。')
 
@@ -415,6 +416,7 @@ export default function PublishComposer({
 
 
   async function saveDraft() {
+    if (autoSaveInFlightRef.current) return
     setBusy(true); setError(''); setMessage('')
     try {
       if (!title.trim() || !body.trim()) {
@@ -761,10 +763,10 @@ export default function PublishComposer({
             放弃草稿
           </button>
         ) : null}
-        <button className="secondary" disabled={busy} onClick={saveDraft} type="button">
+        <button className="secondary" disabled={busy || autoSaveInFlightRef.current} onClick={saveDraft} type="button">
           {busy ? '处理中…' : '保存草稿'}
         </button>
-        <button className="primary" disabled={busy || draft?.state === 'PENDING_REVIEW'} onClick={submitForReview} type="button">
+        <button className="primary" disabled={busy || autoSaveInFlightRef.current || draft?.state === 'PENDING_REVIEW'} onClick={submitForReview} type="button">
           {busy ? '处理中…' : draft?.state === 'PENDING_REVIEW' ? '审核中…' : '提交发布'}
         </button>
       </div>
