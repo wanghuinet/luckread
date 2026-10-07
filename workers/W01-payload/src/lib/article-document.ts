@@ -76,15 +76,21 @@ export const normalizeArticleDocument = (value: unknown): ArticleDocument => {
     throw new Error('INVALID_ARTICLE_DOCUMENT')
   }
   const blocks = candidate.blocks.map(normalizeBlock)
-  if (blocks.some((block) => block.type !== 'divider' && !block.text.trim())) {
-    throw new Error('INVALID_ARTICLE_DOCUMENT')
-  }
   return { version: ARTICLE_DOCUMENT_VERSION, blocks }
 }
 
 export const serializeArticleDocument = (document: ArticleDocument): string => {
   const normalized = normalizeArticleDocument(document)
-  const serialized = JSON.stringify(normalized)
+  const persistableBlocks = normalized.blocks.filter(
+    (block) => block.type === 'divider' || Boolean(block.text.trim()),
+  )
+  if (!persistableBlocks.some((block) => block.type !== 'divider' && block.text.trim())) {
+    throw new Error('ARTICLE_DOCUMENT_EMPTY')
+  }
+  const serialized = JSON.stringify({
+    version: ARTICLE_DOCUMENT_VERSION,
+    blocks: persistableBlocks,
+  })
   if (new TextEncoder().encode(serialized).byteLength > ARTICLE_MAX_SERIALIZED_BYTES) {
     throw new Error('ARTICLE_DOCUMENT_TOO_LARGE')
   }
