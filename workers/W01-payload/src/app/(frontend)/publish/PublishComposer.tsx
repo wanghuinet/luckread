@@ -622,7 +622,7 @@ export default function PublishComposer({
       {type === 'article' ? (
         <ArticleStructuredEditor
           disabled={busy || reviewLocked}
-          mediaAssets={assets.map((asset) => ({ id: asset.id, url: asset.url, filename: asset.filename }))}
+          mediaAssets={assets.map((asset) => ({ id: asset.id, url: asset.url, filename: asset.filename, mimeType: asset.mimeType }))}
           onChange={(nextDocument, plainText) => {
             setArticleDocument(nextDocument)
             setBody(plainText)
@@ -653,7 +653,7 @@ export default function PublishComposer({
           <label className="lr-upload-button">
             添加媒体
             <input
-              accept="image/*,video/*"
+              accept={type === 'article' ? 'image/*' : 'image/*,video/*'}
               hidden
               multiple
               disabled={busy || reviewLocked}
