@@ -385,7 +385,7 @@ export default function PublishComposer({
         autoSaveTimerRef.current = null
       }
     }
-  }, [title, body, type, assets, coverRef, busy])
+  }, [title, body, type, assets, coverRef, busy, articleDocument])
 
   function startNewContent() {
     setDraft(null)
@@ -622,6 +622,7 @@ export default function PublishComposer({
       {type === 'article' ? (
         <ArticleStructuredEditor
           disabled={busy || reviewLocked}
+          mediaAssets={assets.map((asset) => ({ id: asset.id, url: asset.url, filename: asset.filename }))}
           onChange={(nextDocument, plainText) => {
             setArticleDocument(nextDocument)
             setBody(plainText)
@@ -783,6 +784,26 @@ export default function PublishComposer({
                       : <h3 key={block.id}>{block.text}</h3>
                   }
                   if (block.type === 'quote') return <blockquote key={block.id}>{block.text}</blockquote>
+                  if (block.type === 'image') {
+                    return (
+                      <figure key={block.id}>
+                        <img alt={block.text || '文章图片'} loading="lazy" src={block.mediaRefs?.[0]} />
+                        {block.text ? <figcaption>{block.text}</figcaption> : null}
+                      </figure>
+                    )
+                  }
+                  if (block.type === 'gallery') {
+                    return (
+                      <figure key={block.id}>
+                        <div className="lr-article-gallery-preview">
+                          {(block.mediaRefs ?? []).map((ref) => (
+                            <img alt={block.text || '文章图库'} key={ref} loading="lazy" src={ref} />
+                          ))}
+                        </div>
+                        {block.text ? <figcaption>{block.text}</figcaption> : null}
+                      </figure>
+                    )
+                  }
                   if (block.type === 'bulletList' || block.type === 'orderedList') {
                     const ListTag = block.type === 'bulletList' ? 'ul' : 'ol'
                     return (
