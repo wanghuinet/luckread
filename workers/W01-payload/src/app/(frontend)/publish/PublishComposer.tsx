@@ -131,13 +131,15 @@ export default function PublishComposer({
         if ((recovered.contentType ?? 'article') === 'article') {
           const recoveredDocument = articleDocumentFromBody(recoveredBody)
           setArticleDocument(recoveredDocument)
-          setBody(plainTextFromArticleDocument(recoveredDocument))
+          const recoveredPlainText = plainTextFromArticleDocument(recoveredDocument)
+          setBody(recoveredPlainText)
+          setSavedBody(recoveredPlainText)
           setSavedArticleSerialized(serializeArticleDocument(recoveredDocument))
         } else {
           setBody(recoveredBody)
+          setSavedBody(recoveredBody)
           setSavedArticleSerialized('')
         }
-        setSavedBody(recoveredBody)
         setCoverRef(recovered.coverRef ?? '')
         setAssets((recovered.mediaRefs ?? []).map((url: string) => ({
           id: url,
@@ -294,6 +296,20 @@ export default function PublishComposer({
     if (!restoreCompleteRef.current) return
     autoSaveChangeTokenRef.current += 1
     autoSaveDirtyRef.current = true
+  }
+
+  function handleContentTypeChange(nextType: ContentType) {
+    if (nextType === type) return
+    if (nextType === 'article') {
+      const nextDocument = articleDocumentFromBody(body)
+      setArticleDocument(nextDocument)
+      setBody(plainTextFromArticleDocument(nextDocument))
+    } else if (type === 'article') {
+      setBody(plainTextFromArticleDocument(articleDocument))
+    }
+    setType(nextType)
+    setPreflightReport(null)
+    markDirty()
   }
 
   function cancelPendingAutoSave() {
@@ -583,7 +599,7 @@ export default function PublishComposer({
             className={type === value ? 'active' : ''}
             key={value}
             disabled={busy || reviewLocked}
-            onClick={() => { setType(value); markDirty() }}
+            onClick={() => handleContentTypeChange(value)}
             role="tab"
             type="button"
           >
