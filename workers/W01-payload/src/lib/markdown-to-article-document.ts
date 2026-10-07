@@ -205,31 +205,48 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
           header: Array<{ text: string }>
           rows: Array<Array<{ text: string }>>
         }
-        const header = tableToken.header.map((cell) => stripInlineMarkdown(cell.text))
-        const rows = tableToken.rows.map((row) => row.map((cell) => stripInlineMarkdown(cell.text)))
-        const allCells = [header, ...rows]
+        const rawHeader = tableToken.header.map((cell) => cell.text)
+        const rawRows = tableToken.rows.map((row) => row.map((cell) => cell.text))
+        const allRawCells = [rawHeader, ...rawRows]
 
-        if (!header.length || header.length > 8 || rows.length > 50 || rows.some((row) => row.length !== header.length)) {
+        if (
+          !rawHeader.length ||
+          rawHeader.length > 8 ||
+          rawRows.length > 50 ||
+          rawRows.some((row) => row.length !== rawHeader.length)
+        ) {
           pushUnsupported(unsupported, '表格尺寸超过当前编辑器限制')
           break
         }
 
-        if (allCells.some((row) =>
-          row.some((cell) => INLINE_LINK_PATTERN.test(cell) || REFERENCE_LINK_PATTERN.test(cell) || /!\\[[^\\]]*\\]\\(/.test(cell)),
+        if (allRawCells.some((row) =>
+          row.some((cell) =>
+            INLINE_LINK_PATTERN.test(cell) ||
+            REFERENCE_LINK_PATTERN.test(cell) ||
+            /!\[[^\]]*\]\(/.test(cell) ||
+            /<[^>]+>/.test(cell),
+          ),
         )) {
-          pushUnsupported(unsupported, '表格内链接或图片')
+          pushUnsupported(unsupported, '表格内链接、图片或 HTML')
           break
         }
 
-        const bounded = allCells.map((row) =>
+        const header = rawHeader.map((cell) => stripInlineMarkdown(cell))
+        const rows = rawRows.map((row) => row.map((cell) => stripInlineMarkdown(cell)))
+        const bounded = [header, ...rows].map((row) =>
           row.map((cell) => boundedText(cell, unsupported)),
         )
         if (bounded.some((row) => row.some((cell) => cell === null))) break
 
-        pushBlock(blocks, createArticleTableBlock(
-          header,
-          rows,
-        ))
+        pushBlock(
+          blocks,
+          createArticleTableBlock(
+            bounded[0].filter((cell): cell is string => cell !== null),
+            bounded.slice(1).map((row) =>
+              row.filter((cell): cell is string => cell !== null),
+            ),
+          ),
+        )
         break
       }
 
