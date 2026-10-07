@@ -267,7 +267,7 @@ export default {
         return json({ data: relationship, requestId: crypto.randomUUID() }, 201)
       }
 
-      if (path && path.relationships && path.relationshipId && request.method === 'DELETE') {
+      if (path && path.relationships && path.id && path.relationshipId && request.method === 'DELETE') {
         const principal = requiredCreatorPrincipal(request)
         const relationshipId = path.relationshipId
         const relationship = await revokeContentRelationship(
