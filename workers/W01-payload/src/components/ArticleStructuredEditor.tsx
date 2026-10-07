@@ -118,13 +118,18 @@ export default function ArticleStructuredEditor({ value, disabled = false, media
     }))
   }
 
-  const orderedPlugins = useMemo(
-    () => plugins
-      .filter((plugin) => plugin.id.trim())
+  const orderedPlugins = useMemo(() => {
+    const seen = new Set<string>()
+    return plugins
+      .filter((plugin) => {
+        const id = plugin.id.trim()
+        if (!id || seen.has(id)) return false
+        seen.add(id)
+        return true
+      })
       .slice()
-      .sort((left, right) => (left.order ?? 0) - (right.order ?? 0) || left.id.localeCompare(right.id)),
-    [plugins],
-  )
+      .sort((left, right) => (left.order ?? 0) - (right.order ?? 0) || left.id.localeCompare(right.id))
+  }, [plugins])
 
   const pluginContext: ArticleEditorPluginContext = {
     value,
