@@ -165,8 +165,8 @@ export const markdownToArticleDocument = (markdown: string): MarkdownImportResul
 
       case 'list': {
         const text = token.items
-          .map((item: { text: string }) => boundedText(stripInlineMarkdown(item.text), unsupported))
-          .filter((item: string | null): item is string => item !== null && Boolean(item))
+          .map((item: unknown) => boundedText(stripInlineMarkdown(typeof item === 'object' && item !== null && 'text' in item && typeof (item as { text?: unknown }).text === 'string' ? (item as { text: string }).text : ''), unsupported))
+          .filter((item): item is string => item !== null && Boolean(item))
           .join('\n')
         if (!text) continue
         pushBlock(
