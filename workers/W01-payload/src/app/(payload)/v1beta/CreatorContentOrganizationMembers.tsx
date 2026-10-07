@@ -109,11 +109,6 @@ export default function CreatorContentOrganizationMembers({
 
   const editable = ['DRAFT', 'REJECTED', 'UNPUBLISHED', 'RESTORED'].includes(organization.state)
 
-  useEffect(() => {
-    setCurrentEtag(organization.etag)
-    setCurrentVersion(organization.version)
-  }, [organization.id, organization.etag, organization.version])
-
   const loadMembers = useCallback(async (signal: AbortSignal) => {
     const response = await fetch(
       organizationMeta.path + '/' + encodeURIComponent(organization.id) + '/members?limit=50',
@@ -178,7 +173,7 @@ export default function CreatorContentOrganizationMembers({
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [loadMembers, onChanged])
+  }, [loadMembers, onChanged, organization.id])
 
   useEffect(() => {
     if (!editable) return
