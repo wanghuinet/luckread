@@ -173,3 +173,24 @@ it('keeps interactive content requests anonymous so signed-in browsers can use t
   expect(page).toContain("headers: { accept: 'application/json' }")
   expect(page).toContain("cache: 'no-store'")
 })
+
+
+it('renders versioned structured article bodies instead of flattening them to paragraphs', () => {
+  const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+  const renderer = read('src/components/ArticleStructuredRenderer.tsx')
+
+  expect(page).toContain("tryDeserializeArticleDocument(body)")
+  expect(page).toContain('ArticleStructuredRenderer')
+  expect(page).toContain('<ArticleStructuredRenderer document={structuredArticle} />')
+  expect(page).toContain('!structuredArticle')
+  expect(renderer).toContain("block.type === 'heading'")
+  expect(renderer).toContain("block.type === 'bulletList' || block.type === 'orderedList'")
+  expect(renderer).toContain("block.type === 'gallery'")
+  expect(renderer).toContain('content-detail-article-gallery')
+})
+
+it('keeps legacy plain-text article bodies on the backward-compatible renderer', () => {
+  const page = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
+  expect(page).toContain('splitBodyIntoParagraphs(body)')
+  expect(page).toContain('content-detail-paragraph')
+})
