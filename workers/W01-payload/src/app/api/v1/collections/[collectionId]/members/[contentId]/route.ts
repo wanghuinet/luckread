@@ -30,7 +30,7 @@ export async function PATCH(
     if (mutationError) return mutationError
     return await callW03Content({
       request,
-      pathname: '/internal/content/collection/' + encodeURIComponent(collectionId) + '/members/' + encodeURIComponent(contentId),
+      pathname: '/internal/content/collections/' + encodeURIComponent(collectionId) + '/members/' + encodeURIComponent(contentId),
       method: 'PATCH',
       body: await request.json(),
       principal,
@@ -54,7 +54,7 @@ export async function DELETE(
     if (mutationError) return mutationError
     return await callW03Content({
       request,
-      pathname: '/internal/content/collection/' + encodeURIComponent(collectionId) + '/members/' + encodeURIComponent(contentId),
+      pathname: '/internal/content/collections/' + encodeURIComponent(collectionId) + '/members/' + encodeURIComponent(contentId),
       method: 'DELETE',
       principal,
     })
